@@ -2,6 +2,65 @@
 
 use super::support::*;
 
+pub(super) fn grid(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let item = |id: &'static str, label: &'static str| {
+        GridItem::new(
+            id,
+            Card::new()
+                .id(format!("scene.grid.card.{id}"))
+                .padding(Space::Md)
+                .child(crate::foundation::text(&theme, TypeScale::Label, label))
+                .child(caption(&theme, "Caller-owned content")),
+        )
+        .span_at(Breakpoint::Large, if id == "summary" { 2 } else { 1 })
+    };
+    stack(&theme)
+        .w(px(840.0))
+        .child(caption(
+            &theme,
+            "Columns and spans resolve from the grid's measured width while semantic order stays source order",
+        ))
+        .child(
+            Grid::new("scene.grid")
+                .columns(1)
+                .columns_at(Breakpoint::Medium, 2)
+                .columns_at(Breakpoint::Large, 3)
+                .gap(Space::Sm)
+                .items([
+                    item("summary", "Summary"),
+                    item("settings", "Settings"),
+                    item("history", "History"),
+                    item("policy", "Policy"),
+                ]),
+        )
+        .into_any_element()
+}
+
+pub(super) fn container(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(
+            &theme,
+            "Page width and gutters come from the installed theme, not component-local pixels",
+        ))
+        .child(
+            Container::new("scene.container.readable")
+                .width(ContainerWidth::Readable)
+                .child(Card::new().id("scene.container.readable.card").child(
+                    crate::foundation::text(&theme, TypeScale::Body, "Readable content"),
+                )),
+        )
+        .child(
+            Container::new("scene.container.dialog")
+                .width(ContainerWidth::Dialog)
+                .child(Card::new().id("scene.container.dialog.card").child(
+                    crate::foundation::text(&theme, TypeScale::Body, "Dialog-width content"),
+                )),
+        )
+        .into_any_element()
+}
+
 /// A pane with a heading and something under it worth resizing.
 ///
 /// Two panes of the same fixture copy demonstrate a divider and nothing else:

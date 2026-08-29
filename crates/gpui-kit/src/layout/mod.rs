@@ -13,6 +13,7 @@
 
 pub mod aspect_ratio;
 pub mod dock;
+pub mod grid;
 pub(crate) mod measure;
 pub mod responsive;
 pub mod scroll;
@@ -25,6 +26,7 @@ pub mod tree;
 
 pub use aspect_ratio::{AspectFit, AspectRatio};
 pub use dock::{Dock, DockEvent, DockPanel, DockRegion};
+pub use grid::{Breakpoint, Container, ContainerWidth, Grid, GridColumns, GridItem};
 pub use responsive::{ContainerSize, Responsive};
 pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
 pub use scroll_fade::{FadeEdges, ScrollFade};

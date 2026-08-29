@@ -654,6 +654,30 @@
       ]
     },
     {
+      "name": "Bubble",
+      "kind": "builder",
+      "path": "gpui_kit::display::Bubble",
+      "source": "crates/gpui-kit/src/display/bubble.rs",
+      "summary": "A token-backed message surface with caller-owned content.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "content(content: impl IntoElement) -> Self",
+        "actions(actions: impl IntoIterator<Item = impl IntoElement>) -> Self",
+        "placement(placement: BubblePlacement) -> Self",
+        "grouped(grouped: bool) -> Self",
+        "max_width(width: f32) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "bubble"
+      ]
+    },
+    {
       "name": "BulkBar",
       "kind": "builder",
       "path": "gpui_kit::data::BulkBar",
@@ -851,6 +875,36 @@
       "reports": [],
       "scenes": [
         "card"
+      ]
+    },
+    {
+      "name": "Carousel",
+      "kind": "builder",
+      "path": "gpui_kit::navigation::Carousel",
+      "source": "crates/gpui-kit/src/navigation/carousel.rs",
+      "summary": "A token-backed paged viewport.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "items(items: impl IntoIterator<Item = CarouselItem>) -> Self",
+        "active(id: impl Into<SharedString>) -> Self",
+        "phase(phase: Phase) -> Self",
+        "reason(reason: impl Into<SharedString>) -> Self",
+        "stale(stale: bool) -> Self",
+        "looped(looped: bool) -> Self",
+        "on_event(handler: impl Fn(CarouselEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [
+        "Previous",
+        "Next",
+        "Selected"
+      ],
+      "scenes": [
+        "carousel"
       ]
     },
     {
@@ -1144,6 +1198,28 @@
       ],
       "scenes": [
         "command-palette"
+      ]
+    },
+    {
+      "name": "Container",
+      "kind": "builder",
+      "path": "gpui_kit::layout::Container",
+      "source": "crates/gpui-kit/src/layout/grid.rs",
+      "summary": "A centered, token-backed page container.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "width(width: ContainerWidth) -> Self",
+        "padding(padding: Space) -> Self",
+        "child(child: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "container"
       ]
     },
     {
@@ -1964,6 +2040,29 @@
       ]
     },
     {
+      "name": "Grid",
+      "kind": "builder",
+      "path": "gpui_kit::layout::Grid",
+      "source": "crates/gpui-kit/src/layout/grid.rs",
+      "summary": "A measured, token-guttered grid that retains caller item order.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "items(items: impl IntoIterator<Item = GridItem>) -> Self",
+        "columns(columns: u16) -> Self",
+        "columns_at(breakpoint: Breakpoint, columns: u16) -> Self",
+        "gap(gap: Space) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "grid"
+      ]
+    },
+    {
       "name": "Heatmap",
       "kind": "builder",
       "path": "gpui_kit::display::Heatmap",
@@ -2117,6 +2216,31 @@
       "reports": [],
       "scenes": [
         "actions"
+      ]
+    },
+    {
+      "name": "ImageList",
+      "kind": "builder",
+      "path": "gpui_kit::data::ImageList",
+      "source": "crates/gpui-kit/src/data/image_list.rs",
+      "summary": "A token-spaced image tile collection.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "items(items: impl IntoIterator<Item = ImageListItem>) -> Self",
+        "columns(columns: usize) -> Self",
+        "columns_at(breakpoint: Breakpoint, columns: usize) -> Self",
+        "gap(gap: Space) -> Self",
+        "selected(id: impl Into<SharedString>) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "image-list"
       ]
     },
     {
@@ -2488,6 +2612,29 @@
       ]
     },
     {
+      "name": "Masonry",
+      "kind": "builder",
+      "path": "gpui_kit::data::Masonry",
+      "source": "crates/gpui-kit/src/data/masonry.rs",
+      "summary": "A measured masonry layout over caller-owned content.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "items(items: impl IntoIterator<Item = MasonryItem>) -> Self",
+        "columns(columns: usize) -> Self",
+        "columns_at(breakpoint: Breakpoint, columns: usize) -> Self",
+        "gap(gap: Space) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "masonry"
+      ]
+    },
+    {
       "name": "MentionInput",
       "kind": "view",
       "path": "gpui_kit::controls::MentionInput",
@@ -2720,6 +2867,45 @@
       ],
       "scenes": [
         "model-viewer"
+      ]
+    },
+    {
+      "name": "MultiSelect",
+      "kind": "view",
+      "path": "gpui_kit::controls::MultiSelect",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "A selectable option set with search, chips, and listbox semantics.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
+        "selected(selected: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
+        "placeholder(placeholder: impl Into<SharedString>) -> Self",
+        "invalid(invalid: bool) -> Self",
+        "clearable(clearable: bool) -> Self"
+      ],
+      "commands": [
+        "set_selected(selected: impl IntoIterator<Item = impl Into<SharedString>>, cx: &mut Context<Self>)",
+        "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
+        "open(window: &mut Window, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "selected_ids() -> &[SharedString]",
+        "is_open() -> bool"
+      ],
+      "slots": [],
+      "reports": [
+        "Toggled",
+        "Removed",
+        "Cleared",
+        "QueryChanged",
+        "Opened",
+        "Closed"
+      ],
+      "scenes": [
+        "multi-select"
       ]
     },
     {
@@ -3456,6 +3642,31 @@
       ]
     },
     {
+      "name": "Rating",
+      "kind": "builder",
+      "path": "gpui_kit::display::Rating",
+      "source": "crates/gpui-kit/src/display/rating.rs",
+      "summary": "A controlled scalar rating rendered as token-sized stars.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "label(label: impl Into<SharedString>) -> Self",
+        "value(value: Option<f32>) -> Self",
+        "maximum(maximum: usize) -> Self",
+        "precision(precision: RatingPrecision) -> Self",
+        "clearable(clearable: bool) -> Self",
+        "on_change(handler: impl Fn(Option<f32>, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "rating"
+      ]
+    },
+    {
       "name": "RefreshVeil",
       "kind": "builder",
       "path": "gpui_kit::display::RefreshVeil",
@@ -3955,7 +4166,7 @@
       "kind": "builder",
       "path": "gpui_kit::controls::Slider",
       "source": "crates/gpui-kit/src/controls/slider.rs",
-      "summary": "A horizontal track with one handle.",
+      "summary": "A track with one or two handles.",
       "construct": [
         "new(ident: impl Into<Ident>) -> Self"
       ],
@@ -3964,6 +4175,8 @@
         "range(min: f32, max: f32) -> Self",
         "value(value: f32) -> Self",
         "step(step: f32) -> Self",
+        "orientation(orientation: SliderOrientation) -> Self",
+        "length(length: f32) -> Self",
         "display(display: impl Into<SharedString>) -> Self",
         "on_change(handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self",
         "bind(binding: &Binding<f32>, cx: &App) -> Self",
@@ -4562,6 +4775,7 @@
         "read_only(read_only: bool) -> Self",
         "rows(rows: usize) -> Self",
         "max_rows(max_rows: usize) -> Self",
+        "autosize(min_rows: usize, max_rows: usize) -> Self",
         "enter(enter: Enter) -> Self",
         "max_length(max_length: usize) -> Self"
       ],
@@ -4925,6 +5139,39 @@
       "reports": [],
       "scenes": [
         "trace"
+      ]
+    },
+    {
+      "name": "TransferList",
+      "kind": "view",
+      "path": "gpui_kit::controls::TransferList",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "A controlled source/target assignment control.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "source(items: impl IntoIterator<Item = TransferItem>) -> Self",
+        "target(items: impl IntoIterator<Item = TransferItem>) -> Self",
+        "source_selected(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "target_selected(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "source_label(label: impl Into<SharedString>) -> Self",
+        "target_label(label: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [
+        "set_query(query: impl Into<SharedString>, cx: &mut Context<Self>)"
+      ],
+      "queries": [],
+      "slots": [],
+      "reports": [
+        "ToggleSource",
+        "ToggleTarget",
+        "MoveToTarget",
+        "MoveToSource",
+        "QueryChanged"
+      ],
+      "scenes": [
+        "transfer-list"
       ]
     },
     {
@@ -6109,6 +6356,34 @@
       ]
     },
     {
+      "name": "Breakpoint",
+      "path": "gpui_kit::layout::Breakpoint",
+      "summary": "A theme-defined container width at which a grid may change arrangement.",
+      "variants": [
+        "Small",
+        "Medium",
+        "Large",
+        "ExtraLarge"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "BubblePlacement",
+      "path": "gpui_kit::display::BubblePlacement",
+      "summary": "Which reading edge a bubble is placed against.",
+      "variants": [
+        "Start",
+        "End"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "BufferedRange",
       "path": "gpui_kit::content::BufferedRange",
       "summary": "One span of media the host already holds, in seconds.",
@@ -6231,6 +6506,32 @@
         "Ghost"
       ],
       "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CarouselEvent",
+      "path": "gpui_kit::navigation::CarouselEvent",
+      "summary": "What a carousel reports. The caller changes the active item or phase.",
+      "variants": [
+        "Previous",
+        "Next",
+        "Selected"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CarouselItem",
+      "path": "gpui_kit::navigation::CarouselItem",
+      "summary": "One page in a Carousel.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, content: impl IntoElement) -> Self"
+      ],
       "options": [],
       "commands": [],
       "queries": []
@@ -6665,6 +6966,21 @@
         "at_least(width: f32) -> bool",
         "narrower_than(width: f32) -> bool"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ContainerWidth",
+      "path": "gpui_kit::layout::ContainerWidth",
+      "summary": "The max-width and padding recipe used by page-level content.",
+      "variants": [
+        "Full",
+        "Readable",
+        "Dialog",
+        "Custom"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -8479,12 +8795,41 @@
       ]
     },
     {
+      "name": "GridColumns",
+      "path": "gpui_kit::layout::GridColumns",
+      "summary": "Number of columns at the base width and at optional token breakpoints.",
+      "variants": [],
+      "construct": [
+        "new(base: u16) -> Self"
+      ],
+      "options": [
+        "at(breakpoint: Breakpoint, columns: u16) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "GridGeometry",
       "path": "gpui_kit::content::GridGeometry",
       "summary": "The grid the element measured, in the coordinates a pointer arrives in.",
       "variants": [],
       "construct": [],
       "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GridItem",
+      "path": "gpui_kit::layout::GridItem",
+      "summary": "One item in a declarative Grid.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, content: impl IntoElement) -> Self"
+      ],
+      "options": [
+        "span(span: u16) -> Self",
+        "span_at(breakpoint: Breakpoint, span: u16) -> Self"
+      ],
       "commands": [],
       "queries": []
     },
@@ -8756,6 +9101,20 @@
         "id() -> &SharedString",
         "label() -> &SharedString"
       ]
+    },
+    {
+      "name": "ImageListItem",
+      "path": "gpui_kit::data::ImageListItem",
+      "summary": "One tile in an ImageList.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, image: impl IntoElement) -> Self"
+      ],
+      "options": [
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ImageRequest",
@@ -9310,6 +9669,18 @@
         "MoreRequested"
       ],
       "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MasonryItem",
+      "path": "gpui_kit::data::MasonryItem",
+      "summary": "A measured masonry item.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, content: impl IntoElement, height: f32) -> Self"
+      ],
       "options": [],
       "commands": [],
       "queries": []
@@ -10031,6 +10402,23 @@
         "animation() -> Animation",
         "repeating() -> Animation"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MultiSelectEvent",
+      "path": "gpui_kit::controls::MultiSelectEvent",
+      "summary": "What a multi-select reports. The owner decides whether the intent changes its selected ids or query.",
+      "variants": [
+        "Toggled",
+        "Removed",
+        "Cleared",
+        "QueryChanged",
+        "Opened",
+        "Closed"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -10964,6 +11352,19 @@
       "path": "gpui_kit::effects::RasterDotLottieAdapter",
       "summary": "Pure-Rust deterministic dotLottie adapter enabled by the dotlottie Cargo feature.",
       "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RatingPrecision",
+      "path": "gpui_kit::display::RatingPrecision",
+      "summary": "The smallest step a rating can report.",
+      "variants": [
+        "Whole",
+        "Half"
+      ],
       "construct": [],
       "options": [],
       "commands": [],
@@ -12033,6 +12434,19 @@
       "queries": []
     },
     {
+      "name": "SliderOrientation",
+      "path": "gpui_kit::controls::SliderOrientation",
+      "summary": "The axis on which a slider lays out and accepts input.",
+      "variants": [
+        "Horizontal",
+        "Vertical"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Slots",
       "path": "gpui_kit::foundation::Slots",
       "summary": "The nodes a caller has replaced inside one component.",
@@ -12965,6 +13379,36 @@
       "queries": []
     },
     {
+      "name": "TransferItem",
+      "path": "gpui_kit::controls::TransferItem",
+      "summary": "An item in one side of a transfer list.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TransferListEvent",
+      "path": "gpui_kit::controls::TransferListEvent",
+      "summary": "What a transfer list reports. The caller performs the actual assignment.",
+      "variants": [
+        "ToggleSource",
+        "ToggleTarget",
+        "MoveToTarget",
+        "MoveToSource",
+        "QueryChanged"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Transition",
       "path": "gpui_kit::motion::Transition",
       "summary": "A value that animates toward whatever it is last told to be.",
@@ -13471,6 +13915,30 @@
       "example": "fn card(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let label = |content: &'static str| {\n        div()\n            .flex_1()\n            .min_w_0()\n            .child(crate::foundation::text(&theme, TypeScale::Label, content))\n    };\n    let caption = |content: &'static str| {\n        crate::foundation::text(&theme, TypeScale::Caption, content)\n            .text_tone(&theme, TextTone::Muted)\n    };\n    let column = |card: Card| div().flex_1().min_w_0().child(card);\n\n    stack(&theme)\n        .child(\n            Card::new()\n                .id(\"scene.card\")\n                .header(\n                    CardHeader::new(\"Workspace services\")\n                        .subtitle(\"Four checked a moment ago\")\n                        .action(|_window, _cx| {\n                            Button::new(\"scene.card.refresh\")\n                                .label(\"Refresh\")\n                                .secondary()\n                                .small()\n                                .into_any_element()\n                        }),\n                )\n                .divided(true)\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.runtime\")\n                        .leading(StatusDot::new(Tone::Success))\n                        .child(label(\"Native runtime\"))\n                        .trailing(Badge::new(\"Ready\").success()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.catalog\")\n                        .leading(StatusDot::new(Tone::Warning))\n                        .child(label(\"Model catalog\"))\n                        .trailing(Badge::new(\"Stale\").warning()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.index\")\n                        .selected(true)\n                        .leading(StatusDot::new(Tone::Success))\n                        .child(label(\"Search index\"))\n                        .trailing(Badge::new(\"Ready\").success()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.telemetry\")\n                        .disabled(true)\n                        .leading(StatusDot::new(Tone::Neutral))\n                        .child(label(\"Telemetry export\"))\n                        .trailing(Badge::new(\"Off\")),\n                )\n                .footer(|_window, cx| {\n                    let theme = cx.theme().clone();\n                    div()\n                        .row()\n                        .w_full()\n                        .gap(px(theme.spacing.sm))\n                        .child(\n                            Button::new(\"scene.card.restart\")\n                                .label(\"Restart all\")\n                                .secondary()\n                                .small(),\n                        )\n                        .child(div().flex_1())\n                        .child(\n                            crate::foundation::text(&theme, TypeScale::Caption, \"4 services\")\n                                .text_tone(&theme, TextTone::Faint),\n                        )\n                        .into_any_element()\n                }),\n        )\n        .child(\n            row(&theme)\n                .items_start()\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.elevated\")\n                        .variant(CardVariant::Elevated)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Strong,\n                            \"Elevated\",\n                        ))\n                        .child(caption(\"A shadow. One card on a page.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.outlined\")\n                        .variant(CardVariant::Outlined)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Strong,\n                            \"Outlined\",\n                        ))\n                        .child(caption(\"A hairline. A grid of them.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.ghost\")\n                        .variant(CardVariant::Ghost)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(&theme, TypeScale::Strong, \"Ghost\"))\n                        .child(caption(\"Neither. Structure without a plane.\")),\n                )),\n        )\n        .child(\n            row(&theme)\n                .items_start()\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.actionable\")\n                        .padding(Space::Lg)\n                        .on_click(|_window, _cx| {})\n                        .header(CardHeader::new(\"Open the run\").subtitle(\"The whole card acts\"))\n                        .child(caption(\"Enter and space reach it from the keyboard.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.chosen\")\n                        .padding(Space::Lg)\n                        .selected(true)\n                        .header(CardHeader::new(\"Selected\").subtitle(\"A wash and a rail\"))\n                        .child(caption(\"Both are drawn inside, so choosing moves nothing.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.unavailable\")\n                        .padding(Space::Lg)\n                        .disabled(true)\n                        .on_click(|_window, _cx| {})\n                        .header(CardHeader::new(\"Unavailable\").subtitle(\"Says so, and stays read\"))\n                        .child(caption(\"A disabled card installs no handler at all.\")),\n                )),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "rating",
+      "capture": "cargo run -p xtask -- headless capture rating",
+      "kind": "exhibit",
+      "subjects": [
+        "Rating"
+      ],
+      "uses": [
+        "Rating"
+      ],
+      "example": "fn rating(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"A numeric rating is distinct from helpful or unhelpful feedback\",\n        ))\n        .child(\n            Rating::new(\"scene.rating.precise\")\n                .label(\"Quality\")\n                .value(Some(3.5))\n                .precision(RatingPrecision::Half)\n                .clearable(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Rating::new(\"scene.rating.unrated\")\n                .label(\"Not reviewed\")\n                .maximum(10)\n                .value(None)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Rating::new(\"scene.rating.disabled\")\n                .label(\"Managed score\")\n                .value(Some(4.0))\n                .disabled(true)\n                .on_change(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "bubble",
+      "capture": "cargo run -p xtask -- headless capture bubble",
+      "kind": "exhibit",
+      "subjects": [
+        "Bubble"
+      ],
+      "uses": [
+        "Bubble"
+      ],
+      "example": "fn bubble(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let message = |id: &'static str, label: &'static str, body: &'static str, placement| {\n        Bubble::new(id, label)\n            .placement(placement)\n            .content(crate::foundation::text(&theme, TypeScale::Body, body))\n            .actions([Button::new(format!(\"{id}.action\")).label(\"Reply\").ghost()])\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"Placement and grouping are visual policy; the message and actions belong to the caller\",\n        ))\n        .child(message(\n            \"scene.bubble.start\",\n            \"Incoming message\",\n            \"The gateway is ready for the next run.\",\n            BubblePlacement::Start,\n        ))\n        .child(message(\n            \"scene.bubble.end\",\n            \"Outgoing message\",\n            \"Start the run when the inputs are verified.\",\n            BubblePlacement::End,\n        ))\n        .child(\n            Bubble::new(\"scene.bubble.grouped\", \"Grouped message\")\n                .grouped(true)\n                .content(crate::foundation::text(\n                    &theme,\n                    TypeScale::Body,\n                    \"A grouped follow-up shares the control radius.\",\n                )),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "status",
       "capture": "cargo run -p xtask -- headless capture status",
       "kind": "exhibit",
@@ -13548,7 +14016,31 @@
         "Slider",
         "Switch"
       ],
-      "example": "fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            Checkbox::new(\"scene.choice.telemetry\")\n                .label(\"Send anonymous usage data\")\n                .description(\"Counts only, never file contents\")\n                .checked(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.partial\")\n                .label(\"Some providers enabled\")\n                .mixed()\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.locked\")\n                .label(\"Managed by policy\")\n                .checked(true)\n                .disabled(true),\n        )\n        .child(\n            Radio::new(\"scene.choice.ask\")\n                .label(\"Ask before every action\")\n                .selected(true)\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Radio::new(\"scene.choice.auto\")\n                .label(\"Run without asking\")\n                .description(\"Consequential actions still require approval\")\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Switch::new(\"scene.choice.preview\")\n                .label(\"Preview releases\")\n                .on(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.temperature\")\n                .label(\"Temperature\")\n                .range(0.0, 2.0)\n                .step(0.1)\n                .value(0.7)\n                .display(\"0.7\")\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.window\")\n                .label(\"Window\")\n                .range(0.0, 1.0)\n                .values(0.2, 0.8)\n                .marks([0.0, 0.25, 0.5, 0.75, 1.0])\n                .display(\"0.2 – 0.8\")\n                .on_range_change(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            Checkbox::new(\"scene.choice.telemetry\")\n                .label(\"Send anonymous usage data\")\n                .description(\"Counts only, never file contents\")\n                .checked(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.partial\")\n                .label(\"Some providers enabled\")\n                .mixed()\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.locked\")\n                .label(\"Managed by policy\")\n                .checked(true)\n                .disabled(true),\n        )\n        .child(\n            Radio::new(\"scene.choice.ask\")\n                .label(\"Ask before every action\")\n                .selected(true)\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Radio::new(\"scene.choice.auto\")\n                .label(\"Run without asking\")\n                .description(\"Consequential actions still require approval\")\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Switch::new(\"scene.choice.preview\")\n                .label(\"Preview releases\")\n                .on(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.temperature\")\n                .label(\"Temperature\")\n                .range(0.0, 2.0)\n                .step(0.1)\n                .value(0.7)\n                .display(\"0.7\")\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.window\")\n                .label(\"Window\")\n                .range(0.0, 1.0)\n                .values(0.2, 0.8)\n                .marks([0.0, 0.25, 0.5, 0.75, 1.0])\n                .display(\"0.2 – 0.8\")\n                .on_range_change(|_, _, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"Vertical range uses the same value, marks, and keyboard contract\",\n        ))\n        .child(\n            div().h(px(220.0)).child(\n                Slider::new(\"scene.choice.vertical\")\n                    .label(\"Vertical\")\n                    .orientation(SliderOrientation::Vertical)\n                    .range(0.0, 100.0)\n                    .step(10.0)\n                    .value(60.0)\n                    .marks([0.0, 25.0, 50.0, 75.0, 100.0])\n                    .display(\"60\")\n                    .on_change(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "multi-select",
+      "capture": "cargo run -p xtask -- headless capture multi-select",
+      "kind": "exhibit",
+      "subjects": [
+        "MultiSelect"
+      ],
+      "uses": [
+        "MultiSelect"
+      ],
+      "example": "fn multi_select(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMultiSelect>() {\n        let control = cx.new(|cx| {\n            MultiSelect::new(\"scene.multi-select\", window, cx)\n                .name(\"Enabled providers\")\n                .placeholder(\"Choose providers\")\n                .selected([\"native\", \"remote\"])\n                .options([\n                    SelectOption::new(\"native\", \"Native runtime\")\n                        .description(\"Runs on this machine\"),\n                    SelectOption::new(\"remote\", \"Remote gateway\")\n                        .description(\"Uses the workspace gateway\"),\n                    SelectOption::new(\"preview\", \"Preview models\").disabled(true),\n                    SelectOption::new(\"archive\", \"Archive models\"),\n                ])\n                .clearable(true)\n        });\n        control.update(cx, |control, cx| control.open(window, cx));\n        cx.set_global(SceneMultiSelect { control });\n    }\n    let theme = cx.theme().clone();\n    let control = cx.global::<SceneMultiSelect>().control.clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"Selected ids stay with the host; search, chips, and option focus stay with the view\",\n        ))\n        .child(control)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "transfer-list",
+      "capture": "cargo run -p xtask -- headless capture transfer-list",
+      "kind": "exhibit",
+      "subjects": [
+        "TransferList"
+      ],
+      "uses": [
+        "TransferList"
+      ],
+      "example": "fn transfer_list(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneTransferList>() {\n        let control = cx.new(|cx| {\n            TransferList::new(\"scene.transfer-list\", window, cx)\n                .source([\n                    TransferItem::new(\"runtime\", \"Native runtime\"),\n                    TransferItem::new(\"gateway\", \"Remote gateway\"),\n                    TransferItem::new(\"preview\", \"Preview models\").disabled(true),\n                ])\n                .target([TransferItem::new(\"logs\", \"Run logs\")])\n                .source_selected([\"gateway\"])\n                .target_selected([\"logs\"])\n                .source_label(\"Available capabilities\")\n                .target_label(\"Assigned capabilities\")\n        });\n        control.update(cx, |control, cx| control.set_query(\"runtime\", cx));\n        cx.set_global(SceneTransferList { control });\n    }\n    let theme = cx.theme().clone();\n    let control = cx.global::<SceneTransferList>().control.clone();\n    stack(&theme)\n        .w(px(720.0))\n        .child(caption(\n            &theme,\n            \"Each pane reports stable item intents; the host performs the assignment\",\n        ))\n        .child(control)\n        .into_any_element()\n}"
     },
     {
       "name": "input",
@@ -13893,6 +14385,18 @@
       "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "carousel",
+      "capture": "cargo run -p xtask -- headless capture carousel",
+      "kind": "exhibit",
+      "subjects": [
+        "Carousel"
+      ],
+      "uses": [
+        "Carousel"
+      ],
+      "example": "fn carousel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let page = |id: &'static str, label: &'static str, text: &'static str| {\n        CarouselItem::new(\n            id,\n            label,\n            Card::new()\n                .id(format!(\"scene.carousel.card.{id}\"))\n                .padding(Space::Xl)\n                .child(crate::foundation::text(&theme, TypeScale::Title, label))\n                .child(crate::foundation::text(&theme, TypeScale::Body, text)),\n        )\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"A controlled, focusable page track with direct selection and reduced-motion-aware transitions\",\n        ))\n        .child(\n            Carousel::new(\"scene.carousel.ready\")\n                .items([\n                    page(\"overview\", \"Overview\", \"The first page is active.\"),\n                    page(\"details\", \"Details\", \"The caller owns the page content.\"),\n                    page(\"history\", \"History\", \"The track reports page intents.\"),\n                ])\n                .active(\"details\")\n                .looped(true)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Carousel::new(\"scene.carousel.empty\")\n                .phase(Phase::Empty)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "accordion",
       "capture": "cargo run -p xtask -- headless capture accordion",
       "kind": "exhibit",
@@ -13927,6 +14431,30 @@
         "List"
       ],
       "example": "fn list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(format!(\n                    \"{FIXTURE_RECORDS} fixture records; only the rendered ones publish\"\n                )),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .py_token(&theme, Space::Sm)\n                .overflow_hidden()\n                .child(\n                    List::new(\"scene.list.records\", FIXTURE_RECORDS, |index, _, _| {\n                        let (id, label) = fixture_record(index);\n                        ListItem::new(id, label.clone()).text(label)\n                    })\n                    .selected(fixture_record(2).0)\n                    .visible_rows(8)\n                    .on_select(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "image-list",
+      "capture": "cargo run -p xtask -- headless capture image-list",
+      "kind": "exhibit",
+      "subjects": [
+        "ImageList"
+      ],
+      "uses": [
+        "ImageList"
+      ],
+      "example": "fn image_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let items = [\n        (\"native\", \"Native runtime\", \"Runtime\"),\n        (\"gateway\", \"Remote gateway\", \"Gateway\"),\n        (\"archive\", \"Archive models\", \"Archive\"),\n        (\"preview\", \"Preview models\", \"Preview\"),\n        (\"disabled\", \"Managed image\", \"Policy\"),\n    ];\n    stack(&theme)\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"Media and media states remain caller-owned; tile identity, labels, selection, and layout do not\",\n        ))\n        .child(\n            ImageList::new(\"scene.image-list\")\n                .columns(2)\n                .columns_at(Breakpoint::Medium, 4)\n                .selected(\"gateway\")\n                .items(items.into_iter().map(|(id, label, image)| {\n                    ImageListItem::new(id, label, scene_picture(image, cx))\n                        .disabled(id == \"disabled\")\n                }))\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "masonry",
+      "capture": "cargo run -p xtask -- headless capture masonry",
+      "kind": "exhibit",
+      "subjects": [
+        "Masonry"
+      ],
+      "uses": [
+        "Masonry"
+      ],
+      "example": "fn masonry(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cards = [\n        (\"short\", \"Short result\", 72.0),\n        (\"medium\", \"A result with a little more detail\", 124.0),\n        (\n            \"tall\",\n            \"A result whose caller-measured content is taller\",\n            184.0,\n        ),\n        (\"another\", \"Another result\", 96.0),\n        (\"last\", \"The final result\", 140.0),\n    ];\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"Column placement uses caller-measured heights and reflows at measured container breakpoints\",\n        ))\n        .child(\n            Masonry::new(\"scene.masonry\")\n                .columns(2)\n                .columns_at(Breakpoint::Medium, 3)\n                .gap(Space::Sm)\n                .items(cards.into_iter().map(|(id, label, height)| {\n                    MasonryItem::new(\n                        id,\n                        Card::new()\n                            .id(format!(\"scene.masonry.card.{id}\"))\n                            .padding(Space::Md)\n                            .child(crate::foundation::text(&theme, TypeScale::Label, label)),\n                        height,\n                    )\n                })),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "flow",
@@ -14013,6 +14541,30 @@
         "SplitPane"
       ],
       "example": "fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .h(px(380.0))\n        .child(\n            div()\n                .h(px(320.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    SplitPane::new(\"scene.split.workspace\")\n                        .horizontal()\n                        .ratio(0.34)\n                        .min_sizes(120.0, 200.0)\n                        .collapsible(true)\n                        .handle_label(\"Resize the file tree\")\n                        .start(pane(\n                            &theme,\n                            \"Files\",\n                            &[\n                                \"src/\",\n                                \"  main.rs\",\n                                \"  theme.rs\",\n                                \"  layout/\",\n                                \"    split.rs\",\n                                \"    scroll.rs\",\n                                \"Cargo.toml\",\n                            ],\n                        ))\n                        .end(pane(\n                            &theme,\n                            \"split.rs\",\n                            &[\n                                \"pub struct SplitPane {\",\n                                \"    ratio: f32,\",\n                                \"    min_start: f32,\",\n                                \"    min_end: f32,\",\n                                \"}\",\n                                \"\",\n                                \"// The divider reports the ratio a drag\",\n                                \"// asked for; the caller decides it.\",\n                            ],\n                        ))\n                        .on_resize(|_, _, _| {})\n                        .on_collapse(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "grid",
+      "capture": "cargo run -p xtask -- headless capture grid",
+      "kind": "exhibit",
+      "subjects": [
+        "Grid"
+      ],
+      "uses": [
+        "Grid"
+      ],
+      "example": "fn grid(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let item = |id: &'static str, label: &'static str| {\n        GridItem::new(\n            id,\n            Card::new()\n                .id(format!(\"scene.grid.card.{id}\"))\n                .padding(Space::Md)\n                .child(crate::foundation::text(&theme, TypeScale::Label, label))\n                .child(caption(&theme, \"Caller-owned content\")),\n        )\n        .span_at(Breakpoint::Large, if id == \"summary\" { 2 } else { 1 })\n    };\n    stack(&theme)\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"Columns and spans resolve from the grid's measured width while semantic order stays source order\",\n        ))\n        .child(\n            Grid::new(\"scene.grid\")\n                .columns(1)\n                .columns_at(Breakpoint::Medium, 2)\n                .columns_at(Breakpoint::Large, 3)\n                .gap(Space::Sm)\n                .items([\n                    item(\"summary\", \"Summary\"),\n                    item(\"settings\", \"Settings\"),\n                    item(\"history\", \"History\"),\n                    item(\"policy\", \"Policy\"),\n                ]),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "container",
+      "capture": "cargo run -p xtask -- headless capture container",
+      "kind": "exhibit",
+      "subjects": [
+        "Container"
+      ],
+      "uses": [
+        "Container"
+      ],
+      "example": "fn container(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(\n            &theme,\n            \"Page width and gutters come from the installed theme, not component-local pixels\",\n        ))\n        .child(\n            Container::new(\"scene.container.readable\")\n                .width(ContainerWidth::Readable)\n                .child(Card::new().id(\"scene.container.readable.card\").child(\n                    crate::foundation::text(&theme, TypeScale::Body, \"Readable content\"),\n                )),\n        )\n        .child(\n            Container::new(\"scene.container.dialog\")\n                .width(ContainerWidth::Dialog)\n                .child(Card::new().id(\"scene.container.dialog.card\").child(\n                    crate::foundation::text(&theme, TypeScale::Body, \"Dialog-width content\"),\n                )),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "scroll-area",

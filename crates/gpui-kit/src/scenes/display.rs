@@ -2,6 +2,77 @@
 
 use super::support::*;
 
+pub(super) fn rating(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "A numeric rating is distinct from helpful or unhelpful feedback",
+        ))
+        .child(
+            Rating::new("scene.rating.precise")
+                .label("Quality")
+                .value(Some(3.5))
+                .precision(RatingPrecision::Half)
+                .clearable(true)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Rating::new("scene.rating.unrated")
+                .label("Not reviewed")
+                .maximum(10)
+                .value(None)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Rating::new("scene.rating.disabled")
+                .label("Managed score")
+                .value(Some(4.0))
+                .disabled(true)
+                .on_change(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+pub(super) fn bubble(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let message = |id: &'static str, label: &'static str, body: &'static str, placement| {
+        Bubble::new(id, label)
+            .placement(placement)
+            .content(crate::foundation::text(&theme, TypeScale::Body, body))
+            .actions([Button::new(format!("{id}.action")).label("Reply").ghost()])
+    };
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "Placement and grouping are visual policy; the message and actions belong to the caller",
+        ))
+        .child(message(
+            "scene.bubble.start",
+            "Incoming message",
+            "The gateway is ready for the next run.",
+            BubblePlacement::Start,
+        ))
+        .child(message(
+            "scene.bubble.end",
+            "Outgoing message",
+            "Start the run when the inputs are verified.",
+            BubblePlacement::End,
+        ))
+        .child(
+            Bubble::new("scene.bubble.grouped", "Grouped message")
+                .grouped(true)
+                .content(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "A grouped follow-up shares the control radius.",
+                )),
+        )
+        .into_any_element()
+}
+
 pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)

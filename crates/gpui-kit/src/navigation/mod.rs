@@ -8,6 +8,7 @@
 pub mod accordion;
 pub mod anchor_list;
 pub mod breadcrumb;
+pub mod carousel;
 pub mod collapsible;
 pub mod pagination;
 pub mod sidebar;
@@ -18,6 +19,7 @@ pub mod wizard;
 pub use accordion::{Accordion, AccordionSection};
 pub use anchor_list::{Anchor, AnchorList};
 pub use breadcrumb::{Breadcrumb, Crumb};
+pub use carousel::{Carousel, CarouselEvent, CarouselItem};
 pub use collapsible::Collapsible;
 pub use pagination::{PageTotal, Pagination};
 pub use sidebar::{Sidebar, SidebarItem, SidebarSection};

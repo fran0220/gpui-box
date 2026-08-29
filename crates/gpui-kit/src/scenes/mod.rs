@@ -59,30 +59,31 @@ use content::{
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
     dropzone, filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor,
-    mention_input, rich_text_editor, search_field, settings, textarea, toggle, upload_list,
+    mention_input, multi_select, rich_text_editor, search_field, settings, textarea, toggle,
+    transfer_list, upload_list,
 };
 use data::{
-    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, kanban, list,
-    table, tree, tree_grid,
+    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, image_list, kanban,
+    list, masonry, table, tree, tree_grid,
 };
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
-    animated_number, avatar, badge, banner, card, chart, detail, divider, empty_state,
+    animated_number, avatar, badge, banner, bubble, card, chart, detail, divider, empty_state,
     failure_panel, heatmap, icon, loading, metric_card, outcome_panel, progress_bar,
-    progress_circle, sparkline, stage_progress, state_ladder, status, tag, trace,
+    progress_circle, rating, sparkline, stage_progress, state_ladder, status, tag, trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
 use layout::{
-    aspect_ratio, desktop_titlebar, ide_shell, responsive, scroll_area, scroll_fade, scroll_shadow,
-    split_pane, split_tree, toolbar,
+    aspect_ratio, container, desktop_titlebar, grid, ide_shell, responsive, scroll_area,
+    scroll_fade, scroll_shadow, split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
 use navigation::{
-    accordion, anchor_list, breadcrumb, collapsible, document_tabs, pagination, sidebar, tabs,
-    undo_history, wizard,
+    accordion, anchor_list, breadcrumb, carousel, collapsible, document_tabs, pagination, sidebar,
+    tabs, undo_history, wizard,
 };
 use overlay::{
     command_palette, context_menu, dialog, drawer, frost, glass, hover_card, kbd, menu, menubar,
@@ -173,6 +174,16 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["Card", "ListRow"]),
         },
         Scene {
+            name: "rating",
+            build: rating,
+            shows: Shows::Subjects(&["Rating"]),
+        },
+        Scene {
+            name: "bubble",
+            build: bubble,
+            shows: Shows::Subjects(&["Bubble"]),
+        },
+        Scene {
             name: "status",
             build: status,
             shows: Shows::Subjects(&["Callout", "StatusDot", "StatusLine"]),
@@ -203,6 +214,16 @@ pub fn catalog() -> Vec<Scene> {
             name: "choice",
             build: choice,
             shows: Shows::Subjects(&["Checkbox", "Radio", "Slider", "Switch"]),
+        },
+        Scene {
+            name: "multi-select",
+            build: multi_select,
+            shows: Shows::Subjects(&["MultiSelect"]),
+        },
+        Scene {
+            name: "transfer-list",
+            build: transfer_list,
+            shows: Shows::Subjects(&["TransferList"]),
         },
         Scene {
             name: "input",
@@ -346,6 +367,11 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["Tabs"]),
         },
         Scene {
+            name: "carousel",
+            build: carousel,
+            shows: Shows::Subjects(&["Carousel"]),
+        },
+        Scene {
             name: "accordion",
             build: accordion,
             shows: Shows::Subjects(&["Accordion"]),
@@ -359,6 +385,16 @@ pub fn catalog() -> Vec<Scene> {
             name: "list",
             build: list,
             shows: Shows::Subjects(&["List"]),
+        },
+        Scene {
+            name: "image-list",
+            build: image_list,
+            shows: Shows::Subjects(&["ImageList"]),
+        },
+        Scene {
+            name: "masonry",
+            build: masonry,
+            shows: Shows::Subjects(&["Masonry"]),
         },
         Scene {
             name: "flow",
@@ -394,6 +430,16 @@ pub fn catalog() -> Vec<Scene> {
             name: "split-pane",
             build: split_pane,
             shows: Shows::Subjects(&["SplitPane"]),
+        },
+        Scene {
+            name: "grid",
+            build: grid,
+            shows: Shows::Subjects(&["Grid"]),
+        },
+        Scene {
+            name: "container",
+            build: container,
+            shows: Shows::Subjects(&["Container"]),
         },
         Scene {
             name: "scroll-area",

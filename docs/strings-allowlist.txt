@@ -39,6 +39,7 @@ Binding
 Blur
 Breadcrumb
 BrowserPanel
+Bubble
 BulkBar
 Button
 ButtonGroup
@@ -46,6 +47,8 @@ Calendar
 Cancel
 Card
 CardHeader
+Carousel
+CarouselItem
 Cascader
 Cell
 Change
@@ -90,9 +93,13 @@ FormField
 Frost
 Glass
 GraphNode
+Grid
+GridItem
 GridRow
 HoverCard
 IconButton
+ImageList
+ImageListItem
 ImageViewer
 InlineEdit
 JsonView
@@ -105,12 +112,15 @@ LoadMore
 LogStream
 MakeWay
 Markdown
+Masonry
+MasonryItem
 MentionCandidate
 MentionInput
 Menu
 Menubar
 MessageList
 ModelViewer
+MultiSelect
 NO
 NULL
 No
@@ -145,6 +155,7 @@ ProgressBar
 ProgressCircle
 Radio
 RangePicker
+Rating
 RefreshVeil
 Responsive
 RewardReveal
@@ -202,6 +213,7 @@ ToggleGroup
 ToolCall
 Toolbar
 ToolbarItem
+TransferList
 TransportBar
 Tree
 TreeGrid

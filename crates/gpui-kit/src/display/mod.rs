@@ -3,6 +3,7 @@
 pub mod animated_number;
 pub mod avatar;
 pub mod badge;
+pub mod bubble;
 pub mod card;
 pub mod chart;
 pub mod description_list;
@@ -16,6 +17,7 @@ pub mod metric;
 pub mod outcome;
 pub mod progress;
 pub mod progress_circle;
+pub mod rating;
 pub(crate) mod signature;
 pub mod sparkline;
 pub mod stage_progress;

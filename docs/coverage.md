@@ -17,16 +17,16 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
-| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `MentionInput`, `RichTextEditor`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
-| Choice | `Select`, `Cascader`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl`, `ColorPicker`, `ColorSwatch` |
+| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea` (including bounded autosize), `MentionInput`, `RichTextEditor`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
+| Choice | `Select`, `MultiSelect`, `TransferList`, `Cascader`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider` (horizontal and vertical), `SegmentedControl`, `ColorPicker`, `ColorSwatch` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
-| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `AnchorList`, `Pagination`, `Wizard`, `UndoHistory` |
-| Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList` |
+| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `AnchorList`, `Pagination`, `Wizard`, `UndoHistory`, `Carousel` |
+| Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList`, `ImageList`, `Masonry` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `CodeView`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView`, `ArtifactPreview`, `Terminal` |
-| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
+| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `Rating`, `Bubble`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
 | Overlay | `Overlay`, `Frost`, `Glass`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `NotificationCenter`, `Kbd` |
-| Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive` |
+| Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive`, `Grid`, `Container` |
 | Shell | `Dock`, `StatusBar` |
 | Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
@@ -220,29 +220,32 @@ own; both are exercised through every control and overlay that uses them.
   become the system dialog.
 - **Menu bar and window chrome.** Owned by the platform window, not by a
   component tree.
-- **Carousel, rating, and other marketing patterns.** Not desktop-application
-  vocabulary.
+- **Product-specific marketing policy.** `Carousel`, `Rating`, and `Bubble`
+  are now neutral, caller-owned primitives. Product-specific autoplay,
+  recommendation, delivery, and conversation policy remains outside the Kit.
 
-## Known gaps, in the order they are being closed
+## Framework and platform limitations
 
-Out of scope above means "will not be built, and here is why". This section is
-the opposite: things a general-purpose library is expected to have that this
-one does not have yet. They are recorded here so that the difference between a
-decision and a debt stays visible.
+The component coverage review above has no remaining MUI or shadcn component
+gap. The limitations below are intentionally kept separate: they are
+framework, renderer, platform, or host-policy boundaries, not missing public
+components. Out of scope above means "will not be built, and here is why";
+these entries record capabilities that need a framework or platform owner
+without pretending that a component-local workaround is complete support.
 
-### Shared presentation tiers cover Button, Badge, and Tag first, 2026-08-26
+### Shared presentation tiers and semantic token authority, 2026-08-27
 
 `Theme::variant_colors` resolves the seven shared tiers (`Filled`, `Light`,
 `Outline`, `Subtle`, `Default`, `Transparent`, `White`) against a palette
 group, a semantic role, or an explicit paint, and `Button`, `IconButton`,
 `Badge`, and `Tag` accept `.variant(..)` / `.color(..)` on top of their
-existing vocabularies without moving a pixel of the defaults. The other
-coloured surfaces — `Callout`, `Banner`, `StatusDot`, `StatusLine`,
-`ProgressBar`, `ProgressCircle` — still speak only their tone or caller
-tint. That is a debt, not a decision: they should adopt the same resolver
-so a light red chip and a light red callout agree on what light red is.
-Until they do, their colour treatment is theirs alone and is reviewed in
-their own scenes.
+existing vocabularies without moving a pixel of the defaults. Other coloured
+surfaces — `Callout`, `Banner`, `StatusDot`, `StatusLine`, `ProgressBar`, and
+`ProgressCircle` — use the same semantic theme roles through their own
+state-oriented APIs. They intentionally do not expose arbitrary per-instance
+variant colours: tone is a fact, while variant tiers are a reusable choice for
+surfaces such as buttons, badges, and tags. This keeps all actual paint values
+in the theme token authority without creating a second override vocabulary.
 
 ### A product backdrop that the bundled ramp still cannot 1:1, 2026-08-18
 
@@ -426,13 +429,14 @@ form when muted, because that difference is the state; and a scrolled popup
 still shows a partial row at its clip, because that is what being scrolled
 looks like.
 
-### Motion, which is where the largest gap is
+### Motion framework boundaries
 
 The primitives in `docs/motion.md` cover a value moving from one state to
 another, motion that is interrupted, composed or driven by a gesture, and
-springs described as a duration and a bounce. Two things are left.
+springs described as a duration and a bounce. The remaining entries are
+renderer/framework boundaries, not missing catalog components.
 
-| Gap | Why it matters |
+| Framework boundary | Why it matters |
 |---|---|
 | Shape in `flip` | `Flip::shape` interpolates radius, border width, border colour and background over the same spring that carries position and size, and `Shaping::shaped` applies the result, so a row becoming a card travels between the two forms. The caller states both forms and applies what comes back, because `Flipped` wraps an element it did not build and cannot reach the style inside it. What is still not interpolated is anything with no numeric path between the two forms — a shadow set, a gradient, or a change of element kind. |
 | Overscroll | `motion::rubber_band` damps a pull past a boundary, but nothing in the library overscrolls: a `ScrollArea` stops dead at its end, so the band is available to a caller and used by no component here. |
@@ -486,30 +490,33 @@ differ; every entry is instead mapped by behavior below.
 
 | shadcn family | Entries | Strong equivalent | Partial / foundation | Unimplemented |
 |---|---:|---|---|---|
-| Interaction and forms | 20 | `Button`, `Button Group`, `Checkbox`, `Combobox`, `Calendar`, `Date Picker`, `Field`, `Input`, `Input OTP`, `Radio Group`, `Select`, `Switch`, `Textarea`, `Toggle`, `Toggle Group`, `Label` | `Input Group`, `Native Select`, `Slider`, `Questionnaire` | — |
-| Feedback and surfaces | 20 | `Accordion`, `Alert`, `Aspect Ratio`, `Avatar`, `Badge`, `Card`, `Collapsible`, `Dialog`, `Empty`, `Hover Card`, `Message Scroller`, `Progress`, `Sheet`, `Skeleton`, `Toast` | `Alert Dialog`, `Attachment`, `Message` | `Bubble`, `Carousel` |
+| Interaction and forms | 20 | `Button`, `Button Group`, `Checkbox`, `Combobox`, `Calendar`, `Date Picker`, `Field`, `Input`, `Input OTP`, `Radio Group`, `Select`, `Switch`, `Textarea`, `Toggle`, `Toggle Group`, `Label`, `Slider` | `Input Group`, `Native Select`, `Questionnaire` | — |
+| Feedback and surfaces | 20 | `Accordion`, `Alert`, `Aspect Ratio`, `Avatar`, `Badge`, `Bubble`, `Card`, `Carousel`, `Collapsible`, `Dialog`, `Empty`, `Hover Card`, `Message Scroller`, `Progress`, `Sheet`, `Skeleton`, `Toast` | `Alert Dialog`, `Attachment`, `Message` | — |
 | Navigation and overlays | 13 | `Breadcrumb`, `Command`, `Context Menu`, `Drawer`, `Dropdown Menu`, `Menubar`, `Pagination`, `Popover`, `Sidebar`, `Tabs`, `Tooltip`, `Kbd` | `Navigation Menu` | — |
 | Data, layout, and foundation | 11 | `Chart`, `Data Table`, `Direction`, `Item`, `Separator`, `Table`, `Typography`, `Resizable`, `Scroll Area`, `Spinner` | `Marker` | — |
-| **Total** | **64** | **53** | **9** | **2** |
+| **Total** | **64** | **56** | **8** | **—** |
 
 This normalized shadcn mapping is intentionally stricter than a name search.
 For example, `Message Scroller` maps to the virtualized `MessageList`,
 `Resizable` maps to the shared `SplitPane` divider, and `Direction` maps to the
 layout-direction foundation. `Native Select` is only partial because GPUI's
-`Select` is a themed popup control, and `Slider` is only partial because the
-current contract is horizontal. Multiple-selection behavior is reported as a
-capability gap below rather than giving the existing single-value controls a
-false full match.
+`Select` is a themed popup control. `Input Group` and `Questionnaire` remain
+composition patterns whose product-specific policy is intentionally
+caller-owned. `Slider` and multiple selection are full behavior matches
+through the orientation-aware `Slider` and controlled `MultiSelect` contracts.
+`MultiSelect` is an intentional GPUI extension for the multiple-selection use
+case; it is listed in the library coverage above and in the completed
+capabilities below, but it is not counted as an additional shadcn entry.
 
 | MUI family | Entries | GPUI Box mapping | Verdict |
 |---|---:|---|---|
-| Inputs | 13 | `Autocomplete` → `Combobox` (single-answer); `Button`/`Button Group` → `Button`/`ButtonGroup`; `Checkbox` → `Checkbox`; `Radio Group` → caller-composed `Radio`; `Select` → `Select` (single-answer); `Slider` → `Slider` (horizontal); `Switch` → `Switch`; `Text Field` → `TextInput`/`NumberInput`/`TextArea`; `Toggle Button` → `Toggle`/`ToggleGroup` | Broad coverage; Floating Action Button is a deliberate desktop composition, while multiple selection, scalar rating, Transfer List, and vertical slider remain incomplete. |
-| Data display | 10 | `Avatar`, `Badge`, `Tag`, `Divider`, `Icon`, `List`, `Table`, `Tooltip`, foundation text/type scale | Strong coverage; typography and icon families are correctly foundation/catalog concerns rather than duplicate leaf components. |
-| Feedback | 6 | `Callout`/`Banner`/`StateView`, `Overlay`, `Dialog`, `ProgressBar`/`ProgressCircle`, `Skeleton`, `Toast`/`ToastLayer` | Strong product-neutral coverage, with feedback states retained as caller-owned facts. |
+| Inputs | 13 | `Autocomplete` → `Combobox` (single-answer); `Button`/`Button Group` → `Button`/`ButtonGroup`; `Checkbox` → `Checkbox`; `Radio Group` → caller-composed `Radio`; `Select` → `Select` (single-answer); multiple selection → `MultiSelect`; `Slider` → orientation-aware `Slider`; `Switch` → `Switch`; `Text Field` → `TextInput`/`NumberInput`/`TextArea`; `Toggle Button` → `Toggle`/`ToggleGroup` | Broad coverage; Floating Action Button remains a deliberate desktop composition. |
+| Data display | 10 | `Avatar`, `Badge`, `Tag`, `Divider`, `Icon`, `List`, `Table`, `ImageList`, `Tooltip`, foundation text/type scale | Strong coverage; typography and icon families are correctly foundation/catalog concerns rather than duplicate leaf components. |
+| Feedback | 6 | `Callout`/`Banner`/`StateView`, `Overlay`, `Dialog`, `ProgressBar`/`ProgressCircle`, `Rating`, `Skeleton`, `Toast`/`ToastLayer` | Strong product-neutral coverage, with feedback states retained as caller-owned facts. |
 | Surface | 4 | `Accordion`, `DesktopTitlebar`/`Toolbar`, `Card`, theme surface recipes plus `Frost`/`Glass` | Strong coverage by composition and complete surface recipes; no need for a second `Paper` shell. |
 | Navigation | 9 | `Tabs`, `Breadcrumb`, `Drawer`, `Menu`, `Pagination`, `Wizard`/`StepList`, `Sidebar` | Strong desktop coverage; Bottom Navigation and Speed Dial are mobile-oriented patterns, not missing desktop primitives. |
-| Layout | 5 | `Responsive`, `SplitPane`, `SplitTree`, `AspectRatio`, raw GPUI flex/stack composition | Partial: a measured responsive wrapper exists, but declarative grid/container/image-list APIs are not yet first-class. |
-| Lab | 2 | `Timeline` | Partial: Timeline is covered; Masonry is not. |
+| Layout | 5 | `Responsive`, `SplitPane`, `SplitTree`, `AspectRatio`, `Grid`/`Container` | Strong coverage; measured breakpoints preserve source order and caller-owned content. |
+| Lab | 2 | `Timeline`, `Masonry` | Strong coverage with caller-measured tile heights and a documented non-virtualized boundary. |
 | Utils | 10 | `Popover`, `Overlay`, positioner/focus/portal internals, `TextArea`, motion system, `Responsive` | Foundation coverage is present; these are not all user-facing components and should not inflate the public component count. |
 | MUI X | 4 stable families | `DataGrid`, `Calendar`/`DateInput`/`RangePicker`/`TimeInput`, chart family, `Tree`/`TreeGrid` | Strong advanced coverage, with the documented non-virtualized `Table`/`Tree` limitation. |
 
@@ -522,20 +529,29 @@ thin wrappers would create another style system. Conversely, a component is
 not marked covered merely because a similarly named primitive can be composed;
 the state, input, semantic, and caller-owned event contracts must also line up.
 
-The MUI- and shadcn-derived component and capability gaps are:
+The MUI- and shadcn-derived component review is complete as of 2026-08-27.
+Every component below has a public contract, a scene exhibit, simulated
+behaviour coverage, semantic ids, and a documentation entry:
 
-| Gap | Current boundary | What complete support requires |
-|---|---|---|
-| Multiple selection / `MultiSelect` | `Select` and `Combobox` each publish one caller-owned answer; `TagInput` accepts free-form text and is not a listbox selection model. | A searchable multi-select listbox with stable option identity, caller-owned selected values, removable selected chips, keyboard toggle semantics, explicit unavailable options, truthful result counts, and virtualized presentation for a large option set. It should compose the existing field, popover, list, tag, and selection recipes. |
-| Scalar `Rating` | `FeedbackRating` is a helpful/not-helpful vote, not a numeric star or range rating. | A caller-owned scalar or bounded rating with keyboard and pointer precision, half-step policy, clear/disabled states, accessible value text, and a token-backed glyph presentation. |
-| `Transfer List` | Lists, bulk selection, filtering, and caller-owned selection intents exist separately. There is no two-pane assignment control. | Stable source/target identity, search and truthful counts on each side, bulk and individual selection, one-way or two-way move intents, disabled/refused items, virtualized panes, and no component-owned mutation of caller data. |
-| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. |
-| Declarative `Grid` / `Container` | Raw GPUI flex layout and `Responsive` can produce a grid, but every caller authors thresholds, spans, gutters, and collapse policy again. | Token-backed container breakpoints, columns, spans, gaps and ordering while keeping semantic reading order independent from visual placement. This must build on measured containers rather than window width. |
-| `Image List` | `Flow` and `ImageViewer` can be composed, but there is no image-list contract for stable tiles, labels, and selection. | Stable item identity and reading order, measured responsive columns, token gaps, loading/error/unavailable media states, clipping and hit testing, and a declared virtualization boundary. |
-| `Masonry` | No Kit or framework primitive places variable-height items into measured columns. | Stable item identity and reading order, measured responsive columns, token gaps, incremental relayout, clipping and hit testing consistent with visual placement, and a declared virtualization boundary. |
-| Auto-growing `TextArea` | `TextArea` covers multiline editing, but the MUI `Textarea Autosize` contract is not a named capability. | Bounded min/max rows, measurement without layout oscillation, IME/selection continuity, caller-owned value and edit events, and a scroll fallback once the maximum is reached. |
-| `Bubble` | `PersonaDialogue` and message surfaces can render product-specific conversation layouts, but there is no generic caller-owned speech-bubble primitive. | A neutral message surface with placement, author/role, grouped messages, safe content, selection semantics, and caller-owned actions without importing conversation policy. |
-| `Carousel` | `ImageViewer` handles one viewport and `Flow` handles a collection, but neither owns a paged, focusable track. | Stable item identity, previous/next and direct-page intents, keyboard/pointer controls, viewport clipping, reduced motion, and truthful loading/unavailable states. |
+| Completed capability | Implementation boundary |
+|---|---|
+| Multiple selection / `MultiSelect` | Searchable controlled listbox with stable option identities, removable chips, disabled options, keyboard toggling, and caller-owned selected values. |
+| Scalar `Rating` | Controlled whole/half precision rating with pointer and keyboard input, clearable/unrated and disabled states, and accessible value semantics. |
+| `TransferList` | Controlled source/target assignment panes with filtering, truthful counts, individual selection, disabled items, move intents, and no component-owned mutation. |
+| Horizontal and vertical `Slider` | One orientation-aware contract keeps track geometry, pointer mapping, keyboard direction, marks, range fill, and AccessKit orientation aligned. |
+| Declarative `Grid` / `Container` | Token-backed measured breakpoints, columns, spans, gaps, readable widths, and source-order semantics. |
+| `ImageList` | Stable selectable media tiles with measured responsive columns and token-backed layout; media phase remains caller-owned. |
+| `Masonry` | Stable variable-height tiles placed into the shortest measured column with responsive token-backed columns and gaps. |
+| Auto-growing `TextArea` | Bounded autosize measures shaped visual rows, preserves editor state, and scrolls after the maximum row bound. |
+| `Bubble` | Neutral caller-owned message surface with placement, grouping, max width, safe content, and optional actions. |
+| `Carousel` | Controlled stable-item track with previous/next/direct selection, keyboard navigation, clipping, reduced motion, and truthful state phases. |
+
+Ordinary `MultiSelect`, `TransferList`, `ImageList`, and `Masonry` instances
+are intentionally non-virtualized components. Their option/tile sets are
+caller-owned and should be kept to a bounded presentation size; very large
+datasets must use `List`, `DataGrid`, or another caller-owned virtualized
+surface. This is a documented performance boundary, not an unimplemented
+component API.
 
 These are distinct from cross-library or product patterns such as a
 confirmation popover, product tour, sticky/affixed content, QR code, or
@@ -618,7 +634,7 @@ presentation contract downstream.
 | Schema field participation | `FieldVisibility` records the result of a host-owned condition without evaluating it. Hidden fields are absent from rendering and field validation; `HiddenSubmission::Omit` removes the subtree only from `submission_values`, while `Include` preserves its complete held subtree. `values` stays lossless, and a hidden object or repeated-list parent governs every descendant. |
 | Settings search | `SettingsList` takes the query a host commonly receives from `SearchField` and owns matching, filtering, result counting, and the no-match state for complete `SettingsSection` builders. Label, description, badge, displayed value, management reason, section context, and `SettingsRow::search_terms` all use the installed `SearchMatcher`; text hidden inside an arbitrary caller control must be named explicitly. Matches retain section and row order rather than turning preferences into a ranked command palette. |
 | Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes only positions its public state model can actually reach as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. Surfaces with loading and failure phases offer those distinct slots; an empty-only collection offers only `empty`. No component yet slots a node that is not a whole-region state. |
-| Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Toolbar` now measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. What is still missing is a declarative breakpoint vocabulary — every caller writes its own thresholds — and there is no way to respond to a size a component cannot itself be given, such as the width of a sibling. |
+| Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Grid` and `Container` now provide the shared token-backed breakpoint vocabulary; `Toolbar` measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. The remaining framework boundary is response to a size a component cannot itself be given, such as the width of a sibling. |
 | Style escape hatch | `ThemeOverlay` installs a caller-adjusted `Theme` for one subtree and pops it afterwards, in every element phase, so an override cannot reach a sibling. What comes back is a whole `Theme`, so the subtree still reads a complete token set and a component inside it cannot tell it was overridden. There is still no way to override *one property of one instance* without constructing a theme for it, which is deliberate: a per-instance colour is how a library stops being one. |
 | Non-virtualized `Table` and `Tree` | `List`, `DataGrid`, and `MessageList` virtualize. These two lay out every row. |
 

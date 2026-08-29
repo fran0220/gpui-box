@@ -2,6 +2,73 @@
 
 use super::support::*;
 
+pub(super) fn image_list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let items = [
+        ("native", "Native runtime", "Runtime"),
+        ("gateway", "Remote gateway", "Gateway"),
+        ("archive", "Archive models", "Archive"),
+        ("preview", "Preview models", "Preview"),
+        ("disabled", "Managed image", "Policy"),
+    ];
+    stack(&theme)
+        .w(px(840.0))
+        .child(caption(
+            &theme,
+            "Media and media states remain caller-owned; tile identity, labels, selection, and layout do not",
+        ))
+        .child(
+            ImageList::new("scene.image-list")
+                .columns(2)
+                .columns_at(Breakpoint::Medium, 4)
+                .selected("gateway")
+                .items(items.into_iter().map(|(id, label, image)| {
+                    ImageListItem::new(id, label, scene_picture(image, cx))
+                        .disabled(id == "disabled")
+                }))
+                .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+pub(super) fn masonry(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let cards = [
+        ("short", "Short result", 72.0),
+        ("medium", "A result with a little more detail", 124.0),
+        (
+            "tall",
+            "A result whose caller-measured content is taller",
+            184.0,
+        ),
+        ("another", "Another result", 96.0),
+        ("last", "The final result", 140.0),
+    ];
+    stack(&theme)
+        .w(px(640.0))
+        .child(caption(
+            &theme,
+            "Column placement uses caller-measured heights and reflows at measured container breakpoints",
+        ))
+        .child(
+            Masonry::new("scene.masonry")
+                .columns(2)
+                .columns_at(Breakpoint::Medium, 3)
+                .gap(Space::Sm)
+                .items(cards.into_iter().map(|(id, label, height)| {
+                    MasonryItem::new(
+                        id,
+                        Card::new()
+                            .id(format!("scene.masonry.card.{id}"))
+                            .padding(Space::Md)
+                            .child(crate::foundation::text(&theme, TypeScale::Label, label)),
+                        height,
+                    )
+                })),
+        )
+        .into_any_element()
+}
+
 pub(super) fn diagnostics_list(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let diagnostics = [

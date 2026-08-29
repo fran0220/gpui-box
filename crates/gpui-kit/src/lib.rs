@@ -181,6 +181,7 @@ pub mod prelude {
     pub use crate::controls::mention::{
         MentionCandidate, MentionInput, MentionInputEvent, MentionQuery,
     };
+    pub use crate::controls::multi_select::{MultiSelect, MultiSelectEvent};
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
     pub use crate::controls::rich_text_editor::{
         RichTextDiagnostic, RichTextDiagnosticSeverity, RichTextEditor, RichTextEditorEvent,
@@ -191,20 +192,21 @@ pub mod prelude {
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
     pub use crate::controls::settings_row::{SettingsList, SettingsRow, SettingsSection};
-    pub use crate::controls::slider::Slider;
+    pub use crate::controls::slider::{Slider, SliderOrientation};
     pub use crate::controls::split_button::SplitButton;
     pub use crate::controls::tag_input::{TagInput, TagInputEvent};
     pub use crate::controls::textarea::{Enter, Frame, Measured, Pasted, TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::controls::toggle_button::{Toggle, ToggleGroup, ToggleItem, ToggleSelection};
+    pub use crate::controls::transfer_list::{TransferItem, TransferList, TransferListEvent};
     pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};
     pub use crate::data::{
         Align, BranchState, BulkBar, Cell, CellRange, Column, ColumnGroup, ColumnWidth, DataGrid,
         Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
         DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, Flow, GridColumn,
-        GridLines, GridRow, KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState, List,
-        ListItem, Row, SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid,
-        TreeGridRow, TreeNode, Viewed,
+        GridLines, GridRow, ImageList, ImageListItem, KanbanBoard, KanbanCard, KanbanColumn,
+        KanbanEvent, KanbanState, List, ListItem, Masonry, MasonryItem, Row, SelectionChange,
+        SelectionMode, SortDirection, Table, Tree, TreeGrid, TreeGridRow, TreeNode, Viewed,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
@@ -215,6 +217,7 @@ pub mod prelude {
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::{Avatar, AvatarGroup, AvatarPresence};
     pub use crate::display::badge::{Badge, Tone};
+    pub use crate::display::bubble::{Bubble, BubblePlacement};
     pub use crate::display::card::{Card, CardHeader, CardVariant, ListRow};
     pub use crate::display::chart::{
         AreaChart, BarChart, ChartAxes, ChartLegend, ChartPoint, ChartSelection, ChartSeries,
@@ -236,6 +239,7 @@ pub mod prelude {
     pub use crate::display::outcome::{OutcomeKind, OutcomePanel};
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
+    pub use crate::display::rating::{Rating, RatingPrecision};
     pub use crate::display::sparkline::{
         Sparkline, SparklinePoint, SparklineReading, SparklineState,
     };
@@ -280,11 +284,12 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        AspectFit, AspectRatio, ContainerSize, DesktopTitlebar, DesktopTitlebarEvent, Dock,
-        DockEvent, DockPanel, DockRegion, FadeEdges, Responsive, ScrollArea, ScrollAxis,
-        ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec,
-        SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem,
-        Toolbar, ToolbarItem, scroll_offset,
+        AspectFit, AspectRatio, Breakpoint, Container, ContainerSize, ContainerWidth,
+        DesktopTitlebar, DesktopTitlebarEvent, Dock, DockEvent, DockPanel, DockRegion, FadeEdges,
+        Grid, GridColumns, GridItem, Responsive, ScrollArea, ScrollAxis, ScrollFade, SplitAxis,
+        SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord,
+        SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar,
+        ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
         AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,
@@ -299,9 +304,10 @@ pub mod prelude {
         Presence, ScrollLink, Shape, Shaping, Transition, Velocity, flip, micro,
     };
     pub use crate::navigation::{
-        Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb,
-        HistoryEntry, PageTotal, Pagination, SaveState, Sidebar, SidebarItem, SidebarSection,
-        StepStatus, TabItem, Tabs, UndoHistory, Wizard, WizardIntent, WizardLayout, WizardStep,
+        Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Carousel, CarouselEvent,
+        CarouselItem, Collapsible, Crumb, HistoryEntry, PageTotal, Pagination, SaveState, Sidebar,
+        SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, UndoHistory, Wizard, WizardIntent,
+        WizardLayout, WizardStep,
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,

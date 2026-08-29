@@ -34,7 +34,9 @@ component grows a literal a reader could read.
 | `Checkbox` | builder | next state | Supports a mixed state for a group that disagrees |
 | `Radio` | builder | selection | The group is owned by the caller |
 | `Switch` | builder | next state | For changes that take effect at once |
-| `Slider` | builder | value on the step grid | Pointer and keyboard |
+| `Slider` | builder | value on the step grid | Pointer and keyboard in horizontal or vertical orientation; range handles, marks, RTL, and accessible orientation share one contract |
+| `MultiSelect` | view | toggled, removed, cleared, query changed, opened, closed | Searchable controlled listbox with removable selected chips, disabled options, keyboard navigation, stable option ids, and caller-owned selection |
+| `TransferList` | view | source/target toggles, move-to-source/target, query changed | Controlled two-pane assignment surface with stable item ids, filtering, counts, disabled items, and caller-owned movement |
 | `IconButton` | builder | click | A glyph-only action. The accessible name is a required argument, because a glyph nobody can name is a button nobody can reach |
 | `ButtonGroup` | builder | — | Adjacent related actions sharing one frame. It reports nothing: every action inside still reports itself, and the group only decides where the corners are and forces one control size |
 | `SplitButton` | view | click on the default action; the menu reports the alternatives | The action and the arrow are separate targets with separate ids. `default_disabled` refuses the usual thing while leaving the alternatives reachable |
@@ -71,6 +73,11 @@ GPUI's AccessKit values and text runs, clipboard copy/cut, and component Debug
 carry no credential or code. `auth-sign-in` and `auth-verification` demonstrate
 composition with `Card`, `FormField`, `Callout`, and generic caller-supplied
 actions. They define no account, provider, network, or credential policy.
+
+`TextArea::autosize(min_rows, max_rows)` is the bounded variant of the same
+editor. It measures shaped visual rows, grows only within the caller's bounds,
+and falls back to scrolling at the maximum, so IME, selection, and undo state
+remain attached to one editor rather than a replacement field.
 
 ## Display
 
@@ -110,6 +117,8 @@ actions. They define no account, provider, network, or credential policy.
 | `StaleMark` | builder | Marks a verified value that is still on screen after a failed refresh |
 | `StageProgress` | builder | Named stages the host already owns. The component invents no ETA |
 | `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
+| `Rating` | builder | A controlled numeric rating with whole or half precision, pointer and keyboard input, clearable/unrated, disabled, and accessible value semantics |
+| `Bubble` | builder | A neutral caller-owned message surface with start/end placement, grouping, max width, safe content, and optional caller-owned actions; it contains no conversation or delivery policy |
 
 ### The card is the container, and there is one of it
 
@@ -276,6 +285,7 @@ downstream chatbot or game surface should not have to recreate.
 | `Wizard` | builder | a step to jump to, back, next, or finish | A step strip with the caller's body under it, horizontal or vertical. A step is complete, current, upcoming, blocked, or failed, and the last two say why |
 | `UndoHistory`, `HistoryEntry` | builder | the history entry that should be restored | A caller-owned revision list, not an undo stack. Entry order, current identity, descriptions, already-formatted time/source labels, and restore refusals are rendered exactly as supplied. Arrow, Home, and End keys skip refused entries; reporting a jump changes nothing |
 | `Pagination` | builder | the page that was asked for | First, previous, next, last, and a numbered range with an ellipsis that says how many pages it stands for. A step with nowhere to go installs no handler. With `PageTotal::Unknown` there is no last-page control, no numbers, and no total in the copy |
+| `Carousel` | view | previous, next, and selected item intents | Controlled stable-item track with direct selection, keyboard navigation, clipping, reduced-motion presentation, and distinct loading, empty, unavailable, error, and ready states |
 
 ### The wizard moves nothing
 
@@ -317,6 +327,8 @@ page would be a number nobody counted.
 | `Dock` | builder | a panel that was picked, a panel that was dragged somewhere, a region asked to collapse, and a region divider's share | Panels in a left, centre, right, and bottom region around one another. Region sizes go through `SplitTree` and panel headers are `Tabs` strips, so resizing and dragging are the same two systems used elsewhere. It moves nothing |
 | `StatusBar` | builder | a click on an item that has an action | Text, a toned state dot, a progress ring, an action, or a caller-supplied element, in a start, centre, and end group. An item the host gave no state claims none |
 | `Responsive` | builder | — | Builds from its own width measured on the previous frame. The first frame is explicitly `Unmeasured`; no window-width guess or hidden breakpoint is introduced |
+| `Grid`, `GridColumns`, `GridItem` | builder/data | — | Token-backed measured columns, responsive spans, stable source order, and caller-owned item content |
+| `Container` | builder | — | Token-backed readable, dialog, and full-width max-width recipes with responsive spacing; it measures its own available width rather than reading the window |
 
 ### A titlebar asks; the window decides
 
@@ -433,6 +445,8 @@ never the better failure.
 | `BulkBar` | builder | the wider selection, and the dismissal that clears the selection | Appears over a selection through `Presence`, states the count it actually has, and offers "select all N" as a separate named action when more rows exist than the host has loaded |
 | `Tree` | builder | a node id and the disclosure state it should take, and the node that was picked | A collapsed node renders none of its children. Up and down walk visible nodes, right opens a shut branch or descends into an open one, left shuts an open branch or ascends |
 | `KanbanBoard`, `KanbanColumn`, `KanbanCard` | builder | card activation and a held card's requested destination column | Columns, cards, ordering, the held card, and the accepted move remain caller-owned. Ready, empty, and unavailable are separate; disabled or refused actions install no handler |
+| `ImageList`, `ImageListItem` | builder | selected tile identity | Stable caller-owned media tiles with measured responsive columns, labels, token-backed gaps/radii, and disabled selection. Media loading, empty, unavailable, and error states are supplied by the caller's image element |
+| `Masonry`, `MasonryItem` | builder | — | Stable variable-height tiles placed into the shortest measured column with responsive token-backed gaps and columns. The caller supplies measured heights; it is deterministic and intentionally not a media loader or virtualized data source |
 
 ### Only rendered rows are published
 

@@ -2,6 +2,44 @@
 
 use super::support::*;
 
+pub(super) fn carousel(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let page = |id: &'static str, label: &'static str, text: &'static str| {
+        CarouselItem::new(
+            id,
+            label,
+            Card::new()
+                .id(format!("scene.carousel.card.{id}"))
+                .padding(Space::Xl)
+                .child(crate::foundation::text(&theme, TypeScale::Title, label))
+                .child(crate::foundation::text(&theme, TypeScale::Body, text)),
+        )
+    };
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "A controlled, focusable page track with direct selection and reduced-motion-aware transitions",
+        ))
+        .child(
+            Carousel::new("scene.carousel.ready")
+                .items([
+                    page("overview", "Overview", "The first page is active."),
+                    page("details", "Details", "The caller owns the page content."),
+                    page("history", "History", "The track reports page intents."),
+                ])
+                .active("details")
+                .looped(true)
+                .on_event(|_, _, _| {}),
+        )
+        .child(
+            Carousel::new("scene.carousel.empty")
+                .phase(Phase::Empty)
+                .on_event(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
 pub(super) fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)

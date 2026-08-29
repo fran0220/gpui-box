@@ -752,6 +752,19 @@ string_keys! {
     TreeChildrenUnavailable => "tree.children-unavailable", "Could not load this branch";
     TreeEmpty => "tree.empty", "No items";
     TextAreaCount => "textarea.count", "{0} of {1}";
+    RatingStar => "rating.star", "{0} star";
+    RatingValue => "rating.value", "{0} of {1}";
+    RatingUnrated => "rating.unrated", "Not rated";
+    RatingClear => "rating.clear", "Clear rating";
+    TransferAvailable => "transfer.available", "Available";
+    TransferSelected => "transfer.selected", "Selected";
+    TransferSearch => "transfer.search", "Filter items";
+    TransferMoveToTarget => "transfer.move-to-target", "Move selected to the selected list";
+    TransferMoveToSource => "transfer.move-to-source", "Move selected to the available list";
+    CarouselPrevious => "carousel.previous", "Previous item";
+    CarouselNext => "carousel.next", "Next item";
+    CarouselPage => "carousel.page", "Go to item {0}";
+    CarouselEmpty => "carousel.empty", "No items";
     // Mention completion.
     MentionSuggestions => "mention.suggestions", "Mention suggestions";
     MentionIdle => "mention.idle", "Mention suggestions have not been requested";

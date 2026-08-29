@@ -374,6 +374,101 @@ pub(super) fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .display("0.2 – 0.8")
                 .on_range_change(|_, _, _, _| {}),
         )
+        .child(caption(
+            &theme,
+            "Vertical range uses the same value, marks, and keyboard contract",
+        ))
+        .child(
+            div().h(px(220.0)).child(
+                Slider::new("scene.choice.vertical")
+                    .label("Vertical")
+                    .orientation(SliderOrientation::Vertical)
+                    .range(0.0, 100.0)
+                    .step(10.0)
+                    .value(60.0)
+                    .marks([0.0, 25.0, 50.0, 75.0, 100.0])
+                    .display("60")
+                    .on_change(|_, _, _| {}),
+            ),
+        )
+        .into_any_element()
+}
+
+/// The searchable multi-value control is kept alive so its query and open
+/// state survive gallery rebuilds.
+pub(super) struct SceneMultiSelect {
+    control: Entity<MultiSelect>,
+}
+
+impl Global for SceneMultiSelect {}
+
+pub(super) fn multi_select(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneMultiSelect>() {
+        let control = cx.new(|cx| {
+            MultiSelect::new("scene.multi-select", window, cx)
+                .name("Enabled providers")
+                .placeholder("Choose providers")
+                .selected(["native", "remote"])
+                .options([
+                    SelectOption::new("native", "Native runtime")
+                        .description("Runs on this machine"),
+                    SelectOption::new("remote", "Remote gateway")
+                        .description("Uses the workspace gateway"),
+                    SelectOption::new("preview", "Preview models").disabled(true),
+                    SelectOption::new("archive", "Archive models"),
+                ])
+                .clearable(true)
+        });
+        control.update(cx, |control, cx| control.open(window, cx));
+        cx.set_global(SceneMultiSelect { control });
+    }
+    let theme = cx.theme().clone();
+    let control = cx.global::<SceneMultiSelect>().control.clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "Selected ids stay with the host; search, chips, and option focus stay with the view",
+        ))
+        .child(control)
+        .into_any_element()
+}
+
+/// The two-pane assignment control demonstrates source/target selection
+/// without allowing the component to mutate either collection.
+pub(super) struct SceneTransferList {
+    control: Entity<TransferList>,
+}
+
+impl Global for SceneTransferList {}
+
+pub(super) fn transfer_list(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneTransferList>() {
+        let control = cx.new(|cx| {
+            TransferList::new("scene.transfer-list", window, cx)
+                .source([
+                    TransferItem::new("runtime", "Native runtime"),
+                    TransferItem::new("gateway", "Remote gateway"),
+                    TransferItem::new("preview", "Preview models").disabled(true),
+                ])
+                .target([TransferItem::new("logs", "Run logs")])
+                .source_selected(["gateway"])
+                .target_selected(["logs"])
+                .source_label("Available capabilities")
+                .target_label("Assigned capabilities")
+        });
+        control.update(cx, |control, cx| control.set_query("runtime", cx));
+        cx.set_global(SceneTransferList { control });
+    }
+    let theme = cx.theme().clone();
+    let control = cx.global::<SceneTransferList>().control.clone();
+    stack(&theme)
+        .w(px(720.0))
+        .child(caption(
+            &theme,
+            "Each pane reports stable item intents; the host performs the assignment",
+        ))
+        .child(control)
         .into_any_element()
 }
 
@@ -897,8 +992,7 @@ impl Pill {
                 .text(text.to_string())
                 .frame(Frame::Host)
                 .enter(Enter::Submits)
-                .rows(1)
-                .max_rows(6)
+                .autosize(1, 6)
         });
         Self {
             ident,
@@ -987,14 +1081,13 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                         "The refusal is shown exactly as the host worded it, and the last \
                          verified value stays on screen.",
                     )
-                    .rows(3)
-                    .max_rows(6)
+                    .autosize(3, 6)
                     .max_length(240)
             }),
             review: cx.new(|cx| {
                 TextArea::new("scene.textarea.review", window, cx)
                     .placeholder("What changed, and why")
-                    .rows(3)
+                    .autosize(3, 6)
             }),
             frozen: cx.new(|cx| {
                 TextArea::new("scene.textarea.frozen", window, cx)
@@ -1006,8 +1099,7 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                 TextArea::new("scene.textarea.message", window, cx)
                     .placeholder("Ask anything. Enter sends, shift-enter opens a line.")
                     .enter(Enter::Submits)
-                    .rows(2)
-                    .max_rows(8)
+                    .autosize(2, 8)
             }),
             asked: cx
                 .new(|cx| Pill::new("scene.textarea.asked", "Rerun the failing test", window, cx)),

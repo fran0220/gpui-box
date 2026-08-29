@@ -30,8 +30,10 @@
 pub mod diagnostics_list;
 pub mod flow;
 pub mod grid;
+pub mod image_list;
 pub mod kanban;
 pub mod list;
+pub mod masonry;
 pub mod table;
 pub mod tree;
 pub mod tree_grid;
@@ -46,8 +48,10 @@ pub use grid::{
     BulkBar, CellRange, ColumnGroup, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded,
     GridColumn, GridLines, GridRow, SelectionChange, SelectionMode,
 };
+pub use image_list::{ImageList, ImageListItem};
 pub use kanban::{KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState};
 pub use list::{List, ListItem};
+pub use masonry::{Masonry, MasonryItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
 pub use tree::{BranchState, Tree, TreeNode};
 pub use tree_grid::{TreeGrid, TreeGridRow};
