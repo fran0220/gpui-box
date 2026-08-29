@@ -42,7 +42,7 @@ mod minimap;
 mod node;
 mod toolbar;
 
-pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, PortSide};
+pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, GraphRouting, PortSide};
 pub(crate) use graph::grid_ground;
 pub use graph::{
     GraphFit, GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed,

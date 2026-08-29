@@ -140,9 +140,9 @@ pub mod prelude {
     };
     pub use crate::canvas::{
         CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent, Diff, EdgeKind, GraphEdge,
-        GraphEndpoint, GraphInteraction, GraphNode, GraphPort, GraphState, GraphViewport, Minimap,
-        MinimapEvent, MinimapMark, MinimapView, NodeGraph, NodeGraphEvent, NodeGroup, NodeMetric,
-        NodeState, Placed, PortDirection, PortSide, layered_layout,
+        GraphEndpoint, GraphFit, GraphInteraction, GraphNode, GraphPort, GraphRouting, GraphState,
+        GraphViewport, Minimap, MinimapEvent, MinimapMark, MinimapView, NodeGraph, NodeGraphEvent,
+        NodeGroup, NodeMetric, NodeState, Placed, PortDirection, PortSide, layered_layout,
     };
     pub use crate::content::{
         AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,

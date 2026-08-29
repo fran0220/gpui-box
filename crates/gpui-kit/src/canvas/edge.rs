@@ -56,6 +56,16 @@ impl PortSide {
             Self::Top | Self::Bottom => Axis::Vertical,
         }
     }
+
+    /// The side something arriving from here would face.
+    pub(crate) fn opposite(self) -> Self {
+        match self {
+            Self::Top => Self::Bottom,
+            Self::Right => Self::Left,
+            Self::Bottom => Self::Top,
+            Self::Left => Self::Right,
+        }
+    }
 }
 
 /// A caller-owned node and port identity used by connection proposals.
@@ -196,6 +206,11 @@ pub(crate) struct OrthogonalRoute {
     points: Vec<Point<f32>>,
     cumulative: Vec<f32>,
     total: f32,
+    /// Whether these points trace a curve rather than turn corners. A curve is
+    /// carried as a fine polyline so that measuring, sampling, trimming and
+    /// painting stay one implementation; what the flag decides is that its
+    /// hundred tiny turns must not be rounded off as if they were corners.
+    curved: bool,
 }
 
 impl OrthogonalRoute {
@@ -205,8 +220,7 @@ impl OrthogonalRoute {
         for pair in points.windows(2) {
             cumulative.push(
                 cumulative.last().copied().unwrap_or(0.0)
-                    + (pair[1].x - pair[0].x).abs()
-                    + (pair[1].y - pair[0].y).abs(),
+                    + (pair[1].x - pair[0].x).hypot(pair[1].y - pair[0].y),
             );
         }
         let total = cumulative.last().copied().unwrap_or(0.0);
@@ -214,6 +228,21 @@ impl OrthogonalRoute {
             points,
             cumulative,
             total,
+            curved: false,
+        }
+    }
+
+    fn into_curve(mut self) -> Self {
+        self.curved = true;
+        self
+    }
+
+    /// How far this route's turns are rounded when painted.
+    pub(crate) fn corner(&self, theme: &Theme) -> f32 {
+        if self.curved {
+            0.0
+        } else {
+            theme.radius(Radius::Small)
         }
     }
     pub(crate) fn points(&self) -> &[Point<f32>] {
@@ -466,6 +495,68 @@ pub(crate) fn route_preview(from: Anchor, to: Point<f32>) -> OrthogonalRoute {
     OrthogonalRoute::new(vec![from.point, lead, elbow, to])
 }
 
+/// How the connections on one graph are drawn.
+///
+/// This is a statement about the graph rather than a taste about the drawing.
+/// Lanes exist to keep many connections legible where they run together, and
+/// [`GraphEdge::lane`] is how a caller separates them; a curve has no lane to
+/// be in, so asking for curves on a graph that needs lanes trades a fact for a
+/// look. What decides it is whether a reader has to follow one connection
+/// through a crowd, or take in the shape of a sparse one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GraphRouting {
+    /// Right-angled runs in separated lanes, which is how a dense pipeline
+    /// stays traceable.
+    #[default]
+    Lanes,
+    /// One curve from port to port, which is how a sparse board reads as a
+    /// gesture rather than as wiring.
+    Curves,
+}
+
+/// How far a curve leaves its port before it starts turning, at the least.
+const CURVE_LEAD: f32 = 46.0;
+/// How finely a curve is cut into the polyline everything else measures.
+const CURVE_STEPS: usize = 24;
+
+/// A single curve between two ports, leaving and arriving along the sides they
+/// face.
+///
+/// It ignores the cards it passes, which is the trade a curve makes: it cannot
+/// be routed around an obstacle without ceasing to be one curve. That is why
+/// it is the caller's choice and not the default.
+pub(crate) fn route_curved(from: Anchor, to: Anchor) -> OrthogonalRoute {
+    let span = (to.point.x - from.point.x)
+        .abs()
+        .max((to.point.y - from.point.y).abs());
+    let lead = (span * 0.45).max(CURVE_LEAD);
+    let first = from.outward_point(lead);
+    let last = to.outward_point(lead);
+    let points = (0..=CURVE_STEPS)
+        .map(|step| {
+            let t = step as f32 / CURVE_STEPS as f32;
+            let u = 1.0 - t;
+            let (a, b, c, d) = (u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t);
+            point(
+                a * from.point.x + b * first.x + c * last.x + d * to.point.x,
+                a * from.point.y + b * first.y + c * last.y + d * to.point.y,
+            )
+        })
+        .collect();
+    OrthogonalRoute::new(points).into_curve()
+}
+
+/// The same curve, from a real port to wherever the pointer is.
+pub(crate) fn route_curved_preview(from: Anchor, to: Point<f32>) -> OrthogonalRoute {
+    route_curved(
+        from,
+        Anchor {
+            point: to,
+            side: from.side.opposite(),
+        },
+    )
+}
+
 impl Anchor {
     fn outward_point(self, distance: f32) -> Point<f32> {
         let normal = self.side.outward();
@@ -601,7 +692,7 @@ pub(crate) fn paint_route(
         EdgeKind::Flow => theme.colors.node.edge_active,
         EdgeKind::Feedback => theme.colors.danger,
     };
-    let corner = route_corner(theme);
+    let corner = route.corner(theme);
     if edge.active {
         paint_route_stroke(
             window,
@@ -644,15 +735,6 @@ pub(crate) fn paint_route(
             );
         }
     }
-}
-
-/// How far back from a turn a connection starts bending, in world units.
-///
-/// A connection takes the same corner as the cards it joins rather than a
-/// number of its own, so a graph does not hold two ideas about how sharp this
-/// interface is.
-pub(crate) fn route_corner(theme: &Theme) -> f32 {
-    theme.radius(Radius::Small)
 }
 
 /// Three phase-shifted traffic trails cut from the route's measured geometry.
@@ -973,6 +1055,43 @@ mod tests {
         assert_eq!(r.midpoint(), point(10.0, 10.0));
         assert_eq!(r.sample(2.0), point(10.0, 30.0));
     }
+
+    #[test]
+    fn a_curve_leaves_and_arrives_along_the_sides_its_ports_face() {
+        let from = anchor(PortSide::Right, bounds(0.0, 0.0));
+        let to = anchor(PortSide::Left, bounds(400.0, 200.0));
+        let route = route_curved(from, to);
+
+        // It still starts and ends on the ports, so trimming, labelling and
+        // sampling read it the same as any other route.
+        assert_eq!(route.points().first().copied(), Some(from.point));
+        assert_eq!(route.points().last().copied(), Some(to.point));
+
+        // The first and last steps run outward along the port's own side,
+        // which is what keeps a connection off the card it leaves.
+        assert!(route.points()[1].x > from.point.x);
+        assert!(route.points()[route.points().len() - 2].x < to.point.x);
+
+        // Its many small turns are not corners to be rounded off.
+        assert_eq!(route.corner(&Theme::studio_dark()), 0.0);
+
+        // Length is measured along the curve, so a comet or a label at half
+        // the length lands halfway along what the eye follows.
+        let straight = (to.point.x - from.point.x).hypot(to.point.y - from.point.y);
+        assert!(route.total_length() > straight);
+    }
+
+    #[test]
+    fn a_short_hop_still_leaves_its_port_far_enough_to_read_as_a_curve() {
+        // Below the floor both control points would sit on the ports and the
+        // curve would collapse into the straight line it replaces.
+        let from = anchor(PortSide::Right, bounds(0.0, 0.0));
+        let to = anchor(PortSide::Left, bounds(60.0, 0.0));
+        let route = route_curved(from, to);
+        assert!(route.points()[1].x - from.point.x > 0.0);
+        assert!(route.total_length() > to.point.x - from.point.x);
+    }
+
     #[test]
     fn a_bend_never_takes_more_than_half_the_run_it_leaves() {
         // A long approach into a short jog: the jog, not the requested

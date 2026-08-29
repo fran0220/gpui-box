@@ -108,6 +108,8 @@ impl GraphPort {
 /// Screen-space values derived from world-space theme values in one place.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct NodeMetrics {
+    /// The zoom these values were scaled by, for the few that scale here.
+    scale: f32,
     width: f32,
     height: Option<f32>,
     padding: f32,
@@ -135,6 +137,7 @@ impl NodeMetrics {
         };
         let scaled = |value: f32| value * scale;
         Self {
+            scale,
             width: scaled(width),
             height: height.map(scaled),
             padding: scaled(theme.spacing.sm),
@@ -349,6 +352,8 @@ pub struct GraphNode {
     state: NodeState,
     /// What kind of step this is, in the caller's own terms.
     category: Option<ColorChoice>,
+    /// The word for that kind, when the caller has one.
+    kind: Option<SharedString>,
     metrics: Vec<NodeMetric>,
     ports: Vec<GraphPort>,
     diff: Option<Diff>,
@@ -385,6 +390,7 @@ impl GraphNode {
             action: None,
             state: NodeState::default(),
             category: None,
+            kind: None,
             metrics: Vec::new(),
             ports: Vec::new(),
             diff: None,
@@ -444,6 +450,20 @@ impl GraphNode {
     /// failure would lose the identity a reader was using to find it.
     pub fn color(mut self, category: impl Into<ColorChoice>) -> Self {
         self.category = Some(category.into());
+        self
+    }
+
+    /// The word for what this node is — "image", "review", "deploy" — shown as
+    /// a small chip before the title.
+    ///
+    /// This is where [`GraphNode::color`] lands when both are given, and it is
+    /// the reason to give both: a wash behind two or three letters says the
+    /// kind once, where a tinted title bar and a stripe down the card say it
+    /// twice and turn a board of cards into a board of colour. A node with a
+    /// colour and no word keeps the stripe, because then the stripe is the
+    /// only thing saying it.
+    pub fn kind(mut self, kind: impl Into<SharedString>) -> Self {
+        self.kind = Some(kind.into());
         self
     }
 
@@ -669,20 +689,35 @@ impl RenderOnce for GraphNode {
             .as_ref()
             .map(|category| theme.variant_colors(Variant::Light, category));
 
-        // The band is what carries the node's identity, and it runs the full
-        // width of the card rather than sitting inside the padding: a tint
-        // that stops short of the edge reads as a highlighted row inside the
-        // node instead of as the node's own header.
+        // The word for the kind, with the category's wash behind it. A canvas
+        // is read by scanning for one kind among many, and a chip is the
+        // smallest mark that answers that: tinting the whole title bar answers
+        // it at ten times the size, and on a board of a dozen cards the tints
+        // become the picture instead of the work.
+        let kind = self.kind.clone().map(|kind| {
+            div()
+                .flex_none()
+                .px(px(metrics.gap))
+                .rounded(px(theme.radius(Radius::Small) * metrics.scale))
+                .text_size(px(metrics.caption_size))
+                .line_height(px(metrics.label_height))
+                .font_weight(FontWeight(theme.typography.label.weight))
+                .map(|element| match identity {
+                    Some(identity) => element.bg(identity.background).text_color(identity.text),
+                    None => element
+                        .bg(theme.colors.node.label_wash)
+                        .text_color(theme.colors.text_muted),
+                })
+                .child(kind)
+        });
+
         let header = div()
             .row()
             .w_full()
             .gap(px(metrics.gap))
             .px(px(metrics.padding))
             .py(px(metrics.header_padding))
-            .when_some(identity, |element, identity| {
-                element.bg(identity.background)
-            })
-            .children(mark)
+            .children(kind)
             .child(
                 div()
                     .min_w_0()
@@ -693,7 +728,14 @@ impl RenderOnce for GraphNode {
                     .text_color(theme.colors.text)
                     .truncate()
                     .child(self.title.clone()),
-            );
+            )
+            // What this node *is* leads the row and what it is *doing* closes
+            // it. Put the running mark first and every card starts with a
+            // status, so a board of a dozen is scanned by state before it is
+            // scanned by kind — which is backwards for the reader arranging
+            // one, and it costs the name a mark's width on every card whether
+            // or not there is anything to report.
+            .children(mark);
 
         let action = self.action.clone().map(|action| {
             div()
@@ -794,7 +836,15 @@ impl RenderOnce for GraphNode {
         // until only its edge is visible still says what it is. A node without
         // a category gets no neutral substitute: a stripe with no meaning is
         // decoration that invites the reader to search for one.
-        let rail = identity.map(|identity| div().flex_none().w(px(metrics.rail)).bg(identity.text));
+        //
+        // It is drawn only where nothing else is saying the same thing: with a
+        // kind chip present the card has already said what it is, and a stripe
+        // beside it is the second telling that made every card read as a block
+        // of colour. Compact cards have no chip — they are a title and nothing
+        // else — so there the stripe is the whole answer.
+        let rail = identity
+            .filter(|_| self.compact || self.kind.is_none())
+            .map(|identity| div().flex_none().w(px(metrics.rail)).bg(identity.text));
 
         let stack = div()
             .flex_1()

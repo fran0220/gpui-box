@@ -35,8 +35,9 @@ use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 use super::edge::{
-    Anchor, Axis, GraphEdge, GraphEndpoint, OrthogonalRoute, PortSide, RouteTransform, paint_route,
-    paint_route_stroke, route_corner, route_orthogonal, route_preview,
+    Anchor, Axis, GraphEdge, GraphEndpoint, GraphRouting, OrthogonalRoute, PortSide,
+    RouteTransform, paint_route, paint_route_stroke, route_curved, route_curved_preview,
+    route_orthogonal, route_preview,
 };
 use super::node::{GraphNode, GraphPort, PortDirection};
 
@@ -536,6 +537,7 @@ pub struct NodeGraph {
     can_connect: Option<ConnectionValidator>,
     minimap: bool,
     fit: GraphFit,
+    routing: GraphRouting,
 }
 
 /// Whether a canvas frames its own content before the reader touches it.
@@ -604,6 +606,7 @@ impl NodeGraph {
             can_connect: None,
             minimap: false,
             fit: GraphFit::Never,
+            routing: GraphRouting::Lanes,
         }
     }
 
@@ -712,6 +715,12 @@ impl NodeGraph {
     /// it. See [`GraphFit`].
     pub fn fit(mut self, fit: GraphFit) -> Self {
         self.fit = fit;
+        self
+    }
+
+    /// How this canvas draws its connections. See [`GraphRouting`].
+    pub fn routing(mut self, routing: GraphRouting) -> Self {
+        self.routing = routing;
         self
     }
 
@@ -837,8 +846,17 @@ impl NodeGraph {
                     (None, None) => auto_anchors(from.bounds, to.bounds, edge.kind()),
                     _ => return None,
                 };
-                let route =
-                    route_orthogonal(a, b, from.bounds, to.bounds, edge.kind(), edge.edge_lane())?;
+                let route = match self.routing {
+                    GraphRouting::Lanes => route_orthogonal(
+                        a,
+                        b,
+                        from.bounds,
+                        to.bounds,
+                        edge.kind(),
+                        edge.edge_lane(),
+                    )?,
+                    GraphRouting::Curves => route_curved(a, b),
+                };
                 Some(RoutedEdge {
                     edge: edge.clone(),
                     route,
@@ -1341,7 +1359,10 @@ impl RenderOnce for NodeGraph {
                         );
                         let world = screen_to_world(pointer, viewport);
                         ConnectionPreview {
-                            route: route_preview(source.anchor, world),
+                            route: match self.routing {
+                                GraphRouting::Lanes => route_preview(source.anchor, world),
+                                GraphRouting::Curves => route_curved_preview(source.anchor, world),
+                            },
                             from: from.clone(),
                             direction: *direction,
                             target: connection_target(
@@ -1410,7 +1431,7 @@ impl RenderOnce for NodeGraph {
                         stroke * 1.5,
                         color.opacity(edge_theme.effects.node_preview_alpha),
                         None,
-                        route_corner(&edge_theme),
+                        preview.route.corner(&edge_theme),
                     );
                 }
             },
@@ -1524,16 +1545,18 @@ impl RenderOnce for NodeGraph {
                         .justify_center()
                         .rounded_full()
                         // At rest this control is the quietest mark on the
-                        // canvas. One disconnect chip per connection, drawn at
-                        // full strength, puts the loudest ring on the canvas
-                        // at the midpoint of every edge and buries the graph
-                        // under its own affordances. It stays present rather
-                        // than appearing on hover, because a control nobody
-                        // can see until they are already on it is a control
-                        // that cannot be found or tabbed to.
+                        // canvas: the glyph alone, at the faintest tone. It
+                        // stays present rather than appearing on hover,
+                        // because a control nobody can see until they are
+                        // already on it is a control that cannot be found or
+                        // tabbed to — but the ring and the fill it used to
+                        // wear at rest made a filled circle the loudest thing
+                        // at the midpoint of every edge, and a graph of ten
+                        // connections was read as ten buttons. The chip
+                        // assembles itself under the pointer, where it is
+                        // about to be used.
                         .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline)
-                        .bg(theme.colors.canvas)
+                        .border_color(gpui::transparent_black())
                         .cursor_pointer()
                         .tab_index(0)
                         .focus_ring(&theme)
@@ -1680,17 +1703,43 @@ impl RenderOnce for NodeGraph {
                     None => theme.colors.node.port_idle,
                 };
                 let filled = target.is_some() || connected;
+                // A port's name answers "what would I be joining to", which is
+                // a question asked while reaching for it and at no other time.
+                // Held open, one name per port turns the space between cards
+                // into a field of words with no card to belong to — and the
+                // ports a reader is not reaching for outnumber the one they
+                // are by every other port on the board. So the name comes back
+                // on the node the reader has picked, while a wire is being
+                // dragged anywhere, or under the pointer.
+                let named = placed.node.node_selected() || preview.is_some();
+                let port_group = SharedString::from(format!("{semantic_id}-name"));
                 // The chip is what keeps a port name off the wire that runs
                 // under it: without clearance either side the stroke touches
                 // the letterforms and the two read as one mark.
+                let wash = theme.colors.node.label_wash;
+                let ink = theme.colors.text_muted;
                 let label = div()
+                    .map(|element| {
+                        if named {
+                            element.bg(wash).text_color(ink)
+                        } else {
+                            // Withheld by colour rather than by leaving the
+                            // chip out, because a name that only exists once
+                            // the pointer is on the port cannot be laid out in
+                            // time to be under it.
+                            element
+                                .bg(gpui::transparent_black())
+                                .text_color(gpui::transparent_black())
+                                .group_hover(port_group.clone(), move |style| {
+                                    style.bg(wash).text_color(ink)
+                                })
+                        }
+                    })
                     .absolute()
                     .whitespace_nowrap()
                     .px(px(theme.spacing.xs * viewport.zoom))
                     .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
-                    .bg(theme.colors.node.label_wash)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
-                    .text_color(theme.colors.text_muted)
                     .child(port.label().clone());
                 let label = match (port.port_side(), port.direction()) {
                     (PortSide::Left, PortDirection::Input) => label
@@ -1714,6 +1763,7 @@ impl RenderOnce for NodeGraph {
                 };
                 let mut view = div()
                     .id(semantic_id)
+                    .group(port_group)
                     .absolute()
                     .left(px(at.x - diameter / 2.0))
                     .top(px(at.y - diameter / 2.0))

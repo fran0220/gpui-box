@@ -310,10 +310,7 @@ fn subject_node(
                 .width(NODE_WIDTH)
                 .state(node_state(&agent.execution))
                 .action(execution_label(&agent.execution, strings))
-                .metric(
-                    strings.text(StringKey::AgentRunCanvasKind),
-                    strings.text(StringKey::AgentRunCanvasAgent),
-                )
+                .kind(strings.text(StringKey::AgentRunCanvasAgent))
         }
         RunSubjectId::Task(task_id) => {
             let Some(task) = run.tasks.iter().find(|task| &task.id == task_id) else {
@@ -323,10 +320,7 @@ fn subject_node(
                 .width(NODE_WIDTH)
                 .state(node_state(&task.execution))
                 .action(execution_label(&task.execution, strings))
-                .metric(
-                    strings.text(StringKey::AgentRunCanvasKind),
-                    strings.text(StringKey::AgentRunCanvasTask),
-                )
+                .kind(strings.text(StringKey::AgentRunCanvasTask))
         }
         RunSubjectId::Invocation(invocation) => GraphNode::new(
             semantic_id,
@@ -335,10 +329,7 @@ fn subject_node(
         .width(NODE_WIDTH)
         .state(NodeState::Pending)
         .action(strings.text(StringKey::AgentRunCanvasInvocationPending))
-        .metric(
-            strings.text(StringKey::AgentRunCanvasKind),
-            strings.text(StringKey::AgentRunCanvasInvocationKind),
-        ),
+        .kind(strings.text(StringKey::AgentRunCanvasInvocationKind)),
     }
 }
 

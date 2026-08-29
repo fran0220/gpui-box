@@ -628,7 +628,6 @@ string_keys! {
     AgentIssueMissingTaskOwner => "agent.issue.missing-task-owner", "Task {0} references missing owner {1}";
     AgentIssueMissingLinkEndpoint => "agent.issue.missing-link-endpoint", "Run link {0} references missing endpoint {1}";
     AgentIssueSelfLink => "agent.issue.self-link", "Run link {0} references itself";
-    AgentRunCanvasKind => "agent.run-canvas.kind", "Kind";
     AgentRunCanvasAgent => "agent.run-canvas.agent", "Agent";
     AgentRunCanvasTask => "agent.run-canvas.task", "Task";
     AgentRunCanvasInvocationKind => "agent.run-canvas.invocation-kind", "Invocation";

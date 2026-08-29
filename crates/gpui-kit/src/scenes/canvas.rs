@@ -85,6 +85,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             graph.node(
                                 GraphNode::new("scene.graph.ingest", "Stream ingest")
                                     .color("teal")
+                                    .kind("ingest")
                                     .width(176.0)
                                     .state(NodeState::Succeeded)
                                     .thumbnail(scene_picture("Input preview", cx))
@@ -105,6 +106,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             graph.node(
                                 GraphNode::new("scene.graph.validate", "Validate & enrich")
                                     .color("indigo")
+                                    .kind("validate")
                                     .width(176.0)
                                     .state(NodeState::Running)
                                     .action("schema + fraud signals")
@@ -130,6 +132,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             graph.node(
                                 GraphNode::new("scene.graph.persist", "Persist batch")
                                     .color("violet")
+                                    .kind("persist")
                                     .width(176.0)
                                     .state(NodeState::Succeeded)
                                     .action("warehouse / orders")
@@ -150,6 +153,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             graph.node(
                                 GraphNode::new("scene.graph.observe", "Observe quality")
                                     .color("orange")
+                                    .kind("observe")
                                     .width(176.0)
                                     .state(NodeState::Failed)
                                     .action("drift threshold exceeded")
@@ -170,6 +174,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             graph.node(
                                 GraphNode::new("scene.graph.publish", "Publish artifact")
                                     .color("lime")
+                                    .kind("publish")
                                     .width(176.0)
                                     .state(NodeState::Pending)
                                     .action("waiting for commit")
@@ -262,6 +267,56 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .state(GraphState::Failed("Graph data could not be loaded".into())),
                     ),
                 ]),
+        )
+        .child(caption(
+            &theme,
+            "the same canvas routed as curves, for a board sparse enough not to need lanes",
+        ))
+        .child(
+            div().w(px(860.0)).h(px(212.0)).child(
+                NodeGraph::new("scene.graph.curves")
+                    .routing(GraphRouting::Curves)
+                    .grid(false)
+                    .node(
+                        GraphNode::new("scene.graph.curves.brief", "Brief")
+                            .color("indigo")
+                            .kind("prompt")
+                            .width(176.0)
+                            .action("a lit interior, dusk")
+                            .port(GraphPort::output("out", "Out")),
+                        24.0,
+                        44.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.curves.render", "Render")
+                            .color("teal")
+                            .kind("image")
+                            .width(176.0)
+                            .state(NodeState::Succeeded)
+                            .port(GraphPort::input("in", "In"))
+                            .port(GraphPort::output("out", "Out")),
+                        330.0,
+                        20.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.curves.grade", "Grade")
+                            .color("orange")
+                            .kind("adjust")
+                            .width(176.0)
+                            .action("warm, +8 contrast")
+                            .port(GraphPort::input("in", "In")),
+                        636.0,
+                        84.0,
+                    )
+                    .edges(vec![
+                        GraphEdge::new("scene.graph.curves.brief", "scene.graph.curves.render")
+                            .id("scene.graph.curves.edge.render")
+                            .ports("out", "in"),
+                        GraphEdge::new("scene.graph.curves.render", "scene.graph.curves.grade")
+                            .id("scene.graph.curves.edge.grade")
+                            .ports("out", "in"),
+                    ]),
+            ),
         )
         .into_any_element()
 }
