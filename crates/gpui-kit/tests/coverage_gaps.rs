@@ -271,7 +271,12 @@ fn autosize_bubble_and_carousel_have_explicit_semantic_contracts(cx: &mut TestAp
             .clone();
         div()
             .child(area)
-            .child(Bubble::new("message.bubble", "Incoming").content("Hello"))
+            .child(Bubble::new("message.start", "Incoming").content("Hello"))
+            .child(
+                Bubble::new("message.end", "Outgoing")
+                    .placement(BubblePlacement::End)
+                    .content("Goodbye"),
+            )
             .child(
                 Carousel::new("gallery")
                     .items([
@@ -289,9 +294,14 @@ fn autosize_bubble_and_carousel_have_explicit_semantic_contracts(cx: &mut TestAp
         Role::MultilineInput
     );
     assert_eq!(
-        harness.node("message.bubble").expect("bubble").role,
+        harness.node("message.start").expect("bubble").role,
         Role::Group
     );
+    let start = harness
+        .bounds("message.start.surface")
+        .expect("start bubble");
+    let end = harness.bounds("message.end.surface").expect("end bubble");
+    assert!(end.origin.x > start.origin.x);
     harness.click("gallery.next");
     assert_eq!(*calls.borrow(), vec![CarouselEvent::Next]);
 

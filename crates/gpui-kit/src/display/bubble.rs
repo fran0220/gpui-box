@@ -136,6 +136,7 @@ impl RenderOnce for Bubble {
         div()
             .id(self.ident.element_id())
             .w_full()
+            .column()
             .child(surface)
             .semantic_in(
                 cx,

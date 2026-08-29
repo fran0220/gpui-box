@@ -15,7 +15,7 @@ pub(super) fn image_list(_window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(840.0))
         .child(caption(
             &theme,
-            "Media and media states remain caller-owned; tile identity, labels, selection, and layout do not",
+            "Caller-owned media tiles reflow from two to four measured columns",
         ))
         .child(
             ImageList::new("scene.image-list")

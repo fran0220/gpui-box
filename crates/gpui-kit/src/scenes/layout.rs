@@ -47,16 +47,30 @@ pub(super) fn container(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             Container::new("scene.container.readable")
                 .width(ContainerWidth::Readable)
-                .child(Card::new().id("scene.container.readable.card").child(
-                    crate::foundation::text(&theme, TypeScale::Body, "Readable content"),
-                )),
+                .child(
+                    Card::new()
+                        .id("scene.container.readable.card")
+                        .padding(Space::Md)
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Readable content",
+                        )),
+                ),
         )
         .child(
             Container::new("scene.container.dialog")
                 .width(ContainerWidth::Dialog)
-                .child(Card::new().id("scene.container.dialog.card").child(
-                    crate::foundation::text(&theme, TypeScale::Body, "Dialog-width content"),
-                )),
+                .child(
+                    Card::new()
+                        .id("scene.container.dialog.card")
+                        .padding(Space::Md)
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Dialog-width content",
+                        )),
+                ),
         )
         .into_any_element()
 }

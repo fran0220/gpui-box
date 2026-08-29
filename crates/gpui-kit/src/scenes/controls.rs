@@ -457,7 +457,6 @@ pub(super) fn transfer_list(window: &mut Window, cx: &mut App) -> AnyElement {
                 .source_label("Available capabilities")
                 .target_label("Assigned capabilities")
         });
-        control.update(cx, |control, cx| control.set_query("runtime", cx));
         cx.set_global(SceneTransferList { control });
     }
     let theme = cx.theme().clone();
