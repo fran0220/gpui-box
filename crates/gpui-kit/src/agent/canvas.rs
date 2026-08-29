@@ -248,7 +248,10 @@ impl RenderOnce for AgentRunCanvas {
                 NodeGraphEvent::NodeDeleted { .. }
                 | NodeGraphEvent::ConnectionRequested { .. }
                 | NodeGraphEvent::ConnectionDropped { .. }
-                | NodeGraphEvent::DisconnectRequested { .. } => {}
+                | NodeGraphEvent::DisconnectRequested { .. }
+                // A run is a record of what happened, so there is no place on
+                // this canvas for the reader to put anything.
+                | NodeGraphEvent::SurfacePressed { .. } => {}
             });
         }
 

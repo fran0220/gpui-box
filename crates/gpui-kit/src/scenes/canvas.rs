@@ -232,6 +232,9 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 }
                             }
                             NodeGraphEvent::ConnectionDropped { .. } => {}
+                            // This scene has no way to add a step, so there is
+                            // nothing truthful to do with a place on it.
+                            NodeGraphEvent::SurfacePressed { .. } => {}
                             NodeGraphEvent::DisconnectRequested { id } => {
                                 scene.edges.retain(|edge| edge.edge_id() != *id);
                             }

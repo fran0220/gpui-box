@@ -90,6 +90,19 @@ pub enum NodeGraphEvent {
     },
     /// Proposes deleting a node by business identity.
     NodeDeleted { id: SharedString },
+    /// Reports a press that landed on the canvas itself rather than on any
+    /// node, with where it landed in world space.
+    ///
+    /// A caller that puts a new node where the reader pointed needs this, and
+    /// only the canvas can answer it: it holds every card's measured box,
+    /// while a caller testing the point itself would be re-deriving those
+    /// boxes from the positions it handed over and would miss whichever card
+    /// came out taller than it assumed.
+    SurfacePressed {
+        position: Point<f32>,
+        button: MouseButton,
+        click_count: usize,
+    },
     /// Proposes a new output-to-input connection.
     ConnectionRequested {
         from: GraphEndpoint,
@@ -159,6 +172,10 @@ struct GestureState {
     gesture: Option<Gesture>,
     pointer: Option<Point<Pixels>>,
     animation_started: Option<Instant>,
+    /// Whether this canvas has already framed itself once. Kept beside the
+    /// gesture because it is the same kind of fact: what this one canvas has
+    /// been through, not what the caller asked for.
+    framed: bool,
 }
 
 fn world_to_screen(world: Point<f32>, viewport: GraphViewport) -> Point<f32> {
@@ -190,6 +207,53 @@ fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
         point(origin.x.min(far.x), origin.y.min(far.y)),
         size((far.x - origin.x).abs(), (far.y - origin.y).abs()),
     )
+}
+
+/// How much of the surface is kept clear when framing, so a card at the edge
+/// of the graph does not end up against the edge of the panel.
+const FIT_MARGIN: f32 = 48.0;
+
+/// The viewport that holds every card, or `None` when there is nothing to hold
+/// or nowhere to hold it yet.
+fn frame_all(
+    nodes: &[NodeGeometry],
+    surface: Bounds<Pixels>,
+    zoom_range: (f32, f32),
+) -> Option<GraphViewport> {
+    let width = f32::from(surface.size.width);
+    let height = f32::from(surface.size.height);
+    if width <= FIT_MARGIN || height <= FIT_MARGIN {
+        return None;
+    }
+    let (min, max) = nodes
+        .iter()
+        .fold(None::<(Point<f32>, Point<f32>)>, |acc, node| {
+            let low = node.bounds.origin;
+            let high = point(
+                node.bounds.origin.x + node.bounds.size.width,
+                node.bounds.origin.y + node.bounds.size.height,
+            );
+            Some(match acc {
+                None => (low, high),
+                Some((left, right)) => (
+                    point(left.x.min(low.x), left.y.min(low.y)),
+                    point(right.x.max(high.x), right.y.max(high.y)),
+                ),
+            })
+        })?;
+    let zoom = ((width - FIT_MARGIN) / (max.x - min.x).max(1.0))
+        .min((height - FIT_MARGIN) / (max.y - min.y).max(1.0))
+        .clamp(zoom_range.0, zoom_range.1)
+        // Never magnify. A graph of three cards blown up to fill a panel reads
+        // as a mistake, and the reader can still zoom in themselves.
+        .min(1.0);
+    Some(GraphViewport::new(
+        point(
+            (width - (min.x + max.x) * zoom) / 2.0,
+            (height - (min.y + max.y) * zoom) / 2.0,
+        ),
+        zoom,
+    ))
 }
 
 fn bounds_overlap(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> bool {
@@ -460,6 +524,33 @@ pub struct NodeGraph {
     on_event: Option<EventHandler>,
     can_connect: Option<ConnectionValidator>,
     minimap: bool,
+    fit: GraphFit,
+}
+
+/// Whether a canvas frames its own content before the reader touches it.
+///
+/// A canvas whose caller computes every position — from a dependency depth, a
+/// git lineage, a ledger's layers — is routinely wider than the surface
+/// holding it, and the default viewport opens on its top-left corner. The
+/// reader's first sight of the graph is then two cards and an edge leaving the
+/// frame, with nothing to say that the rest exists.
+///
+/// The canvas is the only thing that can answer this honestly: it holds every
+/// card's measured box and its own surface size, while a caller knows only the
+/// positions it handed over and would have to guess how tall a card came out.
+/// What stays with the caller is whether framing is wanted at all, because on
+/// a canvas the reader arranges, the opening view is theirs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GraphFit {
+    /// The viewport is the caller's from the first frame.
+    #[default]
+    Never,
+    /// Frame every node once, as soon as the cards have been laid out and
+    /// their real heights are known. Reported as an ordinary
+    /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
+    /// its viewport needs nothing else; afterwards the viewport is the
+    /// reader's and the canvas never moves it again.
+    OnFirstLayout,
 }
 
 impl std::fmt::Debug for NodeGraph {
@@ -498,6 +589,7 @@ impl NodeGraph {
             on_event: None,
             can_connect: None,
             minimap: false,
+            fit: GraphFit::Never,
         }
     }
 
@@ -599,6 +691,13 @@ impl NodeGraph {
     /// Draws a small overview of the placed nodes in the corner.
     pub fn minimap(mut self, show: bool) -> Self {
         self.minimap = show;
+        self
+    }
+
+    /// Whether this canvas frames its own content before the reader touches
+    /// it. See [`GraphFit`].
+    pub fn fit(mut self, fit: GraphFit) -> Self {
+        self.fit = fit;
         self
     }
 
@@ -935,12 +1034,32 @@ impl RenderOnce for NodeGraph {
                     )
                 })
                 .collect::<Vec<_>>();
-            frame = frame.on_mouse_up(MouseButton::Left, move |_, window, cx| {
+            frame = frame.on_mouse_up(MouseButton::Left, move |event, window, cx| {
                 let gesture = up.borrow_mut().gesture.take();
                 match gesture {
                     Some(Gesture::Pan { moved: false, .. }) => {
                         up_report(
                             &NodeGraphEvent::SelectionChanged { ids: Vec::new() },
+                            window,
+                            cx,
+                        );
+                        // A press that reached this branch never touched a
+                        // card, so where it landed is a place on the canvas
+                        // and the caller may want to put something there.
+                        let frame = up_bounds.get();
+                        let at = screen_to_world(
+                            point(
+                                f32::from(event.position.x - frame.origin.x),
+                                f32::from(event.position.y - frame.origin.y),
+                            ),
+                            viewport,
+                        );
+                        up_report(
+                            &NodeGraphEvent::SurfacePressed {
+                                position: at,
+                                button: MouseButton::Left,
+                                click_count: event.click_count,
+                            },
                             window,
                             cx,
                         );
@@ -974,6 +1093,39 @@ impl RenderOnce for NodeGraph {
                     }
                     _ => {}
                 }
+            });
+            // The secondary button is not a gesture and is left to travel, so
+            // a caller keeps whatever menu it already opens. What the canvas
+            // adds is the one fact the caller cannot work out: whether the
+            // press was on a card or on the canvas behind it.
+            let context_report = Rc::clone(&report);
+            let context_bounds = Rc::clone(&measured);
+            let context_nodes = self
+                .nodes
+                .iter()
+                .map(|placed| placed.bounds(&theme, None))
+                .collect::<Vec<_>>();
+            frame = frame.on_mouse_down(MouseButton::Right, move |event, window, cx| {
+                let frame = context_bounds.get();
+                let at = screen_to_world(
+                    point(
+                        f32::from(event.position.x - frame.origin.x),
+                        f32::from(event.position.y - frame.origin.y),
+                    ),
+                    viewport,
+                );
+                if context_nodes.iter().any(|bounds| bounds.contains(&at)) {
+                    return;
+                }
+                context_report(
+                    &NodeGraphEvent::SurfacePressed {
+                        position: at,
+                        button: MouseButton::Right,
+                        click_count: event.click_count,
+                    },
+                    window,
+                    cx,
+                );
             });
             let wheel_report = Rc::clone(&report);
             let wheel_bounds = Rc::clone(&measured);
@@ -1099,6 +1251,24 @@ impl RenderOnce for NodeGraph {
             let bounds = measured.get();
             (f32::from(bounds.size.width) > 1.0).then(|| world_view(viewport, bounds))
         };
+        if self.fit == GraphFit::OnFirstLayout
+            && !gesture.borrow().framed
+            // Waiting for real heights is the whole point: framing from the
+            // estimate would leave the tallest card half outside the frame it
+            // was supposed to guarantee.
+            && !measured_heights.is_empty()
+            && let Some(framed) = frame_all(&geometry, measured.get(), self.zoom_range)
+            && let Some(report) = self.on_event.as_ref().cloned()
+        {
+            gesture.borrow_mut().framed = true;
+            // Reported rather than applied: the viewport belongs to the caller
+            // and this is the same proposal a pan or a wheel makes. Deferred
+            // because a caller answers it by writing its own state, which it
+            // cannot do in the middle of being drawn.
+            window.defer(cx, move |window, cx| {
+                report(&NodeGraphEvent::ViewportChanged(framed), window, cx);
+            });
+        }
         let visible_ids: std::collections::HashSet<SharedString> = geometry
             .iter()
             .filter(|node| {
@@ -2164,6 +2334,77 @@ mod tests {
                 300.0,
                 0.0,
             )
+    }
+
+    fn geometry_at(boxes: &[(f32, f32, f32, f32)]) -> Vec<NodeGeometry> {
+        boxes
+            .iter()
+            .enumerate()
+            .map(|(index, (x, y, width, height))| NodeGeometry {
+                id: format!("node.{index}").into(),
+                bounds: Bounds::new(point(*x, *y), size(*width, *height)),
+                ports: Vec::new(),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.accent,
+            })
+            .collect()
+    }
+
+    fn surface(width: f32, height: f32) -> Bounds<Pixels> {
+        Bounds::new(point(px(0.0), px(0.0)), size(px(width), px(height)))
+    }
+
+    #[test]
+    fn a_frame_holds_every_card_it_was_given() {
+        // Deliberately wider than the surface and starting far from the
+        // origin, which is the case a default viewport shows nothing of.
+        let nodes = geometry_at(&[(400.0, 300.0, 200.0, 160.0), (1600.0, 900.0, 200.0, 400.0)]);
+        let surface = surface(640.0, 480.0);
+        let framed = frame_all(&nodes, surface, (0.2, 2.0)).expect("a frame");
+        let view = world_view(framed, surface);
+        for node in &nodes {
+            assert!(
+                node.bounds.origin.x >= view.origin.x
+                    && node.bounds.origin.y >= view.origin.y
+                    && node.bounds.origin.x + node.bounds.size.width
+                        <= view.origin.x + view.size.width
+                    && node.bounds.origin.y + node.bounds.size.height
+                        <= view.origin.y + view.size.height,
+                "{:?} fell outside {view:?}",
+                node.bounds
+            );
+        }
+    }
+
+    #[test]
+    fn a_frame_never_magnifies_and_never_leaves_its_zoom_range() {
+        let one = geometry_at(&[(0.0, 0.0, 40.0, 40.0)]);
+        let framed = frame_all(&one, surface(1200.0, 900.0), (0.2, 2.0)).expect("a frame");
+        assert_eq!(
+            framed.zoom, 1.0,
+            "a small graph is shown at its own size, not blown up"
+        );
+
+        let wide = geometry_at(&[(0.0, 0.0, 100_000.0, 100.0)]);
+        let floored = frame_all(&wide, surface(640.0, 480.0), (0.4, 2.0)).expect("a frame");
+        assert_eq!(
+            floored.zoom, 0.4,
+            "a graph too wide to fit is held at the caller's floor rather than \
+             shrunk past it"
+        );
+    }
+
+    #[test]
+    fn there_is_no_frame_without_something_to_frame_or_somewhere_to_put_it() {
+        assert!(frame_all(&[], surface(640.0, 480.0), (0.2, 2.0)).is_none());
+        assert!(
+            frame_all(
+                &geometry_at(&[(0.0, 0.0, 40.0, 40.0)]),
+                surface(4.0, 4.0),
+                (0.2, 2.0)
+            )
+            .is_none(),
+            "a canvas that has not been laid out yet is not a frame of zero size"
+        );
     }
 
     #[test]
