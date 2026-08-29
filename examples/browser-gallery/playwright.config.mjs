@@ -39,8 +39,19 @@ export default defineConfig({
       name: "forced-webgpu",
       metadata: { backend: "webgpu", renderer: "webgpu" },
       use: {
+        // Chromium's headless surface destroys a configured WebGPU device.
+        // Run the real browser under Xvfb so this project proves presentation,
+        // not only adapter and pipeline creation.
+        headless: false,
         launchOptions: {
-          args: ["--enable-unsafe-webgpu", "--enable-unsafe-swiftshader"],
+          args: [
+            "--enable-unsafe-webgpu",
+            "--use-webgpu-adapter=swiftshader",
+            "--enable-dawn-features=allow_unsafe_apis",
+            "--enable-webgpu-developer-features",
+            "--use-gpu-in-tests",
+            "--enable-accelerated-2d-canvas",
+          ],
         },
       },
     },

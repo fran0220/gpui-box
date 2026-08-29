@@ -14,6 +14,8 @@ packages=(
   libx11-xcb-dev
   libxkbcommon-x11-dev
   libvulkan1
+  xauth
+  xvfb
 )
 missing_packages=()
 for package in "${packages[@]}"; do

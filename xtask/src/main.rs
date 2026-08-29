@@ -1393,20 +1393,42 @@ fn web_smoke_prepared() -> Result<()> {
     let package = package.to_string_lossy();
     let config = root().join("examples/browser-gallery/playwright.config.mjs");
     let config = config.to_string_lossy();
-    step(
-        "npm",
-        &[
-            "--prefix",
-            package.as_ref(),
-            "exec",
-            "--",
-            "playwright",
-            "test",
-            "--config",
-            config.as_ref(),
-        ],
-        None,
-    )
+    #[cfg(target_os = "linux")]
+    {
+        return step(
+            "xvfb-run",
+            &[
+                "-a",
+                "npm",
+                "--prefix",
+                package.as_ref(),
+                "exec",
+                "--",
+                "playwright",
+                "test",
+                "--config",
+                config.as_ref(),
+            ],
+            None,
+        );
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        step(
+            "npm",
+            &[
+                "--prefix",
+                package.as_ref(),
+                "exec",
+                "--",
+                "playwright",
+                "test",
+                "--config",
+                config.as_ref(),
+            ],
+            None,
+        )
+    }
 }
 
 fn web_site_smoke_prepared() -> Result<()> {

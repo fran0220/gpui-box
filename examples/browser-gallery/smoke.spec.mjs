@@ -87,10 +87,11 @@ test("ordinary control uses the catalog component and stable semantics", async (
 test("glass remains renderable after forced WebGPU compiles every pipeline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.metadata.renderer !== "webgpu");
 
-  const errors = [];
-  page.on("pageerror", error => errors.push(error.message));
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
   page.on("console", message => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() === "error") consoleErrors.push(message.text());
   });
 
   await openScene(page, testInfo, "glass");
@@ -99,7 +100,8 @@ test("glass remains renderable after forced WebGPU compiles every pipeline", asy
   await page.waitForTimeout(5_000);
   await settle(page);
 
-  expect(errors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
   expect(nonBlackPixelRatio(await page.locator("canvas").screenshot())).toBeGreaterThan(0.25);
 });
 

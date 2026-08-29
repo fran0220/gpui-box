@@ -224,8 +224,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
-      - name: Install Binaryen
-        run: sudo apt-get update && sudo apt-get install -y binaryen
+      - name: Install browser system tools
+        run: sudo apt-get update && sudo apt-get install -y xauth xvfb
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1, targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
