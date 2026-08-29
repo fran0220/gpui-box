@@ -75,6 +75,7 @@ DockPanel
 DotLottieAsset
 Drawer
 Dropzone
+Editor
 Element(..)
 EmptyState
 Emulator
@@ -200,9 +201,14 @@ TagInput
 Text
 TextArea
 TextArea TextAreaCompletes
+TextArea TextAreaCompletes TextAreaSource
+TextArea TextAreaSource
 TextArea TextAreaSubmits
 TextArea TextAreaSubmits TextAreaCompletes
+TextArea TextAreaSubmits TextAreaCompletes TextAreaSource
+TextArea TextAreaSubmits TextAreaSource
 TextAreaCompletes
+TextAreaSource
 TextAreaSubmits
 TextInput
 ThinkingBlock

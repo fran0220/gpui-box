@@ -275,6 +275,7 @@ impl MentionInput {
             TextAreaEvent::MoveDown => self.move_active(1, cx),
             TextAreaEvent::AcceptCompletion => self.accept_active(cx),
             TextAreaEvent::DismissCompletion => self.dismiss(cx),
+            TextAreaEvent::IndentRequested | TextAreaEvent::OutdentRequested => {}
         }
     }
 

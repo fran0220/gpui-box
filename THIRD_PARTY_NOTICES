@@ -294,3 +294,14 @@ Box's `FrameTimingMonitor` and controlled `PerformanceHud` are original. No
 upstream Rust source, resource sampler, overlay policy, styling, or Cargo
 dependency is included; see PROVENANCE.md P14.
 License text: LICENSE-APACHE
+
+Longbridge GPUI Component editor behavior reference
+--------------------------------------------------------------------------------
+Source: https://github.com/longbridge/gpui-component
+Revision: 6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7
+License: Apache-2.0
+Scope: behavioral reference for a source-oriented editing surface. GPUI Box's
+`Editor` and `TextArea` changes are original and include no upstream Rust
+source, parser, grammar, language-server transport, product model, or Cargo
+dependency; see PROVENANCE.md P15.
+License text: LICENSE-APACHE

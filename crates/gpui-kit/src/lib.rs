@@ -170,6 +170,10 @@ pub mod prelude {
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
     pub use crate::controls::copy_button::{CopyButton, CopyEvent, CopyState};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
+    pub use crate::controls::editor::{
+        Editor, EditorEvent, EditorGeometry, EditorHighlight, EditorHighlights,
+        EditorIndentDirection, EditorIndentRequest, EditorIndentation, EditorLineGeometry,
+    };
     pub use crate::controls::field::{FieldState, field_shell};
     pub use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
     pub use crate::controls::form_field::FormField;

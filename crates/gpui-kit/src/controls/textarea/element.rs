@@ -8,8 +8,8 @@
 
 use gpui::{
     App, Bounds, EditableTextLayout, Element, ElementId, ElementInputHandler, Entity,
-    GlobalElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, TextRun, UnderlineStyle,
-    Window, fill, point, px, relative,
+    GlobalElementId, HighlightStyle, IntoElement, LayoutId, PaintQuad, Pixels, Style, TextRun,
+    TextStyle, UnderlineStyle, Window, fill, point, px, relative,
 };
 use gpui_kit_theme::ActiveTheme;
 
@@ -101,42 +101,19 @@ impl Element for TextAreaElement {
             (content, style.color)
         };
 
-        let run = TextRun {
-            len: display_text.len(),
-            font: style.font(),
-            color: text_color,
-            background_color: None,
-            background_radius: None,
-            underline: None,
-            strikethrough: None,
-        };
-        // An input method underlines what it is still composing, so the
-        // typist can see which characters are not yet committed.
-        let runs = match marked {
-            Some(marked) if marked.end <= display_text.len() => vec![
-                TextRun {
-                    len: marked.start,
-                    ..run.clone()
-                },
-                TextRun {
-                    len: marked.end - marked.start,
-                    underline: Some(UnderlineStyle {
-                        color: Some(run.color),
-                        thickness: px(theme.measures.text_decoration_width),
-                        wavy: false,
-                    }),
-                    ..run.clone()
-                },
-                TextRun {
-                    len: display_text.len() - marked.end,
-                    ..run
-                },
-            ]
-            .into_iter()
-            .filter(|run| run.len > 0)
-            .collect(),
-            _ => vec![run],
-        };
+        let mut base = style.clone();
+        base.color = text_color;
+        let highlights = if empty { &[] } else { area.highlights() };
+        // Caller-owned source colours and IME composition share one run
+        // partition, so highlighting cannot shift the geometry used by the
+        // caret, selection, hit testing, accessibility, or the input method.
+        let runs = text_runs(
+            display_text.len(),
+            &base,
+            highlights,
+            marked,
+            px(theme.measures.text_decoration_width),
+        );
 
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
@@ -292,4 +269,59 @@ impl Element for TextAreaElement {
             }
         });
     }
+}
+
+fn text_runs(
+    len: usize,
+    base: &TextStyle,
+    highlights: &[(std::ops::Range<usize>, HighlightStyle)],
+    marked: Option<std::ops::Range<usize>>,
+    decoration_width: Pixels,
+) -> Vec<TextRun> {
+    if len == 0 {
+        return vec![base.to_run(0)];
+    }
+    let marked = marked.filter(|range| range.end <= len);
+    let mut boundaries = vec![0, len];
+    for (range, _) in highlights {
+        boundaries.extend([range.start, range.end]);
+    }
+    if let Some(range) = marked.as_ref() {
+        boundaries.extend([range.start, range.end]);
+    }
+    boundaries.sort_unstable();
+    boundaries.dedup();
+
+    boundaries
+        .windows(2)
+        .filter_map(|edge| {
+            let range = edge[0]..edge[1];
+            if range.is_empty() {
+                return None;
+            }
+            let highlight = highlights
+                .iter()
+                .find(|(highlighted, _)| {
+                    highlighted.start <= range.start && range.end <= highlighted.end
+                })
+                .map(|(_, style)| *style);
+            let mut style = base.clone();
+            if let Some(highlight) = highlight {
+                style = style.highlight(highlight);
+            }
+            if marked
+                .as_ref()
+                .is_some_and(|marked| marked.start <= range.start && range.end <= marked.end)
+            {
+                style.underline = Some(UnderlineStyle {
+                    color: Some(style.color),
+                    thickness: decoration_width,
+                    wavy: false,
+                });
+            }
+            let mut run = style.to_run(range.len());
+            run.background_radius = highlight.and_then(|style| style.background_radius);
+            Some(run)
+        })
+        .collect()
 }

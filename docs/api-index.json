@@ -1748,6 +1748,47 @@
       ]
     },
     {
+      "name": "Editor",
+      "kind": "view",
+      "path": "gpui_kit::controls::Editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Plain source editing with caller-owned language policy.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, text: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "rows(rows: usize) -> Self",
+        "line_numbers(visible: bool) -> Self",
+        "read_only(read_only: bool) -> Self",
+        "indent_with(indenter: impl Fn(EditorIndentRequest) -> Option<EditorIndentation> + 'static) -> Self",
+        "highlights(highlights: EditorHighlights) -> Self"
+      ],
+      "commands": [
+        "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
+      ],
+      "queries": [
+        "text_area() -> &Entity<TextArea>",
+        "snapshot(cx: &App) -> TextAreaSnapshot",
+        "selected_range(cx: &App) -> Range<usize>",
+        "geometry(cx: &App) -> Option<EditorGeometry>"
+      ],
+      "slots": [],
+      "reports": [
+        "Edited",
+        "Changed",
+        "SelectionChanged",
+        "Pasted",
+        "Submitted",
+        "Cancelled",
+        "Focused",
+        "Blurred"
+      ],
+      "scenes": [
+        "editor"
+      ]
+    },
+    {
       "name": "EffectParticles",
       "kind": "builder",
       "path": "gpui_kit::effects::EffectParticles",
@@ -4909,6 +4950,8 @@
         "MoveDown",
         "AcceptCompletion",
         "DismissCompletion",
+        "IndentRequested",
+        "OutdentRequested",
         "SelectionChanged",
         "GeometryChanged",
         "Focus",
@@ -8075,6 +8118,112 @@
       "construct": [
         "new(row: impl Into<SharedString>, column: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
       ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorEvent",
+      "path": "gpui_kit::controls::EditorEvent",
+      "summary": "What a source editor reports to its owner.",
+      "variants": [
+        "Edited",
+        "Changed",
+        "SelectionChanged",
+        "Pasted",
+        "Submitted",
+        "Cancelled",
+        "Focused",
+        "Blurred"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorGeometry",
+      "path": "gpui_kit::controls::EditorGeometry",
+      "summary": "The measured source viewport, tagged with the revision it describes.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorHighlight",
+      "path": "gpui_kit::controls::EditorHighlight",
+      "summary": "One caller-owned style range in an editor revision.",
+      "variants": [],
+      "construct": [
+        "new(range: Range<usize>, style: HighlightStyle) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "range() -> &Range<usize>",
+        "style() -> HighlightStyle"
+      ]
+    },
+    {
+      "name": "EditorHighlights",
+      "path": "gpui_kit::controls::EditorHighlights",
+      "summary": "Syntax and diagnostic styles tagged with the text revision they describe.",
+      "variants": [],
+      "construct": [
+        "new(revision: u64, spans: impl IntoIterator<Item = EditorHighlight>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "revision() -> u64",
+        "spans() -> &[EditorHighlight]"
+      ]
+    },
+    {
+      "name": "EditorIndentDirection",
+      "path": "gpui_kit::controls::EditorIndentDirection",
+      "summary": "Which indentation chord the source editor received.",
+      "variants": [
+        "Indent",
+        "Outdent"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorIndentRequest",
+      "path": "gpui_kit::controls::EditorIndentRequest",
+      "summary": "The immutable input to a caller-owned indentation policy.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorIndentation",
+      "path": "gpui_kit::controls::EditorIndentation",
+      "summary": "One synchronous replacement returned by an indentation policy.",
+      "variants": [],
+      "construct": [
+        "new(range: Range<usize>, text: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "selection(selection: Range<usize>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorLineGeometry",
+      "path": "gpui_kit::controls::EditorLineGeometry",
+      "summary": "Current-frame geometry for one hard source line.",
+      "variants": [],
+      "construct": [],
       "options": [],
       "commands": [],
       "queries": []
@@ -13365,6 +13514,8 @@
         "MoveDown",
         "AcceptCompletion",
         "DismissCompletion",
+        "IndentRequested",
+        "OutdentRequested",
         "SelectionChanged",
         "GeometryChanged",
         "Focus",
@@ -14407,6 +14558,18 @@
         "TextArea"
       ],
       "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen, message, asked, told) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n        inputs.message.clone(),\n        inputs.asked.clone(),\n        inputs.told.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            FormField::new(\"scene.textarea.notes.field\", \"Release notes\")\n                .control(\"scene.textarea.notes\")\n                .description(\"Shown to everyone who opens this run.\")\n                .child(notes),\n        )\n        .child(\n            FormField::new(\"scene.textarea.review.field\", \"Review\")\n                .control(\"scene.textarea.review\")\n                .child(review),\n        )\n        .child(\n            FormField::new(\"scene.textarea.frozen.field\", \"Policy\")\n                .control(\"scene.textarea.frozen\")\n                .child(frozen),\n        )\n        // The other enter policy, for text that is a message rather than a\n        // value. Nothing about it looks different, which is the point: what\n        // changes is which key is the common act.\n        .child(message)\n        .child(caption(\n            &theme,\n            \"a frame that measures its text rather than its rows: the same pill \\\n             holds one line, and becomes a panel for a message that outgrew it\",\n        ))\n        .child(asked)\n        .child(told)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "editor",
+      "capture": "cargo run -p xtask -- headless capture editor",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor)\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",

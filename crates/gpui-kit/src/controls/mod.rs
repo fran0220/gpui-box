@@ -7,6 +7,7 @@ pub mod color_picker;
 pub mod combobox;
 pub mod copy_button;
 pub mod dropzone;
+pub mod editor;
 pub mod field;
 pub mod filter_bar;
 pub mod form_field;

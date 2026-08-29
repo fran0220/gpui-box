@@ -35,10 +35,11 @@ use std::sync::{Arc, Mutex};
 
 use gpui::{
     AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout, Entity,
-    EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
-    Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
-    Window, accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
+    EntityInputHandler, EventEmitter, FocusHandle, Focusable, HighlightStyle, InteractiveElement,
+    IntoElement, KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    ParentElement, Pixels, Point, Render, SharedString, StatefulInteractiveElement, Styled,
+    Subscription, UTF16Selection, Window, accesskit::ActionData, actions, div, point,
+    prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, TypeScale};
@@ -91,6 +92,8 @@ actions!(
         Cancel,
         AcceptCompletion,
         DismissCompletion,
+        Indent,
+        Outdent,
         ShowCharacterPalette,
     ]
 );
@@ -115,6 +118,9 @@ const SUBMIT_CONTEXT: &str = "TextAreaSubmits";
 /// primitive even though the menu and its candidates belong to the owner.
 const COMPLETION_CONTEXT: &str = "TextAreaCompletes";
 
+/// The marker published only while a source editor owns indentation keys.
+const SOURCE_CONTEXT: &str = "TextAreaSource";
+
 /// The whole context such an area declares: the shared one, so every other
 /// binding still reaches it, plus the marker.
 const SUBMIT_KEY_CONTEXT: &str = "TextArea TextAreaSubmits";
@@ -122,6 +128,15 @@ const SUBMIT_KEY_CONTEXT: &str = "TextArea TextAreaSubmits";
 const COMPLETION_KEY_CONTEXT: &str = "TextArea TextAreaCompletes";
 
 const SUBMIT_COMPLETION_KEY_CONTEXT: &str = "TextArea TextAreaSubmits TextAreaCompletes";
+
+const SOURCE_KEY_CONTEXT: &str = "TextArea TextAreaSource";
+
+const SUBMIT_SOURCE_KEY_CONTEXT: &str = "TextArea TextAreaSubmits TextAreaSource";
+
+const COMPLETION_SOURCE_KEY_CONTEXT: &str = "TextArea TextAreaCompletes TextAreaSource";
+
+const SUBMIT_COMPLETION_SOURCE_KEY_CONTEXT: &str =
+    "TextArea TextAreaSubmits TextAreaCompletes TextAreaSource";
 
 /// The visible rows a text area occupies when the caller asks for none.
 const DEFAULT_ROWS: usize = 3;
@@ -241,6 +256,8 @@ pub(crate) fn install(cx: &mut App) {
         KeyBinding::new(&format!("{primary}-v"), Paste, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-z"), Undo, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-shift-z"), Redo, Some(KEY_CONTEXT)),
+        KeyBinding::new("tab", Indent, Some(SOURCE_CONTEXT)),
+        KeyBinding::new("shift-tab", Outdent, Some(SOURCE_CONTEXT)),
     ];
 
     if cfg!(target_os = "macos") {
@@ -345,6 +362,15 @@ pub struct TextAreaEdit {
     pub inserted: SharedString,
 }
 
+pub(crate) struct TextAreaGeometry {
+    pub revision: u64,
+    pub viewport: Bounds<Pixels>,
+    pub horizontal_scroll: Pixels,
+    pub vertical_scroll: Pixels,
+    pub line_height: Pixels,
+    pub rows: Vec<Range<usize>>,
+}
+
 /// What a text area measured the last time it was laid out.
 ///
 /// An area grows itself between `rows` and `max_rows`, which is the whole
@@ -392,6 +418,10 @@ pub enum TextAreaEvent {
     AcceptCompletion,
     /// Escape, on the same terms. Ordinary cancellation was not emitted.
     DismissCompletion,
+    /// Tab, while a source editor has claimed indentation.
+    IndentRequested,
+    /// Shift-tab, while a source editor has claimed indentation.
+    OutdentRequested,
     /// The caret or selection moved, including as the result of an edit.
     SelectionChanged(Range<usize>),
     /// Painted text geometry changed and current-frame range bounds are ready.
@@ -432,6 +462,8 @@ pub struct TextArea {
     arrows_claimed: bool,
     /// Whether enter and escape belong to the open completion surface.
     completion_claimed: bool,
+    /// Whether tab belongs to a source editor wrapped around this area.
+    indentation_claimed: bool,
     /// The rows the frame decided to occupy, which grows with the text until
     /// `max_rows` and is measured rather than guessed.
     visible_rows: usize,
@@ -450,6 +482,8 @@ pub struct TextArea {
     /// taken before it.
     layout_pass: u64,
     revision: u64,
+    highlight_revision: Option<u64>,
+    highlights: Vec<(Range<usize>, HighlightStyle)>,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
@@ -493,6 +527,7 @@ impl TextArea {
             wrap: TextAreaWrap::Soft,
             arrows_claimed: false,
             completion_claimed: false,
+            indentation_claimed: false,
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
             horizontal_scroll_offset: px(0.0),
@@ -504,6 +539,8 @@ impl TextArea {
             caret_width: px(cx.theme().measures.caret_width),
             layout_pass: 0,
             revision: 0,
+            highlight_revision: None,
+            highlights: Vec::new(),
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
             accessible_geometry: Arc::default(),
@@ -650,6 +687,10 @@ impl TextArea {
 
     pub fn completion_claimed(&self) -> bool {
         self.completion_claimed
+    }
+
+    pub(crate) fn set_indentation_claimed(&mut self, claimed: bool) {
+        self.indentation_claimed = claimed;
     }
 
     pub fn max_length(mut self, max_length: usize) -> Self {
@@ -910,8 +951,63 @@ impl TextArea {
         self.horizontal_scroll_offset
     }
 
+    pub(crate) fn source_geometry(&self) -> Option<TextAreaGeometry> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        let layout = self.last_layout.as_ref()?;
+        let viewport = self.last_bounds?;
+        Some(TextAreaGeometry {
+            revision: self.revision,
+            viewport,
+            horizontal_scroll: self.horizontal_scroll_offset,
+            vertical_scroll: self.scroll_offset,
+            line_height: layout.line_height(),
+            rows: layout.visual_rows(self.edit.text()),
+        })
+    }
+
+    pub(crate) fn set_highlights(
+        &mut self,
+        revision: u64,
+        mut highlights: Vec<(Range<usize>, HighlightStyle)>,
+    ) -> bool {
+        highlights.sort_by_key(|(range, _)| (range.start, range.end));
+        let mut end = 0;
+        let valid = revision == self.revision
+            && highlights.iter().all(|(range, _)| {
+                let valid = range.start >= end
+                    && range.start <= range.end
+                    && self.edit.text().get(range.clone()).is_some();
+                end = range.end;
+                valid
+            });
+        if valid {
+            self.highlight_revision = Some(revision);
+            self.highlights = highlights;
+        } else {
+            self.highlight_revision = None;
+            self.highlights.clear();
+        }
+        valid
+    }
+
+    pub(crate) fn highlights(&self) -> &[(Range<usize>, HighlightStyle)] {
+        if self.highlight_revision == Some(self.revision) {
+            &self.highlights
+        } else {
+            &[]
+        }
+    }
+
     pub(crate) fn row_limits(&self) -> (usize, usize) {
         (self.rows, self.max_rows.unwrap_or(self.rows).max(self.rows))
+    }
+
+    pub(crate) fn set_row_limits(&mut self, rows: usize, max_rows: usize) {
+        self.rows = rows.max(1);
+        self.max_rows = Some(max_rows.max(self.rows));
+        self.visible_rows = self.visible_rows.clamp(self.rows, max_rows.max(self.rows));
     }
 
     pub(crate) fn visible_rows(&self) -> usize {
@@ -1382,6 +1478,14 @@ impl TextArea {
         cx.emit(TextAreaEvent::DismissCompletion);
     }
 
+    fn indent(&mut self, _: &Indent, _: &mut Window, cx: &mut Context<Self>) {
+        cx.emit(TextAreaEvent::IndentRequested);
+    }
+
+    fn outdent(&mut self, _: &Outdent, _: &mut Window, cx: &mut Context<Self>) {
+        cx.emit(TextAreaEvent::OutdentRequested);
+    }
+
     fn show_character_palette(
         &mut self,
         _: &ShowCharacterPalette,
@@ -1635,12 +1739,22 @@ impl Render for TextArea {
             // The second identifier is what the two enter bindings are written
             // against, so what enter means travels with the area rather than
             // with the keymap.
-            .key_context(match (self.enter, self.completion_claimed) {
-                (Enter::Opens, false) => KEY_CONTEXT,
-                (Enter::Submits, false) => SUBMIT_KEY_CONTEXT,
-                (Enter::Opens, true) => COMPLETION_KEY_CONTEXT,
-                (Enter::Submits, true) => SUBMIT_COMPLETION_KEY_CONTEXT,
-            })
+            .key_context(
+                match (
+                    self.enter,
+                    self.completion_claimed,
+                    self.indentation_claimed,
+                ) {
+                    (Enter::Opens, false, false) => KEY_CONTEXT,
+                    (Enter::Submits, false, false) => SUBMIT_KEY_CONTEXT,
+                    (Enter::Opens, true, false) => COMPLETION_KEY_CONTEXT,
+                    (Enter::Submits, true, false) => SUBMIT_COMPLETION_KEY_CONTEXT,
+                    (Enter::Opens, false, true) => SOURCE_KEY_CONTEXT,
+                    (Enter::Submits, false, true) => SUBMIT_SOURCE_KEY_CONTEXT,
+                    (Enter::Opens, true, true) => COMPLETION_SOURCE_KEY_CONTEXT,
+                    (Enter::Submits, true, true) => SUBMIT_COMPLETION_SOURCE_KEY_CONTEXT,
+                },
+            )
             .when(!self.disabled, |element| {
                 element.track_focus(&self.focus_handle)
             })
@@ -1689,6 +1803,11 @@ impl Render for TextArea {
                     .on_action(cx.listener(Self::cancel))
                     .on_action(cx.listener(Self::accept_completion))
                     .on_action(cx.listener(Self::dismiss_completion))
+                    .when(self.indentation_claimed, |element| {
+                        element
+                            .on_action(cx.listener(Self::indent))
+                            .on_action(cx.listener(Self::outdent))
+                    })
                     .on_action(cx.listener(Self::show_character_palette))
                     .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
                     .on_mouse_move(cx.listener(Self::on_mouse_move))

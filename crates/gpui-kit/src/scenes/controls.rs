@@ -1216,6 +1216,97 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+const EDITOR_SOURCE: &str = r#"use gpui::App;
+
+pub fn summarize(values: &[u32]) -> Option<u32> {
+    let total = values.iter().copied().sum();
+    let message = "language policy stays with the caller";
+    (total > 0).then_some(total)
+}
+
+const LONG_SOURCE_LINE: &str = "one source row stays whole without wrapping";
+"#;
+
+pub(super) struct SceneEditor {
+    editor: Entity<Editor>,
+}
+
+impl Global for SceneEditor {}
+
+pub(super) fn ensure_editor(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneEditor>() {
+        return;
+    }
+    let theme = cx.theme().clone();
+    let span = |needle: &str, color| {
+        let start = EDITOR_SOURCE
+            .find(needle)
+            .expect("scene source contains span");
+        EditorHighlight::new(
+            start..start + needle.len(),
+            gpui::HighlightStyle {
+                color: Some(color),
+                ..Default::default()
+            },
+        )
+    };
+    let highlights = EditorHighlights::new(
+        0,
+        [
+            span("use", theme.colors.syntax.get(SyntaxColor::Keyword)),
+            span("pub fn", theme.colors.syntax.get(SyntaxColor::Keyword)),
+            span("let total", theme.colors.syntax.get(SyntaxColor::Keyword)),
+            span(
+                "\"language policy stays with the caller\"",
+                theme.colors.syntax.get(SyntaxColor::StringLiteral),
+            ),
+            span("0", theme.colors.syntax.get(SyntaxColor::Number)),
+            span("const", theme.colors.syntax.get(SyntaxColor::Keyword)),
+        ],
+    );
+    let editor = cx.new(|cx| {
+        Editor::new(
+            "scene.editor",
+            "Rust source editor",
+            EDITOR_SOURCE,
+            window,
+            cx,
+        )
+        .rows(12)
+        .highlights(highlights)
+        .indent_with(|request| {
+            let caret = request.selection.end;
+            match request.direction {
+                EditorIndentDirection::Indent => Some(
+                    EditorIndentation::new(caret..caret, "    ").selection(caret + 4..caret + 4),
+                ),
+                EditorIndentDirection::Outdent => None,
+            }
+        })
+    });
+    let area = editor.read(cx).text_area().clone();
+    let caret = EDITOR_SOURCE
+        .find("let message")
+        .expect("scene source contains the focused line");
+    area.update(cx, |area, cx| area.set_selected_range(caret..caret, cx));
+    window.focus(&area.read(cx).focus_handle(cx), cx);
+    cx.set_global(SceneEditor { editor });
+}
+
+pub(super) fn editor(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_editor(window, cx);
+    let editor = cx.global::<SceneEditor>().editor.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(760.0))
+        .child(caption(
+            &theme,
+            "one text/IME/history geometry; caller-owned revision highlights and indentation",
+        ))
+        .child(editor)
+        .into_any_element()
+}
+
 pub(super) struct SceneMentionInput {
     input: Entity<MentionInput>,
 }

@@ -155,11 +155,12 @@ own; both are exercised through every control and overlay that uses them.
 - **Persisting a layout.** `SplitLayout` converts to and from plain records so
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
-- **Language intelligence and document policy.** The shared editable buffer,
-  geometry, style coverage, rich document, and caller-owned edit session now
-  drive `RichTextEditor`: styled blocks, alignment, lists, diagnostics,
-  keyboard/clipboard/IME behavior, semantics, and its formatting toolbar share
-  one projection. Grammar/LSP facts, folding and multi-caret policy,
+- **Language intelligence and document policy.** `Editor` fixes the shared
+  `TextArea` buffer and geometry to a no-wrap source projection, then accepts
+  revision-tagged caller highlights and one synchronous caller-owned
+  indentation replacement. `RichTextEditor` projects the same editing
+  invariants through styled blocks, alignment, lists, diagnostics, semantics,
+  and a formatting toolbar. Grammar/LSP facts, folding and multi-caret policy,
   persistence, collaboration, URL policy, and conversion to a product
   document format remain host work. Syntax colouring still stops at four
   built-in classes on the eight languages `content::highlight` knows. A host
@@ -543,6 +544,7 @@ behaviour coverage, semantic ids, and a documentation entry:
 | `ImageList` | Stable selectable media tiles with measured responsive columns and token-backed layout; media phase remains caller-owned. |
 | `Masonry` | Stable variable-height tiles placed into the shortest measured column with responsive token-backed columns and gaps. |
 | Auto-growing `TextArea` | Bounded autosize measures shaped visual rows, preserves editor state, and scrolls after the maximum row bound. |
+| Source `Editor` | One no-wrap `TextArea` projection adds hard-line numbers/geometry, revision-safe caller highlights, and caller-owned indentation without duplicating buffer, caret, IME, history, paint, or hit testing. |
 | `Bubble` | Neutral caller-owned message surface with placement, grouping, max width, safe content, and optional actions. |
 | `Carousel` | Controlled stable-item track with previous/next/direct selection, keyboard navigation, clipping, reduced motion, and truthful state phases. |
 

@@ -475,3 +475,21 @@ monitor, clock, history, resource sampler, overlay placement, or refresh loop.
 Draw-budget overage is not called a dropped frame, and all styling, strings,
 numbers, states, and semantic ids use existing Box authorities. No upstream
 Rust source, resource-profiling code, or dependency was copied.
+
+## P15: GPUI Component editor behavior reference
+
+- Reference: <https://github.com/longbridge/gpui-component>
+- Revision: `6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7`
+- License: Apache-2.0
+- Reference location: `crates/ui/src/input/editor.rs`
+- Destination: `crates/gpui-kit/src/controls/editor.rs` and
+  `crates/gpui-kit/src/controls/textarea`
+
+The reference established the usefulness of a source-oriented editing surface
+with line numbers and syntax styling. GPUI Box's implementation is original
+and deliberately uses its existing `TextArea` as the sole document, selection,
+IME, history, geometry, paint, hit-test, and accessibility authority. `Editor`
+adds only no-wrap source policy, hard-line projection, revision-tagged
+caller-owned styles, and a synchronous indentation request. No upstream Rust
+source, parser, grammar, language-server transport, product model, or
+dependency was copied.
