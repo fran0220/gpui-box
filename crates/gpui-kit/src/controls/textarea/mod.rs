@@ -14,8 +14,7 @@
 //! let notes = cx.new(|cx| {
 //!     TextArea::new("review.notes", window, cx)
 //!         .placeholder("What changed, and why")
-//!         .rows(4)
-//!         .max_rows(12)
+//!         .autosize(4, 12)
 //! });
 //! cx.subscribe(&notes, |_host, notes, event, cx| {
 //!     if let TextAreaEvent::Submit = event {
@@ -540,6 +539,21 @@ impl TextArea {
     /// Grows with the text up to this many rows, then scrolls instead.
     pub fn max_rows(mut self, max_rows: usize) -> Self {
         self.max_rows = Some(max_rows.max(1));
+        self
+    }
+
+    /// Enables measured auto-sizing between an inclusive minimum and maximum
+    /// row count. Once the maximum is reached, the editor keeps that height
+    /// and scrolls its content instead of changing the surrounding layout.
+    ///
+    /// This is the named convenience API for the MUI `Textarea Autosize`
+    /// contract. It uses the same shaped layout as ordinary text areas, so
+    /// IME composition, selection, caret geometry, and undo history remain
+    /// attached to this editor rather than to a second measuring field.
+    pub fn autosize(mut self, min_rows: usize, max_rows: usize) -> Self {
+        self.rows = min_rows.max(1);
+        self.max_rows = Some(max_rows.max(self.rows));
+        self.visible_rows = self.rows;
         self
     }
 

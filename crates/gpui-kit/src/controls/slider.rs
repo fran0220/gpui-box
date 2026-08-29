@@ -29,7 +29,15 @@ struct PointerDriven(bool);
 type ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;
 type RangeHandler = Rc<dyn Fn(f32, f32, &mut Window, &mut App)>;
 
-/// A horizontal track with one handle.
+/// The axis on which a slider lays out and accepts input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SliderOrientation {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+
+/// A track with one or two handles.
 ///
 /// The value is caller-owned: the slider reports where the typist pointed and
 /// renders whatever the caller decides, so a rejected or clamped change is
@@ -42,6 +50,8 @@ pub struct Slider {
     max: f32,
     value: f32,
     step: Option<f32>,
+    orientation: SliderOrientation,
+    length: Option<f32>,
     size: ControlSize,
     disabled: bool,
     /// Rendered next to the label, for a unit the number alone does not carry.
@@ -77,6 +87,8 @@ impl Slider {
             max: 1.0,
             value: 0.0,
             step: None,
+            orientation: SliderOrientation::Horizontal,
+            length: None,
             size: ControlSize::Md,
             disabled: false,
             display: None,
@@ -113,6 +125,21 @@ impl Slider {
     /// Rounds every reported value to a multiple of `step`.
     pub fn step(mut self, step: f32) -> Self {
         self.step = (step > 0.0).then_some(step);
+        self
+    }
+
+    /// Sets the layout, hit-test, keyboard, and accessibility axis together.
+    pub fn orientation(mut self, orientation: SliderOrientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
+
+    /// Sets the cross-axis length used by a vertical slider. When omitted,
+    /// the theme's `measure.sliderVerticalHeight` token supplies it.
+    pub fn length(mut self, length: f32) -> Self {
+        if length.is_finite() && length > 0.0 {
+            self.length = Some(length);
+        }
         self
     }
 
@@ -205,6 +232,7 @@ impl RenderOnce for Slider {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let metrics = theme.control.get(self.size);
+        let vertical = self.orientation == SliderOrientation::Vertical;
         let actionable =
             !self.disabled && (self.on_change.is_some() || self.on_range_change.is_some());
         let dragging = keyed::slot::<PointerDriven>(
@@ -231,8 +259,9 @@ impl RenderOnce for Slider {
                 cx,
             )
         });
-        let physical_fraction = directed_fraction(fraction, direction);
-        let physical_high = high_fraction.map(|high| directed_fraction(high, direction));
+        let physical_fraction = to_physical_fraction(fraction, self.orientation, direction);
+        let physical_high =
+            high_fraction.map(|high| to_physical_fraction(high, self.orientation, direction));
         let track_height = px(theme.measures.slider_track_height);
         // A disabled slider still reports a value, so it keeps its fill and
         // loses only the colour that says the value can be moved. Dimming
@@ -245,6 +274,7 @@ impl RenderOnce for Slider {
         // The handle is the control's only tappable part, so it is sized from
         // the same scale step the other controls take their glyphs from.
         let knob = px(metrics.icon_size);
+        let vertical_length = px(self.length.unwrap_or(theme.measures.slider_vertical_height));
 
         // The track is the assertion target, not the row: an automated click
         // on the centre of a slider has to land on something draggable.
@@ -256,30 +286,43 @@ impl RenderOnce for Slider {
         // starts and ends half a handle inside that box, so a value at either
         // endpoint keeps all of its handle inside the slider's layout,
         // semantic bounds, clipping ancestor, and hit target.
-        let travel = div()
-            .absolute()
-            .left(knob / 2.0)
-            .right(knob / 2.0)
-            .top_0()
-            .bottom_0()
-            .flex()
-            .items_center()
-            .child(
+        let groove = if vertical {
+            div()
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .w(track_height)
+                .rounded_full()
+                // The groove is a recess, not a drawn line: without the
+                // boundary a 6px bar of `track` on `canvas` is a smudge.
+                .bg(theme.colors.track)
+                .border(px(theme.borders.hairline))
+                .border_color(theme.colors.hairline)
+        } else {
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .h(track_height)
+                .rounded_full()
+                // The groove is a recess, not a drawn line: without the
+                // boundary a 6px bar of `track` on `canvas` is a smudge.
+                .bg(theme.colors.track)
+                .border(px(theme.borders.hairline))
+                .border_color(theme.colors.hairline)
+        };
+        let fill = if let Some(high) = physical_high {
+            let start = physical_fraction.min(high);
+            let span = (physical_fraction - high).abs();
+            if vertical {
                 div()
                     .absolute()
-                    .left_0()
-                    .right_0()
-                    .h(track_height)
+                    .top(gpui::relative(start))
+                    .h(gpui::relative(span))
+                    .w(track_height)
                     .rounded_full()
-                    // The groove is a recess, not a drawn line: without the
-                    // boundary a 6px bar of `track` on `canvas` is a smudge.
-                    .bg(theme.colors.track)
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline),
-            )
-            .child(if let Some(high) = physical_high {
-                let start = physical_fraction.min(high);
-                let span = (physical_fraction - high).abs();
+                    .bg(fill_color)
+            } else {
                 div()
                     .absolute()
                     .left(gpui::relative(start))
@@ -287,15 +330,36 @@ impl RenderOnce for Slider {
                     .h(track_height)
                     .rounded_full()
                     .bg(fill_color)
-            } else {
-                div()
-                    .absolute()
-                    .left_0()
-                    .w(gpui::relative(physical_fraction))
-                    .h(track_height)
-                    .rounded_full()
-                    .bg(fill_color)
-            })
+            }
+        } else if vertical {
+            div()
+                .absolute()
+                .top(gpui::relative(physical_fraction))
+                .h(gpui::relative(1.0 - physical_fraction))
+                .w(track_height)
+                .rounded_full()
+                .bg(fill_color)
+        } else {
+            div()
+                .absolute()
+                .left_0()
+                .w(gpui::relative(physical_fraction))
+                .h(track_height)
+                .rounded_full()
+                .bg(fill_color)
+        };
+        let mut travel = div().absolute().flex().child(groove).child(fill);
+        if vertical {
+            travel = travel
+                .top(knob / 2.0)
+                .bottom(knob / 2.0)
+                .left_0()
+                .right_0()
+                .justify_center();
+        } else {
+            travel = travel.left(knob / 2.0).right(knob / 2.0).items_center();
+        }
+        travel = travel
             // Ticks are drawn over both halves of the track, and over the
             // fill they invert: under the fill a hairline mark is invisible,
             // which is how a scale with marks came to show none.
@@ -314,10 +378,24 @@ impl RenderOnce for Slider {
                     Some(high) => logical >= fraction.min(high) && logical <= fraction.max(high),
                     None => logical <= fraction,
                 };
-                let at = directed_fraction(logical, direction);
-                Some(
-                    div()
-                        .absolute()
+                let at = to_physical_fraction(logical, self.orientation, direction);
+                let mut mark_view = div().absolute().rounded_full().bg(if filled {
+                    theme.colors.text_on_accent.opacity(theme.opacity.muted)
+                } else {
+                    theme.colors.hairline_strong
+                });
+                if vertical {
+                    mark_view = mark_view
+                        .top(gpui::relative(at))
+                        .mt(px(-theme.space(Space::Xxs) / 2.0))
+                        .h(px(theme.space(Space::Xxs)))
+                        .w(if filled {
+                            track_height
+                        } else {
+                            track_height + px(theme.space(Space::Xxs) * 2.0)
+                        });
+                } else {
+                    mark_view = mark_view
                         .left(gpui::relative(at))
                         .ml(px(-theme.space(Space::Xxs) / 2.0))
                         .w(px(theme.space(Space::Xxs)))
@@ -325,26 +403,30 @@ impl RenderOnce for Slider {
                             track_height
                         } else {
                             track_height + px(theme.space(Space::Xxs) * 2.0)
-                        })
-                        .rounded_full()
-                        .bg(if filled {
-                            theme.colors.text_on_accent.opacity(theme.opacity.muted)
-                        } else {
-                            theme.colors.hairline_strong
-                        }),
-                )
+                        });
+                }
+                Some(mark_view)
             }))
-            .child(knob_at(physical_fraction, knob, &theme, self.disabled))
-            .children(physical_high.map(|high| knob_at(high, knob, &theme, self.disabled)));
+            .child(knob_at(
+                physical_fraction,
+                knob,
+                &theme,
+                self.disabled,
+                vertical,
+            ))
+            .children(
+                physical_high.map(|high| knob_at(high, knob, &theme, self.disabled, vertical)),
+            );
 
         // The outer box is the assertion and pointer target. It includes the
         // whole handles at both ends while the child above owns their travel.
         let mut track = div()
             .id(track_id.element_id())
             .relative()
-            .w_full()
-            .min_w(knob)
-            .h(knob)
+            .when(vertical, |element| {
+                element.w_full().h(vertical_length).min_h(knob)
+            })
+            .when(!vertical, |element| element.w_full().min_w(knob).h(knob))
             .when(actionable, |element| element.cursor_pointer())
             .child(travel);
 
@@ -374,15 +456,27 @@ impl RenderOnce for Slider {
                 let bounds = down_bounds.get();
                 let width = f32::from(bounds.size.width);
                 let Some(fraction) = pointer_fraction(
-                    f32::from(event.position.x),
-                    f32::from(bounds.left()),
-                    width,
+                    if vertical {
+                        f32::from(event.position.y)
+                    } else {
+                        f32::from(event.position.x)
+                    },
+                    if vertical {
+                        f32::from(bounds.top())
+                    } else {
+                        f32::from(bounds.left())
+                    },
+                    if vertical {
+                        f32::from(bounds.size.height)
+                    } else {
+                        width
+                    },
                     f32::from(knob),
                 ) else {
                     return;
                 };
                 down_dragging.borrow_mut().0 = true;
-                let fraction = directed_fraction(fraction, direction);
+                let fraction = logical_fraction(fraction, self.orientation, direction);
                 down(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -400,15 +494,27 @@ impl RenderOnce for Slider {
                 let bounds = move_bounds.get();
                 let width = f32::from(bounds.size.width);
                 let Some(fraction) = pointer_fraction(
-                    f32::from(event.position.x),
-                    f32::from(bounds.left()),
-                    width,
+                    if vertical {
+                        f32::from(event.position.y)
+                    } else {
+                        f32::from(event.position.x)
+                    },
+                    if vertical {
+                        f32::from(bounds.top())
+                    } else {
+                        f32::from(bounds.left())
+                    },
+                    if vertical {
+                        f32::from(bounds.size.height)
+                    } else {
+                        width
+                    },
                     f32::from(knob),
                 ) else {
                     return;
                 };
                 move_dragging.borrow_mut().0 = true;
-                let fraction = directed_fraction(fraction, direction);
+                let fraction = logical_fraction(fraction, self.orientation, direction);
                 drag(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -421,7 +527,12 @@ impl RenderOnce for Slider {
         let keyboard_step = self.step.unwrap_or((self.max - self.min) / 20.0);
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Slider)
             .disabled(self.disabled)
-            .range(self.min, self.max, value);
+            .range(self.min, self.max, value)
+            .orientation(if vertical {
+                gpui::accesskit::Orientation::Vertical
+            } else {
+                gpui::accesskit::Orientation::Horizontal
+            });
         if let Some(label) = self.label.clone() {
             spec = spec.text(label);
         }
@@ -474,22 +585,40 @@ impl RenderOnce for Slider {
                     .semantic_in(cx, spec),
             );
 
-        if actionable && let Some(handler) = self.on_change.clone() {
+        if actionable {
             let (min, max) = (self.min, self.max);
+            let on_change = self.on_change.clone();
+            let on_range_change = self.on_range_change.clone();
+            let current_high = self.clamped_high().unwrap_or(value);
             frame.interactivity().on_key_down(move |event, window, cx| {
                 let key = event.keystroke.key.as_str();
-                let next = match direction.arrow_step(key) {
-                    Some(1) => value + keyboard_step,
-                    Some(_) => value - keyboard_step,
-                    None => match key {
-                        "down" => value - keyboard_step,
+                let next = if vertical {
+                    match key {
                         "up" => value + keyboard_step,
+                        "down" => value - keyboard_step,
                         "home" => min,
                         "end" => max,
                         _ => return,
-                    },
+                    }
+                } else {
+                    match direction.arrow_step(key) {
+                        Some(1) => value + keyboard_step,
+                        Some(_) => value - keyboard_step,
+                        None => match key {
+                            "down" => value - keyboard_step,
+                            "up" => value + keyboard_step,
+                            "home" => min,
+                            "end" => max,
+                            _ => return,
+                        },
+                    }
                 };
-                handler(next.clamp(min, max), window, cx);
+                let next = next.clamp(min, max);
+                if let Some(handler) = &on_change {
+                    handler(next, window, cx);
+                } else if let Some(handler) = &on_range_change {
+                    handler(next.min(current_high), current_high.max(next), window, cx);
+                }
                 cx.stop_propagation();
             });
         }
@@ -503,11 +632,10 @@ fn knob_at(
     knob: gpui::Pixels,
     theme: &gpui_kit_theme::Theme,
     disabled: bool,
+    vertical: bool,
 ) -> gpui::Div {
-    div()
+    let mut knob_view = div()
         .absolute()
-        .left(gpui::relative(fraction))
-        .ml(-(knob / 2.0))
         .size(knob)
         .rounded_full()
         .bg(if disabled {
@@ -516,7 +644,25 @@ fn knob_at(
             theme.colors.text
         })
         .border(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline_strong)
+        .border_color(theme.colors.hairline_strong);
+    if vertical {
+        knob_view = knob_view
+            .top(gpui::relative(fraction))
+            .mt(-(knob / 2.0))
+            .left(gpui::relative(0.5))
+            .ml(-(knob / 2.0))
+            .flex()
+            .justify_center();
+    } else {
+        knob_view = knob_view
+            .left(gpui::relative(fraction))
+            .ml(-(knob / 2.0))
+            .top_0()
+            .bottom_0()
+            .flex()
+            .items_center();
+    }
+    knob_view
 }
 
 /// Converts between a logical fraction and a physical left-origin fraction.
@@ -526,6 +672,28 @@ fn directed_fraction(fraction: f32, direction: LayoutDirection) -> f32 {
         1.0 - fraction
     } else {
         fraction
+    }
+}
+
+fn to_physical_fraction(
+    fraction: f32,
+    orientation: SliderOrientation,
+    direction: LayoutDirection,
+) -> f32 {
+    match orientation {
+        SliderOrientation::Horizontal => directed_fraction(fraction, direction),
+        SliderOrientation::Vertical => 1.0 - fraction,
+    }
+}
+
+fn logical_fraction(
+    fraction: f32,
+    orientation: SliderOrientation,
+    direction: LayoutDirection,
+) -> f32 {
+    match orientation {
+        SliderOrientation::Horizontal => directed_fraction(fraction, direction),
+        SliderOrientation::Vertical => 1.0 - fraction,
     }
 }
 
