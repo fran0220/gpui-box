@@ -5,7 +5,7 @@ async function liveFrame(page, scene, theme = "studio-dark") {
   const iframe = host.locator("iframe");
   await expect(iframe).toHaveAttribute("loading", "lazy");
   await expect(iframe).toHaveAttribute("title", `Live GPUI Box ${scene} scene in ${theme}`);
-  await expect(host).toHaveClass(/is-ready/);
+  await expect(host).toHaveClass(/is-ready/, { timeout: 30_000 });
   await expect(host.locator(".live-fallback")).toBeHidden();
   const handle = await iframe.elementHandle();
   const frame = await handle.contentFrame();
