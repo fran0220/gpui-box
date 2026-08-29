@@ -1,11 +1,10 @@
 //! A surface that shows what is behind it, out of focus and bent.
 //!
 //! [`Glass`] is the material a popover, a dialog or a rail is placed on when
-//! the window itself is translucent. The pixels underneath are blurred, the
-//! surface colour is laid over the blur at `effect.glassAlpha`, and — where
-//! the renderer can — the edge behaves like the rim of a body of glass: it
-//! bends what is behind it, splits the bend into colour, and catches a
-//! highlight.
+//! the window itself is translucent. Liquid and Lens snapshot the sharp
+//! backdrop and bend it at the edge; Frosted independently scatters its
+//! snapshot. Blur is therefore one material axis, not the switch that decides
+//! whether glass exists.
 //!
 //! # One layer, in one order
 //!
@@ -17,15 +16,14 @@
 //! Inside one layer the relationship is structural: surface first, fill and
 //! content after.
 //!
-//! # Where the optics do not exist
+//! # Fill and optics are different layers
 //!
-//! A backdrop blur is a renderer capability, not a paintable colour, and the
-//! optics on top of it are another. Where the renderer has neither, the fill
-//! is all that remains, which is a legible surface rather than a broken one —
-//! this is why the fill is painted whether or not anything was blurred. A
-//! theme that declares itself opaque by setting `effect.glassAlpha` to 1 takes
-//! the same path deliberately: there is nothing to see through, so nothing is
-//! blurred and nothing is bent.
+//! Liquid and Lens paint no ordinary source-over fill by default: doing that
+//! on top of the additive lift would mute the very refraction that names the
+//! material. Frosted still needs its theme-owned fill, and `adaptive(true)` is
+//! an explicit readability policy that may add one when the backdrop opposes
+//! the content. A theme that sets `effect.glassAlpha` to 1 makes either of
+//! those fills opaque, so there is deliberately no backdrop work beneath it.
 //!
 //! `docs/coverage.md` records which renderer does which of these today.
 
@@ -36,7 +34,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use gpui::{
     AnyElement, App, Bounds, Corners, Element, GlassLobe, GlassMaterial, GlobalElementId,
     InspectorElementId, InteractiveElement as _, IntoElement, LayoutId, MAX_GLASS_LOBES,
-    MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce,
+    MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -66,16 +64,15 @@ pub enum GlassPreset {
 }
 
 impl GlassPreset {
-    /// How much of the surface is tint, at this theme.
+    /// How much ordinary source-over fill the surface paints, at this theme.
     ///
-    /// A frosted surface has nothing but its fill to separate it from the
-    /// backdrop, so it takes `effect.glassAlpha`. The other two are read by
-    /// their optics, and a fill that strong would cover them, so they take
-    /// the thinner `effect.glassLiquidAlpha`.
+    /// A frosted surface uses `effect.glassAlpha` to separate its scattered
+    /// backdrop from surrounding content. Liquid and Lens use shader-owned
+    /// optics instead; their default fill is transparent.
     pub fn tint_alpha(self, theme: &Theme) -> f32 {
         match self {
             GlassPreset::Frosted => theme.effects.glass_alpha,
-            GlassPreset::Liquid | GlassPreset::Lens => theme.effects.glass_liquid_alpha,
+            GlassPreset::Liquid | GlassPreset::Lens => 0.0,
         }
     }
 
@@ -86,22 +83,68 @@ impl GlassPreset {
     pub fn material(self, theme: &Theme) -> GlassMaterial<Pixels> {
         let effects = &theme.effects;
         match self {
-            GlassPreset::Frosted => GlassMaterial::frosted(),
+            GlassPreset::Frosted => GlassMaterial::frosted(px(effects.glass_frost_blur)),
             GlassPreset::Liquid => GlassMaterial {
-                bevel: px(effects.glass_bevel),
                 refraction: effects.glass_refraction,
                 dispersion: effects.glass_dispersion,
                 specular: effects.glass_specular,
+                transmission_gain: effects.glass_transmission_gain,
+                optical_lift: Rgba {
+                    r: 1.0,
+                    g: 1.0,
+                    b: 1.0,
+                    a: effects.glass_optical_lift,
+                },
+                hairline: px(effects.glass_hairline),
                 light_angle: effects.glass_light_angle,
                 specular_sharpness: effects.glass_specular_sharpness,
-                ..GlassMaterial::frosted()
+                ..GlassMaterial::clear()
             },
             GlassPreset::Lens => GlassMaterial {
-                bevel: px(effects.glass_bevel),
                 refraction: effects.glass_refraction,
-                ..GlassMaterial::frosted()
+                ..GlassMaterial::clear()
             },
         }
+    }
+
+    /// The responsive optical profile this preset resolves once its bounds are
+    /// known. Frosted is flat; the two clear presets scale with their own
+    /// control rather than borrowing one fixed pixel bevel.
+    fn bevel(self, theme: &Theme) -> Option<ResponsiveBevel> {
+        (self != GlassPreset::Frosted).then_some(ResponsiveBevel {
+            ratio: theme.effects.glass_bevel_ratio,
+            min: px(theme.effects.glass_bevel_min),
+            max: px(theme.effects.glass_bevel_max),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResponsiveBevel {
+    ratio: f32,
+    min: Pixels,
+    max: Pixels,
+}
+
+impl ResponsiveBevel {
+    /// Resolve from the short edge of one control. A fused body uses the
+    /// smallest constituent short edge, never the potentially very wide union.
+    fn resolve(self, bounds: Bounds<Pixels>, lobes: &[GlassLobe<Pixels>]) -> Pixels {
+        let short_edge = if lobes.is_empty() {
+            f32::from(bounds.size.width).min(f32::from(bounds.size.height))
+        } else {
+            lobes.iter().fold(f32::INFINITY, |shortest, lobe| {
+                shortest
+                    .min(f32::from(lobe.bounds.size.width).min(f32::from(lobe.bounds.size.height)))
+            })
+        };
+        if !short_edge.is_finite() || short_edge <= 0.0 {
+            return px(0.0);
+        }
+
+        let upper = f32::from(self.max).max(0.0).min(short_edge * 0.5);
+        let lower = f32::from(self.min).max(0.0).min(upper);
+        px((short_edge * self.ratio.max(0.0)).clamp(lower, upper))
     }
 }
 
@@ -164,7 +207,8 @@ struct GlassState {
     lease: ProbeLease,
 }
 
-/// A glass surface: blurred and bent backdrop, tinted fill, caller's content.
+/// A glass surface: optionally scattered and bent backdrop, optional fill,
+/// and caller-owned content.
 #[derive(IntoElement)]
 pub struct Glass {
     ident: Ident,
@@ -222,8 +266,8 @@ impl Glass {
         }
     }
 
-    /// Which surface colour is laid over the blur. The overlay surface is the
-    /// default because that is what a floating thing is made of.
+    /// Which surface colour Frosted or adaptive Liquid lays over the backdrop.
+    /// Clear Liquid and Lens paint no ordinary fill by default.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
         self
@@ -237,8 +281,9 @@ impl Glass {
         self
     }
 
-    /// How far the backdrop is blurred, in pixels, when `effect.glassBlur` is
-    /// not what this particular surface wants.
+    /// How far the backdrop is blurred, in pixels, overriding the preset. The
+    /// Liquid and Lens defaults are zero; adding blur composes frost with their
+    /// optics instead of enabling those optics.
     pub fn blur(mut self, blur: f32) -> Self {
         self.blur = Some(blur.max(0.0));
         self
@@ -294,15 +339,14 @@ impl Glass {
         self
     }
 
-    /// Deepen the tint from `effect.glassLiquidAlpha` to `effect.glassAlpha`
-    /// while the blurred backdrop opposes the surface's own fill — a dark
-    /// panel over a bright backdrop, a light one over a dark backdrop — where
-    /// a thin tint would let the backdrop wash out the content sitting on it.
+    /// Add a tint at `effect.glassAlpha` while the optical source opposes the
+    /// surface colour — a dark panel over a bright backdrop, or a light one
+    /// over a dark backdrop — where clear glass would wash out its content.
     ///
     /// The reading comes from [`Window::backdrop_luminance`] one frame after
     /// the backdrop moved, so the flip lands on the next frame the window
     /// draws. On a renderer that takes no probes the reading never arrives
-    /// and the tint honestly stays thin.
+    /// and the surface honestly stays clear.
     pub fn adaptive(mut self, adaptive: bool) -> Self {
         self.adaptive = adaptive;
         self
@@ -324,6 +368,9 @@ impl Glass {
     /// combination with the caller's overrides laid over it.
     fn material(&self, theme: &Theme) -> GlassMaterial<Pixels> {
         let mut material = self.preset.material(theme);
+        if let Some(blur) = self.blur {
+            material.blur_radius = px(blur);
+        }
         if let Some(refraction) = self.refraction {
             material.refraction = refraction;
         }
@@ -345,8 +392,8 @@ impl RenderOnce for Glass {
         let theme = cx.theme().clone();
         let radius = theme.radius(self.radius);
         let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
-        let blur = self.blur.unwrap_or(theme.effects.glass_blur);
         let mut material = self.material(&theme);
+        let bevel = self.preset.bevel(&theme);
 
         let id = self.ident.semantic_id();
         let interactive = self.track_pointer || self.pressable || self.adaptive;
@@ -402,7 +449,7 @@ impl RenderOnce for Glass {
         }
 
         let fill = theme.surface(self.surface).opacity(alpha);
-        let translucent = shows_a_backdrop(alpha, blur);
+        let translucent = alpha < 1.0;
 
         let surface = div()
             .rounded(px(radius))
@@ -444,8 +491,8 @@ impl RenderOnce for Glass {
             });
             return BackdropLayer {
                 radius: px(radius),
-                blur: px(blur),
                 material,
+                bevel,
                 lobes: LobeSource::Surface,
                 translucent,
                 measured: Some(measured),
@@ -455,8 +502,8 @@ impl RenderOnce for Glass {
 
         BackdropLayer {
             radius: px(radius),
-            blur: px(blur),
             material,
+            bevel,
             lobes: LobeSource::Surface,
             translucent,
             measured: Some(measured),
@@ -473,8 +520,9 @@ impl RenderOnce for Glass {
 /// meet. The optics — bevel, refraction, dispersion, the highlight — follow
 /// the fused outline rather than each pane's own.
 ///
-/// The fill does not fuse: each pane lays its own tint, and the neck between
-/// two panes shows the bare bent backdrop. A group holds at most
+/// A Frosted fill does not fuse: each pane lays its own tint, and the neck
+/// between two panes shows the bare optical source. Liquid and Lens panes are
+/// clear. A group holds at most
 /// [`MAX_GLASS_LOBES`] panes; panes past that keep their fill and their
 /// content but fall outside the fused shape, so the bound is asserted in
 /// debug rather than silently absorbed.
@@ -520,7 +568,8 @@ impl GlassGroup {
         }
     }
 
-    /// Which surface colour each pane lays over the blur.
+    /// Which surface colour each Frosted pane lays over the backdrop. Liquid
+    /// and Lens panes are clear.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
         self
@@ -532,7 +581,8 @@ impl GlassGroup {
         self
     }
 
-    /// How far the backdrop is blurred, overriding `effect.glassBlur`.
+    /// How far the backdrop is blurred, overriding the preset. Liquid groups
+    /// are clear by default; this opt-in composes scattering with refraction.
     pub fn blur(mut self, blur: f32) -> Self {
         self.blur = Some(blur.max(0.0));
         self
@@ -577,10 +627,13 @@ impl RenderOnce for GlassGroup {
         let radius = theme.radius(self.radius);
         let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let fill = theme.surface(self.surface).opacity(alpha);
-        let blur = self.blur.unwrap_or(theme.effects.glass_blur);
         let mut material = self.preset.material(&theme);
+        if let Some(blur) = self.blur {
+            material.blur_radius = px(blur);
+        }
         material.smoothing = px(self.merge.unwrap_or(theme.effects.glass_merge_distance));
-        let translucent = shows_a_backdrop(alpha, blur);
+        let translucent = alpha < 1.0;
+        let bevel = self.preset.bevel(&theme);
         let collected: Rc<RefCell<Vec<GlassLobe<Pixels>>>> = Rc::default();
 
         let row = div()
@@ -603,8 +656,8 @@ impl RenderOnce for GlassGroup {
 
         BackdropLayer {
             radius: px(radius),
-            blur: px(blur),
             material,
+            bevel,
             lobes: LobeSource::Collected(collected),
             translucent,
             measured: None,
@@ -719,14 +772,12 @@ fn deepen_tint(deepened: bool, luminance: f32, dark_fill: bool, low: f32, high: 
     }
 }
 
-/// Whether there is anything for a backdrop to show. Blurring what a fully
-/// opaque fill is about to cover costs a render pass and changes no pixel, and
-/// a radius of zero is a caller saying not to blur at all.
-///
-/// The optics ride on the same decision: they act on the blurred backdrop, so
-/// where there is no backdrop there is nothing for them to act on either.
-fn shows_a_backdrop(alpha: f32, blur: f32) -> bool {
-    alpha < 1.0 && blur > 0.0
+/// Whether there is anything for a backdrop to show. An opaque fill hides all
+/// optics; otherwise the material decides, and clear refraction remains real
+/// even when its blur radius is zero.
+#[cfg(test)]
+fn shows_a_backdrop(alpha: f32, material: &GlassMaterial<Pixels>) -> bool {
+    alpha < 1.0 && material.needs_backdrop()
 }
 
 /// Where a backdrop surface's shape comes from.
@@ -747,8 +798,8 @@ pub(crate) enum LobeSource {
 /// a backdrop at all are decided by the caller and passed in already resolved.
 pub(crate) struct BackdropLayer {
     pub(crate) radius: Pixels,
-    pub(crate) blur: Pixels,
     pub(crate) material: GlassMaterial<Pixels>,
+    bevel: Option<ResponsiveBevel>,
     pub(crate) lobes: LobeSource,
     pub(crate) translucent: bool,
     /// Where to record the bounds this layer was painted at, for a caller
@@ -816,14 +867,16 @@ impl Element for BackdropLayer {
                 &collected[..collected.len().min(MAX_GLASS_LOBES)]
             }
         };
+        let mut material = self.material;
+        if let Some(bevel) = self.bevel {
+            material.bevel = bevel.resolve(bounds, lobes);
+        }
+        if !material.needs_backdrop() {
+            self.child.paint(window, cx);
+            return;
+        }
         window.paint_layer(bounds, |window| {
-            window.paint_backdrop_glass(
-                bounds,
-                Corners::all(self.radius),
-                self.blur,
-                self.material,
-                lobes,
-            );
+            window.paint_backdrop_glass(bounds, Corners::all(self.radius), material, lobes);
             self.child.paint(window, cx);
         });
     }
@@ -842,13 +895,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_opaque_theme_shows_no_backdrop() {
-        assert!(shows_a_backdrop(0.72, 24.0));
+    fn clear_optics_show_a_backdrop_without_blur() {
+        let theme = Theme::studio_dark();
+        let mut lens = GlassMaterial::clear();
+        lens.bevel = px(12.0);
+        lens.refraction = 0.34;
+
+        assert_eq!(GlassPreset::Liquid.tint_alpha(&theme), 0.0);
+        assert_eq!(GlassPreset::Lens.tint_alpha(&theme), 0.0);
+        assert!(shows_a_backdrop(0.72, &lens));
         assert!(
-            !shows_a_backdrop(1.0, 24.0),
-            "an opaque fill hides what it blurred"
+            !shows_a_backdrop(1.0, &lens),
+            "an opaque fill hides every optical result"
         );
-        assert!(!shows_a_backdrop(0.72, 0.0), "no radius is no blur");
+        assert!(
+            !shows_a_backdrop(0.72, &GlassMaterial::clear()),
+            "a plain clear copy changes no pixel"
+        );
     }
 
     #[test]
@@ -856,7 +919,7 @@ mod tests {
         let theme = Theme::studio_dark();
         assert_eq!(
             GlassPreset::Frosted.material(&theme),
-            GlassMaterial::frosted()
+            GlassMaterial::frosted(px(theme.effects.glass_frost_blur))
         );
         assert!(GlassPreset::Frosted.material(&theme).is_flat());
     }
@@ -864,9 +927,14 @@ mod tests {
     #[test]
     fn the_lens_preset_bends_without_colouring_or_lighting() {
         let theme = Theme::studio_dark();
-        let material = GlassPreset::Lens.material(&theme);
+        let mut material = GlassPreset::Lens.material(&theme);
+        material.bevel = GlassPreset::Lens
+            .bevel(&theme)
+            .expect("a lens has a responsive bevel")
+            .resolve(surface_bounds(), &[]);
 
         assert!(material.bends_light());
+        assert_eq!(material.blur_radius, px(0.0), "a lens is clear by default");
         assert_eq!(material.dispersion, 0.0, "a lens does not fringe text");
         assert_eq!(material.specular, 0.0, "a lens carries no highlight");
     }
@@ -874,12 +942,27 @@ mod tests {
     #[test]
     fn the_liquid_preset_takes_every_optic_from_tokens() {
         let theme = Theme::studio_dark();
-        let material = GlassPreset::Liquid.material(&theme);
+        let mut material = GlassPreset::Liquid.material(&theme);
+        material.bevel = GlassPreset::Liquid
+            .bevel(&theme)
+            .expect("liquid has a responsive bevel")
+            .resolve(surface_bounds(), &[]);
 
-        assert_eq!(material.bevel, px(theme.effects.glass_bevel));
+        assert_eq!(
+            material.bevel,
+            px(100.0 * theme.effects.glass_bevel_ratio),
+            "the profile follows the control's short edge"
+        );
+        assert_eq!(material.blur_radius, px(0.0));
         assert_eq!(material.refraction, theme.effects.glass_refraction);
         assert_eq!(material.dispersion, theme.effects.glass_dispersion);
         assert_eq!(material.specular, theme.effects.glass_specular);
+        assert_eq!(
+            material.transmission_gain,
+            theme.effects.glass_transmission_gain
+        );
+        assert_eq!(material.optical_lift.a, theme.effects.glass_optical_lift);
+        assert_eq!(material.hairline, px(theme.effects.glass_hairline));
         assert_eq!(material.light_angle, theme.effects.glass_light_angle);
         assert!(!material.is_flat());
     }
@@ -900,9 +983,8 @@ mod tests {
         assert_eq!(material.specular, 0.9);
         assert_eq!(material.light_angle, 1.5);
         assert_eq!(
-            material.bevel,
-            px(theme.effects.glass_bevel),
-            "what the caller did not override stays with the theme"
+            material.transmission_gain, theme.effects.glass_transmission_gain,
+            "what the caller did not override stays with the preset"
         );
     }
 
@@ -911,6 +993,46 @@ mod tests {
             origin: gpui::point(px(100.), px(100.)),
             size: gpui::size(px(200.), px(100.)),
         }
+    }
+
+    #[test]
+    fn responsive_bevel_scales_and_clamps_by_short_edge() {
+        let policy = ResponsiveBevel {
+            ratio: 0.225,
+            min: px(8.0),
+            max: px(36.0),
+        };
+        let bounds = |width, height| Bounds {
+            origin: gpui::point(px(0.0), px(0.0)),
+            size: gpui::size(px(width), px(height)),
+        };
+
+        assert_eq!(policy.resolve(bounds(200.0, 20.0), &[]), px(8.0));
+        assert_eq!(policy.resolve(bounds(200.0, 120.0), &[]), px(27.0));
+        assert_eq!(policy.resolve(bounds(400.0, 240.0), &[]), px(36.0));
+    }
+
+    #[test]
+    fn a_group_bevel_uses_constituent_controls_not_the_union() {
+        let policy = ResponsiveBevel {
+            ratio: 0.225,
+            min: px(0.0),
+            max: px(100.0),
+        };
+        let lobe = |x, width, height| GlassLobe {
+            bounds: Bounds {
+                origin: gpui::point(px(x), px(0.0)),
+                size: gpui::size(px(width), px(height)),
+            },
+            corner_radii: Corners::default(),
+        };
+        let lobes = [lobe(0.0, 100.0, 40.0), lobe(112.0, 160.0, 60.0)];
+        let union = Bounds {
+            origin: gpui::point(px(0.0), px(0.0)),
+            size: gpui::size(px(272.0), px(60.0)),
+        };
+
+        assert_eq!(policy.resolve(union, &lobes), px(9.0));
     }
 
     #[test]
@@ -975,14 +1097,15 @@ mod tests {
     }
 
     #[test]
-    fn an_override_can_take_the_optics_off_a_lit_preset() {
+    fn a_blur_override_composes_frost_with_liquid() {
         let theme = Theme::studio_dark();
         let material = Glass::new("surface")
             .preset(GlassPreset::Liquid)
-            .refraction(0.0)
-            .specular(0.0)
+            .blur(12.0)
             .material(&theme);
 
-        assert!(material.is_flat(), "a caller may ask for a plain pane");
+        assert_eq!(material.blur_radius, px(12.0));
+        assert_eq!(material.refraction, theme.effects.glass_refraction);
+        assert_eq!(material.optical_lift.a, theme.effects.glass_optical_lift);
     }
 }

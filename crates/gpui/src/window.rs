@@ -2696,9 +2696,9 @@ impl Window {
             .render_to_image(&self.rendered_frame.scene)
     }
 
-    /// The mean luminance of the blurred backdrop a probed glass surface
+    /// The mean luminance of the optical source a probed glass surface
     /// covered, in `0..=1`, or `None` while the slot holds no completed
-    /// reading.
+    /// reading. The source is sharp for clear glass and blurred for frost.
     ///
     /// A surface fills a slot by setting [`crate::GlassMaterial::probe`]. The
     /// renderer copies the reading back without stalling the frame that took
@@ -4703,9 +4703,9 @@ impl Window {
     /// Paint a within-window backdrop blur: everything already painted
     /// beneath `bounds` is snapshotted and painted back gaussian-blurred
     /// inside the rounded rect (frosted-glass popovers). Metal, WGPU and
-    /// DirectX renderers support it; other renderers, invalid radii, and blur
-    /// regions beyond a renderer's bounded per-frame budget fall back to an
-    /// unblurred backdrop. Callers should keep a translucent fill over it.
+    /// DirectX renderers support it; invalid radii and blur regions beyond a
+    /// renderer's bounded per-frame budget fall back to the sharp source.
+    /// Frosted callers should keep a translucent fill over it.
     /// Content painted AFTER this call composites on top of the blur.
     ///
     /// This is [`Window::paint_backdrop_glass`] with [`GlassMaterial::frosted`]
@@ -4720,15 +4720,15 @@ impl Window {
         self.paint_backdrop_glass(
             bounds,
             corner_radii,
-            blur_radius,
-            GlassMaterial::frosted(),
+            GlassMaterial::frosted(blur_radius),
             &[],
         );
     }
 
     /// Paint a within-window glass surface: everything already painted beneath
-    /// `bounds` is snapshotted, gaussian-blurred, and painted back through the
-    /// surface's shape and `material`.
+    /// `bounds` is snapshotted and painted back through the surface's shape and
+    /// `material`. A zero [`GlassMaterial::blur_radius`] keeps the snapshot
+    /// sharp; it does not disable refraction or the rest of the optics.
     ///
     /// `lobes` is the shape. An empty slice means the surface is the single
     /// rounded rect named by `bounds` and `corner_radii`, which is the common
@@ -4737,23 +4737,23 @@ impl Window {
     /// is the region the renderer rasterizes and the blur is clipped to. Lobes
     /// past [`MAX_GLASS_LOBES`] are dropped.
     ///
-    /// The optics are a renderer capability, not a paintable colour. Where a
-    /// renderer has none, the blur is painted without them rather than the
-    /// surface being skipped, on the same reasoning as the blur itself:
-    /// a legible surface beats a hole. `material` is sanitized on the way in,
-    /// so a value computed from an animation cannot produce one.
+    /// Metal, DirectX, and native/browser WGPU implement this complete
+    /// contract. A bounded renderer may discard requested scattering when it
+    /// runs out of Gaussian work, but it must retain the sharp snapshot and
+    /// every other optical field. `material` is sanitized on the way in, so a
+    /// value computed from an animation cannot produce a hole.
     ///
     /// Content painted AFTER this call composites on top.
     pub fn paint_backdrop_glass(
         &mut self,
         bounds: Bounds<Pixels>,
         corner_radii: Corners<Pixels>,
-        blur_radius: Pixels,
         material: GlassMaterial<Pixels>,
         lobes: &[GlassLobe<Pixels>],
     ) {
         self.invalidator.debug_assert_paint();
-        if !blur_radius.0.is_finite() || blur_radius.0 < 0.0 {
+        let material = material.sanitized();
+        if !material.needs_backdrop() {
             return;
         }
         let scale_factor = self.scale_factor();
@@ -4785,7 +4785,6 @@ impl Window {
 
         self.next_frame.scene.insert_backdrop_glass(BackdropGlass {
             order: 0,
-            blur_radius: blur_radius.scale(scale_factor),
             bounds: bounds.scale(scale_factor),
             content_mask,
             corner_radii: corner_radii.scale(scale_factor),

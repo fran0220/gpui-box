@@ -55,8 +55,8 @@ impl Frost {
         self
     }
 
-    /// How far the backdrop is blurred, in pixels, when `effect.glassBlur` is
-    /// not what this particular surface wants.
+    /// How far the backdrop is blurred, in pixels, overriding
+    /// `effect.glassFrostBlur` for this surface.
     pub fn blur(mut self, blur: f32) -> Self {
         self.inner = self.inner.blur(blur);
         self
@@ -85,7 +85,7 @@ mod tests {
         let theme = Theme::studio_dark();
         assert_eq!(
             Frost::new("surface").inner.material_for_test(&theme),
-            GlassMaterial::frosted(),
+            GlassMaterial::frosted(gpui::px(theme.effects.glass_frost_blur)),
             "a frosted surface asks the renderer for a blur and nothing else"
         );
     }

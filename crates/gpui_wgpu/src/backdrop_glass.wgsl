@@ -19,16 +19,18 @@ struct Params {
     light_angle: f32,
     specular_sharpness: f32,
     smoothing: f32,
+    transmission_gain: f32,
+    hairline: f32,
     lobe_count: u32,
     pad_0: u32,
-    pad_1: u32,
-    pad_2: u32,
+    optical_lift: vec4<f32>,
     lobes: array<Lobe, MAX_GLASS_LOBES>,
 }
 
 @group(0) @binding(0) var source: texture_2d<f32>;
-@group(0) @binding(1) var source_sampler: sampler;
-@group(0) @binding(2) var<uniform> params: Params;
+@group(0) @binding(1) var sharp_source: texture_2d<f32>;
+@group(0) @binding(2) var source_sampler: sampler;
+@group(0) @binding(3) var<uniform> params: Params;
 
 struct Varying {
     @builtin(position) position: vec4<f32>,
@@ -123,9 +125,11 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // Without optics the blurred snapshot is the whole answer, and reading it
-    // by texel rather than by sample keeps that path exact.
-    if ((params.bevel <= 0.0 || params.refraction == 0.0) && params.specular <= 0.0) {
+    // A plain frost is an exact copy of its blurred source. Liquid reaches the
+    // path below even with blur zero: scattering is not the optics switch.
+    if ((params.bevel <= 0.0 || params.refraction == 0.0) && params.specular <= 0.0 &&
+        params.transmission_gain == 1.0 && params.optical_lift.a <= 0.0 &&
+        params.hairline <= 0.0) {
         return textureLoad(source, vec2<i32>(point), 0);
     }
 
@@ -143,48 +147,67 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         gradient = gradient / gradient_length;
     }
 
-    // The bevel: 0 at the rim rising to 1 once the surface is `bevel` pixels
-    // deep. `slope` is how much of it is left to bend light with.
-    var height = 1.0;
+    // `depth` is zero at the rim and one once the dome has flattened. The
+    // corresponding spherical slope diverges at the rim, then the measured
+    // reach cap below bounds its displacement to 45% of the profile depth.
+    var depth = 1.0;
     if (params.bevel > 0.0) {
-        height = clamp(-distance / params.bevel, 0.0, 1.0);
+        depth = clamp(-distance / params.bevel, 0.0, 1.0);
     }
-    let slope = 1.0 - height;
-    let smooth_slope = slope * slope * (3.0 - 2.0 * slope);
-    let normal = normalize(vec3<f32>(gradient * smooth_slope, max(height, 0.001)));
+    let rise = 1.0 - depth;
+    let slope = rise / sqrt(max(1.0 - rise * rise, 1e-4));
+    var displacement = -gradient * slope * params.bevel * params.refraction;
+    let reach_limit = params.bevel * 0.45;
+    let reach = length(displacement);
+    if (reach > reach_limit && reach > 0.0) {
+        displacement *= reach_limit / reach;
+    }
 
-    var color: vec4<f32>;
-    if (params.bevel > 0.0 && params.refraction != 0.0) {
-        let offset = normal.xy * params.refraction * params.bevel * smooth_slope /
-            params.viewport;
-        let uv = point / params.viewport;
-        if (params.dispersion > 0.0) {
-            // Dispersion splits the channels along the same offset, which is
-            // what makes a rim read as glass rather than as a smear.
-            let red = textureSample(source, source_sampler, uv + offset * (1.0 + params.dispersion));
-            let green = textureSample(source, source_sampler, uv + offset);
-            let blue = textureSample(source, source_sampler, uv + offset * (1.0 - params.dispersion));
-            color = vec4<f32>(red.r, green.g, blue.b, green.a);
-        } else {
-            color = textureSample(source, source_sampler, uv + offset);
-        }
-    } else {
-        color = textureLoad(source, vec2<i32>(point), 0);
-    }
+    // Frost in the interior, the sharp snapshot at the bent rim. Both sources
+    // are sampled at the same displaced coordinate so blur changes scattering,
+    // never the geometry of the refraction.
+    let sharpness = rise * rise;
+    let red_uv = (point + displacement * (1.0 - params.dispersion)) / params.viewport;
+    let green_uv = (point + displacement) / params.viewport;
+    let blue_uv = (point + displacement * (1.0 + params.dispersion)) / params.viewport;
+    let frosted_red = textureSample(source, source_sampler, red_uv);
+    let frosted_green = textureSample(source, source_sampler, green_uv);
+    let frosted_blue = textureSample(source, source_sampler, blue_uv);
+    let sharp_red = textureSample(sharp_source, source_sampler, red_uv);
+    let sharp_green = textureSample(sharp_source, source_sampler, green_uv);
+    let sharp_blue = textureSample(sharp_source, source_sampler, blue_uv);
+    var color = vec4<f32>(
+        mix(frosted_red.r, sharp_red.r, sharpness),
+        mix(frosted_green.g, sharp_green.g, sharpness),
+        mix(frosted_blue.b, sharp_blue.b, sharpness),
+        mix(frosted_green.a, sharp_green.a, sharpness),
+    );
+
+    color = vec4<f32>(
+        color.rgb * params.transmission_gain + params.optical_lift.rgb * params.optical_lift.a,
+        color.a,
+    );
 
     if (params.specular > 0.0) {
         // The light sits on the unit sphere at `light_angle`, measured
         // clockwise from straight up, tilted towards the viewer so a flat
         // surface is lit rather than black.
+        let normal = normalize(vec3<f32>(gradient * rise, max(depth, 0.001)));
         let light = normalize(vec3<f32>(
             sin(params.light_angle), -cos(params.light_angle), 0.6));
         let lobe_value = clamp(dot(normal, light), 0.0, 1.0);
         let highlight = pow(lobe_value, params.specular_sharpness) *
-            params.specular * smooth_slope;
-        color = vec4<f32>(clamp(color.rgb + highlight, vec3<f32>(0.0), vec3<f32>(1.0)), color.a);
+            params.specular * rise;
+        color = vec4<f32>(color.rgb + highlight, color.a);
     }
 
-    return color;
+    if (params.hairline > 0.0) {
+        let hair = 1.0 - smoothstep(0.0, params.hairline * 1.5, -distance);
+        let facing_up = clamp(-gradient.y, 0.0, 1.0);
+        color = vec4<f32>(color.rgb + hair * (1.0 - 0.18 * facing_up) * 0.18, color.a);
+    }
+
+    return vec4<f32>(clamp(color.rgb, vec3<f32>(0.0), vec3<f32>(1.0)), color.a);
 }
 
 @fragment

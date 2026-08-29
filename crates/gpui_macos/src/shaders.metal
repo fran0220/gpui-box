@@ -1479,7 +1479,9 @@ fragment float4 backdrop_glass_fragment(
     constant Size_DevicePixels *viewport_size
     [[buffer(BackdropGlassInputIndex_ViewportSize)]],
     texture2d<float> source_texture
-    [[texture(BackdropGlassInputIndex_SourceTexture)]]) {
+    [[texture(BackdropGlassInputIndex_SourceTexture)]],
+    texture2d<float> sharp_texture
+    [[texture(BackdropGlassInputIndex_SharpTexture)]]) {
   constexpr sampler source_sampler(coord::normalized, address::clamp_to_edge,
                                    filter::linear);
   BackdropGlass glass = surfaces[input.glass_id];
@@ -1507,12 +1509,18 @@ fragment float4 backdrop_glass_fragment(
       float2((float)viewport_size->width, (float)viewport_size->height);
   float2 uv = point / viewport;
 
-  // The snapshot was gaussian-blurred on the GPU (MPSImageGaussianBlur)
-  // before this pass. Without optics that is the whole answer.
+  // A plain frost is an exact copy of its blurred source. Liquid reaches the
+  // path below even with blur zero: scattering is not the optics switch.
   float bevel = glass.material.bevel;
   float refraction = glass.material.refraction;
   float specular = glass.material.specular;
-  if ((bevel <= 0. || refraction == 0.) && specular <= 0.) {
+  float4 optical_lift = float4(glass.material.optical_lift.r,
+                               glass.material.optical_lift.g,
+                               glass.material.optical_lift.b,
+                               glass.material.optical_lift.a);
+  if ((bevel <= 0. || refraction == 0.) && specular <= 0. &&
+      glass.material.transmission_gain == 1. && optical_lift.a <= 0. &&
+      glass.material.hairline <= 0.) {
     return source_texture.sample(source_sampler, uv);
   }
 
@@ -1532,49 +1540,59 @@ fragment float4 backdrop_glass_fragment(
   float gradient_length = length(gradient);
   gradient = gradient_length > 0. ? gradient / gradient_length : float2(0.);
 
-  // The bevel: 0 at the rim rising to 1 once the surface is `bevel` pixels
-  // deep. `height` is how flat the glass is here, so `1 - height` is how much
-  // of the slope is left to bend light with.
-  float height = bevel > 0. ? saturate(-distance / bevel) : 1.;
-  float slope = 1. - height;
-  float smooth_slope = slope * slope * (3. - 2. * slope);
-
-  // The surface normal of that bevel, in three dimensions: the flatter the
-  // glass the more the normal points at the viewer.
-  float3 normal = normalize(float3(gradient * smooth_slope, max(height, 0.001)));
-
-  float4 color;
-  if (bevel > 0. && refraction != 0.) {
-    // Refraction displaces the sample along the normal. The offset is a
-    // fraction of the bevel, so a deeper bevel bends further, and it vanishes
-    // in the middle where the glass is flat.
-    float2 offset = normal.xy * refraction * bevel * smooth_slope / viewport;
-    float dispersion = glass.material.dispersion;
-    if (dispersion > 0.) {
-      // Dispersion splits the channels along the same offset, which is what
-      // makes a rim read as glass rather than as a smear.
-      float4 red = source_texture.sample(source_sampler, uv + offset * (1. + dispersion));
-      float4 green = source_texture.sample(source_sampler, uv + offset);
-      float4 blue = source_texture.sample(source_sampler, uv + offset * (1. - dispersion));
-      color = float4(red.r, green.g, blue.b, green.a);
-    } else {
-      color = source_texture.sample(source_sampler, uv + offset);
-    }
-  } else {
-    color = source_texture.sample(source_sampler, uv);
+  // `depth` is zero at the rim and one once the dome has flattened. The
+  // spherical slope diverges at the rim, then the measured reach cap bounds
+  // displacement to 45% of the profile depth.
+  float depth = bevel > 0. ? saturate(-distance / bevel) : 1.;
+  float rise = 1. - depth;
+  float slope = rise / sqrt(max(1. - rise * rise, 1e-4));
+  float2 displacement = -gradient * slope * bevel * refraction;
+  float reach_limit = bevel * 0.45;
+  float reach = length(displacement);
+  if (reach > reach_limit && reach > 0.) {
+    displacement *= reach_limit / reach;
   }
+
+  // Frost in the interior, the sharp snapshot at the bent rim. Both sources
+  // use the same displaced coordinates, so blur changes scattering without
+  // changing refraction geometry.
+  float dispersion = glass.material.dispersion;
+  float2 red_uv = (point + displacement * (1. - dispersion)) / viewport;
+  float2 green_uv = (point + displacement) / viewport;
+  float2 blue_uv = (point + displacement * (1. + dispersion)) / viewport;
+  float sharpness = rise * rise;
+  float4 frosted_red = source_texture.sample(source_sampler, red_uv);
+  float4 frosted_green = source_texture.sample(source_sampler, green_uv);
+  float4 frosted_blue = source_texture.sample(source_sampler, blue_uv);
+  float4 sharp_red = sharp_texture.sample(source_sampler, red_uv);
+  float4 sharp_green = sharp_texture.sample(source_sampler, green_uv);
+  float4 sharp_blue = sharp_texture.sample(source_sampler, blue_uv);
+  float4 color = float4(mix(frosted_red.r, sharp_red.r, sharpness),
+                        mix(frosted_green.g, sharp_green.g, sharpness),
+                        mix(frosted_blue.b, sharp_blue.b, sharpness),
+                        mix(frosted_green.a, sharp_green.a, sharpness));
+
+  color.rgb = color.rgb * glass.material.transmission_gain +
+              optical_lift.rgb * optical_lift.a;
 
   if (specular > 0.) {
     // The light sits on the unit sphere at `light_angle`, measured clockwise
     // from straight up, tilted towards the viewer so a flat surface is lit
     // rather than black.
+    float3 normal = normalize(float3(gradient * rise, max(depth, 0.001)));
     float angle = glass.material.light_angle;
     float3 light = normalize(float3(sin(angle), -cos(angle), 0.6));
     float lobe_value = saturate(dot(normal, light));
     float highlight = pow(lobe_value, glass.material.specular_sharpness) *
-                      specular * smooth_slope;
-    color = float4(saturate(color.rgb + highlight), color.a);
+                      specular * rise;
+    color.rgb += highlight;
   }
 
-  return color;
+  if (glass.material.hairline > 0.) {
+    float hair = 1. - smoothstep(0., glass.material.hairline * 1.5, -distance);
+    float facing_up = saturate(-gradient.y);
+    color.rgb += hair * (1. - 0.18 * facing_up) * 0.18;
+  }
+
+  return float4(saturate(color.rgb), color.a);
 }

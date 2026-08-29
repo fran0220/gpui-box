@@ -816,9 +816,9 @@ impl MetalRenderer {
                     metal::MTLOrigin { x: 0, y: 0, z: 0 },
                 );
                 blit.end_encoding();
-                {
+                let frosted = if glass.material.blur_radius.0 > 0.0 {
                     use metal::foreign_types::ForeignType as _;
-                    let kernel = self.ensure_gaussian_kernel(glass.blur_radius.0.max(1.0));
+                    let kernel = self.ensure_gaussian_kernel(glass.material.blur_radius.0);
                     unsafe {
                         let _: () = msg_send![
                             kernel,
@@ -827,15 +827,19 @@ impl MetalRenderer {
                             destinationTexture: blurred.as_ptr() as *mut objc::runtime::Object
                         ];
                     }
-                }
-                self.encode_probe_blit(&glass, &blurred, command_buffer);
+                    blurred
+                } else {
+                    scratch.clone()
+                };
+                self.encode_probe_blit(&glass, &frosted, command_buffer);
                 command_encoder =
                     new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
                 if let Err(error) = self.draw_backdrop_glass(
                     &[glass],
                     writer,
                     viewport_size,
-                    &blurred,
+                    &frosted,
+                    &scratch,
                     command_encoder,
                 ) {
                     command_encoder.end_encoding();
@@ -936,9 +940,9 @@ impl MetalRenderer {
                 metal::MTLOrigin { x: 0, y: 0, z: 0 },
             );
             blit.end_encoding();
-            {
+            let frosted = if glass.material.blur_radius.0 > 0.0 {
                 use metal::foreign_types::ForeignType as _;
-                let kernel = self.ensure_gaussian_kernel(glass.blur_radius.0.max(1.0));
+                let kernel = self.ensure_gaussian_kernel(glass.material.blur_radius.0);
                 unsafe {
                     let _: () = msg_send![
                         kernel,
@@ -947,15 +951,19 @@ impl MetalRenderer {
                         destinationTexture: blurred.as_ptr() as *mut objc::runtime::Object
                     ];
                 }
-            }
-            self.encode_probe_blit(glass, &blurred, command_buffer);
+                blurred
+            } else {
+                scratch.clone()
+            };
+            self.encode_probe_blit(glass, &frosted, command_buffer);
             command_encoder =
                 new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
             if let Err(error) = self.draw_backdrop_glass(
                 &[*glass],
                 writer,
                 viewport_size,
-                &blurred,
+                &frosted,
+                &scratch,
                 command_encoder,
             ) {
                 command_encoder.end_encoding();
@@ -1189,6 +1197,7 @@ impl MetalRenderer {
         writer: &mut InstanceBufferWriter,
         viewport_size: Size<DevicePixels>,
         source_texture: &metal::TextureRef,
+        sharp_texture: &metal::TextureRef,
         command_encoder: &metal::RenderCommandEncoderRef,
     ) -> Result<()> {
         if surfaces.is_empty() {
@@ -1225,6 +1234,10 @@ impl MetalRenderer {
         command_encoder.set_fragment_texture(
             BackdropGlassInputIndex::SourceTexture as u64,
             Some(source_texture),
+        );
+        command_encoder.set_fragment_texture(
+            BackdropGlassInputIndex::SharpTexture as u64,
+            Some(sharp_texture),
         );
 
         command_encoder.draw_primitives_instanced(
@@ -2099,6 +2112,7 @@ enum BackdropGlassInputIndex {
     Surfaces = 1,
     ViewportSize = 2,
     SourceTexture = 3,
+    SharpTexture = 4,
 }
 
 #[repr(C)]
@@ -2226,7 +2240,6 @@ mod tests {
         });
         scene.insert_backdrop_glass(gpui::BackdropGlass {
             order: 0,
-            blur_radius: ScaledPixels(16.),
             bounds: Bounds {
                 origin: point(ScaledPixels(64.), ScaledPixels(64.)),
                 size: size(ScaledPixels(128.), ScaledPixels(128.)),
@@ -2234,8 +2247,9 @@ mod tests {
             content_mask: ContentMask { bounds: viewport },
             corner_radii: Corners::default(),
             material: GlassMaterial {
+                blur_radius: ScaledPixels(16.),
                 probe: slot,
-                ..GlassMaterial::frosted()
+                ..GlassMaterial::clear()
             },
             lobes: [gpui::GlassLobe::default(); gpui::MAX_GLASS_LOBES],
             lobe_count: 0,

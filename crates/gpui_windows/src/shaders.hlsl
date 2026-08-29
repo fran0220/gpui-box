@@ -15,6 +15,7 @@ cbuffer BatchParams: register(b1) {
 };
 
 Texture2D<float4> t_sprite: register(t0);
+Texture2D<float4> t_backdrop_sharp: register(t1);
 SamplerState s_sprite: register(s0);
 
 struct SubpixelSpriteFragmentOutput {
@@ -1397,6 +1398,10 @@ cbuffer BackdropGlassParams: register(b2) {
     float backdrop_smoothing;
     uint backdrop_lobe_count;
     uint backdrop_pad;
+    float backdrop_transmission_gain;
+    float backdrop_hairline;
+    float2 backdrop_optical_pad;
+    float4 backdrop_optical_lift;
     // Eight lobes, each a bounds and a radii. Written as an array of vectors
     // rather than of structs so that the sixteen-byte constant buffer packing
     // is the one the Rust side lays out.
@@ -1489,7 +1494,8 @@ float backdrop_glass_distance(float2 pt) {
     return distance;
 }
 
-// The blurred snapshot painted back through the surface's shape and material.
+// The optical source and retained sharp snapshot painted back through the
+// surface's shape and material.
 // Mirrors `fs_composite` in backdrop_glass.wgsl and
 // `backdrop_glass_fragment` in shaders.metal.
 float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
@@ -1501,10 +1507,11 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         discard;
     }
 
-    float2 uv = pt / global_viewport_size;
-
-    // Without optics the blurred snapshot is the whole answer.
-    if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) && backdrop_specular <= 0.0) {
+    // A plain frost is an exact copy of its blurred source. Liquid reaches the
+    // path below even with blur zero: scattering is not the optics switch.
+    if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) &&
+        backdrop_specular <= 0.0 && backdrop_transmission_gain == 1.0 &&
+        backdrop_optical_lift.a <= 0.0 && backdrop_hairline <= 0.0) {
         return t_sprite.Load(int3(int2(pt), 0));
     }
 
@@ -1522,42 +1529,61 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         gradient = gradient / gradient_length;
     }
 
-    // The bevel: 0 at the rim rising to 1 once the surface is `bevel` pixels
-    // deep. `slope` is how much of it is left to bend light with.
-    float height = backdrop_bevel > 0.0 ? saturate(-distance / backdrop_bevel) : 1.0;
-    float slope = 1.0 - height;
-    float smooth_slope = slope * slope * (3.0 - 2.0 * slope);
-    float3 normal = normalize(float3(gradient * smooth_slope, max(height, 0.001)));
-
-    float4 color;
-    if (backdrop_bevel > 0.0 && backdrop_refraction != 0.0) {
-        float2 offset = normal.xy * backdrop_refraction * backdrop_bevel * smooth_slope /
-            global_viewport_size;
-        if (backdrop_dispersion > 0.0) {
-            // Dispersion splits the channels along the same offset, which is
-            // what makes a rim read as glass rather than as a smear.
-            float4 red = t_sprite.Sample(s_sprite, uv + offset * (1.0 + backdrop_dispersion));
-            float4 green = t_sprite.Sample(s_sprite, uv + offset);
-            float4 blue = t_sprite.Sample(s_sprite, uv + offset * (1.0 - backdrop_dispersion));
-            color = float4(red.r, green.g, blue.b, green.a);
-        } else {
-            color = t_sprite.Sample(s_sprite, uv + offset);
-        }
-    } else {
-        color = t_sprite.Load(int3(int2(pt), 0));
+    // `depth` is zero at the rim and one once the dome has flattened. The
+    // spherical slope diverges at the rim, then the measured reach cap bounds
+    // displacement to 45% of the profile depth.
+    float depth = backdrop_bevel > 0.0 ? saturate(-distance / backdrop_bevel) : 1.0;
+    float rise = 1.0 - depth;
+    float slope = rise / sqrt(max(1.0 - rise * rise, 1e-4));
+    float2 displacement = -gradient * slope * backdrop_bevel * backdrop_refraction;
+    float reach_limit = backdrop_bevel * 0.45;
+    float reach = length(displacement);
+    if (reach > reach_limit && reach > 0.0) {
+        displacement *= reach_limit / reach;
     }
+
+    // Frost in the interior, the sharp snapshot at the bent rim. Both sources
+    // use the same displaced coordinates, so blur changes scattering without
+    // changing refraction geometry.
+    float2 red_uv = (pt + displacement * (1.0 - backdrop_dispersion)) /
+        global_viewport_size;
+    float2 green_uv = (pt + displacement) / global_viewport_size;
+    float2 blue_uv = (pt + displacement * (1.0 + backdrop_dispersion)) /
+        global_viewport_size;
+    float sharpness = rise * rise;
+    float4 frosted_red = t_sprite.Sample(s_sprite, red_uv);
+    float4 frosted_green = t_sprite.Sample(s_sprite, green_uv);
+    float4 frosted_blue = t_sprite.Sample(s_sprite, blue_uv);
+    float4 sharp_red = t_backdrop_sharp.Sample(s_sprite, red_uv);
+    float4 sharp_green = t_backdrop_sharp.Sample(s_sprite, green_uv);
+    float4 sharp_blue = t_backdrop_sharp.Sample(s_sprite, blue_uv);
+    float4 color = float4(
+        lerp(frosted_red.r, sharp_red.r, sharpness),
+        lerp(frosted_green.g, sharp_green.g, sharpness),
+        lerp(frosted_blue.b, sharp_blue.b, sharpness),
+        lerp(frosted_green.a, sharp_green.a, sharpness));
+
+    color.rgb = color.rgb * backdrop_transmission_gain +
+        backdrop_optical_lift.rgb * backdrop_optical_lift.a;
 
     if (backdrop_specular > 0.0) {
         // The light sits on the unit sphere at `light_angle`, measured
         // clockwise from straight up, tilted towards the viewer so a flat
         // surface is lit rather than black.
+        float3 normal = normalize(float3(gradient * rise, max(depth, 0.001)));
         float3 light = normalize(float3(sin(backdrop_light_angle),
                                         -cos(backdrop_light_angle), 0.6));
         float lobe_value = saturate(dot(normal, light));
         float highlight = pow(lobe_value, backdrop_specular_sharpness) *
-                          backdrop_specular * smooth_slope;
-        color = float4(saturate(color.rgb + highlight), color.a);
+                          backdrop_specular * rise;
+        color.rgb += highlight;
     }
 
-    return color;
+    if (backdrop_hairline > 0.0) {
+        float hair = 1.0 - smoothstep(0.0, backdrop_hairline * 1.5, -distance);
+        float facing_up = saturate(-gradient.y);
+        color.rgb += hair * (1.0 - 0.18 * facing_up) * 0.18;
+    }
+
+    return float4(saturate(color.rgb), color.a);
 }

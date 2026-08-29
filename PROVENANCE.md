@@ -330,6 +330,39 @@ turn off upstream, and this repository opens no pty and spawns no process,
 which stays the host's job. Recorded here rather than left implicit, because a
 UI crate that links a process spawner should have to say so.
 
+## P12: clear liquid-glass material and dual-source renderer
+
+- Material-policy source: <https://github.com/crabtalk/bezel>
+- Bezel revision: `2cfff23c96c6d33177a65d523f1827b0941b2eac`
+- Bezel license: MIT
+- Renderer source: <https://github.com/crabtalk/zed>
+- Renderer revision: `ddd1c7d2cd98e1109f5bc4e21488c7ec8aefe198`
+- Renderer parent: `756cafe25ddfa4a702c39db70f4b16d6276c02a3`
+- Renderer license: Apache-2.0
+- Source locations: Bezel `crates/ui/src/material.rs`; crabtalk/zed
+  `crates/gpui/src/{scene.rs,window.rs}` and
+  `crates/gpui_apple/src/{metal_renderer.rs,shaders.metal}`
+- Destinations: GPUI Box `crates/gpui/src/{scene.rs,window.rs}`,
+  `crates/gpui_{macos,wgpu,windows}/src/`, and
+  `crates/gpui-kit/src/overlay/glass.rs`
+
+This is a source-level, product-neutral adaptation, not a Cargo dependency and
+not a reopening of the frozen Zed import lane. Bezel supplies the measured
+material policy: clear glass defaults to no blur, bevel depth is 0.225 of the
+short edge, magnification is 0.34, dispersion is 0.005, white additive lift is
+0.075, transmission gain is 1.042, and the hairline is one logical pixel. The
+crabtalk/zed commit supplies the dual-source rendering model and spherical
+profile: preserve sharp and blurred snapshots, blend the sharp source toward
+the rim by `(1 - depth)²`, and cap displacement at 0.45 of the bevel.
+
+GPUI Box generalized the Metal-only source across its existing multi-lobe SDF,
+paint-order, clipping, probe, WGPU, and Direct3D infrastructure. It retained
+the existing directional specular interaction as an independent optional axis,
+made blur part of the framework material rather than a call-site gate, and
+added bounded-pass fallback and cross-renderer tests. Bezel's license text is
+`licenses/BEZEL-MIT.txt`; the Apache-2.0 text is
+`licenses/ZED-APACHE-2.0.txt`.
+
 ## P11: bundled theme preset palettes
 
 - Destinations: `crates/gpui-kit-tokens/tokens/{catppuccin-mocha,

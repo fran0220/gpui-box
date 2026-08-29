@@ -780,13 +780,13 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    /// Snapshot what has been painted, blur it, and paint it back through the
-    /// surface's shape and material.
+    /// Snapshot what has been painted, optionally derive a blurred source,
+    /// and paint it back through the surface's shape and material.
     ///
     /// A surface whose blur needs more passes than the frame has left keeps
-    /// its unblurred backdrop rather than being skipped, which is the same
-    /// refusal the other renderers make and the reason it is a fallback
-    /// rather than a hole: a legible surface beats a missing one.
+    /// its unblurred backdrop rather than being skipped, matching WGPU's
+    /// bounded fallback. It is a fallback rather than a hole because a
+    /// legible clear surface beats a missing one.
     fn draw_backdrop_glass(
         &mut self,
         glass: &BackdropGlass,
@@ -821,6 +821,9 @@ impl DirectXRenderer {
         let mut params = BackdropGlassParams::from_glass(glass);
 
         unsafe {
+            // The previous surface bound its sharp snapshot at t1. Release
+            // both source slots before overwriting that texture.
+            device_context.PSSetShaderResources(0, Some(&[None, None]));
             // Take the backdrop out of the render target. Everything painted
             // below this order is in it, and nothing above it has been drawn.
             device_context.CopyResource(&resources.backdrop_snapshot, &render_target.texture);
@@ -838,7 +841,7 @@ impl DirectXRenderer {
         let mut read = &resources.backdrop_snapshot_srv;
         let mut blurred = &resources.backdrop_snapshot;
         if pass_count > 0 {
-            params.sigma = glass.blur_radius.0.max(1.0) / (pass_count as f32).sqrt();
+            params.sigma = glass.material.blur_radius.0.max(1.0) / (pass_count as f32).sqrt();
             for _ in 0..pass_count {
                 for (index, direction) in [[1.0, 0.0], [0.0, 1.0]].into_iter().enumerate() {
                     params.direction = direction;
@@ -889,20 +892,22 @@ impl DirectXRenderer {
             }
         }
 
-        // The composite reads the blurred backdrop and writes the surface
-        // back into the render target it was taken from.
+        // The composite reads the optical source plus the retained sharp
+        // snapshot and writes the surface back into the render target it was
+        // taken from.
         params.direction = [0.0, 0.0];
         update_buffer(device_context, backdrop_params_buffer, &[params])?;
         unsafe {
-            device_context.PSSetShaderResources(0, Some(&[None]));
+            device_context.PSSetShaderResources(0, Some(&[None, None]));
             device_context.OMSetRenderTargets(Some(slice::from_ref(&render_target.view)), None);
         }
+        let composite_sources = [read.clone(), resources.backdrop_snapshot_srv.clone()];
         self.pipelines
             .backdrop_glass
-            .draw(device_context, slice::from_ref(read), sampler);
+            .draw(device_context, &composite_sources, sampler);
 
         unsafe {
-            device_context.PSSetShaderResources(0, Some(&[None]));
+            device_context.PSSetShaderResources(0, Some(&[None, None]));
         }
         if takes_probe {
             self.probe_requests.push(probe_slot);
@@ -1820,14 +1825,18 @@ struct BackdropGlassParams {
     smoothing: f32,
     lobe_count: u32,
     _pad: u32,
+    transmission_gain: f32,
+    hairline: f32,
+    _optical_pad: [f32; 2],
+    optical_lift: [f32; 4],
     lobes: [[f32; 4]; MAX_GLASS_LOBES * 2],
 }
 
-// Six sixteen-byte registers of header, then two per lobe. HLSL packs a
+// Eight sixteen-byte registers of header, then two per lobe. HLSL packs a
 // constant buffer into sixteen-byte registers that a member may not straddle,
 // which is what the groupings above are chosen to respect.
 const _: () = assert!(
-    std::mem::size_of::<BackdropGlassParams>() == 96 + MAX_GLASS_LOBES * 32,
+    std::mem::size_of::<BackdropGlassParams>() == 128 + MAX_GLASS_LOBES * 32,
     "the backdrop parameter buffer must match the cbuffer in shaders.hlsl"
 );
 
@@ -1872,6 +1881,15 @@ impl BackdropGlassParams {
             smoothing: glass.material.smoothing.0,
             lobe_count: lobe_count as u32,
             _pad: 0,
+            transmission_gain: glass.material.transmission_gain,
+            hairline: glass.material.hairline.0,
+            _optical_pad: [0.0; 2],
+            optical_lift: [
+                glass.material.optical_lift.r,
+                glass.material.optical_lift.g,
+                glass.material.optical_lift.b,
+                glass.material.optical_lift.a,
+            ],
             lobes,
         }
     }

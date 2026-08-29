@@ -326,9 +326,11 @@ impl TokenDocument {
         for (path, value) in [
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
-            ("effect.glassBlur", self.effect.glass_blur),
-            ("effect.glassBevel", self.effect.glass_bevel),
+            ("effect.glassFrostBlur", self.effect.glass_frost_blur),
+            ("effect.glassBevelMin", self.effect.glass_bevel_min),
+            ("effect.glassBevelMax", self.effect.glass_bevel_max),
             ("effect.glassRefraction", self.effect.glass_refraction),
+            ("effect.glassHairline", self.effect.glass_hairline),
             (
                 "effect.glassMergeDistance",
                 self.effect.glass_merge_distance,
@@ -337,6 +339,17 @@ impl TokenDocument {
             if value < 0.0 {
                 return invalid(path, "must not be negative");
             }
+        }
+
+        if self.effect.glass_bevel_min > self.effect.glass_bevel_max {
+            return invalid(
+                "effect.glassBevelMin",
+                "must not exceed effect.glassBevelMax",
+            );
+        }
+
+        if !(0.0..=2.0).contains(&self.effect.glass_transmission_gain) {
+            return invalid("effect.glassTransmissionGain", "must be between 0 and 2");
         }
 
         // A bloom pulled in further than it is blurred never reaches the
@@ -450,9 +463,10 @@ impl TokenDocument {
                 self.effect.custom_color_active_lightness_delta,
             ),
             ("effect.glassAlpha", self.effect.glass_alpha),
-            ("effect.glassLiquidAlpha", self.effect.glass_liquid_alpha),
+            ("effect.glassBevelRatio", self.effect.glass_bevel_ratio),
             ("effect.glassDispersion", self.effect.glass_dispersion),
             ("effect.glassSpecular", self.effect.glass_specular),
+            ("effect.glassOpticalLift", self.effect.glass_optical_lift),
             (
                 "effect.glassContrastFlipLow",
                 self.effect.glass_contrast_flip_low,
@@ -2311,20 +2325,14 @@ pub struct EffectTokens {
     /// that sets this to 1 declares itself opaque, and a frosted surface then
     /// paints no blur at all rather than blurring pixels nobody can see.
     pub glass_alpha: f32,
-    /// How far a frosted surface blurs what is behind it, in pixels.
-    pub glass_blur: f32,
-    /// How much of a glass surface is tint when the optics are what makes it
-    /// legible rather than the fill.
-    ///
-    /// This is well below `glassAlpha` on purpose. A frosted surface has only
-    /// its fill to separate it from the backdrop, so the fill must be strong;
-    /// a surface that bends, splits and lights its edge is read by those, and
-    /// a fill strong enough to stand alone would cover them.
-    pub glass_liquid_alpha: f32,
-    /// How far in from its edge a glass surface's bevel reaches, in pixels.
-    /// This is the band the optics act in: refraction, dispersion and the
-    /// specular rim all fall to nothing once the surface is this deep.
-    pub glass_bevel: f32,
+    /// How far the Frosted preset scatters what is behind it, in pixels.
+    /// Liquid and Lens are clear by default and do not borrow this value.
+    pub glass_frost_blur: f32,
+    /// Fraction of the control's short edge occupied by its optical profile.
+    pub glass_bevel_ratio: f32,
+    /// Lower and upper bounds for the responsive optical profile, in pixels.
+    pub glass_bevel_min: f32,
+    pub glass_bevel_max: f32,
     /// How far the bevel displaces what is behind it, as a fraction of the
     /// bevel. Read as the thickness of the glass body.
     pub glass_refraction: f32,
@@ -2333,6 +2341,12 @@ pub struct EffectTokens {
     pub glass_dispersion: f32,
     /// Peak brightness of the rim highlight.
     pub glass_specular: f32,
+    /// Multiplicative light transmission through Liquid glass.
+    pub glass_transmission_gain: f32,
+    /// White additive lift applied inside the Liquid shader.
+    pub glass_optical_lift: f32,
+    /// Width of Liquid's measured lit edge, in pixels.
+    pub glass_hairline: f32,
     /// How tight that highlight is. Larger is smaller and harder.
     pub glass_specular_sharpness: f32,
     /// Where the light that makes the highlight is, in radians clockwise from

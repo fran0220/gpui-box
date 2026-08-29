@@ -364,13 +364,24 @@ not bypassed by a default constructor. Micro bounce, wobble, and pop timings
 also live in `durationMs`; their keyframe shapes remain local component
 topology.
 
-Overlay surfaces are opaque by default. `Frost` is the one surface that is not:
-`effect.glassAlpha` is how opaque its own fill is over what it blurs and
-`effect.glassBlur` is how far that blur reaches. A theme that sets the alpha to
-1 declares itself opaque and no blur is painted at all, and where the renderer
-provides no backdrop blur the tinted fill is drawn on its own — GPUI Box Kit does
-not fake a blur with a gradient, because the colour behind a translucent window
-is not a colour anything can paint.
+Overlay surfaces are opaque by default. Glass separates scattering from optics:
+`Frosted` uses `effect.glassFrostBlur`, while `Liquid` and `Lens` default to a
+sharp snapshot (`blur = 0`) and still refract it. A caller can add blur to either
+clear preset, in which case the renderer keeps both snapshots: blurred for the
+interior and sharp for the refracted rim. `effect.glassAlpha` is Frosted's
+source-over fill and the fill an explicitly adaptive Liquid surface may add
+for readability. Ordinary Liquid and Lens paint no source-over fill: their
+light response is shader-owned, where `glassTransmissionGain` multiplies the
+transmitted backdrop and `glassOpticalLift` adds white light rather than
+tinting over it.
+
+The optical profile scales from `glassBevelRatio` times each control's short
+edge and is bounded by `glassBevelMin`/`glassBevelMax`. Refraction and dispersion
+are independent ratios; `glassHairline` remains one logical pixel rather than
+growing with the control. A theme that sets `glassAlpha` to 1 declares the
+surface opaque and no backdrop work is painted. GPUI Box Kit does not fake
+optics with a gradient, because the colour behind a translucent window is not
+a colour anything can paint.
 
 Selection and focus live here too, and they are drawn differently on purpose:
 selection says which answer is current, focus says where the next keystroke

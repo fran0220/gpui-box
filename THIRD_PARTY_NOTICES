@@ -199,6 +199,28 @@ markdown document model into crates/gpui-kit/src/content/markdown/doc. Not a
 Cargo dependency; see PROVENANCE.md P10 for what was adapted.
 License text: licenses/BEZEL-MIT.txt
 
+bezel liquid-glass material measurements
+--------------------------------------------------------------------------------
+Source: https://github.com/crabtalk/bezel
+Revision: 2cfff23c96c6d33177a65d523f1827b0941b2eac
+License: MIT
+Copyright (c) 2026 clearloop
+Scope: measured clear-glass defaults and responsive material policy adapted
+into crates/gpui-kit/src/overlay/glass.rs and its effect tokens. Not a Cargo
+dependency; see PROVENANCE.md P12.
+License text: licenses/BEZEL-MIT.txt
+
+crabtalk/zed liquid-glass GPUI adaptation
+--------------------------------------------------------------------------------
+Source: https://github.com/crabtalk/zed
+Revision: ddd1c7d2cd98e1109f5bc4e21488c7ec8aefe198
+License: Apache-2.0
+Scope: dual sharp/blurred backdrop sources, spherical edge displacement,
+sharp-rim blending, additive lift and measured hairline adapted at the GPUI Box
+framework boundary across Metal, WGPU and Direct3D. No Git or Cargo dependency;
+see PROVENANCE.md P12.
+License text: licenses/ZED-APACHE-2.0.txt
+
 alacritty_terminal
 --------------------------------------------------------------------------------
 Source: https://github.com/alacritty/alacritty

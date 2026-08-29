@@ -666,9 +666,10 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             .child(caption(&theme, body))
     };
 
-    // A checkerboard bends far more legibly than a flat fill: a straight edge
-    // running under the rim is what makes refraction readable in a still. It
-    // is drawn in neutrals, and every plate that carries one is an exact
+    // A ruled checkerboard bends far more legibly than a flat fill: its
+    // one-pixel lines reveal whether the refracted rim retained the sharp
+    // snapshot while Frosted scattered the interior. It is drawn in neutrals,
+    // and every plate that carries one is an exact
     // number of squares across and down: a board cut through the middle of a
     // square at the plate edge reads as a broken pattern rather than as the
     // ruled backdrop the optics are being measured against.
@@ -698,6 +699,24 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 },
                             )
                         }))
+                }))
+                .children((0..=(width / 12.0) as usize).map(|column| {
+                    div()
+                        .absolute()
+                        .top(px(0.0))
+                        .left(px(column as f32 * 12.0))
+                        .w(px(1.0))
+                        .h(px(height))
+                        .bg(theme.colors.divider.opacity(0.55))
+                }))
+                .children((0..=(height / 12.0) as usize).map(|row| {
+                    div()
+                        .absolute()
+                        .top(px(row as f32 * 12.0))
+                        .left(px(0.0))
+                        .w(px(width))
+                        .h(px(1.0))
+                        .bg(theme.colors.divider.opacity(0.55))
                 }))
         };
 
@@ -735,22 +754,25 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             "Frosted",
             "The control the others are read against",
         ))
-        .child(caption(&theme, "Lens: the edge bends the backdrop"))
+        .child(caption(
+            &theme,
+            "Lens: clear inside, the edge bends the sharp backdrop",
+        ))
         .child(plate(
             "scene.glass.lens",
             GlassPreset::Lens,
             "Lens",
-            "The squares bend at the rim and run straight inside",
+            "The one-pixel rules bend at the rim and stay sharp",
         ))
         .child(caption(
             &theme,
-            "Liquid: the bend, its colour, and the light",
+            "Liquid: clear refraction, additive lift, and a lit hairline",
         ))
         .child(plate(
             "scene.glass.liquid",
             GlassPreset::Liquid,
             "Liquid",
-            "Dispersion at the rim and a highlight from the top right",
+            "Subtle dispersion without turning the backdrop into a smear",
         ))
         // The last two demonstrations sit side by side so the whole scene
         // stays inside the window a real display can give the gallery, which

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, DevicePixels, Edges, Hsla,
-    Pixels, Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree, point, white,
+    Pixels, Point, Radians, Rgba, ScaledPixels, Size, bounds_tree::BoundsTree, point, white,
 };
 use std::{
     fmt::Debug,
@@ -105,7 +105,8 @@ impl Scene {
     }
 
     pub fn insert_backdrop_glass(&mut self, mut glass: BackdropGlass) {
-        if !glass.blur_radius.0.is_finite() || glass.blur_radius.0 < 0.0 {
+        glass.material = glass.material.sanitized();
+        if !glass.material.needs_backdrop() {
             return;
         }
         let clipped_bounds = glass.bounds.intersect(&glass.content_mask.bounds);
@@ -116,7 +117,6 @@ impl Scene {
         // read whatever `Default` left behind, so it is clamped here rather
         // than in three shaders.
         glass.lobe_count = glass.lobe_count.min(MAX_GLASS_LOBES as u32);
-        glass.material = glass.material.sanitized();
         glass.order = self
             .layer_stack
             .last()
@@ -321,8 +321,104 @@ mod tests {
         }
     }
 
+    /// CPU reference for the profile all three native shaders mirror. Keeping
+    /// it next to the framework tests makes the cap and centre/rim invariants
+    /// executable without making a shader implementation another public API.
+    fn optical_profile(
+        distance: f32,
+        outward: Point<f32>,
+        bevel: f32,
+        refraction: f32,
+    ) -> (f32, Point<f32>, f32) {
+        let depth = if bevel > 0.0 {
+            (-distance / bevel).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let rise = 1.0 - depth;
+        let slope = rise / (1.0 - rise * rise).max(1e-4).sqrt();
+        let mut offset = point(
+            -outward.x * slope * bevel * refraction,
+            -outward.y * slope * bevel * refraction,
+        );
+        let reach = (offset.x * offset.x + offset.y * offset.y).sqrt();
+        let limit = bevel * 0.45;
+        if reach > limit && reach > 0.0 {
+            offset.x *= limit / reach;
+            offset.y *= limit / reach;
+        }
+        (depth, offset, rise * rise)
+    }
+
+    fn channel_offsets(offset: Point<f32>, dispersion: f32) -> [Point<f32>; 3] {
+        [
+            point(offset.x * (1.0 - dispersion), offset.y * (1.0 - dispersion)),
+            offset,
+            point(offset.x * (1.0 + dispersion), offset.y * (1.0 + dispersion)),
+        ]
+    }
+
     #[test]
-    fn invalid_backdrop_glass_radii_are_ignored() {
+    fn clear_glass_is_kept_even_when_it_spends_zero_gaussian_passes() {
+        let bounds = Bounds {
+            origin: Point::default(),
+            size: Size {
+                width: ScaledPixels(100.0),
+                height: ScaledPixels(40.0),
+            },
+        };
+        let mut material = GlassMaterial::clear();
+        material.bevel = ScaledPixels(9.0);
+        material.refraction = 0.34;
+        let mut scene = Scene::default();
+        scene.insert_backdrop_glass(BackdropGlass {
+            order: 0,
+            bounds,
+            content_mask: ContentMask { bounds },
+            corner_radii: Corners::default(),
+            material,
+            lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
+            lobe_count: 0,
+        });
+
+        assert_eq!(scene.backdrop_glass.len(), 1);
+        assert_eq!(scene.backdrop_glass[0].gaussian_pass_count(), Some(0));
+    }
+
+    #[test]
+    fn the_optical_profile_is_flat_at_the_centre_and_bounded_at_the_rim() {
+        let outward = point(1.0, 0.0);
+        let (centre_depth, centre_offset, centre_sharpness) =
+            optical_profile(-18.0, outward, 18.0, 0.34);
+        assert_eq!(centre_depth, 1.0);
+        assert_eq!(centre_offset, point(0.0, 0.0));
+        assert_eq!(centre_sharpness, 0.0);
+
+        let (rim_depth, rim_offset, rim_sharpness) = optical_profile(0.0, outward, 18.0, 0.34);
+        assert_eq!(rim_depth, 0.0);
+        assert!((rim_offset.x.abs() - 18.0 * 0.45).abs() < 1e-5);
+        assert_eq!(rim_offset.y, 0.0);
+        assert_eq!(
+            rim_sharpness, 1.0,
+            "the refracted rim uses the sharp source"
+        );
+    }
+
+    #[test]
+    fn dispersion_is_independent_and_subtle() {
+        let (_, offset, _) = optical_profile(-9.0, point(1.0, 0.0), 18.0, 0.34);
+        let together = channel_offsets(offset, 0.0);
+        assert_eq!(together[0], together[1]);
+        assert_eq!(together[1], together[2]);
+
+        let measured = channel_offsets(offset, 0.005);
+        assert!(measured[0].x.abs() < measured[1].x.abs());
+        assert!(measured[1].x.abs() < measured[2].x.abs());
+        assert!((measured[2].x - measured[0].x).abs() < offset.x.abs() * 0.011);
+    }
+
+    #[test]
+    fn invalid_backdrop_glass_blurs_are_sanitized_to_clear() {
         let bounds = Bounds {
             origin: Point::default(),
             size: Size {
@@ -335,11 +431,10 @@ mod tests {
         for radius in [-1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             scene.insert_backdrop_glass(BackdropGlass {
                 order: 0,
-                blur_radius: ScaledPixels(radius),
                 bounds,
                 content_mask: ContentMask { bounds },
                 corner_radii: Corners::default(),
-                material: GlassMaterial::frosted(),
+                material: GlassMaterial::frosted(ScaledPixels(radius)),
                 lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
                 lobe_count: 0,
             });
@@ -361,11 +456,10 @@ mod tests {
         let mut scene = Scene::default();
         scene.insert_backdrop_glass(BackdropGlass {
             order: 0,
-            blur_radius: ScaledPixels(8.),
             bounds,
             content_mask: ContentMask { bounds },
             corner_radii: Corners::default(),
-            material: GlassMaterial::frosted(),
+            material: GlassMaterial::frosted(ScaledPixels(8.)),
             lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
             lobe_count: 4096,
         });
@@ -395,11 +489,10 @@ mod tests {
         };
         let glass = BackdropGlass {
             order: 0,
-            blur_radius: ScaledPixels(8.),
             bounds,
             content_mask: ContentMask { bounds },
             corner_radii,
-            material: GlassMaterial::frosted(),
+            material: GlassMaterial::frosted(ScaledPixels(8.)),
             lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
             lobe_count: 0,
         };
@@ -413,10 +506,19 @@ mod tests {
     #[test]
     fn a_material_a_renderer_could_not_act_on_is_replaced_by_one_it_can() {
         let material = GlassMaterial {
+            blur_radius: ScaledPixels(f32::NEG_INFINITY),
             bevel: ScaledPixels(f32::NAN),
             refraction: f32::INFINITY,
             dispersion: 4.,
             specular: -1.,
+            transmission_gain: f32::NAN,
+            optical_lift: Rgba {
+                r: -1.,
+                g: 2.,
+                b: f32::NAN,
+                a: f32::INFINITY,
+            },
+            hairline: ScaledPixels(-2.),
             light_angle: f32::NAN,
             specular_sharpness: 0.,
             smoothing: ScaledPixels(-8.),
@@ -424,10 +526,22 @@ mod tests {
         }
         .sanitized();
 
+        assert_eq!(material.blur_radius, ScaledPixels(0.));
         assert_eq!(material.bevel, ScaledPixels(0.));
         assert_eq!(material.refraction, 0.);
         assert_eq!(material.dispersion, 1., "dispersion is a fraction");
         assert_eq!(material.specular, 0.);
+        assert_eq!(material.transmission_gain, 1.);
+        assert_eq!(
+            material.optical_lift,
+            Rgba {
+                r: 0.,
+                g: 1.,
+                b: 0.,
+                a: 0.,
+            }
+        );
+        assert_eq!(material.hairline, ScaledPixels(0.));
         assert_eq!(material.light_angle, 0.);
         assert_eq!(
             material.specular_sharpness, 1.,
@@ -437,20 +551,33 @@ mod tests {
     }
 
     #[test]
-    fn a_frosted_material_asks_for_no_optics() {
-        let frosted = GlassMaterial::<ScaledPixels>::frosted();
+    fn clear_and_frosted_materials_keep_scattering_independent_of_optics() {
+        let clear = GlassMaterial::<ScaledPixels>::clear();
+        let frosted = GlassMaterial::frosted(ScaledPixels(24.));
+        assert!(clear.is_flat());
+        assert!(!clear.needs_backdrop());
         assert!(frosted.is_flat());
         assert!(!frosted.bends_light());
-        assert_eq!(GlassMaterial::<ScaledPixels>::default(), frosted);
+        assert!(frosted.needs_backdrop());
+        assert_eq!(GlassMaterial::<ScaledPixels>::default(), clear);
     }
 
     #[test]
     fn scaling_a_material_moves_its_lengths_and_nothing_else() {
         let logical = GlassMaterial::<Pixels> {
+            blur_radius: Pixels(24.),
             bevel: Pixels(14.),
             refraction: 0.55,
             dispersion: 0.16,
             specular: 0.4,
+            transmission_gain: 1.042,
+            optical_lift: Rgba {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: 0.075,
+            },
+            hairline: Pixels(1.),
             light_angle: 0.78,
             specular_sharpness: 12.,
             smoothing: Pixels(28.),
@@ -459,11 +586,15 @@ mod tests {
 
         let device = logical.scale(2.);
 
+        assert_eq!(device.blur_radius, ScaledPixels(48.));
         assert_eq!(device.bevel, ScaledPixels(28.));
         assert_eq!(device.smoothing, ScaledPixels(56.));
+        assert_eq!(device.hairline, ScaledPixels(2.));
         assert_eq!(device.refraction, logical.refraction, "a ratio is a ratio");
         assert_eq!(device.dispersion, logical.dispersion);
         assert_eq!(device.specular, logical.specular);
+        assert_eq!(device.transmission_gain, logical.transmission_gain);
+        assert_eq!(device.optical_lift, logical.optical_lift);
         assert_eq!(
             device.light_angle, logical.light_angle,
             "an angle does not scale"
@@ -485,11 +616,10 @@ mod tests {
         };
         BackdropGlass {
             order: 0,
-            blur_radius: ScaledPixels(24.),
             bounds,
             content_mask: ContentMask { bounds },
             corner_radii: Corners::default(),
-            material: GlassMaterial::frosted(),
+            material: GlassMaterial::frosted(ScaledPixels(24.)),
             lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
             lobe_count: 0,
         }
@@ -532,13 +662,13 @@ mod tests {
     fn a_bevel_without_refraction_bends_nothing() {
         let sloped = GlassMaterial {
             bevel: ScaledPixels(12.),
-            ..GlassMaterial::frosted()
+            ..GlassMaterial::clear()
         };
         assert!(!sloped.bends_light(), "a slope with no index is a pane");
 
         let dense = GlassMaterial::<ScaledPixels> {
             refraction: 0.4,
-            ..GlassMaterial::frosted()
+            ..GlassMaterial::clear()
         };
         assert!(!dense.bends_light(), "an index with no slope is a pane");
     }
@@ -624,7 +754,7 @@ mod tests {
                 + size_of::<u32>()
         );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
-        assert_eq!(size_of::<GlassMaterial>(), 8 * size_of::<f32>());
+        assert_eq!(size_of::<GlassMaterial>(), 15 * size_of::<f32>());
         assert_eq!(
             size_of::<PolychromeSprite>(),
             size_of::<DrawOrder>()
@@ -643,7 +773,6 @@ mod tests {
         assert_eq!(
             size_of::<BackdropGlass>(),
             size_of::<DrawOrder>()
-                + size_of::<ScaledPixels>()
                 + size_of::<Bounds<ScaledPixels>>()
                 + size_of::<ContentMask<ScaledPixels>>()
                 + size_of::<Corners<ScaledPixels>>()
@@ -671,11 +800,10 @@ mod tests {
             shadows: vec![shadow(1), shadow(2), shadow(4)],
             backdrop_glass: vec![BackdropGlass {
                 order: 3,
-                blur_radius: ScaledPixels::default(),
                 bounds: Bounds::default(),
                 content_mask: ContentMask::default(),
                 corner_radii: Corners::default(),
-                material: GlassMaterial::frosted(),
+                material: GlassMaterial::clear(),
                 lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
                 lobe_count: 0,
             }],
@@ -1224,7 +1352,7 @@ pub const NO_LUMINANCE_PROBE: u32 = u32::MAX;
 /// the same way [`MAX_GLASS_LOBES`] bounds the instance.
 pub const MAX_LUMINANCE_PROBES: usize = 16;
 
-/// How many points of the blurred backdrop one probe averages.
+/// How many points of the sharp or blurred backdrop one probe averages.
 pub const LUMINANCE_PROBE_SAMPLES: usize = 5;
 
 /// The relative luminance of one probe sample, from encoded channel values in
@@ -1298,16 +1426,20 @@ impl GlassLobe<Pixels> {
     }
 }
 
-/// The optical response of a glass surface, over and above blurring what is
-/// behind it.
+/// The complete optical response of a glass surface.
 ///
-/// [`GlassMaterial::frosted()`] is all zeroes and asks for none of it, which is
-/// what [`crate::Window::paint_backdrop_blur`] paints: the backdrop is blurred
-/// and nothing is bent, split or lit. Every field is independent, so a caller
-/// may take refraction without dispersion, or a specular rim without either.
+/// Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]
+/// snapshots the sharp backdrop and leaves it unchanged; callers independently
+/// add refraction, dispersion, transmission, an optical lift, or edge light.
+/// [`GlassMaterial::frosted`] adds only scattering. A renderer therefore keeps
+/// a sharp snapshot even when it also derives a blurred one: the interior may
+/// be frosted while the refracted rim remains sharp.
 #[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(C)]
 pub struct GlassMaterial<P = ScaledPixels> {
+    /// Gaussian sigma applied to the backdrop snapshot. Zero keeps the source
+    /// sharp while still allowing every other optical field to act on it.
+    pub blur_radius: P,
     /// How far in from the edge the bevel that bends the backdrop reaches.
     /// Zero leaves the backdrop flat however large the other fields are,
     /// because there is no slope for them to act on.
@@ -1321,6 +1453,14 @@ pub struct GlassMaterial<P = ScaledPixels> {
     pub dispersion: f32,
     /// Peak brightness of the rim highlight, 0 for none.
     pub specular: f32,
+    /// Multiplicative transmission applied after sampling. One preserves the
+    /// backdrop; values above one model the measured light gain of clear glass.
+    pub transmission_gain: f32,
+    /// A colour added after transmission, as `rgb * alpha`. This is not
+    /// source-over tint: it lifts the light already passing through the glass.
+    pub optical_lift: Rgba,
+    /// Width of the consistently lit edge in pixels. Zero paints no hairline.
+    pub hairline: P,
     /// Where the light is, in radians clockwise from straight up.
     pub light_angle: f32,
     /// How tight the specular lobe is. Larger is a smaller, harder highlight.
@@ -1330,24 +1470,28 @@ pub struct GlassMaterial<P = ScaledPixels> {
     pub smoothing: P,
     /// Which luminance probe slot this surface fills, or [`NO_LUMINANCE_PROBE`].
     ///
-    /// A probed surface has the mean luminance of the backdrop it blurred
-    /// reported back through [`crate::Window::backdrop_luminance`], one frame
-    /// later. See that method for what the delay means for a caller.
+    /// A probed surface has the mean luminance of its optical source reported
+    /// back through [`crate::Window::backdrop_luminance`], one frame later.
+    /// That source is sharp for clear glass and blurred for frosted glass. See
+    /// that method for what the delay means for a caller.
     pub probe: u32,
 }
 
 impl<P: GlassLength> GlassMaterial<P> {
-    /// Blur the backdrop and bend nothing: the material a plain frosted
-    /// surface is made of.
+    /// Preserve the sharp backdrop and apply no optics.
     ///
     /// This is a function rather than a constant because the zero length
     /// depends on the unit; every field in it is nevertheless fixed.
-    pub fn frosted() -> Self {
+    pub fn clear() -> Self {
         Self {
+            blur_radius: P::from_raw(0.),
             bevel: P::from_raw(0.),
             refraction: 0.,
             dispersion: 0.,
             specular: 0.,
+            transmission_gain: 1.,
+            optical_lift: Rgba::default(),
+            hairline: P::from_raw(0.),
             light_angle: 0.,
             specular_sharpness: 1.,
             smoothing: P::from_raw(0.),
@@ -1355,16 +1499,33 @@ impl<P: GlassLength> GlassMaterial<P> {
         }
     }
 
-    /// Whether this material asks the renderer for anything a blur alone does
-    /// not already do. A renderer without the optics may skip them and still
-    /// be painting what the caller asked for when this is false.
+    /// Blur the backdrop and apply no other optics.
+    pub fn frosted(blur_radius: P) -> Self {
+        Self {
+            blur_radius,
+            ..Self::clear()
+        }
+    }
+
+    /// Whether this material asks the renderer for anything beyond passing
+    /// through its sharp or blurred source unchanged.
     pub fn is_flat(&self) -> bool {
-        !self.bends_light() && self.specular <= 0.
+        !self.bends_light()
+            && self.specular <= 0.
+            && self.transmission_gain == 1.
+            && self.optical_lift.a <= 0.
+            && self.hairline.raw() <= 0.
     }
 
     /// Whether the backdrop sample is displaced at all.
     pub fn bends_light(&self) -> bool {
         self.bevel.raw() > 0. && self.refraction != 0.
+    }
+
+    /// Whether a renderer must snapshot the framebuffer for this material.
+    /// A clear refractive surface returns true even though its blur is zero.
+    pub fn needs_backdrop(&self) -> bool {
+        self.blur_radius.raw() > 0. || !self.is_flat() || self.probe != NO_LUMINANCE_PROBE
     }
 
     /// Replaces every field that a renderer could not act on with one it can:
@@ -1375,10 +1536,19 @@ impl<P: GlassLength> GlassMaterial<P> {
         fn finite(value: f32, fallback: f32) -> f32 {
             if value.is_finite() { value } else { fallback }
         }
+        self.blur_radius = P::from_raw(finite(self.blur_radius.raw(), 0.).max(0.));
         self.bevel = P::from_raw(finite(self.bevel.raw(), 0.).max(0.));
         self.refraction = finite(self.refraction, 0.);
         self.dispersion = finite(self.dispersion, 0.).clamp(0., 1.);
         self.specular = finite(self.specular, 0.).max(0.);
+        self.transmission_gain = finite(self.transmission_gain, 1.).max(0.);
+        self.optical_lift = Rgba {
+            r: finite(self.optical_lift.r, 0.).clamp(0., 1.),
+            g: finite(self.optical_lift.g, 0.).clamp(0., 1.),
+            b: finite(self.optical_lift.b, 0.).clamp(0., 1.),
+            a: finite(self.optical_lift.a, 0.).clamp(0., 1.),
+        };
+        self.hairline = P::from_raw(finite(self.hairline.raw(), 0.).max(0.));
         self.light_angle = finite(self.light_angle, 0.);
         self.specular_sharpness = finite(self.specular_sharpness, 1.).max(1.);
         self.smoothing = P::from_raw(finite(self.smoothing.raw(), 0.).max(0.));
@@ -1387,15 +1557,19 @@ impl<P: GlassLength> GlassMaterial<P> {
 }
 
 impl GlassMaterial<Pixels> {
-    /// The same material in device pixels. Only the two lengths change: every
+    /// The same material in device pixels. Only its lengths change: every
     /// other field is a ratio, an angle or a slot index, and means the same
     /// thing at any scale.
     pub fn scale(self, factor: f32) -> GlassMaterial<ScaledPixels> {
         GlassMaterial {
+            blur_radius: self.blur_radius.scale(factor),
             bevel: self.bevel.scale(factor),
             refraction: self.refraction,
             dispersion: self.dispersion,
             specular: self.specular,
+            transmission_gain: self.transmission_gain,
+            optical_lift: self.optical_lift,
+            hairline: self.hairline.scale(factor),
             light_angle: self.light_angle,
             specular_sharpness: self.specular_sharpness,
             smoothing: self.smoothing.scale(factor),
@@ -1406,19 +1580,19 @@ impl GlassMaterial<Pixels> {
 
 impl<P: GlassLength> Default for GlassMaterial<P> {
     fn default() -> Self {
-        Self::frosted()
+        Self::clear()
     }
 }
 
 /// A within-window glass surface: the renderer snapshots everything painted
-/// below this order, blurs it, and paints it back through the surface's
-/// shape and material. See [`crate::Window::paint_backdrop_glass`].
+/// below this order, optionally derives a blurred source, and paints it back
+/// through the surface's shape and material. See
+/// [`crate::Window::paint_backdrop_glass`].
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 #[expect(missing_docs)]
 pub struct BackdropGlass {
     pub order: DrawOrder,
-    pub blur_radius: ScaledPixels,
     /// The region the surface occupies. With more than one lobe this is the
     /// union's bounding box, which is what the renderer rasterizes and what
     /// clips the blur; the shape inside it comes from `lobes`.
@@ -1462,16 +1636,16 @@ impl BackdropGlass {
         }
     }
 
-    /// Where this surface's luminance probe samples the blurred backdrop:
-    /// the centre of the surface and the four quarter points, in device
-    /// pixels, each clamped inside a `width` by `height` texture.
+    /// Where this surface's luminance probe samples its sharp or blurred
+    /// optical source: the centre of the surface and the four quarter points,
+    /// in device pixels, each clamped inside a `width` by `height` texture.
     ///
     /// Five points rather than one because a probe summarises the whole
-    /// surface: the blur has already averaged each point's neighbourhood, so
-    /// a sparse cross is what stops a single bright stripe under the centre
-    /// from speaking for the corners. Every renderer copies exactly these
-    /// texels, which is what makes one probe value mean the same thing on
-    /// each of them.
+    /// surface: for frost the blur has already averaged each point's
+    /// neighbourhood, while for clear glass the cross keeps one bright stripe
+    /// under the centre from speaking for the corners. Every renderer copies
+    /// exactly these texels, which is what makes one probe value mean the same
+    /// thing on each of them.
     pub fn probe_sample_points(
         &self,
         width: f32,
@@ -1507,12 +1681,16 @@ impl BackdropGlass {
     /// because the number is a property of the shader's tap budget and the
     /// two shaders have the same one.
     pub fn gaussian_pass_count(&self) -> Option<u32> {
-        let radius = self.blur_radius.0;
+        let radius = self.material.blur_radius.0;
         if !radius.is_finite() || radius < 0. {
             return None;
         }
 
-        let sigma = radius.max(1.);
+        if radius == 0. {
+            return Some(0);
+        }
+
+        let sigma = radius;
         let passes = (sigma * sigma / MAX_GLASS_SIGMA_PER_PASS.powi(2))
             .ceil()
             .max(1.) as u32;

@@ -269,6 +269,23 @@ Behaviour is platform-independent: it is decided in `Window` from dispatched
 events, so macOS, Windows, Linux, and the browser host agree without any
 platform reporting a focus modality of its own.
 
+Backdrop glass is one material contract across Metal, Direct3D, and WGPU.
+`GlassMaterial::blur_radius` controls scattering only: zero performs no
+gaussian passes but still snapshots and composites clear refraction. A positive
+radius derives a blurred source while retaining the sharp paint-order snapshot
+for the refracted rim. `GlassMaterial::clear()` replaces the historical
+zero-argument `frosted()` constructor; `GlassMaterial::frosted(radius)` names an
+actual frost. The material also carries transmission gain, additive optical
+lift, and hairline width. Kit resolves Liquid/Lens bevel depth from the
+control's short edge; Frosted remains the only preset blurred by default.
+
+Metal uses its platform gaussian when scattering is nonzero. Direct3D and WGPU
+split wide gaussians into bounded passes and both degrade an over-budget blur to
+the sharp source without dropping refraction or a requested luminance probe.
+The browser uses the same WGPU path, including clear optics and bounded
+scattering. Ordinary Liquid and Lens paint no source-over fill; only Frosted
+and the explicitly adaptive readability policy add one.
+
 ## Native external data drag and drop
 
 macOS and Windows preserve the existing `ExternalPaths` contract for real
