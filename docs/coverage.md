@@ -24,7 +24,7 @@ input, and an entry in `docs/components.md`.
 | Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList`, `ImageList`, `Masonry` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `CodeView`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView`, `ArtifactPreview`, `Terminal` |
-| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `Rating`, `Bubble`, `Plot`, `CandlestickChart`, `SankeyChart`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
+| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `PerformanceHud`, `MicroMark`, `Rating`, `Bubble`, `Plot`, `CandlestickChart`, `SankeyChart`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
 | Overlay | `Overlay`, `Frost`, `Glass`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `NotificationCenter`, `Kbd` |
 | Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive`, `Grid`, `Container` |
 | Shell | `Dock`, `StatusBar` |
@@ -590,6 +590,10 @@ intents without keeping or mutating an undo stack. The non-rendering
 `reactive::History<T>` is the bounded undo/redo record store beneath callers
 that need one: ignored records are refused by the model, a divergent push
 clears redo, and the caller remains responsible for applying every record.
+`PerformanceHud` covers live diagnostics without turning the observer into the
+workload: framework `FrameTimingMonitor` filters and bounds existing per-window
+draws, while the controlled Kit view presents the caller's latest summary and
+never schedules another frame.
 
 Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come

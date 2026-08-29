@@ -804,6 +804,24 @@ string_keys! {
     SparklineMinimum => "sparkline.minimum", "Minimum: {0}";
     SparklineMaximum => "sparkline.maximum", "Maximum: {0}";
     SparklineRange => "sparkline.range", "Minimum {0}; maximum {1}";
+    // Frame timing diagnostics. The framework supplies measurements; Kit owns
+    // only these labels and asks the installed number adapter for every digit.
+    PerformanceTitle => "performance.title", "Performance";
+    PerformanceWaiting => "performance.waiting", "Waiting for frame samples";
+    PerformanceUnavailable => "performance.unavailable", "Frame timing unavailable";
+    PerformanceExpand => "performance.expand", "Show details";
+    PerformanceCollapse => "performance.collapse", "Hide details";
+    PerformanceFps => "performance.fps", "Draw rate";
+    PerformanceFpsValue => "performance.fps-value", "{0} FPS";
+    PerformanceMeanDraw => "performance.mean-draw", "Mean draw";
+    PerformanceP95Draw => "performance.p95-draw", "P95 draw";
+    PerformanceFrameBudget => "performance.frame-budget", "Frame budget";
+    PerformanceOverBudget => "performance.over-budget", "Draws over budget";
+    PerformanceInvalidations => "performance.invalidations", "Mean invalidations";
+    PerformanceDirtyToDraw => "performance.dirty-to-draw", "Mean dirty to draw";
+    PerformanceSamples => "performance.samples", "Samples";
+    PerformanceDrawHistory => "performance.draw-history", "Draw duration history";
+    PerformanceMilliseconds => "performance.milliseconds", "{0} ms";
 
     // Uploads.
     UploadQueued => "upload.queued", "Queued";

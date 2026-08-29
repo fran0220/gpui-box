@@ -455,3 +455,23 @@ keyboard traversal, truthful states, and theme presentation. No upstream Rust
 source was copied. In particular, GPUI Box does not include or translate the
 referenced `d3-sankey` topology/layout algorithm, and carries no d3 dependency
 or financial fixture policy.
+
+## P14: GPUI Component FPS behavior reference
+
+- Reference: <https://github.com/longbridge/gpui-component>
+- Revision: `6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7`
+- License: Apache-2.0
+- Reference locations: `crates/fps/src/lib.rs`,
+  `crates/fps/src/monitor.rs`, `crates/fps/src/overlay.rs`,
+  `crates/fps/src/sampler.rs`, and `crates/fps/src/style.rs`
+- Destination: `crates/gpui/src/profiler.rs` and
+  `crates/gpui-kit/src/display/performance_hud.rs`
+
+The reference established the usefulness of a bounded, per-window live frame
+reading. GPUI Box's implementation is original and separates responsibilities
+more strictly: the framework monitor derives FPS from recorded draw-start
+timestamps and never requests a frame, while the controlled Kit view owns no
+monitor, clock, history, resource sampler, overlay placement, or refresh loop.
+Draw-budget overage is not called a dropped frame, and all styling, strings,
+numbers, states, and semantic ids use existing Box authorities. No upstream
+Rust source, resource-profiling code, or dependency was copied.

@@ -147,6 +147,7 @@ POSITION
 Pagination
 PartyRoster
 PasswordInput
+PerformanceHud
 PermissionMatrix
 PersonaDialogue
 Placed

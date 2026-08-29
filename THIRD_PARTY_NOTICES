@@ -283,3 +283,14 @@ Plot, CandlestickChart, and SankeyChart implementation in
 crates/gpui-kit/src/display/plot.rs. No upstream source, d3-sankey layout code,
 financial fixture, or Cargo dependency is included; see PROVENANCE.md P13.
 License text: LICENSE-APACHE
+
+Longbridge GPUI Component FPS behavior reference
+--------------------------------------------------------------------------------
+Source: https://github.com/longbridge/gpui-component
+Revision: 6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7
+License: Apache-2.0
+Scope: behavioral reference for a bounded per-window live frame reading. GPUI
+Box's `FrameTimingMonitor` and controlled `PerformanceHud` are original. No
+upstream Rust source, resource sampler, overlay policy, styling, or Cargo
+dependency is included; see PROVENANCE.md P14.
+License text: LICENSE-APACHE

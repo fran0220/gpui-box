@@ -70,8 +70,9 @@ use data::{
 use datetime::{calendar, date_range, date_time};
 use display::{
     animated_number, avatar, badge, banner, bubble, card, chart, detail, divider, empty_state,
-    failure_panel, heatmap, icon, loading, metric_card, outcome_panel, plot, progress_bar,
-    progress_circle, rating, sparkline, stage_progress, state_ladder, status, tag, trace,
+    failure_panel, heatmap, icon, loading, metric_card, outcome_panel, performance_hud, plot,
+    progress_bar, progress_circle, rating, sparkline, stage_progress, state_ladder, status, tag,
+    trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -853,6 +854,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "sparkline",
             build: sparkline,
             shows: Shows::Subjects(&["Sparkline"]),
+        },
+        Scene {
+            name: "performance-hud",
+            build: performance_hud,
+            shows: Shows::Subjects(&["PerformanceHud"]),
         },
         Scene {
             name: "chart",

@@ -238,6 +238,7 @@ pub mod prelude {
     };
     pub use crate::display::metric::{MetricCard, MetricReading, MetricState};
     pub use crate::display::outcome::{OutcomeKind, OutcomePanel};
+    pub use crate::display::performance_hud::{PerformanceHud, PerformanceHudState};
     pub use crate::display::plot::{
         Candlestick, CandlestickChart, Plot, PlotFrame, PlotMark, PlotState, SankeyChart,
         SankeyData, SankeyLink, SankeyNode,

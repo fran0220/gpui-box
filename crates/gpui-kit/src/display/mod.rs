@@ -15,6 +15,7 @@ pub mod icon;
 pub mod loading;
 pub mod metric;
 pub mod outcome;
+pub mod performance_hud;
 pub mod plot;
 pub mod progress;
 pub mod progress_circle;

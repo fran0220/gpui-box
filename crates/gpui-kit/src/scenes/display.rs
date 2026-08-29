@@ -2,6 +2,58 @@
 
 use super::support::*;
 
+pub(super) fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let summary = gpui::FrameTimingSummary {
+        sample_count: 8,
+        frames_per_second: 58.7,
+        frame_budget: Duration::from_micros(16_667),
+        mean_draw_duration: Duration::from_micros(8_425),
+        p95_draw_duration: Duration::from_micros(18_900),
+        over_budget_fraction: 0.125,
+        mean_invalidations: 1.4,
+        mean_dirty_to_draw_duration: Some(Duration::from_micros(10_600)),
+        draw_durations: [7_200, 7_800, 8_100, 7_600, 9_300, 18_900, 8_000, 8_500]
+            .map(Duration::from_micros)
+            .into(),
+    };
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "The framework observes existing draws; the controlled HUD only presents the caller's latest summary",
+        ))
+        .child(
+            PerformanceHud::new(
+                "scene.performance.ready",
+                PerformanceHudState::Ready(summary),
+            )
+            .expanded(true)
+            .on_expanded(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .row()
+                .items_stretch()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div().flex_1().min_w_0().child(PerformanceHud::new(
+                        "scene.performance.waiting",
+                        PerformanceHudState::Waiting,
+                    )),
+                )
+                .child(
+                    div().flex_1().min_w_0().child(PerformanceHud::new(
+                        "scene.performance.unavailable",
+                        PerformanceHudState::Unavailable(
+                            "Frame tracing is disabled by this host.".into(),
+                        ),
+                    )),
+                ),
+        )
+        .into_any_element()
+}
+
 pub(super) fn rating(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)

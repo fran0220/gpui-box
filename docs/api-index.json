@@ -3346,6 +3346,27 @@
       ]
     },
     {
+      "name": "PerformanceHud",
+      "kind": "builder",
+      "path": "gpui_kit::display::PerformanceHud",
+      "source": "crates/gpui-kit/src/display/performance_hud.rs",
+      "summary": "A compact or expanded frame diagnostics surface.",
+      "construct": [
+        "new(ident: impl Into<Ident>, state: PerformanceHudState) -> Self"
+      ],
+      "options": [
+        "expanded(expanded: bool) -> Self",
+        "on_expanded(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "performance-hud"
+      ]
+    },
+    {
       "name": "PermissionMatrix",
       "kind": "builder",
       "path": "gpui_kit::agent::PermissionMatrix",
@@ -11079,6 +11100,22 @@
       "queries": []
     },
     {
+      "name": "PerformanceHudState",
+      "path": "gpui_kit::display::PerformanceHudState",
+      "summary": "The diagnostics fact a host currently has.",
+      "variants": [
+        "Waiting",
+        "Ready",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
       "name": "PermissionAction",
       "path": "gpui_kit::agent::PermissionAction",
       "summary": "One column: an action, addressed by a stable key.",
@@ -15811,6 +15848,18 @@
         "Sparkline"
       ],
       "example": "fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let points = [\n        SparklinePoint::new(0.0, 0.20),\n        SparklinePoint::new(0.14, 0.34),\n        SparklinePoint::new(0.28, 0.29),\n        SparklinePoint::new(0.42, 0.56),\n        SparklinePoint::new(0.57, 0.48),\n        SparklinePoint::new(0.71, 0.74),\n        SparklinePoint::new(0.85, 0.66),\n        SparklinePoint::new(1.0, 0.82),\n    ];\n    // A second metric is a second shape. Two readings that draw the same\n    // curve prove only that both were handed the same fixture.\n    let queue = [\n        SparklinePoint::new(0.0, 0.72),\n        SparklinePoint::new(0.14, 0.64),\n        SparklinePoint::new(0.28, 0.80),\n        SparklinePoint::new(0.42, 0.45),\n        SparklinePoint::new(0.57, 0.38),\n        SparklinePoint::new(0.71, 0.52),\n        SparklinePoint::new(0.85, 0.30),\n        SparklinePoint::new(1.0, 0.34),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry with caller-formatted current, minimum and maximum\",\n        ))\n        .child(Sparkline::new(\n            \"scene.sparkline.rate\",\n            \"Fixture throughput\",\n            SparklineState::Ready(SparklineReading::new(\n                points, \"82 req/s\", \"20 req/s\", \"82 req/s\",\n            )),\n        ))\n        .child(caption(\n            &theme,\n            \"a reading that is no longer verified draws quieter, and its latest \\\n             sample is a ring rather than a mark\",\n        ))\n        .child(Sparkline::new(\n            \"scene.sparkline.stale\",\n            \"Fixture queue depth\",\n            SparklineState::Stale {\n                reading: SparklineReading::new(queue, \"34 jobs\", \"8 jobs\", \"41 jobs\"),\n                reason: \"The latest sample is unavailable; the verified reading remains.\".into(),\n            },\n        ))\n        .child(caption(\n            &theme,\n            \"a series the caller has already spent a colour on\",\n        ))\n        .child(\n            Sparkline::new(\n                \"scene.sparkline.tinted\",\n                \"Fixture tokens\",\n                SparklineState::Ready(SparklineReading::new(points, \"1.2k\", \"0.4k\", \"1.4k\")),\n            )\n            .tint(identity_tint(&theme, \"agent.read\")),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "performance-hud",
+      "capture": "cargo run -p xtask -- headless capture performance-hud",
+      "kind": "exhibit",
+      "subjects": [
+        "PerformanceHud"
+      ],
+      "uses": [
+        "PerformanceHud"
+      ],
+      "example": "fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let summary = gpui::FrameTimingSummary {\n        sample_count: 8,\n        frames_per_second: 58.7,\n        frame_budget: Duration::from_micros(16_667),\n        mean_draw_duration: Duration::from_micros(8_425),\n        p95_draw_duration: Duration::from_micros(18_900),\n        over_budget_fraction: 0.125,\n        mean_invalidations: 1.4,\n        mean_dirty_to_draw_duration: Some(Duration::from_micros(10_600)),\n        draw_durations: [7_200, 7_800, 8_100, 7_600, 9_300, 18_900, 8_000, 8_500]\n            .map(Duration::from_micros)\n            .into(),\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"The framework observes existing draws; the controlled HUD only presents the caller's latest summary\",\n        ))\n        .child(\n            PerformanceHud::new(\n                \"scene.performance.ready\",\n                PerformanceHudState::Ready(summary),\n            )\n            .expanded(true)\n            .on_expanded(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row()\n                .items_stretch()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.waiting\",\n                        PerformanceHudState::Waiting,\n                    )),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.unavailable\",\n                        PerformanceHudState::Unavailable(\n                            \"Frame tracing is disabled by this host.\".into(),\n                        ),\n                    )),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "chart",
