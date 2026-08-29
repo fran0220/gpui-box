@@ -1395,7 +1395,7 @@ fn web_smoke_prepared() -> Result<()> {
     let config = config.to_string_lossy();
     #[cfg(target_os = "linux")]
     {
-        return step(
+        step(
             "xvfb-run",
             &[
                 "-a",
@@ -1410,7 +1410,7 @@ fn web_smoke_prepared() -> Result<()> {
                 config.as_ref(),
             ],
             None,
-        );
+        )
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -1677,22 +1677,6 @@ fn tokens(check: bool) -> Result<()> {
 
 fn same_generated_text(current: &str, expected: &str) -> bool {
     current.replace("\r\n", "\n") == expected
-}
-
-#[cfg(test)]
-mod generated_text_tests {
-    use super::same_generated_text;
-
-    #[test]
-    fn accepts_git_materialized_crlf() {
-        assert!(same_generated_text("one\r\ntwo\r\n", "one\ntwo\n"));
-    }
-
-    #[test]
-    fn rejects_content_changes_and_lone_carriage_returns() {
-        assert!(!same_generated_text("one\rchanged\n", "one\ntwo\n"));
-        assert!(!same_generated_text("one\rtwo\n", "one\ntwo\n"));
-    }
 }
 
 /// Every theme carries the same palette groups and steps, so a component or a
@@ -2462,4 +2446,20 @@ fn root() -> PathBuf {
         .parent()
         .expect("xtask lives under the repository root")
         .to_path_buf()
+}
+
+#[cfg(test)]
+mod generated_text_tests {
+    use super::same_generated_text;
+
+    #[test]
+    fn accepts_git_materialized_crlf() {
+        assert!(same_generated_text("one\r\ntwo\r\n", "one\ntwo\n"));
+    }
+
+    #[test]
+    fn rejects_content_changes_and_lone_carriage_returns() {
+        assert!(!same_generated_text("one\rchanged\n", "one\ntwo\n"));
+        assert!(!same_generated_text("one\rtwo\n", "one\ntwo\n"));
+    }
 }
