@@ -172,10 +172,10 @@ struct GestureState {
     gesture: Option<Gesture>,
     pointer: Option<Point<Pixels>>,
     animation_started: Option<Instant>,
-    /// Whether this canvas has already framed itself once. Kept beside the
+    /// The fit token this canvas last framed itself for. Kept beside the
     /// gesture because it is the same kind of fact: what this one canvas has
     /// been through, not what the caller asked for.
-    framed: bool,
+    framed: Option<u64>,
 }
 
 fn world_to_screen(world: Point<f32>, viewport: GraphViewport) -> Point<f32> {
@@ -212,6 +212,17 @@ fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
 /// How much of the surface is kept clear when framing, so a card at the edge
 /// of the graph does not end up against the edge of the panel.
 const FIT_MARGIN: f32 = 48.0;
+
+/// The token to frame for, or `None` when this canvas has already framed for
+/// the one the caller is holding. Separated from the drawing so the rule —
+/// framing happens once per token, and a reader's own panning never earns
+/// another one — can be read and tested without a window.
+fn wants_frame(fit: GraphFit, framed: Option<u64>) -> Option<u64> {
+    match fit {
+        GraphFit::Never => None,
+        GraphFit::Whole(token) => (framed != Some(token)).then_some(token),
+    }
+}
 
 /// The viewport that holds every card, or `None` when there is nothing to hold
 /// or nowhere to hold it yet.
@@ -545,12 +556,15 @@ pub enum GraphFit {
     /// The viewport is the caller's from the first frame.
     #[default]
     Never,
-    /// Frame every node once, as soon as the cards have been laid out and
-    /// their real heights are known. Reported as an ordinary
+    /// Frame every node as soon as the cards have been laid out and their
+    /// real heights are known, and again each time this value changes — which
+    /// is what a caller's own Fit control bumps, since the caller cannot
+    /// compute the frame itself. Reported as an ordinary
     /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
-    /// its viewport needs nothing else; afterwards the viewport is the
-    /// reader's and the canvas never moves it again.
-    OnFirstLayout,
+    /// its viewport needs nothing else. Between framings the viewport is the
+    /// reader's and the canvas never moves it on its own, so a caller that
+    /// holds one value is framed exactly once, when the canvas first opens.
+    Whole(u64),
 }
 
 impl std::fmt::Debug for NodeGraph {
@@ -1251,8 +1265,7 @@ impl RenderOnce for NodeGraph {
             let bounds = measured.get();
             (f32::from(bounds.size.width) > 1.0).then(|| world_view(viewport, bounds))
         };
-        if self.fit == GraphFit::OnFirstLayout
-            && !gesture.borrow().framed
+        if let Some(token) = wants_frame(self.fit, gesture.borrow().framed)
             // Waiting for real heights is the whole point: framing from the
             // estimate would leave the tallest card half outside the frame it
             // was supposed to guarantee.
@@ -1260,7 +1273,7 @@ impl RenderOnce for NodeGraph {
             && let Some(framed) = frame_all(&geometry, measured.get(), self.zoom_range)
             && let Some(report) = self.on_event.as_ref().cloned()
         {
-            gesture.borrow_mut().framed = true;
+            gesture.borrow_mut().framed = Some(token);
             // Reported rather than applied: the viewport belongs to the caller
             // and this is the same proposal a pan or a wheel makes. Deferred
             // because a caller answers it by writing its own state, which it
@@ -2404,6 +2417,30 @@ mod tests {
             )
             .is_none(),
             "a canvas that has not been laid out yet is not a frame of zero size"
+        );
+    }
+
+    #[test]
+    fn a_canvas_frames_once_per_token_and_never_takes_the_view_back() {
+        assert_eq!(
+            wants_frame(GraphFit::Never, None),
+            None,
+            "a canvas the caller never asked to frame stays where the caller put it"
+        );
+
+        let opening = wants_frame(GraphFit::Whole(0), None).expect("the opening frame");
+        assert_eq!(opening, 0);
+        assert_eq!(
+            wants_frame(GraphFit::Whole(0), Some(opening)),
+            None,
+            "once framed, the view is the reader's: panning away does not earn \
+             it back"
+        );
+        assert_eq!(
+            wants_frame(GraphFit::Whole(1), Some(0)),
+            Some(1),
+            "a caller's own Fit control bumps the token, which is how it asks \
+             for a frame it cannot compute itself"
         );
     }
 

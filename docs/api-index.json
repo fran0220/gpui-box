@@ -8381,7 +8381,7 @@
       "summary": "Whether a canvas frames its own content before the reader touches it.",
       "variants": [
         "Never",
-        "OnFirstLayout"
+        "Whole"
       ],
       "construct": [],
       "options": [],
