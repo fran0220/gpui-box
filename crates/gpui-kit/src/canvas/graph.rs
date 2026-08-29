@@ -1265,7 +1265,11 @@ impl RenderOnce for NodeGraph {
             let bounds = measured.get();
             (f32::from(bounds.size.width) > 1.0).then(|| world_view(viewport, bounds))
         };
-        if let Some(token) = wants_frame(self.fit, gesture.borrow().framed)
+        // Read out rather than borrowed in place: a borrow held in an `if let`
+        // scrutinee lives as long as the block, and the block takes the same
+        // cell mutably to record what it framed.
+        let already_framed = gesture.borrow().framed;
+        if let Some(token) = wants_frame(self.fit, already_framed)
             // Waiting for real heights is the whole point: framing from the
             // estimate would leave the tallest card half outside the frame it
             // was supposed to guarantee.
