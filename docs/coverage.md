@@ -24,7 +24,7 @@ input, and an entry in `docs/components.md`.
 | Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList`, `ImageList`, `Masonry` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `CodeView`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView`, `ArtifactPreview`, `Terminal` |
-| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `Rating`, `Bubble`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
+| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `Rating`, `Bubble`, `Plot`, `CandlestickChart`, `SankeyChart`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
 | Overlay | `Overlay`, `Frost`, `Glass`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `NotificationCenter`, `Kbd` |
 | Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive`, `Grid`, `Container` |
 | Shell | `Dock`, `StatusBar` |
@@ -604,7 +604,10 @@ the form never owns the condition or removes caller data.
 `LineChart` and `BarChart` now cover the cartesian presentation gap with keyed
 motion, area fills, pointer and keyboard crosshairs, exact host-formatted text,
 and stale-data retention. Domains, ticks, aggregation, and queries remain host
-facts rather than drawing work.
+facts rather than drawing work. `Plot` supplies the lower generic measured
+frame and semantic mark traversal. `CandlestickChart` and `SankeyChart` render
+caller-normalized OHLC and flow geometry through that boundary; neither owns a
+market scale, topology algorithm, value transform, or financial vocabulary.
 
 Agent and game applications now have product-neutral run, persona, party,
 objective, ability, and reward families rather than one-off downstream cards.

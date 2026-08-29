@@ -543,6 +543,169 @@ pub(super) fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+pub(super) fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let accent = theme.colors.accent;
+    let custom_marks = vec![
+        PlotMark::new(
+            "first",
+            "First stage",
+            "18 jobs",
+            bounds(point(0.08, 0.58), size(0.18, 0.28)),
+        ),
+        PlotMark::new(
+            "middle",
+            "Middle stage",
+            "34 jobs",
+            bounds(point(0.40, 0.30), size(0.18, 0.56)),
+        ),
+        PlotMark::new(
+            "last",
+            "Last stage",
+            "26 jobs",
+            bounds(point(0.72, 0.44), size(0.18, 0.42)),
+        ),
+    ];
+    let painted_marks = custom_marks.clone();
+    let candles = [
+        Candlestick::new("monday", 0.10, 0.32, 0.58, 0.20, 0.50, "Monday", "32–50"),
+        Candlestick::new("tuesday", 0.30, 0.52, 0.66, 0.38, 0.44, "Tuesday", "52–44"),
+        Candlestick::new(
+            "wednesday",
+            0.50,
+            0.45,
+            0.80,
+            0.40,
+            0.72,
+            "Wednesday",
+            "45–72",
+        ),
+        Candlestick::new(
+            "thursday", 0.70, 0.70, 0.76, 0.34, 0.42, "Thursday", "70–42",
+        ),
+        Candlestick::new("friday", 0.90, 0.44, 0.88, 0.36, 0.82, "Friday", "44–82"),
+    ];
+    let source_tint = identity_tint(&theme, "agent.read");
+    let target_tint = identity_tint(&theme, "agent.write");
+    let sankey = SankeyData::new(
+        [
+            SankeyNode::new(
+                "queued",
+                "Queued",
+                "48 jobs",
+                bounds(point(0.03, 0.20), size(0.08, 0.58)),
+            )
+            .tint(source_tint),
+            SankeyNode::new(
+                "running",
+                "Running",
+                "34 jobs",
+                bounds(point(0.46, 0.28), size(0.08, 0.42)),
+            ),
+            SankeyNode::new(
+                "completed",
+                "Completed",
+                "26 jobs",
+                bounds(point(0.89, 0.12), size(0.08, 0.32)),
+            )
+            .tint(target_tint),
+            SankeyNode::new(
+                "deferred",
+                "Deferred",
+                "8 jobs",
+                bounds(point(0.89, 0.62), size(0.08, 0.18)),
+            )
+            .tint(theme.colors.warning),
+        ],
+        [
+            SankeyLink::new(
+                "queue-running",
+                "queued",
+                "running",
+                "Queued to running",
+                "34 jobs",
+                point(0.11, 0.48),
+                point(0.46, 0.49),
+                0.30,
+            )
+            .tint(source_tint),
+            SankeyLink::new(
+                "running-completed",
+                "running",
+                "completed",
+                "Running to completed",
+                "26 jobs",
+                point(0.54, 0.44),
+                point(0.89, 0.28),
+                0.24,
+            )
+            .tint(target_tint),
+            SankeyLink::new(
+                "running-deferred",
+                "running",
+                "deferred",
+                "Running to deferred",
+                "8 jobs",
+                point(0.54, 0.62),
+                point(0.89, 0.71),
+                0.10,
+            )
+            .tint(theme.colors.warning),
+        ],
+    );
+
+    let column = || div().column().flex_1().min_w_0();
+    stack(&theme)
+        .w(px(920.0))
+        .child(caption(
+            &theme,
+            "normalized geometry and exact wording remain caller-owned",
+        ))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .w_full()
+                .gap(px(theme.space(Space::Lg)))
+                .child(
+                    column().child(
+                        Plot::new(
+                            "scene.plot.custom",
+                            "Pipeline",
+                            PlotState::Ready(custom_marks),
+                        )
+                        .current("middle")
+                        .on_current(|_, _, _| {})
+                        .paint(move |frame, window, _| {
+                            for mark in &painted_marks {
+                                window
+                                    .paint_quad(gpui::fill(frame.mark_bounds(mark.bounds), accent));
+                            }
+                        }),
+                    ),
+                )
+                .child(
+                    column().child(
+                        CandlestickChart::new(
+                            "scene.plot.candles",
+                            "Daily range",
+                            PlotState::Ready(candles.into()),
+                        )
+                        .current("wednesday")
+                        .on_current(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    column().child(
+                        SankeyChart::new("scene.plot.sankey", "Run flow", PlotState::Ready(sankey))
+                            .current("node.running")
+                            .on_current(|_, _, _| {}),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
 pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let cpu = [

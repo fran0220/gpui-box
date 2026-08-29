@@ -269,3 +269,14 @@ Solarized
 Source: https://github.com/altercation/solarized
 License: MIT
 Copyright (c) 2011 Ethan Schoonover
+
+Longbridge GPUI Component plot behavior reference
+--------------------------------------------------------------------------------
+Source: https://github.com/longbridge/gpui-component
+Revision: 6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7
+License: Apache-2.0
+Scope: behavioral and architectural reference for the original normalized
+Plot, CandlestickChart, and SankeyChart implementation in
+crates/gpui-kit/src/display/plot.rs. No upstream source, d3-sankey layout code,
+financial fixture, or Cargo dependency is included; see PROVENANCE.md P13.
+License text: LICENSE-APACHE

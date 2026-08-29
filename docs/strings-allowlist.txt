@@ -45,6 +45,7 @@ Button
 ButtonGroup
 Calendar
 Cancel
+CandlestickChart
 Card
 CardHeader
 Carousel
@@ -150,6 +151,7 @@ PermissionMatrix
 PersonaDialogue
 Placed
 PlatformMediaTransport
+Plot
 Popover
 ProgressBar
 ProgressCircle
@@ -162,6 +164,7 @@ RewardReveal
 RichTextEditor
 Row
 SCALAR
+SankeyChart
 SchemaForm
 ScrollArea
 ScrollFade
@@ -274,6 +277,7 @@ pane `{id}` has children
 plain text
 platform
 policy-owned particle recipes must remain valid
+ready handled above
 records the root does not reach
 redacted, {shape}
 rich text is never blockless

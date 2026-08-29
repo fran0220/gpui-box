@@ -5,7 +5,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gpui::{
-    IntoElement, Modifiers, MouseMoveEvent, ParentElement, Styled, TestAppContext, div, point, px,
+    IntoElement, Modifiers, MouseMoveEvent, ParentElement, SharedString, Styled, TestAppContext,
+    bounds, div, point, px,
 };
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -474,6 +475,75 @@ fn chart_semantics_take_new_text_before_pixels_settle(cx: &mut TestAppContext) {
             .as_deref(),
         Some("refresh failed")
     );
+}
+
+#[gpui::test]
+fn plot_marks_publish_measured_business_bounds_and_keyboard_values(cx: &mut TestAppContext) {
+    let reports = Rc::new(RefCell::new(Vec::<SharedString>::new()));
+    let sink = Rc::clone(&reports);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = Rc::clone(&sink);
+        div()
+            .w(px(420.0))
+            .child(
+                CandlestickChart::new(
+                    "candles",
+                    "Daily range",
+                    PlotState::Ready(vec![
+                        Candlestick::new("monday", 0.2, 0.3, 0.6, 0.2, 0.5, "Monday", "30–50"),
+                        Candlestick::new("tuesday", 0.8, 0.5, 0.8, 0.4, 0.7, "Tuesday", "50–70"),
+                    ]),
+                )
+                .current("monday")
+                .on_current(move |id, _, _| sink.borrow_mut().push(id)),
+            )
+            .into_any_element()
+    });
+
+    let monday = harness
+        .node("candles.plot.mark.monday")
+        .expect("stable candle mark");
+    assert_eq!(monday.text.as_deref(), Some("Monday"));
+    assert_eq!(monday.value.as_deref(), Some("30–50"));
+    assert!(monday.bounds.area() > 0.0);
+
+    harness.update(|window, cx| window.focus_next(cx));
+    harness.keystrokes("right");
+    assert_eq!(
+        reports.borrow().last().map(SharedString::as_ref),
+        Some("tuesday")
+    );
+    assert!(
+        harness
+            .node("candles.plot.mark.tuesday")
+            .expect("next candle")
+            .selected
+    );
+}
+
+#[gpui::test]
+fn a_stale_plot_keeps_verified_marks_and_the_refresh_failure(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Plot::new(
+            "plot",
+            "Capacity",
+            PlotState::Stale {
+                data: vec![PlotMark::new(
+                    "verified",
+                    "Verified",
+                    "42",
+                    bounds(point(0.2, 0.2), gpui::size(0.4, 0.5)),
+                )],
+                reason: "refresh failed".into(),
+            },
+        )
+        .into_any_element()
+    });
+
+    assert!(harness.node("plot.plot.mark.verified").is_some());
+    let plot = harness.node("plot").expect("plot state");
+    assert_eq!(plot.value.as_deref(), Some("stale"));
+    assert_eq!(plot.description.as_deref(), Some("refresh failed"));
 }
 
 #[gpui::test]

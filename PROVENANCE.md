@@ -431,3 +431,22 @@ that contains the translation.
 
 No product state, credentials, telemetry, user content, provider logos, or Zed
 editor/workspace/product source is included by the framework filter.
+
+## P13: GPUI Component plot behavior reference
+
+- Reference: <https://github.com/longbridge/gpui-component>
+- Revision: `6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7`
+- License: Apache-2.0
+- Reference locations: `crates/ui/src/plot/mod.rs`,
+  `crates/ui/src/chart/candlestick_chart.rs`, and
+  `crates/ui/src/chart/sankey_chart.rs`
+- Destination: `crates/gpui-kit/src/display/plot.rs`
+
+The reference established the product-neutral separation between a measured
+plot frame, caller data, and styled chart wrappers. GPUI Box's implementation
+is original and deliberately narrower: callers supply normalized mark, OHLC,
+node, and ribbon geometry; Kit supplies stable semantic ids, measured bounds,
+keyboard traversal, truthful states, and theme presentation. No upstream Rust
+source was copied. In particular, GPUI Box does not include or translate the
+referenced `d3-sankey` topology/layout algorithm, and carries no d3 dependency
+or financial fixture policy.

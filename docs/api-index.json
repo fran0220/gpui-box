@@ -826,6 +826,30 @@
       ]
     },
     {
+      "name": "CandlestickChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::CandlestickChart",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "Candlesticks over caller-owned normalized OHLC readings.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<Vec<Candlestick>>) -> Self"
+      ],
+      "options": [
+        "body_width(normalized: f32) -> Self",
+        "rising_tint(tint: Hsla) -> Self",
+        "falling_tint(tint: Hsla) -> Self",
+        "current(id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "plot"
+      ]
+    },
+    {
       "name": "CanvasToolbar",
       "kind": "builder",
       "path": "gpui_kit::canvas::CanvasToolbar",
@@ -3425,6 +3449,28 @@
       ]
     },
     {
+      "name": "Plot",
+      "kind": "builder",
+      "path": "gpui_kit::display::Plot",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "A measured plot with caller-painted content and semantic marks.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<Vec<PlotMark>>) -> Self"
+      ],
+      "options": [
+        "paint(painter: impl Fn(PlotFrame, &mut Window, &mut App) + 'static) -> Self",
+        "current(mark_id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "plot"
+      ]
+    },
+    {
       "name": "Popover",
       "kind": "view",
       "path": "gpui_kit::overlay::Popover",
@@ -3773,6 +3819,27 @@
       ],
       "scenes": [
         "rich-text-editor"
+      ]
+    },
+    {
+      "name": "SankeyChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::SankeyChart",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "Sankey ribbons over caller-owned normalized layout.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<SankeyData>) -> Self"
+      ],
+      "options": [
+        "current(id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "plot"
       ]
     },
     {
@@ -6452,6 +6519,20 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "Candlestick",
+      "path": "gpui_kit::display::Candlestick",
+      "summary": "One caller-normalized OHLC reading.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, x: f32, open: f32, high: f32, low: f32, close: f32, label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_bounded() -> bool"
+      ]
     },
     {
       "name": "CanvasToolbarAction",
@@ -11209,6 +11290,57 @@
       ]
     },
     {
+      "name": "PlotFrame",
+      "path": "gpui_kit::display::PlotFrame",
+      "summary": "The measured pixel frame handed to a plot painter.",
+      "variants": [],
+      "construct": [
+        "new(bounds: Bounds<Pixels>) -> Self"
+      ],
+      "options": [
+        "bounds() -> Bounds<Pixels>",
+        "point(normalized: Point<f32>) -> Point<Pixels>",
+        "mark_bounds(normalized: Bounds<f32>) -> Bounds<Pixels>"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PlotMark",
+      "path": "gpui_kit::display::PlotMark",
+      "summary": "One semantic target inside a plot.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, value: impl Into<SharedString>, bounds: Bounds<f32>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_bounded() -> bool"
+      ]
+    },
+    {
+      "name": "PlotState",
+      "path": "gpui_kit::display::PlotState",
+      "summary": "Loading and refresh truth for arbitrary caller-owned plot data.",
+      "variants": [
+        "Loading",
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Error",
+        "Stale"
+      ],
+      "construct": [],
+      "options": [
+        "map<U>(map: impl FnOnce(T) -> U) -> PlotState<U>"
+      ],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
       "name": "Plural",
       "path": "gpui_kit::strings::Plural",
       "summary": "Which plural form a count takes in the host's language.",
@@ -12029,6 +12161,47 @@
       "queries": [
         "as_str() -> &str"
       ]
+    },
+    {
+      "name": "SankeyData",
+      "path": "gpui_kit::display::SankeyData",
+      "summary": "Caller-owned node and ribbon geometry for a Sankey presentation.",
+      "variants": [],
+      "construct": [
+        "new(nodes: impl IntoIterator<Item = SankeyNode>, links: impl IntoIterator<Item = SankeyLink>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SankeyLink",
+      "path": "gpui_kit::display::SankeyLink",
+      "summary": "One caller-laid-out flow ribbon.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, source: impl Into<SharedString>, target: impl Into<SharedString>, label: impl Into<SharedString>, value: impl Into<SharedString>, start: Point<f32>, end: Point<f32>, width: f32) -> Self"
+      ],
+      "options": [
+        "widths(start: f32, end: f32) -> Self",
+        "tint(color: Hsla) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SankeyNode",
+      "path": "gpui_kit::display::SankeyNode",
+      "summary": "One caller-laid-out Sankey node.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, value: impl Into<SharedString>, bounds: Bounds<f32>) -> Self"
+      ],
+      "options": [
+        "tint(color: Hsla) -> Self"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SaveState",
@@ -15666,6 +15839,22 @@
         "StackedBarChart"
       ],
       "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    // Three columns rather than one tall stack. The family is eleven surfaces\n    // once truthful empty/stale states are included, and even two columns run\n    // the final plots below the fixed review frame.\n    let column = || {\n        div()\n            .column()\n            .flex_1()\n            .min_w_0()\n            .gap(px(theme.space(Space::Md)))\n    };\n    // The frame this is reviewed in is 920 wide. Every column flexes inside\n    // that width so the third one earns vertical room without escaping at the\n    // right edge.\n    stack(&theme)\n        .w(px(920.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .w_full()\n                .gap(px(theme.space(Space::Lg)))\n                .child(\n                    column()\n                        .child(\n                            LineChart::new(\n                                \"scene.chart.ready\",\n                                \"Fixture load\",\n                                ChartState::Stale {\n                                    series: vec![\n                                        ChartSeries::new(\"cpu\", \"CPU\")\n                                            .points(cpu)\n                                            .tint(identity_tint(&theme, \"agent.read\")),\n                                        ChartSeries::new(\"memory\", \"Memory\")\n                                            .points(memory)\n                                            .tint(identity_tint(&theme, \"agent.shell\")),\n                                    ],\n                                    reason: \"Refresh failed; showing last verified sample\".into(),\n                                },\n                            )\n                            .area()\n                            .crosshair()\n                            .current(\"cpu\", \"00:45\")\n                            .on_current(|_, _, _| {})\n                            .axes(\n                                ChartAxes::default()\n                                    .x_label(\"Time\")\n                                    .y_label(\"Utilization\")\n                                    .x_ends(\"00:00\", \"01:00\")\n                                    .y_ends(\"0%\", \"100%\"),\n                            ),\n                        )\n                        .child(LineChart::new(\n                            \"scene.chart.empty\",\n                            \"Fixture load\",\n                            ChartState::Empty,\n                        ))\n                        .child(\n                            BarChart::new(\n                                \"scene.chart.bars\",\n                                \"Fixture share\",\n                                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points(\n                                    [\n                                        ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                                        ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                                        ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                                        ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                                    ],\n                                )]),\n                            )\n                            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n                        )\n                        .child(\n                            PieChart::new(\n                                \"scene.chart.pie\",\n                                \"Fixture share\",\n                                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points(\n                                    [\n                                        ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                                        ChartPoint::new(\"beta\", 0.25, 0.35, \"Beta\", \"35%\"),\n                                        ChartPoint::new(\"gamma\", 0.60, 0.20, \"Gamma\", \"20%\"),\n                                        ChartPoint::new(\"delta\", 0.80, 0.20, \"Delta\", \"20%\"),\n                                    ],\n                                )]),\n                            )\n                            .donut(),\n                        ),\n                )\n                .child(\n                    column()\n                        .child(\n                            ChartLegend::new(\n                                \"scene.chart.legend\",\n                                [\n                                    ChartSeries::new(\"cpu\", \"CPU\")\n                                        .tint(identity_tint(&theme, \"agent.read\")),\n                                    ChartSeries::new(\"memory\", \"Memory\")\n                                        .tint(identity_tint(&theme, \"agent.shell\")),\n                                ],\n                            )\n                            .on_toggle(|_, _, _, _| {}),\n                        )\n                        .child(\n                            AreaChart::new(\n                                \"scene.chart.area\",\n                                \"Fixture tokens\",\n                                ChartState::Ready(vec![\n                                    ChartSeries::new(\"tokens\", \"Tokens\")\n                                        .points([\n                                            ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n                                            ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n                                            ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n                                            ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n                                            ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n                                        ])\n                                        .tint(identity_tint(&theme, \"agent.read\")),\n                                ]),\n                            )\n                            .axes(ChartAxes::default().y_ends(\"0\", \"max\"))\n                            .crosshair(),\n                        )\n                        .child(\n                            ScatterChart::new(\n                                \"scene.chart.scatter\",\n                                \"Fixture samples\",\n                                ChartState::Ready(vec![\n                                    ChartSeries::new(\"samples\", \"Samples\").points([\n                                        ChartPoint::new(\"a\", 0.15, 0.30, \"A\", \"30\").weight(0.2),\n                                        ChartPoint::new(\"b\", 0.40, 0.62, \"B\", \"62\").weight(0.6),\n                                        ChartPoint::new(\"c\", 0.72, 0.48, \"C\", \"48\").weight(0.35),\n                                        ChartPoint::new(\"d\", 0.88, 0.80, \"D\", \"80\").weight(0.9),\n                                    ]),\n                                ]),\n                            )\n                            .crosshair()\n                            .current(\"samples\", \"b\")\n                            .on_current(|_, _, _| {})\n                            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n                        ),\n                )\n                .child(\n                    column()\n                        .child(\n                            StackedBarChart::new(\n                                \"scene.chart.stacked\",\n                                \"Fixture mix\",\n                                ChartState::Ready(vec![\n                                    ChartSeries::new(\"cpu\", \"CPU\")\n                                        .points([\n                                            ChartPoint::new(\"alpha\", 0.0, 0.30, \"Alpha\", \"30%\"),\n                                            ChartPoint::new(\"beta\", 0.5, 0.20, \"Beta\", \"20%\"),\n                                        ])\n                                        .tint(identity_tint(&theme, \"agent.read\")),\n                                    ChartSeries::new(\"memory\", \"Memory\")\n                                        .points([\n                                            ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                                            ChartPoint::new(\"beta\", 0.5, 0.40, \"Beta\", \"40%\"),\n                                        ])\n                                        .tint(identity_tint(&theme, \"agent.shell\")),\n                                ]),\n                            )\n                            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n                        )\n                        .child(RadarChart::new(\n                            \"scene.chart.radar\",\n                            \"Fixture profile\",\n                            ChartState::Ready(vec![ChartSeries::new(\"profile\", \"Profile\").points(\n                                [\n                                    ChartPoint::new(\"clarity\", 0.0, 0.80, \"Clarity\", \"80\"),\n                                    ChartPoint::new(\"speed\", 0.0, 0.55, \"Speed\", \"55\"),\n                                    ChartPoint::new(\"coverage\", 0.0, 0.70, \"Coverage\", \"70\"),\n                                    ChartPoint::new(\"cost\", 0.0, 0.40, \"Cost\", \"40\"),\n                                ],\n                            )]),\n                        ))\n                        .child(RadarChart::new(\n                            \"scene.chart.radar-empty\",\n                            \"Fixture profile\",\n                            ChartState::Empty,\n                        ))\n                        .child(GaugeChart::new(\n                            \"scene.chart.gauge\",\n                            \"Fixture occupancy\",\n                            ChartState::Ready(vec![\n                                ChartSeries::new(\"occupancy\", \"Occupancy\")\n                                    .points([ChartPoint::new(\"now\", 0.0, 0.72, \"Now\", \"72%\")]),\n                            ]),\n                        )),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "plot",
+      "capture": "cargo run -p xtask -- headless capture plot",
+      "kind": "exhibit",
+      "subjects": [
+        "CandlestickChart",
+        "Plot",
+        "SankeyChart"
+      ],
+      "uses": [
+        "CandlestickChart",
+        "Plot",
+        "SankeyChart"
+      ],
+      "example": "fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let accent = theme.colors.accent;\n    let custom_marks = vec![\n        PlotMark::new(\n            \"first\",\n            \"First stage\",\n            \"18 jobs\",\n            bounds(point(0.08, 0.58), size(0.18, 0.28)),\n        ),\n        PlotMark::new(\n            \"middle\",\n            \"Middle stage\",\n            \"34 jobs\",\n            bounds(point(0.40, 0.30), size(0.18, 0.56)),\n        ),\n        PlotMark::new(\n            \"last\",\n            \"Last stage\",\n            \"26 jobs\",\n            bounds(point(0.72, 0.44), size(0.18, 0.42)),\n        ),\n    ];\n    let painted_marks = custom_marks.clone();\n    let candles = [\n        Candlestick::new(\"monday\", 0.10, 0.32, 0.58, 0.20, 0.50, \"Monday\", \"32–50\"),\n        Candlestick::new(\"tuesday\", 0.30, 0.52, 0.66, 0.38, 0.44, \"Tuesday\", \"52–44\"),\n        Candlestick::new(\n            \"wednesday\",\n            0.50,\n            0.45,\n            0.80,\n            0.40,\n            0.72,\n            \"Wednesday\",\n            \"45–72\",\n        ),\n        Candlestick::new(\n            \"thursday\", 0.70, 0.70, 0.76, 0.34, 0.42, \"Thursday\", \"70–42\",\n        ),\n        Candlestick::new(\"friday\", 0.90, 0.44, 0.88, 0.36, 0.82, \"Friday\", \"44–82\"),\n    ];\n    let source_tint = identity_tint(&theme, \"agent.read\");\n    let target_tint = identity_tint(&theme, \"agent.write\");\n    let sankey = SankeyData::new(\n        [\n            SankeyNode::new(\n                \"queued\",\n                \"Queued\",\n                \"48 jobs\",\n                bounds(point(0.03, 0.20), size(0.08, 0.58)),\n            )\n            .tint(source_tint),\n            SankeyNode::new(\n                \"running\",\n                \"Running\",\n                \"34 jobs\",\n                bounds(point(0.46, 0.28), size(0.08, 0.42)),\n            ),\n            SankeyNode::new(\n                \"completed\",\n                \"Completed\",\n                \"26 jobs\",\n                bounds(point(0.89, 0.12), size(0.08, 0.32)),\n            )\n            .tint(target_tint),\n            SankeyNode::new(\n                \"deferred\",\n                \"Deferred\",\n                \"8 jobs\",\n                bounds(point(0.89, 0.62), size(0.08, 0.18)),\n            )\n            .tint(theme.colors.warning),\n        ],\n        [\n            SankeyLink::new(\n                \"queue-running\",\n                \"queued\",\n                \"running\",\n                \"Queued to running\",\n                \"34 jobs\",\n                point(0.11, 0.48),\n                point(0.46, 0.49),\n                0.30,\n            )\n            .tint(source_tint),\n            SankeyLink::new(\n                \"running-completed\",\n                \"running\",\n                \"completed\",\n                \"Running to completed\",\n                \"26 jobs\",\n                point(0.54, 0.44),\n                point(0.89, 0.28),\n                0.24,\n            )\n            .tint(target_tint),\n            SankeyLink::new(\n                \"running-deferred\",\n                \"running\",\n                \"deferred\",\n                \"Running to deferred\",\n                \"8 jobs\",\n                point(0.54, 0.62),\n                point(0.89, 0.71),\n                0.10,\n            )\n            .tint(theme.colors.warning),\n        ],\n    );\n\n    let column = || div().column().flex_1().min_w_0();\n    stack(&theme)\n        .w(px(920.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry and exact wording remain caller-owned\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .w_full()\n                .gap(px(theme.space(Space::Lg)))\n                .child(\n                    column().child(\n                        Plot::new(\n                            \"scene.plot.custom\",\n                            \"Pipeline\",\n                            PlotState::Ready(custom_marks),\n                        )\n                        .current(\"middle\")\n                        .on_current(|_, _, _| {})\n                        .paint(move |frame, window, _| {\n                            for mark in &painted_marks {\n                                window\n                                    .paint_quad(gpui::fill(frame.mark_bounds(mark.bounds), accent));\n                            }\n                        }),\n                    ),\n                )\n                .child(\n                    column().child(\n                        CandlestickChart::new(\n                            \"scene.plot.candles\",\n                            \"Daily range\",\n                            PlotState::Ready(candles.into()),\n                        )\n                        .current(\"wednesday\")\n                        .on_current(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    column().child(\n                        SankeyChart::new(\"scene.plot.sankey\", \"Run flow\", PlotState::Ready(sankey))\n                            .current(\"node.running\")\n                            .on_current(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "metric-card",

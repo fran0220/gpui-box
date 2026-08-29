@@ -238,6 +238,10 @@ pub mod prelude {
     };
     pub use crate::display::metric::{MetricCard, MetricReading, MetricState};
     pub use crate::display::outcome::{OutcomeKind, OutcomePanel};
+    pub use crate::display::plot::{
+        Candlestick, CandlestickChart, Plot, PlotFrame, PlotMark, PlotState, SankeyChart,
+        SankeyData, SankeyLink, SankeyNode,
+    };
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
     pub use crate::display::rating::{Rating, RatingPrecision};
