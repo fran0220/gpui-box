@@ -769,37 +769,99 @@ const MAX_FRAME_TIMINGS: usize = (16 * 1024 * 1024) / core::mem::size_of::<Frame
 struct FrameTimings {
     timings: VecDeque<FrameTiming>,
     total_pushed: u64,
+    manual_enabled: bool,
+    lease_count: usize,
 }
 
 static FRAME_TIMINGS: spin::Mutex<FrameTimings> = spin::Mutex::new(FrameTimings {
     timings: VecDeque::new(),
     total_pushed: 0,
+    manual_enabled: false,
+    lease_count: 0,
 });
 
 static FRAME_TRACE_ENABLED: AtomicBool = AtomicBool::new(false);
 
-/// Enables or disables frame timing collection at runtime.
+impl FrameTimings {
+    fn enabled(&self) -> bool {
+        self.manual_enabled || self.lease_count > 0
+    }
+
+    fn clear(&mut self) {
+        self.timings.clear();
+        self.timings.shrink_to_fit();
+        self.total_pushed = 0;
+    }
+}
+
+/// Enables or disables the manual owner of frame timing collection at runtime.
 ///
-/// When transitioning from enabled to disabled, the buffered frame timings are
-/// cleared so stale data isn't reported after a later re-enable. Returns false
-/// if the value was unchanged.
+/// Collection remains enabled while any [`FrameTraceLease`] exists. When the
+/// final owner releases tracing, buffered timings are cleared so stale data is
+/// not reported after a later re-enable. Returns false if the manual owner's
+/// value was unchanged.
 pub fn set_frame_trace_enabled(enabled: bool) -> bool {
-    if FRAME_TRACE_ENABLED.swap(enabled, Ordering::AcqRel) == enabled {
+    let mut frames = FRAME_TIMINGS.lock();
+    if frames.manual_enabled == enabled {
         return false;
     }
 
-    if !enabled {
-        let mut frames = FRAME_TIMINGS.lock();
-        frames.timings.clear();
-        frames.timings.shrink_to_fit();
-        frames.total_pushed = 0;
+    let was_enabled = frames.enabled();
+    frames.manual_enabled = enabled;
+    let is_enabled = frames.enabled();
+    if was_enabled && !is_enabled {
+        frames.clear();
     }
+    FRAME_TRACE_ENABLED.store(is_enabled, Ordering::Release);
     true
 }
 
 /// Returns whether frame timing collection is enabled.
 pub fn frame_trace_enabled() -> bool {
     FRAME_TRACE_ENABLED.load(Ordering::Relaxed)
+}
+
+/// A reference-counted owner of frame timing collection.
+///
+/// Acquire a lease before creating a [`FrameTimingCollector`]. Dropping one
+/// lease cannot disable tracing requested manually or by another consumer.
+/// A lease records existing application redraws; it never schedules frames.
+#[derive(Debug)]
+pub struct FrameTraceLease {
+    active: bool,
+}
+
+impl FrameTraceLease {
+    /// Acquires one independent owner of frame timing collection.
+    pub fn new() -> Self {
+        let mut frames = FRAME_TIMINGS.lock();
+        frames.lease_count = frames.lease_count.saturating_add(1);
+        FRAME_TRACE_ENABLED.store(true, Ordering::Release);
+        Self { active: true }
+    }
+}
+
+impl Default for FrameTraceLease {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for FrameTraceLease {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+
+        let mut frames = FRAME_TIMINGS.lock();
+        frames.lease_count = frames.lease_count.saturating_sub(1);
+        let enabled = frames.enabled();
+        if !enabled {
+            frames.clear();
+        }
+        FRAME_TRACE_ENABLED.store(enabled, Ordering::Release);
+        self.active = false;
+    }
 }
 
 /// Records the timing of a drawn window frame.
@@ -812,6 +874,9 @@ pub fn record_frame_timing(timing: FrameTiming) {
     std::hint::cold_path(); // optimize for when profiling is off
 
     let mut frames = FRAME_TIMINGS.lock();
+    if !frames.enabled() {
+        return;
+    }
     if frames.timings.len() >= MAX_FRAME_TIMINGS {
         frames.timings.pop_front();
     }
@@ -855,5 +920,231 @@ impl FrameTimingCollector {
             .collect();
         self.cursor = frames.total_pushed;
         unseen
+    }
+}
+
+/// A bounded, per-window summary of observed draw work.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameTimingSummary {
+    /// Number of retained target-window draws represented by this summary.
+    pub sample_count: usize,
+    /// Draw starts per second, computed from the first and last retained draw
+    /// timestamps rather than from the monitor's polling cadence.
+    pub frames_per_second: f64,
+    /// Caller-supplied threshold used to classify draw-budget overage.
+    pub frame_budget: Duration,
+    /// Arithmetic mean of retained `Window::draw` durations.
+    pub mean_draw_duration: Duration,
+    /// Nearest-rank 95th percentile of retained draw durations.
+    pub p95_draw_duration: Duration,
+    /// Fraction of retained draws whose own duration exceeded `frame_budget`.
+    /// This is draw-budget overage, not a claim about display drops.
+    pub over_budget_fraction: f64,
+    /// Arithmetic mean of invalidations coalesced into each retained draw.
+    pub mean_invalidations: f64,
+    /// Mean first-dirty-to-draw-end latency for samples whose first
+    /// invalidation was observed after tracing began.
+    pub mean_dirty_to_draw_duration: Option<Duration>,
+    /// Draw durations in retained timestamp order, for caller-owned plots.
+    pub draw_durations: Vec<Duration>,
+}
+
+/// Observes existing draws for one window and keeps a bounded history.
+///
+/// The monitor owns a [`FrameTraceLease`] but never refreshes the window. A
+/// host chooses when to call [`Self::collect`] and whether its workload should
+/// produce another frame, so displaying diagnostics does not silently create
+/// a continuous redraw loop.
+pub struct FrameTimingMonitor {
+    window_id: WindowId,
+    capacity: usize,
+    frame_budget: Duration,
+    samples: VecDeque<FrameTiming>,
+    collector: FrameTimingCollector,
+    _lease: FrameTraceLease,
+}
+
+impl FrameTimingMonitor {
+    /// Creates a monitor for `window_id`. A zero capacity retains one sample,
+    /// although a summary is unavailable until two draw starts are observed.
+    pub fn new(window_id: WindowId, capacity: usize, frame_budget: Duration) -> Self {
+        let lease = FrameTraceLease::new();
+        let collector = FrameTimingCollector::new();
+        Self {
+            window_id,
+            capacity: capacity.max(1),
+            frame_budget,
+            samples: VecDeque::with_capacity(capacity.max(1)),
+            collector,
+            _lease: lease,
+        }
+    }
+
+    /// The only window whose draws this monitor retains.
+    pub fn window_id(&self) -> WindowId {
+        self.window_id
+    }
+
+    /// Number of currently retained target-window draws.
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// Collects newly recorded frames, discarding frames from other windows,
+    /// and returns the current summary once two target-window draws exist.
+    pub fn collect(&mut self) -> Option<FrameTimingSummary> {
+        for timing in self.collector.collect_unseen() {
+            if timing.window_id != self.window_id {
+                continue;
+            }
+            if self.samples.len() >= self.capacity {
+                self.samples.pop_front();
+            }
+            self.samples.push_back(timing);
+        }
+        self.summary()
+    }
+
+    /// Summarizes the retained samples without consuming them.
+    pub fn summary(&self) -> Option<FrameTimingSummary> {
+        summarize_frame_timings(&self.samples, self.frame_budget)
+    }
+}
+
+fn summarize_frame_timings(
+    samples: &VecDeque<FrameTiming>,
+    frame_budget: Duration,
+) -> Option<FrameTimingSummary> {
+    if samples.len() < 2 {
+        return None;
+    }
+
+    let sample_count = samples.len();
+    let elapsed = samples
+        .back()?
+        .draw_start
+        .saturating_duration_since(samples.front()?.draw_start);
+    let frames_per_second = if elapsed.is_zero() {
+        0.0
+    } else {
+        (sample_count - 1) as f64 / elapsed.as_secs_f64()
+    };
+    let draw_durations = samples
+        .iter()
+        .map(FrameTiming::draw_duration)
+        .collect::<Vec<_>>();
+    let mean_draw_duration = mean_duration(draw_durations.iter().copied());
+    let mut sorted_draws = draw_durations.clone();
+    sorted_draws.sort_unstable();
+    let p95_index = (sample_count * 95).div_ceil(100).saturating_sub(1);
+    let p95_draw_duration = sorted_draws[p95_index];
+    let over_budget = draw_durations
+        .iter()
+        .filter(|duration| **duration > frame_budget)
+        .count();
+    let mean_invalidations = samples
+        .iter()
+        .map(|sample| sample.invalidations as f64)
+        .sum::<f64>()
+        / sample_count as f64;
+    let dirty_to_draw = samples
+        .iter()
+        .filter_map(FrameTiming::dirty_to_draw_duration)
+        .collect::<Vec<_>>();
+
+    Some(FrameTimingSummary {
+        sample_count,
+        frames_per_second,
+        frame_budget,
+        mean_draw_duration,
+        p95_draw_duration,
+        over_budget_fraction: over_budget as f64 / sample_count as f64,
+        mean_invalidations,
+        mean_dirty_to_draw_duration: (!dirty_to_draw.is_empty())
+            .then(|| mean_duration(dirty_to_draw.iter().copied())),
+        draw_durations,
+    })
+}
+
+fn mean_duration(durations: impl Iterator<Item = Duration>) -> Duration {
+    let (total, count) = durations.fold((0_u128, 0_u128), |(total, count), duration| {
+        (total.saturating_add(duration.as_nanos()), count + 1)
+    });
+    if count == 0 {
+        return Duration::ZERO;
+    }
+    Duration::from_nanos(u64::try_from(total / count).unwrap_or(u64::MAX))
+}
+
+#[cfg(test)]
+mod frame_timing_tests {
+    use super::*;
+
+    fn timing(
+        window_id: u64,
+        anchor: Instant,
+        start_ms: u64,
+        draw_ms: u64,
+        dirty_ms: Option<u64>,
+        invalidations: u64,
+    ) -> FrameTiming {
+        let draw_start = anchor + Duration::from_millis(start_ms);
+        FrameTiming {
+            window_id: WindowId::from(window_id),
+            dirty_at: dirty_ms.map(|milliseconds| anchor + Duration::from_millis(milliseconds)),
+            invalidations,
+            draw_start,
+            draw_end: draw_start + Duration::from_millis(draw_ms),
+        }
+    }
+
+    #[test]
+    fn frame_summary_uses_draw_timestamps_and_reports_budget_overage() {
+        let anchor = Instant::now();
+        let samples = VecDeque::from([
+            timing(1, anchor, 10, 4, Some(6), 1),
+            timing(1, anchor, 30, 8, Some(30), 3),
+            timing(1, anchor, 50, 30, None, 2),
+            timing(1, anchor, 70, 12, Some(74), 2),
+        ]);
+
+        let summary = summarize_frame_timings(&samples, Duration::from_millis(16))
+            .expect("four samples produce a summary");
+        assert_eq!(summary.sample_count, 4);
+        assert_eq!(summary.frames_per_second, 50.0);
+        assert_eq!(summary.mean_draw_duration, Duration::from_micros(13_500));
+        assert_eq!(summary.p95_draw_duration, Duration::from_millis(30));
+        assert_eq!(summary.over_budget_fraction, 0.25);
+        assert_eq!(summary.mean_invalidations, 2.0);
+        assert_eq!(
+            summary.mean_dirty_to_draw_duration,
+            Some(Duration::from_millis(8))
+        );
+        assert_eq!(summary.draw_durations.len(), 4);
+    }
+
+    #[test]
+    fn frame_summary_waits_for_two_draw_starts() {
+        let anchor = Instant::now();
+        let samples = VecDeque::from([timing(1, anchor, 0, 4, Some(0), 1)]);
+        assert!(summarize_frame_timings(&samples, Duration::from_millis(16)).is_none());
+    }
+
+    #[test]
+    fn frame_trace_ownership_keeps_collection_enabled_until_every_owner_releases() {
+        let mut frames = FrameTimings {
+            timings: VecDeque::new(),
+            total_pushed: 0,
+            manual_enabled: false,
+            lease_count: 0,
+        };
+        assert!(!frames.enabled());
+        frames.lease_count += 2;
+        assert!(frames.enabled());
+        frames.manual_enabled = true;
+        frames.lease_count -= 2;
+        assert!(frames.enabled());
+        frames.manual_enabled = false;
+        assert!(!frames.enabled());
     }
 }

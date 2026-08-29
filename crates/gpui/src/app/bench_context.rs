@@ -15,7 +15,7 @@ use crate::{
     PlatformTextSystem, Render, Reservation, Task, TestPlatform, ThreadedDispatcher, VisualContext,
     Window, WindowBounds, WindowHandle, WindowOptions,
     app::GpuiBorrow,
-    profiler::{self, FrameTiming, FrameTimingCollector},
+    profiler::{FrameTiming, FrameTimingCollector, FrameTraceLease},
 };
 
 /// Returns a benchmark platform backed by this thread's shared dispatcher.
@@ -231,29 +231,21 @@ fn format_duration(duration: Duration) -> String {
 /// (e.g. a later benchmark in the same process).
 struct FrameTraceScope {
     collector: FrameTimingCollector,
-    was_already_enabled: bool,
+    _lease: FrameTraceLease,
 }
 
 impl FrameTraceScope {
     fn start() -> Self {
-        let was_already_enabled = !profiler::set_frame_trace_enabled(true);
+        let lease = FrameTraceLease::new();
         Self {
             collector: FrameTimingCollector::new(),
-            was_already_enabled,
+            _lease: lease,
         }
     }
 
     fn finish(mut self) -> Vec<FrameTiming> {
         self.collector.collect_unseen()
         // Dropping `self` restores the previous tracing state.
-    }
-}
-
-impl Drop for FrameTraceScope {
-    fn drop(&mut self) {
-        if !self.was_already_enabled {
-            profiler::set_frame_trace_enabled(false);
-        }
     }
 }
 

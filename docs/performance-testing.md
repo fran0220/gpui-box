@@ -49,3 +49,15 @@ threshold from one runner is never accepted as a cross-platform budget. This
 renderer-calibration lane is reported separately from the structural gate so a
 timing regression cannot be hidden by changing a structural limit, or vice
 versa.
+
+For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
+trace lease, filters observations to one `WindowId`, and retains a caller-sized
+history. Its `FrameTimingSummary` derives FPS from actual draw-start timestamps,
+plus mean and P95 draw duration, draw-budget overage, invalidations, and the
+available dirty-to-draw latency. “Over budget” describes time spent in
+`Window::draw`; it does not claim that the display dropped a frame.
+
+The monitor never requests a redraw. A host decides when to poll it and whether
+the application workload should produce another frame. Multiple monitors,
+benchmarks, and a manual `set_frame_trace_enabled` owner can coexist: dropping
+one lease cannot disable another owner or clear its active trace.

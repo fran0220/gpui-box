@@ -151,6 +151,11 @@ component fixtures are subsequent GPUI Box work. They instrument existing
 framework draw boundaries and import no profiler, allocator, benchmark, or
 product source.
 
+Reference-counted frame-trace leases and the bounded per-window timing monitor
+are subsequent GPUI Box work over those same draw boundaries. They derive
+summaries from observed draw timestamps without scheduling frames and import no
+profiler HUD, product, or third-party source.
+
 The explicit `Styled::font_fallbacks` refinement, grapheme-aware fallback run
 selection, and DirectWrite lookup across registered and system collections are
 subsequent GPUI Box work. They make caller-declared font chains a consistent

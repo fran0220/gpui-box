@@ -73,6 +73,9 @@ layout, input, and accessibility state and import no grid or third-party source.
 The per-window structural frame counters, retained element-arena growth
 accounting, and deterministic 10,000-item Kit performance budgets are GPUI Box
 work and import no profiler, allocator, benchmark, or product source.
+The reference-counted frame-trace lease and bounded per-window timing monitor
+are GPUI Box work over those draw boundaries and import no profiler HUD,
+product, or third-party source.
 The AVFoundation and Media Foundation playback services are GPUI Box work and
 use operating-system frameworks; they import no additional third-party source
 or media assets.

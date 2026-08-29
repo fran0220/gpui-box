@@ -46,6 +46,13 @@ DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument fixtures and writes
 its renderer-specific timing lane remains separate from the structural gate.
 See [`performance-testing.md`](performance-testing.md).
 
+Live frame timing has the same per-window boundary. `FrameTimingMonitor`
+retains a bounded history of draws already requested by the application and
+does not create a refresh loop. Reference-counted trace leases keep concurrent
+diagnostic and benchmark consumers independent; the derived over-budget metric
+means draw work exceeded a caller-supplied budget, not that a compositor or
+display reported a dropped frame.
+
 Client-drawn desktop titlebars share one framework contract. Nested `Client`
 areas override an enclosing `Drag` strip, caption controls preserve their
 platform identities, and `Window::request_close` follows the same vetoable
