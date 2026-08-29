@@ -112,7 +112,7 @@ impl Scene {
     pub(crate) fn insert_backdrop_glass_with_fallback(
         &mut self,
         mut glass: BackdropGlass,
-        fallback: Option<Background>,
+        fallback: Option<Hsla>,
     ) {
         glass.material = glass.material.sanitized();
         if !glass.material.needs_backdrop() {
@@ -133,7 +133,7 @@ impl Scene {
             .unwrap_or_else(|| self.primitive_bounds.insert(clipped_bounds));
         if self.backdrop_glass.len() < MAX_BACKDROP_GLASS_SURFACES_PER_FRAME {
             self.backdrop_glass.push(glass);
-        } else if let Some(background) = fallback {
+        } else if let Some(color) = fallback {
             let (lobes, lobe_count) = glass.shape();
             self.quads
                 .extend(lobes[..lobe_count].iter().map(|lobe| Quad {
@@ -141,7 +141,7 @@ impl Scene {
                     border_style: BorderStyle::default(),
                     bounds: lobe.bounds,
                     content_mask: glass.content_mask,
-                    background,
+                    background: color.into(),
                     border_color: Hsla::transparent_black(),
                     corner_radii: lobe.corner_radii,
                     border_widths: Edges::default(),
@@ -445,7 +445,7 @@ mod tests {
     #[test]
     fn backdrop_glass_admission_bounds_work_and_keeps_rejected_intents_replayable() {
         let mut scene = Scene::default();
-        let fallback = Background::from(Hsla::black());
+        let fallback = Hsla::black();
 
         for index in 0..1_000 {
             scene.insert_backdrop_glass_with_fallback(bounded_glass(index), Some(fallback));
@@ -506,7 +506,7 @@ mod tests {
         rejected.lobes[0] = test_lobe((0.0, 0.0), (40.0, 40.0), 8.0);
         rejected.lobes[1] = test_lobe((48.0, 0.0), (40.0, 40.0), 8.0);
         rejected.lobe_count = 2;
-        scene.insert_backdrop_glass_with_fallback(rejected, Some(Background::from(Hsla::black())));
+        scene.insert_backdrop_glass_with_fallback(rejected, Some(Hsla::black()));
 
         assert_eq!(scene.quads.len(), 2);
         assert_eq!(scene.quads[0].bounds, rejected.lobes[0].bounds);
@@ -1052,7 +1052,7 @@ pub(crate) enum PaintOperation {
     Primitive(Primitive),
     BackdropGlass {
         glass: BackdropGlass,
-        fallback: Option<Background>,
+        fallback: Option<Hsla>,
     },
     StartLayer(Bounds<ScaledPixels>),
     EndLayer,

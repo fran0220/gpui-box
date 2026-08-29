@@ -4773,7 +4773,7 @@ impl Window {
         corner_radii: Corners<Pixels>,
         material: GlassMaterial<Pixels>,
         lobes: &[GlassLobe<Pixels>],
-        fallback: impl Into<Background>,
+        fallback: impl Into<Hsla>,
     ) {
         self.paint_backdrop_glass_inner(
             bounds,
@@ -4790,7 +4790,7 @@ impl Window {
         corner_radii: Corners<Pixels>,
         material: GlassMaterial<Pixels>,
         lobes: &[GlassLobe<Pixels>],
-        fallback: Option<Background>,
+        fallback: Option<Hsla>,
     ) {
         self.invalidator.debug_assert_paint();
         let material = material.sanitized();
@@ -4825,11 +4825,8 @@ impl Window {
         }
 
         let fallback = fallback
-            .map(|background| {
-                self.quad_fade_gradient(bounds, &background)
-                    .unwrap_or_else(|| background.opacity(self.element_opacity_at(bounds.center())))
-            })
-            .filter(|background| !background.is_transparent());
+            .map(|color| color.opacity(self.element_opacity_at(bounds.center())))
+            .filter(|color| !color.is_transparent());
         self.next_frame.scene.insert_backdrop_glass_with_fallback(
             BackdropGlass {
                 order: 0,

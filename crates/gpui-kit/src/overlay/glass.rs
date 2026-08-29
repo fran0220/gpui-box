@@ -32,9 +32,9 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use gpui::{
-    AnyElement, App, Background, Bounds, Corners, Element, GlassLobe, GlassMaterial,
-    GlobalElementId, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
-    MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
+    AnyElement, App, Bounds, Corners, Element, GlassLobe, GlassMaterial, GlobalElementId,
+    InspectorElementId, InteractiveElement as _, IntoElement, LayoutId, MAX_GLASS_LOBES,
+    MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -450,11 +450,9 @@ impl RenderOnce for Glass {
 
         let fill = theme.surface(self.surface).opacity(alpha);
         let fallback = (alpha == 0.0).then(|| {
-            Background::from(
-                theme
-                    .surface(self.surface)
-                    .opacity(theme.effects.glass_alpha),
-            )
+            theme
+                .surface(self.surface)
+                .opacity(theme.effects.glass_alpha)
         });
         let translucent = alpha < 1.0;
 
@@ -637,11 +635,9 @@ impl RenderOnce for GlassGroup {
         let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let fill = theme.surface(self.surface).opacity(alpha);
         let fallback = (alpha == 0.0).then(|| {
-            Background::from(
-                theme
-                    .surface(self.surface)
-                    .opacity(theme.effects.glass_alpha),
-            )
+            theme
+                .surface(self.surface)
+                .opacity(theme.effects.glass_alpha)
         });
         let mut material = self.preset.material(&theme);
         if let Some(blur) = self.blur {
@@ -822,7 +818,7 @@ pub(crate) struct BackdropLayer {
     /// Ordinary surface fill used only when the framework's per-frame glass
     /// admission budget is exhausted. A caller already painting a tint needs
     /// no second fallback; clear Liquid and Lens do.
-    pub(crate) fallback: Option<Background>,
+    pub(crate) fallback: Option<gpui::Hsla>,
     /// Where to record the bounds this layer was painted at, for a caller
     /// whose pointer math needs them next frame.
     pub(crate) measured: Option<Rc<Cell<Bounds<Pixels>>>>,
