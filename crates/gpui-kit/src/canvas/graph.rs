@@ -38,7 +38,7 @@ use super::edge::{
     Anchor, Axis, GraphEdge, GraphEndpoint, OrthogonalRoute, PortSide, RouteTransform, paint_route,
     paint_route_stroke, route_corner, route_orthogonal, route_preview,
 };
-use super::node::{GraphNode, GraphPort, NODE_WIDTH, PortDirection};
+use super::node::{GraphNode, GraphPort, PortDirection};
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
@@ -46,7 +46,12 @@ const GRID_DOT: f32 = 1.0;
 /// Below this zoom a node draws only its title, and ports stay off.
 const LOD_ZOOM: f32 = 0.4;
 /// Extra world space kept around the viewport so a node entering does not pop.
-const CULL_PAD: f32 = 80.0;
+///
+/// Wide enough to cover a whole card, because culling reads a node's box and
+/// that box is an estimate until the card has been measured once. A pad
+/// narrower than a card lets a node that is really on screen be dropped for
+/// the frame in which its own height is still being guessed.
+const CULL_PAD: f32 = 240.0;
 
 /// Caller-owned pan and zoom values for a [`NodeGraph`].
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -917,10 +922,18 @@ impl RenderOnce for NodeGraph {
             let up = Rc::clone(&gesture);
             let up_report = Rc::clone(&report);
             let up_bounds = Rc::clone(&measured);
+            // Each card's own box, not one shared guess: a marquee that
+            // selected by a fixed rectangle would miss a tall card the reader
+            // dragged across and catch a short one they went around.
             let up_nodes = self
                 .nodes
                 .iter()
-                .map(|placed| (placed.node.ident().semantic_id(), placed.x, placed.y))
+                .map(|placed| {
+                    (
+                        placed.node.ident().semantic_id(),
+                        placed.bounds(&theme, None),
+                    )
+                })
                 .collect::<Vec<_>>();
             frame = frame.on_mouse_up(MouseButton::Left, move |_, window, cx| {
                 let gesture = up.borrow_mut().gesture.take();
@@ -954,14 +967,8 @@ impl RenderOnce for NodeGraph {
                         );
                         let ids = up_nodes
                             .iter()
-                            .filter(|(_, x, y)| {
-                                bounds_overlap(
-                                    Bounds::new(point(*x, *y), size(NODE_WIDTH, 48.0)),
-                                    box_bounds,
-                                    0.0,
-                                )
-                            })
-                            .map(|(id, _, _)| id.clone())
+                            .filter(|(_, bounds)| bounds_overlap(*bounds, box_bounds, 0.0))
+                            .map(|(id, _)| id.clone())
                             .collect();
                         up_report(&NodeGraphEvent::SelectionChanged { ids }, window, cx);
                     }

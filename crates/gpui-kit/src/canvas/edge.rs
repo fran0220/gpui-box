@@ -289,8 +289,19 @@ pub(crate) fn route_orthogonal(
     // this, opposite routes between two same-side port groups can share their
     // first or last horizontal segment even though their trunks are distinct.
     let preferred_lead = (LEAD + lane_offset).max(MIN_LEAD);
-    let a = from.outward_point(lead_distance(from, to_bounds, preferred_lead)?);
-    let b = to.outward_point(lead_distance(to, from_bounds, preferred_lead)?);
+    // Two cards packed until they overlap leave a port sitting inside the
+    // other's box, and no lead clears both. The connection is still a fact,
+    // so the route degrades to the straight line between the two ports: an
+    // edge that disappeared would say these cards are not connected, which is
+    // the one thing a reader would believe without checking.
+    let (Some(from_lead), Some(to_lead)) = (
+        lead_distance(from, to_bounds, preferred_lead),
+        lead_distance(to, from_bounds, preferred_lead),
+    ) else {
+        return Some(OrthogonalRoute::new(vec![from.point, to.point]));
+    };
+    let a = from.outward_point(from_lead);
+    let b = to.outward_point(to_lead);
     let left = from_bounds.left().min(to_bounds.left()) - CORRIDOR;
     let right = from_bounds.right().max(to_bounds.right()) + CORRIDOR;
     let top = from_bounds.top().min(to_bounds.top()) - CORRIDOR;
@@ -378,6 +389,19 @@ pub(crate) fn route_orthogonal(
             path_cost(left.points())
                 .partial_cmp(&path_cost(right.points()))
                 .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        // Every candidate crossed a card, which happens once cards are packed
+        // tightly enough. The plain elbow is drawn anyway, for the same reason
+        // as above: a connection that exists is drawn even when it cannot be
+        // drawn cleanly.
+        .or_else(|| {
+            Some(OrthogonalRoute::new(vec![
+                from.point,
+                a,
+                point(b.x, a.y),
+                b,
+                to.point,
+            ]))
         })
 }
 
@@ -829,20 +853,23 @@ mod tests {
             }
         }
     }
+    /// A connection is a fact about the graph, and cards packed until they
+    /// overlap leave no clean corridor between them. The route degrades to the
+    /// straight line rather than to nothing: an edge that disappeared would
+    /// say these two cards are unconnected, which a reader would believe
+    /// without checking.
     #[test]
-    fn overlapping_cards_are_omitted_and_self_links_route() {
+    fn overlapping_cards_still_draw_their_connection_and_self_links_route() {
         let a = bounds(50.0, 20.0);
         let overlapping = bounds(55.0, 25.0);
-        assert!(
-            route_orthogonal(
-                anchor(PortSide::Right, a),
-                anchor(PortSide::Left, overlapping),
-                a,
-                overlapping,
-                EdgeKind::Flow,
-                0,
-            )
-            .is_none()
+        let from_port = anchor(PortSide::Right, a);
+        let to_port = anchor(PortSide::Left, overlapping);
+        let crossed = route_orthogonal(from_port, to_port, a, overlapping, EdgeKind::Flow, 0)
+            .expect("an overlapping pair still draws its edge");
+        assert_eq!(crossed.points()[0], from_port.point);
+        assert_eq!(
+            *crossed.points().last().expect("route endpoint"),
+            to_port.point
         );
         let from = anchor(PortSide::Bottom, a);
         let to = anchor(PortSide::Top, a);

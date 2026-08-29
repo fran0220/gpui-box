@@ -299,6 +299,42 @@ impl Diff {
     }
 }
 
+/// About how wide a run of text will come out, before anything is laid out.
+///
+/// Wide scripts take about one em per character and Latin about half of one,
+/// which is the difference between one row of figures and two. This is only
+/// ever an opening estimate for geometry that must exist before a card has
+/// been measured; the real measurement replaces it one frame later.
+fn text_advance(text: &str, size: f32) -> f32 {
+    text.chars()
+        .map(|character| if character.is_ascii() { 0.55 } else { 1.0 })
+        .sum::<f32>()
+        * size
+}
+
+/// How many rows a wrapping strip of these widths needs.
+fn wrapped_rows(widths: &[f32], available: f32, gap: f32) -> usize {
+    if widths.is_empty() {
+        return 0;
+    }
+    if available <= 0.0 {
+        return widths.len();
+    }
+    let mut rows = 1;
+    let mut used = 0.0;
+    for width in widths {
+        if used > 0.0 && used + gap + width > available {
+            rows += 1;
+            used = *width;
+        } else if used > 0.0 {
+            used += gap + width;
+        } else {
+            used = *width;
+        }
+    }
+    rows
+}
+
 pub(crate) type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A step of a run, as a card on the canvas.
@@ -536,6 +572,25 @@ impl GraphNode {
             .unwrap_or_else(|| self.measured_height(theme))
     }
 
+    /// The width each figure in the strip will ask for before it wraps.
+    fn figure_widths(&self, theme: &gpui_kit_theme::Theme) -> Vec<f32> {
+        let size = theme.typography.caption.size;
+        let inner = theme.spacing.xs / 2.0;
+        let mut widths: Vec<f32> = self
+            .metrics
+            .iter()
+            .map(|metric| {
+                text_advance(&metric.label, size) + inner + text_advance(&metric.value, size)
+            })
+            .collect();
+        if let Some(diff) = self.diff.filter(|diff| !diff.is_empty()) {
+            let counted =
+                |value: usize| (value.to_string().chars().count() + 1) as f32 * size * 0.55;
+            widths.push(counted(diff.added) + inner + counted(diff.removed));
+        }
+        widths
+    }
+
     /// How tall the card will come out, from the rows it actually has.
     ///
     /// Edges are geometry and need a box before the card has been laid out,
@@ -559,8 +614,19 @@ impl GraphNode {
         if self.action.is_some() {
             rows.push(theme.typography.caption.line_height);
         }
-        if !self.metrics.is_empty() || self.diff.is_some_and(|diff| !diff.is_empty()) {
-            rows.push(theme.typography.caption.line_height);
+        // The figure strip wraps, so a card carrying three figures on a narrow
+        // node is two rows tall. An estimate that always answered one row
+        // would put every edge into such a card above the socket it joins,
+        // and would leave the card's own last row outside the box it is
+        // clipped to.
+        let figures = self.figure_widths(theme);
+        if !figures.is_empty() {
+            let content = (self.width - theme.effects.rail_width - theme.spacing.sm * 2.0).max(0.0);
+            let lines = wrapped_rows(&figures, content, theme.spacing.sm);
+            rows.push(
+                theme.typography.caption.line_height * lines as f32
+                    + theme.spacing.sm * lines.saturating_sub(1) as f32,
+            );
         }
         if rows.is_empty() {
             return header;
@@ -992,6 +1058,41 @@ mod tests {
             .thumbnail_ratio(1.0)
             .measured_height(&theme);
         assert!(square > thumbnail);
+    }
+
+    /// The strip wraps, so the box edges are routed into has to know that a
+    /// card carrying many figures is more than one figure row tall.
+    #[test]
+    fn a_wrapping_figure_strip_makes_the_card_taller() {
+        let theme = theme();
+        let one = GraphNode::new("one", "One")
+            .metric("Model", "A")
+            .measured_height(&theme);
+        let many = GraphNode::new("many", "Many")
+            .metric("Model", "GPT Image")
+            .metric("Ratio", "16:9")
+            .metric("Duration", "12s")
+            .metric("Seed", "118")
+            .measured_height(&theme);
+        assert!(many > one, "{many} should exceed {one}");
+    }
+
+    /// Wide scripts are about twice the advance of Latin, and a strip measured
+    /// as if they were the same width would under-report its own rows.
+    #[test]
+    fn wide_scripts_count_for_their_own_width() {
+        let size = 12.0;
+        assert!(text_advance("模型比例时长", size) > text_advance("model", size));
+    }
+
+    #[test]
+    fn a_strip_wraps_only_when_the_row_is_really_full() {
+        assert_eq!(wrapped_rows(&[], 100.0, 8.0), 0);
+        assert_eq!(wrapped_rows(&[40.0, 40.0], 100.0, 8.0), 1);
+        assert_eq!(wrapped_rows(&[60.0, 60.0], 100.0, 8.0), 2);
+        // A single figure wider than the row still occupies exactly one row:
+        // it overflows its own line rather than starting a second one.
+        assert_eq!(wrapped_rows(&[400.0], 100.0, 8.0), 1);
     }
 
     #[test]
