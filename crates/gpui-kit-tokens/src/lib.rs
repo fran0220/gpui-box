@@ -219,6 +219,17 @@ impl TokenDocument {
                 self.measure.slider_track_height,
             ),
             (
+                "measure.sliderVerticalHeight",
+                self.measure.slider_vertical_height,
+            ),
+            ("measure.containerSmall", self.measure.container_small),
+            ("measure.containerMedium", self.measure.container_medium),
+            ("measure.containerLarge", self.measure.container_large),
+            (
+                "measure.containerExtraLarge",
+                self.measure.container_extra_large,
+            ),
+            (
                 "measure.compactOverlayWidth",
                 self.measure.compact_overlay_width,
             ),
@@ -2055,6 +2066,15 @@ pub struct MeasureTokens {
     /// from progress: one reports a reading, while the other must carry a
     /// handle and marks without disappearing underneath them.
     pub slider_track_height: f32,
+    /// Default length of a vertical numeric slider.
+    pub slider_vertical_height: f32,
+    /// Widths at which a measured container may adopt the next grid layout.
+    /// They are part of the theme document so a host can tune responsive
+    /// behavior without changing component code.
+    pub container_small: f32,
+    pub container_medium: f32,
+    pub container_large: f32,
+    pub container_extra_large: f32,
     /// Width shared by compact floating surfaces such as previews,
     /// notifications, and rich suggestion menus.
     pub compact_overlay_width: f32,

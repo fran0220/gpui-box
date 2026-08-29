@@ -1970,6 +1970,17 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             tokens.measure.slider_track_height,
         ),
         (
+            "measure.sliderVerticalHeight",
+            tokens.measure.slider_vertical_height,
+        ),
+        ("measure.containerSmall", tokens.measure.container_small),
+        ("measure.containerMedium", tokens.measure.container_medium),
+        ("measure.containerLarge", tokens.measure.container_large),
+        (
+            "measure.containerExtraLarge",
+            tokens.measure.container_extra_large,
+        ),
+        (
             "measure.compactOverlayWidth",
             tokens.measure.compact_overlay_width,
         ),
