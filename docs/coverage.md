@@ -586,7 +586,10 @@ and rows through the installed locale matcher, includes visible row copy and
 explicit caller-authored aliases/control vocabulary, preserves the settings
 page's familiar order, counts the result, and presents a distinct no-match
 state. `UndoHistory` covers the caller-owned revision list and reports restore
-intents without keeping or mutating an undo stack.
+intents without keeping or mutating an undo stack. The non-rendering
+`reactive::History<T>` is the bounded undo/redo record store beneath callers
+that need one: ignored records are refused by the model, a divergent push
+clears redo, and the caller remains responsible for applying every record.
 
 Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come

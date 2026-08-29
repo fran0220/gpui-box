@@ -7,6 +7,7 @@ a control. Nothing in it renders, and no component owns any of it.
 |---|---|
 | `Signal<T>` | A value the caller creates and keeps. Changing it notifies every watcher once. |
 | `Binding<T>` | A read and a write of one value, handed to a control. Not storage. |
+| `History<T>` | A bounded undo/redo stack of caller-owned records. It stores records and applies nothing. |
 | `Form` | Named `Signal<String>` fields, the caller's rules, and a `ValidationState` per field. |
 | `validators` | `required`, `email`, `min_len`, `equals_field` — the rules most forms are built from. |
 
@@ -72,6 +73,27 @@ let name: Binding<String> = profile.lens(
 
 A lens write is a read-modify-write of the whole value, so it moves the field
 it projects and leaves every other field exactly as it was.
+
+## A history
+
+`History<T>` holds reversible records, not copies of application state and not
+commands it can execute. The caller applies the record returned by `undo` in
+reverse and the one returned by `redo` forwards:
+
+```rust
+let mut history = History::new(200);
+history.push(edit);
+
+if let Some(edit) = history.undo() {
+    document.apply_reverse(edit);
+}
+```
+
+Recording after an undo starts a new branch and clears redo. `set_ignoring`
+refuses records at the storage boundary, which lets a caller replay changes
+without relying on every call site to remember a flag. The oldest records are
+dropped when the declared capacity is reached; a capacity of zero records
+nothing.
 
 ## Binding a control
 

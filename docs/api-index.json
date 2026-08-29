@@ -8976,6 +8976,30 @@
       "queries": []
     },
     {
+      "name": "History",
+      "path": "gpui_kit::reactive::History",
+      "summary": "A bounded stack of caller-owned reversible records.",
+      "variants": [],
+      "construct": [
+        "new(capacity: usize) -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "push(record: T) -> bool",
+        "undo() -> Option<T> where T: Clone,",
+        "redo() -> Option<T> where T: Clone,",
+        "set_ignoring(ignoring: bool)",
+        "clear()"
+      ],
+      "queries": [
+        "is_ignoring() -> bool",
+        "can_undo() -> bool",
+        "can_redo() -> bool",
+        "undo_len() -> usize",
+        "redo_len() -> usize"
+      ]
+    },
+    {
       "name": "HistoryEntry",
       "path": "gpui_kit::navigation::HistoryEntry",
       "summary": "One caller-owned point in an undo history.",

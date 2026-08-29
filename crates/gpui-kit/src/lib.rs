@@ -32,8 +32,9 @@
 //! - [`mod@motion`] — token-driven animation.
 //! - [`effects`] — semantic visual events, quality policy, replay, and budgets.
 //! - [`reactive`] — caller-owned [`Signal`](reactive::Signal)s,
-//!   [`Binding`](reactive::Binding)s, and a [`Form`](reactive::Form) whose
-//!   results land on the [`state`] validation ladder. Nothing here renders.
+//!   [`Binding`](reactive::Binding)s, a bounded [`History`](reactive::History),
+//!   and a [`Form`](reactive::Form) whose results land on the [`state`]
+//!   validation ladder. Nothing here renders.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
 //! - [`strings`] — every word and numeric shape this library shows, including
 //!   plural categories and editable decimal parsing, and the host's right to
@@ -317,7 +318,7 @@ pub mod prelude {
         MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
-    pub use crate::reactive::{Binding, Form, FormValues, Rule, Signal, validators};
+    pub use crate::reactive::{Binding, Form, FormValues, History, Rule, Signal, validators};
     pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase, ValidationState};
     pub use crate::strings::{
         ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,

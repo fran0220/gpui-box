@@ -28,7 +28,9 @@
 //! See `docs/reactive.md`.
 
 mod form;
+mod history;
 mod signal;
 
 pub use form::{Form, FormValues, Rule, validators};
+pub use history::History;
 pub use signal::{Binding, Signal};
