@@ -1591,3 +1591,119 @@ fn reduced_motion_is_at_the_new_shape_from_the_first_frame(cx: &mut TestAppConte
         "reduced motion never draws an intermediate form"
     );
 }
+
+fn motion_primitives_scene(cx: &mut TestAppContext) -> Harness {
+    let scene = gpui_kit::scenes::find("motion-primitives").expect("motion scene is registered");
+    Harness::new(cx, gpui_kit::install, scene.build)
+}
+
+#[gpui::test]
+fn the_motion_scene_clock_retargets_before_each_digit_settles(cx: &mut TestAppContext) {
+    let mut harness = motion_primitives_scene(cx);
+    assert_eq!(
+        harness
+            .node("scene.motion.clock")
+            .expect("clock is published")
+            .value
+            .as_deref(),
+        Some("08:00")
+    );
+
+    harness.click("scene.motion.clock.play");
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness
+            .node("scene.motion.clock")
+            .expect("clock is published")
+            .value
+            .as_deref(),
+        Some("08:30")
+    );
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness
+            .node("scene.motion.clock")
+            .expect("clock is published")
+            .value
+            .as_deref(),
+        Some("09:00"),
+        "the next target arrives before the 620ms digit transition finishes"
+    );
+}
+
+#[gpui::test]
+fn the_motion_scene_presence_waits_for_its_exit_before_unmounting(cx: &mut TestAppContext) {
+    let mut harness = motion_primitives_scene(cx);
+    harness.click("scene.motion.tabs.presence");
+    assert!(
+        present(&harness.snapshot(), "scene.motion.presence.notice").is_ok(),
+        "the notice begins mounted"
+    );
+
+    harness.click("scene.motion.presence.toggle");
+    harness.advance(Duration::from_millis(180));
+    assert!(
+        present(&harness.snapshot(), "scene.motion.presence.notice").is_ok(),
+        "the notice remains mounted for the whole exit"
+    );
+    harness.advance(Duration::from_millis(180));
+    assert!(
+        present(&harness.snapshot(), "scene.motion.presence.notice").is_err(),
+        "the notice is removed only after becoming absent"
+    );
+}
+
+#[gpui::test]
+fn the_motion_scene_keyframes_and_stagger_share_deterministic_clocks(cx: &mut TestAppContext) {
+    let mut harness = motion_primitives_scene(cx);
+    harness.click("scene.motion.tabs.keyframes");
+    harness.advance(Duration::from_millis(420));
+    let clone = harness
+        .node("scene.motion.keyframes.clone")
+        .expect("first activity bar")
+        .value
+        .as_deref()
+        .expect("sampled value")
+        .parse::<f32>()
+        .expect("numeric sample");
+    let publish = harness
+        .node("scene.motion.keyframes.publish")
+        .expect("last activity bar")
+        .value
+        .as_deref()
+        .expect("sampled value")
+        .parse::<f32>()
+        .expect("numeric sample");
+    assert!(
+        clone > publish,
+        "the delayed playheads must not all sample the same keyframe: {clone} against {publish}"
+    );
+
+    harness.click("scene.motion.tabs.stagger");
+    let first = harness
+        .bounds("scene.motion.stagger.plan")
+        .expect("first row")
+        .origin
+        .x;
+    let last = harness
+        .bounds("scene.motion.stagger.publish")
+        .expect("last row")
+        .origin
+        .x;
+    assert_eq!(first, last, "all rows begin from the same offset");
+    harness.advance(Duration::from_millis(180));
+    let first = harness
+        .bounds("scene.motion.stagger.plan")
+        .expect("first row")
+        .origin
+        .x;
+    let last = harness
+        .bounds("scene.motion.stagger.publish")
+        .expect("last row")
+        .origin
+        .x;
+    assert!(
+        first < last,
+        "the first row must travel before the last row: {first:?} against {last:?}"
+    );
+}

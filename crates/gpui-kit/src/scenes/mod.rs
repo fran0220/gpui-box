@@ -79,7 +79,7 @@ use layout::{
     split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
-use motion::micro;
+use motion::{micro, motion_primitives};
 use navigation::{
     accordion, anchor_list, breadcrumb, collapsible, document_tabs, pagination, sidebar, tabs,
     undo_history, wizard,
@@ -463,6 +463,11 @@ pub fn catalog() -> Vec<Scene> {
                 "Switch",
                 "Tabs",
             ]),
+        },
+        Scene {
+            name: "motion-primitives",
+            build: motion_primitives,
+            shows: Shows::Composition(&["Button", "Tabs"]),
         },
         Scene {
             name: "animated-number",
