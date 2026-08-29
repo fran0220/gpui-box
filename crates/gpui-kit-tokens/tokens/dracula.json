@@ -556,6 +556,8 @@
       "toast": 6000,
       "hoverCardOpen": 400,
       "hoverCardGrace": 300,
+      "feedback": 900,
+      "celebration": 1600,
       "confirmation": 1600
     },
     "easing": {

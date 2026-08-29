@@ -5,6 +5,9 @@
 //! - [`CubicBezier`] and [`Easing`] name curves;
 //! - [`Spring`] solves physical motion in closed form;
 //! - [`MotionSpec`] pairs a curve with a duration and delay;
+//! - [`MotionRole`] names why a component moves and [`MotionPolicy`] resolves
+//!   that reason into the one theme-backed specification and reduced-motion
+//!   answer every component shares;
 //! - [`Interpolate`] moves a value between two states;
 //! - [`Keyframes`] takes a value through named stops rather than straight
 //!   across;
@@ -58,6 +61,7 @@ mod interpolate;
 pub(crate) mod keyed;
 mod keyframes;
 mod micro;
+mod policy;
 mod presence;
 mod scroll_link;
 mod sequence;
@@ -80,6 +84,7 @@ pub use glide::Glide;
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use micro::{Micro, MicroMark, MicroMotion, micro};
+pub use policy::{MotionDisposition, MotionPolicy, MotionRole, ResolvedMotion};
 pub use presence::{Phase, Presence};
 pub use scroll_link::ScrollLink;
 pub use sequence::Sequence;

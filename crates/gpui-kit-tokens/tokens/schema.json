@@ -577,6 +577,8 @@
         "toast",
         "hoverCardOpen",
         "hoverCardGrace",
+        "feedback",
+        "celebration",
         "confirmation"
       ],
       "properties": {
@@ -597,6 +599,8 @@
         "toast": { "type": "integer", "minimum": 0 },
         "hoverCardOpen": { "type": "integer", "minimum": 0 },
         "hoverCardGrace": { "type": "integer", "minimum": 0 },
+        "feedback": { "type": "integer", "minimum": 0 },
+        "celebration": { "type": "integer", "minimum": 0 },
         "confirmation": { "type": "integer", "minimum": 0 }
       }
     },

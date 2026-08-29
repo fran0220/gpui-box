@@ -300,8 +300,9 @@ pub mod prelude {
         NativeMediaPlayer, NativeMediaSubscription, PlatformMediaTransport, VideoPlayer,
     };
     pub use crate::motion::{
-        Animator, Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion, MotionSample,
-        Presence, ScrollLink, Shape, Shaping, Transition, Velocity, flip, micro,
+        Animator, Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion,
+        MotionDisposition, MotionPolicy, MotionRole, MotionSample, Presence, ResolvedMotion,
+        ScrollLink, Shape, Shaping, Transition, Velocity, flip, micro,
     };
     pub use crate::navigation::{
         Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Carousel, CarouselEvent,

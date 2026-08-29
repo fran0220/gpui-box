@@ -23,26 +23,14 @@
 
 use std::ops::Range;
 
+use gpui_kit_theme::Theme;
 use web_time::Instant;
 
-/// Where the cadence estimate starts, before there is a cadence.
-const SEED_MS: f32 = 160.0;
-/// The shortest a fade may be. Below this it is a flash, not a fade.
-const MIN_FADE_MS: f32 = 120.0;
-/// The longest a fade may be. Beyond this the text reads as broken rather than
-/// arriving.
-const MAX_FADE_MS: f32 = 400.0;
+use crate::motion::{MotionPolicy, ResolvedMotion};
+
 /// How the veil dissolves. Above one, so it clears quickly and then lingers
 /// faintly, which reads as the text settling rather than as a linear wipe.
 const CURVE: f32 = 1.6;
-/// The longest gap that says anything about cadence. A stream that paused for
-/// a minute has not become a slow stream.
-const GAP_CLAMP_MS: f32 = 1000.0;
-/// Past this many chunks in flight the stream is outrunning the fade, so the
-/// fade gets out of its way.
-const BACKLOG: usize = 3;
-/// How much faster a backed-up fade runs.
-const BACKLOG_SPEEDUP: f32 = 0.75;
 
 /// One arrival, mid-fade.
 #[derive(Debug, Clone)]
@@ -79,7 +67,20 @@ impl Veil {
     /// document that changed rather than one that grew — an edit, a retry, a
     /// different answer — and that appears settled, because fading it would be
     /// claiming it just arrived when it did not.
-    pub(crate) fn observe(&mut self, runs: Vec<String>, now: Instant) {
+    pub(crate) fn observe(
+        &mut self,
+        runs: Vec<String>,
+        now: Instant,
+        theme: &Theme,
+        motion: ResolvedMotion,
+    ) {
+        if !motion.animates() {
+            self.runs = runs;
+            self.chunks.clear();
+            self.cadence = 0.0;
+            self.last = None;
+            return;
+        }
         if self.runs.is_empty() {
             // The first sight of a document is not an arrival. Fading it in
             // would animate opening a conversation, not receiving one.
@@ -105,26 +106,19 @@ impl Veil {
             return;
         }
 
-        let gap = self
+        let observed_gap = self
             .last
-            .map(|last| {
-                (now.saturating_duration_since(last).as_secs_f32() * 1000.0).min(GAP_CLAMP_MS)
-            })
-            .unwrap_or(SEED_MS);
-        self.cadence = if self.cadence == 0.0 {
-            gap
-        } else {
-            self.cadence + 0.3 * (gap - self.cadence)
-        };
+            .map(|last| now.saturating_duration_since(last).as_secs_f32() * 1000.0);
         self.last = Some(now);
 
-        // Three times the cadence, so a chunk is still fading while the next
-        // few arrive: one soft edge rather than a row of separate blinks.
-        let mut duration = (self.cadence * 3.0).clamp(MIN_FADE_MS, MAX_FADE_MS);
         self.drop_finished(now);
-        if self.chunks.len() >= BACKLOG {
-            duration *= BACKLOG_SPEEDUP;
-        }
+        let (cadence, duration) = MotionPolicy::streaming_timing(
+            theme,
+            (self.cadence > 0.0).then_some(self.cadence),
+            observed_gap,
+            self.chunks.len(),
+        );
+        self.cadence = cadence;
 
         let mut arrived = false;
         for (index, after) in runs.iter().enumerate() {
@@ -186,8 +180,20 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    use crate::motion::MotionRole;
+
     fn runs(texts: &[&str]) -> Vec<String> {
         texts.iter().map(|text| (*text).to_string()).collect()
+    }
+
+    fn observe(veil: &mut Veil, runs: Vec<String>, now: Instant) {
+        let theme = Theme::studio_dark();
+        veil.observe(
+            runs,
+            now,
+            &theme,
+            MotionPolicy::resolve_for(MotionRole::Streaming, &theme, false),
+        );
     }
 
     #[test]
@@ -196,7 +202,7 @@ mod tests {
         // in what was already there would animate the wrong event.
         let mut veil = Veil::default();
         let now = Instant::now();
-        veil.observe(runs(&["Already written."]), now);
+        observe(&mut veil, runs(&["Already written."]), now);
         assert!(veil.spans(0, now).is_empty());
         assert!(!veil.is_fading(now));
     }
@@ -205,8 +211,8 @@ mod tests {
     fn text_appended_to_a_run_fades_from_where_it_starts() {
         let mut veil = Veil::default();
         let start = Instant::now();
-        veil.observe(runs(&["Hello"]), start);
-        veil.observe(runs(&["Hello there"]), start);
+        observe(&mut veil, runs(&["Hello"]), start);
+        observe(&mut veil, runs(&["Hello there"]), start);
 
         let spans = veil.spans(0, start);
         assert_eq!(spans.len(), 1);
@@ -219,16 +225,18 @@ mod tests {
     fn a_fade_finishes_and_never_starts_again() {
         let mut veil = Veil::default();
         let start = Instant::now();
-        veil.observe(runs(&["Hello"]), start);
-        veil.observe(runs(&["Hello there"]), start);
+        observe(&mut veil, runs(&["Hello"]), start);
+        observe(&mut veil, runs(&["Hello there"]), start);
         assert!(veil.is_fading(start));
 
-        let later = start + Duration::from_millis(MAX_FADE_MS as u64 + 1);
+        let later = start
+            + MotionPolicy::spec(MotionRole::Entrance, &Theme::studio_dark()).total()
+            + Duration::from_millis(1);
         assert!(veil.spans(0, later).is_empty(), "the fade is over");
         assert!(!veil.is_fading(later));
 
         // Settled text must not breathe when the next chunk arrives.
-        veil.observe(runs(&["Hello there, friend"]), later);
+        observe(&mut veil, runs(&["Hello there, friend"]), later);
         let spans = veil.spans(0, later);
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].0, 11..19, "only the newest characters fade");
@@ -240,10 +248,14 @@ mod tests {
         // chunks overlapping rather than queueing.
         let mut veil = Veil::default();
         let start = Instant::now();
-        veil.observe(runs(&["a"]), start);
-        veil.observe(runs(&["ab"]), start + Duration::from_millis(10));
-        veil.observe(runs(&["abc"]), start + Duration::from_millis(20));
-        veil.observe(runs(&["abcd"]), start + Duration::from_millis(30));
+        observe(&mut veil, runs(&["a"]), start);
+        observe(&mut veil, runs(&["ab"]), start + Duration::from_millis(10));
+        observe(&mut veil, runs(&["abc"]), start + Duration::from_millis(20));
+        observe(
+            &mut veil,
+            runs(&["abcd"]),
+            start + Duration::from_millis(30),
+        );
 
         let spans = veil.spans(0, start + Duration::from_millis(30));
         assert!(spans.len() > 1, "a fast stream keeps several chunks alive");
@@ -255,11 +267,11 @@ mod tests {
         // of it just arrived, so none of it fades.
         let mut veil = Veil::default();
         let now = Instant::now();
-        veil.observe(runs(&["First answer"]), now);
-        veil.observe(runs(&["First answer more"]), now);
+        observe(&mut veil, runs(&["First answer"]), now);
+        observe(&mut veil, runs(&["First answer more"]), now);
         assert!(veil.is_fading(now));
 
-        veil.observe(runs(&["A completely different answer"]), now);
+        observe(&mut veil, runs(&["A completely different answer"]), now);
         assert!(
             veil.spans(0, now).is_empty(),
             "replacing a document is not receiving one"
@@ -270,12 +282,24 @@ mod tests {
     fn a_new_run_after_the_existing_ones_fades_whole() {
         let mut veil = Veil::default();
         let now = Instant::now();
-        veil.observe(runs(&["First"]), now);
-        veil.observe(runs(&["First", "Second"]), now);
+        observe(&mut veil, runs(&["First"]), now);
+        observe(&mut veil, runs(&["First", "Second"]), now);
         assert_eq!(
             veil.spans(1, now).first().map(|(range, _)| range.clone()),
             Some(0..6)
         );
+    }
+
+    #[test]
+    fn reduced_motion_settles_streaming_text_without_a_timeline() {
+        let mut veil = Veil::default();
+        let now = Instant::now();
+        let theme = Theme::studio_dark();
+        let motion = MotionPolicy::resolve_for(MotionRole::Streaming, &theme, true);
+        veil.observe(runs(&["First"]), now, &theme, motion);
+        veil.observe(runs(&["First second"]), now, &theme, motion);
+        assert!(veil.spans(0, now).is_empty());
+        assert!(!veil.is_fading(now));
     }
 
     #[test]

@@ -397,6 +397,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -1138,6 +1140,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -1879,6 +1883,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -2620,6 +2626,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -3361,6 +3369,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -4102,6 +4112,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -4843,6 +4855,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -5584,6 +5598,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -6325,6 +6341,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.
@@ -7066,6 +7084,8 @@ Numeric readout scale: 1.6×
 | `motion.durationMs.toast` | 6000 |
 | `motion.durationMs.hoverCardOpen` | 400 |
 | `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.feedback` | 900 |
+| `motion.durationMs.celebration` | 1600 |
 | `motion.durationMs.confirmation` | 1600 |
 
 Row stagger maximum items: `8`.

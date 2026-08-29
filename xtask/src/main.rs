@@ -2168,6 +2168,8 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("toast", tokens.motion.duration_ms.toast),
         ("hoverCardOpen", tokens.motion.duration_ms.hover_card_open),
         ("hoverCardGrace", tokens.motion.duration_ms.hover_card_grace),
+        ("feedback", tokens.motion.duration_ms.feedback),
+        ("celebration", tokens.motion.duration_ms.celebration),
         ("confirmation", tokens.motion.duration_ms.confirmation),
     ] {
         writeln!(output, "| `motion.durationMs.{name}` | {value} |")?;

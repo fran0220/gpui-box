@@ -3,10 +3,10 @@
 use std::time::Duration;
 
 use gpui::{Animation, AnimationElement, AnimationExt, ElementId, IntoElement, Styled, px};
-use gpui_kit_theme::{SpringPreset, Theme};
+use gpui_kit_theme::Theme;
 
-use super::Spring;
-use super::easing::{CubicBezier, Easing};
+use super::easing::CubicBezier;
+use super::{MotionPolicy, MotionRole, Spring};
 
 /// A curve with a duration and a delay: everything one animation needs, taken
 /// from the token document rather than written beside the element.
@@ -141,41 +141,41 @@ impl MotionSpec {
 
 /// How a surface that is part of the page arrives.
 pub fn entrance(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.entrance_ms, Easing::Settle.curve(theme))
+    MotionPolicy::spec(MotionRole::Entrance, theme)
 }
 
 /// How a menu opens: short, because it is answering a click.
 pub fn menu(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.menu_ms, Easing::Standard.curve(theme))
+    MotionPolicy::spec(MotionRole::MenuEnter, theme)
 }
 
 /// How a modal arrives: slower, because it is taking the page over.
 pub fn dialog(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.dialog_ms, Easing::Standard.curve(theme))
+    MotionPolicy::spec(MotionRole::ModalTransition, theme)
 }
 
 /// How a modal arrives when it should arrive with weight: on the smooth
 /// spring, which keeps moving after a curve of the same length has stopped.
 pub fn dialog_arrival(theme: &Theme) -> MotionSpec {
-    MotionSpec::sprung(Spring::preset(theme, SpringPreset::Smooth))
+    MotionPolicy::spec(MotionRole::ModalEnter, theme)
 }
 
 /// How one control moves to a new state: short, because it is answering a
 /// pointer that is still on it.
 pub fn state_change(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.quick_ms, Easing::Standard.curve(theme))
+    MotionPolicy::spec(MotionRole::StateChange, theme)
 }
 
 /// How a value that has a position moves to a new one, such as a progress
 /// fill or an opening section.
 pub fn resize(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.resize_ms, Easing::Standard.curve(theme))
+    MotionPolicy::spec(MotionRole::Resize, theme)
 }
 
 /// How a control that is being manipulated follows the value: the tight
 /// spring, so it feels attached rather than trailing.
 pub fn tracking(theme: &Theme) -> MotionSpec {
-    MotionSpec::sprung(Spring::preset(theme, SpringPreset::Grab))
+    MotionPolicy::spec(MotionRole::Tracking, theme)
 }
 
 /// Fades `element` in over the entrance specification.
@@ -300,6 +300,7 @@ pub fn gradient_opacity(phase: f32, dim: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::motion::Easing;
 
     #[test]
     fn delayed_specs_hold_then_finish() {

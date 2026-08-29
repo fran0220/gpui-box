@@ -1000,6 +1000,8 @@ impl TokenDocument {
             MotionDuration::Toast => self.motion.duration_ms.toast,
             MotionDuration::HoverCardOpen => self.motion.duration_ms.hover_card_open,
             MotionDuration::HoverCardGrace => self.motion.duration_ms.hover_card_grace,
+            MotionDuration::Feedback => self.motion.duration_ms.feedback,
+            MotionDuration::Celebration => self.motion.duration_ms.celebration,
             MotionDuration::Confirmation => self.motion.duration_ms.confirmation,
         })
     }
@@ -1524,6 +1526,10 @@ pub enum MotionDuration {
     /// How long contextual detail remains reachable while the pointer crosses
     /// the gap from its trigger.
     HoverCardGrace,
+    /// How long a semantic one-shot response takes to report its event.
+    Feedback,
+    /// How long an intentionally prominent celebratory response takes.
+    Celebration,
     /// How long a control reports that a short action, such as copying, held.
     Confirmation,
 }
@@ -2270,6 +2276,10 @@ pub struct DurationTokens {
     pub toast: u64,
     pub hover_card_open: u64,
     pub hover_card_grace: u64,
+    /// A semantic one-shot response such as success, failure, or handoff.
+    pub feedback: u64,
+    /// A deliberately prominent one-shot response such as a reward.
+    pub celebration: u64,
     pub confirmation: u64,
 }
 

@@ -10354,6 +10354,35 @@
       ]
     },
     {
+      "name": "MotionDisposition",
+      "path": "gpui_kit::motion::MotionDisposition",
+      "summary": "What the resolved policy permits the renderer to do.",
+      "variants": [
+        "Animate",
+        "Settle",
+        "Suppress",
+        "Poster"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MotionPolicy",
+      "path": "gpui_kit::motion::MotionPolicy",
+      "summary": "The sole mapping from semantic roles to motion tokens and preferences.",
+      "variants": [],
+      "construct": [
+        "resolve(role: MotionRole, cx: &App) -> ResolvedMotion",
+        "resolve_for(role: MotionRole, theme: &Theme, reduce_motion: bool) -> ResolvedMotion",
+        "spec(role: MotionRole, theme: &Theme) -> MotionSpec"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "MotionProperty",
       "path": "gpui_kit::motion::MotionProperty",
       "summary": "A property a described motion can move.",
@@ -10368,6 +10397,31 @@
         "name() -> &'static str",
         "neutral() -> f32"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MotionRole",
+      "path": "gpui_kit::motion::MotionRole",
+      "summary": "Why a surface is moving.",
+      "variants": [
+        "Entrance",
+        "MenuEnter",
+        "ModalEnter",
+        "ModalTransition",
+        "Exit",
+        "StateChange",
+        "Resize",
+        "Tracking",
+        "Navigation",
+        "Streaming",
+        "Feedback",
+        "Celebration",
+        "Activity",
+        "Micro"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -11422,6 +11476,16 @@
         "as_str() -> &'static str",
         "is_disclosable() -> bool"
       ]
+    },
+    {
+      "name": "ResolvedMotion",
+      "path": "gpui_kit::motion::ResolvedMotion",
+      "summary": "One role resolved against a theme and the user's motion preference.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ResultCount",

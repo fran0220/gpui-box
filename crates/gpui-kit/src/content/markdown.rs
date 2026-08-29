@@ -50,7 +50,7 @@ use crate::content::code_view::styled_code;
 use crate::content::highlight::{Cache, Language};
 use crate::controls::button::Button;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::motion::keyed;
+use crate::motion::{MotionPolicy, MotionRole, keyed};
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use stream::Stream;
@@ -304,7 +304,12 @@ impl RenderOnce for Markdown {
         // rather than of what a second walk of the tree guessed was drawn.
         if let Some(veil) = veil {
             let mut veil = veil.borrow_mut();
-            veil.observe(std::mem::take(&mut painter.drawn), now);
+            veil.observe(
+                std::mem::take(&mut painter.drawn),
+                now,
+                &theme,
+                MotionPolicy::resolve(MotionRole::Streaming, cx),
+            );
             if veil.is_fading(now) {
                 window.request_animation_frame();
             }
