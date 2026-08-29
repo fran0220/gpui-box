@@ -283,8 +283,14 @@ Metal uses its platform gaussian when scattering is nonzero. Direct3D and WGPU
 split wide gaussians into bounded passes and both degrade an over-budget blur to
 the sharp source without dropping refraction or a requested luminance probe.
 The browser uses the same WGPU path, including clear optics and bounded
-scattering. Ordinary Liquid and Lens paint no source-over fill; only Frosted
-and the explicitly adaptive readability policy add one.
+scattering. Independently, the scene admits at most 16 backdrop-glass surfaces
+per frame because even a clear surface requires a full-frame snapshot. Valid
+surfaces past that paint their caller-supplied ordinary-fill fallback and stay
+in cached paint ranges so a later paint-order change can admit them. Rejected
+surfaces never issue luminance probes. Ordinary Liquid and Lens paint no
+source-over fill while admitted; Kit supplies `effect.glassAlpha` as their
+over-budget fallback. Frosted and the explicitly adaptive readability policy
+already carry that fill.
 
 ## Native external data drag and drop
 

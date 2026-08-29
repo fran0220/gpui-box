@@ -4741,7 +4741,11 @@ impl Window {
     /// contract. A bounded renderer may discard requested scattering when it
     /// runs out of Gaussian work, but it must retain the sharp snapshot and
     /// every other optical field. `material` is sanitized on the way in, so a
-    /// value computed from an animation cannot produce a hole.
+    /// value computed from an animation cannot produce a hole. The scene
+    /// admits at most [`crate::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME`] surfaces;
+    /// callers without an ordinary fill should use
+    /// [`Window::paint_backdrop_glass_with_fallback`] so rejection remains a
+    /// legible surface rather than a hole.
     ///
     /// Content painted AFTER this call composites on top.
     pub fn paint_backdrop_glass(
@@ -4750,6 +4754,43 @@ impl Window {
         corner_radii: Corners<Pixels>,
         material: GlassMaterial<Pixels>,
         lobes: &[GlassLobe<Pixels>],
+    ) {
+        self.paint_backdrop_glass_inner(bounds, corner_radii, material, lobes, None);
+    }
+
+    /// Paint a within-window glass surface with an ordinary-fill fallback.
+    ///
+    /// This has the same optical contract as [`Window::paint_backdrop_glass`].
+    /// When the surface is past
+    /// [`crate::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME`], however, the scene
+    /// paints `fallback` through the same rounded-rect or lobe shape instead
+    /// of asking a renderer for another full-frame snapshot. The decision is
+    /// retained by scene replay, so cached subtrees cannot bypass the budget
+    /// or lose their fallback when their paint order changes.
+    pub fn paint_backdrop_glass_with_fallback(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        material: GlassMaterial<Pixels>,
+        lobes: &[GlassLobe<Pixels>],
+        fallback: impl Into<Background>,
+    ) {
+        self.paint_backdrop_glass_inner(
+            bounds,
+            corner_radii,
+            material,
+            lobes,
+            Some(fallback.into()),
+        );
+    }
+
+    fn paint_backdrop_glass_inner(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        material: GlassMaterial<Pixels>,
+        lobes: &[GlassLobe<Pixels>],
+        fallback: Option<Background>,
     ) {
         self.invalidator.debug_assert_paint();
         let material = material.sanitized();
@@ -4783,15 +4824,24 @@ impl Window {
             *slot = lobe.scale(scale_factor);
         }
 
-        self.next_frame.scene.insert_backdrop_glass(BackdropGlass {
-            order: 0,
-            bounds: bounds.scale(scale_factor),
-            content_mask,
-            corner_radii: corner_radii.scale(scale_factor),
-            material: material.scale(scale_factor),
-            lobes: stored,
-            lobe_count: lobe_count as u32,
-        });
+        let fallback = fallback
+            .map(|background| {
+                self.quad_fade_gradient(bounds, &background)
+                    .unwrap_or_else(|| background.opacity(self.element_opacity_at(bounds.center())))
+            })
+            .filter(|background| !background.is_transparent());
+        self.next_frame.scene.insert_backdrop_glass_with_fallback(
+            BackdropGlass {
+                order: 0,
+                bounds: bounds.scale(scale_factor),
+                content_mask,
+                corner_radii: corner_radii.scale(scale_factor),
+                material: material.scale(scale_factor),
+                lobes: stored,
+                lobe_count: lobe_count as u32,
+            },
+            fallback,
+        );
     }
 
     /// Paint one or more quads into the scene for the next frame at the current stacking context.

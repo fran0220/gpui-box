@@ -218,7 +218,9 @@ License: Apache-2.0
 Scope: dual sharp/blurred backdrop sources, spherical edge displacement,
 sharp-rim blending, additive lift and measured hairline adapted at the GPUI Box
 framework boundary across Metal, WGPU and Direct3D. No Git or Cargo dependency;
-see PROVENANCE.md P12.
+see PROVENANCE.md P12. The fixed per-frame surface admission budget,
+replay-aware ordinary-fill fallback, and rejection of over-budget probe work
+are subsequent GPUI Box work and import no additional source.
 License text: licenses/ZED-APACHE-2.0.txt
 
 alacritty_terminal

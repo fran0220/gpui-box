@@ -32,9 +32,9 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use gpui::{
-    AnyElement, App, Bounds, Corners, Element, GlassLobe, GlassMaterial, GlobalElementId,
-    InspectorElementId, InteractiveElement as _, IntoElement, LayoutId, MAX_GLASS_LOBES,
-    MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
+    AnyElement, App, Background, Bounds, Corners, Element, GlassLobe, GlassMaterial,
+    GlobalElementId, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
+    MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -449,6 +449,13 @@ impl RenderOnce for Glass {
         }
 
         let fill = theme.surface(self.surface).opacity(alpha);
+        let fallback = (alpha == 0.0).then(|| {
+            Background::from(
+                theme
+                    .surface(self.surface)
+                    .opacity(theme.effects.glass_alpha),
+            )
+        });
         let translucent = alpha < 1.0;
 
         let surface = div()
@@ -495,6 +502,7 @@ impl RenderOnce for Glass {
                 bevel,
                 lobes: LobeSource::Surface,
                 translucent,
+                fallback,
                 measured: Some(measured),
                 child: stateful.into_any_element(),
             };
@@ -506,6 +514,7 @@ impl RenderOnce for Glass {
             bevel,
             lobes: LobeSource::Surface,
             translucent,
+            fallback,
             measured: Some(measured),
             child: surface.into_any_element(),
         }
@@ -627,6 +636,13 @@ impl RenderOnce for GlassGroup {
         let radius = theme.radius(self.radius);
         let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let fill = theme.surface(self.surface).opacity(alpha);
+        let fallback = (alpha == 0.0).then(|| {
+            Background::from(
+                theme
+                    .surface(self.surface)
+                    .opacity(theme.effects.glass_alpha),
+            )
+        });
         let mut material = self.preset.material(&theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
@@ -660,6 +676,7 @@ impl RenderOnce for GlassGroup {
             bevel,
             lobes: LobeSource::Collected(collected),
             translucent,
+            fallback,
             measured: None,
             child: row.into_any_element(),
         }
@@ -802,6 +819,10 @@ pub(crate) struct BackdropLayer {
     bevel: Option<ResponsiveBevel>,
     pub(crate) lobes: LobeSource,
     pub(crate) translucent: bool,
+    /// Ordinary surface fill used only when the framework's per-frame glass
+    /// admission budget is exhausted. A caller already painting a tint needs
+    /// no second fallback; clear Liquid and Lens do.
+    pub(crate) fallback: Option<Background>,
     /// Where to record the bounds this layer was painted at, for a caller
     /// whose pointer math needs them next frame.
     pub(crate) measured: Option<Rc<Cell<Bounds<Pixels>>>>,
@@ -876,7 +897,17 @@ impl Element for BackdropLayer {
             return;
         }
         window.paint_layer(bounds, |window| {
-            window.paint_backdrop_glass(bounds, Corners::all(self.radius), material, lobes);
+            if let Some(fallback) = self.fallback {
+                window.paint_backdrop_glass_with_fallback(
+                    bounds,
+                    Corners::all(self.radius),
+                    material,
+                    lobes,
+                    fallback,
+                );
+            } else {
+                window.paint_backdrop_glass(bounds, Corners::all(self.radius), material, lobes);
+            }
             self.child.paint(window, cx);
         });
     }

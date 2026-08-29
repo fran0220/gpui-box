@@ -90,6 +90,7 @@ impl Scene {
             && self.subpixel_sprites.is_empty()
             && self.polychrome_sprites.is_empty()
             && self.surfaces.is_empty()
+            && self.backdrop_glass.is_empty()
     }
 
     pub fn push_layer(&mut self, bounds: Bounds<ScaledPixels>) {
@@ -104,7 +105,15 @@ impl Scene {
         self.paint_operations.push(PaintOperation::EndLayer);
     }
 
-    pub fn insert_backdrop_glass(&mut self, mut glass: BackdropGlass) {
+    pub fn insert_backdrop_glass(&mut self, glass: BackdropGlass) {
+        self.insert_backdrop_glass_with_fallback(glass, None);
+    }
+
+    pub(crate) fn insert_backdrop_glass_with_fallback(
+        &mut self,
+        mut glass: BackdropGlass,
+        fallback: Option<Background>,
+    ) {
         glass.material = glass.material.sanitized();
         if !glass.material.needs_backdrop() {
             return;
@@ -122,9 +131,29 @@ impl Scene {
             .last()
             .copied()
             .unwrap_or_else(|| self.primitive_bounds.insert(clipped_bounds));
-        self.backdrop_glass.push(glass);
+        if self.backdrop_glass.len() < MAX_BACKDROP_GLASS_SURFACES_PER_FRAME {
+            self.backdrop_glass.push(glass);
+        } else if let Some(background) = fallback {
+            let (lobes, lobe_count) = glass.shape();
+            self.quads
+                .extend(lobes[..lobe_count].iter().map(|lobe| Quad {
+                    order: glass.order,
+                    border_style: BorderStyle::default(),
+                    bounds: lobe.bounds,
+                    content_mask: glass.content_mask,
+                    background,
+                    border_color: Hsla::transparent_black(),
+                    corner_radii: lobe.corner_radii,
+                    border_widths: Edges::default(),
+                }));
+        }
+        // Keep every valid intent replayable even when this frame rejected it.
+        // A cached subtree may move earlier next frame and become one of the
+        // admitted surfaces; recording only admitted work would make that
+        // impossible, while recording the fallback as an unconditional quad
+        // would paint it over an optic that later becomes admitted.
         self.paint_operations
-            .push(PaintOperation::BackdropGlass(glass));
+            .push(PaintOperation::BackdropGlass { glass, fallback });
     }
 
     pub fn insert_primitive(&mut self, primitive: impl Into<Primitive>) {
@@ -185,7 +214,9 @@ impl Scene {
         for operation in &prev_scene.paint_operations[range] {
             match operation {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
-                PaintOperation::BackdropGlass(glass) => self.insert_backdrop_glass(*glass),
+                PaintOperation::BackdropGlass { glass, fallback } => {
+                    self.insert_backdrop_glass_with_fallback(*glass, *fallback)
+                }
                 PaintOperation::StartLayer(bounds) => self.push_layer(*bounds),
                 PaintOperation::EndLayer => self.pop_layer(),
             }
@@ -383,6 +414,103 @@ mod tests {
 
         assert_eq!(scene.backdrop_glass.len(), 1);
         assert_eq!(scene.backdrop_glass[0].gaussian_pass_count(), Some(0));
+    }
+
+    fn bounded_glass(index: usize) -> BackdropGlass {
+        let bounds = Bounds {
+            origin: Point {
+                x: ScaledPixels(index as f32),
+                y: ScaledPixels(0.0),
+            },
+            size: Size {
+                width: ScaledPixels(100.0),
+                height: ScaledPixels(40.0),
+            },
+        };
+        let mut material = GlassMaterial::clear();
+        material.bevel = ScaledPixels(9.0);
+        material.refraction = 0.34;
+        material.probe = index as u32;
+        BackdropGlass {
+            order: 0,
+            bounds,
+            content_mask: ContentMask { bounds },
+            corner_radii: Corners::default(),
+            material,
+            lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
+            lobe_count: 0,
+        }
+    }
+
+    #[test]
+    fn backdrop_glass_admission_bounds_work_and_keeps_rejected_intents_replayable() {
+        let mut scene = Scene::default();
+        let fallback = Background::from(Hsla::black());
+
+        for index in 0..1_000 {
+            scene.insert_backdrop_glass_with_fallback(bounded_glass(index), Some(fallback));
+        }
+
+        assert_eq!(
+            scene.backdrop_glass.len(),
+            MAX_BACKDROP_GLASS_SURFACES_PER_FRAME
+        );
+        assert_eq!(
+            scene.quads.len(),
+            1_000 - MAX_BACKDROP_GLASS_SURFACES_PER_FRAME,
+            "every rejected single-lobe surface becomes one ordinary fill"
+        );
+        assert_eq!(
+            scene.paint_operations.len(),
+            1_000,
+            "rejected intents remain in cached paint ranges"
+        );
+        assert_eq!(
+            scene
+                .backdrop_glass
+                .iter()
+                .map(|glass| glass.material.probe)
+                .collect::<Vec<_>>(),
+            (0..MAX_BACKDROP_GLASS_SURFACES_PER_FRAME as u32).collect::<Vec<_>>(),
+            "only admitted surfaces can become renderer probe requests"
+        );
+
+        let mut replayed = Scene::default();
+        replayed.replay(0..scene.len(), &scene);
+        assert_eq!(
+            replayed.backdrop_glass.len(),
+            MAX_BACKDROP_GLASS_SURFACES_PER_FRAME
+        );
+        assert_eq!(replayed.quads.len(), scene.quads.len());
+
+        let mut promoted = Scene::default();
+        promoted.replay(
+            MAX_BACKDROP_GLASS_SURFACES_PER_FRAME..MAX_BACKDROP_GLASS_SURFACES_PER_FRAME + 1,
+            &scene,
+        );
+        assert_eq!(promoted.backdrop_glass.len(), 1);
+        assert!(
+            promoted.quads.is_empty(),
+            "a previously rejected cached intent must not retain its fallback when admitted"
+        );
+    }
+
+    #[test]
+    fn rejected_fused_glass_falls_back_to_each_real_lobe() {
+        let mut scene = Scene::default();
+        for index in 0..MAX_BACKDROP_GLASS_SURFACES_PER_FRAME {
+            scene.insert_backdrop_glass(bounded_glass(index));
+        }
+
+        let mut rejected = bounded_glass(MAX_BACKDROP_GLASS_SURFACES_PER_FRAME);
+        rejected.lobes[0] = test_lobe((0.0, 0.0), (40.0, 40.0), 8.0);
+        rejected.lobes[1] = test_lobe((48.0, 0.0), (40.0, 40.0), 8.0);
+        rejected.lobe_count = 2;
+        scene.insert_backdrop_glass_with_fallback(rejected, Some(Background::from(Hsla::black())));
+
+        assert_eq!(scene.quads.len(), 2);
+        assert_eq!(scene.quads[0].bounds, rejected.lobes[0].bounds);
+        assert_eq!(scene.quads[1].bounds, rejected.lobes[1].bounds);
     }
 
     #[test]
@@ -922,7 +1050,10 @@ pub(crate) enum PrimitiveKind {
 
 pub(crate) enum PaintOperation {
     Primitive(Primitive),
-    BackdropGlass(BackdropGlass),
+    BackdropGlass {
+        glass: BackdropGlass,
+        fallback: Option<Background>,
+    },
     StartLayer(Bounds<ScaledPixels>),
     EndLayer,
 }
@@ -1341,6 +1472,17 @@ impl From<Underline> for Primitive {
 /// bounded rather than allocated: a loop a shader can unroll is the reason
 /// this is a fixed array inside the instance rather than a second buffer.
 pub const MAX_GLASS_LOBES: usize = 8;
+
+/// The most backdrop-glass surfaces a scene admits in one frame.
+///
+/// Every admitted surface snapshots the full framebuffer before compositing
+/// its optics, even when its blur spends no Gaussian passes. Bounding surfaces
+/// separately from the Gaussian budget therefore bounds that fixed work on
+/// Metal, DirectX, native WGPU, and browser WGPU alike. Admission follows
+/// paint order. Valid intents past the limit remain replayable and callers may
+/// supply an ordinary-fill fallback through
+/// [`crate::Window::paint_backdrop_glass_with_fallback`].
+pub const MAX_BACKDROP_GLASS_SURFACES_PER_FRAME: usize = 16;
 
 /// The value of [`GlassMaterial::probe`] that asks for no luminance probe.
 pub const NO_LUMINANCE_PROBE: u32 = u32::MAX;

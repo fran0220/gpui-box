@@ -3547,8 +3547,9 @@ impl RenderingParameters {
 mod tests {
     use super::*;
     use gpui::{
-        ContentMask, Corners, GlassLobe, GlassMaterial, MonochromeSprite, PolychromeSprite, Quad,
-        Shadow, SubpixelSprite, Underline,
+        ContentMask, Corners, GlassLobe, GlassMaterial, MAX_BACKDROP_GLASS_SURFACES_PER_FRAME,
+        MAX_GLASS_SIGMA_PER_PASS, MonochromeSprite, PolychromeSprite, Quad, Shadow, SubpixelSprite,
+        Underline,
     };
 
     fn backdrop_glass_with_radius(radius: f32) -> BackdropGlass {
@@ -3660,6 +3661,49 @@ mod tests {
         assert_eq!(gaussian_render_passes, 256);
         assert_eq!(clear_fallbacks, 872);
         assert_eq!(remaining, 0);
+    }
+
+    #[test]
+    fn scene_admission_bounds_the_wgpu_parameter_buffer_plan() {
+        let mut scene = Scene::default();
+        let bounds = Bounds {
+            origin: Point {
+                x: ScaledPixels(0.0),
+                y: ScaledPixels(0.0),
+            },
+            size: Size {
+                width: ScaledPixels(100.0),
+                height: ScaledPixels(40.0),
+            },
+        };
+        for _ in 0..1_000 {
+            let mut glass = backdrop_glass_with_radius(MAX_GLASS_SIGMA_PER_PASS * 4.0);
+            glass.bounds = bounds;
+            glass.content_mask = ContentMask { bounds };
+            scene.insert_backdrop_glass(glass);
+        }
+
+        assert_eq!(scene.len(), 1_000, "all valid intents remain replayable");
+        assert_eq!(
+            scene.backdrop_glass.len(),
+            MAX_BACKDROP_GLASS_SURFACES_PER_FRAME
+        );
+
+        let mut remaining = MAX_BACKDROP_GLASS_GAUSSIAN_RENDER_PASSES_PER_FRAME;
+        let required_parameter_buffers = scene
+            .backdrop_glass
+            .iter()
+            .map(|glass| planned_backdrop_glass_pass_count(glass, &mut remaining))
+            .map(backdrop_glass_render_pass_count)
+            .sum::<usize>()
+            + 1;
+        assert_eq!(
+            required_parameter_buffers,
+            MAX_BACKDROP_GLASS_GAUSSIAN_RENDER_PASSES_PER_FRAME
+                + MAX_BACKDROP_GLASS_SURFACES_PER_FRAME * 2
+                + 1,
+            "persistent parameter buffers are bounded by the surface and Gaussian budgets"
+        );
     }
 
     #[test]
