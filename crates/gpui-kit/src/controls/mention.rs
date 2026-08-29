@@ -240,6 +240,9 @@ impl MentionInput {
 
     fn on_editor_event(&mut self, event: &TextAreaEvent, cx: &mut Context<Self>) {
         match event {
+            // The revisioned delta accompanies Change. Mention routing stays
+            // on the complete value so it never updates twice for one edit.
+            TextAreaEvent::Edited(_) => {}
             TextAreaEvent::Change(value) => {
                 cx.emit(MentionInputEvent::Changed(value.clone()));
                 self.sync_trigger(cx);

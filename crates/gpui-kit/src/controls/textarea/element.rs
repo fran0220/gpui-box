@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_kit_theme::ActiveTheme;
 
-use super::{TextArea, text_edit};
+use super::{TextArea, TextAreaWrap, text_edit};
 
 pub struct TextAreaElement {
     area: Entity<TextArea>,
@@ -31,6 +31,7 @@ pub struct PrepaintState {
     cursor: Option<PaintQuad>,
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
+    horizontal_scroll_offset: Pixels,
     visible_rows: usize,
 }
 
@@ -89,6 +90,7 @@ impl Element for TextAreaElement {
         let (min_rows, max_rows) = area.row_limits();
         let empty = content.is_empty();
         let style = window.text_style();
+        let wrap = area.wrap_mode();
 
         let (display_text, text_color) = if empty {
             (
@@ -144,7 +146,7 @@ impl Element for TextAreaElement {
                 display_text,
                 font_size,
                 &runs,
-                Some(bounds.size.width),
+                (wrap == TextAreaWrap::Soft).then_some(bounds.size.width),
                 None,
             )
             .map(|lines| lines.into_iter().collect::<Vec<_>>())
@@ -164,8 +166,19 @@ impl Element for TextAreaElement {
             bounds.size.height,
             self.area.read(cx).scroll_offset(),
         );
+        let horizontal_scroll_offset = match wrap {
+            TextAreaWrap::Soft => px(0.0),
+            TextAreaWrap::None => layout.horizontal_scroll_offset_to_reveal(
+                cursor,
+                bounds.size.width,
+                self.area.read(cx).horizontal_scroll_offset(),
+            ),
+        };
 
-        let origin = point(bounds.left(), bounds.top() - scroll_offset);
+        let origin = point(
+            bounds.left() - horizontal_scroll_offset,
+            bounds.top() - scroll_offset,
+        );
         let accessible_geometry = text_edit::AccessibleTextGeometry::capture(
             source_text.clone(),
             window.scale_factor(),
@@ -196,6 +209,7 @@ impl Element for TextAreaElement {
             cursor,
             selection,
             scroll_offset,
+            horizontal_scroll_offset,
             visible_rows,
         }
     }
@@ -223,6 +237,7 @@ impl Element for TextAreaElement {
         }
 
         let scroll_offset = prepaint.scroll_offset;
+        let horizontal_scroll_offset = prepaint.horizontal_scroll_offset;
         let visible_rows = prepaint.visible_rows;
         window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
             for selection in prepaint.selection.drain(..) {
@@ -231,7 +246,10 @@ impl Element for TextAreaElement {
             if let Some(layout) = prepaint.layout.take() {
                 for (line, top) in layout.painted_lines() {
                     line.paint(
-                        point(bounds.origin.x, bounds.origin.y + top - scroll_offset),
+                        point(
+                            bounds.origin.x - horizontal_scroll_offset,
+                            bounds.origin.y + top - scroll_offset,
+                        ),
                         window.line_height(),
                         gpui::TextAlign::Left,
                         None,
@@ -244,8 +262,11 @@ impl Element for TextAreaElement {
                 self.area.update(cx, |area, cx| {
                     let grew = area.visible_rows() != visible_rows;
                     let scroll_changed = area.scroll_offset() != scroll_offset;
+                    let horizontal_scroll_changed =
+                        area.horizontal_scroll_offset() != horizontal_scroll_offset;
                     area.set_visible_rows(visible_rows);
                     area.set_scroll_offset(scroll_offset);
+                    area.set_horizontal_scroll_offset(horizontal_scroll_offset);
                     let layout_changed = area.set_last_layout(
                         layout,
                         prepaint.source_text.clone(),
@@ -255,8 +276,8 @@ impl Element for TextAreaElement {
                     // Geometry and accessibility consumers need one
                     // corrective frame when shaped rows, bounds, or scrolling
                     // change. Notifying on every paint would redraw forever.
-                    if grew || layout_changed || scroll_changed {
-                        if layout_changed || scroll_changed {
+                    if grew || layout_changed || scroll_changed || horizontal_scroll_changed {
+                        if layout_changed || scroll_changed || horizontal_scroll_changed {
                             cx.emit(crate::controls::textarea::TextAreaEvent::GeometryChanged);
                         }
                         cx.notify();

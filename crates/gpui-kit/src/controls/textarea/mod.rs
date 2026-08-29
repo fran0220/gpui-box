@@ -2,9 +2,11 @@
 //!
 //! `TextArea` is a view rather than a `RenderOnce` builder, for the same
 //! reason [`crate::controls::input::TextInput`] is: the caret, the selection,
-//! the in-progress input method composition, and the vertical scroll position
-//! all outlive a frame. Text wraps at the width the control was given, so
-//! there is no horizontal scrolling, and the caret moves by visual line.
+//! the in-progress input method composition, and the viewport all outlive a
+//! frame. Ordinary text wraps at the width the control was given. A source
+//! editor can instead select [`TextAreaWrap::None`], which keeps hard lines
+//! intact and reveals the caret through the same geometry used by hit testing,
+//! accessibility, selection, and input methods.
 //!
 //! ```no_run
 //! # use gpui::{App, AppContext as _, Context, Window};
@@ -306,6 +308,43 @@ pub enum Frame {
     Host,
 }
 
+/// How a text area lays out lines wider than its viewport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextAreaWrap {
+    /// Break long hard lines into visual rows at the available width.
+    #[default]
+    Soft,
+    /// Keep hard lines intact and scroll the viewport horizontally to reveal
+    /// the caret. This is the source-editor mode; it does not create a second
+    /// text or geometry model.
+    None,
+}
+
+/// An immutable value tagged with the revision that produced it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextAreaSnapshot {
+    /// The edit revision that produced `text`.
+    pub revision: u64,
+    /// The complete immutable value at `revision`.
+    pub text: SharedString,
+}
+
+/// The single contiguous replacement between two text-area revisions.
+///
+/// Offsets are UTF-8 byte offsets in the preceding revision. `inserted` is
+/// the text occupying that range in `revision`. Typing, IME composition,
+/// paste, programmatic replacement, undo, and redo all report through this
+/// same contract.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextAreaEdit {
+    /// The new revision after this replacement was applied.
+    pub revision: u64,
+    /// The UTF-8 range replaced in the preceding revision.
+    pub replaced: Range<usize>,
+    /// The text inserted at `replaced.start` in the new revision.
+    pub inserted: SharedString,
+}
+
 /// What a text area measured the last time it was laid out.
 ///
 /// An area grows itself between `rows` and `max_rows`, which is the whole
@@ -334,6 +373,9 @@ pub struct Measured {
 /// What a text area reports to its owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextAreaEvent {
+    /// A revisioned edit suitable for caller-owned parsing, diagnostics, and
+    /// syntax projections. This accompanies [`Self::Change`].
+    Edited(TextAreaEdit),
     /// The text changed, by typing, deletion, paste, or a programmatic set.
     Change(SharedString),
     /// The submit chord was pressed while the area had focus.
@@ -383,6 +425,7 @@ pub struct TextArea {
     max_rows: Option<usize>,
     enter: Enter,
     frame: Frame,
+    wrap: TextAreaWrap,
     /// Whether the vertical arrows belong to something other than the caret.
     /// Set from the host's render while a surface over the area is listing
     /// options, because that is the only thing that knows there is one.
@@ -393,6 +436,7 @@ pub struct TextArea {
     /// `max_rows` and is measured rather than guessed.
     visible_rows: usize,
     scroll_offset: Pixels,
+    horizontal_scroll_offset: Pixels,
     /// The horizontal position vertical motion aims for, so a run of up or
     /// down keys through a short line does not drag the caret leftwards.
     goal_x: Option<Pixels>,
@@ -405,6 +449,7 @@ pub struct TextArea {
     /// this area can tell a measurement taken after its last change from one
     /// taken before it.
     layout_pass: u64,
+    revision: u64,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
@@ -445,10 +490,12 @@ impl TextArea {
             max_rows: None,
             enter: Enter::Opens,
             frame: Frame::Own,
+            wrap: TextAreaWrap::Soft,
             arrows_claimed: false,
             completion_claimed: false,
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
+            horizontal_scroll_offset: px(0.0),
             goal_x: None,
             is_selecting: false,
             last_layout: None,
@@ -456,6 +503,7 @@ impl TextArea {
             last_bounds: None,
             caret_width: px(cx.theme().measures.caret_width),
             layout_pass: 0,
+            revision: 0,
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
             accessible_geometry: Arc::default(),
@@ -503,6 +551,12 @@ impl TextArea {
     /// Who draws the frame around the text. See [`Frame`].
     pub fn frame(mut self, frame: Frame) -> Self {
         self.frame = frame;
+        self
+    }
+
+    /// Chooses soft wrapping or a horizontally scrolling hard-line viewport.
+    pub fn wrap(mut self, wrap: TextAreaWrap) -> Self {
+        self.wrap = wrap;
         self
     }
 
@@ -608,6 +662,22 @@ impl TextArea {
         self.edit.text()
     }
 
+    /// The current immutable value and the monotonic revision that produced it.
+    pub fn snapshot(&self) -> TextAreaSnapshot {
+        TextAreaSnapshot {
+            revision: self.revision,
+            text: self.edit.text().clone(),
+        }
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    pub fn wrap_mode(&self) -> TextAreaWrap {
+        self.wrap
+    }
+
     pub fn is_empty(&self) -> bool {
         self.edit.is_empty()
     }
@@ -651,13 +721,17 @@ impl TextArea {
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
+        let before = self.edit.text().clone();
         // A value the host set is not a step the reader can walk back
         // through, so it ends the history rather than joining it.
-        self.edit.set_text(&value.into());
-        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        let outcome = self.edit.set_text(&value.into());
+        if outcome.changed {
+            self.record_edit(&before, cx);
+            cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        }
         self.scroll_offset = px(0.0);
+        self.horizontal_scroll_offset = px(0.0);
         self.goal_x = None;
-        cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
@@ -777,7 +851,7 @@ impl TextArea {
         let bounds = self.last_bounds?;
         Some(layout.bounds_for_range(
             range,
-            point(bounds.left(), bounds.top() - self.scroll_offset),
+            self.text_origin(bounds),
             gpui::TextAlign::Left,
             bounds.size.width,
         ))
@@ -792,7 +866,7 @@ impl TextArea {
         let bounds = self.last_bounds?;
         Some(layout.caret_bounds(
             self.cursor_offset(),
-            point(bounds.left(), bounds.top() - self.scroll_offset),
+            self.text_origin(bounds),
             self.caret_width,
         ))
     }
@@ -832,6 +906,10 @@ impl TextArea {
         self.scroll_offset
     }
 
+    pub fn horizontal_scroll_offset(&self) -> Pixels {
+        self.horizontal_scroll_offset
+    }
+
     pub(crate) fn row_limits(&self) -> (usize, usize) {
         (self.rows, self.max_rows.unwrap_or(self.rows).max(self.rows))
     }
@@ -846,6 +924,17 @@ impl TextArea {
 
     pub(crate) fn set_scroll_offset(&mut self, offset: Pixels) {
         self.scroll_offset = offset;
+    }
+
+    pub(crate) fn set_horizontal_scroll_offset(&mut self, offset: Pixels) {
+        self.horizontal_scroll_offset = offset;
+    }
+
+    pub(crate) fn text_origin(&self, bounds: Bounds<Pixels>) -> Point<Pixels> {
+        point(
+            bounds.left() - self.horizontal_scroll_offset,
+            bounds.top() - self.scroll_offset,
+        )
     }
 
     pub(crate) fn set_last_layout(
@@ -916,6 +1005,7 @@ impl TextArea {
             return;
         }
         let selection_before = self.edit.selection();
+        let before = self.edit.text().clone();
         // A key that arrives while an input method is composing ends the
         // composition, so the run is one step rather than merging with what
         // follows it.
@@ -923,7 +1013,7 @@ impl TextArea {
         let outcome = self.edit.replace(range, new_text, cause);
         self.goal_x = None;
         if outcome.changed {
-            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+            self.record_edit(&before, cx);
             cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         }
         self.emit_selection_if_changed(selection_before, cx);
@@ -932,10 +1022,11 @@ impl TextArea {
 
     fn undo(&mut self, _: &Undo, _: &mut Window, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
+        let before = self.edit.text().clone();
         if self.disabled || self.read_only || !self.edit.undo() {
             return;
         }
-        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        self.record_edit(&before, cx);
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         self.emit_selection_if_changed(selection_before, cx);
@@ -944,14 +1035,28 @@ impl TextArea {
 
     fn redo(&mut self, _: &Redo, _: &mut Window, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
+        let before = self.edit.text().clone();
         if self.disabled || self.read_only || !self.edit.redo() {
             return;
         }
-        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        self.record_edit(&before, cx);
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
+    }
+
+    fn record_edit(&mut self, before: &str, cx: &mut Context<Self>) {
+        let after = self.edit.text();
+        let (replaced, inserted) = replacement_between(before, after);
+        let inserted = SharedString::from(inserted.to_owned());
+        self.revision = self.revision.saturating_add(1);
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        cx.emit(TextAreaEvent::Edited(TextAreaEdit {
+            revision: self.revision,
+            replaced,
+            inserted,
+        }));
     }
 
     fn emit_selection_if_changed(&self, selection_before: Range<usize>, cx: &mut Context<Self>) {
@@ -1007,7 +1112,7 @@ impl TextArea {
             return 0;
         };
         let local = point(
-            position.x - bounds.left(),
+            position.x - bounds.left() + self.horizontal_scroll_offset,
             position.y - bounds.top() + self.scroll_offset,
         );
         layout
@@ -1450,6 +1555,7 @@ impl EntityInputHandler for TextArea {
         }
         let selection_before = self.edit.selection();
         let range = self.edit_range(range_utf16);
+        let before = self.edit.text().clone();
         // The composing selection is reported relative to the replacement,
         // not to the whole value, so it is converted against exactly that
         // replacement. Converting against the already-mutated value can land
@@ -1461,7 +1567,7 @@ impl EntityInputHandler for TextArea {
         let outcome = self.edit.replace_and_mark(range, new_text, inside);
         self.goal_x = None;
         if outcome.changed {
-            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+            self.record_edit(&before, cx);
             cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         }
         self.emit_selection_if_changed(selection_before, cx);
@@ -1479,7 +1585,7 @@ impl EntityInputHandler for TextArea {
         let range = self.range_from_utf16(&range_utf16);
         Some(layout.enclosing_bounds_for_range(
             range,
-            point(bounds.left(), bounds.top() - self.scroll_offset),
+            self.text_origin(bounds),
             gpui::TextAlign::Left,
             bounds.size.width,
         ))
@@ -1788,4 +1894,39 @@ fn non_text(item: &ClipboardItem) -> Option<Pasted> {
         .flatten()
         .collect();
     (!paths.is_empty()).then_some(Pasted::Paths(paths))
+}
+
+/// Finds the one contiguous replacement between two values. Every mutation
+/// of an edit buffer is one replacement, but undo, redo, and composition hide
+/// their original transaction detail from the control. Recovering the common
+/// prefix and suffix here gives every route the same caller-facing delta.
+fn replacement_between<'a>(before: &str, after: &'a str) -> (Range<usize>, &'a str) {
+    let mut prefix = before
+        .as_bytes()
+        .iter()
+        .zip(after.as_bytes())
+        .take_while(|(left, right)| left == right)
+        .count();
+    while !before.is_char_boundary(prefix) || !after.is_char_boundary(prefix) {
+        prefix -= 1;
+    }
+
+    let max_suffix = before.len().min(after.len()) - prefix;
+    let mut suffix = before.as_bytes()[prefix..]
+        .iter()
+        .rev()
+        .zip(after.as_bytes()[prefix..].iter().rev())
+        .take(max_suffix)
+        .take_while(|(left, right)| left == right)
+        .count();
+    while !before.is_char_boundary(before.len() - suffix)
+        || !after.is_char_boundary(after.len() - suffix)
+    {
+        suffix -= 1;
+    }
+
+    (
+        prefix..before.len() - suffix,
+        &after[prefix..after.len() - suffix],
+    )
 }

@@ -4857,6 +4857,7 @@
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
         "frame(frame: Frame) -> Self",
+        "wrap(wrap: TextAreaWrap) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self",
         "required(required: bool) -> Self",
@@ -4883,6 +4884,9 @@
         "arrows_claimed() -> bool",
         "completion_claimed() -> bool",
         "value() -> &SharedString",
+        "snapshot() -> TextAreaSnapshot",
+        "revision() -> u64",
+        "wrap_mode() -> TextAreaWrap",
         "is_empty() -> bool",
         "is_disabled() -> bool",
         "is_read_only() -> bool",
@@ -4891,10 +4895,12 @@
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
-        "measured() -> Option<Measured>"
+        "measured() -> Option<Measured>",
+        "horizontal_scroll_offset() -> Pixels"
       ],
       "slots": [],
       "reports": [
+        "Edited",
         "Change",
         "Submit",
         "Cancel",
@@ -13324,6 +13330,16 @@
       ]
     },
     {
+      "name": "TextAreaEdit",
+      "path": "gpui_kit::controls::TextAreaEdit",
+      "summary": "The single contiguous replacement between two text-area revisions.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "TextAreaElement",
       "path": "gpui_kit::controls::TextAreaElement",
       "summary": "",
@@ -13340,6 +13356,7 @@
       "path": "gpui_kit::controls::TextAreaEvent",
       "summary": "What a text area reports to its owner.",
       "variants": [
+        "Edited",
         "Change",
         "Submit",
         "Cancel",
@@ -13352,6 +13369,29 @@
         "GeometryChanged",
         "Focus",
         "Blur"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TextAreaSnapshot",
+      "path": "gpui_kit::controls::TextAreaSnapshot",
+      "summary": "An immutable value tagged with the revision that produced it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TextAreaWrap",
+      "path": "gpui_kit::controls::TextAreaWrap",
+      "summary": "How a text area lays out lines wider than its viewport.",
+      "variants": [
+        "Soft",
+        "None"
       ],
       "construct": [],
       "options": [],

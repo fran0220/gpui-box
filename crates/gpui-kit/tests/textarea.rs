@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{AppContext as _, Entity, Focusable, IntoElement, TestAppContext, div, prelude::*, px};
-use gpui_kit::controls::textarea::{Frame, TextArea, TextAreaEvent};
+use gpui_kit::controls::textarea::{Frame, TextArea, TextAreaEvent, TextAreaWrap};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 use unicode_segmentation::UnicodeSegmentation;
@@ -966,4 +966,74 @@ fn an_area_built_without_a_window_reports_focus_once_it_is_shown(cx: &mut TestAp
         "and it reports each change once: repeated frames do not subscribe it twice: {:?}",
         events.borrow()
     );
+}
+
+#[gpui::test]
+fn no_wrap_keeps_one_hard_line_and_reveals_its_caret(cx: &mut TestAppContext) {
+    let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa";
+    let (mut harness, slot) = area(cx, move |area| {
+        area.text(text).rows(2).wrap(TextAreaWrap::None)
+    });
+
+    harness.frame();
+    harness.frame();
+    let entity = slot.borrow().clone().expect("area was built");
+    let (row, offset, caret) = harness.update(|_, cx| {
+        let area = entity.read(cx);
+        (
+            area.cursor_row(),
+            area.horizontal_scroll_offset(),
+            area.caret_bounds(),
+        )
+    });
+
+    assert_eq!(row, 0, "a hard line must not become visual rows");
+    assert!(
+        offset > px(0.0),
+        "the viewport must reveal the ending caret"
+    );
+    assert!(
+        caret.is_some(),
+        "the revealed caret keeps published geometry"
+    );
+}
+
+#[gpui::test]
+fn edits_and_undo_publish_monotonic_revisioned_replacements(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.text("alpha"));
+    let events = reported(&mut harness, &slot);
+    let entity = slot.borrow().clone().expect("area was built");
+
+    let changed = entity.clone();
+    harness.update(move |_, cx| {
+        changed.update(cx, |area, cx| {
+            assert_eq!(area.replace_range(1..4, "β", cx), Some(1..3));
+        });
+    });
+    assert_eq!(value(&mut harness, &slot), "aβa");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).snapshot()),
+        gpui_kit::controls::textarea::TextAreaSnapshot {
+            revision: 1,
+            text: "aβa".into(),
+        }
+    );
+    assert!(events.borrow().contains(&TextAreaEvent::Edited(
+        gpui_kit::controls::textarea::TextAreaEdit {
+            revision: 1,
+            replaced: 1..4,
+            inserted: "β".into(),
+        }
+    )));
+
+    harness.click("form.notes");
+    harness.keystrokes(&primary("z"));
+    assert_eq!(value(&mut harness, &slot), "alpha");
+    assert!(events.borrow().contains(&TextAreaEvent::Edited(
+        gpui_kit::controls::textarea::TextAreaEdit {
+            revision: 2,
+            replaced: 1..3,
+            inserted: "lph".into(),
+        }
+    )));
 }
