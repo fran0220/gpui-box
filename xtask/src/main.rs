@@ -1256,6 +1256,7 @@ fn web_check() -> Result<()> {
 }
 
 fn web_build() -> Result<()> {
+    web_install_node_tools()?;
     step(
         env!("CARGO"),
         &[
@@ -1314,14 +1315,30 @@ fn web_build() -> Result<()> {
     Ok(())
 }
 
+fn web_install_node_tools() -> Result<()> {
+    let package = root().join("examples/browser-gallery");
+    let package = package.to_string_lossy();
+    step("npm", &["--prefix", package.as_ref(), "ci"], None)
+}
+
 /// Cloudflare Workers rejects a static asset above 25 MiB. The release
 /// wasm-bindgen output now sits just over that; Binaryen's `-Oz` brings it
-/// back under without changing the surface the compose page loads.
+/// back under without changing the surface the compose page loads. Use the
+/// workspace-pinned Binaryen: older releases can silently export wasm-bindgen's
+/// fixed function table as `__wbindgen_externrefs`, which only fails when the
+/// generated JavaScript first grows that table.
 fn shrink_browser_wasm(output: &Path) -> Result<()> {
     let wasm = output.join("gpui_kit_browser_gallery_bg.wasm");
     let tmp = output.join("gpui_kit_browser_gallery_bg.opt.wasm");
-    let status = Command::new("wasm-opt")
+    let package = root().join("examples/browser-gallery");
+    let package = package.to_string_lossy();
+    let status = Command::new("npm")
         .args([
+            "--prefix",
+            package.as_ref(),
+            "exec",
+            "--",
+            "wasm-opt",
             "-Oz",
             "--enable-bulk-memory",
             "--enable-nontrapping-float-to-int",
@@ -1335,8 +1352,8 @@ fn shrink_browser_wasm(output: &Path) -> Result<()> {
         .current_dir(root())
         .status()
         .context(
-            "wasm-opt is required to keep the compose WASM under the Workers 25 MiB asset limit; \
-             install Binaryen (`brew install binaryen`)",
+            "run the browser workspace's pinned wasm-opt; run \
+             `npm --prefix examples/browser-gallery ci` to install it",
         )?;
     if !status.success() {
         let _ = fs::remove_file(&tmp);
@@ -1356,7 +1373,6 @@ fn web_smoke() -> Result<()> {
 fn web_prepare() -> Result<()> {
     let package = root().join("examples/browser-gallery");
     let package = package.to_string_lossy();
-    step("npm", &["--prefix", package.as_ref(), "ci"], None)?;
     step(
         "npm",
         &[

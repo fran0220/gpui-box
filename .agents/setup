@@ -5,7 +5,6 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 packages=(
-  binaryen
   build-essential
   clang
   cmake
@@ -78,6 +77,9 @@ if ! command -v npx >/dev/null 2>&1; then
   echo "npx is required to deploy the hosted site and MCP endpoint." >&2
   exit 1
 fi
+
+echo "Installing locked browser-gallery tools."
+npm --prefix examples/browser-gallery ci
 
 echo "Caching Wrangler for hosted site and MCP deployments."
 npx --yes wrangler@4 --version >/dev/null

@@ -7,6 +7,7 @@
     "visual:capture": "playwright test --config visual.config.mjs --update-snapshots"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "binaryen": "132.0.0"
   }
 }
