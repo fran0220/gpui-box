@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import pngjs from "pngjs";
+
+const { PNG } = pngjs;
 
 async function openScene(page, testInfo, scene) {
   const { backend, renderer } = testInfo.project.metadata;
@@ -43,6 +46,17 @@ async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+function nonBlackPixelRatio(buffer) {
+  const image = PNG.sync.read(buffer);
+  let nonBlack = 0;
+  for (let offset = 0; offset < image.data.length; offset += 4) {
+    if (image.data[offset] > 24 || image.data[offset + 1] > 24 || image.data[offset + 2] > 24) {
+      nonBlack += 1;
+    }
+  }
+  return nonBlack / (image.width * image.height);
+}
+
 async function selection(page) {
   return JSON.parse(await page.evaluate(() => window.gpuiBoxSelection));
 }
@@ -68,6 +82,25 @@ test("ordinary control uses the catalog component and stable semantics", async (
   }
   await pointer(page, "pointerup", center(primary), 0);
   await settle(page);
+});
+
+test("glass remains renderable after forced WebGPU compiles every pipeline", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.metadata.renderer !== "webgpu");
+
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  await openScene(page, testInfo, "glass");
+  // Pipeline validation and uncaptured WebGPU errors are asynchronous. A
+  // ready flag alone used to pass several seconds before the canvas failed.
+  await page.waitForTimeout(5_000);
+  await settle(page);
+
+  expect(errors).toEqual([]);
+  expect(nonBlackPixelRatio(await page.locator("canvas").screenshot())).toBeGreaterThan(0.25);
 });
 
 test("text input accepts real browser keyboard input", async ({ page }, testInfo) => {

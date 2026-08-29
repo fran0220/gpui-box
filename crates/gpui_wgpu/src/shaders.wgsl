@@ -1392,15 +1392,17 @@ fn vs_poly_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index
 @fragment
 fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.tile_position);
-    // Alpha clip after using the derivatives.
-    if (any(input.clip_distances < vec4<f32>(0.0))) {
-        return vec4<f32>(0.0);
-    }
-
     let sprite = load_poly_sprite(input.sprite_id);
     let distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
     let edge_width = max(fwidth(distance), 0.0001);
     let coverage = saturate(0.5 - distance / edge_width);
+
+    // Texture sampling and edge antialiasing both use derivatives. Evaluate
+    // them before the per-fragment clip branch: WebGPU rejects derivatives in
+    // non-uniform control flow even though native backends accept the shader.
+    if (any(input.clip_distances < vec4<f32>(0.0))) {
+        return vec4<f32>(0.0);
+    }
 
     var color = sample;
     if (sprite.color_mode == 1u) {
