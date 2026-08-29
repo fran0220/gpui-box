@@ -1269,11 +1269,17 @@ impl RenderOnce for NodeGraph {
         // scrutinee lives as long as the block, and the block takes the same
         // cell mutably to record what it framed.
         let already_framed = gesture.borrow().framed;
-        if let Some(token) = wants_frame(self.fit, already_framed)
-            // Waiting for real heights is the whole point: framing from the
-            // estimate would leave the tallest card half outside the frame it
-            // was supposed to guarantee.
-            && !measured_heights.is_empty()
+        let pending_frame = wants_frame(self.fit, already_framed);
+        // Waiting for real heights is the whole point: framing from the
+        // estimate would leave the tallest card half outside the frame it was
+        // supposed to guarantee. Every card has to be measured, not just one —
+        // the ones a frame is most likely to leave out are exactly the far ones
+        // the opening viewport never drew.
+        let every_card_measured = geometry
+            .iter()
+            .all(|node| measured_heights.contains_key(&node.id));
+        if let Some(token) = pending_frame
+            && every_card_measured
             && let Some(framed) = frame_all(&geometry, measured.get(), self.zoom_range)
             && let Some(report) = self.on_event.as_ref().cloned()
         {
@@ -1289,8 +1295,14 @@ impl RenderOnce for NodeGraph {
         let visible_ids: std::collections::HashSet<SharedString> = geometry
             .iter()
             .filter(|node| {
-                view.map(|view| bounds_overlap(node.bounds, view, CULL_PAD))
-                    .unwrap_or(true)
+                // A card outside the opening view is never drawn, so it is
+                // never measured, so a frame waiting on measurements would
+                // wait forever for the very cards it exists to bring in. While
+                // a frame is owed, everything is drawn once.
+                pending_frame.is_some()
+                    || view
+                        .map(|view| bounds_overlap(node.bounds, view, CULL_PAD))
+                        .unwrap_or(true)
             })
             .map(|node| node.id.clone())
             .collect();
