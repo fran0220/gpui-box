@@ -663,7 +663,11 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                 TypeScale::Label,
                 SharedString::from(title),
             ))
-            .child(caption(&theme, body))
+            .child(crate::foundation::text(
+                &theme,
+                TypeScale::Caption,
+                SharedString::from(body),
+            ))
     };
 
     // A ruled checkerboard bends far more legibly than a flat fill: its

@@ -200,11 +200,24 @@ impl Drop for ProbeLease {
 /// The transient visual state an interactive glass surface keeps across
 /// frames: whether it is pressed, which side of the contrast band it last
 /// settled on, and its probe slot.
-#[derive(Default)]
 struct GlassState {
     pressed: bool,
     deepened: bool,
     lease: ProbeLease,
+}
+
+impl Default for GlassState {
+    fn default() -> Self {
+        Self {
+            pressed: false,
+            // Adaptive is an explicit readability policy. Until the first
+            // probe resolves, fail safe to its tint rather than briefly
+            // exposing content over an unknown opposing backdrop. A renderer
+            // without probes keeps this legible fallback.
+            deepened: true,
+            lease: ProbeLease::default(),
+        }
+    }
 }
 
 /// A glass surface: optionally scattered and bent backdrop, optional fill,
@@ -345,8 +358,9 @@ impl Glass {
     ///
     /// The reading comes from [`Window::backdrop_luminance`] one frame after
     /// the backdrop moved, so the flip lands on the next frame the window
-    /// draws. On a renderer that takes no probes the reading never arrives
-    /// and the surface honestly stays clear.
+    /// draws. Before that first reading, and on a renderer that takes no
+    /// probes, the surface keeps the theme tint as a safe readability
+    /// fallback.
     pub fn adaptive(mut self, adaptive: bool) -> Self {
         self.adaptive = adaptive;
         self
@@ -1102,6 +1116,11 @@ mod tests {
         // Inside the band the previous answer stands, whichever it was.
         assert!(deepen_tint(true, 0.5, true, low, high));
         assert!(!deepen_tint(false, 0.5, true, low, high));
+    }
+
+    #[test]
+    fn adaptive_glass_starts_with_its_safe_tint() {
+        assert!(GlassState::default().deepened);
     }
 
     #[test]

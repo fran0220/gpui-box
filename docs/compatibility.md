@@ -290,7 +290,9 @@ in cached paint ranges so a later paint-order change can admit them. Rejected
 surfaces never issue luminance probes. Ordinary Liquid and Lens paint no
 source-over fill while admitted; Kit supplies `effect.glassAlpha` as their
 over-budget fallback. Frosted and the explicitly adaptive readability policy
-already carry that fill.
+already carry that fill. Adaptive surfaces begin with the safe tint and release
+it after the first non-opposing probe reading, so first paint and renderers
+without probe delivery do not expose content over an unknown backdrop.
 
 ## Native external data drag and drop
 
