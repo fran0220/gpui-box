@@ -58,7 +58,8 @@ Copyright (c) 2026 Wing, MIT licensed.
 
 The calendar, checkbox-empty, checkbox-checked, double-arrow-left,
 double-arrow-right, drag-handle, filter, forbidden, image, minus, pause, play,
-sound-wave, stop and video glyphs are original drawings for this repository, on
+sound-wave, star, star-filled, stop and video glyphs are original drawings for
+this repository, on
 the same sixteen-unit grid and 1.25 stroke as the set around them. They exist
 because the components that needed them were drawing a character the embedded
 fonts do not cover — a task list rendered its boxes as tofu, a date field

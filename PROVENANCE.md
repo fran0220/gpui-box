@@ -247,6 +247,9 @@ License text: `licenses/COMET-MIT.txt`.
 - Files: most SVGs under `crates/gpui-kit-assets/assets/icons/`
 - License text: `crates/gpui-kit-assets/licenses/CC-BY-4.0.txt`
 
+The `star` and `star-filled` glyphs are original repository drawings and are
+covered by the repository license rather than the Solar Icons attribution.
+
 Comet-authored generic glyphs in that directory remain under MIT and are
 identified by the adjacent `assets/SOURCE.md`.
 

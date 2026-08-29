@@ -173,6 +173,8 @@ https://creativecommons.org/licenses/by/4.0/
 Attribution: “Solar Icons by 480 Design.”
 Scope: product-neutral SVGs under crates/gpui-kit-assets/assets/icons. Generic
 Comet glyphs identified in assets/SOURCE.md are covered by Comet's MIT license.
+The `star` and `star-filled` glyphs are original repository drawings covered by
+the repository license.
 License text: crates/gpui-kit-assets/licenses/CC-BY-4.0.txt
 
 IBM Plex Sans and Lilex

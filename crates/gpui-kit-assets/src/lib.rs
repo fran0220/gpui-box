@@ -145,6 +145,8 @@ icons![
     (SidebarLeft, "sidebar-minimalistic-left", Directional),
     (Smartphone, "smartphone", Fixed),
     (SortVertical, "sort-vertical", Fixed),
+    (Star, "star", Fixed),
+    (StarFilled, "star-filled", Fixed),
     (SoundWave, "sound-wave", Fixed),
     (Stop, "stop", Fixed),
     (Terminal, "terminal", Directional),
@@ -284,7 +286,7 @@ mod tests {
             .iter()
             .filter(|icon| icon.mirrors_in_rtl())
             .count();
-        assert_eq!(Icon::ALL.len(), 64);
+        assert_eq!(Icon::ALL.len(), 66);
         assert_eq!(directional, 27);
     }
 
