@@ -189,10 +189,200 @@ impl Presence {
     }
 }
 
+/// A floating surface's whole life, from its arrival to the frame after it is
+/// dismissed.
+///
+/// The library's arrival helpers — [`menu_in`](super::menu_in),
+/// [`dialog_in`](super::dialog_in), [`fade_in`](super::fade_in) — are built on
+/// `with_animation`, which runs once when an element appears and has nowhere
+/// to put a departure. An element cannot animate out after it has been dropped
+/// from the tree, so a surface built on them either snaps away or keeps a
+/// [`Presence`] and hand-writes everything around it. `Toast` and `Drawer` each
+/// did the second, which is why an application wanting a command palette that
+/// closes had to copy a component's private recipe rather than use one.
+///
+/// This is that recipe, named. It pairs the enter specification the role
+/// carries with the library's one exit, keeps the two phases cancellable by
+/// each other, and hands out the progress that
+/// [`presenting`](super::presenting) turns into an appearance. A host that
+/// holds one of these and honours [`is_rendered`](Self::is_rendered) has the
+/// same lifecycle every overlay in the library has.
+///
+/// ```no_run
+/// # use gpui_kit::motion::{MotionRole, Presenting, presenting};
+/// # use gpui_kit::prelude::*;
+/// # fn example(theme: &gpui_kit_theme::Theme) {
+/// let mut palette = Presenting::closed(theme, MotionRole::MenuEnter);
+/// palette.open();
+/// // While `palette.is_rendered()` the surface stays in the tree, even
+/// // after `palette.close()`, which is what gives the exit somewhere to run.
+/// # }
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Presenting {
+    presence: Presence,
+    role: super::MotionRole,
+}
+
+impl Presenting {
+    /// Starts closed, so the first [`open`](Self::open) animates in.
+    ///
+    /// The role decides the arrival: a menu answers the action that opened it,
+    /// a modal arrives with weight, and content that becomes part of the
+    /// surface rises. Every departure is [`MotionRole::Exit`], because leaving
+    /// is one thing however the surface arrived — a surface that took its
+    /// entrance curve back out would decelerate on the way off screen, which
+    /// reads as reluctance rather than dismissal.
+    pub fn closed(theme: &gpui_kit_theme::Theme, role: super::MotionRole) -> Self {
+        Self {
+            presence: Presence::hidden(
+                super::MotionPolicy::spec(role, theme),
+                super::MotionPolicy::spec(super::MotionRole::Exit, theme),
+            ),
+            role,
+        }
+    }
+
+    /// Starts open, for a surface that exists before the first frame.
+    pub fn opened(theme: &gpui_kit_theme::Theme, role: super::MotionRole) -> Self {
+        let mut presenting = Self::closed(theme, role);
+        presenting.presence = Presence::visible(
+            super::MotionPolicy::spec(role, theme),
+            super::MotionPolicy::spec(super::MotionRole::Exit, theme),
+        );
+        presenting
+    }
+
+    /// The role this surface arrives on.
+    pub const fn role(&self) -> super::MotionRole {
+        self.role
+    }
+
+    /// Arrives, or reverses a departure still in flight.
+    pub fn open(&mut self) {
+        self.presence.show();
+    }
+
+    /// Starts the departure. The surface stays rendered until it finishes.
+    pub fn close(&mut self) {
+        self.presence.hide();
+    }
+
+    pub fn toggle(&mut self) {
+        self.presence.toggle();
+    }
+
+    /// Finishes whichever phase is running, for a host that wants the surface
+    /// where it is going without the frames in between.
+    pub fn settle(&mut self) {
+        self.presence.settle();
+    }
+
+    /// True while the host must keep the surface in the tree, including for
+    /// the whole departure.
+    pub fn is_rendered(&self) -> bool {
+        self.presence.is_rendered()
+    }
+
+    /// True while the surface is here or on its way here, which is the
+    /// question a focus trap, a stack push or an escape binding asks — not
+    /// whether it is painted.
+    pub fn is_open(&self) -> bool {
+        matches!(self.phase(), Phase::Entering | Phase::Present)
+    }
+
+    pub fn phase(&self) -> Phase {
+        self.presence.phase()
+    }
+
+    pub fn progress(&self) -> f32 {
+        self.presence.progress()
+    }
+
+    /// Advances one frame and requests the next while a phase is running.
+    /// Reduced motion settles immediately.
+    pub fn animate(&mut self, window: &mut Window, cx: &mut App) -> f32 {
+        self.presence.animate(window, cx)
+    }
+
+    pub fn advance(&mut self, delta: Duration) {
+        self.presence.advance(delta);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::motion::{CubicBezier, MotionSpec};
+
+    /// The gap this closes: `with_animation` runs once and only forwards, so
+    /// every surface built on the `*_in` helpers snapped away, and the two
+    /// that did not each kept a `Presence` and hand-wrote the rest.
+    #[test]
+    fn a_surface_stays_rendered_through_its_whole_departure() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let mut palette = Presenting::closed(&theme, crate::motion::MotionRole::MenuEnter);
+        assert!(!palette.is_rendered());
+        assert!(!palette.is_open());
+
+        palette.open();
+        palette.advance(Duration::from_millis(1_000));
+        assert_eq!(palette.phase(), Phase::Present);
+        assert_eq!(palette.progress(), 1.0);
+        assert!(palette.is_open());
+
+        palette.close();
+        // Still on screen, and no longer open: it takes no keyboard and
+        // answers no dismissal while it is only finishing a departure.
+        assert!(palette.is_rendered());
+        assert!(!palette.is_open());
+        assert_eq!(palette.phase(), Phase::Exiting);
+
+        palette.advance(Duration::from_millis(1_000));
+        assert_eq!(palette.phase(), Phase::Gone);
+        assert!(!palette.is_rendered());
+    }
+
+    /// A departure interrupted by the reader opening the surface again plays
+    /// back from where it had got to rather than restarting, which is the
+    /// property the underlying `Presence` exists for.
+    #[test]
+    fn reopening_a_departing_surface_resumes_rather_than_restarts() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let mut palette = Presenting::opened(&theme, crate::motion::MotionRole::ModalEnter);
+        assert!(palette.is_open());
+        palette.close();
+        palette.advance(Duration::from_millis(60));
+        let partway = palette.progress();
+        assert!(
+            partway > 0.0 && partway < 1.0,
+            "the exit did not get partway: {partway}"
+        );
+
+        palette.open();
+        assert_eq!(palette.phase(), Phase::Entering);
+        assert!((palette.progress() - partway).abs() < 0.05);
+    }
+
+    /// Every departure is the one exit, whatever the arrival was: a surface
+    /// that took its entrance curve back out would decelerate on the way off
+    /// screen, which reads as reluctance rather than dismissal.
+    #[test]
+    fn arrivals_differ_by_role_and_departures_do_not() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let exit = crate::motion::MotionPolicy::spec(crate::motion::MotionRole::Exit, &theme);
+        for role in [
+            crate::motion::MotionRole::MenuEnter,
+            crate::motion::MotionRole::ModalEnter,
+            crate::motion::MotionRole::Entrance,
+        ] {
+            let mut surface = Presenting::opened(&theme, role);
+            assert_eq!(surface.role(), role);
+            surface.close();
+            surface.advance(exit.total());
+            assert_eq!(surface.phase(), Phase::Gone, "{role:?} outlived the exit");
+        }
+    }
 
     fn presence() -> Presence {
         let linear = |ms| MotionSpec::new(ms, CubicBezier::new(0.0, 0.0, 1.0, 1.0));

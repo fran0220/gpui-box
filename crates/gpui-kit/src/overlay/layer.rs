@@ -144,6 +144,10 @@ pub struct Overlay {
     hang: Hang,
     window_snap_margin: Option<Pixels>,
     scrim: bool,
+    /// How far through its arrival the surface is. A scrim that snapped off
+    /// while the surface it belongs to was still leaving would report the
+    /// content behind as reachable a whole exit before it is.
+    progress: f32,
     content: Option<AnyElement>,
     on_dismiss: Option<DismissHandler>,
 }
@@ -173,6 +177,7 @@ impl Overlay {
             hang: Hang::Start,
             window_snap_margin: None,
             scrim: false,
+            progress: 1.0,
             content: None,
             on_dismiss: None,
         }
@@ -233,6 +238,19 @@ impl Overlay {
     /// Dims and blocks the content behind the overlay.
     pub fn scrim(mut self, scrim: bool) -> Self {
         self.scrim = scrim;
+        self
+    }
+
+    /// How far through its arrival the surface is, from
+    /// [`Presenting::progress`](crate::motion::Presenting::progress).
+    ///
+    /// Only the scrim reads it: the surface's own appearance is the caller's,
+    /// because only the caller knows which element inside the overlay is the
+    /// one that should move. What the overlay owns is that the veil behind a
+    /// departing surface goes with it. Left unset the overlay is fully
+    /// arrived, which is what a caller with no lifecycle of its own means.
+    pub fn progress(mut self, progress: f32) -> Self {
+        self.progress = progress.clamp(0.0, 1.0);
         self
     }
 
@@ -297,36 +315,52 @@ impl RenderOnce for Overlay {
         }
 
         let placed = match self.placement {
-            Placement::Center => scrim_frame(&theme, viewport, self.scrim, self.on_dismiss.clone())
-                .items_center()
-                .justify_center()
-                .child(surface)
-                .into_any_element(),
+            Placement::Center => scrim_frame(
+                &theme,
+                viewport,
+                self.scrim,
+                self.progress,
+                self.on_dismiss.clone(),
+            )
+            .items_center()
+            .justify_center()
+            .child(surface)
+            .into_any_element(),
             // The surface keeps its own size along the pinned axis and is
             // left to stretch across the other one, which is what makes a
             // drawer reach both ends of the side it hangs from.
-            Placement::Edge(edge) => {
-                scrim_frame(&theme, viewport, self.scrim, self.on_dismiss.clone())
-                    .map(|frame| {
-                        if edge.is_horizontal() {
-                            frame.flex_row()
-                        } else {
-                            frame.flex_col()
-                        }
-                    })
-                    .map(|frame| {
-                        if edge.is_leading() {
-                            frame.justify_start()
-                        } else {
-                            frame.justify_end()
-                        }
-                    })
-                    .child(surface)
-                    .into_any_element()
-            }
-            _ if self.scrim => scrim_frame(&theme, viewport, true, self.on_dismiss.clone())
-                .child(anchored.child(surface))
-                .into_any_element(),
+            Placement::Edge(edge) => scrim_frame(
+                &theme,
+                viewport,
+                self.scrim,
+                self.progress,
+                self.on_dismiss.clone(),
+            )
+            .map(|frame| {
+                if edge.is_horizontal() {
+                    frame.flex_row()
+                } else {
+                    frame.flex_col()
+                }
+            })
+            .map(|frame| {
+                if edge.is_leading() {
+                    frame.justify_start()
+                } else {
+                    frame.justify_end()
+                }
+            })
+            .child(surface)
+            .into_any_element(),
+            _ if self.scrim => scrim_frame(
+                &theme,
+                viewport,
+                true,
+                self.progress,
+                self.on_dismiss.clone(),
+            )
+            .child(anchored.child(surface))
+            .into_any_element(),
             _ => anchored.child(surface).into_any_element(),
         };
 
@@ -362,6 +396,7 @@ fn scrim_frame(
     theme: &Theme,
     viewport: gpui::Size<Pixels>,
     visible: bool,
+    progress: f32,
     on_dismiss: Option<DismissHandler>,
 ) -> Stateful<Div> {
     let mut frame = div()
@@ -376,7 +411,7 @@ fn scrim_frame(
     if visible {
         // The veil colour is the token document's: dark themes carry a cast
         // the page does not have, because black over near-black is invisible.
-        frame = frame.bg(theme.colors.scrim.opacity(theme.opacity.scrim));
+        frame = frame.bg(theme.colors.scrim.opacity(theme.opacity.scrim * progress));
     }
     if let Some(handler) = on_dismiss {
         frame = frame.on_click(move |_: &ClickEvent, window, cx| handler(window, cx));

@@ -24,6 +24,7 @@ use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::positioner::Positioner;
 
 use crate::motion;
+use crate::motion::{MotionRole, Phase, Presenting};
 use crate::strings::{ActiveSearch, EnglishSearch, SearchMatcher};
 
 /// What a keystroke means to a menu-like surface, once the platform's
@@ -555,7 +556,11 @@ pub struct Popover {
     placement: Placement,
     hang: Hang,
     dismissable: bool,
-    open: bool,
+    /// The surface's arrival and departure, or `None` while it has never been
+    /// opened. Kept rather than a bare `open` flag because an element cannot
+    /// animate out after it has been dropped from the tree: the popover has to
+    /// keep rendering through the exit, and this is what says when it may stop.
+    presenting: Option<Presenting>,
     /// Set by `open`, cleared by the first frame that can act on it.
     pending_focus: bool,
     trap: FocusTrap,
@@ -571,7 +576,7 @@ impl std::fmt::Debug for Popover {
             .field("placement", &self.placement)
             .field("hang", &self.hang)
             .field("dismissable", &self.dismissable)
-            .field("open", &self.open)
+            .field("open", &self.is_open())
             .finish()
     }
 }
@@ -588,7 +593,7 @@ impl Popover {
             placement: Placement::Below,
             hang: Hang::Start,
             dismissable: true,
-            open: false,
+            presenting: None,
             pending_focus: false,
             trap: FocusTrap::new(),
         }
@@ -636,8 +641,14 @@ impl Popover {
         self
     }
 
+    /// True while the surface is here or on its way here.
+    ///
+    /// A surface still playing its exit is not open: it takes no keyboard,
+    /// answers no dismissal, and is on screen only because a departure needs
+    /// somewhere to run.
     pub fn is_open(&self) -> bool {
-        self.open
+        self.presenting
+            .is_some_and(|presenting| presenting.is_open())
     }
 
     pub fn is_dismissable(&self) -> bool {
@@ -645,10 +656,13 @@ impl Popover {
     }
 
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.open {
+        if self.is_open() {
             return;
         }
-        self.open = true;
+        let theme = cx.theme().clone();
+        self.presenting
+            .get_or_insert_with(|| Presenting::closed(&theme, MotionRole::MenuEnter))
+            .open();
         self.pending_focus = true;
         self.trap.engage(window, cx);
         cx.emit(PopoverEvent::Opened);
@@ -656,20 +670,26 @@ impl Popover {
     }
 
     /// Closes the surface and gives the keyboard back to the trigger.
+    /// Starts the departure and gives the keyboard back to the trigger. The
+    /// surface stays on screen until the exit finishes, and
+    /// [`PopoverEvent::Closed`] is reported then rather than now — a report
+    /// that the surface is gone while it is still on screen is the one thing a
+    /// host would act on immediately.
     pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.open {
+        if !self.is_open() {
             return;
         }
-        self.open = false;
         self.pending_focus = false;
+        if let Some(presenting) = self.presenting.as_mut() {
+            presenting.close();
+        }
         self.trap.release(window, cx);
         self.trigger_focus.focus(window, cx);
-        cx.emit(PopoverEvent::Closed);
         cx.notify();
     }
 
     pub fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.open {
+        if self.is_open() {
             self.dismiss(window, cx);
         } else {
             self.open(window, cx);
@@ -679,7 +699,7 @@ impl Popover {
     /// Reports a wave-away. A popover that is not dismissable cannot be waved
     /// away even by a host calling this directly.
     pub fn dismiss(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.open || !self.dismissable {
+        if !self.is_open() || !self.dismissable {
             return;
         }
         cx.emit(PopoverEvent::Dismissed);
@@ -692,7 +712,7 @@ impl Popover {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.open || event.keystroke.key.as_str() != "escape" {
+        if !self.is_open() || event.keystroke.key.as_str() != "escape" {
             return;
         }
         self.dismiss(window, cx);
@@ -722,45 +742,67 @@ impl Render for Popover {
             })
             .into_any_element();
 
-        let overlay = self.open.then(|| {
-            if self.pending_focus {
-                // The handle can only take focus once this frame has put it in
-                // the dispatch tree, which is why opening records the intent.
-                self.pending_focus = false;
-                self.focus_handle.focus(window, cx);
-            }
-            let body = self.content.clone().map(|content| content(window, cx));
-            let mut card = surface(&theme, OverlaySurface::FLOATING)
-                .p_token(&theme, Space::Sm)
-                .track_focus(&self.focus_handle);
-            if self.dismissable {
-                card = card
-                    .on_key_down(cx.listener(Self::on_dismiss_key))
-                    .on_mouse_down_out(cx.listener(|popover, _, window, cx| {
-                        popover.dismiss(window, cx);
-                    }));
-            }
-            let card = card.children(body).semantic_in(
-                cx,
-                NodeSpec::new(self.ident.child("surface").semantic_id(), Role::Group)
-                    .parent(self.ident.semantic_id())
-                    .focus(&self.focus_handle),
-            );
-            // Through the shared menu layer, so the surface clears its trigger
-            // by the same air a menu does. Without it a white panel opening
-            // under a white trigger is one shape with a notch in it.
-            menu_overlay(
-                &self.ident,
-                &theme,
-                self.placement,
-                self.hang,
-                card.into_any_element(),
-            )
-        });
+        // The exit runs here, and the surface leaves the tree only once it has
+        // finished. Reporting `Closed` at the moment the reader dismissed it
+        // would tell a host the surface was gone while it was still on screen.
+        let progress = self
+            .presenting
+            .as_mut()
+            .map(|presenting| presenting.animate(window, cx))
+            .unwrap_or_default();
+        if self
+            .presenting
+            .is_some_and(|presenting| presenting.phase() == Phase::Gone)
+        {
+            self.presenting = None;
+            cx.emit(PopoverEvent::Closed);
+        }
+        let overlay = self
+            .presenting
+            .is_some_and(|presenting| presenting.is_rendered())
+            .then(|| {
+                if self.pending_focus {
+                    // The handle can only take focus once this frame has put it in
+                    // the dispatch tree, which is why opening records the intent.
+                    self.pending_focus = false;
+                    self.focus_handle.focus(window, cx);
+                }
+                let body = self.content.clone().map(|content| content(window, cx));
+                let mut card = surface(&theme, OverlaySurface::FLOATING)
+                    .p_token(&theme, Space::Sm)
+                    .track_focus(&self.focus_handle);
+                if self.dismissable {
+                    card = card
+                        .on_key_down(cx.listener(Self::on_dismiss_key))
+                        .on_mouse_down_out(cx.listener(|popover, _, window, cx| {
+                            popover.dismiss(window, cx);
+                        }));
+                }
+                // The arrival and the departure are one appearance played in the
+                // two directions, so a popover leaves the way it came rather than
+                // being switched off.
+                let card = motion::presenting(card, MotionRole::MenuEnter, progress);
+                let card = card.children(body).semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("surface").semantic_id(), Role::Group)
+                        .parent(self.ident.semantic_id())
+                        .focus(&self.focus_handle),
+                );
+                // Through the shared menu layer, so the surface clears its trigger
+                // by the same air a menu does. Without it a white panel opening
+                // under a white trigger is one shape with a notch in it.
+                menu_overlay(
+                    &self.ident,
+                    &theme,
+                    self.placement,
+                    self.hang,
+                    card.into_any_element(),
+                )
+            });
 
         anchored_slot(self.placement, self.hang, trigger, overlay).semantic_in(
             cx,
-            NodeSpec::new(self.ident.semantic_id(), Role::Group).expanded(self.open),
+            NodeSpec::new(self.ident.semantic_id(), Role::Group).expanded(self.is_open()),
         )
     }
 }

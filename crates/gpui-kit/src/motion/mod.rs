@@ -25,6 +25,10 @@
 //!   content, interrupts;
 //! - [`Presence`] keeps an element alive long enough to animate out, and plays
 //!   a phase backwards from where it had got to when the other cancels it;
+//! - [`Presenting`] is that lifecycle wearing one [`MotionRole`], which is
+//!   what a floating surface needs, and [`presenting`] is what it looks like
+//!   partway through — the appearance the `*_in` helpers apply, taken out of
+//!   the one-way timeline that keeps them from running backwards;
 //! - [`Stagger`] spreads one specification across a group, forwards or in
 //!   reverse;
 //! - [`Sequence`] runs specifications one after another and knows how long
@@ -85,12 +89,13 @@ pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use micro::{Micro, MicroMark, MicroMotion, micro};
 pub use policy::{MotionDisposition, MotionPolicy, MotionRole, ResolvedMotion};
-pub use presence::{Phase, Presence};
+pub use presence::{Phase, Presence, Presenting};
 pub use scroll_link::ScrollLink;
 pub use sequence::Sequence;
 pub use spec::{
     MotionSpec, content_in, dialog, dialog_arrival, dialog_in, entrance, fade_in, gradient_opacity,
-    menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, surface_in, tracking,
+    menu, menu_in, presenting, pulse_wave, resize, row_in, shimmer_offset, state_change,
+    surface_in, tracking,
 };
 pub use spring::Spring;
 pub use stagger::{Stagger, StaggerBudget, row_stagger_cap, staggered_phase};

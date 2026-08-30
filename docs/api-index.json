@@ -3319,6 +3319,7 @@
         "placement(placement: Placement) -> Self",
         "hang(hang: Hang) -> Self",
         "scrim(scrim: bool) -> Self",
+        "progress(progress: f32) -> Self",
         "child(content: impl IntoElement) -> Self",
         "on_dismiss(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
@@ -11837,6 +11838,31 @@
         "phase() -> Phase",
         "is_rendered() -> bool",
         "is_animating() -> bool",
+        "progress() -> f32"
+      ]
+    },
+    {
+      "name": "Presenting",
+      "path": "gpui_kit::motion::Presenting",
+      "summary": "A floating surface's whole life, from its arrival to the frame after it is dismissed.",
+      "variants": [],
+      "construct": [
+        "closed(theme: &gpui_kit_theme::Theme, role: super::MotionRole) -> Self",
+        "opened(theme: &gpui_kit_theme::Theme, role: super::MotionRole) -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "open()",
+        "close()",
+        "toggle()",
+        "settle()",
+        "animate(window: &mut Window, cx: &mut App) -> f32",
+        "advance(delta: Duration)"
+      ],
+      "queries": [
+        "is_rendered() -> bool",
+        "is_open() -> bool",
+        "phase() -> Phase",
         "progress() -> f32"
       ]
     },

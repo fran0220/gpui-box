@@ -219,6 +219,49 @@ where
     })
 }
 
+/// How a surface on `role` looks at `progress`, where 0 is absent and 1 is
+/// fully present.
+///
+/// The `*_in` helpers above each own two things: the timeline, and what the
+/// element looks like partway along it. That pairing is why none of them can
+/// run backwards — `with_animation` drives the timeline, and it only goes one
+/// way. This is the second half on its own, taking the progress from wherever
+/// the caller keeps it, which for an overlay is [`Presenting`](super::Presenting).
+///
+/// The appearance is the same one the matching helper produces, so a surface
+/// that departs through this and a surface that arrives through `menu_in` are
+/// the same surface. What it adds is that the departure is the arrival in
+/// reverse: a menu that rose two pixels sinks two pixels back, rather than
+/// vanishing from wherever it was.
+pub fn presenting<E>(element: E, role: MotionRole, progress: f32) -> E
+where
+    E: Styled,
+{
+    let progress = progress.clamp(0.0, 1.0);
+    let away = 1.0 - progress;
+    match role {
+        // A menu answers the action that opened it, so it never fades from
+        // nothing: at zero it is already a third there, which is what makes it
+        // read as arriving rather than as being drawn.
+        MotionRole::MenuEnter => element
+            .relative()
+            .opacity(0.3 + 0.7 * progress)
+            .top(px(-2.0 * away)),
+        // A modal arrives with weight, so it rises further and from nothing.
+        MotionRole::ModalEnter | MotionRole::ModalTransition => {
+            element.relative().opacity(progress).top(px(8.0 * away))
+        }
+        // Content that becomes part of the surface rises a little.
+        MotionRole::Entrance | MotionRole::Navigation => {
+            element.relative().opacity(progress).top(px(4.0 * away))
+        }
+        // Everything else changes only in strength. A rise is a layout input,
+        // and a role that is not about arrival has no business moving the box
+        // underneath whatever is reading it.
+        _ => element.opacity(progress),
+    }
+}
+
 /// The arrival one row of a menu-shaped list makes.
 ///
 /// Opacity only, and deliberately so: a rise is a layout input, so a row that
