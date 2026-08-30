@@ -1951,8 +1951,16 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ),
         ("color.node.edge".into(), color.node.edge.as_str()),
         (
+            "color.node.edgeTarget".into(),
+            color.node.edge_target.as_str(),
+        ),
+        (
             "color.node.edgeActive".into(),
             color.node.edge_active.as_str(),
+        ),
+        (
+            "color.node.edgeFlowHighlight".into(),
+            color.node.edge_flow_highlight.as_str(),
         ),
         (
             "color.node.edgeFeedback".into(),
@@ -1961,6 +1969,22 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         (
             "color.node.edgeFeedbackActive".into(),
             color.node.edge_feedback_active.as_str(),
+        ),
+        (
+            "color.node.auraActive".into(),
+            color.node.aura_active.as_str(),
+        ),
+        (
+            "color.node.auraSuccess".into(),
+            color.node.aura_success.as_str(),
+        ),
+        (
+            "color.node.auraAttention".into(),
+            color.node.aura_attention.as_str(),
+        ),
+        (
+            "color.node.auraDanger".into(),
+            color.node.aura_danger.as_str(),
         ),
         (
             "color.node.labelWash".into(),
@@ -2210,6 +2234,8 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("microWobble", tokens.motion.duration_ms.micro_wobble),
         ("microPop", tokens.motion.duration_ms.micro_pop),
         ("pulse", tokens.motion.duration_ms.pulse),
+        ("nodeAuraPulse", tokens.motion.duration_ms.node_aura_pulse),
+        ("nodeFlow", tokens.motion.duration_ms.node_flow),
         ("shimmer", tokens.motion.duration_ms.shimmer),
         ("toast", tokens.motion.duration_ms.toast),
         ("hoverCardOpen", tokens.motion.duration_ms.hover_card_open),
@@ -2345,6 +2371,38 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         (
             "effect.nodeOverviewVeilAlpha",
             tokens.effect.node_overview_veil_alpha,
+        ),
+        (
+            "effect.nodeAuraRestingAlpha",
+            tokens.effect.node_aura_resting_alpha,
+        ),
+        (
+            "effect.nodeAuraPulseFloorAlpha",
+            tokens.effect.node_aura_pulse_floor_alpha,
+        ),
+        (
+            "effect.nodeAuraPulsePeakAlpha",
+            tokens.effect.node_aura_pulse_peak_alpha,
+        ),
+        (
+            "effect.nodeAuraSettlePeakAlpha",
+            tokens.effect.node_aura_settle_peak_alpha,
+        ),
+        (
+            "effect.nodeAuraSettleExpansion",
+            tokens.effect.node_aura_settle_expansion,
+        ),
+        (
+            "effect.nodeEdgeHoverWidthScale",
+            tokens.effect.node_edge_hover_width_scale,
+        ),
+        (
+            "effect.nodeEdgeSelectedWidthScale",
+            tokens.effect.node_edge_selected_width_scale,
+        ),
+        (
+            "effect.nodeEdgeGlowWidthScale",
+            tokens.effect.node_edge_glow_width_scale,
         ),
         ("effect.railWidth", tokens.effect.rail_width),
         (

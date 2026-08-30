@@ -326,8 +326,14 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     for role in [
         NodeColor::PortConnected,
         NodeColor::PortHover,
+        NodeColor::EdgeTarget,
         NodeColor::EdgeActive,
+        NodeColor::EdgeFlowHighlight,
         NodeColor::EdgeFeedbackActive,
+        NodeColor::AuraActive,
+        NodeColor::AuraSuccess,
+        NodeColor::AuraAttention,
+        NodeColor::AuraDanger,
     ] {
         checks.push(check(
             role.path(),
@@ -883,8 +889,13 @@ pub fn canvas_report(tokens: &TokenDocument) -> Vec<PerceptualCheck> {
     for (left, right) in [
         (NodeColor::PortIdle, NodeColor::PortHover),
         (NodeColor::PortIdle, NodeColor::PortConnected),
+        (NodeColor::Edge, NodeColor::EdgeTarget),
         (NodeColor::Edge, NodeColor::EdgeFeedback),
         (NodeColor::EdgeActive, NodeColor::EdgeFeedbackActive),
+        (NodeColor::AuraActive, NodeColor::AuraSuccess),
+        (NodeColor::AuraSuccess, NodeColor::AuraAttention),
+        (NodeColor::AuraAttention, NodeColor::AuraDanger),
+        (NodeColor::AuraDanger, NodeColor::AuraActive),
     ] {
         checks.push(PerceptualCheck {
             measure: "separation".into(),
@@ -1071,11 +1082,11 @@ mod tests {
         // Twenty-three tones against each of six surfaces, ten code checks
         // against each of the two surfaces code is drawn on, the sixteen ANSI
         // slots against the terminal background, the eight series colours
-        // against each of the three surfaces a chart is drawn on, the four
+        // against each of the three surfaces a chart is drawn on, the ten
         // live canvas roles and the two stackings of an edge label,
         // `onAccent` against `accent`, and the primary fill against each of
         // the six surfaces with its own label over it.
-        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 6 + 1 + 6 + 1);
+        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 12 + 1 + 6 + 1);
     }
 
     /// The primary fill is a role a theme owns, not the prose colour under a
@@ -1415,7 +1426,7 @@ mod tests {
     fn every_shipped_theme_keeps_its_canvas_marks_apart() {
         for tokens in crate::all() {
             let checks = canvas_report(tokens);
-            assert_eq!(checks.len(), 6, "{}", tokens.meta.id);
+            assert_eq!(checks.len(), 11, "{}", tokens.meta.id);
             for check in checks {
                 assert!(check.passes(), "{}: {check:#?}", tokens.meta.id);
             }

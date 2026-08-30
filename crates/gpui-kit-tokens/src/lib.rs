@@ -400,6 +400,22 @@ impl TokenDocument {
                 self.effect.node_overview_veil_alpha,
             ),
             (
+                "effect.nodeAuraRestingAlpha",
+                self.effect.node_aura_resting_alpha,
+            ),
+            (
+                "effect.nodeAuraPulseFloorAlpha",
+                self.effect.node_aura_pulse_floor_alpha,
+            ),
+            (
+                "effect.nodeAuraPulsePeakAlpha",
+                self.effect.node_aura_pulse_peak_alpha,
+            ),
+            (
+                "effect.nodeAuraSettlePeakAlpha",
+                self.effect.node_aura_settle_peak_alpha,
+            ),
+            (
                 "effect.semanticWashFaintAlpha",
                 self.effect.semantic_wash_faint_alpha,
             ),
@@ -492,6 +508,45 @@ impl TokenDocument {
             if !(0.0..=1.0).contains(&value) {
                 return invalid(path, "must be between 0 and 1");
             }
+        }
+
+        for (path, value) in [
+            (
+                "effect.nodeAuraSettleExpansion",
+                self.effect.node_aura_settle_expansion,
+            ),
+            (
+                "effect.nodeEdgeHoverWidthScale",
+                self.effect.node_edge_hover_width_scale,
+            ),
+            (
+                "effect.nodeEdgeSelectedWidthScale",
+                self.effect.node_edge_selected_width_scale,
+            ),
+            (
+                "effect.nodeEdgeGlowWidthScale",
+                self.effect.node_edge_glow_width_scale,
+            ),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return invalid(path, "must be finite and greater than zero");
+            }
+        }
+        if self.effect.node_aura_pulse_floor_alpha
+            > self.effect.node_aura_pulse_peak_alpha
+        {
+            return invalid(
+                "effect.nodeAuraPulseFloorAlpha",
+                "must not exceed effect.nodeAuraPulsePeakAlpha",
+            );
+        }
+        if self.effect.node_edge_hover_width_scale
+            > self.effect.node_edge_selected_width_scale
+        {
+            return invalid(
+                "effect.nodeEdgeHoverWidthScale",
+                "must not exceed effect.nodeEdgeSelectedWidthScale",
+            );
         }
 
         // A flip band that crosses over is a theme asking for the oscillation
@@ -815,9 +870,15 @@ impl TokenDocument {
             NodeColor::PortHover => self.color.node.port_hover.as_str(),
             NodeColor::PortConnected => self.color.node.port_connected.as_str(),
             NodeColor::Edge => self.color.node.edge.as_str(),
+            NodeColor::EdgeTarget => self.color.node.edge_target.as_str(),
             NodeColor::EdgeActive => self.color.node.edge_active.as_str(),
+            NodeColor::EdgeFlowHighlight => self.color.node.edge_flow_highlight.as_str(),
             NodeColor::EdgeFeedback => self.color.node.edge_feedback.as_str(),
             NodeColor::EdgeFeedbackActive => self.color.node.edge_feedback_active.as_str(),
+            NodeColor::AuraActive => self.color.node.aura_active.as_str(),
+            NodeColor::AuraSuccess => self.color.node.aura_success.as_str(),
+            NodeColor::AuraAttention => self.color.node.aura_attention.as_str(),
+            NodeColor::AuraDanger => self.color.node.aura_danger.as_str(),
             NodeColor::LabelWash => self.color.node.label_wash.as_str(),
             NodeColor::Grid => self.color.node.grid.as_str(),
             NodeColor::GridStrong => self.color.node.grid_strong.as_str(),
@@ -1035,6 +1096,8 @@ impl TokenDocument {
             MotionDuration::MicroWobble => self.motion.duration_ms.micro_wobble,
             MotionDuration::MicroPop => self.motion.duration_ms.micro_pop,
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
+            MotionDuration::NodeAuraPulse => self.motion.duration_ms.node_aura_pulse,
+            MotionDuration::NodeFlow => self.motion.duration_ms.node_flow,
             MotionDuration::Shimmer => self.motion.duration_ms.shimmer,
             MotionDuration::Toast => self.motion.duration_ms.toast,
             MotionDuration::HoverCardOpen => self.motion.duration_ms.hover_card_open,
@@ -1308,9 +1371,15 @@ pub enum NodeColor {
     PortHover,
     PortConnected,
     Edge,
+    EdgeTarget,
     EdgeActive,
+    EdgeFlowHighlight,
     EdgeFeedback,
     EdgeFeedbackActive,
+    AuraActive,
+    AuraSuccess,
+    AuraAttention,
+    AuraDanger,
     LabelWash,
     Grid,
     GridStrong,
@@ -1318,15 +1387,21 @@ pub enum NodeColor {
 }
 
 impl NodeColor {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 18] = [
         Self::HeaderWash,
         Self::PortIdle,
         Self::PortHover,
         Self::PortConnected,
         Self::Edge,
+        Self::EdgeTarget,
         Self::EdgeActive,
+        Self::EdgeFlowHighlight,
         Self::EdgeFeedback,
         Self::EdgeFeedbackActive,
+        Self::AuraActive,
+        Self::AuraSuccess,
+        Self::AuraAttention,
+        Self::AuraDanger,
         Self::LabelWash,
         Self::Grid,
         Self::GridStrong,
@@ -1340,9 +1415,15 @@ impl NodeColor {
             Self::PortHover => "color.node.portHover",
             Self::PortConnected => "color.node.portConnected",
             Self::Edge => "color.node.edge",
+            Self::EdgeTarget => "color.node.edgeTarget",
             Self::EdgeActive => "color.node.edgeActive",
+            Self::EdgeFlowHighlight => "color.node.edgeFlowHighlight",
             Self::EdgeFeedback => "color.node.edgeFeedback",
             Self::EdgeFeedbackActive => "color.node.edgeFeedbackActive",
+            Self::AuraActive => "color.node.auraActive",
+            Self::AuraSuccess => "color.node.auraSuccess",
+            Self::AuraAttention => "color.node.auraAttention",
+            Self::AuraDanger => "color.node.auraDanger",
             Self::LabelWash => "color.node.labelWash",
             Self::Grid => "color.node.grid",
             Self::GridStrong => "color.node.gridStrong",
@@ -1582,6 +1663,10 @@ pub enum MotionDuration {
     MicroWobble,
     MicroPop,
     Pulse,
+    /// One breath of a node aura that reports live work.
+    NodeAuraPulse,
+    /// One traversal of traffic from an edge's source to its destination.
+    NodeFlow,
     /// How long a loading placeholder's highlight takes to cross it.
     Shimmer,
     /// How long a transient notification stays before it leaves on its own.
@@ -1600,7 +1685,7 @@ pub enum MotionDuration {
 }
 
 impl MotionDuration {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 23] = [
         Self::Instant,
         Self::Quick,
         Self::Exit,
@@ -1615,6 +1700,8 @@ impl MotionDuration {
         Self::MicroWobble,
         Self::MicroPop,
         Self::Pulse,
+        Self::NodeAuraPulse,
+        Self::NodeFlow,
         Self::Shimmer,
         Self::Toast,
         Self::HoverCardOpen,
@@ -1829,7 +1916,7 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 64] = [
+        let fixed: [(&'static str, &str); 70] = [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),
@@ -1899,12 +1986,21 @@ impl ColorTokens {
             ("color.node.portHover", &self.node.port_hover),
             ("color.node.portConnected", &self.node.port_connected),
             ("color.node.edge", &self.node.edge),
+            ("color.node.edgeTarget", &self.node.edge_target),
             ("color.node.edgeActive", &self.node.edge_active),
+            (
+                "color.node.edgeFlowHighlight",
+                &self.node.edge_flow_highlight,
+            ),
             ("color.node.edgeFeedback", &self.node.edge_feedback),
             (
                 "color.node.edgeFeedbackActive",
                 &self.node.edge_feedback_active,
             ),
+            ("color.node.auraActive", &self.node.aura_active),
+            ("color.node.auraSuccess", &self.node.aura_success),
+            ("color.node.auraAttention", &self.node.aura_attention),
+            ("color.node.auraDanger", &self.node.aura_danger),
             ("color.node.labelWash", &self.node.label_wash),
             ("color.node.grid", &self.node.grid),
             ("color.node.gridStrong", &self.node.grid_strong),
@@ -2040,8 +2136,13 @@ pub struct NodeColors {
     /// an edge drawn at a control boundary's loudness turns the graph into a
     /// mesh.
     pub edge: String,
+    /// The destination end of a resting connection. Its separation from
+    /// `edge` gives even a still route a direction without claiming traffic.
+    pub edge_target: String,
     /// A connection carrying traffic, or under the pointer.
     pub edge_active: String,
+    /// The head of traffic moving from source to destination.
+    pub edge_flow_highlight: String,
     /// A resting return path — work that came back to an earlier step.
     ///
     /// Its own role because a return is a fact about control flow and not a
@@ -2051,6 +2152,14 @@ pub struct NodeColors {
     pub edge_feedback: String,
     /// A return path carrying traffic.
     pub edge_feedback_active: String,
+    /// State colours that may bleed beyond a node card. These are canvas
+    /// roles rather than aliases consumed directly from the semantic palette:
+    /// a theme can tune a blurred colour independently from a text or glyph
+    /// drawn in that semantic family.
+    pub aura_active: String,
+    pub aura_success: String,
+    pub aura_attention: String,
+    pub aura_danger: String,
     /// The chip behind an edge label. Nearly opaque, because the label sits
     /// on the canvas *and* on whatever edge passes under it.
     pub label_wash: String,
@@ -2399,6 +2508,10 @@ pub struct DurationTokens {
     pub micro_wobble: u64,
     pub micro_pop: u64,
     pub pulse: u64,
+    /// One breath of a node aura that reports live work.
+    pub node_aura_pulse: u64,
+    /// One traversal of traffic from an edge's source to its destination.
+    pub node_flow: u64,
     /// How long a loading placeholder's highlight takes to cross it.
     pub shimmer: u64,
     pub toast: u64,
@@ -2541,6 +2654,20 @@ pub struct EffectTokens {
     /// enough that the marks outside the view still read, because saying
     /// where the rest of the graph is, is the whole reason an overview exists.
     pub node_overview_veil_alpha: f32,
+    /// The static and animated intensity ladder for state auras. Values scale
+    /// the shared glow alpha; they never replace the semantic state colour.
+    pub node_aura_resting_alpha: f32,
+    pub node_aura_pulse_floor_alpha: f32,
+    pub node_aura_pulse_peak_alpha: f32,
+    pub node_aura_settle_peak_alpha: f32,
+    /// How much wider a successful outcome begins before it contracts into
+    /// the card and disappears, as a factor of the shared glow blur.
+    pub node_aura_settle_expansion: f32,
+    /// Width multipliers for route emphasis. Hover and selection stay
+    /// distinct from traffic: they change geometry and bloom, not edge state.
+    pub node_edge_hover_width_scale: f32,
+    pub node_edge_selected_width_scale: f32,
+    pub node_edge_glow_width_scale: f32,
     /// How wide an identity rail is, in pixels: a node's category stripe, a
     /// callout's edge.
     ///
@@ -2721,6 +2848,50 @@ mod tests {
             }
             for preset in SpringPreset::ALL {
                 assert_eq!(tokens.spring(preset), reference.spring(preset), "{id}");
+            }
+            for (name, value, expected) in [
+                (
+                    "nodeAuraRestingAlpha",
+                    tokens.effect.node_aura_resting_alpha,
+                    reference.effect.node_aura_resting_alpha,
+                ),
+                (
+                    "nodeAuraPulseFloorAlpha",
+                    tokens.effect.node_aura_pulse_floor_alpha,
+                    reference.effect.node_aura_pulse_floor_alpha,
+                ),
+                (
+                    "nodeAuraPulsePeakAlpha",
+                    tokens.effect.node_aura_pulse_peak_alpha,
+                    reference.effect.node_aura_pulse_peak_alpha,
+                ),
+                (
+                    "nodeAuraSettlePeakAlpha",
+                    tokens.effect.node_aura_settle_peak_alpha,
+                    reference.effect.node_aura_settle_peak_alpha,
+                ),
+                (
+                    "nodeAuraSettleExpansion",
+                    tokens.effect.node_aura_settle_expansion,
+                    reference.effect.node_aura_settle_expansion,
+                ),
+                (
+                    "nodeEdgeHoverWidthScale",
+                    tokens.effect.node_edge_hover_width_scale,
+                    reference.effect.node_edge_hover_width_scale,
+                ),
+                (
+                    "nodeEdgeSelectedWidthScale",
+                    tokens.effect.node_edge_selected_width_scale,
+                    reference.effect.node_edge_selected_width_scale,
+                ),
+                (
+                    "nodeEdgeGlowWidthScale",
+                    tokens.effect.node_edge_glow_width_scale,
+                    reference.effect.node_edge_glow_width_scale,
+                ),
+            ] {
+                assert_eq!(value, expected, "{id} changes effect.{name}");
             }
         }
     }
