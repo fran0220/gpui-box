@@ -10,6 +10,67 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Colour is measured in a space that can see what the reader sees.** The
+contrast report asks whether a paint can be *seen*; nothing asked whether two
+paints can be told from *each other*, and neither the WCAG ratio nor CIE L\*
+can answer that — two colours of equal lightness in different hues are 1:1 by
+ratio and zero apart in L\*. `gpui-box-kit-tokens` gains OKLab and OKLCH with
+`perceptual_distance` and a perceptual `mix`, and three new invariants on the
+categorical scale: every pair separated, the whole scale inside one lightness
+band so it does not read as a ranking, and no slot washed out beside the rest.
+`contrast::canvas_report` holds the node canvas to the same measure. Both
+appearances' series scales are retuned onto one hue walk anchored at the theme
+accent and authored as a `series` palette group; the dark scale's worst pair
+moves from 0.052 to 0.151 and its chroma ratio from 0.36 to 0.72. `TokenError`
+gains `Perceptual`.
+
+**The node canvas stops borrowing paints that mean something else.** A return
+path was drawn in `danger`, so a run that retried once and then succeeded had
+a red line through it forever; a hovered port wore `portConnected`, which says
+an edge is already attached — the one thing the reader is hovering to find
+out; and the canvas had no origin, so a pan reported travel and never arrival.
+`color.node` gains `edgeFeedback`, `edgeFeedbackActive`, `portHover` and
+`gridAxis` in every theme, and `EdgeKind::active_color` resolves the second
+pair.
+
+**The canvas draws its connections, its grid and its ports as they happen.**
+A connection the canvas has not drawn before arrives, drawn from the port it
+leaves to the port it reaches. A traffic trail is four nested strokes that
+accumulate into a head and narrow behind it rather than one flat trim, which
+is a dash with no direction. A connection proposal is dashed while it crosses
+open canvas and solid once it has found a legal port, with a mark at its head.
+The grid climbs by its major interval instead of scaling with the zoom, so the
+interval stays countable at any zoom, and the finest level fades out before it
+is replaced. A node's state crosses over instead of cutting, so a step that
+fails can be watched failing. A frame or a zoom-to travels, with the scale
+moving geometrically; the reader's own drag or wheel is exempt and lands
+exactly. The overview draws the reader's view as a hole in a veil rather than
+a fill, so the part they are looking at is no longer the part hardest to read.
+
+**A departure leaves.** `easing.exit` was byte-identical to `easeOut`, so
+every surface in the library decelerated on its way off screen after the
+reader had already said they were finished with it, and `MotionRole::Exit`
+took the state-change duration, so a menu took longer to leave than to open.
+The curve accelerates now and `motion.durationMs.exit` is its own token at
+120ms. Three invariants hold it: an arrival is more than half done at half its
+time and a departure is less than half done, the exit is no longer than any
+arrival, and the four spring presets stay a ladder with every damping ratio
+inside 0.4 to 1.1. The parity test covers every duration, spring and spacing
+step in all ten themes rather than a sample of two.
+
+**The focus ring is visible on any background.** It was one band in the focus
+paint, which is the same colour as a control of the focus paint's own family
+and invisible on it. It is two bands now — the focus paint nearest the control
+and the text pole outside it at `effect.focusRingCounterAlpha` — so whichever
+background the focused thing is sitting on, one of them is visible. Neither
+band offsets layout.
+
+**`PopoverEvent::Closed` reports when the exit finishes.** It reported at the
+moment the reader dismissed the surface, which told a host the popover was
+gone while it was still on screen; `Drawer` already reported the other way.
+`Popover::is_open` is correspondingly false for the whole departure, which is
+the question a focus trap and an escape binding ask.
+
 **Components now choose why they move, not how long they move.** The public
 `MotionRole` and `MotionPolicy` boundary is the sole mapping from semantic
 entrance, state, resize, tracking, navigation, activity, feedback, and
@@ -217,6 +278,39 @@ count in progress in a filter bar wears the same loading mark as everything
 else that is waiting.
 
 ### Added
+
+**A floating surface has a seat for its own departure.** Every `*_in` helper is
+built on `with_animation`, which runs once and only forwards, and an element
+cannot animate out after it has been dropped from the tree — so a surface built
+on the recipes snapped away, and the two that did not each kept a `Presence` and
+hand-wrote the lifecycle. `motion::Presenting` is that recipe named: the enter
+specification a `MotionRole` carries paired with the library's one exit,
+cancellable in both directions. `motion::presenting` is the appearance those
+helpers apply, taken out of the one-way timeline, so a departure is the arrival
+in reverse. `Overlay::progress` fades the scrim with the surface it belongs to.
+
+**A canvas can name a region of its own world.** `GraphBand`, added through
+`NodeGraph::band`, is a labelled rectangle in the coordinates the nodes are
+placed in, so it pans and zooms with the cards it encloses. `NodeGroup` wraps
+children the *host* laid out, in the host's coordinates, so a host wanting to
+name two rows of a placed graph had to overlay a box and keep it in sync with
+the viewport by hand. A band derives nothing from the cards inside it — which
+nodes belong to a region is a product question — and never intercepts a
+pointer, so marquee selection and node dragging reach through it.
+
+**A canvas toolbar offers only the intents its host can carry out.**
+`CanvasToolbar::actions` names them. The toolbar drew Fit, Snap and Arrange
+unconditionally, so an inspect-only canvas offered two chips it would not
+answer, which is a promise the reader is entitled to believe. The default is
+still all three.
+
+**The theme answers three questions callers were guessing at.**
+`Theme::readable_on` and `readable_over` publish the text-pole choice
+`variant_colors` was making privately, for a caller drawing a paint the theme
+has never seen. `Theme::contrast` exposes the measurement so a host can hold
+its own combinations to the floors the library holds its themes to.
+`Theme::mix` blends two paints perceptually, which is what any crossfade
+between two meanings needs.
 
 **Labels and help now reach the native accessibility relationship graph.**
 Role-bearing GPUI elements can declare labelled-by and described-by in either
