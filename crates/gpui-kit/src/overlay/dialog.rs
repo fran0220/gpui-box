@@ -16,6 +16,7 @@ use gpui_kit_theme::{ActiveTheme, Space};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Ident, StyledExt};
+use crate::motion::{Animated, Entrance};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, OverlaySurface, surface};
 use crate::overlay::panel::{self, Body};
@@ -366,10 +367,13 @@ impl Render for Dialog {
                 .child(panel::seam(&theme))
                 .child(panel::band(&theme).child(actions))
         });
-        let card = card
-            .child(header)
-            .children(body)
-            .children(footer)
+        let card = card.child(header).children(body).children(footer);
+        // The arrival wraps the card inside the element that publishes the
+        // node, so the dialog is announced from its settled box and only the
+        // pixels travel. The id lives under the dialog's own, so closing and
+        // reopening replays the arrival rather than resuming a finished one.
+        let card = div()
+            .child(card.animate_in(self.ident.child("in").element_id(), cx, Entrance::Dialog))
             .semantic_in(cx, spec);
 
         let mut overlay = Overlay::modal(self.ident.child("overlay"))

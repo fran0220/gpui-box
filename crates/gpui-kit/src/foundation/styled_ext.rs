@@ -74,6 +74,18 @@ pub trait StyledExt: Styled + Sized {
         self.text_color(theme.text_color(tone))
     }
 
+    /// The plane a window's content stands on.
+    ///
+    /// Every other surface reads against this one: a panel is a region *of*
+    /// the page, a card is a thing *on* it, and an overlay floats *above* it.
+    /// A page body painted panel collapses that ladder — the first card on it
+    /// has no colour step left to take — so a host names the page's plane
+    /// exactly once, with this, and the surfaces on it keep their footing.
+    fn page(self, theme: &Theme) -> Self {
+        self.surface(theme, Surface::Canvas)
+            .text_tone(theme, TextTone::Primary)
+    }
+
     /// Monospace text that shows exactly the characters it was handed.
     ///
     /// The family alone is not enough. The bundled mono face carries `liga`
@@ -281,6 +293,22 @@ pub trait SelectedRow: Styled + ParentElement + Sized {
                 .rounded_t(width / 2.0)
                 .bg(theme.colors.accent),
         )
+    }
+
+    /// The wash alone, for an option chosen among peers that all stay on
+    /// screen — a swatch, a tile, a segment of a chooser.
+    ///
+    /// The rail has exactly two homes: the reading edge of a collection's
+    /// selected row ([`SelectedRow::selected_row`]) and the bottom edge of a
+    /// selected tab or step ([`SelectedRow::selected_column`]). An option
+    /// grid is neither — every peer remains visible beside the chosen one —
+    /// so the wash says which answer is current, and a rail here would hang
+    /// a collection's mark on something that is not a collection's row.
+    fn selected_option(self, theme: &Theme, selected: bool) -> Self {
+        if !selected {
+            return self;
+        }
+        self.bg(theme.colors.selected)
     }
 }
 

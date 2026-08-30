@@ -25,14 +25,15 @@ use gpui::{
     IntoElement, ParentElement, Render, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, rule};
+use crate::foundation::{Ident, Sizable, StyledExt, rule};
+use crate::overlay::layer::{OverlaySurface, surface};
 use crate::overlay::toast::{self, Toast};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -612,11 +613,14 @@ impl Render for NotificationCenter {
             div().column().w_full().children(rows).into_any_element()
         };
 
-        div()
+        // The centre floats above the window like the toasts it holds, so it
+        // wears the floating overlay recipe rather than an in-page card's. A
+        // header painted as a raised in-page plane put a square-cornered strip
+        // of a third vocabulary on top of it; the title band shares the
+        // surface now and a rule marks where the records begin.
+        surface(&theme, OverlaySurface::FLOATING)
             .id(self.ident.element_id())
-            .column()
             .w_full()
-            .card_surface(&theme, CardVariant::Elevated)
             .child(
                 div()
                     .row()
@@ -624,7 +628,6 @@ impl Render for NotificationCenter {
                     .gap_token(&theme, Space::Sm)
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
-                    .surface(&theme, Surface::Raised)
                     .child(
                         div()
                             .type_scale(&theme, TypeScale::Label)
@@ -635,6 +638,7 @@ impl Render for NotificationCenter {
                     .children(mark_all)
                     .children(clear_all),
             )
+            .child(rule(&theme))
             .child(body)
             .semantic_in(
                 cx,

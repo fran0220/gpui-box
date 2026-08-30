@@ -126,6 +126,8 @@ pub struct List {
     visible_rows: Option<usize>,
     /// Whether the list takes the height of whatever holds it.
     fills: bool,
+    /// Whether the rows fade in as one wave when the list itself arrives.
+    arriving: bool,
     size: ControlSize,
     disabled: bool,
     on_select: Option<SelectHandler>,
@@ -165,6 +167,7 @@ impl List {
             alignment: ListAlignment::Top,
             visible_rows: None,
             fills: false,
+            arriving: false,
             size: ControlSize::Md,
             disabled: false,
             on_select: None,
@@ -252,6 +255,20 @@ impl List {
         self
     }
 
+    /// Fades the rows in as one short wave when the list itself arrives, the
+    /// way a menu's rows arrive.
+    ///
+    /// Off by default, because a row scrolled into a viewport is the same row
+    /// that was always there — so a virtualized window ([`List::fills`],
+    /// [`List::visible_rows`]) ignores this rather than claim rows are
+    /// arriving every time the viewport moves, and so does a reorderable
+    /// list, whose rows are already moving for a better reason. Opacity only,
+    /// exactly as menu rows arrive: no published box moves.
+    pub fn arriving(mut self) -> Self {
+        self.arriving = true;
+        self
+    }
+
     pub fn on_select(
         mut self,
         handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
@@ -333,6 +350,10 @@ impl RenderOnce for List {
         } else {
             ListSizingBehavior::Infer
         };
+        // The wave only runs when every row is laid out with the list, so a
+        // virtualized window never replays it as rows scroll into view.
+        let arriving =
+            (self.arriving && self.visible_rows.is_none() && !self.fills).then_some(count);
         let flowing = self.flowing;
         let rows: AnyElement = if flowing {
             let ident = ident.clone();
@@ -356,6 +377,7 @@ impl RenderOnce for List {
                     None,
                     item,
                     index,
+                    arriving,
                     selected.as_ref(),
                     handler.as_ref(),
                     reorder.as_ref(),
@@ -401,6 +423,7 @@ impl RenderOnce for List {
                                 Some(row_height),
                                 item,
                                 index,
+                                arriving,
                                 selected.as_ref(),
                                 handler.as_ref(),
                                 reorder.as_ref(),
@@ -548,6 +571,8 @@ fn row_element(
     height: Option<f32>,
     item: ListItem,
     index: usize,
+    // The row count, when the list is arriving as one staggered wave.
+    arriving: Option<usize>,
     selected: Option<&SharedString>,
     handler: Option<&SelectHandler>,
     reorder: Option<&Reorder>,
@@ -655,7 +680,13 @@ fn row_element(
             row.make_way(ident.semantic_id(), point(px(0.0), shift), window, cx)
                 .into_any_element()
         }
-        None => row.into_any_element(),
+        None => match arriving {
+            Some(count) => {
+                crate::motion::row_in(ident.child("arrive").element_id(), theme, index, count, row)
+                    .into_any_element()
+            }
+            None => row.into_any_element(),
+        },
     }
 }
 

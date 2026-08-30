@@ -125,6 +125,11 @@ impl std::fmt::Debug for Button {
 }
 
 impl Button {
+    /// A new button carries Primary weight until told otherwise: it is the
+    /// one decision its local area is asking for, so a second action on the
+    /// same surface must say it is [`Button::secondary`] or [`Button::ghost`].
+    /// [`IconButton`] starts Ghost instead, because a bare glyph is almost
+    /// never that one decision.
     pub fn new(ident: impl Into<Ident>) -> Self {
         Self {
             ident: ident.into(),
@@ -659,6 +664,11 @@ fn frame(
 /// address, and there is no sensible default for what a picture means.
 /// Everything else — tone, size, refusal, the action in flight — is
 /// [`Button`]'s behaviour, reused rather than reimplemented.
+///
+/// Where [`Button`] starts Primary, this starts Ghost: a bare glyph is
+/// almost never the one decision an area is asking for, so weight on one is
+/// something a caller opts into rather than something it has to remember to
+/// take away.
 #[derive(IntoElement)]
 pub struct IconButton {
     button: Button,

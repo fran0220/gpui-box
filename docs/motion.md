@@ -48,6 +48,25 @@ different local `if` in every component.
 | `Activity(Activity)` | Advancing, working, or deliberating loops | the activity's shimmer/spin/pulse token |
 | `Micro(Micro)` | Heartbeat, bounce, wobble, pop, or sparkle | the named micro token |
 
+### The product contract
+
+A product asking "what should move here" starts from the event, not from a
+component. One event, one role, one helper; anything not on this list holds
+still.
+
+| The product event | Role | The one call |
+|---|---|---|
+| A page's content replaces what was there | `Entrance` | `animate_in(Entrance::Rise)` / `content_in` |
+| Real content replaces a skeleton or empty stand-in | `StateChange` | `surface_in` (opacity only — the box was already reserved) |
+| A menu or popover answers a click | `MenuEnter` | `animate_in(Entrance::Menu)`; rows via `Stagger::rows` |
+| A dialog takes the page over | `ModalEnter` | `Dialog` carries it; elsewhere `animate_in(Entrance::Dialog)` / `dialog_in` |
+| A list arrives with its surface | `MenuEnter` | `List::arriving` / `animate_in_staggered` |
+| A control answers the pointer on it | `StateChange` | `Pressable`, `animate_change` |
+| A selection or indicator moves between peers | `Tracking` | `Flipping::flip` |
+| A measured value or extent changes | `Resize` | `Transition` |
+| Dismissed content leaves | `Exit` | `Presence` |
+| Work is in flight | `Activity(..)` | the loader family; never a hand-rolled loop |
+
 Downstream components use the same boundary. `Transition` and `Presence`
 already finish immediately for reduced motion, so they take the resolved spec:
 
@@ -89,7 +108,8 @@ component. Anything not listed here does not move.
 | `Spinner`, speaking voice | Arc or bars cycle | `Activity::Working` + repeating timeline | A turn has no endpoint to imply; reduced motion suppresses the timeline. |
 | `EmptyState`, `Callout` | Content fades and rises | `Entrance` + `content_in` | The travel is inside the element that publishes the node, so the published box never moves. |
 | `Card` | Rises on hover, sinks while held | `StateChange` + `HoverLift`/`Pressable` | Only when the card is itself an action. |
-| `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `StateChange` + `Pressable` | Rows get no entrance: a row scrolled into a viewport is the same row that was always there. |
+| `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `StateChange` + `Pressable` | Rows get no entrance by default: a row scrolled into a viewport is the same row that was always there. `List::arriving` opts a fully laid-out list into the menu wave for the moment the whole list is what arrived; a virtualized window ignores it. |
+| `Tooltip` | Arrives as a menu does | `MenuEnter` + `animate_in` | Help answering a hover that has already happened. |
 | `Dialog`, `Drawer` | Arrive on a spring, leave on a curve | `ModalEnter`/`Exit` + `Presence` | Arriving has weight; being dismissed is just gone. |
 | `Toast` | Arrives, exits, and changes stack slot | `MenuEnter`/`Exit` + `Presence`; `Tracking` + FLIP | The slot slides, not the card, because the card already carries its own arrival. |
 | `Carousel`, `Calendar`, virtualized glide | Page, month, or viewport travels | `Navigation` + `Transition`/`Glide` | Travel preserves the reader's direction and place. |
@@ -101,7 +121,7 @@ component. Anything not listed here does not move.
 | Drag ghost and make-way slots | Ghost/slot follows a moving target | `Tracking` + `spring.grab` | Pointer-owned movement remains attached and settles coherently. |
 | `ScrollArea` | Top shadow fades in once the content is off the top | `ScrollLink` | A function of the offset rather than of a clock, so it never animates on its own and asks for no frames. |
 
-Deliberately still: `Tooltip`, `Badge`, `Tag` (the body of it), `Breadcrumb`,
+Deliberately still: `Badge`, `Tag` (the body of it), `Breadcrumb`,
 `Divider`, `Avatar`, `Kbd`, the split divider, and every scrim. A drag handle
 in particular gets no press response, because a handle that sank under the
 pointer would fight the drag it exists to serve.

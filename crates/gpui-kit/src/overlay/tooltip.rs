@@ -13,10 +13,11 @@ use gpui::{
     SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
+use gpui_kit_theme::{ActiveTheme, Space};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::{Animated, Entrance};
+use crate::overlay::layer::{OverlaySurface, surface};
 use crate::overlay::tail::{TailSide, tail};
 
 /// A themed help surface.
@@ -75,16 +76,16 @@ impl RenderOnce for Tooltip {
                     .child(tail(&theme, TailSide::Up, theme.colors.overlay)),
             )
             .child(
-                div()
+                // The one floating recipe, same as a menu or a toast: a
+                // tooltip that kept its own radius was a second vocabulary
+                // for the same detached plane.
+                surface(&theme, OverlaySurface::FLOATING)
                     .max_w(px(260.0))
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
-                    .radius(&theme, Radius::Small)
-                    .frame(&theme, Surface::Overlay, Elevation::Overlay)
                     .text_size(px(theme.typography.label.size))
                     .line_height(px(theme.typography.label.line_height))
                     .font_fallbacks(gpui_kit_assets::text_fallbacks())
-                    .text_color(theme.colors.text)
                     .child(self.text.clone()),
             );
 

@@ -40,8 +40,7 @@ pub(super) fn stack(theme: &Theme) -> gpui::Div {
         .column()
         .gap(px(theme.spacing.md))
         .p(px(theme.spacing.lg))
-        .bg(theme.colors.canvas)
-        .text_color(theme.colors.text)
+        .page(theme)
         .font_family(theme.typography.sans.clone())
 }
 

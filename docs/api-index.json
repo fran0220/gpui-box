@@ -2587,6 +2587,7 @@
         "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "visible_rows(rows: usize) -> Self",
         "fills() -> Self",
+        "arriving() -> Self",
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
