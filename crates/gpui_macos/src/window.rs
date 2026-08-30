@@ -10,10 +10,10 @@ use block::ConcreteBlock;
 use cocoa::{
     appkit::{
         NSApplication, NSBackingStoreBuffered, NSColor, NSEvent, NSEventModifierFlags, NSEventType,
-        NSFilenamesPboardType, NSPasteboard, NSRequestUserAttentionType, NSScreen, NSView,
-        NSViewHeightSizable, NSViewWidthSizable, NSVisualEffectMaterial, NSVisualEffectState,
-        NSVisualEffectView, NSWindow, NSWindowCollectionBehavior, NSWindowOcclusionState,
-        NSWindowOrderingMode, NSWindowStyleMask, NSWindowTitleVisibility,
+        NSFilenamesPboardType, NSMenu, NSMenuItem, NSPasteboard, NSRequestUserAttentionType,
+        NSScreen, NSView, NSViewHeightSizable, NSViewWidthSizable, NSVisualEffectMaterial,
+        NSVisualEffectState, NSVisualEffectView, NSWindow, NSWindowCollectionBehavior,
+        NSWindowOcclusionState, NSWindowOrderingMode, NSWindowStyleMask, NSWindowTitleVisibility,
     },
     base::{id, nil},
     foundation::{
@@ -24,14 +24,15 @@ use cocoa::{
 };
 use dispatch2::DispatchQueue;
 use gpui::{
-    AnyWindowHandle, BackgroundExecutor, Bounds, Capslock, CursorStyle, ExternalDragPayload,
-    ExternalDropEvent, ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke,
-    Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler,
-    PlatformViewHandle, PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point,
-    PromptButton, PromptLevel, RequestFrameOptions, SharedString, Size, SystemWindowTab,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind,
-    WindowParams, flip_bounds_origin_y, platform_view_content_origin, point, px, size,
+    Action, AnyWindowHandle, BackgroundExecutor, Bounds, Capslock, CursorStyle,
+    ExternalDragPayload, ExternalDropEvent, ExternalPaths, FileDropEvent, ForegroundExecutor,
+    KeyDownEvent, Keystroke, Menu, MenuItem, Modifiers, ModifiersChangedEvent, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, NativeMenuNotSupportedError, Pixels,
+    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
+    PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel,
+    RequestFrameOptions, SharedString, Size, SystemWindowTab, WindowAppearance,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams,
+    flip_bounds_origin_y, platform_view_content_origin, point, px, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -83,6 +84,9 @@ static mut PANEL_CLASS: *const Class = ptr::null();
 static mut VIEW_CLASS: *const Class = ptr::null();
 static mut OVERLAY_VIEW_CLASS: *const Class = ptr::null();
 static mut BLURRED_VIEW_CLASS: *const Class = ptr::null();
+static mut CONTEXT_MENU_TARGET_CLASS: *const Class = ptr::null();
+
+const CONTEXT_MENU_SELECTION_IVAR: &str = "selectedContextMenuItem";
 
 #[allow(non_upper_case_globals)]
 const NSWindowStyleMaskNonactivatingPanel: NSWindowStyleMask =
@@ -134,6 +138,13 @@ extern "C" fn handle_overlay_event(this: &Object, selector: Sel, native_event: i
     let native_view = window_state.lock().native_view;
     unsafe {
         handle_view_event(native_view.as_ref(), selector, native_event);
+    }
+}
+
+extern "C" fn context_menu_item_clicked(this: &mut Object, _: Sel, sender: id) {
+    unsafe {
+        let tag: NSInteger = msg_send![sender, tag];
+        *this.get_mut_ivar(CONTEXT_MENU_SELECTION_IVAR) = tag;
     }
 }
 
@@ -376,6 +387,17 @@ unsafe fn build_classes() {
             decl.add_method(
                 sel!(updateLayer),
                 blurred_view_update_layer as extern "C" fn(&Object, Sel),
+            );
+            decl.register()
+        };
+
+        CONTEXT_MENU_TARGET_CLASS = {
+            let mut decl = ClassDecl::new("GPUIContextMenuTarget", class!(NSObject))
+                .expect("required framework invariant must hold");
+            decl.add_ivar::<NSInteger>(CONTEXT_MENU_SELECTION_IVAR);
+            decl.add_method(
+                sel!(contextMenuItemClicked:),
+                context_menu_item_clicked as extern "C" fn(&mut Object, Sel, id),
             );
             decl.register()
         };
@@ -1352,6 +1374,94 @@ fn if_window_not_closed(closed: Arc<AtomicBool>, f: impl FnOnce()) {
     }
 }
 
+unsafe fn run_context_menu(
+    native_view: id,
+    menu: Menu,
+    position: Point<Pixels>,
+) -> Option<Box<dyn Action>> {
+    unsafe {
+        let pool = NSAutoreleasePool::new(nil);
+        let target: id = msg_send![CONTEXT_MENU_TARGET_CLASS, new];
+        (*target).set_ivar(CONTEXT_MENU_SELECTION_IVAR, -1_isize);
+
+        let mut actions = Vec::new();
+        let native_menu = build_context_menu(&menu, target, &mut actions);
+        let frame = NSView::bounds(native_view);
+        let location = NSPoint::new(position.x.to_f64(), frame.size.height - position.y.to_f64());
+        let _: BOOL = msg_send![
+            native_menu,
+            popUpMenuPositioningItem: nil
+            atLocation: location
+            inView: native_view
+        ];
+
+        let selected: NSInteger = *(*target).get_ivar(CONTEXT_MENU_SELECTION_IVAR);
+        let action = usize::try_from(selected)
+            .ok()
+            .and_then(|index| actions.get(index))
+            .map(|action: &&Box<dyn Action>| action.boxed_clone());
+        let _: () = msg_send![target, release];
+        pool.drain();
+        action
+    }
+}
+
+unsafe fn build_context_menu<'a>(
+    menu: &'a Menu,
+    target: id,
+    actions: &mut Vec<&'a Box<dyn Action>>,
+) -> id {
+    unsafe {
+        let native_menu = NSMenu::new(nil).autorelease();
+        native_menu.setAutoenablesItems(NO);
+
+        for item in &menu.items {
+            match item {
+                MenuItem::Separator => {
+                    native_menu.addItem_(NSMenuItem::separatorItem(nil));
+                }
+                MenuItem::Action {
+                    name,
+                    action,
+                    checked,
+                    disabled,
+                    ..
+                } => {
+                    let native_item = NSMenuItem::alloc(nil)
+                        .initWithTitle_action_keyEquivalent_(
+                            ns_string(name),
+                            sel!(contextMenuItemClicked:),
+                            ns_string(""),
+                        )
+                        .autorelease();
+                    native_item.setEnabled_(if *disabled { NO } else { YES });
+                    if *checked {
+                        native_item.setState_(NSVisualEffectState::Active);
+                    }
+                    if !*disabled {
+                        let tag = actions.len() as NSInteger;
+                        let _: () = msg_send![native_item, setTag: tag];
+                        native_item.setTarget_(target);
+                        actions.push(action);
+                    }
+                    native_menu.addItem_(native_item);
+                }
+                MenuItem::Submenu(submenu) => {
+                    let native_item = NSMenuItem::new(nil).autorelease();
+                    let native_submenu = build_context_menu(submenu, target, actions);
+                    let _: () = msg_send![native_item, setTitle: ns_string(&submenu.name)];
+                    native_item.setEnabled_(if submenu.disabled { NO } else { YES });
+                    native_item.setSubmenu_(native_submenu);
+                    native_menu.addItem_(native_item);
+                }
+                MenuItem::SystemMenu(_) => {}
+            }
+        }
+
+        native_menu
+    }
+}
+
 impl PlatformWindow for MacWindow {
     fn bounds(&self) -> Bounds<Pixels> {
         self.0.as_ref().lock().bounds()
@@ -1758,6 +1868,29 @@ impl PlatformWindow for MacWindow {
                 }
             })
             .detach();
+    }
+
+    fn show_context_menu(
+        &self,
+        menu: Menu,
+        position: Point<Pixels>,
+    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
+    {
+        let (executor, native_view) = {
+            let state = self.0.lock();
+            (
+                state.foreground_executor.clone(),
+                state.native_view.as_ptr() as usize,
+            )
+        };
+        let (sender, receiver) = oneshot::channel();
+        executor
+            .spawn(async move {
+                let action = unsafe { run_context_menu(native_view as id, menu, position) };
+                sender.send(action).ok();
+            })
+            .detach();
+        Ok(receiver)
     }
 
     fn minimize(&self) {

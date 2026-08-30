@@ -2781,6 +2781,44 @@ impl Window {
         self.platform_window.show_window_menu(position)
     }
 
+    /// Presents `menu` as an operating-system context menu at a position in
+    /// this window's logical coordinate space.
+    ///
+    /// The native tracking loop begins after the current GPUI callback has
+    /// returned. Selection dispatches the item's [`Action`] through the focus
+    /// context captured here, then resolves the returned task. Dismissal
+    /// resolves without dispatch. Platforms without this capability return
+    /// [`crate::NativeMenuNotSupportedError`], allowing a component to keep
+    /// its in-window menu as the fallback.
+    pub fn show_context_menu(
+        &mut self,
+        menu: crate::Menu,
+        position: Point<Pixels>,
+        cx: &mut App,
+    ) -> std::result::Result<Task<crate::NativeMenuOutcome>, crate::NativeMenuNotSupportedError>
+    {
+        let result = self.platform_window.show_context_menu(menu, position)?;
+        let focus_id = self.focused(cx).map(|handle| handle.id);
+        let handle = self.handle;
+
+        Ok(cx.spawn(async move |cx| {
+            let action = result.await.ok().flatten();
+            if let Some(action) = action {
+                handle
+                    .update(cx, |_, window, cx| {
+                        let node_id = window.focus_node_id_in_rendered_frame(focus_id);
+                        window.dispatch_action_on_node(node_id, action.as_ref(), cx);
+                        window.refresh();
+                    })
+                    .log_err();
+                crate::NativeMenuOutcome::Selected
+            } else {
+                handle.update(cx, |_, window, _| window.refresh()).log_err();
+                crate::NativeMenuOutcome::Dismissed
+            }
+        }))
+    }
+
     /// Handle window movement for Linux and macOS.
     /// Tells the compositor to take control of window movement (Wayland and X11)
     ///

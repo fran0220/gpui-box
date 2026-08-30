@@ -1,4 +1,5 @@
 use crate::{Action, App, Platform, SharedString};
+use thiserror::Error;
 
 /// A menu of the application, either a main menu or a submenu
 pub struct Menu {
@@ -243,6 +244,29 @@ pub struct OwnedMenu {
     pub disabled: bool,
 }
 
+/// How a platform-native context menu finished.
+///
+/// The selected action is dispatched through the focus context that was
+/// active when the menu opened before [`Selected`](Self::Selected) is
+/// reported.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum NativeMenuOutcome {
+    /// The user selected an enabled action.
+    Selected,
+    /// The menu closed without selecting an action.
+    Dismissed,
+}
+
+/// Returned when the current platform cannot present application-provided
+/// context menus through the operating system.
+///
+/// This is a capability result, not a presentation failure. Components that
+/// work on every platform should use it as the signal to draw their existing
+/// in-window menu instead.
+#[derive(Debug, Error)]
+#[error("native context menus are not supported on this platform")]
+pub struct NativeMenuNotSupportedError;
+
 /// The different kinds of items that can be in a menu
 pub enum OwnedMenuItem {
     /// A separator between items
@@ -357,7 +381,25 @@ pub(crate) fn init_app_menus(platform: &dyn Platform, cx: &App) {
 
 #[cfg(test)]
 mod tests {
-    use crate::Menu;
+    use crate::{
+        Context, FocusHandle, InteractiveElement, IntoElement, Menu, Point, Render, TestAppContext,
+        Window, div, point, px,
+    };
+
+    crate::actions!(native_menu_test, [Choose]);
+
+    struct NativeMenuTarget {
+        focus: FocusHandle,
+        chose: bool,
+    }
+
+    impl Render for NativeMenuTarget {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .track_focus(&self.focus)
+                .on_action(cx.listener(|target, _: &Choose, _, _| target.chose = true))
+        }
+    }
 
     #[test]
     fn test_menu() {
@@ -419,5 +461,40 @@ mod tests {
         );
         assert!(!submenu.is_checked());
         assert!(submenu.is_disabled());
+    }
+
+    #[gpui::test]
+    fn native_context_menu_dispatches_in_the_captured_focus_context(cx: &mut TestAppContext) {
+        let window = cx.add_window(|_, cx| NativeMenuTarget {
+            focus: cx.focus_handle(),
+            chose: false,
+        });
+        let any_window = *window;
+        cx.set_native_context_menus_supported(any_window, true);
+
+        window
+            .update(cx, |target, window, cx| {
+                target.focus.focus(window, cx);
+                window
+                    .show_context_menu(
+                        Menu::new("Actions").items([crate::MenuItem::action("Choose", Choose)]),
+                        point(px(42.0), px(73.0)),
+                        cx,
+                    )
+                    .expect("test platform should support native menus")
+                    .detach();
+            })
+            .expect("test window should remain open");
+
+        assert_eq!(
+            cx.pending_context_menu_position(any_window),
+            Some(Point::new(px(42.0), px(73.0)))
+        );
+        cx.select_context_menu_item(any_window, &[0]);
+        cx.run_until_parked();
+
+        window
+            .update(cx, |target, _, _| assert!(target.chose))
+            .expect("test window should remain open");
     }
 }

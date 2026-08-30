@@ -405,6 +405,30 @@ impl TestAppContext {
         self.test_window(window_handle).simulate_resize(size);
     }
 
+    /// Controls whether the test window accepts platform-native context menus.
+    /// Test windows default to unsupported so component fallback rendering is
+    /// exercised unless a test opts into the native contract.
+    pub fn set_native_context_menus_supported(&self, window: AnyWindowHandle, supported: bool) {
+        self.test_window(window)
+            .set_native_context_menus_supported(supported);
+    }
+
+    /// Returns the logical window position of the pending native context menu.
+    pub fn pending_context_menu_position(&self, window: AnyWindowHandle) -> Option<Point<Pixels>> {
+        self.test_window(window).pending_context_menu_position()
+    }
+
+    /// Simulates choosing one native context-menu item by its recursive index
+    /// path, for example `[2, 0]` for the first item of the third submenu.
+    pub fn select_context_menu_item(&self, window: AnyWindowHandle, path: &[usize]) {
+        self.test_window(window).select_context_menu_item(path);
+    }
+
+    /// Simulates closing the pending native context menu without a selection.
+    pub fn dismiss_context_menu(&self, window: AnyWindowHandle) {
+        self.test_window(window).dismiss_context_menu();
+    }
+
     /// Returns true if there's an alert dialog open.
     pub fn expect_restart(&self) -> oneshot::Receiver<Option<PathBuf>> {
         let (tx, rx) = futures::channel::oneshot::channel();

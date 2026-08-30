@@ -620,6 +620,105 @@ impl Drop for WindowsWindow {
     }
 }
 
+fn run_context_menu(
+    hwnd: HWND,
+    menu: Menu,
+    position: Point<Pixels>,
+    scale_factor: f32,
+) -> Option<Box<dyn Action>> {
+    unsafe {
+        let mut actions = Vec::new();
+        let native_menu = build_context_menu(&menu, &mut actions)?;
+        let mut screen_position = POINT {
+            x: (position.x.as_f32() * scale_factor).round() as i32,
+            y: (position.y.as_f32() * scale_factor).round() as i32,
+        };
+        if ClientToScreen(hwnd, &mut screen_position).is_err() {
+            DestroyMenu(native_menu).ok();
+            return None;
+        }
+        let _ = SetForegroundWindow(hwnd);
+        let flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY;
+        let selected = TrackPopupMenuEx(
+            native_menu,
+            flags.0,
+            screen_position.x,
+            screen_position.y,
+            hwnd,
+            None,
+        );
+        DestroyMenu(native_menu).ok();
+
+        usize::try_from(selected.0)
+            .ok()
+            .and_then(|id| id.checked_sub(1))
+            .and_then(|index| actions.get(index))
+            .map(|action: &&Box<dyn Action>| action.boxed_clone())
+    }
+}
+
+unsafe fn build_context_menu<'a>(
+    menu: &'a Menu,
+    actions: &mut Vec<&'a Box<dyn Action>>,
+) -> Option<HMENU> {
+    unsafe {
+        let native_menu = CreatePopupMenu().ok()?;
+        for item in &menu.items {
+            match item {
+                MenuItem::Separator => {
+                    AppendMenuW(native_menu, MF_SEPARATOR, 0, PCWSTR::null()).ok();
+                }
+                MenuItem::Action {
+                    name,
+                    action,
+                    checked,
+                    disabled,
+                    ..
+                } => {
+                    let mut flags = MF_STRING;
+                    if *checked {
+                        flags |= MF_CHECKED;
+                    }
+                    if *disabled {
+                        flags |= MF_GRAYED;
+                    }
+                    let id = if *disabled {
+                        0
+                    } else {
+                        actions.push(action);
+                        actions.len()
+                    };
+                    let label: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+                    AppendMenuW(native_menu, flags, id, PCWSTR(label.as_ptr())).ok();
+                }
+                MenuItem::Submenu(submenu) => {
+                    let Some(native_submenu) = build_context_menu(submenu, actions) else {
+                        continue;
+                    };
+                    let mut flags = MF_POPUP;
+                    if submenu.disabled {
+                        flags |= MF_GRAYED;
+                    }
+                    let label: Vec<u16> = submenu
+                        .name
+                        .encode_utf16()
+                        .chain(std::iter::once(0))
+                        .collect();
+                    AppendMenuW(
+                        native_menu,
+                        flags,
+                        native_submenu.0 as usize,
+                        PCWSTR(label.as_ptr()),
+                    )
+                    .ok();
+                }
+                MenuItem::SystemMenu(_) => {}
+            }
+        }
+        Some(native_menu)
+    }
+}
+
 impl PlatformWindow for WindowsWindow {
     fn bounds(&self) -> Bounds<Pixels> {
         self.state.bounds()
@@ -664,6 +763,25 @@ impl PlatformWindow for WindowsWindow {
                 }
             })
             .detach();
+    }
+
+    fn show_context_menu(
+        &self,
+        menu: Menu,
+        position: Point<Pixels>,
+    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
+    {
+        let hwnd = self.0.hwnd;
+        let scale_factor = self.scale_factor();
+        let executor = self.0.executor.clone();
+        let (sender, receiver) = oneshot::channel();
+        executor
+            .spawn(async move {
+                let action = run_context_menu(hwnd, menu, position, scale_factor);
+                sender.send(action).ok();
+            })
+            .detach();
+        Ok(receiver)
     }
 
     fn scale_factor(&self) -> f32 {

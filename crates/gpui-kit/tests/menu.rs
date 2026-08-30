@@ -630,6 +630,64 @@ fn a_right_click_opens_the_menu_at_the_pointer_and_reports_the_target(cx: &mut T
 }
 
 #[gpui::test]
+fn native_context_menu_dispatches_and_reports_native_dismissal(cx: &mut TestAppContext) {
+    let (mut harness, menu) = context_menu(cx);
+    let seen = context_events(&mut harness, &menu);
+    let window = harness.window();
+    harness
+        .context()
+        .set_native_context_menus_supported(window, true);
+
+    let position = harness.point_in("records.row");
+    harness.context().simulate_event(MouseDownEvent {
+        button: MouseButton::Right,
+        position,
+        modifiers: Modifiers::none(),
+        click_count: 1,
+        first_mouse: false,
+    });
+    harness.context().run_until_parked();
+
+    assert_eq!(
+        harness.context().pending_context_menu_position(window),
+        Some(position)
+    );
+    assert!(
+        harness.node("records.row.menu").is_none(),
+        "the OS owns native presentation rather than duplicating it in-window"
+    );
+    harness.context().select_context_menu_item(window, &[1]);
+    harness.context().run_until_parked();
+    assert_eq!(
+        *seen.borrow(),
+        vec![
+            ContextMenuEvent::Opened("record-a04".into()),
+            ContextMenuEvent::Invoked("undo".into()),
+            ContextMenuEvent::Closed,
+        ]
+    );
+
+    harness.update({
+        let menu = menu.clone();
+        move |window, cx| {
+            menu.update(cx, |menu, cx| {
+                menu.open_at(gpui::point(px(180.0), px(140.0)), window, cx);
+            });
+        }
+    });
+    harness.context().dismiss_context_menu(window);
+    harness.context().run_until_parked();
+    assert_eq!(
+        &seen.borrow()[3..],
+        &[
+            ContextMenuEvent::Opened("record-a04".into()),
+            ContextMenuEvent::Dismissed,
+            ContextMenuEvent::Closed,
+        ]
+    );
+}
+
+#[gpui::test]
 fn a_context_menu_reports_the_command_and_closes(cx: &mut TestAppContext) {
     let (mut harness, menu) = context_menu(cx);
     let seen = context_events(&mut harness, &menu);

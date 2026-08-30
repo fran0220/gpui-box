@@ -23,10 +23,10 @@ history. It does not contact either historical source repository.
 
 | Platform | Current repository contract | Validation command/evidence | Limits |
 |---|---|---|---|
-| macOS | Framework, kit, Metal, clipped and paint-ordered native views, native AVFoundation audio/video playback, and deterministic headless catalog | CI runs native media load/control/replacement/teardown tests, the all-feature native check, and `cargo run -p xtask -- headless check`; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility needs a logged-in host |
-| Windows | Framework/kit, paint-ordered custom caption controls and native drag/resize behavior, re-entrant native frame-request deferral, clipped and paint-ordered native views, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | CI runs framework input tests, native UIA editing/focus/character/caret/form-description/menu-action smoke, native media replacement/teardown/COM/MF-lifetime and truthful no-backend tests on its audio-less hosted runner, the all-feature native check, and `cargo run -p xtask -- headless check`; release acceptance additionally exercises real-window caption controls and borders plus media load/control/end/restart on an equipped Windows host; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; native frame capture is not implemented |
-| Linux | Wayland/X11 framework code and an all-feature native check | CI runs the all-feature native check. Headless pixel comparison is not a Linux gate; `snapshots/headless/linux` is retired | Native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
-| Browser/WASM | Stable, single-threaded browser gallery, hosted compose surface, and lazy catalog embeds using the same Rust scenes | CI runs `web check` and the real Chromium gallery/site smoke; the visual command remains available for scoped review | Native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
+| macOS | Framework, kit, Metal, native action context menus, clipped and paint-ordered native views, native AVFoundation audio/video playback, and deterministic headless catalog | CI runs native media load/control/replacement/teardown tests, the all-feature native check, and `cargo run -p xtask -- headless check`; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility and context-menu presentation need a logged-in host |
+| Windows | Framework/kit, native action context menus, paint-ordered custom caption controls and native drag/resize behavior, re-entrant native frame-request deferral, clipped and paint-ordered native views, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | CI runs framework input tests, native UIA editing/focus/character/caret/form-description/menu-action smoke, native media replacement/teardown/COM/MF-lifetime and truthful no-backend tests on its audio-less hosted runner, the all-feature native check, and `cargo run -p xtask -- headless check`; release acceptance additionally exercises real-window caption controls and borders plus media load/control/end/restart on an equipped Windows host; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; native frame capture is not implemented |
+| Linux | Wayland/X11 framework code and an all-feature native check | CI runs the all-feature native check. Headless pixel comparison is not a Linux gate; `snapshots/headless/linux` is retired | Application context menus use Kit's in-window fallback; native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
+| Browser/WASM | Stable, single-threaded browser gallery, hosted compose surface, and lazy catalog embeds using the same Rust scenes | CI runs `web check` and the real Chromium gallery/site smoke; the visual command remains available for scoped review | Application context menus use Kit's in-window fallback; native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
 
 All four rows are mandatory CI surfaces. A release may claim only results
 recorded for its commit; the commands do not erase the explicit limitations in
@@ -83,6 +83,16 @@ with the active mask before AccessKit publication; a fully shut subtree is not
 prepainted or published. `Reveal` owns no timer, easing, or component policy.
 Kit's Accordion and Collapsible resolve semantic `Resize` motion and pass only
 the resulting progress into this framework primitive.
+
+Application-provided native context menus use the framework's existing
+`Menu`/`MenuItem` action tree rather than a platform-specific component model.
+macOS maps it to `NSMenu`; Windows maps it to `HMENU` and
+`TrackPopupMenuEx`. Both run their blocking tracking loop only after GPUI's
+current borrow has yielded, then dispatch the selected action through the
+focus context captured at open time. The explicit unsupported result keeps
+Linux, browser, headless, and other platforms on Kit's accessible in-window
+`ContextMenu`; `ContextMenuPresentation::InWindow` also lets a host force that
+portable rendering on a native-capable platform.
 
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the

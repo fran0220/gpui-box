@@ -946,6 +946,21 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     }
     fn request_decorations(&self, _decorations: WindowDecorations) {}
     fn show_window_menu(&self, _position: Point<Pixels>) {}
+    /// Presents an application-provided context menu using the operating
+    /// system and resolves with the selected action, or `None` on dismissal.
+    ///
+    /// Implementations must run a blocking native tracking loop only after the
+    /// current GPUI call stack has yielded. Coordinates are window-relative
+    /// logical pixels. Unsupported platforms return
+    /// [`NativeMenuNotSupportedError`] so the component can render in-window.
+    fn show_context_menu(
+        &self,
+        _menu: Menu,
+        _position: Point<Pixels>,
+    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
+    {
+        Err(NativeMenuNotSupportedError)
+    }
     fn start_window_move(&self) {}
     fn can_start_external_drag(&self) -> bool {
         false

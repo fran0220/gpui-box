@@ -1,9 +1,10 @@
 use crate::{
-    A11yCallbacks, AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds, DevicePixels,
-    DispatchEventResult, GpuSpecs, Pixels, PlatformAtlas, PlatformDisplay,
-    PlatformHeadlessRenderer, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, RequestFrameOptions, Scene, Size, TestPlatform, TileId, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowParams,
+    A11yCallbacks, Action, AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds,
+    DevicePixels, DispatchEventResult, GpuSpecs, Menu, MenuItem, NativeMenuNotSupportedError,
+    Pixels, PlatformAtlas, PlatformDisplay, PlatformHeadlessRenderer, PlatformInput,
+    PlatformInputHandler, PlatformWindow, Point, PromptButton, RequestFrameOptions, Scene, Size,
+    TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+    WindowControlArea, WindowParams,
 };
 use collections::HashMap;
 use gpui_util::ResultExt as _;
@@ -46,6 +47,14 @@ pub(crate) struct TestWindowState {
     start_external_drag_result: bool,
     scene_overlay_supported: bool,
     subpixel_rendering_supported: bool,
+    native_context_menus_supported: bool,
+    pending_context_menu: Option<PendingContextMenu>,
+}
+
+struct PendingContextMenu {
+    menu: Menu,
+    position: Point<Pixels>,
+    result: futures::channel::oneshot::Sender<Option<Box<dyn Action>>>,
 }
 
 #[derive(Clone)]
@@ -107,7 +116,42 @@ impl TestWindow {
             start_external_drag_result: false,
             scene_overlay_supported: false,
             subpixel_rendering_supported: false,
+            native_context_menus_supported: false,
+            pending_context_menu: None,
         })))
+    }
+
+    pub(crate) fn set_native_context_menus_supported(&self, supported: bool) {
+        self.0.lock().native_context_menus_supported = supported;
+    }
+
+    pub(crate) fn pending_context_menu_position(&self) -> Option<Point<Pixels>> {
+        self.0
+            .lock()
+            .pending_context_menu
+            .as_ref()
+            .map(|menu| menu.position)
+    }
+
+    pub(crate) fn select_context_menu_item(&self, path: &[usize]) {
+        let pending = self
+            .0
+            .lock()
+            .pending_context_menu
+            .take()
+            .expect("test should have an open native context menu");
+        let action = take_action(pending.menu.items, path);
+        pending.result.send(action).ok();
+    }
+
+    pub(crate) fn dismiss_context_menu(&self) {
+        let pending = self
+            .0
+            .lock()
+            .pending_context_menu
+            .take()
+            .expect("test should have an open native context menu");
+        pending.result.send(None).ok();
     }
 
     pub fn simulate_resize(&mut self, size: Size<Pixels>) {
@@ -470,6 +514,27 @@ impl PlatformWindow for TestWindow {
         unimplemented!()
     }
 
+    fn show_context_menu(
+        &self,
+        menu: Menu,
+        position: Point<Pixels>,
+    ) -> std::result::Result<
+        futures::channel::oneshot::Receiver<Option<Box<dyn Action>>>,
+        NativeMenuNotSupportedError,
+    > {
+        let mut state = self.0.lock();
+        if !state.native_context_menus_supported {
+            return Err(NativeMenuNotSupportedError);
+        }
+        let (result, receiver) = futures::channel::oneshot::channel();
+        state.pending_context_menu = Some(PendingContextMenu {
+            menu,
+            position,
+            result,
+        });
+        Ok(receiver)
+    }
+
     fn start_window_move(&self) {
         unimplemented!()
     }
@@ -492,6 +557,19 @@ impl PlatformWindow for TestWindow {
 
     fn gpu_specs(&self) -> Option<GpuSpecs> {
         None
+    }
+}
+
+fn take_action(items: Vec<MenuItem>, path: &[usize]) -> Option<Box<dyn Action>> {
+    let (index, rest) = path.split_first()?;
+    let item = items.into_iter().nth(*index)?;
+    match item {
+        MenuItem::Action {
+            action, disabled, ..
+        } if rest.is_empty() && !disabled => Some(action),
+        MenuItem::Submenu(menu) if !menu.disabled => take_action(menu.items, rest),
+        MenuItem::Separator | MenuItem::SystemMenu(_) | MenuItem::Action { .. } => None,
+        MenuItem::Submenu(_) => None,
     }
 }
 

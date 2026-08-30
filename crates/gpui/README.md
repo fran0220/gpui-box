@@ -113,6 +113,20 @@ horizontal axis and `Reveal::from_end` anchors a partial reveal to the physical
 bottom or right edge. At zero, the subtree is measured but not prepainted, hit
 testable, or addressable.
 
+### Native context menus
+
+`Window::show_context_menu` presents the existing `Menu`/`MenuItem` action tree
+through the operating system on macOS and Windows. The position is expressed in
+window-relative logical pixels. Native tracking starts only after the current
+GPUI callback yields; the selected action is dispatched through the focus
+context captured when the menu opened, and the returned task reports selection
+or dismissal.
+
+Platforms without native application context menus return
+`NativeMenuNotSupportedError`. Portable components should keep their ordinary
+in-window menu and use that result as the fallback signal rather than inventing
+a second command model.
+
 ## Documentation and support
 
 - [GPUI Box repository](https://github.com/fran0220/gpui-box)

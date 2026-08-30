@@ -325,11 +325,12 @@ pub mod prelude {
         WizardLayout, WizardStep,
     };
     pub use crate::overlay::{
-        Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
-        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost, Glass, GlassGroup, GlassPreset,
-        Hang, HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent, MenuItem, Menubar, MenubarEvent,
-        MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
-        Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
+        Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent,
+        ContextMenuPresentation, Dialog, DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost,
+        Glass, GlassGroup, GlassPreset, Hang, HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent,
+        MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification, NotificationCenter,
+        NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent, Toast, ToastCorner,
+        ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::reactive::{Binding, Form, FormValues, History, Rule, Signal, validators};
     pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase, ValidationState};

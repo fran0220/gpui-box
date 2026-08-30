@@ -13,9 +13,9 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render,
-    SharedString, StatefulInteractiveElement, Styled, Transformation, Window, div,
-    prelude::FluentBuilder, px,
+    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, NativeMenuOutcome, ParentElement,
+    Pixels, Point, Render, SharedString, StatefulInteractiveElement, Styled, Transformation,
+    Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -1021,6 +1021,23 @@ pub enum ContextMenuEvent {
     Closed,
 }
 
+/// Where a [`ContextMenu`] is presented.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum ContextMenuPresentation {
+    /// Prefer the operating-system menu on platforms that provide one and use
+    /// the ordinary GPUI surface everywhere else.
+    #[default]
+    Native,
+    /// Always draw the menu in the GPUI window.
+    InWindow,
+}
+
+#[derive(Clone, Debug, PartialEq, gpui::Action)]
+#[action(namespace = gpui_kit_context_menu, no_json, no_register)]
+struct InvokeNativeContextMenuItem {
+    id: SharedString,
+}
+
 impl EventEmitter<ContextMenuEvent> for ContextMenu {}
 
 /// Builds the wrapped region for one frame.
@@ -1035,7 +1052,9 @@ pub struct ContextMenu {
     target: Option<SharedString>,
     items: Vec<MenuItem>,
     content: Option<Content>,
+    presentation: ContextMenuPresentation,
     open: bool,
+    native_open: bool,
     position: Point<Pixels>,
     pending_focus: bool,
     state: MenuState,
@@ -1049,7 +1068,7 @@ impl std::fmt::Debug for ContextMenu {
             .field("ident", &self.ident)
             .field("target", &self.target)
             .field("items", &self.items.len())
-            .field("open", &self.open)
+            .field("open", &self.is_open())
             .finish()
     }
 }
@@ -1063,7 +1082,9 @@ impl ContextMenu {
             target: None,
             items: Vec::new(),
             content: None,
+            presentation: ContextMenuPresentation::default(),
             open: false,
+            native_open: false,
             position: gpui::point(px(0.0), px(0.0)),
             pending_focus: false,
             state: MenuState::default(),
@@ -1073,6 +1094,12 @@ impl ContextMenu {
 
     pub fn menu(mut self, items: impl IntoIterator<Item = MenuItem>) -> Self {
         self.items = items.into_iter().collect();
+        self
+    }
+
+    /// Chooses native presentation or forces the GPUI-drawn menu.
+    pub fn presentation(mut self, presentation: ContextMenuPresentation) -> Self {
+        self.presentation = presentation;
         self
     }
 
@@ -1110,7 +1137,7 @@ impl ContextMenu {
     }
 
     pub fn is_open(&self) -> bool {
-        self.open
+        self.open || self.native_open
     }
 
     pub fn position(&self) -> Point<Pixels> {
@@ -1125,20 +1152,86 @@ impl ContextMenu {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.native_open {
+            return;
+        }
         self.position = position;
         self.state.reset();
         self.state.active = first_selectable(&self.items);
+
+        if self.presentation == ContextMenuPresentation::Native {
+            self.trap.engage(window, cx);
+            self.focus_handle.focus(window, cx);
+            if let Ok(task) = window.show_context_menu(self.native_menu(), position, cx) {
+                self.native_open = true;
+                let window_handle = window.window_handle();
+                cx.spawn(async move |menu, cx| {
+                    let outcome = task.await;
+                    window_handle
+                        .update(cx, |_, window, cx| {
+                            menu.update(cx, |menu, cx| {
+                                menu.finish_native(outcome, window, cx);
+                            })
+                            .ok();
+                        })
+                        .ok();
+                })
+                .detach();
+                self.emit_opened(cx);
+                cx.notify();
+                return;
+            }
+        }
+
         if !self.open {
             self.open = true;
             self.pending_focus = true;
             self.trap.engage(window, cx);
         }
+        self.emit_opened(cx);
+        cx.notify();
+    }
+
+    fn emit_opened(&self, cx: &mut Context<Self>) {
         let target = self
             .target
             .clone()
             .unwrap_or_else(|| self.ident.semantic_id());
         cx.emit(ContextMenuEvent::Opened(target));
+    }
+
+    fn native_menu(&self) -> gpui::Menu {
+        gpui::Menu::new(self.name.clone()).items(native_items(&self.items))
+    }
+
+    fn finish_native(
+        &mut self,
+        outcome: NativeMenuOutcome,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.native_open {
+            return;
+        }
+        self.native_open = false;
+        self.state.reset();
+        self.trap.release(window, cx);
+        if outcome == NativeMenuOutcome::Dismissed {
+            cx.emit(ContextMenuEvent::Dismissed);
+        }
+        cx.emit(ContextMenuEvent::Closed);
         cx.notify();
+    }
+
+    fn native_item_invoked(
+        &mut self,
+        action: &InvokeNativeContextMenuItem,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.native_open {
+            cx.emit(ContextMenuEvent::Invoked(action.id.clone()));
+        }
     }
 
     pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1242,6 +1335,8 @@ impl Render for ContextMenu {
 
         div()
             .id(self.ident.element_id())
+            .track_focus(&self.focus_handle)
+            .on_action(cx.listener(Self::native_item_invoked))
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(|menu, event: &MouseDownEvent, window, cx| {
@@ -1253,9 +1348,38 @@ impl Render for ContextMenu {
             .children(overlay)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Region).expanded(self.open),
+                NodeSpec::new(self.ident.semantic_id(), Role::Region).expanded(self.is_open()),
             )
     }
+}
+
+fn native_items(items: &[MenuItem]) -> Vec<gpui::MenuItem> {
+    items
+        .iter()
+        .map(|item| match &item.kind {
+            MenuItemKind::Separator => gpui::MenuItem::separator(),
+            MenuItemKind::Submenu(children) => gpui::MenuItem::submenu(
+                gpui::Menu::new(item.label.clone())
+                    .items(native_items(children))
+                    .disabled(item.disabled),
+            ),
+            MenuItemKind::Command | MenuItemKind::Section => gpui::MenuItem::action(
+                item.label.clone(),
+                InvokeNativeContextMenuItem {
+                    id: item.id.clone(),
+                },
+            )
+            .disabled(item.disabled || matches!(item.kind, MenuItemKind::Section)),
+            MenuItemKind::Check(checked) => gpui::MenuItem::action(
+                item.label.clone(),
+                InvokeNativeContextMenuItem {
+                    id: item.id.clone(),
+                },
+            )
+            .checked(*checked)
+            .disabled(item.disabled),
+        })
+        .collect()
 }
 
 #[cfg(test)]

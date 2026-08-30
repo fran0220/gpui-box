@@ -1281,6 +1281,7 @@
       ],
       "options": [
         "menu(items: impl IntoIterator<Item = MenuItem>) -> Self",
+        "presentation(presentation: ContextMenuPresentation) -> Self",
         "name(name: impl Into<SharedString>) -> Self",
         "target(target: impl Into<SharedString>) -> Self",
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
@@ -7174,6 +7175,19 @@
         "Invoked",
         "Dismissed",
         "Closed"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ContextMenuPresentation",
+      "path": "gpui_kit::overlay::ContextMenuPresentation",
+      "summary": "Where a ContextMenu is presented.",
+      "variants": [
+        "Native",
+        "InWindow"
       ],
       "construct": [],
       "options": [],

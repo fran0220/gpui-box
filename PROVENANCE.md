@@ -518,3 +518,27 @@ records through its existing `SplitLayout`/`SplitTree`, `Tabs`, and drag system.
 It includes no upstream Rust source, panel registry, application model, skin,
 tile renderer, persistence transport, or dependency, and never invents the
 stable ids required to apply an edge split.
+
+## P17: GPUI Component native-menu behavior reference
+
+- Reference: <https://github.com/longbridge/gpui-component>
+- Revision: `6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7`
+- License: Apache-2.0
+- Reference locations: `crates/ui/src/native_menu/mod.rs`,
+  `crates/ui/src/native_menu/macos.rs`,
+  `crates/ui/src/native_menu/windows.rs`, and
+  `crates/ui/src/native_menu/fallback.rs`
+- Destinations: `crates/gpui/src/platform/app_menu.rs`,
+  `crates/gpui/src/window.rs`, `crates/gpui_macos/src/window.rs`,
+  `crates/gpui_windows/src/window.rs`, and
+  `crates/gpui-kit/src/overlay/menu.rs`
+
+The reference established the product-neutral contract of mapping a recursive
+GPUI action menu to `NSMenu`/`HMENU`, running native tracking outside an active
+GPUI borrow, and retaining a drawn fallback. GPUI Box implements that contract
+at its framework/platform boundary over its existing `Menu` and `MenuItem`
+authority, returns an explicit unsupported result, captures the originating
+focus context, reports native completion to Kit, and reuses Kit's existing
+accessible `ContextMenu` as the fallback. It does not include the upstream
+component-native menu model, root overlay, icon loading/rasterization, theme
+hooks, or source files, and adds no dependency.

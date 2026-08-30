@@ -44,7 +44,7 @@ pub use glass::{Glass, GlassGroup, GlassPreset};
 pub use hover_card::{HoverCard, HoverCardEvent};
 pub use kbd::{Kbd, caps};
 pub use layer::{Edge, Hang, Overlay, OverlaySurface, Placement, priority, surface};
-pub use menu::{ContextMenu, ContextMenuEvent, Menu, MenuEvent, MenuItem};
+pub use menu::{ContextMenu, ContextMenuEvent, ContextMenuPresentation, Menu, MenuEvent, MenuItem};
 pub use menubar::{Menubar, MenubarEvent, MenubarMenu};
 pub use notification_center::{
     Notification, NotificationCenter, NotificationCenterEvent, UnreadCount,

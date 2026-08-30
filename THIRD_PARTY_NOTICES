@@ -320,3 +320,16 @@ and reuses its existing split, tab, and drag authorities. No upstream Rust
 source, registry, application model, skin, tile renderer, persistence
 transport, or Cargo dependency is included; see PROVENANCE.md P16.
 License text: LICENSE-APACHE
+
+Longbridge GPUI Component native-menu behavior reference
+--------------------------------------------------------------------------------
+Source: https://github.com/longbridge/gpui-component
+Revision: 6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7
+License: Apache-2.0
+Scope: architectural and platform-behavior reference for mapping recursive
+GPUI actions to macOS/Windows native context menus while retaining an
+in-window fallback. GPUI Box places the contract in its framework/platform
+boundary and reuses its existing Kit menu. No upstream component menu model,
+root overlay, icon pipeline, source file, or Cargo dependency is included; see
+PROVENANCE.md P17.
+License text: LICENSE-APACHE
