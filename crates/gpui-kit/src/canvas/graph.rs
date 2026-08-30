@@ -15,8 +15,8 @@ use std::{
 
 use gpui::{
     AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Pixels, Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point,
-    prelude::FluentBuilder, px, relative, size,
+    Pixels, Point, RenderOnce, ScrollDelta, SharedString, StatefulInteractiveElement, Styled,
+    Window, canvas, div, point, prelude::FluentBuilder, px, relative, size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -37,9 +37,9 @@ use crate::strings::{ActiveStrings, StringKey};
 
 use super::band::GraphBand;
 use super::edge::{
-    Anchor, Axis, EdgePaint, GraphEdge, GraphEndpoint, GraphRouting, OrthogonalRoute, PortSide,
-    RouteTransform, paint_route, paint_route_stroke, route_curved, route_curved_preview,
-    route_orthogonal, route_preview,
+    Anchor, Axis, EdgeColors, EdgePaint, EdgeState, GraphEdge, GraphEndpoint, GraphRouting,
+    OrthogonalRoute, PortSide, RouteTransform, paint_route, paint_route_stroke, route_curved,
+    route_curved_preview, route_orthogonal, route_preview,
 };
 use super::node::{GraphNode, GraphPort, PortDirection};
 
@@ -174,6 +174,8 @@ struct GestureState {
     gesture: Option<Gesture>,
     pointer: Option<Point<Pixels>>,
     animation_started: Option<Instant>,
+    /// The visible colour crossover for each caller-owned edge.
+    edge_transitions: HashMap<SharedString, EdgeTransition>,
     /// The fit token this canvas last framed itself for. Kept beside the
     /// gesture because it is the same kind of fact: what this one canvas has
     /// been through, not what the caller asked for.
@@ -204,6 +206,83 @@ struct GestureState {
     /// Recording what was proposed is how the two are told apart exactly,
     /// rather than by guessing from how far the viewport moved.
     direct: Option<GraphViewport>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EdgeTransition {
+    state: EdgeState,
+    from: EdgeColors,
+    to: EdgeColors,
+    started: Option<Instant>,
+}
+
+impl EdgeTransition {
+    fn settled(state: EdgeState, colors: EdgeColors) -> Self {
+        Self {
+            state,
+            from: colors,
+            to: colors,
+            started: None,
+        }
+    }
+
+    fn at(&self, now: Instant, spec: MotionSpec, theme: &gpui_kit_theme::Theme) -> EdgeColors {
+        let Some(started) = self.started else {
+            return self.to;
+        };
+        let span = spec.total().as_secs_f32().max(f32::EPSILON);
+        let raw = (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0);
+        if raw <= 0.0 {
+            return self.from;
+        }
+        if raw >= 1.0 {
+            return self.to;
+        }
+        let progress = spec.progress(raw);
+        EdgeColors::new(
+            theme.mix(self.from.from, self.to.from, progress),
+            theme.mix(self.from.to, self.to.to, progress),
+        )
+    }
+
+    /// Retargets from the paint visible now rather than an earlier semantic
+    /// state, so two rapid changes cannot jump backwards between colours.
+    fn show(
+        &mut self,
+        state: EdgeState,
+        target: EdgeColors,
+        now: Instant,
+        spec: MotionSpec,
+        animates: bool,
+        theme: &gpui_kit_theme::Theme,
+    ) -> (EdgeColors, bool) {
+        if !animates {
+            *self = Self::settled(state, target);
+            return (target, false);
+        }
+        if self.state != state {
+            let visible = self.at(now, spec, theme);
+            *self = Self {
+                state,
+                from: visible,
+                to: target,
+                started: Some(now),
+            };
+        } else if self.to != target {
+            // A theme change is not an edge-state event. It adopts the new
+            // theme directly rather than replaying a traffic transition.
+            *self = Self::settled(state, target);
+        }
+        let visible = self.at(now, spec, theme);
+        let animating = self.started.is_some_and(|started| {
+            now.duration_since(started).as_secs_f32() < spec.total().as_secs_f32().max(f32::EPSILON)
+        });
+        if !animating {
+            self.from = self.to;
+            self.started = None;
+        }
+        (visible, animating)
+    }
 }
 
 /// A canvas moving from where it was looking to where it has been asked to
@@ -1075,13 +1154,15 @@ impl RenderOnce for NodeGraph {
         let theme = cx.theme().clone();
         let mut viewport = self.viewport;
         viewport.zoom = viewport.zoom.clamp(self.zoom_range.0, self.zoom_range.1);
-        let moving_effects = matches!(self.state, GraphState::Ready)
-            && (self.edges.iter().any(GraphEdge::is_active)
-                || self
+        let active_edges =
+            matches!(self.state, GraphState::Ready) && self.edges.iter().any(GraphEdge::is_active);
+        let graph_busy = matches!(self.state, GraphState::Loading)
+            || active_edges
+            || (matches!(self.state, GraphState::Ready)
+                && self
                     .nodes
                     .iter()
                     .any(|placed| placed.node.node_state().is_busy()));
-        let graph_busy = matches!(self.state, GraphState::Loading) || moving_effects;
         let gesture = keyed::slot::<GestureState>(
             &self.ident.semantic_id(),
             window.window_handle().window_id(),
@@ -1113,8 +1194,8 @@ impl RenderOnce for NodeGraph {
         if travelling {
             window.request_animation_frame();
         }
-        let activity = MotionPolicy::resolve(MotionRole::Activity(Activity::Advancing), cx);
-        let animation_phase = if moving_effects && activity.animates() {
+        let activity = MotionPolicy::resolve(MotionRole::Activity(Activity::Transmitting), cx);
+        let edge_flow_phase = if active_edges && activity.animates() {
             let now = cx.background_executor().now();
             let mut state = gesture.borrow_mut();
             let started = *state.animation_started.get_or_insert(now);
@@ -1126,7 +1207,7 @@ impl RenderOnce for NodeGraph {
             gesture.borrow_mut().animation_started = None;
             None
         };
-        if animation_phase.is_some() {
+        if edge_flow_phase.is_some() {
             window.request_animation_frame();
         }
         let spec = NodeSpec::new(self.ident.semantic_id(), Role::Group).busy(graph_busy);
@@ -1145,6 +1226,22 @@ impl RenderOnce for NodeGraph {
             .overflow_hidden()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .surface(&theme, Surface::Canvas);
+
+        // Route hover is visual transient state and exists even on an inspect-
+        // only graph. The pointer is recorded here and resolved against the
+        // exact routes below, after their measured geometry is available.
+        let hover_motion = Rc::clone(&gesture);
+        frame = frame.on_mouse_move(move |event, window, _| {
+            hover_motion.borrow_mut().pointer = Some(event.position);
+            window.refresh();
+        });
+        let leave_motion = Rc::clone(&gesture);
+        frame = frame.on_hover(move |hovered, window, _| {
+            if !hovered {
+                leave_motion.borrow_mut().pointer = None;
+                window.refresh();
+            }
+        });
 
         if let Some(report) = self
             .on_event
@@ -1500,6 +1597,66 @@ impl RenderOnce for NodeGraph {
                 }
             })
             .collect();
+        let hovered_edge = {
+            let state = gesture.borrow();
+            match (&state.gesture, state.pointer) {
+                (Some(Gesture::Connect { .. }), _) | (_, None) => None,
+                (_, Some(pointer)) => {
+                    let bounds = measured.get();
+                    let local = point(
+                        f32::from(pointer.x - bounds.origin.x),
+                        f32::from(pointer.y - bounds.origin.y),
+                    );
+                    let world = screen_to_world(local, viewport);
+                    let threshold = 7.0 / viewport.zoom.max(f32::EPSILON);
+                    routes
+                        .iter()
+                        .map(|routed| (routed.route.distance_to(world), routed.edge.edge_id()))
+                        .filter(|(distance, _)| *distance <= threshold)
+                        .min_by(|left, right| {
+                            left.0
+                                .partial_cmp(&right.0)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .map(|(_, id)| id)
+                }
+            }
+        };
+        let state_change = MotionPolicy::resolve(MotionRole::StateChange, cx);
+        let edge_colors: HashMap<SharedString, EdgeColors> = {
+            let now = cx.background_executor().now();
+            let live: HashSet<SharedString> = self.edges.iter().map(GraphEdge::edge_id).collect();
+            let mut gesture = gesture.borrow_mut();
+            gesture.edge_transitions.retain(|id, _| live.contains(id));
+            let mut animating = false;
+            let colors = self
+                .edges
+                .iter()
+                .map(|edge| {
+                    let id = edge.edge_id();
+                    let target = edge.edge_state().colors(edge.kind(), &theme);
+                    let transition = gesture
+                        .edge_transitions
+                        .entry(id.clone())
+                        .or_insert_with(|| EdgeTransition::settled(edge.edge_state(), target));
+                    let (colors, crossing) = transition.show(
+                        edge.edge_state(),
+                        target,
+                        now,
+                        state_change.spec(),
+                        state_change.animates(),
+                        &theme,
+                    );
+                    animating |= crossing;
+                    (id, colors)
+                })
+                .collect();
+            drop(gesture);
+            if animating {
+                window.request_animation_frame();
+            }
+            colors
+        };
         let preview = {
             let state = gesture.borrow();
             match (&state.gesture, state.pointer) {
@@ -1613,13 +1770,23 @@ impl RenderOnce for NodeGraph {
             move |bounds, _, window, _| {
                 let transform = RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom);
                 for (routed, reveal) in painted_routes {
+                    let id = routed.edge.edge_id();
+                    let colors = edge_colors.get(&id).copied().unwrap_or_else(|| {
+                        routed
+                            .edge
+                            .edge_state()
+                            .colors(routed.edge.kind(), &edge_theme)
+                    });
                     paint_route(
                         window,
                         &edge_theme,
                         &routed.edge,
                         &routed.route,
                         transform,
-                        EdgePaint::new(stroke).reveal(reveal).phase(animation_phase),
+                        EdgePaint::new(stroke, colors)
+                            .reveal(reveal)
+                            .phase(routed.edge.is_active().then_some(edge_flow_phase).flatten())
+                            .hovered(hovered_edge.as_ref() == Some(&id)),
                     );
                 }
                 if let Some(preview) = painted_preview {
@@ -1761,6 +1928,8 @@ impl RenderOnce for NodeGraph {
                     .edge_label()
                     .cloned()
                     .unwrap_or_else(|| cx.strings().text(StringKey::CanvasConnection));
+                let description: SharedString =
+                    format!("{relation}; state {}", routed.edge.edge_state().value()).into();
                 if let Some(report) = self
                     .on_event
                     .as_ref()
@@ -1836,7 +2005,8 @@ impl RenderOnce for NodeGraph {
                             NodeSpec::new(semantic_id, Role::Button)
                                 .parent(self.ident.semantic_id())
                                 .text(cx.strings().text(StringKey::CanvasDisconnect))
-                                .description(relation)
+                                .description(description)
+                                .selected(routed.edge.is_selected())
                                 .value(id),
                         )
                         .into_any_element()
@@ -1852,6 +2022,8 @@ impl RenderOnce for NodeGraph {
                             NodeSpec::new(semantic_id, Role::Group)
                                 .parent(self.ident.semantic_id())
                                 .text(relation)
+                                .description(description)
+                                .selected(routed.edge.is_selected())
                                 .value(id),
                         )
                         .into_any_element()
@@ -2138,54 +2310,6 @@ impl RenderOnce for NodeGraph {
                     });
                 }
                 ports.push(view.semantic_in(cx, spec).into_any_element());
-            }
-        }
-
-        let mut shockwaves = Vec::new();
-        // A shockwave is a ring travelling outward. Held at one frame it is
-        // just a second outline sitting a fixed distance off the card, which
-        // reads as a selection halo that overshot rather than as motion, so
-        // under reduced motion the node's own glow carries "running" alone.
-        for placed in self
-            .nodes
-            .iter()
-            .filter(|_| animation_phase.is_some())
-            .filter(|placed| placed.node.node_state().is_busy())
-            .filter(|placed| {
-                geometry
-                    .iter()
-                    .any(|node| node.id == placed.node.ident().semantic_id())
-            })
-        {
-            let Some(bounds) = geometry
-                .iter()
-                .find(|node| node.id == placed.node.ident().semantic_id())
-                .map(|node| node.bounds)
-            else {
-                continue;
-            };
-            let screen = world_to_screen(bounds.origin, viewport);
-            let width = bounds.size.width * viewport.zoom;
-            let height = bounds.size.height * viewport.zoom;
-            let state_color = placed.node.node_state().color(&theme);
-            let phases: Vec<f32> = animation_phase
-                .map(|phase| vec![phase, (phase + 0.5).rem_euclid(1.0)])
-                .unwrap_or_default();
-            for phase in phases {
-                let reach = (8.0 + phase * 30.0) * viewport.zoom;
-                let opacity = theme.effects.glow_alpha * (1.0 - phase).powf(1.7);
-                shockwaves.push(
-                    div()
-                        .absolute()
-                        .left(px(screen.x - reach))
-                        .top(px(screen.y - reach))
-                        .w(px(width + reach * 2.0))
-                        .h(px(height + reach * 2.0))
-                        .rounded(px(theme.radius(Radius::Card) * viewport.zoom + reach))
-                        .border(px(theme.borders.hairline))
-                        .border_color(state_color.opacity(opacity))
-                        .into_any_element(),
-                );
             }
         }
 
@@ -2538,7 +2662,6 @@ impl RenderOnce for NodeGraph {
             .child(ground)
             .children(if compact { Vec::new() } else { bands })
             .child(beneath)
-            .children(shockwaves)
             .children(if compact { Vec::new() } else { edge_labels })
             .children(group)
             .children(cards)
@@ -2853,6 +2976,41 @@ mod tests {
             MotionRole::Navigation,
             &gpui_kit_theme::Theme::studio_dark(),
         )
+    }
+
+    /// Edge state is caller-owned and may change more quickly than its visual
+    /// crossover. A second change must leave from the paint actually visible,
+    /// while reduced motion must make the latest state true immediately.
+    #[test]
+    fn edge_state_changes_retarget_without_jumping_and_reduce_to_the_truth() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let spec = MotionPolicy::spec(MotionRole::StateChange, &theme);
+        let start = Instant::now();
+        let idle = EdgeState::Idle.colors(EdgeKind::Flow, &theme);
+        let active = EdgeState::Active.colors(EdgeKind::Flow, &theme);
+        let failed = EdgeState::Failed.colors(EdgeKind::Flow, &theme);
+        let mut transition = EdgeTransition::settled(EdgeState::Idle, idle);
+
+        let (paint, animating) =
+            transition.show(EdgeState::Active, active, start, spec, true, &theme);
+        assert_eq!(paint, idle);
+        assert!(animating);
+
+        let interrupted = start + spec.total() / 2;
+        let visible = transition.at(interrupted, spec, &theme);
+        assert_ne!(visible, idle);
+        assert_ne!(visible, active);
+        let (paint, animating) =
+            transition.show(EdgeState::Failed, failed, interrupted, spec, true, &theme);
+        assert_eq!(paint, visible);
+        assert_eq!(transition.from, visible);
+        assert!(animating);
+
+        let (paint, animating) =
+            transition.show(EdgeState::Active, active, interrupted, spec, false, &theme);
+        assert_eq!(paint, active);
+        assert!(!animating);
+        assert!(transition.started.is_none());
     }
 
     /// A frame is a jump the reader did not make, and a jump that is not

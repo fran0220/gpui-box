@@ -44,7 +44,7 @@ mod node;
 mod toolbar;
 
 pub use band::GraphBand;
-pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, GraphRouting, PortSide};
+pub use edge::{EdgeKind, EdgeState, GraphEdge, GraphEndpoint, GraphRouting, PortSide};
 pub(crate) use graph::grid_ground;
 pub use graph::{
     GraphFit, GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed,

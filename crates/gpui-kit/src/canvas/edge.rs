@@ -33,6 +33,74 @@ impl EdgeKind {
     }
 }
 
+/// The caller-owned state of one connection.
+///
+/// Only [`EdgeState::Active`] carries continuous traffic. A succeeded or
+/// failed route keeps the outcome colour but stops moving, because motion on
+/// either would claim work is still crossing it. [`GraphEdge::active`] remains
+/// the compatibility builder for callers that only distinguish idle from
+/// active; [`GraphEdge::state`] is the complete vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EdgeState {
+    #[default]
+    Idle,
+    Active,
+    Succeeded,
+    Failed,
+}
+
+impl EdgeState {
+    pub fn value(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Active => "active",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+        }
+    }
+
+    pub(crate) fn colors(self, kind: EdgeKind, theme: &Theme) -> EdgeColors {
+        match (self, kind) {
+            (Self::Idle, EdgeKind::Flow) => {
+                EdgeColors::new(theme.colors.node.edge, theme.colors.node.edge_target)
+            }
+            (Self::Active, EdgeKind::Flow) => EdgeColors::new(
+                theme.colors.node.edge_active,
+                theme.colors.node.edge_flow_highlight,
+            ),
+            (Self::Idle, EdgeKind::Feedback) => EdgeColors::new(
+                theme.colors.node.edge_feedback,
+                theme.colors.node.edge_feedback_active,
+            ),
+            (Self::Active, EdgeKind::Feedback) => EdgeColors::new(
+                theme.colors.node.edge_feedback_active,
+                theme.colors.node.aura_attention,
+            ),
+            (Self::Succeeded, _) => {
+                EdgeColors::new(kind.color(theme), theme.colors.node.aura_success)
+            }
+            (Self::Failed, _) => EdgeColors::new(kind.color(theme), theme.colors.node.aura_danger),
+        }
+    }
+}
+
+/// Source and destination paints for one route frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct EdgeColors {
+    pub(crate) from: Hsla,
+    pub(crate) to: Hsla,
+}
+
+impl EdgeColors {
+    pub(crate) const fn new(from: Hsla, to: Hsla) -> Self {
+        Self { from, to }
+    }
+
+    fn opacity(self, alpha: f32) -> Self {
+        Self::new(self.from.opacity(alpha), self.to.opacity(alpha))
+    }
+}
+
 /// The side of a node on which a port is placed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum PortSide {
@@ -104,7 +172,8 @@ pub struct GraphEdge {
     from_port: Option<SharedString>,
     to_port: Option<SharedString>,
     label: Option<SharedString>,
-    active: bool,
+    state: EdgeState,
+    selected: bool,
     lane: i16,
 }
 
@@ -118,7 +187,8 @@ impl GraphEdge {
             from_port: None,
             to_port: None,
             label: None,
-            active: false,
+            state: EdgeState::Idle,
+            selected: false,
             lane: 0,
         }
     }
@@ -146,7 +216,19 @@ impl GraphEdge {
         self
     }
     pub fn active(mut self, active: bool) -> Self {
-        self.active = active;
+        self.state = if active {
+            EdgeState::Active
+        } else {
+            EdgeState::Idle
+        };
+        self
+    }
+    pub fn state(mut self, state: EdgeState) -> Self {
+        self.state = state;
+        self
+    }
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
         self
     }
     pub fn lane(mut self, lane: i16) -> Self {
@@ -168,7 +250,13 @@ impl GraphEdge {
         self.label.as_ref()
     }
     pub(crate) fn is_active(&self) -> bool {
-        self.active
+        self.state == EdgeState::Active
+    }
+    pub(crate) fn edge_state(&self) -> EdgeState {
+        self.state
+    }
+    pub(crate) fn is_selected(&self) -> bool {
+        self.selected
     }
     pub(crate) fn edge_lane(&self) -> i16 {
         self.lane
@@ -289,6 +377,17 @@ impl OrthogonalRoute {
         self.sample(0.5)
     }
 
+    /// Shortest world-space distance from a point to this route.
+    ///
+    /// Curves use the same measured polyline that paint, sampling and trim
+    /// use, so hover cannot disagree with the connection the reader sees.
+    pub(crate) fn distance_to(&self, point: Point<f32>) -> f32 {
+        self.points
+            .windows(2)
+            .map(|segment| distance_to_segment(point, segment[0], segment[1]))
+            .fold(f32::INFINITY, f32::min)
+    }
+
     pub(crate) fn midpoint_axis(&self) -> Axis {
         if self.points.len() < 2 {
             return Axis::Horizontal;
@@ -304,6 +403,18 @@ impl OrthogonalRoute {
             Axis::Horizontal
         }
     }
+}
+
+fn distance_to_segment(at: Point<f32>, from: Point<f32>, to: Point<f32>) -> f32 {
+    let run = point(to.x - from.x, to.y - from.y);
+    let length_squared = run.x * run.x + run.y * run.y;
+    if length_squared <= f32::EPSILON {
+        return (at.x - from.x).hypot(at.y - from.y);
+    }
+    let progress =
+        (((at.x - from.x) * run.x + (at.y - from.y) * run.y) / length_squared).clamp(0.0, 1.0);
+    let nearest = point(from.x + run.x * progress, from.y + run.y * progress);
+    (at.x - nearest.x).hypot(at.y - nearest.y)
 }
 
 const LEAD: f32 = 24.0;
@@ -708,14 +819,20 @@ pub(crate) struct EdgePaint {
     pub(crate) reveal: f32,
     /// Where the traffic trails are along the route, if it carries any.
     pub(crate) phase: Option<f32>,
+    /// The perceptually interpolated state paints for this frame.
+    pub(crate) colors: EdgeColors,
+    /// Pointer emphasis is transient and never implies traffic.
+    pub(crate) hovered: bool,
 }
 
 impl EdgePaint {
-    pub(crate) fn new(width: f32) -> Self {
+    pub(crate) fn new(width: f32, colors: EdgeColors) -> Self {
         Self {
             width,
             reveal: 1.0,
             phase: None,
+            colors,
+            hovered: false,
         }
     }
 
@@ -726,6 +843,11 @@ impl EdgePaint {
 
     pub(crate) fn phase(mut self, phase: Option<f32>) -> Self {
         self.phase = phase;
+        self
+    }
+
+    pub(crate) fn hovered(mut self, hovered: bool) -> Self {
+        self.hovered = hovered;
         self
     }
 }
@@ -741,43 +863,52 @@ pub(crate) fn paint_route(
     if paint.reveal <= 0.0 {
         return;
     }
-    let active_color = edge.kind.active_color(theme);
-    let width = paint.width;
+    let selected = edge.is_selected();
+    let emphasis = if selected {
+        theme.effects.node_edge_selected_width_scale
+    } else if paint.hovered {
+        theme.effects.node_edge_hover_width_scale
+    } else {
+        1.0
+    };
+    let width = paint.width * emphasis;
     let drawn = Stroke {
         width,
-        color: edge.kind.color(theme),
+        color: paint.colors.from,
         dashes: edge.kind.dashes(),
         corner: route.corner(theme),
         trim: Some((0.0, paint.reveal)),
     };
-    if edge.active {
-        paint_trimmed_stroke(
+    if selected || paint.hovered {
+        paint_gradient(
             window,
+            theme,
             route,
             transform,
             Stroke {
-                width: width * 5.0,
-                color: active_color.opacity(theme.effects.node_active_wash_alpha),
+                width: paint.width * theme.effects.node_edge_glow_width_scale * emphasis,
                 ..drawn
             },
+            paint.colors.opacity(theme.effects.node_active_wash_alpha),
+            paint.reveal,
         );
     }
-    paint_trimmed_stroke(window, route, transform, drawn);
-    if edge.active {
-        paint_trimmed_stroke(
-            window,
-            route,
-            transform,
-            Stroke {
-                width: width * 1.2,
-                color: active_color.opacity(theme.effects.node_active_stroke_alpha),
-                ..drawn
-            },
-        );
-    }
+    paint_gradient(
+        window,
+        theme,
+        route,
+        transform,
+        drawn,
+        paint.colors,
+        paint.reveal,
+    );
     let trail = Stroke {
         width: width.max(1.0),
-        color: active_color.opacity(theme.effects.node_traffic_alpha),
+        color: theme
+            .colors
+            .node
+            .edge_flow_highlight
+            .opacity(theme.effects.node_traffic_alpha),
         dashes: None,
         ..drawn
     };
@@ -789,13 +920,49 @@ pub(crate) fn paint_route(
         paint_comet(window, route, transform, trail, paint.reveal);
         return;
     }
-    if edge.active
+    if edge.is_active()
         && let Some(phase) = paint.phase
     {
         for comet in 0..COMETS {
             let head = (phase + comet as f32 / COMETS as f32).rem_euclid(1.0);
             paint_comet(window, route, transform, trail, head);
         }
+    }
+}
+
+/// A source-to-destination colour gradient cut from the same route path used
+/// by reveal and traffic. GPUI gradients are spatial backgrounds rather than
+/// distance-along-path paints, so bounded route-progress slices are the local
+/// geometry needed to keep a bent route directional. Every slice retains the
+/// full path's trim and dash phase, avoiding seams in feedback routes.
+fn paint_gradient(
+    window: &mut Window,
+    theme: &Theme,
+    route: &OrthogonalRoute,
+    transform: RouteTransform,
+    stroke: Stroke,
+    colors: EdgeColors,
+    reveal: f32,
+) {
+    const SLICES: usize = 24;
+    let reveal = reveal.clamp(0.0, 1.0);
+    for slice in 0..SLICES {
+        let from = slice as f32 / SLICES as f32;
+        if from >= reveal {
+            break;
+        }
+        let to = ((slice + 1) as f32 / SLICES as f32).min(reveal);
+        let middle = (from + to) * 0.5;
+        paint_trimmed_stroke(
+            window,
+            route,
+            transform,
+            Stroke {
+                color: theme.mix(colors.from, colors.to, middle),
+                trim: Some((from, to)),
+                ..stroke
+            },
+        );
     }
 }
 
@@ -1161,6 +1328,8 @@ mod tests {
         assert_eq!(r.total_length(), 40.0);
         assert_eq!(r.midpoint(), point(10.0, 10.0));
         assert_eq!(r.sample(2.0), point(10.0, 30.0));
+        assert_eq!(r.distance_to(point(4.0, 3.0)), 3.0);
+        assert_eq!(r.distance_to(point(13.0, 20.0)), 3.0);
     }
 
     #[test]
@@ -1268,17 +1437,18 @@ mod tests {
     /// graph has not said exists.
     #[test]
     fn an_arriving_connection_is_drawn_from_the_port_it_leaves() {
-        let paint = EdgePaint::new(1.0).reveal(0.4).phase(Some(0.7));
+        let colors = EdgeState::Idle.colors(EdgeKind::Flow, &Theme::studio_dark());
+        let paint = EdgePaint::new(1.0, colors).reveal(0.4).phase(Some(0.7));
         assert_eq!(paint.reveal, 0.4);
         assert_eq!(paint.width, 1.0);
         // Out-of-range reveals are clamped rather than trusted, because the
         // clock they come from can overrun a frame.
-        assert_eq!(EdgePaint::new(1.0).reveal(1.4).reveal, 1.0);
-        assert_eq!(EdgePaint::new(1.0).reveal(-0.2).reveal, 0.0);
+        assert_eq!(EdgePaint::new(1.0, colors).reveal(1.4).reveal, 1.0);
+        assert_eq!(EdgePaint::new(1.0, colors).reveal(-0.2).reveal, 0.0);
         // A settled edge is the default, so a caller that never mentions
         // arrival draws the whole connection.
-        assert_eq!(EdgePaint::new(1.0).reveal, 1.0);
-        assert_eq!(EdgePaint::new(1.0).phase, None);
+        assert_eq!(EdgePaint::new(1.0, colors).reveal, 1.0);
+        assert_eq!(EdgePaint::new(1.0, colors).phase, None);
     }
 
     #[test]
@@ -1306,6 +1476,13 @@ mod tests {
         assert_eq!(a.target_port().expect("target port"), "in");
         assert_eq!(a.edge_label().expect("edge label"), "work");
         assert!(a.is_active());
+        assert_eq!(a.edge_state(), EdgeState::Active);
+        assert!(!a.is_selected());
+        assert!(a.clone().selected(true).is_selected());
+        assert_eq!(
+            a.clone().state(EdgeState::Failed).edge_state(),
+            EdgeState::Failed
+        );
         assert_eq!(a.edge_lane(), 3);
         assert_eq!(
             a.clone().id("business").edge_id(),

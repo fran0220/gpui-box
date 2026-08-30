@@ -20,7 +20,7 @@ use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Theme
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
-use crate::motion::{MotionPolicy, MotionRole, keyed};
+use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, keyed};
 use crate::strings::ActiveNumbers;
 
 use super::edge::PortSide;
@@ -248,22 +248,27 @@ impl NodeState {
         matches!(self, Self::Blocked | Self::Failed | Self::TimedOut)
     }
 
-    /// Whether the state is worth bleeding into the pixels around the card.
+    /// The ambient state paint, if this state needs to reach past the card.
     ///
-    /// Only the states a reader is scanning for glow. A canvas where every
-    /// node glowed would be a canvas where none of them stood out, which is
-    /// the same as no glow at all but more expensive to draw.
-    fn is_notable(self) -> bool {
-        self.is_busy()
-            || matches!(
-                self,
-                Self::Waiting
-                    | Self::Blocked
-                    | Self::Partial
-                    | Self::Failed
-                    | Self::Refused
-                    | Self::TimedOut
-            )
+    /// This vocabulary is deliberately smaller than the semantic state list:
+    /// the glyph and semantic value carry exact identity, while the aura lets
+    /// a reader scan for live, attention, successful handoff, and danger.
+    fn aura_color(self, theme: &Theme) -> Option<Hsla> {
+        match self {
+            Self::Running | Self::Starting => Some(theme.colors.node.aura_active),
+            Self::Queued | Self::Waiting | Self::Partial | Self::Refused | Self::Cancelling => {
+                Some(theme.colors.node.aura_attention)
+            }
+            Self::Blocked | Self::Failed | Self::TimedOut => Some(theme.colors.node.aura_danger),
+            // Success is a one-shot handoff, not a permanent live signal.
+            Self::Succeeded | Self::Pending | Self::Idle | Self::Cancelled | Self::Unavailable => {
+                None
+            }
+        }
+    }
+
+    fn animates_mark(self) -> bool {
+        matches!(self, Self::Starting | Self::Running | Self::Cancelling)
     }
 }
 
@@ -668,10 +673,40 @@ impl Selectable for GraphNode {
 
 /// What a card was showing and what it is showing now, kept between frames so
 /// a state change can be watched rather than only noticed afterwards.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct NodePaint {
+    mark: Hsla,
+    aura: Hsla,
+    aura_alpha: f32,
+}
+
+impl NodePaint {
+    fn for_state(state: NodeState, theme: &Theme) -> Self {
+        let mark = state.color(theme);
+        let aura = state.aura_color(theme).unwrap_or(mark);
+        Self {
+            mark,
+            aura,
+            aura_alpha: state
+                .aura_color(theme)
+                .map_or(0.0, |_| theme.effects.node_aura_resting_alpha),
+        }
+    }
+
+    fn mix(self, to: Self, amount: f32, theme: &Theme) -> Self {
+        Self {
+            mark: theme.mix(self.mark, to.mark, amount),
+            aura: theme.mix(self.aura, to.aura, amount),
+            aura_alpha: self.aura_alpha + (to.aura_alpha - self.aura_alpha) * amount,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct StateFade {
-    from: NodeState,
-    to: NodeState,
+    state: NodeState,
+    from: Option<NodePaint>,
+    to: Option<NodePaint>,
     /// When the crossover began, or `None` while the card is settled.
     started: Option<Instant>,
     /// Whether this card has been drawn before.
@@ -681,35 +716,84 @@ struct StateFade {
     /// of succeeded steps would fade up out of grey — which is a claim that
     /// they all just finished.
     drawn: bool,
+    /// A successful handoff flashes once only when it was observed happening.
+    succeeded_at: Option<Instant>,
 }
 
 impl StateFade {
-    /// Records `state` and answers what the card is showing: the state it is
-    /// crossing from, and how far across it is.
-    ///
-    /// A progress of 1 means settled, whatever `from` says.
-    fn advance(&mut self, state: NodeState, now: Instant, span: f32) -> (NodeState, f32) {
-        if self.to != state {
-            let crossing = self
-                .started
-                .is_some_and(|started| now.duration_since(started).as_secs_f32() < span);
-            // Interrupted partway, the crossover starts from the paint on
-            // screen rather than from the state that is already gone: a card
-            // that changed twice quickly would otherwise jump back to the
-            // first colour before setting off for the third.
-            *self = Self {
-                from: if crossing { self.from } else { self.to },
-                to: state,
-                started: self.drawn.then_some(now),
-                drawn: true,
-            };
+    fn at(&self, now: Instant, spec: MotionSpec, theme: &Theme) -> NodePaint {
+        let to = self.to.expect("a drawn state fade has a destination");
+        let (Some(from), Some(started)) = (self.from, self.started) else {
+            return to;
+        };
+        let span = spec.total().as_secs_f32().max(f32::EPSILON);
+        let raw = (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0);
+        if raw <= 0.0 {
+            return from;
         }
-        self.drawn = true;
-        let progress = self.started.map_or(1.0, |started| {
-            (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0)
-        });
-        (self.from, progress)
+        if raw >= 1.0 {
+            return to;
+        }
+        from.mix(to, spec.progress(raw), theme)
     }
+
+    /// Returns the visible paint, whether its crossover is live, and the
+    /// remaining successful-handoff flash from 1 to 0.
+    fn show(
+        &mut self,
+        state: NodeState,
+        target: NodePaint,
+        now: Instant,
+        change: MotionSpec,
+        change_animates: bool,
+        feedback: MotionSpec,
+        feedback_animates: bool,
+        theme: &Theme,
+    ) -> (NodePaint, bool, f32) {
+        if !self.drawn {
+            self.state = state;
+            self.from = Some(target);
+            self.to = Some(target);
+            self.drawn = true;
+            return (target, false, 0.0);
+        }
+        if self.state != state {
+            let visible = self.at(now, change, theme);
+            self.state = state;
+            self.from = Some(if change_animates { visible } else { target });
+            self.to = Some(target);
+            self.started = change_animates.then_some(now);
+            self.succeeded_at = (state == NodeState::Succeeded && feedback_animates).then_some(now);
+        } else if self.to != Some(target) {
+            // A theme change is not a node-state event.
+            self.from = Some(target);
+            self.to = Some(target);
+            self.started = None;
+        }
+        let visible = self.at(now, change, theme);
+        let crossing = self.started.is_some_and(|started| {
+            now.duration_since(started).as_secs_f32()
+                < change.total().as_secs_f32().max(f32::EPSILON)
+        });
+        if !crossing {
+            self.from = self.to;
+            self.started = None;
+        }
+        let settle = self.succeeded_at.map_or(0.0, |started| {
+            let span = feedback.total().as_secs_f32().max(f32::EPSILON);
+            let raw = (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0);
+            1.0 - feedback.progress(raw)
+        });
+        if settle <= 0.0 {
+            self.succeeded_at = None;
+        }
+        (visible, crossing, settle)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct AuraClock {
+    started: Option<Instant>,
 }
 
 impl GraphNode {
@@ -720,33 +804,70 @@ impl GraphNode {
     /// state has not changed, a reader who asked for reduced motion, and a
     /// card whose first frame this is all get the same values the hard cut
     /// gave.
-    fn state_crossfade(&self, theme: &Theme, window: &mut Window, cx: &mut App) -> (Hsla, f32) {
-        let settled = (
-            self.state.color(theme),
-            if self.state.is_notable() { 1.0 } else { 0.0 },
-        );
+    fn state_paint(&self, theme: &Theme, window: &mut Window, cx: &mut App) -> (NodePaint, f32) {
+        let target = NodePaint::for_state(self.state, theme);
         let change = MotionPolicy::resolve(MotionRole::StateChange, cx);
-        if !change.animates() {
-            return settled;
-        }
+        let feedback = MotionPolicy::resolve(MotionRole::Feedback, cx);
         let now = cx.background_executor().now();
-        let span = change.spec().total().as_secs_f32().max(f32::EPSILON);
         let fade = keyed::slot::<StateFade>(
             &self.ident.child("state").semantic_id(),
             window.window_handle().window_id(),
             cx,
         );
-        let (from, progress) = fade.borrow_mut().advance(self.state, now, span);
-        if from == self.state || progress >= 1.0 {
-            return settled;
+        let (mut paint, crossing, settle) = fade.borrow_mut().show(
+            self.state,
+            target,
+            now,
+            change.spec(),
+            change.animates(),
+            feedback.spec(),
+            feedback.animates(),
+            theme,
+        );
+        if crossing || settle > 0.0 {
+            window.request_animation_frame();
         }
-        window.request_animation_frame();
-        let eased = change.spec().progress(progress);
-        let was = if from.is_notable() { 1.0 } else { 0.0 };
-        (
-            theme.mix(from.color(theme), self.state.color(theme), eased),
-            was + (settled.1 - was) * eased,
-        )
+
+        let clock = keyed::slot::<AuraClock>(
+            &self.ident.child("aura").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        if self.state == NodeState::Running {
+            let signal = MotionPolicy::resolve(MotionRole::Activity(Activity::Signaling), cx);
+            if signal.animates() {
+                let started = *clock.borrow_mut().started.get_or_insert(now);
+                let phase = (now.duration_since(started).as_secs_f32()
+                    / signal.spec().total().as_secs_f32().max(f32::EPSILON))
+                .rem_euclid(1.0);
+                let half = if phase < 0.5 {
+                    phase * 2.0
+                } else {
+                    (1.0 - phase) * 2.0
+                };
+                let breath = signal.spec().progress(half);
+                paint.aura_alpha = theme.effects.node_aura_pulse_floor_alpha
+                    + (theme.effects.node_aura_pulse_peak_alpha
+                        - theme.effects.node_aura_pulse_floor_alpha)
+                        * breath;
+                window.request_animation_frame();
+            } else {
+                clock.borrow_mut().started = None;
+                paint.aura_alpha = theme.effects.node_aura_resting_alpha;
+            }
+        } else {
+            clock.borrow_mut().started = None;
+        }
+
+        // The successful handoff is an overlay on the crossing paint. Its
+        // strength and reach contract together, then disappear completely.
+        if settle > 0.0 {
+            paint.aura = theme.mix(paint.aura, theme.colors.node.aura_success, settle);
+            paint.aura_alpha = paint
+                .aura_alpha
+                .max(theme.effects.node_aura_settle_peak_alpha * settle);
+        }
+        (paint, theme.effects.node_aura_settle_expansion * settle)
     }
 }
 
@@ -763,15 +884,17 @@ impl RenderOnce for GraphNode {
         // The crossfade is perceptual, so a run that goes from accent to
         // danger passes through the colours between them rather than through
         // the mud two gamma-encoded paints average to.
-        let (color, notable) = self.state_crossfade(&theme, window, cx);
+        let (paint, aura_expansion) = self.state_paint(&theme, window, cx);
         let metrics = NodeMetrics::new(&theme, self.width, self.display_zoom, self.declared_height);
 
         // The mark is the one part of a node that moves, and it moves because
         // the step is still running. It turns through the shared vocabulary,
         // so a running node and a running tool call turn at one rate.
         let mark = self.state.glyph().map(|glyph| {
-            let element = icon(glyph).size(px(metrics.icon_size)).text_color(color);
-            if self.state.is_busy() {
+            let element = icon(glyph)
+                .size(px(metrics.icon_size))
+                .text_color(paint.mark);
+            if self.state.animates_mark() {
                 motion::spin(element, self.ident.child("mark").element_id(), &theme, cx)
             } else {
                 element.into_any_element()
@@ -964,8 +1087,16 @@ impl RenderOnce for GraphNode {
             // The state bleeds out of the card rather than being drawn round
             // it, so a running node and a failed one differ by the colour the
             // canvas takes near them and not by which of two lines they wear.
-            .when(notable > 0.0, |element| {
-                element.glow(&theme, color.opacity(notable))
+            .when(paint.aura_alpha > 0.0, |element| {
+                element.shadow(vec![gpui::BoxShadow {
+                    color: paint
+                        .aura
+                        .opacity(theme.effects.glow_alpha * paint.aura_alpha),
+                    offset: gpui::point(px(0.0), px(0.0)),
+                    blur_radius: px(theme.effects.glow_blur * (1.0 + aura_expansion)),
+                    spread_radius: px(theme.effects.glow_spread * (1.0 + aura_expansion)),
+                    inset: false,
+                }])
             })
             // A node floats on the canvas rather than sitting in a column, so
             // it is the one place selection cannot be a rail at a reading
@@ -1056,71 +1187,125 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    fn theme() -> gpui_kit_theme::Theme {
+        gpui_kit_theme::Theme::studio_dark()
+    }
+
+    fn show(
+        fade: &mut StateFade,
+        state: NodeState,
+        now: Instant,
+        theme: &Theme,
+        animates: bool,
+    ) -> (NodePaint, bool, f32) {
+        fade.show(
+            state,
+            NodePaint::for_state(state, theme),
+            now,
+            MotionPolicy::spec(MotionRole::StateChange, theme),
+            animates,
+            MotionPolicy::spec(MotionRole::Feedback, theme),
+            animates,
+            theme,
+        )
+    }
+
     /// A state change was a hard cut: a node went from running to failed
     /// between two frames, so anybody who blinked saw a failed node and never
     /// saw it fail.
     #[test]
     fn a_state_change_crosses_over_rather_than_cutting() {
-        const SPAN: f32 = 0.2;
+        let theme = theme();
         let start = Instant::now();
         let mut fade = StateFade::default();
 
         // The first frame is a drawing, not a change. A canvas opening onto a
         // finished run would otherwise fade every succeeded step up out of
         // grey, which claims they all just finished.
-        let (_, progress) = fade.advance(NodeState::Succeeded, start, SPAN);
-        assert_eq!(progress, 1.0, "the first frame crossed over from nothing");
+        let (paint, crossing, settle) = show(&mut fade, NodeState::Succeeded, start, &theme, true);
+        assert_eq!(paint, NodePaint::for_state(NodeState::Succeeded, &theme));
+        assert!(!crossing, "the first frame crossed over from nothing");
+        assert_eq!(settle, 0.0, "the first frame replayed a success flash");
 
         let changed = start + Duration::from_millis(100);
-        let (from, progress) = fade.advance(NodeState::Failed, changed, SPAN);
-        assert_eq!(from, NodeState::Succeeded);
-        assert_eq!(progress, 0.0);
+        let (paint, crossing, _) = show(&mut fade, NodeState::Failed, changed, &theme, true);
+        assert_eq!(paint, NodePaint::for_state(NodeState::Succeeded, &theme));
+        assert!(crossing);
 
-        let (from, progress) = fade.advance(
+        let (paint, crossing, _) = show(
+            &mut fade,
             NodeState::Failed,
             changed + Duration::from_millis(100),
-            SPAN,
+            &theme,
+            true,
         );
-        assert_eq!(from, NodeState::Succeeded);
-        assert!((progress - 0.5).abs() < 0.01);
+        assert!(crossing);
+        assert_ne!(paint, NodePaint::for_state(NodeState::Succeeded, &theme));
+        assert_ne!(paint, NodePaint::for_state(NodeState::Failed, &theme));
 
-        let (_, progress) = fade.advance(
+        let (paint, crossing, _) = show(
+            &mut fade,
             NodeState::Failed,
             changed + Duration::from_millis(400),
-            SPAN,
+            &theme,
+            true,
         );
-        assert_eq!(progress, 1.0);
+        assert_eq!(paint, NodePaint::for_state(NodeState::Failed, &theme));
+        assert!(!crossing);
     }
 
     /// A card that changes twice quickly must not jump back to the first
     /// colour before setting off for the third.
     #[test]
     fn a_change_interrupted_partway_leaves_from_the_paint_on_screen() {
-        const SPAN: f32 = 0.2;
+        let theme = theme();
         let start = Instant::now();
         let mut fade = StateFade::default();
-        fade.advance(NodeState::Running, start, SPAN);
+        show(&mut fade, NodeState::Running, start, &theme, true);
 
         let first = start + Duration::from_millis(10);
-        fade.advance(NodeState::Waiting, first, SPAN);
+        show(&mut fade, NodeState::Waiting, first, &theme, true);
         let second = first + Duration::from_millis(60);
-        let (from, progress) = fade.advance(NodeState::Failed, second, SPAN);
+        let (visible, _, _) = show(&mut fade, NodeState::Waiting, second, &theme, true);
+        let (paint, crossing, _) = show(&mut fade, NodeState::Failed, second, &theme, true);
         assert_eq!(
-            from,
-            NodeState::Running,
+            paint, visible,
             "the interrupted crossover restarted from the state it had already left"
         );
-        assert_eq!(progress, 0.0);
+        assert_eq!(fade.from, Some(visible));
+        assert!(crossing);
 
         // Once one has finished, the next starts from where it landed.
-        fade.advance(NodeState::Failed, second + Duration::from_millis(300), SPAN);
+        show(
+            &mut fade,
+            NodeState::Failed,
+            second + Duration::from_millis(300),
+            &theme,
+            true,
+        );
         let third = second + Duration::from_millis(400);
-        let (from, _) = fade.advance(NodeState::Succeeded, third, SPAN);
-        assert_eq!(from, NodeState::Failed);
+        let (paint, crossing, settle) = show(&mut fade, NodeState::Succeeded, third, &theme, true);
+        assert_eq!(paint, NodePaint::for_state(NodeState::Failed, &theme));
+        assert!(crossing);
+        assert_eq!(settle, 1.0);
     }
 
-    fn theme() -> gpui_kit_theme::Theme {
-        gpui_kit_theme::Theme::studio_dark()
+    #[test]
+    fn reduced_motion_settles_state_and_success_without_a_timeline() {
+        let theme = theme();
+        let start = Instant::now();
+        let mut fade = StateFade::default();
+        show(&mut fade, NodeState::Running, start, &theme, false);
+        let (paint, crossing, settle) = show(
+            &mut fade,
+            NodeState::Succeeded,
+            start + Duration::from_millis(10),
+            &theme,
+            false,
+        );
+        assert_eq!(paint, NodePaint::for_state(NodeState::Succeeded, &theme));
+        assert!(!crossing);
+        assert_eq!(settle, 0.0);
     }
 
     /// Tone is intentionally shared by related states, so the semantic word
@@ -1165,11 +1350,23 @@ mod tests {
 
     #[test]
     fn only_the_states_worth_scanning_for_reach_past_the_card() {
-        assert!(NodeState::Running.is_notable());
-        assert!(NodeState::Failed.is_notable());
-        assert!(NodeState::Refused.is_notable());
-        assert!(!NodeState::Pending.is_notable());
-        assert!(!NodeState::Succeeded.is_notable());
+        let theme = theme();
+        assert_eq!(
+            NodeState::Running.aura_color(&theme),
+            Some(theme.colors.node.aura_active)
+        );
+        assert_eq!(
+            NodeState::Failed.aura_color(&theme),
+            Some(theme.colors.node.aura_danger)
+        );
+        assert_eq!(
+            NodeState::Refused.aura_color(&theme),
+            Some(theme.colors.node.aura_attention)
+        );
+        assert!(NodeState::Pending.aura_color(&theme).is_none());
+        assert!(NodeState::Succeeded.aura_color(&theme).is_none());
+        assert!(NodeState::Running.animates_mark());
+        assert!(!NodeState::Queued.animates_mark());
     }
 
     #[test]

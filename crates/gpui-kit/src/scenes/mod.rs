@@ -48,7 +48,7 @@ use agent::{
     cost_meter, feedback_rating, offering_catalog, permission_matrix, persona, prompt_builder,
     server_list, step_list, thinking, tool_call,
 };
-use canvas::{canvas_regions, canvas_tools, node_graph};
+use canvas::{canvas_regions, canvas_tools, node_graph, node_graph_motion};
 use compositions::{motion_flip, motion_state, reading_direction};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
@@ -734,6 +734,11 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "node-graph",
             build: node_graph,
+            shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
+        },
+        Scene {
+            name: "node-graph-motion",
+            build: node_graph_motion,
             shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
         },
         Scene {

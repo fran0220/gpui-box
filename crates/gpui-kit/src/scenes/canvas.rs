@@ -19,7 +19,7 @@ pub(super) struct SceneGraph {
 impl Global for SceneGraph {}
 
 /// A live processing graph with the visual states and editor gestures shown
-/// together: traffic lanes, a running shockwave, explicit ports, labels,
+/// together: traffic lanes, a running aura, explicit ports, labels,
 /// feedback routing, pan, zoom, node movement, and connection creation.
 pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneGraph>() {
@@ -316,6 +316,184 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .id("scene.graph.curves.edge.grade")
                             .ports("out", "in"),
                     ]),
+            ),
+        )
+        .into_any_element()
+}
+
+const NODE_STATES: [(NodeState, &str, &str); 15] = [
+    (NodeState::Pending, "Pending", "pending"),
+    (NodeState::Idle, "Idle", "idle"),
+    (NodeState::Queued, "Queued", "queued"),
+    (NodeState::Starting, "Starting", "starting"),
+    (NodeState::Running, "Running", "running"),
+    (NodeState::Waiting, "Waiting", "waiting"),
+    (NodeState::Blocked, "Blocked", "blocked"),
+    (NodeState::Succeeded, "Succeeded", "succeeded"),
+    (NodeState::Partial, "Partial", "partial"),
+    (NodeState::Failed, "Failed", "failed"),
+    (NodeState::Refused, "Refused", "refused"),
+    (NodeState::Cancelling, "Cancelling", "cancelling"),
+    (NodeState::Cancelled, "Cancelled", "cancelled"),
+    (NodeState::TimedOut, "Timed out", "timed-out"),
+    (NodeState::Unavailable, "Unavailable", "unavailable"),
+];
+
+#[derive(Debug)]
+pub(super) struct SceneGraphMotion {
+    state: usize,
+}
+
+impl Global for SceneGraphMotion {}
+
+/// Every node state beside every edge state, plus one stable node identity a
+/// reader can retarget to inspect OKLab crossover and the successful handoff.
+pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneGraphMotion>() {
+        cx.set_global(SceneGraphMotion { state: 4 });
+    }
+    let theme = cx.theme().clone();
+    let state_index = cx.global::<SceneGraphMotion>().state;
+    let (state, state_label, _) = NODE_STATES[state_index];
+    let state_cards = NODE_STATES.into_iter().map(|(state, label, slug)| {
+        div().w(px(164.0)).child(
+            GraphNode::new(format!("scene.graph-motion.state.{slug}"), label)
+                .width(164.0)
+                .state(state)
+                .action(slug),
+        )
+    });
+
+    stack(&theme)
+        .w(px(920.0))
+        .child(caption(
+            &theme,
+            "state owns every aura; only Running breathes, and a successful handoff flashes once",
+        ))
+        .child(
+            div()
+                .row()
+                .items_center()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    GraphNode::new("scene.graph-motion.transition", "Observed transition")
+                        .width(210.0)
+                        .state(state)
+                        .action(state_label),
+                )
+                .child(
+                    Button::new("scene.graph-motion.next-state")
+                        .label("Next state")
+                        .secondary()
+                        .on_click(|_, cx| {
+                            cx.update_global::<SceneGraphMotion, ()>(|scene, _| {
+                                scene.state = (scene.state + 1) % NODE_STATES.len();
+                            });
+                            cx.refresh_windows();
+                        }),
+                )
+                .child(
+                    Button::new("scene.graph-motion.succeed")
+                        .label("Complete successfully")
+                        .on_click(|_, cx| {
+                            cx.update_global::<SceneGraphMotion, ()>(|scene, _| {
+                                scene.state = 7;
+                            });
+                            cx.refresh_windows();
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .row()
+                .flex_wrap()
+                .items_start()
+                .gap_token(&theme, Space::Sm)
+                .children(state_cards),
+        )
+        .child(caption(
+            &theme,
+            "every route grades source to destination; hover a route, and compare the selected succeeded route with the active flow",
+        ))
+        .child(
+            div().w(px(880.0)).h(px(420.0)).child(
+                NodeGraph::new("scene.graph-motion.edges")
+                    .interaction(GraphInteraction::Inspect)
+                    .viewport(GraphViewport::new(gpui::point(20.0, 12.0), 1.0))
+                    .node(
+                        GraphNode::new("scene.graph-motion.source", "Source")
+                            .width(164.0)
+                            .state(NodeState::Running)
+                            .port(GraphPort::output("idle", "Idle"))
+                            .port(GraphPort::output("active", "Active"))
+                            .port(GraphPort::output("succeeded", "Succeeded"))
+                            .port(GraphPort::output("failed", "Failed")),
+                        12.0,
+                        132.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph-motion.idle", "Idle route")
+                            .width(164.0)
+                            .state(NodeState::Idle)
+                            .port(GraphPort::input("in", "In")),
+                        648.0,
+                        8.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph-motion.active", "Traffic crossing")
+                            .width(164.0)
+                            .state(NodeState::Running)
+                            .port(GraphPort::input("in", "In")),
+                        648.0,
+                        104.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph-motion.succeeded", "Delivered")
+                            .width(164.0)
+                            .state(NodeState::Succeeded)
+                            .port(GraphPort::input("in", "In")),
+                        648.0,
+                        200.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph-motion.failed", "Delivery failed")
+                            .width(164.0)
+                            .state(NodeState::Failed)
+                            .port(GraphPort::input("in", "In")),
+                        648.0,
+                        296.0,
+                    )
+                    .edges([
+                        GraphEdge::new("scene.graph-motion.source", "scene.graph-motion.idle")
+                            .id("scene.graph-motion.edge.idle")
+                            .ports("idle", "in")
+                            .label("idle")
+                            .lane(-3)
+                            .state(EdgeState::Idle),
+                        GraphEdge::new("scene.graph-motion.source", "scene.graph-motion.active")
+                            .id("scene.graph-motion.edge.active")
+                            .ports("active", "in")
+                            .label("active · flowing")
+                            .lane(-1)
+                            .state(EdgeState::Active),
+                        GraphEdge::new(
+                            "scene.graph-motion.source",
+                            "scene.graph-motion.succeeded",
+                        )
+                        .id("scene.graph-motion.edge.succeeded")
+                        .ports("succeeded", "in")
+                        .label("succeeded · selected")
+                        .lane(1)
+                        .state(EdgeState::Succeeded)
+                        .selected(true),
+                        GraphEdge::new("scene.graph-motion.source", "scene.graph-motion.failed")
+                            .id("scene.graph-motion.edge.failed")
+                            .ports("failed", "in")
+                            .label("failed")
+                            .lane(3)
+                            .state(EdgeState::Failed),
+                    ])
+                    .on_event(|_, _, _| {}),
             ),
         )
         .into_any_element()

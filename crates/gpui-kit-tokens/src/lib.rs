@@ -532,17 +532,13 @@ impl TokenDocument {
                 return invalid(path, "must be finite and greater than zero");
             }
         }
-        if self.effect.node_aura_pulse_floor_alpha
-            > self.effect.node_aura_pulse_peak_alpha
-        {
+        if self.effect.node_aura_pulse_floor_alpha > self.effect.node_aura_pulse_peak_alpha {
             return invalid(
                 "effect.nodeAuraPulseFloorAlpha",
                 "must not exceed effect.nodeAuraPulsePeakAlpha",
             );
         }
-        if self.effect.node_edge_hover_width_scale
-            > self.effect.node_edge_selected_width_scale
-        {
+        if self.effect.node_edge_hover_width_scale > self.effect.node_edge_selected_width_scale {
             return invalid(
                 "effect.nodeEdgeHoverWidthScale",
                 "must not exceed effect.nodeEdgeSelectedWidthScale",

@@ -7,8 +7,8 @@
 //! A still picture of a rotation arrow does not read as "working", it reads as
 //! "stuck", which is the one thing it was there to rule out.
 //!
-//! So the choice is made once, here, and the three answers are three claims
-//! about the work rather than three decorations:
+//! So the choice is made once, here, and the five answers are five claims
+//! about the work rather than five decorations:
 //!
 //! - [`Activity::Advancing`] — the extent is known and the work is moving
 //!   through it. A band sweeps across, in the direction the work is going.
@@ -17,6 +17,10 @@
 //! - [`Activity::Deliberating`] — something is being weighed and there is no
 //!   progress to report at all. It breathes, because a breath claims even
 //!   less than a turn does.
+//! - [`Activity::Signaling`] — a live state is continuously present. Its aura
+//!   breathes slowly, without implying an extent or a finish line.
+//! - [`Activity::Transmitting`] — traffic is crossing a directional route.
+//!   The highlight advances linearly so it never stalls before arriving.
 //!
 //! Picking the wrong one is not a style mistake, it is a false statement: a
 //! sweep on work of unknown extent draws a finish line that does not exist.
@@ -56,6 +60,10 @@ pub enum Activity {
     Working,
     /// Something is being weighed, with no progress to report.
     Deliberating,
+    /// A live state is continuously present, without a measurable extent.
+    Signaling,
+    /// Traffic is moving from a source to a destination.
+    Transmitting,
 }
 
 impl Activity {
@@ -65,6 +73,8 @@ impl Activity {
             Self::Advancing => theme.motion.shimmer_ms,
             Self::Working => theme.motion.spin_ms,
             Self::Deliberating => theme.motion.pulse_ms,
+            Self::Signaling => theme.motion.node_aura_pulse_ms,
+            Self::Transmitting => theme.motion.node_flow_ms,
         }
     }
 
@@ -72,12 +82,15 @@ impl Activity {
     ///
     /// A turn is linear because any easing on a loop puts a stall at the seam,
     /// and a mark that hesitates once per revolution reads as a mark that is
-    /// catching on something. The other two ease, because both of them have a
-    /// natural turning point where slowing down is the honest shape.
+    /// catching on something. Transmission is linear for the same reason: a
+    /// highlight that slows before its destination reads as congestion. The
+    /// other three ease, because each has a natural turning point.
     pub fn curve(self, theme: &Theme) -> CubicBezier {
         match self {
-            Self::Working => Easing::Linear.curve(theme),
-            Self::Advancing | Self::Deliberating => Easing::EaseInOut.curve(theme),
+            Self::Working | Self::Transmitting => Easing::Linear.curve(theme),
+            Self::Advancing | Self::Deliberating | Self::Signaling => {
+                Easing::EaseInOut.curve(theme)
+            }
         }
     }
 }
@@ -215,16 +228,18 @@ mod tests {
         Theme::studio_dark()
     }
 
-    /// The three answers are three different claims, so no two of them may
+    /// The five answers are five different claims, so no two of them may
     /// run on the same period: a reader who learns the rhythm of one is
     /// entitled to read a different rhythm as a different statement.
     #[test]
-    fn the_three_activities_run_at_three_different_rates() {
+    fn the_five_activities_run_at_five_different_rates() {
         let theme = theme();
         let periods = [
             Activity::Advancing.period_ms(&theme),
             Activity::Working.period_ms(&theme),
             Activity::Deliberating.period_ms(&theme),
+            Activity::Signaling.period_ms(&theme),
+            Activity::Transmitting.period_ms(&theme),
         ];
         for (index, period) in periods.iter().enumerate() {
             for other in &periods[index + 1..] {
@@ -242,10 +257,12 @@ mod tests {
         assert_eq!(Activity::Working.curve(&theme), linear);
         assert_ne!(Activity::Deliberating.curve(&theme), linear);
         assert_ne!(Activity::Advancing.curve(&theme), linear);
+        assert_ne!(Activity::Signaling.curve(&theme), linear);
+        assert_eq!(Activity::Transmitting.curve(&theme), linear);
     }
 
     /// Every period comes from the theme, so a host that retunes motion
-    /// retunes these with it rather than finding three numbers welded in.
+    /// retunes these with it rather than finding five numbers welded in.
     #[test]
     fn every_period_is_a_token_the_theme_carries() {
         let theme = theme();
@@ -257,6 +274,14 @@ mod tests {
         assert_eq!(
             Activity::Deliberating.period_ms(&theme),
             theme.motion.pulse_ms
+        );
+        assert_eq!(
+            Activity::Signaling.period_ms(&theme),
+            theme.motion.node_aura_pulse_ms
+        );
+        assert_eq!(
+            Activity::Transmitting.period_ms(&theme),
+            theme.motion.node_flow_ms
         );
     }
 
