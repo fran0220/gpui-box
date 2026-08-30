@@ -1601,15 +1601,32 @@ mod tests {
     /// anyone drifting back into.
     const MIN_SURFACE_STEP: f32 = 0.02;
 
+    /// Every theme the library ships, not only the pair it designs against.
+    ///
+    /// A preset is not decoration once a component stops drawing a line to
+    /// help its surfaces apart: a field in Nord is carried by the same step a
+    /// field in studio-dark is, so a preset that does not clear the floor
+    /// ships a control nobody can find.
+    fn shipped_themes() -> Vec<Theme> {
+        gpui_kit_tokens::all()
+            .into_iter()
+            .map(|tokens| Theme::from_tokens(tokens, Density::Comfortable))
+            .collect()
+    }
+
     #[test]
     fn a_surface_step_is_visible_without_a_border_to_help_it() {
-        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+        for theme in shipped_themes() {
             let steps = [
                 (
                     "backdrop to canvas",
                     theme.colors.backdrop,
                     theme.colors.canvas,
                 ),
+                // The step a field stands on. `StyledExt::well` holds its
+                // border transparent, so this is the whole resting statement
+                // that an editable control is one.
+                ("canvas to sunken", theme.colors.sunken, theme.colors.canvas),
                 ("sunken to panel", theme.colors.sunken, theme.colors.panel),
                 ("canvas to panel", theme.colors.canvas, theme.colors.panel),
             ];
@@ -1628,7 +1645,7 @@ mod tests {
 
     #[test]
     fn every_theme_separates_surfaces_and_text_emphasis() {
-        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+        for theme in shipped_themes() {
             assert!(theme.colors.backdrop.l < theme.colors.canvas.l);
             assert!(theme.colors.sunken.l < theme.colors.panel.l);
             assert!(theme.colors.canvas.l < theme.colors.panel.l);

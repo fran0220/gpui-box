@@ -40,7 +40,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::Button;
 use crate::foundation::direction::ActiveDirection;
@@ -213,8 +213,7 @@ impl RenderOnce for FailurePanel {
             // subject is the sentence, not the colour.
             .overflow_hidden()
             .relative()
-            .bg(theme.colors.panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(crate::display::status::tone_rail(
                 &theme,
                 theme.colors.danger,

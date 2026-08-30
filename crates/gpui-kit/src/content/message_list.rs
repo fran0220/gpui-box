@@ -918,7 +918,6 @@ fn truncation_mark(ident: &Ident, hidden: usize, theme: &Theme, cx: &mut App) ->
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Sunken)
-        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(
@@ -1068,7 +1067,6 @@ fn attachment_chip(
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Sunken)
-        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(text.clone())
@@ -1097,7 +1095,6 @@ fn reaction_chip(ident: &Ident, reaction: &Reaction, theme: &Theme, cx: &mut App
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Pill)
         .surface(theme, Surface::Sunken)
-        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(text.clone())

@@ -1917,18 +1917,12 @@ impl Render for TextArea {
                     .py(px(theme.spacing.xs))
                     .radius(&theme, Radius::Control)
                     .well(&theme)
-                    // The same drawn boundary every field in the library
-                    // carries; invalidity recolours it rather than adding one.
-                    // A refused area gives the line up instead: with the same
-                    // outline as the areas around it, the only thing saying it
-                    // could not be typed in was the weight of text somebody
-                    // else wrote.
-                    .border_color(if self.invalid {
-                        theme.colors.danger
-                    } else if self.disabled {
-                        gpui::transparent_black()
-                    } else {
-                        theme.colors.hairline
+                    // The recess every field in the library rests in, and
+                    // invalidity colours the space it already holds rather
+                    // than adding a line. A refused area says so the way the
+                    // rest of the library does, in the weight of its text.
+                    .when(self.invalid, |element| {
+                        element.border_color(theme.colors.danger)
                     })
                     .when(focused, |element| element.shadow(theme.focus_ring()))
                     .text_size(px(metrics.font_size))

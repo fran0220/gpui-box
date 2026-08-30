@@ -10,7 +10,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TextTone, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 
 use crate::agent::{AgentActivityLine, AgentId, PersonaPortrait};
 use crate::controls::button::Button;
@@ -709,7 +711,6 @@ fn ability_control(
             } else {
                 theme.colors.raised
             })
-            .hairline(theme)
             .type_scale(theme, TypeScale::Label)
             .text_tone(theme, TextTone::Muted);
         if let Some(icon) = ability.icon {
@@ -1130,8 +1131,7 @@ fn reward_item(
         .w(px(174.0))
         .p_token(theme, Space::Sm)
         .radius(theme, Radius::Card)
-        .surface(theme, Surface::Raised)
-        .hairline(theme)
+        .frame(theme, Surface::Raised, Elevation::Raised)
         .child(art)
         .child(
             div()

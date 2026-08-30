@@ -667,10 +667,8 @@ impl Render for Select {
             .px(px(metrics.padding_x))
             .radius(&theme, Radius::Control)
             .well(&theme)
-            .border_color(if self.invalid {
-                theme.colors.danger
-            } else {
-                theme.colors.hairline
+            .when(self.invalid, |element| {
+                element.border_color(theme.colors.danger)
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .when(!self.disabled, |element| {

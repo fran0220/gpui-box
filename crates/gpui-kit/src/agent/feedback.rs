@@ -156,7 +156,6 @@ impl RenderOnce for FeedbackRating {
                     .py(px(theme.space(Space::Xs)))
                     .radius(&theme, Radius::Small)
                     .surface(&theme, Surface::Raised)
-                    .hairline(&theme)
                     .text_color(theme.colors.text),
                 selected,
             )
@@ -205,7 +204,7 @@ impl RenderOnce for FeedbackRating {
                         .px(px(theme.space(Space::Xs)))
                         .py(px(theme.space(Space::Xxs)))
                         .radius(&theme, Radius::Small)
-                        .hairline(&theme),
+                        .surface(&theme, Surface::Raised),
                     selected,
                 )
                 .type_scale(&theme, TypeScale::Caption)

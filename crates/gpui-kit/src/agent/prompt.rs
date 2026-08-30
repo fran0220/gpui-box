@@ -12,7 +12,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
@@ -198,14 +198,18 @@ impl RenderOnce for PromptBuilder {
                         // said neither: it coloured both alike and sat below
                         // the contrast the caption size needs. A filled slot
                         // is a settled value on a raised chip; an empty one is
-                        // an outlined hole with the slot's name in it.
+                        // an outlined hole with the slot's name in it. The
+                        // line belongs to the hole, so the filled chip holds
+                        // its space transparently and filling a slot moves
+                        // nothing beside it.
                         let mut chip = div()
                             .id(self.ident.child("slot").child(id.as_ref()).element_id())
                             .focus_ring(&theme)
                             .px(px(theme.space(Space::Xs)))
                             .py_token(&theme, Space::Xs)
                             .radius(&theme, Radius::Small)
-                            .hairline(&theme)
+                            .border(px(theme.borders.hairline))
+                            .border_color(gpui::transparent_black())
                             .type_scale(&theme, TypeScale::Caption)
                             .map(|element| {
                                 if filled {
@@ -287,8 +291,7 @@ impl RenderOnce for PromptBuilder {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .surface(&theme, Surface::Panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(
                 div()
                     .type_scale(&theme, TypeScale::Caption)

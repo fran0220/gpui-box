@@ -8,7 +8,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::content::code_view::styled_code;
 use crate::content::highlight::{self, Language};
@@ -231,8 +231,7 @@ impl RenderOnce for ArtifactPreview {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .surface(&theme, Surface::Panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(
                 div()
                     .row()

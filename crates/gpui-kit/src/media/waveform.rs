@@ -175,14 +175,12 @@ pub(crate) fn band(theme: &Theme) -> gpui::Div {
         .relative()
         .w_full()
         .h(px(BAND_HEIGHT))
-        // The plot is inset from the recess it sits in. At the previous step
-        // the first and last bar stood on the hairline, which read as an
-        // envelope that had been cropped rather than one that had been
-        // measured to the end.
+        // The plot is inset from the recess it sits in. Flush with the edge,
+        // the first and last bar read as an envelope that had been cropped
+        // rather than one that had been measured to the end.
         .px_token(theme, Space::Sm)
         .radius(theme, Radius::Card)
         .surface(theme, Surface::Sunken)
-        .hairline(theme)
         .overflow_hidden()
         .child(
             div()

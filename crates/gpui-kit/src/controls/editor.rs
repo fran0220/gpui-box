@@ -472,11 +472,6 @@ impl Render for Editor {
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Control)
             .well(&theme)
-            .border_color(if self.disabled {
-                gpui::transparent_black()
-            } else {
-                theme.colors.hairline
-            })
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .track_focus(&focus)
             .mono(&theme)

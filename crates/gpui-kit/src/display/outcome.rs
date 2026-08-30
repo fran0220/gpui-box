@@ -7,7 +7,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::foundation::{Ident, StyledExt};
@@ -131,8 +131,7 @@ impl RenderOnce for OutcomePanel {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .surface(&theme, Surface::Panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             // The outcome is carried by a rail and a glyph rather than by a
             // halo around the card. A bloom the size of the panel it reports
             // on is the loudest thing on the page and says nothing the mark

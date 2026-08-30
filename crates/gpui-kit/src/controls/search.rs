@@ -670,7 +670,6 @@ impl Render for FindReplace {
                     .p_token(&theme, Space::Xs)
                     .radius(&theme, Radius::Card)
                     .surface(&theme, Surface::Sunken)
-                    .hairline(&theme)
                     .child(
                         div()
                             .row_reading(direction)

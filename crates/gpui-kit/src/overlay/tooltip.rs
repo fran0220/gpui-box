@@ -13,7 +13,7 @@ use gpui::{
     SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::{Animated, Entrance};
@@ -80,9 +80,7 @@ impl RenderOnce for Tooltip {
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
                     .radius(&theme, Radius::Small)
-                    .bg(theme.colors.overlay)
-                    .hairline(&theme)
-                    .elevation(&theme, Elevation::Overlay)
+                    .frame(&theme, Surface::Overlay, Elevation::Overlay)
                     .text_size(px(theme.typography.label.size))
                     .line_height(px(theme.typography.label.line_height))
                     .font_fallbacks(gpui_kit_assets::text_fallbacks())

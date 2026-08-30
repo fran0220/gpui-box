@@ -67,17 +67,14 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
         .well(theme)
-        // The recess alone does not separate a field from the canvas behind
-        // it in a dark theme — the two surfaces are a step apart and the step
-        // vanishes at arm's length — so the line the well holds space for is
-        // drawn rather than left transparent. Invalidity then recolours the
-        // same line instead of introducing one, which is why becoming invalid
-        // still reflows nothing. Focus stays a ring, which is the same ring
-        // every other focusable thing in the library wears.
-        .border_color(if state.invalid {
-            theme.colors.danger
-        } else {
-            theme.colors.hairline
+        // The recess is the whole resting treatment: a theme meeting the
+        // canvas-to-sunken floor has already said where the field is, and a
+        // line added on top of a step that works is the outline this library
+        // spends everywhere else. Invalidity colours the space the well is
+        // already holding, so becoming invalid reflows nothing, and focus
+        // stays the ring every other focusable thing in the library wears.
+        .when(state.invalid, |field| {
+            field.border_color(theme.colors.danger)
         })
         .when(state.focused, |field| field.shadow(theme.focus_ring()))
         .text_size(px(metrics.font_size))
