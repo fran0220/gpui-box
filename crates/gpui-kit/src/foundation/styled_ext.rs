@@ -162,10 +162,25 @@ pub trait StyledExt: Styled + Sized {
     /// through here, because a card that means the same thing and is drawn two
     /// ways is two components wearing one name.
     fn card_surface(self, theme: &Theme, variant: CardVariant) -> Self {
+        self.card_surface_on(theme, variant, Surface::Canvas)
+    }
+
+    /// The same shell for a card standing somewhere other than the page.
+    ///
+    /// A card is a plane of its own, and the colour step above what holds it
+    /// is what says so. The default assumes the page's canvas and paints the
+    /// panel step; a host mounting cards inside a region that is already the
+    /// panel plane names that ground instead, so the card takes the raised
+    /// step and the boundary survives instead of dissolving into its ground.
+    fn card_surface_on(self, theme: &Theme, variant: CardVariant, ground: Surface) -> Self {
+        let plane = match ground {
+            Surface::Panel => Surface::Raised,
+            _ => Surface::Panel,
+        };
         let element = self.radius(theme, Radius::Card);
         match variant {
-            CardVariant::Elevated => element.frame(theme, Surface::Panel, Elevation::Raised),
-            CardVariant::Outlined => element.surface(theme, Surface::Panel).hairline(theme),
+            CardVariant::Elevated => element.frame(theme, plane, Elevation::Raised),
+            CardVariant::Outlined => element.surface(theme, plane).hairline(theme),
             CardVariant::Ghost => element,
         }
     }

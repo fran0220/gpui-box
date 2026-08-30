@@ -5,7 +5,7 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, Surface, TextTone, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
@@ -72,6 +72,7 @@ pub struct Card {
     ident: Option<Ident>,
     name: Option<SharedString>,
     variant: CardVariant,
+    ground: Surface,
     header: Option<CardHeader>,
     media: Option<SlotRender>,
     footer: Option<SlotRender>,
@@ -112,6 +113,7 @@ impl Card {
             ident: None,
             name: None,
             variant: CardVariant::default(),
+            ground: Surface::Canvas,
             header: None,
             media: None,
             footer: None,
@@ -141,6 +143,17 @@ impl Card {
 
     pub fn variant(mut self, variant: CardVariant) -> Self {
         self.variant = variant;
+        self
+    }
+
+    /// The plane this card stands on, when it is not the page's canvas.
+    ///
+    /// A card separates itself by the colour step above its ground, so the
+    /// ground decides the fill: on the canvas a card takes the panel step,
+    /// and inside a region that is already the panel plane it takes the
+    /// raised one. See [`StyledExt::card_surface_on`].
+    pub fn ground(mut self, ground: Surface) -> Self {
+        self.ground = ground;
         self
     }
 
@@ -333,11 +346,11 @@ impl RenderOnce for Card {
         .flatten()
         .collect();
 
-        let mut frame = div()
-            .w_full()
-            .overflow_hidden()
-            .column()
-            .card_surface(&theme, self.variant);
+        let mut frame = div().w_full().overflow_hidden().column().card_surface_on(
+            &theme,
+            self.variant,
+            self.ground,
+        );
         if self.selected {
             frame = frame.relative().bg(theme.colors.selected).child(
                 crate::foundation::selection_rail(&theme, cx.layout_direction()),

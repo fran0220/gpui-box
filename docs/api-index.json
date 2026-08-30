@@ -885,6 +885,7 @@
         "id(ident: impl Into<Ident>) -> Self",
         "name(name: impl Into<SharedString>) -> Self",
         "variant(variant: CardVariant) -> Self",
+        "ground(ground: Surface) -> Self",
         "header(header: CardHeader) -> Self",
         "media(media: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
         "footer(footer: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
