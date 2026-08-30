@@ -15,7 +15,16 @@ impl EdgeKind {
     pub fn color(self, theme: &Theme) -> Hsla {
         match self {
             Self::Flow => theme.colors.node.edge,
-            Self::Feedback => theme.colors.danger,
+            Self::Feedback => theme.colors.node.edge_feedback,
+        }
+    }
+
+    /// The paint this kind takes when it carries traffic or sits under the
+    /// pointer.
+    pub fn active_color(self, theme: &Theme) -> Hsla {
+        match self {
+            Self::Flow => theme.colors.node.edge_active,
+            Self::Feedback => theme.colors.node.edge_feedback_active,
         }
     }
 
@@ -679,114 +688,157 @@ impl RouteTransform {
     }
 }
 
+/// How much of a connection is drawn, and what is travelling along it.
+///
+/// A struct rather than four positional arguments because the three facts are
+/// independent — a connection can be arriving, carrying traffic, both, or
+/// neither — and a caller reading `paint_route(.., 1.0, None, 1.0)` cannot see
+/// which is which.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct EdgePaint {
+    /// The resting stroke width, before any state widens it.
+    pub(crate) width: f32,
+    /// How much of the route is drawn, from its source end, `0..=1`.
+    ///
+    /// A connection that has just been made draws itself from the port it
+    /// leaves to the port it arrives at, which is the direction it means. Below
+    /// 1 the connection is still arriving, so it carries no traffic: a comet
+    /// running down a wire that does not reach anywhere yet is traffic to a
+    /// place the graph has not said exists.
+    pub(crate) reveal: f32,
+    /// Where the traffic trails are along the route, if it carries any.
+    pub(crate) phase: Option<f32>,
+}
+
+impl EdgePaint {
+    pub(crate) fn new(width: f32) -> Self {
+        Self {
+            width,
+            reveal: 1.0,
+            phase: None,
+        }
+    }
+
+    pub(crate) fn reveal(mut self, reveal: f32) -> Self {
+        self.reveal = reveal.clamp(0.0, 1.0);
+        self
+    }
+
+    pub(crate) fn phase(mut self, phase: Option<f32>) -> Self {
+        self.phase = phase;
+        self
+    }
+}
+
 pub(crate) fn paint_route(
     window: &mut Window,
     theme: &Theme,
     edge: &GraphEdge,
     route: &OrthogonalRoute,
     transform: RouteTransform,
-    width: f32,
-    phase: Option<f32>,
+    paint: EdgePaint,
 ) {
-    let active_color = match edge.kind {
-        EdgeKind::Flow => theme.colors.node.edge_active,
-        EdgeKind::Feedback => theme.colors.danger,
-    };
-    let corner = route.corner(theme);
-    if edge.active {
-        paint_route_stroke(
-            window,
-            route,
-            transform,
-            width * 5.0,
-            active_color.opacity(theme.effects.node_active_wash_alpha),
-            edge.kind.dashes(),
-            corner,
-        );
+    if paint.reveal <= 0.0 {
+        return;
     }
-    paint_route_stroke(
-        window,
-        route,
-        transform,
+    let active_color = edge.kind.active_color(theme);
+    let width = paint.width;
+    let drawn = Stroke {
         width,
-        edge.kind.color(theme),
-        edge.kind.dashes(),
-        corner,
-    );
+        color: edge.kind.color(theme),
+        dashes: edge.kind.dashes(),
+        corner: route.corner(theme),
+        trim: Some((0.0, paint.reveal)),
+    };
     if edge.active {
-        paint_route_stroke(
+        paint_trimmed_stroke(
             window,
             route,
             transform,
-            width * 1.2,
-            active_color.opacity(theme.effects.node_active_stroke_alpha),
-            edge.kind.dashes(),
-            corner,
+            Stroke {
+                width: width * 5.0,
+                color: active_color.opacity(theme.effects.node_active_wash_alpha),
+                ..drawn
+            },
         );
-        if let Some(phase) = phase {
-            paint_comets(
-                window,
-                route,
-                transform,
-                width.max(1.0),
-                phase,
-                active_color.opacity(theme.effects.node_traffic_alpha),
-                corner,
-            );
+    }
+    paint_trimmed_stroke(window, route, transform, drawn);
+    if edge.active {
+        paint_trimmed_stroke(
+            window,
+            route,
+            transform,
+            Stroke {
+                width: width * 1.2,
+                color: active_color.opacity(theme.effects.node_active_stroke_alpha),
+                ..drawn
+            },
+        );
+    }
+    let trail = Stroke {
+        width: width.max(1.0),
+        color: active_color.opacity(theme.effects.node_traffic_alpha),
+        dashes: None,
+        ..drawn
+    };
+    if paint.reveal < 1.0 {
+        // The leading end of an arriving connection, so the reveal reads as
+        // something travelling to the far port rather than as a line being
+        // stretched. It is the same mark the traffic trails use, which is why
+        // an edge that arrives and then goes live does not change vocabulary.
+        paint_comet(window, route, transform, trail, paint.reveal);
+        return;
+    }
+    if edge.active
+        && let Some(phase) = paint.phase
+    {
+        for comet in 0..COMETS {
+            let head = (phase + comet as f32 / COMETS as f32).rem_euclid(1.0);
+            paint_comet(window, route, transform, trail, head);
         }
     }
 }
 
-/// Three phase-shifted traffic trails cut from the route's measured geometry.
-/// The framework trim keeps joins and future curve modes intact without
-/// rebuilding each tail from a row of short line elements.
-fn paint_comets(
+/// How many traffic trails share one live connection.
+const COMETS: usize = 3;
+/// How much of the route one trail covers.
+const TAIL: f32 = 0.09;
+/// How many nested strokes the trail is built from.
+///
+/// Each is shorter, wider and stronger than the one under it, so the paint
+/// accumulates into an opaque head that narrows and fades behind. One flat
+/// trim, which is what this was, is a dash: it has a hard back edge and no
+/// direction, so a reader cannot tell which way the traffic is going.
+const TAPER: usize = 4;
+
+/// One traffic trail, its head at `head` along the route.
+fn paint_comet(
     window: &mut Window,
     route: &OrthogonalRoute,
     transform: RouteTransform,
-    width: f32,
-    phase: f32,
-    color: Hsla,
-    corner: f32,
+    trail: Stroke,
+    head: f32,
 ) {
-    const COMETS: usize = 3;
-    const TAIL: f32 = 0.075;
-
-    for comet in 0..COMETS {
-        let head = (phase + comet as f32 / COMETS as f32).rem_euclid(1.0);
-        let tail = head - TAIL;
+    for step in 0..TAPER {
+        let remaining = (TAPER - step) as f32 / TAPER as f32;
+        let extent = TAIL * remaining;
+        // Widest and strongest at the head, which is the step with the least
+        // extent left to cover.
+        let step = Stroke {
+            width: trail.width * (1.15 + 1.05 * (1.0 - remaining)),
+            color: trail.color.opacity(0.3 + 0.7 * (1.0 - remaining).powf(1.5)),
+            ..trail
+        };
+        let tail = head - extent;
         if tail >= 0.0 {
-            paint_comet_interval(window, route, transform, width, (tail, head), color, corner);
+            paint_trimmed_stroke(window, route, transform, step.cut(tail, head));
         } else {
-            paint_comet_interval(window, route, transform, width, (0.0, head), color, corner);
-            paint_comet_interval(
-                window,
-                route,
-                transform,
-                width,
-                (1.0 + tail, 1.0),
-                color,
-                corner,
-            );
+            // The trail is crossing the route's start, so it is drawn as the
+            // two pieces of one interval rather than skipped: a comet that
+            // vanished at the seam would report a gap in the traffic.
+            paint_trimmed_stroke(window, route, transform, step.cut(0.0, head));
+            paint_trimmed_stroke(window, route, transform, step.cut(1.0 + tail, 1.0));
         }
-    }
-}
-
-fn paint_comet_interval(
-    window: &mut Window,
-    route: &OrthogonalRoute,
-    transform: RouteTransform,
-    width: f32,
-    // `interval` is where the tail starts and ends along the route, as
-    // fractions of its measured length.
-    interval: (f32, f32),
-    color: Hsla,
-    corner: f32,
-) {
-    let mut builder = PathBuilder::stroke(px(width * 1.9)).stroke_trim(interval.0, interval.1);
-    trace_route(&mut builder, route, transform, corner);
-    if let Ok(path) = builder.build() {
-        window.paint_path(path, color);
     }
 }
 
@@ -867,13 +919,68 @@ pub(crate) fn paint_route_stroke(
     dashes: Option<[Pixels; 2]>,
     corner: f32,
 ) {
-    let mut builder = PathBuilder::stroke(px(width));
-    if let Some(dashes) = dashes {
+    paint_trimmed_stroke(
+        window,
+        route,
+        transform,
+        Stroke {
+            width,
+            color,
+            dashes,
+            corner,
+            trim: None,
+        },
+    );
+}
+
+/// One stroke of a route: how wide, in what paint, dashed or not, and cut to
+/// which interval of the route's measured length.
+#[derive(Debug, Clone, Copy)]
+struct Stroke {
+    width: f32,
+    color: Hsla,
+    dashes: Option<[Pixels; 2]>,
+    corner: f32,
+    /// The part of the route to draw, as fractions of its length. `None`
+    /// draws all of it.
+    trim: Option<(f32, f32)>,
+}
+
+impl Stroke {
+    fn cut(self, from: f32, to: f32) -> Self {
+        Self {
+            trim: Some((from, to)),
+            ..self
+        }
+    }
+}
+
+/// Draws one stroke of a route.
+///
+/// Everything that draws part of a connection goes through here — the reveal
+/// of a new edge and every segment of a traffic trail — so a partial stroke
+/// rounds the same corners the whole one does. A trim taken from the raw
+/// vertices would cut the corner the stroke goes round, and the two would
+/// separate at every turn.
+fn paint_trimmed_stroke(
+    window: &mut Window,
+    route: &OrthogonalRoute,
+    transform: RouteTransform,
+    stroke: Stroke,
+) {
+    let mut builder = PathBuilder::stroke(px(stroke.width));
+    if let Some(dashes) = stroke.dashes {
         builder = builder.dash_array(&dashes);
     }
-    trace_route(&mut builder, route, transform, corner);
+    if let Some((from, to)) = stroke.trim {
+        if to <= from {
+            return;
+        }
+        builder = builder.stroke_trim(from, to);
+    }
+    trace_route(&mut builder, route, transform, stroke.corner);
     if let Ok(path) = builder.build() {
-        window.paint_path(path, color);
+        window.paint_path(path, stroke.color);
     }
 }
 
@@ -1132,6 +1239,48 @@ mod tests {
         assert_eq!(r.total_length(), 0.0);
         assert_eq!(r.sample(f32::NAN), point(2.0, 3.0));
     }
+    /// A return is a fact about control flow, not a failure. Drawn in the
+    /// danger paint, as it was, a run that retried once and then succeeded
+    /// has a red line through it forever.
+    #[test]
+    fn a_return_path_is_not_drawn_as_a_failure() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert_ne!(EdgeKind::Feedback.color(&theme), theme.colors.danger);
+            assert_ne!(EdgeKind::Feedback.active_color(&theme), theme.colors.danger);
+            // And it is still not the flow it returns from, in either state.
+            assert_ne!(
+                EdgeKind::Feedback.color(&theme),
+                EdgeKind::Flow.color(&theme)
+            );
+            assert_ne!(
+                EdgeKind::Feedback.active_color(&theme),
+                EdgeKind::Flow.active_color(&theme)
+            );
+            // Traffic is louder than rest, whichever kind is carrying it.
+            for kind in [EdgeKind::Flow, EdgeKind::Feedback] {
+                assert_ne!(kind.color(&theme), kind.active_color(&theme));
+            }
+        }
+    }
+
+    /// A connection that is still arriving carries no traffic: a comet running
+    /// down a wire that does not reach anywhere yet is traffic to a place the
+    /// graph has not said exists.
+    #[test]
+    fn an_arriving_connection_is_drawn_from_the_port_it_leaves() {
+        let paint = EdgePaint::new(1.0).reveal(0.4).phase(Some(0.7));
+        assert_eq!(paint.reveal, 0.4);
+        assert_eq!(paint.width, 1.0);
+        // Out-of-range reveals are clamped rather than trusted, because the
+        // clock they come from can overrun a frame.
+        assert_eq!(EdgePaint::new(1.0).reveal(1.4).reveal, 1.0);
+        assert_eq!(EdgePaint::new(1.0).reveal(-0.2).reveal, 0.0);
+        // A settled edge is the default, so a caller that never mentions
+        // arrival draws the whole connection.
+        assert_eq!(EdgePaint::new(1.0).reveal, 1.0);
+        assert_eq!(EdgePaint::new(1.0).phase, None);
+    }
+
     #[test]
     fn identity_and_builders_are_stable() {
         let a = GraphEdge::new("one", "two")

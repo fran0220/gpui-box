@@ -35,7 +35,7 @@ use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 use super::edge::{
-    Anchor, Axis, GraphEdge, GraphEndpoint, GraphRouting, OrthogonalRoute, PortSide,
+    Anchor, Axis, EdgePaint, GraphEdge, GraphEndpoint, GraphRouting, OrthogonalRoute, PortSide,
     RouteTransform, paint_route, paint_route_stroke, route_curved, route_curved_preview,
     route_orthogonal, route_preview,
 };
@@ -43,7 +43,6 @@ use super::node::{GraphNode, GraphPort, PortDirection};
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
-const GRID_DOT: f32 = 1.0;
 /// Below this zoom a node draws only its title, and ports stay off.
 const LOD_ZOOM: f32 = 0.4;
 /// Extra world space kept around the viewport so a node entering does not pop.
@@ -177,6 +176,20 @@ struct GestureState {
     /// gesture because it is the same kind of fact: what this one canvas has
     /// been through, not what the caller asked for.
     framed: Option<u64>,
+    /// When each connection this canvas is drawing was first seen, so a new
+    /// one can arrive rather than appear.
+    ///
+    /// The same kind of fact as the two above: what this canvas has been
+    /// through. The caller owns which edges exist; only the canvas knows
+    /// which of them it has already drawn, and a caller asked to say so would
+    /// be keeping a record of the component's own paint history.
+    ///
+    /// Empty on the first frame, which is deliberate: a canvas opening onto a
+    /// graph draws it, and does not animate in every connection at once.
+    arrived: HashMap<SharedString, Instant>,
+    /// Whether the first frame has been drawn, which is what makes the
+    /// distinction above possible.
+    opened: bool,
 }
 
 fn world_to_screen(world: Point<f32>, viewport: GraphViewport) -> Point<f32> {
@@ -1385,11 +1398,57 @@ impl RenderOnce for NodeGraph {
             }
         };
         let stroke = theme.borders.hairline;
-        let grid_color = theme.colors.node.grid;
-        let grid_major = theme.colors.node.grid_strong;
+        let grid_paint = GridPaint {
+            minor: theme.colors.node.grid,
+            major: theme.colors.node.grid_strong,
+            axis: theme.colors.node.grid_axis,
+            dot: theme.borders.hairline,
+        };
         let draw_grid = self.grid;
         let edge_theme = theme.clone();
-        let painted_routes = routes.clone();
+        // How far each connection has got into arriving. A connection the
+        // canvas has drawn before is simply there; one it has not is drawn
+        // from the port it leaves to the port it reaches, over the same
+        // entrance the rest of the library arrives on.
+        let arrival = MotionPolicy::resolve(MotionRole::Entrance, cx);
+        let reveals: HashMap<SharedString, f32> = {
+            let now = cx.background_executor().now();
+            let mut state = gesture.borrow_mut();
+            let opened = state.opened;
+            state.opened = true;
+            // Every edge the caller declared, not the ones that survived
+            // culling: a connection panned off screen and back has already
+            // been drawn, and treating it as new would animate it in every
+            // time it returned.
+            let live: HashSet<SharedString> = self.edges.iter().map(GraphEdge::edge_id).collect();
+            state.arrived.retain(|id, _| live.contains(id));
+            let span = arrival.spec().total().as_secs_f32().max(f32::EPSILON);
+            live.into_iter()
+                .map(|id| {
+                    let born = *state.arrived.entry(id.clone()).or_insert(now);
+                    // A canvas opening onto a graph draws it rather than
+                    // animating every connection in at once, and reduced
+                    // motion settles the same way.
+                    let reveal = if !opened || !arrival.animates() {
+                        1.0
+                    } else {
+                        (now.duration_since(born).as_secs_f32() / span).clamp(0.0, 1.0)
+                    };
+                    (id, reveal)
+                })
+                .collect()
+        };
+        let arriving = reveals.values().any(|reveal| *reveal < 1.0);
+        if arriving {
+            window.request_animation_frame();
+        }
+        let painted_routes: Vec<(RoutedEdge, f32)> = routes
+            .iter()
+            .map(|routed| {
+                let reveal = reveals.get(&routed.edge.edge_id()).copied().unwrap_or(1.0);
+                (routed.clone(), reveal)
+            })
+            .collect();
         let painted_preview = preview.clone();
 
         // Edges and the grid are one painted layer beneath the nodes, so a
@@ -1399,44 +1458,67 @@ impl RenderOnce for NodeGraph {
             |_, _, _| {},
             move |bounds, _, window, _| {
                 if draw_grid {
-                    paint_grid(
-                        window,
-                        bounds,
-                        viewport.offset.x,
-                        viewport.offset.y,
-                        GRID_STEP * viewport.zoom,
-                        grid_color,
-                        grid_major,
-                    );
+                    paint_grid(window, bounds, viewport, grid_paint);
                 }
-                for routed in painted_routes {
-                    let transform =
-                        RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom);
+                let transform = RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom);
+                for (routed, reveal) in painted_routes {
                     paint_route(
                         window,
                         &edge_theme,
                         &routed.edge,
                         &routed.route,
                         transform,
-                        stroke,
-                        animation_phase,
+                        EdgePaint::new(stroke).reveal(reveal).phase(animation_phase),
                     );
                 }
                 if let Some(preview) = painted_preview {
-                    let color = match preview.target {
-                        Some((_, true)) => edge_theme.colors.success,
-                        Some((_, false)) => edge_theme.colors.danger,
-                        None => edge_theme.colors.accent,
+                    // A proposal that has found a port is drawn as the
+                    // connection it would become; one still crossing open
+                    // canvas is drawn as the provisional thing it is. The
+                    // dashes are the same vocabulary a return path uses, for
+                    // the same reason: this line is not an ordinary flow.
+                    let (color, dashes) = match preview.target {
+                        Some((_, true)) => (edge_theme.colors.success, None),
+                        Some((_, false)) => (edge_theme.colors.danger, None),
+                        None => (
+                            edge_theme.colors.accent,
+                            Some([px(PREVIEW_DASH), px(PREVIEW_GAP)]),
+                        ),
                     };
+                    let connecting = preview.target.is_some_and(|(_, legal)| legal);
                     paint_route_stroke(
                         window,
                         &preview.route,
-                        RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom),
-                        stroke * 1.5,
-                        color.opacity(edge_theme.effects.node_preview_alpha),
-                        None,
+                        transform,
+                        stroke * if connecting { 2.0 } else { 1.5 },
+                        color.opacity(if connecting {
+                            edge_theme.effects.node_active_stroke_alpha
+                        } else {
+                            edge_theme.effects.node_preview_alpha
+                        }),
+                        dashes,
                         preview.route.corner(&edge_theme),
                     );
+                    // The head of the proposal, so the reader's own gesture
+                    // has a mark on the canvas rather than only a line
+                    // trailing off the pointer.
+                    let head = preview.route.sample(1.0);
+                    let head = point(
+                        bounds.origin.x + px(head.x * viewport.zoom + viewport.offset.x),
+                        bounds.origin.y + px(head.y * viewport.zoom + viewport.offset.y),
+                    );
+                    let radius = px(PREVIEW_HEAD * viewport.zoom.clamp(0.5, 1.5));
+                    window.paint_quad(gpui::quad(
+                        Bounds::new(
+                            point(head.x - radius, head.y - radius),
+                            size(radius * 2.0, radius * 2.0),
+                        ),
+                        radius,
+                        color.opacity(edge_theme.effects.node_active_stroke_alpha),
+                        px(edge_theme.borders.hairline),
+                        edge_theme.colors.canvas,
+                        gpui::BorderStyle::Solid,
+                    ));
                 }
             },
         )
@@ -1794,9 +1876,22 @@ impl RenderOnce for NodeGraph {
                         element.opacity(theme.opacity.disabled)
                     })
                     // Reaching for a 12px target is easier when the target
-                    // answers, and a port that grows under the pointer is the
+                    // answers, and a port that reacts under the pointer is the
                     // one affordance a connection gesture has before it starts.
-                    .hover(|style| style.bg(theme.colors.node.port_connected))
+                    //
+                    // The answer is a ring rather than the connected paint.
+                    // Wearing the connected paint on hover, as this did, says
+                    // an edge is already attached — which is the one thing the
+                    // reader is hovering to find out. The ring is a channel
+                    // colour is not using, so it separates a port that can be
+                    // grabbed from a port that is wired without either of them
+                    // borrowing the other's meaning.
+                    .hover(|style| {
+                        style
+                            .bg(theme.colors.node.port_hover)
+                            .border_color(theme.colors.node.port_hover)
+                            .shadow(theme.glow(theme.colors.node.port_hover))
+                    })
                     .child(label);
                 if editable {
                     view = view.cursor_pointer();
@@ -2331,6 +2426,15 @@ fn graph_minimap(
         .into_any_element()
 }
 
+/// The paints one canvas rules itself in.
+#[derive(Debug, Clone, Copy)]
+struct GridPaint {
+    minor: Hsla,
+    major: Hsla,
+    axis: Hsla,
+    dot: f32,
+}
+
 /// The canvas ground on its own, unpanned and unzoomed.
 ///
 /// A region, a lasso or a piece of canvas chrome has to be shown standing on
@@ -2338,68 +2442,136 @@ fn graph_minimap(
 /// is how the two come to disagree about what a canvas looks like. This is
 /// that ground without a graph on it: no nodes, no edges, no viewport.
 pub(crate) fn grid_ground(theme: &gpui_kit_theme::Theme) -> impl IntoElement {
-    let color = theme.colors.node.grid;
-    let major = theme.colors.node.grid_strong;
+    let paint = GridPaint {
+        minor: theme.colors.node.grid,
+        major: theme.colors.node.grid_strong,
+        axis: theme.colors.node.grid_axis,
+        dot: theme.borders.hairline,
+    };
     canvas(
         |_, _, _| {},
         move |bounds, _, window, _| {
-            paint_grid(window, bounds, 0.0, 0.0, GRID_STEP, color, major);
+            paint_grid(window, bounds, GraphViewport::default(), paint);
         },
     )
     .absolute()
     .inset_0()
 }
 
-/// Paints the dot grid the canvas sits on.
+/// Every dot the same weight is a texture, not a grid: it says the canvas has
+/// a surface but not how far anything has been dragged. Marking one interval
+/// in a heavier dot gives the pan a ruler to move against.
+const MAJOR: i32 = 5;
+/// The closest two dots may sit before the grid stops being a ruler and
+/// becomes a fill.
+const GRID_MIN_SPACING: f32 = 15.0;
+/// How wide the axis rules are drawn, in device pixels.
+const AXIS_WIDTH: f32 = 1.0;
+/// The dash and gap of a connection proposal that has not found a port.
+const PREVIEW_DASH: f32 = 6.0;
+const PREVIEW_GAP: f32 = 5.0;
+/// The radius of the mark at the head of a connection proposal.
+const PREVIEW_HEAD: f32 = 4.0;
+
+/// The world step the grid rules itself at, and how far the finest level has
+/// faded in.
+///
+/// A grid of one fixed world step is a grid for one zoom. Multiplied by the
+/// zoom, as this was, its dots close to a smear on the way out and spread to
+/// nothing on the way in — and both are the same failure, which is that the
+/// interval stopped being something a reader can count. The step climbs by
+/// the major interval instead, so whatever the zoom the dots are a countable
+/// distance apart and the heavier dot is still five of them.
+///
+/// The level changes at a zoom, and a level that appeared would pop, so the
+/// finest one fades across the band it lives in and is gone by the moment it
+/// would have been replaced. The heavier interval never fades: it is the one
+/// that becomes the next level's dots.
+fn grid_level(zoom: f32) -> (f32, f32) {
+    let mut world = GRID_STEP;
+    let major = MAJOR as f32;
+    while world * zoom < GRID_MIN_SPACING {
+        world *= major;
+    }
+    while world * zoom >= GRID_MIN_SPACING * major {
+        world /= major;
+    }
+    let spacing = world * zoom;
+    let fade = ((spacing - GRID_MIN_SPACING) / (GRID_MIN_SPACING * (major - 1.0))).clamp(0.0, 1.0);
+    (world, fade)
+}
+
+/// Paints the dot grid the canvas sits on, and the two rules through its
+/// origin.
 ///
 /// The grid is anchored to the pan offset rather than to the viewport, so it
 /// travels with the graph and reports that the canvas moved. A grid pinned to
 /// the viewport would sit still under a graph that was moving, which reads as
 /// the graph having stayed where it was.
+///
+/// The axes are where the origin is. Every interval of a grid looks like every
+/// other one, so a grid alone says how far the canvas has been dragged and
+/// never where the reader has arrived; the axes are the one place on the
+/// canvas that is somewhere in particular.
 fn paint_grid(
     window: &mut Window,
     bounds: Bounds<Pixels>,
-    pan_x: f32,
-    pan_y: f32,
-    step: f32,
-    color: gpui::Hsla,
-    major: gpui::Hsla,
+    viewport: GraphViewport,
+    paint: GridPaint,
 ) {
-    // Every dot the same weight is a texture, not a grid: it says the canvas
-    // has a surface but not how far anything has been dragged. Marking one
-    // interval in a heavier dot gives the pan a ruler to move against, and it
-    // is the same interval whatever the zoom, so distance keeps its meaning.
-    const MAJOR: i32 = 5;
+    let (world_step, fade) = grid_level(viewport.zoom);
+    let width = f32::from(bounds.size.width);
+    let height = f32::from(bounds.size.height);
+    let screen = |world: f32, offset: f32| world * viewport.zoom + offset;
+    // The first ruled world coordinate at or before the visible edge, so a
+    // dot half off screen is still drawn where it belongs.
+    let first = |offset: f32| ((-offset / viewport.zoom) / world_step).floor() * world_step;
 
-    let first = |pan: f32| {
-        let offset = pan.rem_euclid(step * MAJOR as f32);
-        (offset - step * MAJOR as f32, (offset / step).round() as i32)
-    };
-    let (start_y, origin_row) = first(pan_y);
-    let (start_x, origin_column) = first(pan_x);
-
-    let mut y = start_y;
-    let mut row = -MAJOR + origin_row;
-    while y < f32::from(bounds.size.height) {
-        let mut x = start_x;
-        let mut column = -MAJOR + origin_column;
-        while x < f32::from(bounds.size.width) {
-            if y >= 0.0 && x >= 0.0 {
-                let heavy = row.rem_euclid(MAJOR) == 0 && column.rem_euclid(MAJOR) == 0;
-                let dot = if heavy { GRID_DOT * 1.5 } else { GRID_DOT };
+    let minor = paint.minor.opacity(fade);
+    let dot = paint.dot;
+    let mut world_y = first(viewport.offset.y);
+    while screen(world_y, viewport.offset.y) < height {
+        let y = screen(world_y, viewport.offset.y);
+        let row_major = ((world_y / world_step).round() as i32).rem_euclid(MAJOR) == 0;
+        let mut world_x = first(viewport.offset.x);
+        while screen(world_x, viewport.offset.x) < width {
+            let x = screen(world_x, viewport.offset.x);
+            let column_major = ((world_x / world_step).round() as i32).rem_euclid(MAJOR) == 0;
+            let heavy = row_major && column_major;
+            if y >= 0.0 && x >= 0.0 && (heavy || fade > 0.0) {
+                let size_px = if heavy { dot * 1.6 } else { dot };
                 window.paint_quad(gpui::fill(
                     Bounds::new(
                         point(bounds.origin.x + px(x), bounds.origin.y + px(y)),
-                        size(px(dot), px(dot)),
+                        size(px(size_px), px(size_px)),
                     ),
-                    if heavy { major } else { color },
+                    if heavy { paint.major } else { minor },
                 ));
             }
-            x += step;
-            column += 1;
+            world_x += world_step;
         }
-        y += step;
-        row += 1;
+        world_y += world_step;
+    }
+
+    let origin_x = viewport.offset.x;
+    let origin_y = viewport.offset.y;
+    if (0.0..width).contains(&origin_x) {
+        window.paint_quad(gpui::fill(
+            Bounds::new(
+                point(bounds.origin.x + px(origin_x), bounds.origin.y),
+                size(px(AXIS_WIDTH), bounds.size.height),
+            ),
+            paint.axis,
+        ));
+    }
+    if (0.0..height).contains(&origin_y) {
+        window.paint_quad(gpui::fill(
+            Bounds::new(
+                point(bounds.origin.x, bounds.origin.y + px(origin_y)),
+                size(bounds.size.width, px(AXIS_WIDTH)),
+            ),
+            paint.axis,
+        ));
     }
 }
 
@@ -2434,6 +2606,54 @@ mod tests {
 
     fn surface(width: f32, height: f32) -> Bounds<Pixels> {
         Bounds::new(point(px(0.0), px(0.0)), size(px(width), px(height)))
+    }
+
+    /// A grid of one fixed world step is a grid for one zoom: scaled straight
+    /// by the zoom it closes to a smear on the way out and spreads to nothing
+    /// on the way in, and both are the interval ceasing to be countable.
+    #[test]
+    fn the_grid_stays_countable_at_every_zoom() {
+        for zoom in [
+            0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0,
+        ] {
+            let (world, fade) = grid_level(zoom);
+            let spacing = world * zoom;
+            assert!(
+                (GRID_MIN_SPACING..GRID_MIN_SPACING * MAJOR as f32).contains(&spacing),
+                "at zoom {zoom} the dots sit {spacing} apart"
+            );
+            assert!((0.0..=1.0).contains(&fade));
+            // The step is always a whole number of the authored interval, up
+            // or down by the major one, so distance keeps its meaning: a
+            // heavier dot is five dots at every level.
+            let ratio = (world / GRID_STEP).max(GRID_STEP / world);
+            assert!(
+                (ratio.log(MAJOR as f32) - ratio.log(MAJOR as f32).round()).abs() < 1.0e-4,
+                "at zoom {zoom} the world step {world} is not a major multiple of {GRID_STEP}"
+            );
+        }
+    }
+
+    /// The level changes at a zoom, and a level that appeared would pop. The
+    /// finest one is gone by the moment it would have been replaced.
+    #[test]
+    fn the_finest_grid_level_fades_out_before_it_is_replaced() {
+        // Walk the zoom down through a level change and watch the fade fall
+        // to nothing and then come back on the level below.
+        let mut zoom = 1.0f32;
+        let mut faded_out = false;
+        for _ in 0..400 {
+            zoom *= 0.99;
+            let (_, fade) = grid_level(zoom);
+            if fade < 0.02 {
+                faded_out = true;
+            }
+        }
+        assert!(faded_out, "the level changed without the finest one fading");
+        // Right at the floor of the band there is nothing left of it.
+        let (world, _) = grid_level(1.0);
+        let (_, fade) = grid_level(GRID_MIN_SPACING / world);
+        assert!(fade < 1.0e-4);
     }
 
     #[test]

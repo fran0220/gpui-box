@@ -8249,7 +8249,8 @@
       ],
       "construct": [],
       "options": [
-        "color(theme: &Theme) -> Hsla"
+        "color(theme: &Theme) -> Hsla",
+        "active_color(theme: &Theme) -> Hsla"
       ],
       "commands": [],
       "queries": []
