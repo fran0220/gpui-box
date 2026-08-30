@@ -76,6 +76,14 @@ use that contract for a single horizontal header/body/summary viewport and a
 direction-aware frozen leading group; their virtualized vertical handle remains
 independent.
 
+Measured `Reveal` subtrees retain a stable natural primary-axis extent while
+contributing caller-supplied progress to ordinary layout. The same content mask
+governs paint and pointer delivery, and role-bearing bounds are intersected
+with the active mask before AccessKit publication; a fully shut subtree is not
+prepainted or published. `Reveal` owns no timer, easing, or component policy.
+Kit's Accordion and Collapsible resolve semantic `Resize` motion and pass only
+the resulting progress into this framework primitive.
+
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the
 transparent overlay plane uses grayscale antialiasing because RGB subpixel

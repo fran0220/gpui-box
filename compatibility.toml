@@ -42,6 +42,10 @@ limitations = ["native media playback is unavailable", "threaded COOP/COEP not c
 
 [framework_accessibility]
 cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."
+clipped_role_bounds = "Role-bearing element bounds are intersected with the active content mask before AccessKit publication; fully clipped nodes are omitted for that frame."
+
+[framework_layout]
+measured_reveal = "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."
 
 [release_validation]
 dependency_graph = "cargo run -p xtask -- dependencies check"

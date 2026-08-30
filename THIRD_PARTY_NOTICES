@@ -70,6 +70,9 @@ source.
 The inline sticky-subtree transform, deferred-prepaint clipping retention, and
 inset-aware focus reveal behavior are GPUI Box framework work over existing
 layout, input, and accessibility state and import no grid or third-party source.
+The measured `Reveal` subtree and content-mask-aware AccessKit bounds are GPUI
+Box framework work over those same authorities. They import no disclosure,
+animation, browser, product, or third-party source.
 The per-window structural frame counters, retained element-arena growth
 accounting, and deterministic 10,000-item Kit performance budgets are GPUI Box
 work and import no profiler, allocator, benchmark, or product source.

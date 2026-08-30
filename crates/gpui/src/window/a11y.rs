@@ -314,6 +314,7 @@ impl A11y {
 pub struct A11ySubtreeBuilder<'a> {
     parent_id: NodeId,
     nodes: &'a mut A11yNodeBuilder,
+    bounds_clip: Option<accesskit::Rect>,
     /// Provenance of the real element whose `a11y_synthetic_children` is
     /// running.
     #[cfg(debug_assertions)]
@@ -325,9 +326,15 @@ impl<'a> A11ySubtreeBuilder<'a> {
         Self {
             parent_id,
             nodes,
+            bounds_clip: None,
             #[cfg(debug_assertions)]
             creator: debug::NodeCreator::default(),
         }
+    }
+
+    pub(crate) fn with_bounds_clip(mut self, bounds: accesskit::Rect) -> Self {
+        self.bounds_clip = Some(bounds);
+        self
     }
 
     #[cfg(debug_assertions)]
@@ -351,9 +358,25 @@ impl<'a> A11ySubtreeBuilder<'a> {
 
     /// Append a synthetic leaf node as a child of this element's node.
     ///
-    /// Returns `false` if a node with this id is already present in the tree,
+    /// Returns `false` if a node with this id is already present in the tree or
+    /// if its bounds are fully outside the real parent's active content clip,
     /// in which case the node is discarded.
-    pub fn push_child(&mut self, id: NodeId, node: accesskit::Node) -> bool {
+    pub fn push_child(&mut self, id: NodeId, mut node: accesskit::Node) -> bool {
+        if let (Some(clip), Some(bounds)) = (self.bounds_clip, node.bounds())
+            && bounds.x1 > bounds.x0
+            && bounds.y1 > bounds.y0
+        {
+            let bounds = accesskit::Rect {
+                x0: bounds.x0.max(clip.x0),
+                y0: bounds.y0.max(clip.y0),
+                x1: bounds.x1.min(clip.x1),
+                y1: bounds.y1.min(clip.y1),
+            };
+            if bounds.x1 <= bounds.x0 || bounds.y1 <= bounds.y0 {
+                return false;
+            }
+            node.set_bounds(bounds);
+        }
         let pushed = self.nodes.push_leaf(id, node);
         #[cfg(debug_assertions)]
         if pushed {
@@ -821,9 +844,9 @@ fn relationship_text(
 mod tests {
     // Import specific items rather than glob-importing `super`, which would pull
     // in gpui's own `test` attribute macro and shadow the standard one.
-    use super::{A11y, A11yNodeBuilder, ROOT_NODE_ID};
+    use super::{A11y, A11yNodeBuilder, A11ySubtreeBuilder, ROOT_NODE_ID};
     use crate::{AccessibilityRelationship, ElementId, FocusId};
-    use accesskit::{NodeId, Role};
+    use accesskit::{NodeId, Rect, Role};
     use std::sync::{Arc, atomic::AtomicBool};
 
     fn test_node() -> accesskit::Node {
@@ -840,6 +863,57 @@ mod tests {
         let mut a11y = A11y::new(Arc::new(AtomicBool::new(true)), false, None);
         a11y.begin_frame();
         a11y
+    }
+
+    #[test]
+    fn synthetic_bounds_follow_the_real_parents_content_clip() {
+        let mut nodes = new_builder();
+        let parent = NodeId(1);
+        let partial = NodeId(2);
+        let hidden = NodeId(3);
+        assert!(nodes.push(parent, test_node()));
+        {
+            let mut subtree = A11ySubtreeBuilder::new(parent, &mut nodes).with_bounds_clip(Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 100.0,
+                y1: 40.0,
+            });
+            let mut partial_node = accesskit::Node::new(Role::TextRun);
+            partial_node.set_bounds(Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 100.0,
+                y1: 100.0,
+            });
+            assert!(subtree.push_child(partial, partial_node));
+
+            let mut hidden_node = accesskit::Node::new(Role::TextRun);
+            hidden_node.set_bounds(Rect {
+                x0: 0.0,
+                y0: 50.0,
+                x1: 100.0,
+                y1: 100.0,
+            });
+            assert!(!subtree.push_child(hidden, hidden_node));
+        }
+        nodes.pop();
+        let update = nodes.finalize();
+        let partial = update
+            .nodes
+            .iter()
+            .find(|(id, _)| *id == partial)
+            .expect("partially visible synthetic node");
+        assert_eq!(
+            partial.1.bounds(),
+            Some(Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: 100.0,
+                y1: 40.0,
+            })
+        );
+        assert!(update.nodes.iter().all(|(id, _)| *id != hidden));
     }
 
     #[test]

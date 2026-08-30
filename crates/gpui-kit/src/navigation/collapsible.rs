@@ -1,12 +1,12 @@
 //! One region that opens and shuts.
 //!
 //! [`Accordion`] is the many-region case and holds every rule worth holding:
-//! the header treatment, the chevron that turns, the measured height a body
-//! grows and shrinks through, and the decision that a shut body leaves the
-//! tree rather than hiding in it. A collapsible is the same thing with one
-//! section, so it is built by handing that section to an accordion rather than
-//! by writing any of it again. If the disclosure animation is ever wrong here,
-//! it is wrong in exactly one place.
+//! the header treatment, the chevron that turns, the semantic motion role, and
+//! the decision that a shut body leaves the tree rather than hiding in it. The
+//! shared GPUI [`gpui::Reveal`] primitive owns measured disclosure geometry and
+//! clipping. A collapsible is the same component policy with one section, so it
+//! is built by handing that section to an accordion rather than writing either
+//! layer again.
 //!
 //! Whether it is open belongs to the caller, as it does for the accordion: the
 //! collapsible reports the state activating the header asks for and draws the

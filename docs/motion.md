@@ -82,7 +82,7 @@ component. Anything not listed here does not move.
 | `Slider`, media scrubbers | Fill and handle follow the value | `Tracking` + `Transition<f32>`, snapped while dragging | A value the pointer is holding must be exactly under the pointer; a value from anywhere else settles onto it. |
 | `SegmentedControl`, `Tabs`, `Sidebar` | Indicator or surviving glyph changes slots | `Tracking` + `Flipping::flip` | One visual identity travels rather than being redrawn elsewhere. |
 | `Select`, `Combobox`, `Menu`, `ContextMenu`, `CommandPalette` | Rows fade in as a wave | `MenuEnter` + `Stagger::rows` | Opacity only: a rise is a layout input and would publish a moving box. |
-| `Accordion` | Body height opens and closes | `Resize` + `Transition<f32>` + `layout::measure` | A settled section is laid out exactly as it was before there was motion here; only a section in flight is driven. |
+| `Accordion`, `Collapsible` | Body height opens and closes | `Resize` + tracked progress + `gpui::reveal` | Kit chooses the semantic motion role; the framework measures the natural subtree and keeps layout, clipping, hit testing, and accessibility bounds on the same revealed extent. |
 | `ProgressBar`, `ProgressCircle`, `AnimatedNumber` | Determinate value moves | `Resize` + `Transition` | The published value is the caller's number from the frame it changes. |
 | `Skeleton`, unknown progress, graph activity | Highlight or trace sweeps | `Activity::Advancing` + repeating timeline | A sweep reads as work moving through known direction without inventing a percentage. |
 | `PulseLoader`, listening voice | Dots or bars breathe | `Activity::Deliberating` + repeating timeline | The quietest claim there is: something is being waited on. Reduced motion leaves a static meaningful mark. |

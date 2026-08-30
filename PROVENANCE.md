@@ -140,6 +140,13 @@ accessibility geometry, and paint on one translated subtree and import no
 browser sticky implementation, grid source, product policy, or third-party
 code.
 
+The stable-id measured `Reveal` subtree and content-mask-aware AccessKit bounds
+are subsequent GPUI Box work at that same framework boundary. The primitive
+keeps natural measurement, in-flow extent, clipping, hit testing, and
+role-bearing accessibility geometry together while leaving clocks, easing, and
+component policy to callers. It imports no disclosure component, animation
+system, browser implementation, product policy, or third-party code.
+
 The bounded native external-data drag bridge for encoded images, MIME-tagged
 text, URLs, and promised or virtual files on macOS and Windows is subsequent
 GPUI Box work. It uses operating-system drag and pasteboard APIs and imports no

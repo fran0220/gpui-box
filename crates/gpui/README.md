@@ -93,6 +93,26 @@ The framework also provides user-defined actions and key bindings, platform
 services, an async executor integrated with the event loop, and `#[gpui::test]`
 with `TestAppContext` for UI tests.
 
+### Measured subtree reveals
+
+`reveal` is the framework boundary for disclosure geometry. It measures a
+subtree at its natural primary-axis extent, contributes a caller-supplied
+fraction of that extent to ordinary layout, and applies the same clipping to
+paint, hit testing, and accessibility bounds. It owns no timer or easing; a
+component or application supplies progress from its own motion policy. The id
+retains the natural measurement across frames.
+
+```rust,no_run
+# use gpui::{div, reveal, ParentElement};
+# let progress = 0.5;
+let details = reveal("details-reveal", progress, div().child("Details"));
+```
+
+Vertical reveals open from the top by default. `Reveal::axis` selects the
+horizontal axis and `Reveal::from_end` anchors a partial reveal to the physical
+bottom or right edge. At zero, the subtree is measured but not prepainted, hit
+testable, or addressable.
+
 ## Documentation and support
 
 - [GPUI Box repository](https://github.com/fran0220/gpui-box)

@@ -11,7 +11,7 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Transformation, Window, div, prelude::FluentBuilder, px,
-    radians,
+    radians, reveal,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -24,7 +24,6 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text as foundation_text,
 };
-use crate::layout::measure;
 use crate::motion::{self, MotionPolicy, MotionRole};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
@@ -274,6 +273,7 @@ impl RenderOnce for Accordion {
             );
 
             let body_id = ident.child("body").semantic_id();
+            let reveal_id = ident.child("body-reveal").element_id();
             let disclosed = motion::tracked(
                 &body_id,
                 f32::from(u8::from(open)),
@@ -287,8 +287,6 @@ impl RenderOnce for Accordion {
             // and something on screen is something a typist can point at, so
             // it stays addressable exactly as long as it stays visible.
             let body = (disclosed > 0.0).then_some(section.body).flatten();
-            let measured = measure::cell(&body_id, window, cx);
-            let height = px(f32::from(measured.get().size.height) * disclosed);
 
             // A stack of sections with no lines in it is one slab with several
             // paragraphs on it. The rule is what says where one section ends,
@@ -299,6 +297,7 @@ impl RenderOnce for Accordion {
             }
             stack = stack.child(div().column().child(header).children(body.map(|body| {
                 let content = div()
+                    .w_full()
                     // A disclosed body is a different plane from the header
                     // that opened it, so an open section reads as opened
                     // rather than as two paragraphs of one header. It steps
@@ -333,35 +332,7 @@ impl RenderOnce for Accordion {
                     .row_reading(direction)
                     .text_start(direction)
                     .child(body);
-                let record = {
-                    let measured = Rc::clone(&measured);
-                    move |bounds: Vec<gpui::Bounds<gpui::Pixels>>,
-                          window: &mut Window,
-                          _: &mut App| {
-                        if let Some(first) = bounds.first() {
-                            measure::record(&measured, *first, window);
-                        }
-                    }
-                };
-
-                // A settled section is laid out exactly as it was
-                // before there was any motion here: the body sits in
-                // the flow and its own height is the section's height.
-                // Only a section in flight uses the driven height, and
-                // it takes the body out of the flow to get one, so the
-                // measurement stays the body's natural height instead
-                // of chasing the frame being animated around it.
-                if disclosed >= 1.0 {
-                    div().w_full().on_children_prepainted(record).child(content)
-                } else {
-                    div()
-                        .relative()
-                        .w_full()
-                        .h(height)
-                        .overflow_hidden()
-                        .on_children_prepainted(record)
-                        .child(content.absolute().top_0().left_0().right_0())
-                }
+                reveal(reveal_id, disclosed, content)
             })));
         }
 
