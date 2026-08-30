@@ -240,12 +240,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#565656` |
+| `color.node.portHover` | `{indigo.400}` | `#7c86ff` |
 | `color.node.portConnected` | `{indigo.600}` | `#5865f2` |
 | `color.node.edge` | `{neutral.500}` | `#565656` |
 | `color.node.edgeActive` | `{indigo.400}` | `#7c86ff` |
+| `color.node.edgeFeedback` | `{amber.500}/b8` | `#ffb900b8` |
+| `color.node.edgeFeedbackActive` | `{amber.500}` | `#ffb900` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#1b1b1bf0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `{indigo.400}` | `#7c86ff` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -717,7 +721,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 8.58 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 5.46 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 4.03 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 5.94 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.94 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 10.79 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.70 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.42 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.17 | 4.5 |
@@ -991,12 +997,16 @@ Appearance: `Light`.
 | `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#0a0a0c0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#9a9aa1` |
+| `color.node.portHover` | `{indigo.400}` | `#4952c9` |
 | `color.node.portConnected` | `{indigo.600}` | `#363fa8` |
 | `color.node.edge` | `{neutral.500}` | `#9a9aa1` |
 | `color.node.edgeActive` | `{indigo.400}` | `#4952c9` |
+| `color.node.edgeFeedback` | `{amber.500}/b8` | `#a76a00b8` |
+| `color.node.edgeFeedbackActive` | `{amber.500}` | `#a76a00` |
 | `color.node.labelWash` | `{neutral.150}/f0` | `#fffffff0` |
 | `color.node.grid` | `{neutral.850}/14` | `#0a0a0c14` |
 | `color.node.gridStrong` | `{neutral.850}/29` | `#0a0a0c29` |
+| `color.node.gridAxis` | `{neutral.850}/4d` | `#0a0a0c4d` |
 | `color.loader.mark` | `{indigo.400}` | `#4952c9` |
 | `color.loader.track` | `{neutral.850}/1f` | `#0a0a0c1f` |
 | `color.loader.placeholder` | `{neutral.850}/17` | `#0a0a0c17` |
@@ -1468,7 +1478,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.26 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 5.30 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.30 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 3.75 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.32 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.03 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.30 | 4.5 |
@@ -1742,12 +1754,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#6c7086` |
+| `color.node.portHover` | `#89b4fa` | `#89b4fa` |
 | `color.node.portConnected` | `#b4befe` | `#b4befe` |
 | `color.node.edge` | `{neutral.500}` | `#6c7086` |
 | `color.node.edgeActive` | `#89b4fa` | `#89b4fa` |
+| `color.node.edgeFeedback` | `#f9e2afb8` | `#f9e2afb8` |
+| `color.node.edgeFeedbackActive` | `#f9e2af` | `#f9e2af` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#262636f0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#89b4fa` | `#89b4fa` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -2219,7 +2235,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 7.32 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 4.65 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 9.17 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 7.79 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 7.79 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 12.91 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.72 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.30 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 8.91 | 4.5 |
@@ -2493,12 +2511,16 @@ Appearance: `Light`.
 | `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#2325370f` |
 | `color.node.portIdle` | `{neutral.500}` | `#9ca0b0` |
+| `color.node.portHover` | `#1e66f5` | `#1e66f5` |
 | `color.node.portConnected` | `#8032e6` | `#8032e6` |
 | `color.node.edge` | `{neutral.500}` | `#9ca0b0` |
 | `color.node.edgeActive` | `#1e66f5` | `#1e66f5` |
+| `color.node.edgeFeedback` | `#9c6608b8` | `#9c6608b8` |
+| `color.node.edgeFeedbackActive` | `#9c6608` | `#9c6608` |
 | `color.node.labelWash` | `{neutral.150}/f0` | `#fffffff0` |
 | `color.node.grid` | `{neutral.850}/14` | `#23253714` |
 | `color.node.gridStrong` | `{neutral.850}/29` | `#23253729` |
+| `color.node.gridAxis` | `{neutral.850}/4d` | `#2325374d` |
 | `color.loader.mark` | `#1e66f5` | `#1e66f5` |
 | `color.loader.track` | `{neutral.850}/1f` | `#2325371f` |
 | `color.loader.placeholder` | `{neutral.850}/17` | `#23253717` |
@@ -2970,7 +2992,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 5.28 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 4.34 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.34 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 4.30 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.51 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.25 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 4.91 | 4.5 |
@@ -3244,12 +3268,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#4c566a` |
+| `color.node.portHover` | `#88c0d0` | `#88c0d0` |
 | `color.node.portConnected` | `#7595c4` | `#7595c4` |
 | `color.node.edge` | `{neutral.500}` | `#4c566a` |
 | `color.node.edgeActive` | `#88c0d0` | `#88c0d0` |
+| `color.node.edgeFeedback` | `#ebcb8bb8` | `#ebcb8bb8` |
+| `color.node.edgeFeedbackActive` | `#ebcb8b` | `#ebcb8b` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#2e3440f0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#88c0d0` | `#88c0d0` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -3721,7 +3749,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 5.86 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 3.72 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 4.57 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 7.01 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 7.01 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 8.98 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 9.31 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 8.98 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 8.17 | 4.5 |
@@ -3995,12 +4025,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#565f89` |
+| `color.node.portHover` | `#7aa2f7` | `#7aa2f7` |
 | `color.node.portConnected` | `#bb9af7` | `#bb9af7` |
 | `color.node.edge` | `{neutral.500}` | `#565f89` |
 | `color.node.edgeActive` | `#7aa2f7` | `#7aa2f7` |
+| `color.node.edgeFeedback` | `#e0af68b8` | `#e0af68b8` |
+| `color.node.edgeFeedbackActive` | `#e0af68` | `#e0af68` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#24283bf0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#7aa2f7` | `#7aa2f7` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -4472,7 +4506,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 7.49 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 4.76 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.39 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 6.79 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 6.79 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 8.55 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.97 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.60 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 7.14 | 4.5 |
@@ -4746,12 +4782,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#665c54` |
+| `color.node.portHover` | `#83a598` | `#83a598` |
 | `color.node.portConnected` | `#8ec07c` | `#8ec07c` |
 | `color.node.edge` | `{neutral.500}` | `#665c54` |
 | `color.node.edgeActive` | `#83a598` | `#83a598` |
+| `color.node.edgeFeedback` | `#fabd2fb8` | `#fabd2fb8` |
+| `color.node.edgeFeedbackActive` | `#fabd2f` | `#fabd2f` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#302e2cf0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#83a598` | `#83a598` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -5223,7 +5263,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 7.17 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 4.56 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.01 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 5.48 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.48 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 8.69 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.92 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.57 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.29 | 4.5 |
@@ -5497,12 +5539,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#6272a4` |
+| `color.node.portHover` | `#bd93f9` | `#bd93f9` |
 | `color.node.portConnected` | `#ff79c6` | `#ff79c6` |
 | `color.node.edge` | `{neutral.500}` | `#6272a4` |
 | `color.node.edgeActive` | `#bd93f9` | `#bd93f9` |
+| `color.node.edgeFeedback` | `#ffb86cb8` | `#ffb86cb8` |
+| `color.node.edgeFeedbackActive` | `#ffb86c` | `#ffb86c` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#282a36f0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#bd93f9` | `#bd93f9` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -5974,7 +6020,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 6.86 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 4.36 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 6.62 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 6.55 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 6.55 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 9.27 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.82 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.32 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.55 | 4.5 |
@@ -6248,12 +6296,16 @@ Appearance: `Dark`.
 | `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#657b83` |
+| `color.node.portHover` | `#268bd2` | `#268bd2` |
 | `color.node.portConnected` | `#868bd8` | `#868bd8` |
 | `color.node.edge` | `{neutral.500}` | `#657b83` |
 | `color.node.edgeActive` | `#268bd2` | `#268bd2` |
+| `color.node.edgeFeedback` | `#b58900b8` | `#b58900b8` |
+| `color.node.edgeFeedbackActive` | `#b58900` | `#b58900` |
 | `color.node.labelWash` | `{neutral.100}/f0` | `#002b36f0` |
 | `color.node.grid` | `{neutral.900}/14` | `#ffffff14` |
 | `color.node.gridStrong` | `{neutral.900}/29` | `#ffffff29` |
+| `color.node.gridAxis` | `{neutral.900}/4d` | `#ffffff4d` |
 | `color.loader.mark` | `#268bd2` | `#268bd2` |
 | `color.loader.track` | `{neutral.900}/24` | `#ffffff24` |
 | `color.loader.placeholder` | `{neutral.900}/14` | `#ffffff14` |
@@ -6725,7 +6777,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 7.57 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 4.81 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 5.41 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 4.61 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.61 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 5.29 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.69 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.24 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 5.35 | 4.5 |
@@ -6999,12 +7053,16 @@ Appearance: `Light`.
 | `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#002b360f` |
 | `color.node.portIdle` | `{neutral.500}` | `#839496` |
+| `color.node.portHover` | `#1b6fab` | `#1b6fab` |
 | `color.node.portConnected` | `#6c71c4` | `#6c71c4` |
 | `color.node.edge` | `{neutral.500}` | `#839496` |
 | `color.node.edgeActive` | `#1b6fab` | `#1b6fab` |
+| `color.node.edgeFeedback` | `#8f6b00b8` | `#8f6b00b8` |
+| `color.node.edgeFeedbackActive` | `#8f6b00` | `#8f6b00` |
 | `color.node.labelWash` | `{neutral.150}/f0` | `#fffdf6f0` |
 | `color.node.grid` | `{neutral.850}/14` | `#002b3614` |
 | `color.node.gridStrong` | `{neutral.850}/29` | `#002b3629` |
+| `color.node.gridAxis` | `{neutral.850}/4d` | `#002b364d` |
 | `color.loader.mark` | `#1b6fab` | `#1b6fab` |
 | `color.loader.track` | `{neutral.850}/1f` | `#002b361f` |
 | `color.loader.placeholder` | `{neutral.850}/17` | `#002b3617` |
@@ -7476,7 +7534,9 @@ Row stagger maximum items: `8`.
 | `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
 | `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 3.81 | 3.0 |
+| `color.node.portHover` | `color.surface.canvas` | 4.68 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.68 | 3.0 |
+| `color.node.edgeFeedbackActive` | `color.surface.canvas` | 4.28 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.29 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 5.99 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 5.37 | 4.5 |

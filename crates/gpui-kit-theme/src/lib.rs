@@ -330,12 +330,16 @@ impl SequenceScale {
 pub struct NodePalette {
     pub header_wash: Hsla,
     pub port_idle: Hsla,
+    pub port_hover: Hsla,
     pub port_connected: Hsla,
     pub edge: Hsla,
     pub edge_active: Hsla,
+    pub edge_feedback: Hsla,
+    pub edge_feedback_active: Hsla,
     pub label_wash: Hsla,
     pub grid: Hsla,
     pub grid_strong: Hsla,
+    pub grid_axis: Hsla,
 }
 
 impl NodePalette {
@@ -343,12 +347,16 @@ impl NodePalette {
         match role {
             NodeColor::HeaderWash => self.header_wash,
             NodeColor::PortIdle => self.port_idle,
+            NodeColor::PortHover => self.port_hover,
             NodeColor::PortConnected => self.port_connected,
             NodeColor::Edge => self.edge,
             NodeColor::EdgeActive => self.edge_active,
+            NodeColor::EdgeFeedback => self.edge_feedback,
+            NodeColor::EdgeFeedbackActive => self.edge_feedback_active,
             NodeColor::LabelWash => self.label_wash,
             NodeColor::Grid => self.grid,
             NodeColor::GridStrong => self.grid_strong,
+            NodeColor::GridAxis => self.grid_axis,
         }
     }
 }
@@ -743,12 +751,16 @@ impl Theme {
                 node: NodePalette {
                     header_wash: color(tokens.node(NodeColor::HeaderWash)),
                     port_idle: color(tokens.node(NodeColor::PortIdle)),
+                    port_hover: color(tokens.node(NodeColor::PortHover)),
                     port_connected: color(tokens.node(NodeColor::PortConnected)),
                     edge: color(tokens.node(NodeColor::Edge)),
                     edge_active: color(tokens.node(NodeColor::EdgeActive)),
+                    edge_feedback: color(tokens.node(NodeColor::EdgeFeedback)),
+                    edge_feedback_active: color(tokens.node(NodeColor::EdgeFeedbackActive)),
                     label_wash: color(tokens.node(NodeColor::LabelWash)),
                     grid: color(tokens.node(NodeColor::Grid)),
                     grid_strong: color(tokens.node(NodeColor::GridStrong)),
+                    grid_axis: color(tokens.node(NodeColor::GridAxis)),
                 },
                 agent: AgentPalette {
                     read: color(tokens.agent(AgentColor::Read)),
@@ -1920,12 +1932,20 @@ mod tests {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
             let node = theme.colors.node;
             assert_ne!(node.port_idle, node.port_connected);
+            assert_ne!(node.port_idle, node.port_hover);
             assert_ne!(node.edge, node.edge_active);
+            // A return path is a fact about control flow, so it is neither
+            // the flow it returns from nor the failure paint.
+            assert_ne!(node.edge, node.edge_feedback);
+            assert_ne!(node.edge_feedback_active, theme.colors.danger);
             assert_eq!(node.get(NodeColor::PortIdle), node.port_idle);
+            assert_eq!(node.get(NodeColor::GridAxis), node.grid_axis);
             // The chip behind an edge label has to cover the line under it.
             assert!(node.label_wash.a > 0.9);
-            // The grid is barely there, and its major interval is louder.
+            // The grid is barely there, its major interval is louder, and the
+            // origin rules are louder still.
             assert!(node.grid.a < node.grid_strong.a);
+            assert!(node.grid_strong.a < node.grid_axis.a);
         }
     }
 

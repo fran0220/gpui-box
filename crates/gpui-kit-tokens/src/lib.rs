@@ -44,8 +44,8 @@ pub enum TokenError {
     Placeholder(String),
     #[error("token tones are not distinguishable:\n{0}")]
     Distinction(String),
-    #[error("the categorical scale does not read as one:\n{0}")]
-    Series(String),
+    #[error("token paints that carry different facts read alike:\n{0}")]
+    Perceptual(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -633,9 +633,10 @@ impl TokenDocument {
             ));
         }
 
-        let failures = contrast::series_failures(self);
+        let mut failures = contrast::series_failures(self);
+        failures.extend(contrast::canvas_failures(self));
         if !failures.is_empty() {
-            return Err(TokenError::Series(
+            return Err(TokenError::Perceptual(
                 failures
                     .iter()
                     .map(|failure| {
@@ -803,12 +804,16 @@ impl TokenDocument {
         let value = match role {
             NodeColor::HeaderWash => self.color.node.header_wash.as_str(),
             NodeColor::PortIdle => self.color.node.port_idle.as_str(),
+            NodeColor::PortHover => self.color.node.port_hover.as_str(),
             NodeColor::PortConnected => self.color.node.port_connected.as_str(),
             NodeColor::Edge => self.color.node.edge.as_str(),
             NodeColor::EdgeActive => self.color.node.edge_active.as_str(),
+            NodeColor::EdgeFeedback => self.color.node.edge_feedback.as_str(),
+            NodeColor::EdgeFeedbackActive => self.color.node.edge_feedback_active.as_str(),
             NodeColor::LabelWash => self.color.node.label_wash.as_str(),
             NodeColor::Grid => self.color.node.grid.as_str(),
             NodeColor::GridStrong => self.color.node.grid_strong.as_str(),
+            NodeColor::GridAxis => self.color.node.grid_axis.as_str(),
         };
         self.resolved(role.path(), value)
     }
@@ -1291,36 +1296,48 @@ impl AgentColor {
 pub enum NodeColor {
     HeaderWash,
     PortIdle,
+    PortHover,
     PortConnected,
     Edge,
     EdgeActive,
+    EdgeFeedback,
+    EdgeFeedbackActive,
     LabelWash,
     Grid,
     GridStrong,
+    GridAxis,
 }
 
 impl NodeColor {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 12] = [
         Self::HeaderWash,
         Self::PortIdle,
+        Self::PortHover,
         Self::PortConnected,
         Self::Edge,
         Self::EdgeActive,
+        Self::EdgeFeedback,
+        Self::EdgeFeedbackActive,
         Self::LabelWash,
         Self::Grid,
         Self::GridStrong,
+        Self::GridAxis,
     ];
 
     pub fn path(self) -> &'static str {
         match self {
             Self::HeaderWash => "color.node.headerWash",
             Self::PortIdle => "color.node.portIdle",
+            Self::PortHover => "color.node.portHover",
             Self::PortConnected => "color.node.portConnected",
             Self::Edge => "color.node.edge",
             Self::EdgeActive => "color.node.edgeActive",
+            Self::EdgeFeedback => "color.node.edgeFeedback",
+            Self::EdgeFeedbackActive => "color.node.edgeFeedbackActive",
             Self::LabelWash => "color.node.labelWash",
             Self::Grid => "color.node.grid",
             Self::GridStrong => "color.node.gridStrong",
+            Self::GridAxis => "color.node.gridAxis",
         }
     }
 }
@@ -1763,7 +1780,7 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 60] = [
+        let fixed: [(&'static str, &str); 64] = [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),
@@ -1830,12 +1847,19 @@ impl ColorTokens {
             ("color.loader.sheen", &self.loader.sheen),
             ("color.node.headerWash", &self.node.header_wash),
             ("color.node.portIdle", &self.node.port_idle),
+            ("color.node.portHover", &self.node.port_hover),
             ("color.node.portConnected", &self.node.port_connected),
             ("color.node.edge", &self.node.edge),
             ("color.node.edgeActive", &self.node.edge_active),
+            ("color.node.edgeFeedback", &self.node.edge_feedback),
+            (
+                "color.node.edgeFeedbackActive",
+                &self.node.edge_feedback_active,
+            ),
             ("color.node.labelWash", &self.node.label_wash),
             ("color.node.grid", &self.node.grid),
             ("color.node.gridStrong", &self.node.grid_strong),
+            ("color.node.gridAxis", &self.node.grid_axis),
         ];
         fixed
             .into_iter()
@@ -1955,6 +1979,11 @@ pub struct NodeColors {
     pub header_wash: String,
     /// An unconnected port.
     pub port_idle: String,
+    /// A port under the pointer, or one a connection gesture could legally
+    /// land on. Its own role rather than `portConnected` reused: painting a
+    /// hovered port in the connected paint says an edge is already attached,
+    /// which is the one thing the reader is hovering to find out.
+    pub port_hover: String,
     /// A port an edge lands on. Further from the canvas than `portIdle` by
     /// contract, because "attached" is the state a reader scans a graph for.
     pub port_connected: String,
@@ -1964,6 +1993,15 @@ pub struct NodeColors {
     pub edge: String,
     /// A connection carrying traffic, or under the pointer.
     pub edge_active: String,
+    /// A resting return path — work that came back to an earlier step.
+    ///
+    /// Its own role because a return is a fact about control flow and not a
+    /// failure. Drawn in the danger paint, as it was, a retry loop claims the
+    /// run is broken; a run that retried once and then succeeded has a red
+    /// line through it forever.
+    pub edge_feedback: String,
+    /// A return path carrying traffic.
+    pub edge_feedback_active: String,
     /// The chip behind an edge label. Nearly opaque, because the label sits
     /// on the canvas *and* on whatever edge passes under it.
     pub label_wash: String,
@@ -1972,6 +2010,14 @@ pub struct NodeColors {
     /// an alpha that rounds away is a canvas the author believes is ruled.
     pub grid: String,
     pub grid_strong: String,
+    /// The two rules through the canvas origin.
+    ///
+    /// A dot grid says a canvas has a surface and how far it has been
+    /// dragged; it does not say *where* the reader is, because every interval
+    /// looks like every other one. The axes are the one place on the canvas
+    /// that is somewhere in particular, which is what makes a pan legible as
+    /// travel rather than as drift.
+    pub grid_axis: String,
 }
 
 /// Quiet classification paint for evidence in an agent transcript.

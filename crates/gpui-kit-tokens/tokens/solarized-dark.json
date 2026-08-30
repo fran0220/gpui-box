@@ -292,12 +292,16 @@
     "node": {
       "headerWash": "{neutral.900}/0f",
       "portIdle": "{neutral.500}",
+      "portHover": "#268bd2",
       "portConnected": "#868bd8",
       "edge": "{neutral.500}",
       "edgeActive": "#268bd2",
+      "edgeFeedback": "#b58900b8",
+      "edgeFeedbackActive": "#b58900",
       "labelWash": "{neutral.100}/f0",
       "grid": "{neutral.900}/14",
-      "gridStrong": "{neutral.900}/29"
+      "gridStrong": "{neutral.900}/29",
+      "gridAxis": "{neutral.900}/4d"
     },
     "agent": {
       "read": "{agent.read}",

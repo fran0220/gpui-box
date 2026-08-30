@@ -323,7 +323,12 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     // edge and the grid are structure and are held to the line floor in
     // `line_report` instead.
     let canvas = tokens.surface(Surface::Canvas);
-    for role in [NodeColor::PortConnected, NodeColor::EdgeActive] {
+    for role in [
+        NodeColor::PortConnected,
+        NodeColor::PortHover,
+        NodeColor::EdgeActive,
+        NodeColor::EdgeFeedbackActive,
+    ] {
         checks.push(check(
             role.path(),
             tokens.node(role),
@@ -611,9 +616,11 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
     let canvas = tokens.surface(Surface::Canvas);
     for role in [
         NodeColor::Edge,
+        NodeColor::EdgeFeedback,
         NodeColor::PortIdle,
         NodeColor::Grid,
         NodeColor::GridStrong,
+        NodeColor::GridAxis,
     ] {
         let drawn = crate::over(tokens.node(role), canvas);
         checks.push(LineCheck {
@@ -728,12 +735,18 @@ pub fn placeholder_failures(tokens: &TokenDocument) -> Vec<PlaceholderCheck> {
         .collect()
 }
 
-/// One measurement of a categorical scale, in OKLab units.
+/// One perceptual measurement, in OKLab units.
 ///
-/// `subject` names what was measured — a pair of series, or the scale as a
-/// whole — so a failure says which entry to move.
+/// The reports above measure whether a paint can be *seen*: a ratio against
+/// what is behind it, or a lightness step away from it. Those cannot answer
+/// whether two paints can be told from *each other*, because two colours of
+/// equal lightness in different hues are 1:1 by the WCAG ratio and zero apart
+/// in L\*. This is the type for the questions that need the answer — a
+/// categorical scale, and the marks a canvas reports state with.
+///
+/// `subject` names what was measured, so a failure says which paint to move.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SeriesCheck {
+pub struct PerceptualCheck {
     pub measure: String,
     pub subject: String,
     pub value: f32,
@@ -741,7 +754,7 @@ pub struct SeriesCheck {
     pub maximum: f32,
 }
 
-impl SeriesCheck {
+impl PerceptualCheck {
     pub fn passes(&self) -> bool {
         self.value >= self.minimum && self.value <= self.maximum
     }
@@ -784,7 +797,7 @@ pub const SERIES_CHROMA_RATIO_MINIMUM: f32 = 0.62;
 /// series can be seen; this one asks whether it can be told from the other
 /// seven, and whether the scale as a whole says only what a categorical scale
 /// is entitled to say.
-pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
+pub fn series_report(tokens: &TokenDocument) -> Vec<PerceptualCheck> {
     let series = tokens.sequence();
     // A series is drawn on the page, so a translucent one is measured as the
     // paint a reader sees rather than as the paint that was typed.
@@ -796,7 +809,7 @@ pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
     let mut checks = Vec::new();
     for (index, left) in painted.iter().enumerate() {
         for (other, right) in painted.iter().enumerate().skip(index + 1) {
-            checks.push(SeriesCheck {
+            checks.push(PerceptualCheck {
                 measure: "separation".into(),
                 subject: format!("color.sequence.categorical.{index} / {other}"),
                 value: crate::perceptual_distance(*left, *right),
@@ -812,7 +825,7 @@ pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
     let chroma: Vec<f32> = painted.iter().map(|color| color.oklch().chroma).collect();
     let spread = lightness.iter().copied().fold(f32::MIN, f32::max)
         - lightness.iter().copied().fold(f32::MAX, f32::min);
-    checks.push(SeriesCheck {
+    checks.push(PerceptualCheck {
         measure: "lightness spread".into(),
         subject: "color.sequence.categorical".into(),
         value: spread,
@@ -821,7 +834,7 @@ pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
     });
     let loudest = chroma.iter().copied().fold(f32::MIN, f32::max);
     let quietest = chroma.iter().copied().fold(f32::MAX, f32::min);
-    checks.push(SeriesCheck {
+    checks.push(PerceptualCheck {
         measure: "chroma ratio".into(),
         subject: "color.sequence.categorical".into(),
         value: if loudest <= f32::EPSILON {
@@ -835,8 +848,75 @@ pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
     checks
 }
 
-pub fn series_failures(tokens: &TokenDocument) -> Vec<SeriesCheck> {
+pub fn series_failures(tokens: &TokenDocument) -> Vec<PerceptualCheck> {
     series_report(tokens)
+        .into_iter()
+        .filter(|check| !check.passes())
+        .collect()
+}
+
+/// How far apart two canvas marks that carry different facts must read.
+///
+/// Lower than the series floor because these marks are read one at a time
+/// against a known neighbour — a port beside its own edge, a return path
+/// beside the flow it returns from — rather than eight at once across a
+/// plot. It is still a floor a hue drift falls through.
+pub const CANVAS_SEPARATION_MINIMUM: f32 = 0.10;
+
+/// Evaluates the node canvas marks that report state, in OKLab.
+///
+/// [`report`] asks whether each of these is visible on the canvas and
+/// [`distinction_report`] holds the one ordering that matters — a connected
+/// port stands further from the page than an idle one. Neither can see two
+/// marks that are visible, correctly ordered, and the same colour.
+///
+/// Hover is measured against idle and not against connected on purpose. A
+/// hovered port and a connected port are both live, and what separates them
+/// is the ring the component draws around the one under the pointer, which is
+/// a channel the token document does not own. What a theme must not do is
+/// leave hover looking like the resting state, because then the canvas never
+/// answers whether a port can be grabbed.
+pub fn canvas_report(tokens: &TokenDocument) -> Vec<PerceptualCheck> {
+    let canvas = tokens.surface(Surface::Canvas);
+    let painted = |role: NodeColor| crate::over(tokens.node(role), canvas);
+    let mut checks = Vec::new();
+    for (left, right) in [
+        (NodeColor::PortIdle, NodeColor::PortHover),
+        (NodeColor::PortIdle, NodeColor::PortConnected),
+        (NodeColor::Edge, NodeColor::EdgeFeedback),
+        (NodeColor::EdgeActive, NodeColor::EdgeFeedbackActive),
+    ] {
+        checks.push(PerceptualCheck {
+            measure: "separation".into(),
+            subject: format!("{} / {}", left.path(), right.path()),
+            value: crate::perceptual_distance(painted(left), painted(right)),
+            minimum: CANVAS_SEPARATION_MINIMUM,
+            maximum: f32::INFINITY,
+        });
+    }
+
+    // The grid is a ruler, and a ruler whose major interval is no louder than
+    // its minor one is a texture. Measured in L* from the page and ordered,
+    // because that is the channel the three of them differ in: an axis louder
+    // than the major interval, and the major interval louder than the rest.
+    let from_page = |role: NodeColor| (painted(role).lightness() - canvas.lightness()).abs();
+    for (louder, quieter) in [
+        (NodeColor::GridStrong, NodeColor::Grid),
+        (NodeColor::GridAxis, NodeColor::GridStrong),
+    ] {
+        checks.push(PerceptualCheck {
+            measure: "grid step".into(),
+            subject: format!("{} over {}", louder.path(), quieter.path()),
+            value: from_page(louder) - from_page(quieter),
+            minimum: LINE_MINIMUM,
+            maximum: f32::INFINITY,
+        });
+    }
+    checks
+}
+
+pub fn canvas_failures(tokens: &TokenDocument) -> Vec<PerceptualCheck> {
+    canvas_report(tokens)
         .into_iter()
         .filter(|check| !check.passes())
         .collect()
@@ -991,11 +1071,11 @@ mod tests {
         // Twenty-three tones against each of six surfaces, ten code checks
         // against each of the two surfaces code is drawn on, the sixteen ANSI
         // slots against the terminal background, the eight series colours
-        // against each of the three surfaces a chart is drawn on, the two
+        // against each of the three surfaces a chart is drawn on, the four
         // live canvas roles and the two stackings of an edge label,
         // `onAccent` against `accent`, and the primary fill against each of
         // the six surfaces with its own label over it.
-        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 4 + 1 + 6 + 1);
+        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 6 + 1 + 6 + 1);
     }
 
     /// The primary fill is a role a theme owns, not the prose colour under a
@@ -1314,7 +1394,7 @@ mod tests {
         );
         assert!(matches!(
             tokens.validate(),
-            Err(crate::TokenError::Series(_))
+            Err(crate::TokenError::Perceptual(_))
         ));
     }
 
@@ -1327,6 +1407,66 @@ mod tests {
         let failures = series_failures(&tokens);
         assert!(
             failures.iter().any(|check| check.measure == "chroma ratio"),
+            "{failures:#?}"
+        );
+    }
+
+    #[test]
+    fn every_shipped_theme_keeps_its_canvas_marks_apart() {
+        for tokens in crate::all() {
+            let checks = canvas_report(tokens);
+            assert_eq!(checks.len(), 6, "{}", tokens.meta.id);
+            for check in checks {
+                assert!(check.passes(), "{}: {check:#?}", tokens.meta.id);
+            }
+        }
+    }
+
+    /// A return path that borrows the flow paint is a graph whose loops
+    /// cannot be traced, and every other check is happy with it: it is
+    /// visible, it clears the line floor, and it is exactly as legible as the
+    /// edge it is indistinguishable from.
+    #[test]
+    fn one_paint_for_a_flow_and_a_return_path_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.edge_feedback = tokens.color.node.edge.clone();
+        assert!(line_failures(&tokens).is_empty());
+        let failures = canvas_failures(&tokens);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].subject.contains("edgeFeedback"));
+        assert!(matches!(
+            tokens.validate(),
+            Err(crate::TokenError::Perceptual(_))
+        ));
+    }
+
+    /// A hovered port drawn in the resting paint never answers the question
+    /// the pointer is asking.
+    #[test]
+    fn a_port_that_does_not_react_to_the_pointer_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.port_hover = tokens.color.node.port_idle.clone();
+        let failures = canvas_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.subject.contains("portHover")),
+            "{failures:#?}"
+        );
+    }
+
+    /// A grid whose major interval and origin rules are no louder than the
+    /// minor dots is a texture: it says the canvas has a surface, and not how
+    /// far anything has been dragged or where the reader is.
+    #[test]
+    fn a_grid_that_does_not_climb_to_its_axes_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.grid_axis = tokens.color.node.grid.clone();
+        let failures = canvas_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.measure == "grid step" && check.subject.contains("gridAxis")),
             "{failures:#?}"
         );
     }

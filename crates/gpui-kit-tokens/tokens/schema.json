@@ -219,22 +219,30 @@
       "required": [
         "headerWash",
         "portIdle",
+        "portHover",
         "portConnected",
         "edge",
         "edgeActive",
+        "edgeFeedback",
+        "edgeFeedbackActive",
         "labelWash",
         "grid",
-        "gridStrong"
+        "gridStrong",
+        "gridAxis"
       ],
       "properties": {
         "headerWash": { "$ref": "#/$defs/color" },
         "portIdle": { "$ref": "#/$defs/color" },
+        "portHover": { "$ref": "#/$defs/color" },
         "portConnected": { "$ref": "#/$defs/color" },
         "edge": { "$ref": "#/$defs/color" },
         "edgeActive": { "$ref": "#/$defs/color" },
+        "edgeFeedback": { "$ref": "#/$defs/color" },
+        "edgeFeedbackActive": { "$ref": "#/$defs/color" },
         "labelWash": { "$ref": "#/$defs/color" },
         "grid": { "$ref": "#/$defs/color" },
-        "gridStrong": { "$ref": "#/$defs/color" }
+        "gridStrong": { "$ref": "#/$defs/color" },
+        "gridAxis": { "$ref": "#/$defs/color" }
       }
     },
     "agentColors": {

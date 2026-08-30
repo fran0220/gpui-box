@@ -1771,7 +1771,10 @@ fn contrast_gate() -> Result<()> {
                 failure.maximum
             );
         }
-        for failure in contrast::series_failures(document) {
+        for failure in contrast::series_failures(document)
+            .into_iter()
+            .chain(contrast::canvas_failures(document))
+        {
             failed = true;
             if failure.maximum.is_finite() {
                 eprintln!(
@@ -1939,6 +1942,10 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ),
         ("color.node.portIdle".into(), color.node.port_idle.as_str()),
         (
+            "color.node.portHover".into(),
+            color.node.port_hover.as_str(),
+        ),
+        (
             "color.node.portConnected".into(),
             color.node.port_connected.as_str(),
         ),
@@ -1946,6 +1953,14 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         (
             "color.node.edgeActive".into(),
             color.node.edge_active.as_str(),
+        ),
+        (
+            "color.node.edgeFeedback".into(),
+            color.node.edge_feedback.as_str(),
+        ),
+        (
+            "color.node.edgeFeedbackActive".into(),
+            color.node.edge_feedback_active.as_str(),
         ),
         (
             "color.node.labelWash".into(),
@@ -1956,6 +1971,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             "color.node.gridStrong".into(),
             color.node.grid_strong.as_str(),
         ),
+        ("color.node.gridAxis".into(), color.node.grid_axis.as_str()),
     ])
     .chain([
         ("color.loader.mark".into(), color.loader.mark.as_str()),
