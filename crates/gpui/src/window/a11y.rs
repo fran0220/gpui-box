@@ -358,24 +358,23 @@ impl<'a> A11ySubtreeBuilder<'a> {
 
     /// Append a synthetic leaf node as a child of this element's node.
     ///
-    /// Returns `false` if a node with this id is already present in the tree or
-    /// if its bounds are fully outside the real parent's active content clip,
-    /// in which case the node is discarded.
+    /// Returns `false` if a node with this id is already present in the tree,
+    /// in which case the node is discarded. Bounds follow the real parent's
+    /// active content clip, but fully clipped logical nodes remain in the tree
+    /// with zero-area bounds at the nearest clip edge. Synthetic text and
+    /// virtualized collections must not lose content merely because it is
+    /// outside the current viewport.
     pub fn push_child(&mut self, id: NodeId, mut node: accesskit::Node) -> bool {
         if let (Some(clip), Some(bounds)) = (self.bounds_clip, node.bounds())
             && bounds.x1 > bounds.x0
             && bounds.y1 > bounds.y0
         {
-            let bounds = accesskit::Rect {
-                x0: bounds.x0.max(clip.x0),
-                y0: bounds.y0.max(clip.y0),
-                x1: bounds.x1.min(clip.x1),
-                y1: bounds.y1.min(clip.y1),
-            };
-            if bounds.x1 <= bounds.x0 || bounds.y1 <= bounds.y0 {
-                return false;
-            }
-            node.set_bounds(bounds);
+            node.set_bounds(accesskit::Rect {
+                x0: bounds.x0.clamp(clip.x0, clip.x1),
+                y0: bounds.y0.clamp(clip.y0, clip.y1),
+                x1: bounds.x1.clamp(clip.x0, clip.x1),
+                y1: bounds.y1.clamp(clip.y0, clip.y1),
+            });
         }
         let pushed = self.nodes.push_leaf(id, node);
         #[cfg(debug_assertions)]
@@ -866,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_bounds_follow_the_real_parents_content_clip() {
+    fn synthetic_bounds_follow_the_real_parents_content_clip_without_losing_logical_nodes() {
         let mut nodes = new_builder();
         let parent = NodeId(1);
         let partial = NodeId(2);
@@ -895,7 +894,7 @@ mod tests {
                 x1: 100.0,
                 y1: 100.0,
             });
-            assert!(!subtree.push_child(hidden, hidden_node));
+            assert!(subtree.push_child(hidden, hidden_node));
         }
         nodes.pop();
         let update = nodes.finalize();
@@ -913,7 +912,20 @@ mod tests {
                 y1: 40.0,
             })
         );
-        assert!(update.nodes.iter().all(|(id, _)| *id != hidden));
+        let hidden = update
+            .nodes
+            .iter()
+            .find(|(id, _)| *id == hidden)
+            .expect("fully clipped synthetic node remains logically present");
+        assert_eq!(
+            hidden.1.bounds(),
+            Some(Rect {
+                x0: 0.0,
+                y0: 40.0,
+                x1: 100.0,
+                y1: 40.0,
+            })
+        );
     }
 
     #[test]
