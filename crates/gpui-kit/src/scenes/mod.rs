@@ -77,7 +77,7 @@ use display::{
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
 use layout::{
-    aspect_ratio, container, desktop_titlebar, grid, ide_shell, responsive, scroll_area,
+    aspect_ratio, container, desktop_titlebar, dock_tree, grid, ide_shell, responsive, scroll_area,
     scroll_fade, scroll_shadow, split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
@@ -580,6 +580,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "split-tree",
             build: split_tree,
             shows: Shows::Subjects(&["SplitTree"]),
+        },
+        Scene {
+            name: "dock-tree",
+            build: dock_tree,
+            shows: Shows::Subjects(&["DockTree"]),
         },
         Scene {
             name: "ide-shell",

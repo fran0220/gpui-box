@@ -84,24 +84,27 @@ against every surface that implements it.
 
 | System | Contract | Implemented by |
 |---|---|---|
-| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers), `Dock` (panel headers) |
+| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers), `Dock`/`DockTree` (panel headers, groups, split edges) |
 
 Drag and drop is covered: the contract is written down, the scenes `drag-list`,
 `drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/dnd.rs` drives
 a simulated pointer through every surface above. `DataGrid` reorders its column
 headers through the same system, driven in `crates/gpui-kit/tests/grid.rs`, and
 `Dock` moves panels between regions through it, driven in
-`crates/gpui-kit/tests/shell.rs`.
+`crates/gpui-kit/tests/shell.rs`; `DockTree` additionally reports centre merges
+into preserved empty stacks and four-way recursive split placement, driven in
+`crates/gpui-kit/tests/dock_tree.rs`.
 
 ## One resize implementation
 
 `SplitPane` is two panes and a divider; `SplitTree` is however many of those the
 caller nests; `Dock` builds a `SplitLayout` from the regions that hold panels
-and hands it to a `SplitTree`. So a divider between two dock regions is the
-same divider a plain split gives, with the same minimums and the same published
-travel range, and there is one place where dragging a divider is implemented.
-A dock region's header is a `Tabs` strip for the same reason: dragging a panel
-is the drag system, not a second one.
+and hands it to a `SplitTree`; `DockTree` projects the caller's recursive
+`DockTopology` to that same layout. So every dock divider is the same divider a
+plain split gives, with the same minimums and published travel range, and there
+is one place where dragging a divider is implemented. Every dock stack header
+is a `Tabs` strip for the same reason: dragging a panel is the drag system, not
+a second one.
 
 ## Table or DataGrid
 

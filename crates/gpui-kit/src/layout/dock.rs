@@ -175,6 +175,22 @@ impl DockPanel {
     pub fn is_unavailable(&self) -> bool {
         self.unavailable.is_some()
     }
+
+    pub(crate) fn glyph(&self) -> Option<Icon> {
+        self.icon
+    }
+
+    pub(crate) fn badge_text(&self) -> Option<SharedString> {
+        self.badge.clone()
+    }
+
+    pub(crate) fn unavailable_reason(&self) -> Option<SharedString> {
+        self.unavailable.clone()
+    }
+
+    pub(crate) fn take_content(&self) -> Option<AnyElement> {
+        self.content.borrow_mut().take()
+    }
 }
 
 /// What the dock reports. The caller decides what any of it means.

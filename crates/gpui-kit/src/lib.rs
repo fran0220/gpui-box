@@ -298,11 +298,12 @@ pub mod prelude {
     };
     pub use crate::layout::{
         AspectFit, AspectRatio, Breakpoint, Container, ContainerSize, ContainerWidth,
-        DesktopTitlebar, DesktopTitlebarEvent, Dock, DockEvent, DockPanel, DockRegion, FadeEdges,
-        Grid, GridColumns, GridItem, Responsive, ScrollArea, ScrollAxis, ScrollFade, SplitAxis,
-        SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord,
-        SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar,
-        ToolbarItem, scroll_offset,
+        DesktopTitlebar, DesktopTitlebarEvent, Dock, DockEvent, DockPanel, DockPlacement,
+        DockRecord, DockRecordError, DockRecordKind, DockRegion, DockStack, DockTopology, DockTree,
+        DockTreeEvent, FadeEdges, Grid, GridColumns, GridItem, Responsive, ScrollArea, ScrollAxis,
+        ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec,
+        SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem,
+        Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
         AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,

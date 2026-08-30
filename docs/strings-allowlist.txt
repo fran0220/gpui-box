@@ -72,6 +72,7 @@ Dialog
 DiffView
 Dock
 DockPanel
+DockTree
 DotLottieAsset
 Drawer
 Dropzone
@@ -281,6 +282,7 @@ object
 paired new
 paired old
 pane `{id}` has children
+panel `{id}` appears more than once
 plain text
 platform
 policy-owned particle recipes must remain valid
@@ -293,7 +295,10 @@ rich-text block id `{id}` is repeated
 series is nonempty
 slot was filled
 soft break
+split `{id}` contains panels
 split `{id}` has {found} children, not 2
+stack `{id}` has children
+stack `{stack}` activates absent panel `{panel}`
 stale
 stateMachines
 status rows are not nodes

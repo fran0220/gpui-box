@@ -1676,6 +1676,34 @@
       ]
     },
     {
+      "name": "DockTree",
+      "kind": "builder",
+      "path": "gpui_kit::layout::DockTree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "Draws a recursive DockTopology without owning it.",
+      "construct": [
+        "new(ident: impl Into<Ident>, topology: DockTopology) -> Self"
+      ],
+      "options": [
+        "panel(panel: DockPanel) -> Self",
+        "panels(panels: impl IntoIterator<Item = DockPanel>) -> Self",
+        "on_event(handler: impl Fn(DockTreeEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [
+        "PanelSelected",
+        "PanelMoved",
+        "PanelSplit",
+        "SplitResized",
+        "StackCollapsed"
+      ],
+      "scenes": [
+        "dock-tree"
+      ]
+    },
+    {
       "name": "Drawer",
       "kind": "view",
       "path": "gpui_kit::overlay::Drawer",
@@ -7744,6 +7772,66 @@
       ]
     },
     {
+      "name": "DockPlacement",
+      "path": "gpui_kit::layout::DockPlacement",
+      "summary": "Which side of an existing stack a dropped panel should split into.",
+      "variants": [
+        "Left",
+        "Right",
+        "Top",
+        "Bottom"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DockRecord",
+      "path": "gpui_kit::layout::DockRecord",
+      "summary": "One node of a DockTopology as plain caller-serializable fields.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DockRecordError",
+      "path": "gpui_kit::layout::DockRecordError",
+      "summary": "Why persisted dock records do not form one valid topology.",
+      "variants": [
+        "NoRoot",
+        "ManyRoots",
+        "DuplicateId",
+        "MissingParent",
+        "WrongChildCount",
+        "StackWithChildren",
+        "SplitWithPanels",
+        "DuplicatePanel",
+        "MissingActive",
+        "Unreachable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DockRecordKind",
+      "path": "gpui_kit::layout::DockRecordKind",
+      "summary": "What one DockRecord describes.",
+      "variants": [
+        "Stack",
+        "Horizontal",
+        "Vertical"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DockRegion",
       "path": "gpui_kit::layout::DockRegion",
       "summary": "Where a panel sits.",
@@ -7757,6 +7845,71 @@
       "options": [
         "name() -> &'static str"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DockStack",
+      "path": "gpui_kit::layout::DockStack",
+      "summary": "One tab stack at a leaf of a DockTopology.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, panels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
+      ],
+      "options": [
+        "active(panel: impl Into<SharedString>) -> Self",
+        "min(minimum: f32) -> Self",
+        "min_width(minimum: f32) -> Self",
+        "min_height(minimum: f32) -> Self",
+        "rail(extent: f32) -> Self",
+        "collapsed(collapsed: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "panels() -> &[SharedString]",
+        "active_panel() -> Option<&SharedString>",
+        "is_collapsed() -> bool"
+      ]
+    },
+    {
+      "name": "DockTopology",
+      "path": "gpui_kit::layout::DockTopology",
+      "summary": "A recursive arrangement of tab stacks.",
+      "variants": [
+        "Stack",
+        "Split"
+      ],
+      "construct": [
+        "stack(id: impl Into<SharedString>, panels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "split(id: impl Into<SharedString>, axis: SplitAxis, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
+        "horizontal(id: impl Into<SharedString>, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
+        "vertical(id: impl Into<SharedString>, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
+        "from_records(records: &[DockRecord]) -> Result<Self, DockRecordError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "stacks() -> Vec<&DockStack>",
+        "find_stack(id: &str) -> Option<&DockStack>",
+        "split_layout() -> SplitLayout",
+        "to_records() -> Vec<DockRecord>"
+      ]
+    },
+    {
+      "name": "DockTreeEvent",
+      "path": "gpui_kit::layout::DockTreeEvent",
+      "summary": "Caller-owned changes requested through DockTree.",
+      "variants": [
+        "PanelSelected",
+        "PanelMoved",
+        "PanelSplit",
+        "SplitResized",
+        "StackCollapsed"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -15378,6 +15531,18 @@
         "SplitTree"
       ],
       "example": "fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let layout = SplitLayout::horizontal(\n        \"workspace\",\n        0.26,\n        SplitLayout::leaf(SplitPaneSpec::new(\"files\").min_width(140.0)),\n        SplitLayout::horizontal(\n            \"body\",\n            0.74,\n            SplitLayout::vertical(\n                \"editing\",\n                0.6,\n                SplitLayout::leaf(SplitPaneSpec::new(\"editor\").min_height(90.0)),\n                SplitLayout::leaf(SplitPaneSpec::new(\"terminal\").min_height(70.0)),\n            ),\n            // A collapsed leaf is drawn at its rail, and the divider beside it\n            // is not offered: a fixed extent has no ratio to trade.\n            SplitLayout::leaf(SplitPaneSpec::new(\"outline\").rail(40.0).collapsed(true)),\n        ),\n    );\n\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            div()\n                .h(px(340.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    SplitTree::new(\"scene.tree.workspace\")\n                        .layout(layout)\n                        // Each pane holds enough to reach the bottom of the\n                        // room the tree gave it: a pane drawn half empty says\n                        // the divider above it is in the wrong place, which is\n                        // the one thing this scene is not about.\n                        .pane(\"files\", filler(&theme, \"Files\", 13))\n                        .pane(\"editor\", filler(&theme, \"main.rs\", 7))\n                        .pane(\"terminal\", filler(&theme, \"Terminal\", 4))\n                        // The rail is narrower than any label, so the collapsed\n                        // leaf is drawn as the room it still holds.\n                        .pane(\"outline\", div())\n                        .on_change(|_, _, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"A divider high in the tree stops where a leaf far below it would \\\n             run out of room.\",\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "dock-tree",
+      "capture": "cargo run -p xtask -- headless capture dock-tree",
+      "kind": "exhibit",
+      "subjects": [
+        "DockTree"
+      ],
+      "uses": [
+        "DockTree"
+      ],
+      "example": "fn dock_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let topology = DockTopology::vertical(\n        \"root\",\n        0.78,\n        DockTopology::horizontal(\n            \"workspace\",\n            0.28,\n            DockTopology::Stack(DockStack::new(\"source\", [\"files\", \"search\"]).active(\"files\")),\n            DockTopology::horizontal(\n                \"editing\",\n                0.9,\n                DockTopology::stack(\"editor\", [\"main\"]),\n                DockTopology::Stack(DockStack::new(\"outline\", [\"symbols\"]).collapsed(true)),\n            ),\n        ),\n        DockTopology::stack(\"terminal\", std::iter::empty::<&str>()),\n    );\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(\n            &theme,\n            \"recursive caller topology; tab groups, empty destinations, rails, and split dividers share existing primitives\",\n        ))\n        .child(\n            div()\n                .h(px(600.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    DockTree::new(\"scene.dock-tree\", topology)\n                        .panels([\n                            DockPanel::new(\"files\", \"Files\")\n                                .icon(Icon::Folder)\n                                .content(filler(&theme, \"Workspace\", 12)),\n                            DockPanel::new(\"search\", \"Search\")\n                                .icon(Icon::Magnifier)\n                                .badge(\"12\"),\n                            DockPanel::new(\"main\", \"main.rs\")\n                                .icon(Icon::Document)\n                                .content(filler(&theme, \"fn main()\", 15)),\n                            DockPanel::new(\"symbols\", \"Outline\").icon(Icon::List),\n                        ])\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "ide-shell",

@@ -305,3 +305,15 @@ Scope: behavioral reference for a source-oriented editing surface. GPUI Box's
 source, parser, grammar, language-server transport, product model, or Cargo
 dependency; see PROVENANCE.md P15.
 License text: LICENSE-APACHE
+
+Longbridge GPUI Component dock behavior reference
+--------------------------------------------------------------------------------
+Source: https://github.com/longbridge/gpui-component
+Revision: 6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7
+License: Apache-2.0
+Scope: behavioral reference for recursive split/tab topology, persistent empty
+groups, and centre-versus-edge dock intents. GPUI Box's `DockTree` is original
+and reuses its existing split, tab, and drag authorities. No upstream Rust
+source, registry, application model, skin, tile renderer, persistence
+transport, or Cargo dependency is included; see PROVENANCE.md P16.
+License text: LICENSE-APACHE

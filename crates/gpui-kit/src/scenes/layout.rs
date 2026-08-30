@@ -497,6 +497,60 @@ pub(super) fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// A recursive dock topology: tab stacks are leaves of the same split tree,
+/// an empty stack remains available, and a collapsed nested stack keeps its
+/// rail instead of flattening the caller's arrangement.
+pub(super) fn dock_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let topology = DockTopology::vertical(
+        "root",
+        0.78,
+        DockTopology::horizontal(
+            "workspace",
+            0.28,
+            DockTopology::Stack(DockStack::new("source", ["files", "search"]).active("files")),
+            DockTopology::horizontal(
+                "editing",
+                0.9,
+                DockTopology::stack("editor", ["main"]),
+                DockTopology::Stack(DockStack::new("outline", ["symbols"]).collapsed(true)),
+            ),
+        ),
+        DockTopology::stack("terminal", std::iter::empty::<&str>()),
+    );
+
+    stack(&theme)
+        .w(px(900.0))
+        .child(caption(
+            &theme,
+            "recursive caller topology; tab groups, empty destinations, rails, and split dividers share existing primitives",
+        ))
+        .child(
+            div()
+                .h(px(600.0))
+                .surface(&theme, Surface::Panel)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    DockTree::new("scene.dock-tree", topology)
+                        .panels([
+                            DockPanel::new("files", "Files")
+                                .icon(Icon::Folder)
+                                .content(filler(&theme, "Workspace", 12)),
+                            DockPanel::new("search", "Search")
+                                .icon(Icon::Magnifier)
+                                .badge("12"),
+                            DockPanel::new("main", "main.rs")
+                                .icon(Icon::Document)
+                                .content(filler(&theme, "fn main()", 15)),
+                            DockPanel::new("symbols", "Outline").icon(Icon::List),
+                        ])
+                        .on_event(|_, _, _| {}),
+                ),
+        )
+        .into_any_element()
+}
+
 /// A whole application frame: panels in regions, one region collapsed to a
 /// rail, one panel the host refuses, and a status bar under all of it.
 pub(super) fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {

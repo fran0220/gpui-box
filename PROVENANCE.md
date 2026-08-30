@@ -493,3 +493,21 @@ adds only no-wrap source policy, hard-line projection, revision-tagged
 caller-owned styles, and a synchronous indentation request. No upstream Rust
 source, parser, grammar, language-server transport, product model, or
 dependency was copied.
+
+## P16: GPUI Component dock behavior reference
+
+- Reference: <https://github.com/longbridge/gpui-component>
+- Revision: `6761b4ec9ca90cf2c37f8ba01deaa9ffcf0d0da7`
+- License: Apache-2.0
+- Reference locations: `crates/base/src/dock/layout`,
+  `crates/base/src/dock/drag.rs`, `crates/base/src/dock/tab_group.rs`, and
+  `crates/base/src/dock/state.rs`
+- Destination: `crates/gpui-kit/src/layout/dock_tree.rs`
+
+The reference established the product-neutral value of recursive split/tab
+topology, persistent empty tab groups, and separate centre-merge and edge-split
+drop intents. GPUI Box's implementation is original and projects caller-owned
+records through its existing `SplitLayout`/`SplitTree`, `Tabs`, and drag system.
+It includes no upstream Rust source, panel registry, application model, skin,
+tile renderer, persistence transport, or dependency, and never invents the
+stable ids required to apply an edge split.

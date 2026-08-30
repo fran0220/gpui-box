@@ -378,6 +378,16 @@ applying either. A panel the host cannot show keeps its tab and states the
 reason where its content would be, because a panel that vanished would read as
 one the workspace never had.
 
+`DockTree` is the recursive contract for hosts whose arrangement is not the
+fixed left/centre/right/bottom shell. Its caller-owned `DockTopology` nests
+stable tab stacks under horizontal and vertical split nodes, converts
+losslessly to and from plain `DockRecord` fields, and preserves empty stacks as
+real merge targets. The renderer delegates every divider to `SplitTree`, every
+tab order to `Tabs`, and every move to the shared DnD system. A centre drop
+reports a stable stack and neighbour; an edge drop reports
+`DockPlacement::{Left,Right,Top,Bottom}` but invents no split or stack id. The
+host applies, normalizes, persists, or refuses that structural change.
+
 ### A status bar never invents reassurance
 
 Every fact in the strip belongs to the host, so an item with no state carries

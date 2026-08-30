@@ -132,6 +132,11 @@ string_keys! {
 
     // Dock, split, scroll, toolbar.
     DockCollapseRegion => "dock.collapse-region", "Collapse region";
+    DockEmptyStack => "dock.empty-stack", "Drop a panel here";
+    DockSplitLeft => "dock.split-left", "Dock left";
+    DockSplitRight => "dock.split-right", "Dock right";
+    DockSplitTop => "dock.split-top", "Dock above";
+    DockSplitBottom => "dock.split-bottom", "Dock below";
     SplitResizeHandle => "split.resize-handle", "Resize panes";
     StatusStale => "status.stale", "stale";
     ScrollbarVertical => "scrollbar.vertical", "Vertical";
