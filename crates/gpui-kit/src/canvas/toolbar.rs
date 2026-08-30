@@ -5,7 +5,10 @@
 
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
+use gpui::{
+    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    prelude::FluentBuilder, px,
+};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
@@ -24,6 +27,10 @@ pub enum CanvasToolbarAction {
 }
 
 impl CanvasToolbarAction {
+    /// Every action, in the order a toolbar that offers all of them shows
+    /// them.
+    pub const ALL: [Self; 3] = [Self::Fit, Self::Snap, Self::Arrange];
+
     pub fn name(self) -> &'static str {
         match self {
             Self::Fit => "fit",
@@ -47,11 +54,13 @@ pub enum CanvasToolbarEvent {
     Action(CanvasToolbarAction),
 }
 
-/// Compact canvas chrome: a host-formatted zoom and three intents.
+/// Compact canvas chrome: a host-formatted zoom and the intents the host can
+/// actually carry out.
 #[derive(IntoElement)]
 pub struct CanvasToolbar {
     ident: Ident,
     zoom: SharedString,
+    actions: Vec<CanvasToolbarAction>,
     snap: bool,
     disabled: bool,
     on_action: Option<ActionHandler>,
@@ -62,10 +71,31 @@ impl CanvasToolbar {
         Self {
             ident: ident.into(),
             zoom: zoom.into(),
+            actions: CanvasToolbarAction::ALL.to_vec(),
             snap: false,
             disabled: false,
             on_action: None,
         }
+    }
+
+    /// The actions this toolbar offers, in the order it shows them.
+    ///
+    /// The default is all three, which is the toolbar a graph editor wants.
+    /// An inspect-only canvas cannot snap or rearrange anything, and a chip
+    /// that reports an intent its host will not act on is a promise the
+    /// reader is entitled to believe. Naming the actions is how a host says
+    /// which promises it can keep; naming none leaves the zoom on its own,
+    /// which is a legitimate readout.
+    ///
+    /// Repeats are dropped rather than drawn twice.
+    pub fn actions(mut self, actions: impl IntoIterator<Item = CanvasToolbarAction>) -> Self {
+        self.actions = Vec::new();
+        for action in actions {
+            if !self.actions.contains(&action) {
+                self.actions.push(action);
+            }
+        }
+        self
     }
 
     pub fn snap(mut self, snap: bool) -> Self {
@@ -126,18 +156,61 @@ impl RenderOnce for CanvasToolbar {
                     .text_color(theme.colors.text_muted)
                     .child(self.zoom.clone()),
             )
-            .child(
-                div()
-                    .w(px(theme.borders.hairline))
-                    .h(px(theme.typography.caption.line_height))
-                    .bg(theme.colors.divider),
+            // The rule separates the reading from the controls, so it is
+            // drawn only when there are controls to separate it from.
+            .when(!self.actions.is_empty(), |element| {
+                element.child(
+                    div()
+                        .w(px(theme.borders.hairline))
+                        .h(px(theme.typography.caption.line_height))
+                        .bg(theme.colors.divider),
+                )
+            })
+            .children(
+                self.actions.iter().map(|action| {
+                    button(*action, *action == CanvasToolbarAction::Snap && self.snap)
+                }),
             )
-            .child(button(CanvasToolbarAction::Fit, false))
-            .child(button(CanvasToolbarAction::Snap, self.snap))
-            .child(button(CanvasToolbarAction::Arrange, false))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group).value(self.zoom),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A chip that reports an intent its host will not act on is a promise
+    /// the reader is entitled to believe. An inspect-only canvas can snap and
+    /// rearrange nothing, so it must be able to say so.
+    #[test]
+    fn a_toolbar_offers_only_the_intents_its_host_can_carry_out() {
+        let all = CanvasToolbar::new("canvas", "100%");
+        assert_eq!(all.actions, CanvasToolbarAction::ALL.to_vec());
+
+        let inspecting = CanvasToolbar::new("canvas", "100%").actions([CanvasToolbarAction::Fit]);
+        assert_eq!(inspecting.actions, vec![CanvasToolbarAction::Fit]);
+
+        // The caller's order is the order, and a repeat is dropped rather
+        // than drawn twice.
+        let reordered = CanvasToolbar::new("canvas", "100%").actions([
+            CanvasToolbarAction::Arrange,
+            CanvasToolbarAction::Fit,
+            CanvasToolbarAction::Arrange,
+        ]);
+        assert_eq!(
+            reordered.actions,
+            vec![CanvasToolbarAction::Arrange, CanvasToolbarAction::Fit]
+        );
+
+        // A zoom with nothing beside it is a readout, which is legitimate.
+        assert!(
+            CanvasToolbar::new("canvas", "100%")
+                .actions([])
+                .actions
+                .is_empty()
+        );
     }
 }

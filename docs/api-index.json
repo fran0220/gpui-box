@@ -854,11 +854,12 @@
       "kind": "builder",
       "path": "gpui_kit::canvas::CanvasToolbar",
       "source": "crates/gpui-kit/src/canvas/toolbar.rs",
-      "summary": "Compact canvas chrome: a host-formatted zoom and three intents.",
+      "summary": "Compact canvas chrome: a host-formatted zoom and the intents the host can actually carry out.",
       "construct": [
         "new(ident: impl Into<Ident>, zoom: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "actions(actions: impl IntoIterator<Item = CanvasToolbarAction>) -> Self",
         "snap(snap: bool) -> Self",
         "on_action(handler: impl Fn(CanvasToolbarAction, &mut Window, &mut App) + 'static) -> Self"
       ],
@@ -3018,6 +3019,8 @@
         "placed(placed: Placed) -> Self",
         "edge(edge: GraphEdge) -> Self",
         "edges(edges: impl IntoIterator<Item = GraphEdge>) -> Self",
+        "band(band: GraphBand) -> Self",
+        "bands(bands: impl IntoIterator<Item = GraphBand>) -> Self",
         "state(state: GraphState) -> Self",
         "empty(empty: EmptyState) -> Self",
         "grid(grid: bool) -> Self",
@@ -3050,7 +3053,8 @@
         "DisconnectRequested"
       ],
       "scenes": [
-        "node-graph"
+        "node-graph",
+        "canvas-regions"
       ]
     },
     {
@@ -9084,6 +9088,25 @@
       "queries": [
         "arrived() -> bool",
         "progress() -> f32"
+      ]
+    },
+    {
+      "name": "GraphBand",
+      "path": "gpui_kit::canvas::GraphBand",
+      "summary": "A labelled rectangle of canvas world space.",
+      "variants": [],
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, x: f32, y: f32, width: f32, height: f32) -> Self"
+      ],
+      "options": [
+        "color(color: impl Into<ColorChoice>) -> Self",
+        "selected(selected: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "ident() -> &Ident",
+        "label() -> &SharedString",
+        "bounds() -> Bounds<f32>"
       ]
     },
     {
@@ -15948,6 +15971,18 @@
         "NodeGroup"
       ],
       "example": "fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // The chrome is only worth looking at over the thing it is chrome for.\n    // Reviewed on the plain scene ground, with grey placeholders standing in\n    // for the nodes, a region read as an empty box next to two pills and said\n    // nothing about what a region is for.\n    let member = |id: &'static str,\n                  title: &'static str,\n                  color: &'static str,\n                  state: NodeState,\n                  action: &'static str,\n                  metric: (&'static str, &'static str)| {\n        GraphNode::new(id, title)\n            .color(color)\n            .width(236.0)\n            .state(state)\n            .action(action)\n            .metric(metric.0, metric.1)\n    };\n    let members = |left: AnyElement, right: AnyElement| {\n        div()\n            .row()\n            .items_start()\n            .gap_token(&theme, Space::Md)\n            .child(left)\n            .child(right)\n    };\n    stack(&theme)\n        // Keep the scene's own padding inside the review frame. At 920px the\n        // content width plus stack padding overhung the capture and clipped\n        // the first words of the caption.\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"overview, chrome, and a named region; the host still owns pan and zoom\",\n        ))\n        .child(\n            div()\n                .relative()\n                .w_full()\n                .column()\n                .gap_token(&theme, Space::Md)\n                .p_token(&theme, Space::Md)\n                .radius(&theme, Radius::Card)\n                .surface(&theme, Surface::Canvas)\n                .overflow_hidden()\n                .child(grid_ground(&theme))\n                .child(\n                    div()\n                        .relative()\n                        .row()\n                        .items_start()\n                        .gap_token(&theme, Space::Md)\n                        .child(\n                            div().flex_1().min_w_0().child(\n                                CanvasToolbar::new(\"scene.canvas.toolbar\", \"125%\")\n                                    .snap(true)\n                                    .on_action(|_, _, _| {}),\n                            ),\n                        )\n                        .child(\n                            div().w(px(160.0)).flex_none().child(\n                                Minimap::new(\"scene.canvas.minimap\")\n                                    .marks([\n                                        MinimapMark::new(\"ingest\", 0.08, 0.24, 0.18, 0.16)\n                                            .color(\"teal\"),\n                                        MinimapMark::new(\"validate\", 0.32, 0.24, 0.20, 0.16)\n                                            .color(\"indigo\"),\n                                        MinimapMark::new(\"observe\", 0.24, 0.62, 0.20, 0.16)\n                                            .color(\"orange\"),\n                                        MinimapMark::new(\"publish\", 0.50, 0.62, 0.18, 0.16)\n                                            .color(\"lime\"),\n                                    ])\n                                    .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))\n                                    .on_pan(|_, _, _, _| {}),\n                            ),\n                        ),\n                )\n                // A region bounds part of a canvas rather than all of it, so\n                // each one is only as wide as the nodes it encloses and the\n                // grid keeps showing around them. Stretched to the frame, the\n                // boundary stopped meaning \"these nodes\" and started meaning\n                // \"everything\", which is what left half of each box empty.\n                .child(\n                    div().relative().w(px(540.0)).child(\n                        NodeGroup::new(\"scene.canvas.group\", \"Ingest\")\n                            .selected(true)\n                            .child(members(\n                                member(\n                                    \"scene.canvas.node.ingest\",\n                                    \"Stream ingest\",\n                                    \"teal\",\n                                    NodeState::Succeeded,\n                                    \"orders.v2 · partition 18\",\n                                    (\"rate\", \"3.2k/s\"),\n                                )\n                                .into_any_element(),\n                                member(\n                                    \"scene.canvas.node.validate\",\n                                    \"Validate & enrich\",\n                                    \"indigo\",\n                                    NodeState::Running,\n                                    \"schema + fraud signals\",\n                                    (\"p95\", \"18 ms\"),\n                                )\n                                .into_any_element(),\n                            )),\n                    ),\n                )\n                .child(\n                    div().relative().w(px(540.0)).ml(px(96.0)).child(\n                        NodeGroup::new(\"scene.canvas.group.quiet\", \"Observe\").child(members(\n                            member(\n                                \"scene.canvas.node.observe\",\n                                \"Observe quality\",\n                                \"orange\",\n                                NodeState::Failed,\n                                \"drift threshold exceeded\",\n                                (\"rejected\", \"94\"),\n                            )\n                            .into_any_element(),\n                            member(\n                                \"scene.canvas.node.publish\",\n                                \"Publish artifact\",\n                                \"lime\",\n                                NodeState::Pending,\n                                \"waiting for commit\",\n                                (\"queued\", \"1\"),\n                            )\n                            .into_any_element(),\n                        )),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "canvas-regions",
+      "capture": "cargo run -p xtask -- headless capture canvas-regions",
+      "kind": "exhibit",
+      "subjects": [
+        "NodeGraph"
+      ],
+      "uses": [
+        "NodeGraph"
+      ],
+      "example": "fn canvas_regions(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let card = |id: &'static str,\n                title: &'static str,\n                color: &'static str,\n                state: NodeState,\n                action: &'static str| {\n        GraphNode::new(id, title)\n            .color(color)\n            .width(168.0)\n            .state(state)\n            .action(action)\n            .port(GraphPort::input(\"in\", \"In\"))\n            .port(GraphPort::output(\"out\", \"Out\"))\n    };\n    stack(&theme)\n        .child(caption(\n            &theme,\n            \"regions live in canvas coordinates; the chrome offers only what this host can do\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().w(px(660.0)).h(px(360.0)).child(\n                        NodeGraph::new(\"scene.regions\")\n                            .viewport(GraphViewport::new(gpui::point(28.0, 18.0), 1.0))\n                            .interaction(GraphInteraction::Inspect)\n                            .band(\n                                GraphBand::new(\n                                    \"scene.regions.baseline\",\n                                    \"Baseline\",\n                                    0.0,\n                                    0.0,\n                                    560.0,\n                                    132.0,\n                                )\n                                .color(\"teal\"),\n                            )\n                            .band(\n                                GraphBand::new(\n                                    \"scene.regions.scope\",\n                                    \"Scope\",\n                                    0.0,\n                                    168.0,\n                                    560.0,\n                                    132.0,\n                                )\n                                .color(\"violet\")\n                                .selected(true),\n                            )\n                            .node(\n                                card(\n                                    \"scene.regions.sample\",\n                                    \"Sample\",\n                                    \"teal\",\n                                    NodeState::Succeeded,\n                                    \"1,204 cases\",\n                                ),\n                                28.0,\n                                34.0,\n                            )\n                            .node(\n                                card(\n                                    \"scene.regions.score\",\n                                    \"Score\",\n                                    \"teal\",\n                                    NodeState::Succeeded,\n                                    \"reference model\",\n                                ),\n                                340.0,\n                                34.0,\n                            )\n                            .node(\n                                card(\n                                    \"scene.regions.candidate\",\n                                    \"Candidate\",\n                                    \"violet\",\n                                    NodeState::Running,\n                                    \"checkpoint 41\",\n                                ),\n                                28.0,\n                                202.0,\n                            )\n                            .node(\n                                card(\n                                    \"scene.regions.compare\",\n                                    \"Compare\",\n                                    \"violet\",\n                                    NodeState::Partial,\n                                    \"3 of 8 rubrics\",\n                                ),\n                                340.0,\n                                202.0,\n                            )\n                            .edge(\n                                GraphEdge::new(\"scene.regions.sample\", \"scene.regions.score\")\n                                    .ports(\"out\", \"in\")\n                                    .active(true),\n                            )\n                            .edge(\n                                GraphEdge::new(\"scene.regions.candidate\", \"scene.regions.compare\")\n                                    .ports(\"out\", \"in\")\n                                    .label(\"8 rubrics\")\n                                    .active(true),\n                            )\n                            // A return path: the comparison sent work back to\n                            // be scored again. It is a fact about the run's\n                            // control flow, so it is not drawn as a failure.\n                            .edge(\n                                GraphEdge::new(\"scene.regions.compare\", \"scene.regions.score\")\n                                    .ports(\"out\", \"in\")\n                                    .label(\"re-score\")\n                                    .lane(1)\n                                    .feedback()\n                                    .active(true),\n                            )\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div()\n                        .flex_none()\n                        .column()\n                        .gap_token(&theme, Space::Sm)\n                        .child(\n                            // Inspect-only: this host frames the canvas and\n                            // rearranges nothing, so it names the one intent it\n                            // can carry out rather than showing three chips and\n                            // meaning one.\n                            CanvasToolbar::new(\"scene.regions.toolbar\", \"100%\")\n                                .actions([CanvasToolbarAction::Fit])\n                                .on_action(|_, _, _| {}),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "browser-panel",

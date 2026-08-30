@@ -22,6 +22,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
     ActiveTheme, Elevation, Radius, SemanticBorder, SemanticColor, SemanticWash, Space, Surface,
+    TypeScale, Variant,
 };
 use web_time::Instant;
 
@@ -34,6 +35,7 @@ use crate::motion::{Activity, MotionPolicy, MotionRole, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
+use super::band::GraphBand;
 use super::edge::{
     Anchor, Axis, EdgePaint, GraphEdge, GraphEndpoint, GraphRouting, OrthogonalRoute, PortSide,
     RouteTransform, paint_route, paint_route_stroke, route_curved, route_curved_preview,
@@ -539,6 +541,7 @@ pub struct NodeGraph {
     ident: Ident,
     nodes: Vec<Placed>,
     edges: Vec<GraphEdge>,
+    bands: Vec<GraphBand>,
     state: GraphState,
     empty: Option<EmptyState>,
     slots: Slots,
@@ -608,6 +611,7 @@ impl NodeGraph {
             ident: ident.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            bands: Vec::new(),
             state: GraphState::Ready,
             empty: None,
             slots: Slots::default(),
@@ -640,6 +644,22 @@ impl NodeGraph {
 
     pub fn edges(mut self, edges: impl IntoIterator<Item = GraphEdge>) -> Self {
         self.edges.extend(edges);
+        self
+    }
+
+    /// Names a region of the canvas, in the same world coordinates the nodes
+    /// are placed in.
+    ///
+    /// Bands are drawn above the grid and below every connection and card, in
+    /// the order they were added, and never intercept a pointer. See
+    /// [`GraphBand`].
+    pub fn band(mut self, band: GraphBand) -> Self {
+        self.bands.push(band);
+        self
+    }
+
+    pub fn bands(mut self, bands: impl IntoIterator<Item = GraphBand>) -> Self {
+        self.bands.extend(bands);
         self
     }
 
@@ -1451,15 +1471,26 @@ impl RenderOnce for NodeGraph {
             .collect();
         let painted_preview = preview.clone();
 
-        // Edges and the grid are one painted layer beneath the nodes, so a
-        // connection never intercepts a click meant for a card and adding one
-        // moves nothing.
-        let beneath = canvas(
+        // The ground the canvas stands on, under everything the caller put
+        // there. Painted rather than laid out, so it never intercepts a click
+        // meant for a card and adding it moves nothing.
+        let ground = canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
                 if draw_grid {
                     paint_grid(window, bounds, viewport, grid_paint);
                 }
+            },
+        )
+        .absolute()
+        .inset_0();
+
+        // Edges are their own painted layer above the regions and below the
+        // cards: a connection crosses a region it does not belong to, and a
+        // region drawn over its own connections would hide them.
+        let beneath = canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
                 let transform = RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom);
                 for (routed, reveal) in painted_routes {
                     paint_route(
@@ -2315,7 +2346,77 @@ impl RenderOnce for NodeGraph {
                 _ => None,
             }
         };
+        // Region bands, in the order the caller declared them. Each is a
+        // world rectangle, so it pans and zooms with the cards it encloses;
+        // its name is not, because a caption that shrank with the zoom would
+        // stop being readable exactly when the reader zoomed out to take in
+        // the regions. Nothing here is interactive: every gesture crossing a
+        // band reaches the canvas underneath.
+        let bands: Vec<AnyElement> = self
+            .bands
+            .iter()
+            .filter(|band| {
+                view.map(|view| bounds_overlap(band.bounds(), view, CULL_PAD))
+                    .unwrap_or(true)
+            })
+            .map(|band| {
+                let colors = band
+                    .color
+                    .as_ref()
+                    .map(|color| theme.variant_colors(Variant::Light, color));
+                let origin = world_to_screen(band.bounds().origin, viewport);
+                // A region is the plane the cards stand on, not a card. The
+                // wash is the strength a chart fills an area at, so a card
+                // inside a region still reads as the loudest thing in it.
+                let wash = colors.map_or(theme.colors.sunken, |colors| {
+                    colors.background.opacity(theme.effects.area_wash_alpha)
+                });
+                let line = if band.selected {
+                    theme.colors.accent
+                } else {
+                    colors.map_or(theme.colors.hairline, |colors| {
+                        colors.text.opacity(theme.effects.semantic_border_alpha)
+                    })
+                };
+                div()
+                    .absolute()
+                    .left(px(origin.x))
+                    .top(px(origin.y))
+                    .w(px(band.bounds().size.width * viewport.zoom))
+                    .h(px(band.bounds().size.height * viewport.zoom))
+                    .rounded(px(theme.radius(Radius::Card)))
+                    .bg(wash)
+                    .border(px(theme.borders.hairline))
+                    .border_color(line)
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(theme.space(Space::Xs)))
+                            .top(px(theme.space(Space::Xs)))
+                            .px_token(&theme, Space::Xs)
+                            .radius(&theme, Radius::Small)
+                            .bg(theme.colors.node.label_wash)
+                            .type_scale(&theme, TypeScale::Caption)
+                            .text_color(if band.selected {
+                                theme.colors.text
+                            } else {
+                                theme.colors.text_muted
+                            })
+                            .child(band.label.clone()),
+                    )
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(band.ident.semantic_id(), Role::Group)
+                            .text(band.label.clone())
+                            .selected(band.selected),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+
         frame
+            .child(ground)
+            .children(if compact { Vec::new() } else { bands })
             .child(beneath)
             .children(shockwaves)
             .children(if compact { Vec::new() } else { edge_labels })
@@ -2465,6 +2566,15 @@ const MAJOR: i32 = 5;
 /// The closest two dots may sit before the grid stops being a ruler and
 /// becomes a fill.
 const GRID_MIN_SPACING: f32 = 15.0;
+/// How far above that floor the finest level is fully drawn, as a share of the
+/// floor.
+///
+/// The fade exists to take a level out before it is replaced, so it belongs at
+/// the bottom of the band rather than across it. Spread over the whole band —
+/// which is five times as wide — the level a canvas actually sits at is only a
+/// fifth drawn, and the grid a reader sees at rest is the major interval on
+/// its own.
+const GRID_FADE_SPAN: f32 = 0.6;
 /// How wide the axis rules are drawn, in device pixels.
 const AXIS_WIDTH: f32 = 1.0;
 /// The dash and gap of a connection proposal that has not found a port.
@@ -2497,7 +2607,7 @@ fn grid_level(zoom: f32) -> (f32, f32) {
         world /= major;
     }
     let spacing = world * zoom;
-    let fade = ((spacing - GRID_MIN_SPACING) / (GRID_MIN_SPACING * (major - 1.0))).clamp(0.0, 1.0);
+    let fade = ((spacing - GRID_MIN_SPACING) / (GRID_MIN_SPACING * GRID_FADE_SPAN)).clamp(0.0, 1.0);
     (world, fade)
 }
 
@@ -2528,7 +2638,17 @@ fn paint_grid(
     let first = |offset: f32| ((-offset / viewport.zoom) / world_step).floor() * world_step;
 
     let minor = paint.minor.opacity(fade);
+    // As the finest level fades out, the heavier one is about to become the
+    // finest, so it settles onto the finest level's own weight on the way. A
+    // major dot that stayed heavy right up to the switch and then became a
+    // minor dot at the same place would change weight in one frame, which is
+    // the pop the fade exists to avoid.
+    let major = gpui::Hsla {
+        a: paint.minor.a + (paint.major.a - paint.minor.a) * fade,
+        ..paint.major
+    };
     let dot = paint.dot;
+    let major_dot = dot * (1.0 + 0.6 * fade);
     let mut world_y = first(viewport.offset.y);
     while screen(world_y, viewport.offset.y) < height {
         let y = screen(world_y, viewport.offset.y);
@@ -2539,13 +2659,13 @@ fn paint_grid(
             let column_major = ((world_x / world_step).round() as i32).rem_euclid(MAJOR) == 0;
             let heavy = row_major && column_major;
             if y >= 0.0 && x >= 0.0 && (heavy || fade > 0.0) {
-                let size_px = if heavy { dot * 1.6 } else { dot };
+                let size_px = if heavy { major_dot } else { dot };
                 window.paint_quad(gpui::fill(
                     Bounds::new(
                         point(bounds.origin.x + px(x), bounds.origin.y + px(y)),
                         size(px(size_px), px(size_px)),
                     ),
-                    if heavy { paint.major } else { minor },
+                    if heavy { major } else { minor },
                 ));
             }
             world_x += world_step;

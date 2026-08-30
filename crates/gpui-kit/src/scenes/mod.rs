@@ -48,7 +48,7 @@ use agent::{
     cost_meter, feedback_rating, offering_catalog, permission_matrix, persona, prompt_builder,
     server_list, step_list, thinking, tool_call,
 };
-use canvas::{canvas_tools, node_graph};
+use canvas::{canvas_regions, canvas_tools, node_graph};
 use compositions::{motion_flip, motion_state, reading_direction};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
@@ -740,6 +740,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "canvas-tools",
             build: canvas_tools,
             shows: Shows::Subjects(&["CanvasToolbar", "Minimap", "NodeGroup"]),
+        },
+        Scene {
+            name: "canvas-regions",
+            build: canvas_regions,
+            shows: Shows::Subjects(&["NodeGraph"]),
         },
         Scene {
             name: "browser-panel",

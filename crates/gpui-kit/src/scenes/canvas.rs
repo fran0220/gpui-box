@@ -457,3 +457,153 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .into_any_element()
 }
+
+/// Two named regions of one canvas, an inspect-only toolbar beside them, and
+/// the return path that crosses both.
+///
+/// The three things it exists to review are the three a host cannot fake.
+/// A region is a rectangle of the graph's own world, so it pans and zooms
+/// with the cards it encloses and a host cannot draw one by overlaying a box.
+/// A toolbar on a canvas that arranges nothing offers only the intent it can
+/// keep. And a return path is drawn as a return rather than as a failure, so
+/// a run that retried and then succeeded is not reported as broken.
+pub(super) fn canvas_regions(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let card = |id: &'static str,
+                title: &'static str,
+                color: &'static str,
+                state: NodeState,
+                action: &'static str| {
+        GraphNode::new(id, title)
+            .color(color)
+            .width(168.0)
+            .state(state)
+            .action(action)
+            .port(GraphPort::input("in", "In"))
+            .port(GraphPort::output("out", "Out"))
+    };
+    stack(&theme)
+        .child(caption(
+            &theme,
+            "regions live in canvas coordinates; the chrome offers only what this host can do",
+        ))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div().w(px(660.0)).h(px(360.0)).child(
+                        NodeGraph::new("scene.regions")
+                            .viewport(GraphViewport::new(gpui::point(28.0, 18.0), 1.0))
+                            .interaction(GraphInteraction::Inspect)
+                            .band(
+                                GraphBand::new(
+                                    "scene.regions.baseline",
+                                    "Baseline",
+                                    0.0,
+                                    0.0,
+                                    560.0,
+                                    132.0,
+                                )
+                                .color("teal"),
+                            )
+                            .band(
+                                GraphBand::new(
+                                    "scene.regions.scope",
+                                    "Scope",
+                                    0.0,
+                                    168.0,
+                                    560.0,
+                                    132.0,
+                                )
+                                .color("violet")
+                                .selected(true),
+                            )
+                            .node(
+                                card(
+                                    "scene.regions.sample",
+                                    "Sample",
+                                    "teal",
+                                    NodeState::Succeeded,
+                                    "1,204 cases",
+                                ),
+                                28.0,
+                                34.0,
+                            )
+                            .node(
+                                card(
+                                    "scene.regions.score",
+                                    "Score",
+                                    "teal",
+                                    NodeState::Succeeded,
+                                    "reference model",
+                                ),
+                                340.0,
+                                34.0,
+                            )
+                            .node(
+                                card(
+                                    "scene.regions.candidate",
+                                    "Candidate",
+                                    "violet",
+                                    NodeState::Running,
+                                    "checkpoint 41",
+                                ),
+                                28.0,
+                                202.0,
+                            )
+                            .node(
+                                card(
+                                    "scene.regions.compare",
+                                    "Compare",
+                                    "violet",
+                                    NodeState::Partial,
+                                    "3 of 8 rubrics",
+                                ),
+                                340.0,
+                                202.0,
+                            )
+                            .edge(
+                                GraphEdge::new("scene.regions.sample", "scene.regions.score")
+                                    .ports("out", "in")
+                                    .active(true),
+                            )
+                            .edge(
+                                GraphEdge::new("scene.regions.candidate", "scene.regions.compare")
+                                    .ports("out", "in")
+                                    .label("8 rubrics")
+                                    .active(true),
+                            )
+                            // A return path: the comparison sent work back to
+                            // be scored again. It is a fact about the run's
+                            // control flow, so it is not drawn as a failure.
+                            .edge(
+                                GraphEdge::new("scene.regions.compare", "scene.regions.score")
+                                    .ports("out", "in")
+                                    .label("re-score")
+                                    .lane(1)
+                                    .feedback()
+                                    .active(true),
+                            )
+                            .on_event(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div()
+                        .flex_none()
+                        .column()
+                        .gap_token(&theme, Space::Sm)
+                        .child(
+                            // Inspect-only: this host frames the canvas and
+                            // rearranges nothing, so it names the one intent it
+                            // can carry out rather than showing three chips and
+                            // meaning one.
+                            CanvasToolbar::new("scene.regions.toolbar", "100%")
+                                .actions([CanvasToolbarAction::Fit])
+                                .on_action(|_, _, _| {}),
+                        ),
+                ),
+        )
+        .into_any_element()
+}

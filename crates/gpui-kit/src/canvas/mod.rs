@@ -35,6 +35,7 @@
 //!     .edge(GraphEdge::new("run.12.apply", "run.12.plan").feedback());
 //! ```
 
+mod band;
 mod edge;
 mod graph;
 mod group;
@@ -42,6 +43,7 @@ mod minimap;
 mod node;
 mod toolbar;
 
+pub use band::GraphBand;
 pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, GraphRouting, PortSide};
 pub(crate) use graph::grid_ground;
 pub use graph::{
