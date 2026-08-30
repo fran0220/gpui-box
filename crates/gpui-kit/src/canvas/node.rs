@@ -20,7 +20,7 @@ use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Theme
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
-use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, keyed};
+use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, ResolvedMotion, keyed};
 use crate::strings::ActiveNumbers;
 
 use super::edge::PortSide;
@@ -744,10 +744,8 @@ impl StateFade {
         state: NodeState,
         target: NodePaint,
         now: Instant,
-        change: MotionSpec,
-        change_animates: bool,
-        feedback: MotionSpec,
-        feedback_animates: bool,
+        change: ResolvedMotion,
+        feedback: ResolvedMotion,
         theme: &Theme,
     ) -> (NodePaint, bool, f32) {
         if !self.drawn {
@@ -758,31 +756,32 @@ impl StateFade {
             return (target, false, 0.0);
         }
         if self.state != state {
-            let visible = self.at(now, change, theme);
+            let visible = self.at(now, change.spec(), theme);
             self.state = state;
-            self.from = Some(if change_animates { visible } else { target });
+            self.from = Some(if change.animates() { visible } else { target });
             self.to = Some(target);
-            self.started = change_animates.then_some(now);
-            self.succeeded_at = (state == NodeState::Succeeded && feedback_animates).then_some(now);
+            self.started = change.animates().then_some(now);
+            self.succeeded_at =
+                (state == NodeState::Succeeded && feedback.animates()).then_some(now);
         } else if self.to != Some(target) {
             // A theme change is not a node-state event.
             self.from = Some(target);
             self.to = Some(target);
             self.started = None;
         }
-        let visible = self.at(now, change, theme);
+        let visible = self.at(now, change.spec(), theme);
         let crossing = self.started.is_some_and(|started| {
             now.duration_since(started).as_secs_f32()
-                < change.total().as_secs_f32().max(f32::EPSILON)
+                < change.spec().total().as_secs_f32().max(f32::EPSILON)
         });
         if !crossing {
             self.from = self.to;
             self.started = None;
         }
         let settle = self.succeeded_at.map_or(0.0, |started| {
-            let span = feedback.total().as_secs_f32().max(f32::EPSILON);
+            let span = feedback.spec().total().as_secs_f32().max(f32::EPSILON);
             let raw = (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0);
-            1.0 - feedback.progress(raw)
+            1.0 - feedback.spec().progress(raw)
         });
         if settle <= 0.0 {
             self.succeeded_at = None;
@@ -814,16 +813,9 @@ impl GraphNode {
             window.window_handle().window_id(),
             cx,
         );
-        let (mut paint, crossing, settle) = fade.borrow_mut().show(
-            self.state,
-            target,
-            now,
-            change.spec(),
-            change.animates(),
-            feedback.spec(),
-            feedback.animates(),
-            theme,
-        );
+        let (mut paint, crossing, settle) = fade
+            .borrow_mut()
+            .show(self.state, target, now, change, feedback, theme);
         if crossing || settle > 0.0 {
             window.request_animation_frame();
         }
@@ -1202,10 +1194,8 @@ mod tests {
             state,
             NodePaint::for_state(state, theme),
             now,
-            MotionPolicy::spec(MotionRole::StateChange, theme),
-            animates,
-            MotionPolicy::spec(MotionRole::Feedback, theme),
-            animates,
+            MotionPolicy::resolve_for(MotionRole::StateChange, theme, !animates),
+            MotionPolicy::resolve_for(MotionRole::Feedback, theme, !animates),
             theme,
         )
     }
