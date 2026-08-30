@@ -633,7 +633,7 @@ fn run_context_menu(
             x: (position.x.as_f32() * scale_factor).round() as i32,
             y: (position.y.as_f32() * scale_factor).round() as i32,
         };
-        if ClientToScreen(hwnd, &mut screen_position).is_err() {
+        if !ClientToScreen(hwnd, &mut screen_position).as_bool() {
             DestroyMenu(native_menu).ok();
             return None;
         }
