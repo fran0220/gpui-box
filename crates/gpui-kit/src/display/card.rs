@@ -360,16 +360,21 @@ impl RenderOnce for Card {
             return frame.semantic_in(cx, spec).into_any_element();
         }
 
-        // A card is a surface, so it is the one place in the library where
-        // rising off the page reads as a response rather than as a component
-        // climbing out of its own frame.
-        let mut card = frame
+        // Which response the pointer gets follows from what the card is, not
+        // from what a caller would like: one that claims a plane rises off the
+        // page, and one that claims none takes the wash any row takes. See
+        // [`CardVariant::claims_a_plane`].
+        let responsive = frame
             .id(ident.element_id())
             .cursor_pointer()
             .tab_index(0)
-            .focus_ring(&theme)
-            .hover_lift(cx)
-            .pressable(cx);
+            .focus_ring(&theme);
+        let mut card = if self.variant.claims_a_plane() {
+            responsive.hover_lift(cx)
+        } else {
+            responsive.hover_row(&theme)
+        }
+        .pressable(cx);
         let handler = self.on_click.clone().expect("an actionable card has one");
         let click = Rc::clone(&handler);
         card.interactivity()

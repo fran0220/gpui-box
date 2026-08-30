@@ -40,6 +40,26 @@ pub enum CardVariant {
     Ghost,
 }
 
+impl CardVariant {
+    /// Whether this card presents itself as a plane of its own.
+    ///
+    /// The two responses a surface can give a pointer are not
+    /// interchangeable, and which one is honest here follows from this answer
+    /// rather than from a caller's preference. Rising off the page says "this
+    /// is a plane, and it has come forward"; a card is the one place in the
+    /// library where that reads as a response rather than as a component
+    /// climbing out of its own frame. A ghost card has no plane to come
+    /// forward — the lift would raise a shadow around a transparent rectangle
+    /// and move a line of text a pixel to announce it — so what it gives is
+    /// the wash any row gives.
+    pub const fn claims_a_plane(self) -> bool {
+        match self {
+            CardVariant::Elevated | CardVariant::Outlined => true,
+            CardVariant::Ghost => false,
+        }
+    }
+}
+
 /// Token-addressed styling helpers.
 ///
 /// These exist so component code names a semantic role instead of repeating a

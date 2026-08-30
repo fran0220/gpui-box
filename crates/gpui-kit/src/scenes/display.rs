@@ -366,6 +366,17 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(caption("Enter and space reach it from the keyboard.")),
                 ))
                 .child(column(
+                    // The pairing the rows above never put together, which is
+                    // how a card with no plane came to be lifted off one.
+                    Card::new()
+                        .id("scene.card.actionable-ghost")
+                        .variant(CardVariant::Ghost)
+                        .padding(Space::Lg)
+                        .on_click(|_window, _cx| {})
+                        .header(CardHeader::new("Open the line").subtitle("A ghost card acts too"))
+                        .child(caption("No plane to rise off, so the pointer gets a wash.")),
+                ))
+                .child(column(
                     Card::new()
                         .id("scene.card.chosen")
                         .padding(Space::Lg)
