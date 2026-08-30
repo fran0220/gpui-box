@@ -35,7 +35,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius};
 
-use crate::foundation::Ident;
+use crate::foundation::{Ident, StyledExt};
 use crate::strings::ActiveNumbers;
 
 /// A run of text with some of it marked.
@@ -217,7 +217,7 @@ impl RenderOnce for HighlightedText {
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .when(self.monospace, |element| {
                 element
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
             });

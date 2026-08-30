@@ -1,4 +1,4 @@
-//! A source-oriented facade over [`TextArea`](super::textarea::TextArea).
+//! A source-oriented facade over [`TextArea`].
 //!
 //! `Editor` deliberately does not own another document, caret, history, IME
 //! session, or text layout. It fixes the shared area to no-wrap source
@@ -479,7 +479,7 @@ impl Render for Editor {
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .track_focus(&focus)
-            .font_family(theme.typography.mono.clone())
+            .mono(&theme)
             .type_scale(&theme, gpui_kit_theme::TypeScale::Code)
             .children(numbers)
             .child(

@@ -646,7 +646,7 @@ impl RenderOnce for JsonView {
             .radius(&theme, Radius::Card)
             .surface(&theme, Surface::Panel)
             .overflow_hidden()
-            .font_family(theme.typography.mono.clone())
+            .mono(&theme)
             .child(rows);
 
         if !view.disabled && (view.on_select.is_some() || view.on_toggle.is_some()) {

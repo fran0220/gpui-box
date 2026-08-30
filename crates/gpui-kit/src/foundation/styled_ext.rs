@@ -74,6 +74,21 @@ pub trait StyledExt: Styled + Sized {
         self.text_color(theme.text_color(tone))
     }
 
+    /// Monospace text that shows exactly the characters it was handed.
+    ///
+    /// The family alone is not enough. The bundled mono face carries `liga`
+    /// ligatures whose glyphs advance one cell however many characters they
+    /// stand for, with the ink hanging left into the cell in front — so a
+    /// shaped `--`, `==` or `->` paints over the space before it and the line
+    /// finishes a cell short of what it says. In a code view, a diff, a
+    /// terminal or a command a reader is being shown, that is not a
+    /// typographic preference: the text on screen stops being the text. Off,
+    /// one character is one cell again.
+    fn mono(self, theme: &Theme) -> Self {
+        self.font_family(theme.typography.mono.clone())
+            .font_features(gpui::FontFeatures::disable_ligatures())
+    }
+
     /// Applies size, line height and weight from one typographic step.
     fn type_scale(self, theme: &Theme, scale: TypeScale) -> Self {
         let style = theme.type_style(scale);

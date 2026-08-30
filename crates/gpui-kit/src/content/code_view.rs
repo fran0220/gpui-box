@@ -616,7 +616,7 @@ impl RenderOnce for CodeView {
                     .relative()
                     .w_full()
                     .overflow_hidden()
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
                     .text_color(theme.colors.text)

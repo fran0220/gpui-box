@@ -121,7 +121,7 @@ impl RenderOnce for CanvasToolbar {
             .child(
                 div()
                     .px_token(&theme, Space::Xs)
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.text_muted)
                     .child(self.zoom.clone()),

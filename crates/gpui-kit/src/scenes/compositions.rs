@@ -201,7 +201,7 @@ pub(super) fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
             .justify_center()
             .radius(&theme, Radius::Small)
             .well(&theme)
-            .font_family(theme.typography.mono.clone())
+            .mono(&theme)
             .type_scale(&theme, TypeScale::Caption)
             .text_color(theme.colors.text)
             .child(format!("{}", index + 1));

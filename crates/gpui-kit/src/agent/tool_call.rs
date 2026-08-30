@@ -544,14 +544,14 @@ impl RenderOnce for ToolCall {
                 // against.
                 text(&theme, TypeScale::Caption, self.tool.clone())
                     .flex_none()
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .text_tone(&theme, TextTone::Primary),
             )
             .children(summary.map(|summary| {
                 text(&theme, TypeScale::Caption, summary)
                     .min_w_0()
                     .truncate()
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .text_tone(&theme, TextTone::Faint)
             }))
             .children(status.map(|(status_ident, words, color, value)| {
@@ -562,7 +562,7 @@ impl RenderOnce for ToolCall {
                 text(&theme, TypeScale::Caption, words.clone())
                     .min_w_0()
                     .truncate()
-                    .font_family(theme.typography.mono.clone())
+                    .mono(&theme)
                     .text_color(color)
                     .semantic_in(
                         cx,
@@ -583,7 +583,7 @@ impl RenderOnce for ToolCall {
                     .map(|elapsed| {
                         text(&theme, TypeScale::Caption, elapsed.clone())
                             .flex_none()
-                            .font_family(theme.typography.mono.clone())
+                            .mono(&theme)
                             .text_tone(&theme, TextTone::Faint)
                             .semantic_in(
                                 cx,
@@ -745,15 +745,15 @@ fn evidence_body(
                 .py_token(theme, Space::Xs)
                 .radius(theme, Radius::Small)
                 .bg(theme.colors.agent.evidence_wash)
-                .font_family(theme.typography.mono.clone())
+                .mono(theme)
                 .children(body.shown_lines().into_iter().map(|line| {
                     text(theme, TypeScale::Caption, line)
-                        .font_family(theme.typography.mono.clone())
+                        .mono(theme)
                         .text_tone(theme, TextTone::Muted)
                 }))
                 .children(more.map(|more| {
                     text(theme, TypeScale::Caption, more)
-                        .font_family(theme.typography.mono.clone())
+                        .mono(theme)
                         .text_tone(theme, TextTone::Faint)
                 })),
         )

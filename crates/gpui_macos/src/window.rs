@@ -1400,7 +1400,7 @@ unsafe fn run_context_menu(
         let action = usize::try_from(selected)
             .ok()
             .and_then(|index| actions.get(index))
-            .map(|action: &&Box<dyn Action>| action.boxed_clone());
+            .map(|action: &&dyn Action| action.boxed_clone());
         let _: () = msg_send![target, release];
         pool.drain();
         action
@@ -1410,7 +1410,7 @@ unsafe fn run_context_menu(
 unsafe fn build_context_menu<'a>(
     menu: &'a Menu,
     target: id,
-    actions: &mut Vec<&'a Box<dyn Action>>,
+    actions: &mut Vec<&'a dyn Action>,
 ) -> id {
     unsafe {
         let native_menu = NSMenu::new(nil).autorelease();
@@ -1443,7 +1443,7 @@ unsafe fn build_context_menu<'a>(
                         let tag = actions.len() as NSInteger;
                         let _: () = msg_send![native_item, setTag: tag];
                         native_item.setTarget_(target);
-                        actions.push(action);
+                        actions.push(action.as_ref());
                     }
                     native_menu.addItem_(native_item);
                 }

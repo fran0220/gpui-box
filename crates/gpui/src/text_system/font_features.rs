@@ -8,9 +8,20 @@ use schemars::{JsonSchema, json_schema};
 pub struct FontFeatures(pub Arc<Vec<(String, u32)>>);
 
 impl FontFeatures {
-    /// Disables `calt`.
+    /// Turns off every ligature feature a shaper applies without being asked.
+    ///
+    /// All three, because they are on by default and a caller that says
+    /// "no ligatures" and still gets `liga` has been told something untrue:
+    /// `liga` is the standard set, `clig` the contextual one, and `calt` the
+    /// alternates most programming faces hang their arrows and arrows-like
+    /// forms on. Discretionary `dlig` is off unless someone asks for it, so
+    /// there is nothing here to turn off.
     pub fn disable_ligatures() -> Self {
-        Self(Arc::new(vec![("calt".into(), 0)]))
+        Self(Arc::new(vec![
+            ("liga".into(), 0),
+            ("clig".into(), 0),
+            ("calt".into(), 0),
+        ]))
     }
 
     /// Get the tag name list of the font OpenType features

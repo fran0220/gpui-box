@@ -637,11 +637,7 @@ impl gpui::Element for TerminalElement {
         // at `cell_width * col` — stays on the true column while the text
         // beside it does not.
         let mut mono = font(theme.typography.mono.clone());
-        mono.features = gpui::FontFeatures(std::sync::Arc::new(vec![
-            ("liga".into(), 0),
-            ("calt".into(), 0),
-            ("dlig".into(), 0),
-        ]));
+        mono.features = gpui::FontFeatures::disable_ligatures();
 
         // The font probe: the cell is whatever this font's em advance actually
         // is, measured, rather than an aspect ratio guessed from the size.

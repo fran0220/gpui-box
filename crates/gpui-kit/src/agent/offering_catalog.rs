@@ -541,7 +541,7 @@ impl OfferingCatalog {
                             element.child(
                                 text(theme, TypeScale::Code, qualifier)
                                     .text_tone(theme, TextTone::Faint)
-                                    .font_family(theme.typography.mono.clone()),
+                                    .mono(theme),
                             )
                         },
                     ),

@@ -74,7 +74,7 @@ impl RenderOnce for Kbd {
                         .justify_center()
                         .radius(&theme, gpui_kit_theme::Radius::Small)
                         .bg(theme.colors.hover)
-                        .font_family(theme.typography.mono.clone())
+                        .mono(&theme)
                         .font_fallbacks(gpui_kit_assets::key_fallbacks())
                         .text_size(px(size))
                         .text_color(theme.colors.text_muted)

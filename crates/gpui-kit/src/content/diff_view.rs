@@ -1281,7 +1281,7 @@ fn diff_row(
         FlatKind::Hunk(header) => row_frame(theme, fit)
             .items_center()
             .px_token(theme, Space::Sm)
-            .font_family(theme.typography.mono.clone())
+            .mono(theme)
             .text_size(px(theme.typography.code.size))
             .text_color(theme.colors.accent)
             .bg(theme
@@ -1329,7 +1329,7 @@ fn unified_line(
             Fit::Clips => frame.items_center(),
             Fit::Wraps => frame.items_start(),
         })
-        .font_family(theme.typography.mono.clone())
+        .mono(theme)
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
         .when(side.mark != DiffLineMark::Context, |element| {
@@ -1370,7 +1370,7 @@ fn split_line(
 ) -> AnyElement {
     row_frame(theme, fit)
         .items_stretch()
-        .font_family(theme.typography.mono.clone())
+        .mono(theme)
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
         // Within one split row the left column reads before the right, so the

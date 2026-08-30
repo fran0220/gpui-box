@@ -202,7 +202,7 @@ impl SceneMotionPrimitives {
                             .h(px(52.0))
                             .flex()
                             .items_center()
-                            .font_family(theme.typography.mono.clone())
+                            .mono(theme)
                             .text_size(px(36.0))
                             .child(":"),
                     )
@@ -571,7 +571,7 @@ fn rolling_digit(theme: &Theme, value: f32) -> gpui::Div {
         .overflow_hidden()
         .radius(theme, Radius::Control)
         .well(theme)
-        .font_family(theme.typography.mono.clone())
+        .mono(theme)
         .text_size(px(40.0))
         .child(glyph(current, -52.0 * fraction))
         .child(glyph(next, 52.0 * (1.0 - fraction)))

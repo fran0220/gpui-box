@@ -530,7 +530,9 @@ fn runs_for_block(
             }
             let style = block.styles().style_at(range.start);
             let mut run_font = if style.format(RichTextFormat::Code) {
-                font(theme.typography.mono.clone())
+                let mut code = font(theme.typography.mono.clone());
+                code.features = gpui::FontFeatures::disable_ligatures();
+                code
             } else {
                 base.font()
             };

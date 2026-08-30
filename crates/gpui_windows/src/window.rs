@@ -653,13 +653,13 @@ fn run_context_menu(
             .ok()
             .and_then(|id| id.checked_sub(1))
             .and_then(|index| actions.get(index))
-            .map(|action: &&Box<dyn Action>| action.boxed_clone())
+            .map(|action: &&dyn Action| action.boxed_clone())
     }
 }
 
 unsafe fn build_context_menu<'a>(
     menu: &'a Menu,
-    actions: &mut Vec<&'a Box<dyn Action>>,
+    actions: &mut Vec<&'a dyn Action>,
 ) -> Option<HMENU> {
     unsafe {
         let native_menu = CreatePopupMenu().ok()?;
@@ -685,7 +685,7 @@ unsafe fn build_context_menu<'a>(
                     let id = if *disabled {
                         0
                     } else {
-                        actions.push(action);
+                        actions.push(action.as_ref());
                         actions.len()
                     };
                     let label: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
