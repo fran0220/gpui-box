@@ -149,6 +149,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#c4b4ff` |
 | `color.palette.syntax.inlineWash` | `#a684ff` |
 | `color.palette.syntax.keyword` | `#e67e7f` |
@@ -222,14 +230,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `{amber.500}` | `#ffb900` |
 | `color.semantic.success` | `{green.500}` | `#57c47f` |
 | `color.semantic.info` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#565656` |
 | `color.node.portConnected` | `{indigo.600}` | `#5865f2` |
@@ -684,30 +692,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 11.66 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 5.96 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 7.74 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 5.94 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 10.32 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 10.79 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 7.78 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 8.19 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 12.19 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 5.52 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 9.76 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 5.50 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 9.57 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 10.00 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 7.22 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 7.59 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 11.30 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 5.12 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 9.05 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.71 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 8.19 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 8.56 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 6.18 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 6.50 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 9.67 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 4.38 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 7.75 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 6.43 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 9.41 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 6.31 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 6.42 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 9.78 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 7.65 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 10.82 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 6.88 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 5.96 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 8.72 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 5.85 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 5.95 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 9.07 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 7.10 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 10.03 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 6.38 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 5.10 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 7.46 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 5.01 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 5.10 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 7.76 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 6.07 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 8.58 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 5.46 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 4.03 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.94 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.70 | 4.5 |
@@ -892,6 +900,14 @@ Appearance: `Light`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#6174d3` |
+| `color.palette.series.2` | `#9256ae` |
+| `color.palette.series.3` | `#c05279` |
+| `color.palette.series.4` | `#c15c24` |
+| `color.palette.series.5` | `#8c7000` |
+| `color.palette.series.6` | `#599532` |
+| `color.palette.series.7` | `#008a76` |
+| `color.palette.series.8` | `#0091bc` |
 | `color.palette.syntax.inline` | `#5b21b6` |
 | `color.palette.syntax.inlineWash` | `#7c3aed` |
 | `color.palette.syntax.keyword` | `#a83232` |
@@ -965,14 +981,14 @@ Appearance: `Light`.
 | `color.semantic.warning` | `{amber.500}` | `#a76a00` |
 | `color.semantic.success` | `{green.500}` | `#237a48` |
 | `color.semantic.info` | `{cyan.400}` | `#2a6f8f` |
-| `color.sequence.categorical.0` | `{indigo.700}` | `#4263eb` |
-| `color.sequence.categorical.1` | `{teal.900}` | `#087f5b` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#a76a00` |
-| `color.sequence.categorical.3` | `{pink.700}` | `#d6336c` |
-| `color.sequence.categorical.4` | `{cyan.800}` | `#0c8599` |
-| `color.sequence.categorical.5` | `{lime.900}` | `#5c940d` |
-| `color.sequence.categorical.6` | `{violet.700}` | `#7048e8` |
-| `color.sequence.categorical.7` | `{orange.900}` | `#d9480f` |
+| `color.sequence.categorical.0` | `{series.1}` | `#6174d3` |
+| `color.sequence.categorical.1` | `{series.2}` | `#9256ae` |
+| `color.sequence.categorical.2` | `{series.3}` | `#c05279` |
+| `color.sequence.categorical.3` | `{series.4}` | `#c15c24` |
+| `color.sequence.categorical.4` | `{series.5}` | `#8c7000` |
+| `color.sequence.categorical.5` | `{series.6}` | `#599532` |
+| `color.sequence.categorical.6` | `{series.7}` | `#008a76` |
+| `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#0a0a0c0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#9a9aa1` |
 | `color.node.portConnected` | `{indigo.600}` | `#363fa8` |
@@ -1427,30 +1443,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 13.40 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 4.46 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 6.93 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 4.19 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 4.21 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 3.75 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 3.88 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 3.66 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 3.10 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.67 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 3.62 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.58 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 4.60 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 4.10 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 4.24 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 4.00 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 3.39 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 5.10 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 3.95 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.98 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 5.00 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 4.46 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 4.62 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 4.35 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 3.69 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 5.55 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 4.30 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 3.57 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 4.24 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 3.74 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 3.66 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 3.98 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 3.06 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 3.61 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 3.06 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 3.90 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 4.63 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.09 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.00 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 4.35 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 3.34 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 3.94 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 3.34 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.24 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 5.04 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.45 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.35 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 4.74 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 3.64 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.26 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.30 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.32 | 4.5 |
@@ -1635,6 +1651,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#f5c2e7` |
 | `color.palette.syntax.inlineWash` | `#cba6f7` |
 | `color.palette.syntax.keyword` | `#cba6f7` |
@@ -1708,14 +1732,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#f9e2af` | `#f9e2af` |
 | `color.semantic.success` | `#a6e3a1` | `#a6e3a1` |
 | `color.semantic.info` | `#89dceb` | `#89dceb` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#6c7086` |
 | `color.node.portConnected` | `#b4befe` | `#b4befe` |
@@ -2170,30 +2194,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 7.97 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 6.42 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 7.61 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 5.24 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 9.11 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 9.52 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 6.87 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 7.23 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 10.76 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.87 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 8.62 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.75 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 8.26 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 8.63 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 6.23 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 6.55 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 9.75 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 4.42 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 7.81 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.02 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 6.98 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 7.30 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 5.27 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 5.54 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 8.25 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 3.74 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 6.61 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 5.68 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 8.30 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 5.57 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 5.67 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 8.64 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 6.76 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 9.55 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 6.07 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 5.14 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 7.53 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 5.05 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 5.14 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 7.83 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 6.12 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 8.65 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 5.50 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.35 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 6.37 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.27 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.35 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 6.62 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 5.18 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 7.32 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 4.65 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 9.17 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 7.79 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.72 | 4.5 |
@@ -2378,6 +2402,14 @@ Appearance: `Light`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#6174d3` |
+| `color.palette.series.2` | `#9256ae` |
+| `color.palette.series.3` | `#c05279` |
+| `color.palette.series.4` | `#c15c24` |
+| `color.palette.series.5` | `#8c7000` |
+| `color.palette.series.6` | `#599532` |
+| `color.palette.series.7` | `#008a76` |
+| `color.palette.series.8` | `#0091bc` |
 | `color.palette.syntax.inline` | `#4249b5` |
 | `color.palette.syntax.inlineWash` | `#7287fd` |
 | `color.palette.syntax.keyword` | `#8032e6` |
@@ -2451,14 +2483,14 @@ Appearance: `Light`.
 | `color.semantic.warning` | `#9c6608` | `#9c6608` |
 | `color.semantic.success` | `#34851f` | `#34851f` |
 | `color.semantic.info` | `#12797f` | `#12797f` |
-| `color.sequence.categorical.0` | `{indigo.700}` | `#4263eb` |
-| `color.sequence.categorical.1` | `{teal.900}` | `#087f5b` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#a76a00` |
-| `color.sequence.categorical.3` | `{pink.700}` | `#d6336c` |
-| `color.sequence.categorical.4` | `{cyan.800}` | `#0c8599` |
-| `color.sequence.categorical.5` | `{lime.900}` | `#5c940d` |
-| `color.sequence.categorical.6` | `{violet.700}` | `#7048e8` |
-| `color.sequence.categorical.7` | `{orange.900}` | `#d9480f` |
+| `color.sequence.categorical.0` | `{series.1}` | `#6174d3` |
+| `color.sequence.categorical.1` | `{series.2}` | `#9256ae` |
+| `color.sequence.categorical.2` | `{series.3}` | `#c05279` |
+| `color.sequence.categorical.3` | `{series.4}` | `#c15c24` |
+| `color.sequence.categorical.4` | `{series.5}` | `#8c7000` |
+| `color.sequence.categorical.5` | `{series.6}` | `#599532` |
+| `color.sequence.categorical.6` | `{series.7}` | `#008a76` |
+| `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#2325370f` |
 | `color.node.portIdle` | `{neutral.500}` | `#9ca0b0` |
 | `color.node.portConnected` | `#8032e6` | `#8032e6` |
@@ -2913,30 +2945,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 5.92 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 5.12 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 6.17 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 4.40 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 4.42 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 3.95 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 4.08 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 3.84 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 3.26 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.91 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 3.80 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.69 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 4.71 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 4.21 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 4.35 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 4.10 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 3.47 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 5.23 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 4.05 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.98 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 5.00 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 4.46 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 4.62 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 4.35 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 3.69 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 5.55 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 4.30 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 3.75 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 4.46 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 3.93 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 3.85 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 4.19 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 3.22 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 3.79 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 3.21 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 4.00 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 4.75 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.19 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.10 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 4.46 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 3.43 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 4.04 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 3.43 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.24 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 5.04 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.45 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.35 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 4.74 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 3.64 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 5.28 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.34 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.51 | 4.5 |
@@ -3121,6 +3153,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#8fbcbb` |
 | `color.palette.syntax.inlineWash` | `#81a1c1` |
 | `color.palette.syntax.keyword` | `#81a1c1` |
@@ -3194,14 +3234,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#ebcb8b` | `#ebcb8b` |
 | `color.semantic.success` | `#a3be8c` | `#a3be8c` |
 | `color.semantic.info` | `#81a1c1` | `#81a1c1` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.300}` | `#b197fc` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#4c566a` |
 | `color.node.portConnected` | `#7595c4` | `#7595c4` |
@@ -3656,30 +3696,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 8.92 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 4.09 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 4.93 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 4.48 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 7.79 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 8.14 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 5.87 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 6.18 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 9.20 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 5.81 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 7.37 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 3.99 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 6.94 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 7.25 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 5.23 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 5.50 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 8.19 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 5.18 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 6.56 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 3.22 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 5.59 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 5.84 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 4.21 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 4.43 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 6.60 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 4.17 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 5.29 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 4.85 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 7.10 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 4.76 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 4.85 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 7.38 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 5.78 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 8.16 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 5.19 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 4.32 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 6.32 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.24 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.32 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 6.58 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 5.14 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 7.27 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 4.62 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 3.48 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 5.09 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 3.42 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 3.48 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 5.30 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 4.14 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 5.86 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 3.72 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 4.57 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 7.01 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 9.31 | 4.5 |
@@ -3864,6 +3904,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#7dcfff` |
 | `color.palette.syntax.inlineWash` | `#7aa2f7` |
 | `color.palette.syntax.keyword` | `#bb9af7` |
@@ -3937,14 +3985,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#e0af68` | `#e0af68` |
 | `color.semantic.success` | `#9ece6a` | `#9ece6a` |
 | `color.semantic.info` | `#7dcfff` | `#7dcfff` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#565f89` |
 | `color.node.portConnected` | `#bb9af7` | `#bb9af7` |
@@ -4399,30 +4447,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 7.25 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 5.51 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 6.87 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 5.46 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 9.49 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 9.92 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 7.16 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 7.53 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 11.21 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 5.08 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 8.98 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.66 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 8.09 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 8.46 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 6.10 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 6.42 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 9.56 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 4.33 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 7.65 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.11 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 7.15 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 7.47 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 5.39 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 5.67 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 8.44 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 3.82 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 6.76 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 5.91 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 8.65 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 5.81 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 5.91 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 9.00 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 7.04 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 9.95 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 6.33 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 5.04 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 7.38 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.95 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 5.04 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 7.67 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 6.00 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 8.48 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 5.39 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.45 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 6.51 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.37 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.45 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 6.77 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 5.30 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 7.49 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 4.76 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.39 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 6.79 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.97 | 4.5 |
@@ -4607,6 +4655,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#8ec07c` |
 | `color.palette.syntax.inlineWash` | `#83a598` |
 | `color.palette.syntax.keyword` | `#fe8019` |
@@ -4680,14 +4736,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#fabd2f` | `#fabd2f` |
 | `color.semantic.success` | `#b8bb26` | `#b8bb26` |
 | `color.semantic.info` | `#d3869b` | `#d3869b` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#665c54` |
 | `color.node.portConnected` | `#8ec07c` | `#8ec07c` |
@@ -5142,30 +5198,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 8.49 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 3.93 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 5.26 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 4.71 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 8.19 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 8.56 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 6.18 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 6.50 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 9.67 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.38 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 7.75 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.32 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 7.51 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 7.85 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 5.67 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 5.96 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 8.87 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 4.02 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 7.11 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 3.94 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 6.84 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 7.15 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 5.16 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 5.42 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 8.08 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 3.66 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 6.47 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 5.10 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 7.46 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 5.01 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 5.10 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 7.76 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 6.07 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 8.58 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 5.46 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 4.68 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 6.85 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.60 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.67 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 7.12 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 5.57 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 7.87 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 5.01 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.26 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 6.23 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.18 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.26 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 6.48 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 5.07 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 7.17 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 4.56 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 7.01 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 5.48 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.92 | 4.5 |
@@ -5350,6 +5406,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#8be9fd` |
 | `color.palette.syntax.inlineWash` | `#bd93f9` |
 | `color.palette.syntax.keyword` | `#ff79c6` |
@@ -5423,14 +5487,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#ffb86c` | `#ffb86c` |
 | `color.semantic.success` | `#50fa7b` | `#50fa7b` |
 | `color.semantic.info` | `#8be9fd` | `#8be9fd` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#6272a4` |
 | `color.node.portConnected` | `#ff79c6` | `#ff79c6` |
@@ -5885,30 +5949,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 11.26 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 4.53 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 8.28 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 5.05 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 8.77 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 9.17 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 6.62 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 6.96 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 10.36 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.69 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 8.30 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.55 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 7.91 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 8.27 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 5.97 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 6.27 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 9.34 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 4.23 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 7.48 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 3.76 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 6.54 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 6.84 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 4.93 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 5.19 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 7.72 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 3.50 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 6.19 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 5.47 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 8.00 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 5.37 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 5.46 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 8.32 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 6.51 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 9.19 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 5.84 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 4.93 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 7.21 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.84 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.92 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 7.50 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 5.87 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 8.29 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 5.27 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.07 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 5.96 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.00 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.07 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 6.20 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 4.85 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 6.86 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 4.36 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 6.62 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 6.55 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.82 | 4.5 |
@@ -6093,6 +6157,14 @@ Appearance: `Dark`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#868dff` |
+| `color.palette.series.2` | `#ec9aff` |
+| `color.palette.series.3` | `#ee699c` |
+| `color.palette.series.4` | `#ed771f` |
+| `color.palette.series.5` | `#e1b800` |
+| `color.palette.series.6` | `#6bb945` |
+| `color.palette.series.7` | `#00dec2` |
+| `color.palette.series.8` | `#00accc` |
 | `color.palette.syntax.inline` | `#a0a4e8` |
 | `color.palette.syntax.inlineWash` | `#6c71c4` |
 | `color.palette.syntax.keyword` | `#9db300` |
@@ -6166,14 +6238,14 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `#b58900` | `#b58900` |
 | `color.semantic.success` | `#859900` | `#859900` |
 | `color.semantic.info` | `#2aa198` | `#2aa198` |
-| `color.sequence.categorical.0` | `{indigo.400}` | `#7c86ff` |
-| `color.sequence.categorical.1` | `{teal.400}` | `#38d9a9` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#ffb900` |
-| `color.sequence.categorical.3` | `{pink.400}` | `#f783ac` |
-| `color.sequence.categorical.4` | `{cyan.400}` | `#7fb3cf` |
-| `color.sequence.categorical.5` | `{lime.400}` | `#a9e34b` |
-| `color.sequence.categorical.6` | `{violet.400}` | `#9775fa` |
-| `color.sequence.categorical.7` | `{orange.400}` | `#ffa94d` |
+| `color.sequence.categorical.0` | `{series.1}` | `#868dff` |
+| `color.sequence.categorical.1` | `{series.2}` | `#ec9aff` |
+| `color.sequence.categorical.2` | `{series.3}` | `#ee699c` |
+| `color.sequence.categorical.3` | `{series.4}` | `#ed771f` |
+| `color.sequence.categorical.4` | `{series.5}` | `#e1b800` |
+| `color.sequence.categorical.5` | `{series.6}` | `#6bb945` |
+| `color.sequence.categorical.6` | `{series.7}` | `#00dec2` |
+| `color.sequence.categorical.7` | `{series.8}` | `#00accc` |
 | `color.node.headerWash` | `{neutral.900}/0f` | `#ffffff0f` |
 | `color.node.portIdle` | `{neutral.500}` | `#657b83` |
 | `color.node.portConnected` | `#868bd8` | `#868bd8` |
@@ -6628,30 +6700,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 7.19 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 4.18 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 5.64 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 5.42 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 9.43 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 9.85 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 7.11 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 7.48 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 11.13 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 5.04 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 8.92 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.80 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 8.34 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 8.72 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 6.29 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 6.61 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 9.85 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 4.46 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 7.89 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.15 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 7.22 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 7.55 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 5.45 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 5.73 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 8.53 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 3.86 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 6.83 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 5.87 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 8.59 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 5.77 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 5.87 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 8.94 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 6.99 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 9.88 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 6.28 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 5.20 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 7.60 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 5.10 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 5.19 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 7.91 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 6.18 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 8.74 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 5.56 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.50 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 6.58 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.42 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.49 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 6.85 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 5.36 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 7.57 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 4.81 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 5.41 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.61 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.69 | 4.5 |
@@ -6836,6 +6908,14 @@ Appearance: `Light`.
 | `color.palette.red.700` | `#f03e3e` |
 | `color.palette.red.800` | `#e03131` |
 | `color.palette.red.900` | `#c92a2a` |
+| `color.palette.series.1` | `#6174d3` |
+| `color.palette.series.2` | `#9256ae` |
+| `color.palette.series.3` | `#c05279` |
+| `color.palette.series.4` | `#c15c24` |
+| `color.palette.series.5` | `#8c7000` |
+| `color.palette.series.6` | `#599532` |
+| `color.palette.series.7` | `#008a76` |
+| `color.palette.series.8` | `#0091bc` |
 | `color.palette.syntax.inline` | `#4a4fa8` |
 | `color.palette.syntax.inlineWash` | `#6c71c4` |
 | `color.palette.syntax.keyword` | `#576600` |
@@ -6909,14 +6989,14 @@ Appearance: `Light`.
 | `color.semantic.warning` | `#8f6b00` | `#8f6b00` |
 | `color.semantic.success` | `#6f8000` | `#6f8000` |
 | `color.semantic.info` | `#1a7d76` | `#1a7d76` |
-| `color.sequence.categorical.0` | `{indigo.700}` | `#4263eb` |
-| `color.sequence.categorical.1` | `{teal.900}` | `#087f5b` |
-| `color.sequence.categorical.2` | `{amber.500}` | `#a76a00` |
-| `color.sequence.categorical.3` | `{pink.700}` | `#d6336c` |
-| `color.sequence.categorical.4` | `{cyan.800}` | `#0c8599` |
-| `color.sequence.categorical.5` | `{lime.900}` | `#5c940d` |
-| `color.sequence.categorical.6` | `{violet.700}` | `#7048e8` |
-| `color.sequence.categorical.7` | `{orange.900}` | `#d9480f` |
+| `color.sequence.categorical.0` | `{series.1}` | `#6174d3` |
+| `color.sequence.categorical.1` | `{series.2}` | `#9256ae` |
+| `color.sequence.categorical.2` | `{series.3}` | `#c05279` |
+| `color.sequence.categorical.3` | `{series.4}` | `#c15c24` |
+| `color.sequence.categorical.4` | `{series.5}` | `#8c7000` |
+| `color.sequence.categorical.5` | `{series.6}` | `#599532` |
+| `color.sequence.categorical.6` | `{series.7}` | `#008a76` |
+| `color.sequence.categorical.7` | `{series.8}` | `#0091bc` |
 | `color.node.headerWash` | `{neutral.850}/0f` | `#002b360f` |
 | `color.node.portIdle` | `{neutral.500}` | `#839496` |
 | `color.node.portConnected` | `#6c71c4` | `#6c71c4` |
@@ -7371,30 +7451,30 @@ Row stagger maximum items: `8`.
 | `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 5.54 | 4.5 |
 | `color.syntax.removed` | `color.surface.panel` | 4.29 | 3.0 |
 | `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 5.69 | 4.5 |
-| `color.sequence.categorical.0` | `color.surface.canvas` | 4.34 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.canvas` | 4.36 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.canvas` | 3.89 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.canvas` | 4.02 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.canvas` | 3.79 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.canvas` | 3.21 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.canvas` | 4.84 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.canvas` | 3.74 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.panel` | 4.62 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.panel` | 4.64 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.panel` | 4.14 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.panel` | 4.28 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.panel` | 4.03 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.panel` | 3.42 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.panel` | 5.15 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.panel` | 3.99 | 3.0 |
-| `color.sequence.categorical.0` | `color.surface.raised` | 4.98 | 3.0 |
-| `color.sequence.categorical.1` | `color.surface.raised` | 5.00 | 3.0 |
-| `color.sequence.categorical.2` | `color.surface.raised` | 4.46 | 3.0 |
-| `color.sequence.categorical.3` | `color.surface.raised` | 4.62 | 3.0 |
-| `color.sequence.categorical.4` | `color.surface.raised` | 4.35 | 3.0 |
-| `color.sequence.categorical.5` | `color.surface.raised` | 3.69 | 3.0 |
-| `color.sequence.categorical.6` | `color.surface.raised` | 5.55 | 3.0 |
-| `color.sequence.categorical.7` | `color.surface.raised` | 4.30 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.canvas` | 3.70 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.canvas` | 4.39 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.canvas` | 3.87 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.canvas` | 3.79 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.canvas` | 4.13 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.canvas` | 3.17 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.canvas` | 3.73 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.canvas` | 3.17 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.panel` | 3.94 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.panel` | 4.67 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.panel` | 4.12 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.panel` | 4.04 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.panel` | 4.39 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.panel` | 3.37 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.panel` | 3.98 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.panel` | 3.37 | 3.0 |
+| `color.sequence.categorical.0` | `color.surface.raised` | 4.24 | 3.0 |
+| `color.sequence.categorical.1` | `color.surface.raised` | 5.04 | 3.0 |
+| `color.sequence.categorical.2` | `color.surface.raised` | 4.45 | 3.0 |
+| `color.sequence.categorical.3` | `color.surface.raised` | 4.35 | 3.0 |
+| `color.sequence.categorical.4` | `color.surface.raised` | 4.74 | 3.0 |
+| `color.sequence.categorical.5` | `color.surface.raised` | 3.64 | 3.0 |
+| `color.sequence.categorical.6` | `color.surface.raised` | 4.29 | 3.0 |
+| `color.sequence.categorical.7` | `color.surface.raised` | 3.64 | 3.0 |
 | `color.node.portConnected` | `color.surface.canvas` | 3.81 | 3.0 |
 | `color.node.edgeActive` | `color.surface.canvas` | 4.68 | 3.0 |
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.29 | 4.5 |

@@ -1748,6 +1748,51 @@ fn contrast_gate() -> Result<()> {
                 document.meta.id, failure.tone, failure.distance, failure.against, failure.minimum
             );
         }
+        // The three checks below are enforced by `TokenDocument::validate`,
+        // and were not reported here. A gate that stops at the checks it
+        // happens to know about tells an author their theme is fine and then
+        // fails somewhere further from the edit.
+        for failure in contrast::line_failures(document) {
+            failed = true;
+            eprintln!(
+                "{}: {} on {} gains {:.2} L*, below the {:.2} minimum",
+                document.meta.id, failure.line, failure.surface, failure.distance, failure.minimum
+            );
+        }
+        for failure in contrast::placeholder_failures(document) {
+            failed = true;
+            eprintln!(
+                "{}: {} over {} reads {:.1} L*, outside the {:.1} to {:.1} band",
+                document.meta.id,
+                failure.role,
+                failure.surface,
+                failure.distance,
+                failure.minimum,
+                failure.maximum
+            );
+        }
+        for failure in contrast::series_failures(document) {
+            failed = true;
+            if failure.maximum.is_finite() {
+                eprintln!(
+                    "{}: {} of {} is {:.3}, above the {:.3} maximum",
+                    document.meta.id,
+                    failure.measure,
+                    failure.subject,
+                    failure.value,
+                    failure.maximum
+                );
+            } else {
+                eprintln!(
+                    "{}: {} of {} is {:.3}, below the {:.3} minimum",
+                    document.meta.id,
+                    failure.measure,
+                    failure.subject,
+                    failure.value,
+                    failure.minimum
+                );
+            }
+        }
     }
     if failed {
         bail!("contrast requirements are not met");

@@ -218,6 +218,16 @@
         "700": "#f76707",
         "800": "#e8590c",
         "900": "#d9480f"
+      },
+      "series": {
+        "1": "#868dff",
+        "2": "#ec9aff",
+        "3": "#ee699c",
+        "4": "#ed771f",
+        "5": "#e1b800",
+        "6": "#6bb945",
+        "7": "#00dec2",
+        "8": "#00accc"
       }
     },
     "paletteSteps": {
@@ -269,14 +279,14 @@
     },
     "sequence": {
       "categorical": [
-        "{indigo.400}",
-        "{teal.400}",
-        "{amber.500}",
-        "{pink.400}",
-        "{cyan.400}",
-        "{lime.400}",
-        "{violet.300}",
-        "{orange.400}"
+        "{series.1}",
+        "{series.2}",
+        "{series.3}",
+        "{series.4}",
+        "{series.5}",
+        "{series.6}",
+        "{series.7}",
+        "{series.8}"
       ]
     },
     "node": {

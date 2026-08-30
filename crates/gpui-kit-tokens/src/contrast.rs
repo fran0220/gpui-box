@@ -728,6 +728,120 @@ pub fn placeholder_failures(tokens: &TokenDocument) -> Vec<PlaceholderCheck> {
         .collect()
 }
 
+/// One measurement of a categorical scale, in OKLab units.
+///
+/// `subject` names what was measured — a pair of series, or the scale as a
+/// whole — so a failure says which entry to move.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SeriesCheck {
+    pub measure: String,
+    pub subject: String,
+    pub value: f32,
+    pub minimum: f32,
+    pub maximum: f32,
+}
+
+impl SeriesCheck {
+    pub fn passes(&self) -> bool {
+        self.value >= self.minimum && self.value <= self.maximum
+    }
+}
+
+/// How far apart any two series must read, in OKLab units.
+///
+/// The contrast report already asks whether each series is visible on each
+/// surface, and a scale can pass that while two of its entries are the same
+/// colour to a reader: the WCAG ratio between two paints of equal lightness
+/// is 1:1 whatever their hues, so it cannot tell "indistinguishable" from
+/// "different". This is the measure that can. The floor is the separation
+/// eight hues can hold at one lightness and a shared chroma inside sRGB, so a
+/// scale that fails it has an entry that drifted rather than an ambition sRGB
+/// cannot meet.
+pub const SERIES_SEPARATION_MINIMUM: f32 = 0.10;
+
+/// The most lightness a categorical scale may spread across, in OKLab L.
+///
+/// Categorical means the entries are *different*, not ranked. Lightness is
+/// the channel a reader reads rank in, so a scale whose entries span a wide
+/// lightness range is quietly claiming an order its data does not have: the
+/// pale ones read as more important and the dark ones as background. Some
+/// spread is unavoidable, because sRGB will not give a saturated blue and a
+/// saturated yellow the same lightness, but it is a cost rather than a
+/// feature and this bounds it.
+pub const SERIES_LIGHTNESS_SPREAD_MAXIMUM: f32 = 0.13;
+
+/// How saturated the quietest series must stay relative to the loudest.
+///
+/// The regression this catches is the one entry picked from a different ramp
+/// than the rest: it keeps its lightness and its contrast, so every other
+/// check passes, and it reads as grey beside seven colours. A near-neutral in
+/// a categorical scale says "no category" while the legend says otherwise.
+pub const SERIES_CHROMA_RATIO_MINIMUM: f32 = 0.62;
+
+/// Evaluates the categorical scale of one theme in OKLab.
+///
+/// This is the perceptual counterpart to [`report`]. That one asks whether a
+/// series can be seen; this one asks whether it can be told from the other
+/// seven, and whether the scale as a whole says only what a categorical scale
+/// is entitled to say.
+pub fn series_report(tokens: &TokenDocument) -> Vec<SeriesCheck> {
+    let series = tokens.sequence();
+    // A series is drawn on the page, so a translucent one is measured as the
+    // paint a reader sees rather than as the paint that was typed.
+    let canvas = tokens.surface(Surface::Canvas);
+    let painted: Vec<Color> = series
+        .iter()
+        .map(|color| crate::over(*color, canvas))
+        .collect();
+    let mut checks = Vec::new();
+    for (index, left) in painted.iter().enumerate() {
+        for (other, right) in painted.iter().enumerate().skip(index + 1) {
+            checks.push(SeriesCheck {
+                measure: "separation".into(),
+                subject: format!("color.sequence.categorical.{index} / {other}"),
+                value: crate::perceptual_distance(*left, *right),
+                minimum: SERIES_SEPARATION_MINIMUM,
+                maximum: f32::INFINITY,
+            });
+        }
+    }
+    let lightness: Vec<f32> = painted
+        .iter()
+        .map(|color| color.oklab().lightness)
+        .collect();
+    let chroma: Vec<f32> = painted.iter().map(|color| color.oklch().chroma).collect();
+    let spread = lightness.iter().copied().fold(f32::MIN, f32::max)
+        - lightness.iter().copied().fold(f32::MAX, f32::min);
+    checks.push(SeriesCheck {
+        measure: "lightness spread".into(),
+        subject: "color.sequence.categorical".into(),
+        value: spread,
+        minimum: 0.0,
+        maximum: SERIES_LIGHTNESS_SPREAD_MAXIMUM,
+    });
+    let loudest = chroma.iter().copied().fold(f32::MIN, f32::max);
+    let quietest = chroma.iter().copied().fold(f32::MAX, f32::min);
+    checks.push(SeriesCheck {
+        measure: "chroma ratio".into(),
+        subject: "color.sequence.categorical".into(),
+        value: if loudest <= f32::EPSILON {
+            0.0
+        } else {
+            quietest / loudest
+        },
+        minimum: SERIES_CHROMA_RATIO_MINIMUM,
+        maximum: f32::INFINITY,
+    });
+    checks
+}
+
+pub fn series_failures(tokens: &TokenDocument) -> Vec<SeriesCheck> {
+    series_report(tokens)
+        .into_iter()
+        .filter(|check| !check.passes())
+        .collect()
+}
+
 /// Two text tones that mean different things, and how far apart they read.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DistinctionCheck {
@@ -1133,6 +1247,88 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The distinctness above is the weakest possible statement of the rule:
+    /// it catches only two slots holding the *same bytes*. Two slots a reader
+    /// cannot tell apart pass it, and every ratio in `report` passes them
+    /// too, which is how a scale with a near-grey cyan and two neighbouring
+    /// ambers shipped. This is the measure that sees them.
+    #[test]
+    fn every_shipped_theme_draws_a_series_a_reader_can_take_apart_by_colour() {
+        for tokens in crate::all() {
+            let checks = series_report(tokens);
+            assert_eq!(
+                checks.len(),
+                crate::SEQUENCE_LENGTH * (crate::SEQUENCE_LENGTH - 1) / 2 + 2,
+                "{}",
+                tokens.meta.id
+            );
+            for check in checks {
+                assert!(check.passes(), "{}: {check:#?}", tokens.meta.id);
+            }
+        }
+    }
+
+    /// Both appearances walk one hue order, so a chart keeps its identities
+    /// across a theme switch: series three is the same category before and
+    /// after, not a different one that happens to sit in slot three.
+    #[test]
+    fn the_two_appearances_walk_the_same_hue_order() {
+        let dark = crate::studio_dark().sequence();
+        let light = crate::studio_light().sequence();
+        for (index, (dark, light)) in dark.iter().zip(light.iter()).enumerate() {
+            assert!(
+                dark.oklch().hue_distance(light.oklch()) < 20.0,
+                "series {index} changes category between appearances"
+            );
+        }
+    }
+
+    #[test]
+    fn a_series_that_reads_as_a_ranking_is_rejected() {
+        // Eight distinct, legible, well-separated hues — spread across the
+        // whole lightness range. Every other check in this file passes, and
+        // the scale still says the pale ones matter more than the dark ones.
+        let mut tokens = crate::studio_dark().clone();
+        let ramp: Vec<String> = (0..crate::SEQUENCE_LENGTH)
+            .map(|index| {
+                let lightness = 0.66 + 0.035 * index as f32;
+                let color =
+                    Color::from_oklch(crate::Oklch::new(lightness, 0.13, 45.0 * index as f32));
+                format!(
+                    "#{:02x}{:02x}{:02x}",
+                    (color.red * 255.0).round() as u8,
+                    (color.green * 255.0).round() as u8,
+                    (color.blue * 255.0).round() as u8
+                )
+            })
+            .collect();
+        tokens.color.sequence.categorical = ramp;
+        let failures = series_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.measure == "lightness spread"),
+            "{failures:#?}"
+        );
+        assert!(matches!(
+            tokens.validate(),
+            Err(crate::TokenError::Series(_))
+        ));
+    }
+
+    #[test]
+    fn one_washed_out_slot_in_an_otherwise_good_scale_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        // The lightness and the contrast of the entry it replaces, with the
+        // colour taken out of it: legible, distinct, and not a category.
+        tokens.color.sequence.categorical[4] = "#9d9d9d".into();
+        let failures = series_failures(&tokens);
+        assert!(
+            failures.iter().any(|check| check.measure == "chroma ratio"),
+            "{failures:#?}"
+        );
     }
 
     #[test]

@@ -13,7 +13,7 @@ use thiserror::Error;
 mod color;
 pub mod contrast;
 
-pub use color::{Color, Palette, contrast_ratio, over};
+pub use color::{Color, Oklab, Oklch, Palette, contrast_ratio, mix, over, perceptual_distance};
 
 const STUDIO_DARK_JSON: &str = include_str!("../tokens/studio-dark.json");
 const STUDIO_LIGHT_JSON: &str = include_str!("../tokens/studio-light.json");
@@ -44,6 +44,8 @@ pub enum TokenError {
     Placeholder(String),
     #[error("token tones are not distinguishable:\n{0}")]
     Distinction(String),
+    #[error("the categorical scale does not read as one:\n{0}")]
+    Series(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -625,6 +627,29 @@ impl TokenDocument {
                             "  {} reads {:.1} L* from {}; requires {:.1}",
                             failure.tone, failure.distance, failure.against, failure.minimum
                         )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
+
+        let failures = contrast::series_failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Series(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        if failure.maximum.is_finite() {
+                            format!(
+                                "  {} of {} is {:.3}; requires at most {:.3}",
+                                failure.measure, failure.subject, failure.value, failure.maximum
+                            )
+                        } else {
+                            format!(
+                                "  {} of {} is {:.3}; requires at least {:.3}",
+                                failure.measure, failure.subject, failure.value, failure.minimum
+                            )
+                        }
                     })
                     .collect::<Vec<_>>()
                     .join("\n"),
