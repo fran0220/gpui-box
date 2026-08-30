@@ -2289,6 +2289,10 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ),
         ("effect.focusRingWidth", tokens.effect.focus_ring_width),
         ("effect.focusRingAlpha", tokens.effect.focus_ring_alpha),
+        (
+            "effect.focusRingCounterAlpha",
+            tokens.effect.focus_ring_counter_alpha,
+        ),
         ("effect.glowAlpha", tokens.effect.glow_alpha),
         ("effect.glowBlur", tokens.effect.glow_blur),
         ("effect.glowSpread", tokens.effect.glow_spread),

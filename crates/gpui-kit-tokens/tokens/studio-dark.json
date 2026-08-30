@@ -665,6 +665,7 @@
     "selectionRailWidth": 2.5,
     "focusRingWidth": 2,
     "focusRingAlpha": 0.7,
+    "focusRingCounterAlpha": 0.4,
     "glowAlpha": 0.26,
     "glowBlur": 12,
     "glowSpread": -5,

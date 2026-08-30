@@ -376,6 +376,10 @@ impl TokenDocument {
         for (path, value) in [
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
+            (
+                "effect.focusRingCounterAlpha",
+                self.effect.focus_ring_counter_alpha,
+            ),
             ("effect.glowAlpha", self.effect.glow_alpha),
             ("effect.sheenAlpha", self.effect.sheen_alpha),
             ("effect.areaWashAlpha", self.effect.area_wash_alpha),
@@ -2438,6 +2442,17 @@ pub struct EffectTokens {
     /// How wide the ring around the focused control is drawn, in pixels.
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
+    /// How strongly the outer band of the focus ring is drawn.
+    ///
+    /// A focus ring is one colour, and one colour cannot be seen on every
+    /// background. The theme's focus paint disappears on a control of the
+    /// same family; a neutral disappears on the surface. So the ring is two
+    /// bands — the focus paint against pale surfaces, and the text pole
+    /// against the focus paint and against dark ones — and whichever
+    /// background the focused thing turns out to be sitting on, one of them
+    /// is visible. This is the second band's strength; it is quieter than the
+    /// first because it is a guarantee rather than the mark itself.
+    pub focus_ring_counter_alpha: f32,
     /// How strongly a surface that carries a state colour bleeds it into the
     /// pixels around its edge.
     pub glow_alpha: f32,

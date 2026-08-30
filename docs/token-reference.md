@@ -464,6 +464,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -1223,6 +1224,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.8 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -1982,6 +1984,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -2741,6 +2744,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -3500,6 +3504,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -4259,6 +4264,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -5018,6 +5024,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -5777,6 +5784,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -6536,6 +6544,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -7295,6 +7304,7 @@ Row stagger maximum items: `8`.
 | `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |

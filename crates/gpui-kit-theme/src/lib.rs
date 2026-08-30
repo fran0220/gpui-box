@@ -614,6 +614,7 @@ pub struct Effects {
     pub selection_rail_width: f32,
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
+    pub focus_ring_counter_alpha: f32,
     pub glow_alpha: f32,
     pub glow_blur: f32,
     /// The bloom budget, negative: how far a state glow is pulled in before
@@ -943,6 +944,7 @@ impl Theme {
                 selection_rail_width: tokens.effect.selection_rail_width,
                 focus_ring_width: tokens.effect.focus_ring_width,
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
+                focus_ring_counter_alpha: tokens.effect.focus_ring_counter_alpha,
                 glow_alpha: tokens.effect.glow_alpha,
                 glow_blur: tokens.effect.glow_blur,
                 glow_spread: tokens.effect.glow_spread,
@@ -1104,6 +1106,57 @@ impl Theme {
         self.colors.hover.opacity(self.effects.subtle_hover_alpha)
     }
 
+    /// The text pole that stays readable on `background`.
+    ///
+    /// [`Self::variant_colors`] answers this for the tiers it resolves, and
+    /// it was the only place that did. A caller drawing its own paint — a
+    /// region band, a chart series, a chip in a colour the host owns — had to
+    /// either guess a pole or re-derive this from the contrast primitives,
+    /// and the guess is wrong on exactly the themes whose surfaces sit near
+    /// the middle. This is the same choice, made once and available on its
+    /// own.
+    ///
+    /// A translucent `background` is composited over the theme's canvas
+    /// first, because a wash is read against the page it is drawn on rather
+    /// than against nothing.
+    pub fn readable_on(&self, background: Hsla) -> Hsla {
+        self.readable_over(background, self.colors.canvas)
+    }
+
+    /// The same, against a caller-named substrate rather than the canvas.
+    ///
+    /// A translucent paint on a raised card is read over the card, and
+    /// answering as though it were on the page would pick the wrong pole
+    /// exactly when the two surfaces are far apart.
+    pub fn readable_over(&self, background: Hsla, substrate: Hsla) -> Hsla {
+        let substrate = token_color(substrate);
+        let background = over(token_color(background), substrate);
+        let candidates = [
+            self.colors.text,
+            self.colors.text_on_accent,
+            self.colors.text_on_primary_fill,
+        ];
+        candidates
+            .into_iter()
+            .max_by(|left, right| {
+                contrast_ratio(token_color(*left), background)
+                    .partial_cmp(&contrast_ratio(token_color(*right), background))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or(self.colors.text)
+    }
+
+    /// How far apart two paints read, as the WCAG ratio, with any
+    /// translucency in `foreground` composited onto `background` first.
+    ///
+    /// Exposed so a host can hold its own colour choices to the same floors
+    /// this library holds its themes to — 4.5:1 for body text, 3:1 for
+    /// anything that carries an identity without being read as prose —
+    /// instead of shipping a combination nobody measured.
+    pub fn contrast(&self, foreground: Hsla, background: Hsla) -> f32 {
+        contrast_ratio(token_color(foreground), token_color(background))
+    }
+
     /// Blends two paints perceptually, `0` returning `from` and `1` returning
     /// `to`.
     ///
@@ -1247,14 +1300,39 @@ impl Theme {
     /// [`Self::selected_ring`]: focus says where the next keystroke goes,
     /// selection says which answer is current, and a reader that cannot tell
     /// the two apart cannot tell what pressing a key would do.
+    /// It is two bands and not one, because one colour cannot be seen on
+    /// every background. The focus paint vanishes on a control of its own
+    /// family — a focused accent button wore a ring the same colour as
+    /// itself — and a neutral vanishes on the surface. The inner band is the
+    /// focus paint and the outer band is the text pole, which stands opposite
+    /// the surfaces in both appearances; whichever background the focused
+    /// thing turns out to be sitting on, one of the two is visible.
+    ///
+    /// Neither band offsets layout: both are outward shadows, so a control
+    /// taking the keyboard does not move the ones beside it.
     pub fn focus_ring(&self) -> Vec<BoxShadow> {
-        vec![BoxShadow {
-            color: self.colors.focus.opacity(self.effects.focus_ring_alpha),
+        let band = |color: Hsla, spread: f32| BoxShadow {
+            color,
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
-            spread_radius: px(self.effects.focus_ring_width),
+            spread_radius: px(spread),
             inset: false,
-        }]
+        };
+        let width = self.effects.focus_ring_width;
+        vec![
+            // The nearer band is listed first, which is the order a shadow
+            // list paints in: it sits on top of the wider one behind it.
+            band(
+                self.colors.focus.opacity(self.effects.focus_ring_alpha),
+                width,
+            ),
+            band(
+                self.colors
+                    .text
+                    .opacity(self.effects.focus_ring_counter_alpha),
+                width * 2.0,
+            ),
+        ]
     }
 
     pub fn selected_ring(&self) -> Vec<BoxShadow> {
@@ -2042,16 +2120,72 @@ mod tests {
 
     #[test]
     fn focus_and_selection_do_not_look_alike() {
-        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+        for theme in gpui_kit_tokens::all()
+            .into_iter()
+            .map(|tokens| Theme::from_tokens(tokens, Density::Comfortable))
+        {
             let focus = theme.focus_ring();
             let selected = theme.selected_ring();
-            assert_eq!(focus.len(), 1);
-            assert_ne!(focus[0].color, selected[0].color);
-            assert!(!focus[0].inset && selected[0].inset);
-            // A ring that reserved space would move the layout the moment the
-            // keyboard arrived on a control.
-            assert_eq!(focus[0].offset, point(px(0.0), px(0.0)));
-            assert!(focus[0].spread_radius > px(0.0));
+            // Two bands, because one colour cannot be seen on every
+            // background: the focus paint disappears on a control of its own
+            // family, and the text pole disappears on the page.
+            assert_eq!(focus.len(), 2, "{}", theme.id);
+            assert_ne!(focus[0].color, focus[1].color, "{}", theme.id);
+            assert_ne!(focus[0].color, selected[0].color, "{}", theme.id);
+            // The nearer band is first, which is the order a shadow list
+            // paints in.
+            assert!(
+                focus[0].spread_radius < focus[1].spread_radius,
+                "{}",
+                theme.id
+            );
+            for band in &focus {
+                assert!(!band.inset, "{}", theme.id);
+                // A ring that reserved space would move the layout the moment
+                // the keyboard arrived on a control.
+                assert_eq!(band.offset, point(px(0.0), px(0.0)), "{}", theme.id);
+                assert!(band.spread_radius > px(0.0), "{}", theme.id);
+                assert_eq!(band.blur_radius, px(0.0), "{}", theme.id);
+            }
+            assert!(selected[0].inset, "{}", theme.id);
+        }
+    }
+
+    /// The choice `variant_colors` makes for its own tiers, available on its
+    /// own — a caller drawing a paint the theme has never seen had no way to
+    /// ask it before, and a guess is wrong on exactly the themes whose
+    /// surfaces sit near the middle.
+    #[test]
+    fn a_readable_pole_is_chosen_for_a_paint_the_theme_has_never_seen() {
+        for theme in gpui_kit_tokens::all()
+            .into_iter()
+            .map(|tokens| Theme::from_tokens(tokens, Density::Comfortable))
+        {
+            for background in [
+                theme.colors.canvas,
+                theme.colors.raised,
+                theme.colors.accent,
+                theme.colors.danger,
+                gpui::rgb(0x101418).into(),
+                gpui::rgb(0xf3f4f6).into(),
+            ] {
+                let pole = theme.readable_on(background);
+                assert!(
+                    theme.contrast(pole, background) >= 4.5,
+                    "{}: {pole:?} on {background:?} reads {}",
+                    theme.id,
+                    theme.contrast(pole, background)
+                );
+            }
+            // A wash is read against the page it is drawn on. Answering as
+            // though it were on nothing picks the wrong pole.
+            let wash = theme.colors.accent.opacity(0.12);
+            let over_page = theme.readable_on(wash);
+            assert!(
+                theme.contrast(over_page, theme.colors.canvas) >= 4.5,
+                "{}",
+                theme.id
+            );
         }
     }
 
