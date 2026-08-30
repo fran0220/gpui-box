@@ -491,6 +491,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -1248,6 +1249,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -2005,6 +2007,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -2762,6 +2765,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -3519,6 +3523,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -4276,6 +4281,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -5033,6 +5039,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -5790,6 +5797,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -6547,6 +6555,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |
@@ -7304,6 +7313,7 @@ Row stagger maximum items: `8`.
 | `effect.nodeTrafficAlpha` | 0.82 |
 | `effect.nodePreviewAlpha` | 0.88 |
 | `effect.nodeMinimapAlpha` | 0.7 |
+| `effect.nodeOverviewVeilAlpha` | 0.55 |
 | `effect.railWidth` | 3 |
 | `effect.semanticWashFaintAlpha` | 0.06 |
 | `effect.semanticWashAlpha` | 0.1 |

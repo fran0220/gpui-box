@@ -692,6 +692,7 @@
     "nodeTrafficAlpha": 0.82,
     "nodePreviewAlpha": 0.88,
     "nodeMinimapAlpha": 0.7,
+    "nodeOverviewVeilAlpha": 0.55,
     "railWidth": 3,
     "semanticWashFaintAlpha": 0.06,
     "semanticWashAlpha": 0.1,

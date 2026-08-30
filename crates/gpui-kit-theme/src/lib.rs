@@ -649,6 +649,7 @@ pub struct Effects {
     pub node_traffic_alpha: f32,
     pub node_preview_alpha: f32,
     pub node_minimap_alpha: f32,
+    pub node_overview_veil_alpha: f32,
     /// How wide an identity rail is, in pixels: a node's category stripe, a
     /// callout's edge. Distinct from `selection_rail_width`, which reports a
     /// transient state rather than what a thing is.
@@ -968,6 +969,7 @@ impl Theme {
                 node_traffic_alpha: tokens.effect.node_traffic_alpha,
                 node_preview_alpha: tokens.effect.node_preview_alpha,
                 node_minimap_alpha: tokens.effect.node_minimap_alpha,
+                node_overview_veil_alpha: tokens.effect.node_overview_veil_alpha,
                 rail_width: tokens.effect.rail_width,
                 semantic_wash_faint_alpha: tokens.effect.semantic_wash_faint_alpha,
                 semantic_wash_alpha: tokens.effect.semantic_wash_alpha,
@@ -1098,6 +1100,32 @@ impl Theme {
 
     pub fn subtle_hover(&self) -> Hsla {
         self.colors.hover.opacity(self.effects.subtle_hover_alpha)
+    }
+
+    /// Blends two paints perceptually, `0` returning `from` and `1` returning
+    /// `to`.
+    ///
+    /// This is what a crossfade between two *meanings* needs — a node that was
+    /// running and is now failed, a chart series retinted, a state that
+    /// changed while the reader was looking at it. Blending in the channels a
+    /// paint is stored in takes the midpoint through a darker, duller colour
+    /// than either end, because those channels are gamma-encoded rather than
+    /// proportional to light; a crossfade between two saturated states dips
+    /// through mud on the way, which reads as a third state nobody declared.
+    /// In OKLab the midpoint is the colour a reader would name as halfway.
+    ///
+    /// Alpha travels linearly, since it is a coverage and not a colour.
+    pub fn mix(&self, from: Hsla, to: Hsla, amount: f32) -> Hsla {
+        let blended = gpui_kit_tokens::mix(token_color(from), token_color(to), amount);
+        let mut paint: Hsla = Rgba {
+            r: blended.red,
+            g: blended.green,
+            b: blended.blue,
+            a: blended.alpha,
+        }
+        .into();
+        paint.a = blended.alpha;
+        paint
     }
 
     pub fn contrast_tint(&self, color: Hsla, strength: ContrastTint) -> Hsla {

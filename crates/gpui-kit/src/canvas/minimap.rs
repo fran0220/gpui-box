@@ -157,19 +157,50 @@ impl RenderOnce for Minimap {
         // The viewport is where the reader is, not an alarm, and it is kept
         // inside the square: a rectangle that overhangs the overview reports
         // a view of somewhere the overview does not describe.
+        //
+        // It is drawn as a hole in a veil rather than as a filled rectangle.
+        // A fill sits *on* the marks it covers, so the part of the canvas the
+        // reader is actually looking at was the part hardest to read; veiling
+        // the rest instead leaves the view clear and dims what is off screen,
+        // which is what the two regions mean. The veil is four bands rather
+        // than one shape because a rectangular hole is not a shape a fill can
+        // have.
         let viewport = self.view.map(|view| {
             let x = view.x.clamp(0.0, 1.0);
             let y = view.y.clamp(0.0, 1.0);
+            let width = view.width.clamp(0.04, 1.0 - x);
+            let height = view.height.clamp(0.04, 1.0 - y);
+            let veil = theme
+                .colors
+                .canvas
+                .opacity(theme.effects.node_overview_veil_alpha);
+            let band = |left: f32, top: f32, wide: f32, tall: f32| {
+                div()
+                    .absolute()
+                    .left(relative(left))
+                    .top(relative(top))
+                    .w(relative(wide.max(0.0)))
+                    .h(relative(tall.max(0.0)))
+                    .bg(veil)
+            };
             div()
                 .absolute()
-                .left(relative(x))
-                .top(relative(y))
-                .w(relative(view.width.clamp(0.04, 1.0 - x)))
-                .h(relative(view.height.clamp(0.04, 1.0 - y)))
-                .radius(&theme, Radius::Small)
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.text)
-                .bg(theme.colors.selected)
+                .inset_0()
+                .child(band(0.0, 0.0, 1.0, y))
+                .child(band(0.0, y + height, 1.0, 1.0 - y - height))
+                .child(band(0.0, y, x, height))
+                .child(band(x + width, y, 1.0 - x - width, height))
+                .child(
+                    div()
+                        .absolute()
+                        .left(relative(x))
+                        .top(relative(y))
+                        .w(relative(width))
+                        .h(relative(height))
+                        .radius(&theme, Radius::Small)
+                        .border(px(theme.borders.hairline))
+                        .border_color(theme.colors.accent),
+                )
         });
         let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let handler = self.on_pan;

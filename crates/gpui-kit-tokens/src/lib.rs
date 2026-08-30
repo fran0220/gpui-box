@@ -392,6 +392,10 @@ impl TokenDocument {
             ("effect.nodePreviewAlpha", self.effect.node_preview_alpha),
             ("effect.nodeMinimapAlpha", self.effect.node_minimap_alpha),
             (
+                "effect.nodeOverviewVeilAlpha",
+                self.effect.node_overview_veil_alpha,
+            ),
+            (
                 "effect.semanticWashFaintAlpha",
                 self.effect.semantic_wash_faint_alpha,
             ),
@@ -2466,6 +2470,13 @@ pub struct EffectTokens {
     pub node_traffic_alpha: f32,
     pub node_preview_alpha: f32,
     pub node_minimap_alpha: f32,
+    /// How far an overview pushes back the canvas the reader is not looking
+    /// at.
+    ///
+    /// Strong enough that the two regions are plainly different and weak
+    /// enough that the marks outside the view still read, because saying
+    /// where the rest of the graph is, is the whole reason an overview exists.
+    pub node_overview_veil_alpha: f32,
     /// How wide an identity rail is, in pixels: a node's category stripe, a
     /// callout's edge.
     ///

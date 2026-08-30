@@ -8,16 +8,19 @@
 
 use std::rc::Rc;
 
+use web_time::Instant;
+
 use gpui::{
     AnyElement, App, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Variant};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Theme, Variant};
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
+use crate::motion::{MotionPolicy, MotionRole, keyed};
 use crate::strings::ActiveNumbers;
 
 use super::edge::PortSide;
@@ -663,10 +666,104 @@ impl Selectable for GraphNode {
     }
 }
 
+/// What a card was showing and what it is showing now, kept between frames so
+/// a state change can be watched rather than only noticed afterwards.
+#[derive(Debug, Clone, Copy, Default)]
+struct StateFade {
+    from: NodeState,
+    to: NodeState,
+    /// When the crossover began, or `None` while the card is settled.
+    started: Option<Instant>,
+    /// Whether this card has been drawn before.
+    ///
+    /// A canvas opening onto a finished run draws it. Without this every card
+    /// would cross over from the default state on its first frame, so a page
+    /// of succeeded steps would fade up out of grey — which is a claim that
+    /// they all just finished.
+    drawn: bool,
+}
+
+impl StateFade {
+    /// Records `state` and answers what the card is showing: the state it is
+    /// crossing from, and how far across it is.
+    ///
+    /// A progress of 1 means settled, whatever `from` says.
+    fn advance(&mut self, state: NodeState, now: Instant, span: f32) -> (NodeState, f32) {
+        if self.to != state {
+            let crossing = self
+                .started
+                .is_some_and(|started| now.duration_since(started).as_secs_f32() < span);
+            // Interrupted partway, the crossover starts from the paint on
+            // screen rather than from the state that is already gone: a card
+            // that changed twice quickly would otherwise jump back to the
+            // first colour before setting off for the third.
+            *self = Self {
+                from: if crossing { self.from } else { self.to },
+                to: state,
+                started: self.drawn.then_some(now),
+                drawn: true,
+            };
+        }
+        self.drawn = true;
+        let progress = self.started.map_or(1.0, |started| {
+            (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0)
+        });
+        (self.from, progress)
+    }
+}
+
+impl GraphNode {
+    /// The paint and glow strength this card is showing, partway between the
+    /// state it had and the state it has.
+    ///
+    /// Returns the settled answer whenever nothing is crossing: a card whose
+    /// state has not changed, a reader who asked for reduced motion, and a
+    /// card whose first frame this is all get the same values the hard cut
+    /// gave.
+    fn state_crossfade(&self, theme: &Theme, window: &mut Window, cx: &mut App) -> (Hsla, f32) {
+        let settled = (
+            self.state.color(theme),
+            if self.state.is_notable() { 1.0 } else { 0.0 },
+        );
+        let change = MotionPolicy::resolve(MotionRole::StateChange, cx);
+        if !change.animates() {
+            return settled;
+        }
+        let now = cx.background_executor().now();
+        let span = change.spec().total().as_secs_f32().max(f32::EPSILON);
+        let fade = keyed::slot::<StateFade>(
+            &self.ident.child("state").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let (from, progress) = fade.borrow_mut().advance(self.state, now, span);
+        if from == self.state || progress >= 1.0 {
+            return settled;
+        }
+        window.request_animation_frame();
+        let eased = change.spec().progress(progress);
+        let was = if from.is_notable() { 1.0 } else { 0.0 };
+        (
+            theme.mix(from.color(theme), self.state.color(theme), eased),
+            was + (settled.1 - was) * eased,
+        )
+    }
+}
+
 impl RenderOnce for GraphNode {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let color = self.state.color(&theme);
+        // A state change is the one thing a reader watching a canvas is
+        // watching for, and it used to be a hard cut: a node went from running
+        // to failed between two frames, so anybody who blinked saw a failed
+        // node and never saw it fail. The colour and the glow cross over
+        // instead, on the same state-change timing every control in the
+        // library answers a local change with.
+        //
+        // The crossfade is perceptual, so a run that goes from accent to
+        // danger passes through the colours between them rather than through
+        // the mud two gamma-encoded paints average to.
+        let (color, notable) = self.state_crossfade(&theme, window, cx);
         let metrics = NodeMetrics::new(&theme, self.width, self.display_zoom, self.declared_height);
 
         // The mark is the one part of a node that moves, and it moves because
@@ -867,8 +964,8 @@ impl RenderOnce for GraphNode {
             // The state bleeds out of the card rather than being drawn round
             // it, so a running node and a failed one differ by the colour the
             // canvas takes near them and not by which of two lines they wear.
-            .when(self.state.is_notable(), |element| {
-                element.glow(&theme, color)
+            .when(notable > 0.0, |element| {
+                element.glow(&theme, color.opacity(notable))
             })
             // A node floats on the canvas rather than sitting in a column, so
             // it is the one place selection cannot be a rail at a reading
@@ -957,6 +1054,70 @@ impl RenderOnce for GraphNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+
+    /// A state change was a hard cut: a node went from running to failed
+    /// between two frames, so anybody who blinked saw a failed node and never
+    /// saw it fail.
+    #[test]
+    fn a_state_change_crosses_over_rather_than_cutting() {
+        const SPAN: f32 = 0.2;
+        let start = Instant::now();
+        let mut fade = StateFade::default();
+
+        // The first frame is a drawing, not a change. A canvas opening onto a
+        // finished run would otherwise fade every succeeded step up out of
+        // grey, which claims they all just finished.
+        let (_, progress) = fade.advance(NodeState::Succeeded, start, SPAN);
+        assert_eq!(progress, 1.0, "the first frame crossed over from nothing");
+
+        let changed = start + Duration::from_millis(100);
+        let (from, progress) = fade.advance(NodeState::Failed, changed, SPAN);
+        assert_eq!(from, NodeState::Succeeded);
+        assert_eq!(progress, 0.0);
+
+        let (from, progress) = fade.advance(
+            NodeState::Failed,
+            changed + Duration::from_millis(100),
+            SPAN,
+        );
+        assert_eq!(from, NodeState::Succeeded);
+        assert!((progress - 0.5).abs() < 0.01);
+
+        let (_, progress) = fade.advance(
+            NodeState::Failed,
+            changed + Duration::from_millis(400),
+            SPAN,
+        );
+        assert_eq!(progress, 1.0);
+    }
+
+    /// A card that changes twice quickly must not jump back to the first
+    /// colour before setting off for the third.
+    #[test]
+    fn a_change_interrupted_partway_leaves_from_the_paint_on_screen() {
+        const SPAN: f32 = 0.2;
+        let start = Instant::now();
+        let mut fade = StateFade::default();
+        fade.advance(NodeState::Running, start, SPAN);
+
+        let first = start + Duration::from_millis(10);
+        fade.advance(NodeState::Waiting, first, SPAN);
+        let second = first + Duration::from_millis(60);
+        let (from, progress) = fade.advance(NodeState::Failed, second, SPAN);
+        assert_eq!(
+            from,
+            NodeState::Running,
+            "the interrupted crossover restarted from the state it had already left"
+        );
+        assert_eq!(progress, 0.0);
+
+        // Once one has finished, the next starts from where it landed.
+        fade.advance(NodeState::Failed, second + Duration::from_millis(300), SPAN);
+        let third = second + Duration::from_millis(400);
+        let (from, _) = fade.advance(NodeState::Succeeded, third, SPAN);
+        assert_eq!(from, NodeState::Failed);
+    }
 
     fn theme() -> gpui_kit_theme::Theme {
         gpui_kit_theme::Theme::studio_dark()

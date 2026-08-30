@@ -2337,6 +2337,10 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("effect.nodeTrafficAlpha", tokens.effect.node_traffic_alpha),
         ("effect.nodePreviewAlpha", tokens.effect.node_preview_alpha),
         ("effect.nodeMinimapAlpha", tokens.effect.node_minimap_alpha),
+        (
+            "effect.nodeOverviewVeilAlpha",
+            tokens.effect.node_overview_veil_alpha,
+        ),
         ("effect.railWidth", tokens.effect.rail_width),
         (
             "effect.semanticWashFaintAlpha",

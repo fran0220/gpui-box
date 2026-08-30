@@ -31,7 +31,7 @@ use crate::display::state_view::StateView;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
-use crate::motion::{Activity, MotionPolicy, MotionRole, keyed};
+use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -192,6 +192,99 @@ struct GestureState {
     /// Whether the first frame has been drawn, which is what makes the
     /// distinction above possible.
     opened: bool,
+    /// Where the canvas is looking, while that is somewhere other than where
+    /// the caller has put it.
+    travel: Travel,
+    /// The viewport this canvas last proposed from a direct manipulation.
+    ///
+    /// A drag and a wheel are the reader moving the canvas with their own
+    /// hand, so the canvas must be exactly where they left it on the next
+    /// frame; anything else lags the pointer. A frame, a zoom-to, or a
+    /// caller restoring a saved position is a jump, and a jump is travelled.
+    /// Recording what was proposed is how the two are told apart exactly,
+    /// rather than by guessing from how far the viewport moved.
+    direct: Option<GraphViewport>,
+}
+
+/// A canvas moving from where it was looking to where it has been asked to
+/// look.
+#[derive(Debug, Clone, Copy, Default)]
+struct Travel {
+    from: Option<GraphViewport>,
+    to: Option<GraphViewport>,
+    started: Option<Instant>,
+}
+
+impl Travel {
+    /// Where the canvas is looking this frame.
+    ///
+    /// `snap` is the reader's own hand on the canvas, and arrives instantly.
+    /// Everything else is a jump the reader did not make, and a jump that is
+    /// not travelled leaves them to work out afterwards which part of the
+    /// graph they are now looking at.
+    fn shown(
+        &mut self,
+        asked: GraphViewport,
+        snap: bool,
+        now: Instant,
+        spec: MotionSpec,
+    ) -> (GraphViewport, bool) {
+        let showing = self.at(now, spec);
+        if snap || self.to.is_none() {
+            *self = Self {
+                from: Some(asked),
+                to: Some(asked),
+                started: None,
+            };
+            return (asked, false);
+        }
+        if self.to != Some(asked) {
+            *self = Self {
+                from: Some(showing),
+                to: Some(asked),
+                started: Some(now),
+            };
+        }
+        let showing = self.at(now, spec);
+        (showing, showing != asked)
+    }
+
+    fn at(&self, now: Instant, spec: MotionSpec) -> GraphViewport {
+        let (Some(from), Some(to)) = (self.from, self.to) else {
+            return GraphViewport::default();
+        };
+        let Some(started) = self.started else {
+            return to;
+        };
+        let span = spec.total().as_secs_f32().max(f32::EPSILON);
+        let progress = (now.duration_since(started).as_secs_f32() / span).clamp(0.0, 1.0);
+        if progress >= 1.0 {
+            return to;
+        }
+        interpolate_viewport(from, to, spec.progress(progress))
+    }
+}
+
+/// Two viewports blended at `t`.
+///
+/// The offset travels straight and the scale travels geometrically, because
+/// scale is a ratio: halfway between 0.5 and 2.0 is 1.0, and a straight blend
+/// would put it at 1.25 and spend most of the journey zoomed further in than
+/// either end. That is the difference between a canvas that pulls back to show
+/// the reader where they are going and one that lurches.
+fn interpolate_viewport(from: GraphViewport, to: GraphViewport, t: f32) -> GraphViewport {
+    let blend = |a: f32, b: f32| a + (b - a) * t;
+    GraphViewport {
+        offset: point(
+            blend(from.offset.x, to.offset.x),
+            blend(from.offset.y, to.offset.y),
+        ),
+        zoom: (blend(
+            from.zoom.max(f32::EPSILON).ln(),
+            to.zoom.max(f32::EPSILON).ln(),
+        ))
+        .exp(),
+    }
 }
 
 fn world_to_screen(world: Point<f32>, viewport: GraphViewport) -> Point<f32> {
@@ -994,6 +1087,32 @@ impl RenderOnce for NodeGraph {
             window.window_handle().window_id(),
             cx,
         );
+        // Where the canvas is looking. The caller owns where it has been asked
+        // to look; what the canvas owns is that it does not arrive there in
+        // one frame when the reader did not move it themselves. A frame or a
+        // zoom-to that cut would leave the reader to work out afterwards which
+        // part of the graph they are now in front of.
+        //
+        // Everything downstream reads this rather than the caller's value, so
+        // a click during the travel lands on what is under the pointer and a
+        // pan started during it continues from where the canvas actually is.
+        // What the canvas publishes stays the settled value, whatever it is
+        // painting on the way there: motion never changes what a surface
+        // reports.
+        let asked = viewport;
+        let travelling = {
+            let travel = MotionPolicy::resolve(MotionRole::Navigation, cx);
+            let now = cx.background_executor().now();
+            let mut state = gesture.borrow_mut();
+            let direct = state.direct.take();
+            let snap = state.gesture.is_some() || !travel.animates() || direct == Some(viewport);
+            let (shown, travelling) = state.travel.shown(viewport, snap, now, travel.spec());
+            viewport = shown;
+            travelling
+        };
+        if travelling {
+            window.request_animation_frame();
+        }
         let activity = MotionPolicy::resolve(MotionRole::Activity(Activity::Advancing), cx);
         let animation_phase = if moving_effects && activity.animates() {
             let now = cx.background_executor().now();
@@ -1070,14 +1189,15 @@ impl RenderOnce for NodeGraph {
                         f32::from(event.position.y - at.y),
                     );
                     *moved |= delta.x.abs().max(delta.y.abs()) >= 4.0;
-                    move_report(
-                        &NodeGraphEvent::ViewportChanged(GraphViewport {
-                            offset: point(viewport.offset.x + delta.x, viewport.offset.y + delta.y),
-                            zoom: viewport.zoom,
-                        }),
-                        window,
-                        cx,
-                    );
+                    let dragged = GraphViewport {
+                        offset: point(viewport.offset.x + delta.x, viewport.offset.y + delta.y),
+                        zoom: viewport.zoom,
+                    };
+                    // The reader's own hand: whatever the caller writes back
+                    // for this, the canvas is already there.
+                    state.direct = Some(dragged);
+                    drop(state);
+                    move_report(&NodeGraphEvent::ViewportChanged(dragged), window, cx);
                 } else if let Some(Gesture::Marquee { current, .. }) = state.gesture.as_mut() {
                     if event.pressed_button != Some(MouseButton::Left) {
                         state.gesture = None;
@@ -1224,11 +1344,11 @@ impl RenderOnce for NodeGraph {
                     f32::from(event.position.x - bounds.origin.x),
                     f32::from(event.position.y - bounds.origin.y),
                 );
-                wheel_report(
-                    &NodeGraphEvent::ViewportChanged(zoom_at(viewport, at, next)),
-                    window,
-                    cx,
-                );
+                let zoomed = zoom_at(viewport, at, next);
+                // The reader turning the wheel is moving the canvas
+                // themselves, so it is already where they have put it.
+                wheel_gesture.borrow_mut().direct = Some(zoomed);
+                wheel_report(&NodeGraphEvent::ViewportChanged(zoomed), window, cx);
             });
         }
 
@@ -1256,7 +1376,7 @@ impl RenderOnce for NodeGraph {
                         .p_token(&theme, Space::Lg)
                         .child(state),
                 )
-                .semantic_in(cx, spec.value(viewport_value(self.state.name(), viewport)))
+                .semantic_in(cx, spec.value(viewport_value(self.state.name(), asked)))
                 .into_any_element();
         }
 
@@ -1277,7 +1397,7 @@ impl RenderOnce for NodeGraph {
                 .child(empty);
             return frame
                 .child(empty)
-                .semantic_in(cx, spec.value(viewport_value("empty", viewport)))
+                .semantic_in(cx, spec.value(viewport_value("empty", asked)))
                 .into_any_element();
         }
 
@@ -2426,7 +2546,7 @@ impl RenderOnce for NodeGraph {
             .children(edge_nodes)
             .children(marquee)
             .children(overview)
-            .semantic_in(cx, spec.value(viewport_value("ready", viewport)))
+            .semantic_in(cx, spec.value(viewport_value("ready", asked)))
             .into_any_element()
     }
 }
@@ -2726,6 +2846,66 @@ mod tests {
 
     fn surface(width: f32, height: f32) -> Bounds<Pixels> {
         Bounds::new(point(px(0.0), px(0.0)), size(px(width), px(height)))
+    }
+
+    fn travel_spec() -> MotionSpec {
+        MotionPolicy::spec(
+            MotionRole::Navigation,
+            &gpui_kit_theme::Theme::studio_dark(),
+        )
+    }
+
+    /// A frame is a jump the reader did not make, and a jump that is not
+    /// travelled leaves them to work out afterwards which part of the graph
+    /// they are now in front of.
+    #[test]
+    fn a_canvas_travels_to_a_frame_and_snaps_to_the_readers_own_hand() {
+        let spec = travel_spec();
+        let start = Instant::now();
+        let here = GraphViewport::new(point(0.0, 0.0), 1.0);
+        let there = GraphViewport::new(point(-400.0, -260.0), 0.6);
+        let mut travel = Travel::default();
+
+        // The first frame is where the canvas opens, not somewhere it
+        // travelled from.
+        let (shown, travelling) = travel.shown(here, false, start, spec);
+        assert_eq!(shown, here);
+        assert!(!travelling);
+
+        let (shown, travelling) = travel.shown(there, false, start, spec);
+        assert!(travelling);
+        assert_eq!(shown, here, "the travel began somewhere other than here");
+
+        let midway = start + spec.total() / 2;
+        let (shown, travelling) = travel.shown(there, false, midway, spec);
+        assert!(travelling);
+        assert!(shown.offset.x < here.offset.x && shown.offset.x > there.offset.x);
+        assert!(shown.zoom < here.zoom && shown.zoom > there.zoom);
+
+        let (shown, travelling) = travel.shown(there, false, start + spec.total(), spec);
+        assert_eq!(shown, there);
+        assert!(!travelling);
+
+        // A drag or a wheel is the reader moving the canvas with their own
+        // hand, and a canvas that eased after the pointer would lag it.
+        let dragged = GraphViewport::new(point(-380.0, -260.0), 0.6);
+        let (shown, travelling) = travel.shown(dragged, true, start + spec.total(), spec);
+        assert_eq!(shown, dragged);
+        assert!(!travelling);
+    }
+
+    /// Scale is a ratio. Halfway between 0.5 and 2.0 is 1.0, and a straight
+    /// blend puts it at 1.25 — most of the journey spent further in than
+    /// either end, which is a lurch rather than a pull-back.
+    #[test]
+    fn a_travel_changes_scale_geometrically() {
+        let from = GraphViewport::new(point(0.0, 0.0), 0.5);
+        let to = GraphViewport::new(point(100.0, 40.0), 2.0);
+        let midway = interpolate_viewport(from, to, 0.5);
+        assert!((midway.zoom - 1.0).abs() < 0.001, "{}", midway.zoom);
+        assert_eq!(midway.offset, point(50.0, 20.0));
+        assert_eq!(interpolate_viewport(from, to, 0.0).zoom, from.zoom);
+        assert!((interpolate_viewport(from, to, 1.0).zoom - to.zoom).abs() < 0.001);
     }
 
     /// A grid of one fixed world step is a grid for one zoom: scaled straight
