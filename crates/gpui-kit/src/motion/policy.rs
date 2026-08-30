@@ -126,7 +126,11 @@ impl MotionPolicy {
             MotionRole::ModalTransition => {
                 MotionSpec::new(theme.motion.dialog_ms, Easing::Standard.curve(theme))
             }
-            MotionRole::Exit => MotionSpec::new(theme.motion.quick_ms, Easing::Exit.curve(theme)),
+            // Leaving is not information. An arrival has to be read; a
+            // departure has already been decided by the reader, so it is
+            // shorter than any arrival and it accelerates away rather than
+            // decelerating into place.
+            MotionRole::Exit => MotionSpec::new(theme.motion.exit_ms, Easing::Exit.curve(theme)),
             MotionRole::StateChange => {
                 MotionSpec::new(theme.motion.quick_ms, Easing::Standard.curve(theme))
             }
@@ -230,6 +234,35 @@ mod tests {
         );
         assert!(MotionPolicy::spec(MotionRole::ModalEnter, &theme).is_sprung());
         assert!(MotionPolicy::spec(MotionRole::Tracking, &theme).is_sprung());
+    }
+
+    /// Leaving is not information. An arrival has to be read — it says what
+    /// has appeared and where it came from — while a departure has already
+    /// been decided by the reader, and every millisecond of it is a
+    /// millisecond they wait for the thing they asked to go to be gone.
+    ///
+    /// The exit used to be `quick`, which is also the state-change duration,
+    /// on the ease-out curve — so a menu took longer to leave than to open and
+    /// slowed down on the way out.
+    #[test]
+    fn a_departure_is_shorter_than_any_arrival_and_does_not_linger() {
+        let theme = theme();
+        let exit = MotionPolicy::spec(MotionRole::Exit, &theme);
+        for arrival in [
+            MotionRole::MenuEnter,
+            MotionRole::ModalTransition,
+            MotionRole::Entrance,
+            MotionRole::Navigation,
+        ] {
+            assert!(
+                exit.duration_ms <= MotionPolicy::spec(arrival, &theme).duration_ms,
+                "leaving takes longer than {arrival:?}"
+            );
+        }
+        // Behind its own clock halfway through: it holds briefly and then
+        // goes, rather than decelerating into being absent.
+        assert!(exit.progress(0.5) < 0.5);
+        assert!(MotionPolicy::spec(MotionRole::Entrance, &theme).progress(0.5) > 0.5);
     }
 
     #[test]

@@ -570,6 +570,7 @@
       "required": [
         "instant",
         "quick",
+        "exit",
         "menu",
         "dialog",
         "resize",
@@ -592,6 +593,7 @@
       "properties": {
         "instant": { "type": "integer", "minimum": 0 },
         "quick": { "type": "integer", "minimum": 0 },
+        "exit": { "type": "integer", "minimum": 0 },
         "menu": { "type": "integer", "minimum": 0 },
         "dialog": { "type": "integer", "minimum": 0 },
         "resize": { "type": "integer", "minimum": 0 },

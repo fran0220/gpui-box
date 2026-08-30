@@ -517,6 +517,7 @@ pub struct Opacity {
 pub struct Motion {
     pub instant_ms: u64,
     pub quick_ms: u64,
+    pub exit_ms: u64,
     pub menu_ms: u64,
     pub dialog_ms: u64,
     pub resize_ms: u64,
@@ -883,6 +884,7 @@ impl Theme {
             motion: Motion {
                 instant_ms: millis(tokens, MotionDuration::Instant),
                 quick_ms: millis(tokens, MotionDuration::Quick),
+                exit_ms: millis(tokens, MotionDuration::Exit),
                 menu_ms: millis(tokens, MotionDuration::Menu),
                 dialog_ms: millis(tokens, MotionDuration::Dialog),
                 resize_ms: millis(tokens, MotionDuration::Resize),

@@ -1019,6 +1019,7 @@ impl TokenDocument {
         Duration::from_millis(match step {
             MotionDuration::Instant => self.motion.duration_ms.instant,
             MotionDuration::Quick => self.motion.duration_ms.quick,
+            MotionDuration::Exit => self.motion.duration_ms.exit,
             MotionDuration::Menu => self.motion.duration_ms.menu,
             MotionDuration::Dialog => self.motion.duration_ms.dialog,
             MotionDuration::Resize => self.motion.duration_ms.resize,
@@ -1404,6 +1405,18 @@ pub enum Space {
     Xxl,
 }
 
+impl Space {
+    pub const ALL: [Self; 7] = [
+        Self::Xxs,
+        Self::Xs,
+        Self::Sm,
+        Self::Md,
+        Self::Lg,
+        Self::Xl,
+        Self::Xxl,
+    ];
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Radius {
     Small,
@@ -1550,6 +1563,8 @@ pub enum TypeScale {
 pub enum MotionDuration {
     Instant,
     Quick,
+    /// How long a surface takes to leave. See [`DurationTokens::exit`].
+    Exit,
     Menu,
     Dialog,
     Resize,
@@ -1578,6 +1593,32 @@ pub enum MotionDuration {
     Celebration,
     /// How long a control reports that a short action, such as copying, held.
     Confirmation,
+}
+
+impl MotionDuration {
+    pub const ALL: [Self; 21] = [
+        Self::Instant,
+        Self::Quick,
+        Self::Exit,
+        Self::Menu,
+        Self::Dialog,
+        Self::Resize,
+        Self::Entrance,
+        Self::Spin,
+        Self::Slow,
+        Self::StaggerStep,
+        Self::MicroBounce,
+        Self::MicroWobble,
+        Self::MicroPop,
+        Self::Pulse,
+        Self::Shimmer,
+        Self::Toast,
+        Self::HoverCardOpen,
+        Self::HoverCardGrace,
+        Self::Feedback,
+        Self::Celebration,
+        Self::Confirmation,
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2329,6 +2370,14 @@ pub struct MotionTokens {
 pub struct DurationTokens {
     pub instant: u64,
     pub quick: u64,
+    /// How long a surface takes to leave.
+    ///
+    /// Shorter than any arrival, because leaving is not information. An
+    /// arrival has to be read — it says what has appeared and where it came
+    /// from — while a departure has already been decided by the reader, and
+    /// every millisecond of it is a millisecond they are waiting for the
+    /// thing they asked to go to be gone.
+    pub exit: u64,
     pub menu: u64,
     pub dialog: u64,
     pub resize: u64,
@@ -2620,20 +2669,157 @@ mod tests {
 
     #[test]
     fn themes_agree_on_every_metric_that_is_not_a_color() {
-        let dark = studio_dark();
-        let light = studio_light();
-        for size in ControlSize::ALL {
-            assert_eq!(dark.control(size).height, light.control(size).height);
-            assert_eq!(dark.control(size).font_size, light.control(size).font_size);
+        // Every shipped theme, not the studio pair. A theme is a set of
+        // colours; timing, geometry and stacking are the library's, and a
+        // theme that quietly retimed a menu or moved a layer would be a
+        // second library wearing a palette.
+        let reference = studio_dark();
+        for tokens in all() {
+            let id = &tokens.meta.id;
+            for size in ControlSize::ALL {
+                assert_eq!(
+                    tokens.control(size).height,
+                    reference.control(size).height,
+                    "{id}"
+                );
+                assert_eq!(
+                    tokens.control(size).font_size,
+                    reference.control(size).font_size,
+                    "{id}"
+                );
+            }
+            for step in Space::ALL {
+                assert_eq!(tokens.spacing(step), reference.spacing(step), "{id}");
+            }
+            for layer in Layer::ALL {
+                assert_eq!(tokens.z_index(layer), reference.z_index(layer), "{id}");
+            }
+            for easing in MotionEasing::ALL {
+                assert_eq!(tokens.easing(easing), reference.easing(easing), "{id}");
+            }
+            for step in MotionDuration::ALL {
+                assert_eq!(
+                    tokens.motion_duration(step),
+                    reference.motion_duration(step),
+                    "{id} retimes {step:?}"
+                );
+            }
+            for preset in SpringPreset::ALL {
+                assert_eq!(tokens.spring(preset), reference.spring(preset), "{id}");
+            }
         }
-        for step in [Space::Xs, Space::Md, Space::Xxl] {
-            assert_eq!(dark.spacing(step), light.spacing(step));
+    }
+
+    /// One point on a cubic bezier easing, the same way the kit's own
+    /// `CubicBezier` evaluates one. Duplicated here rather than depended on,
+    /// because this crate has no view layer and the question — does this
+    /// curve run ahead of its clock or behind it — is a question about the
+    /// token.
+    fn cubic_bezier_at(points: [f32; 4], time: f32) -> f32 {
+        let [x1, y1, x2, y2] = points;
+        let axis = |a: f32, b: f32, t: f32| {
+            let u = 1.0 - t;
+            3.0 * u * u * t * a + 3.0 * u * t * t * b + t * t * t
+        };
+        let mut low = 0.0;
+        let mut high = 1.0;
+        for _ in 0..32 {
+            let mid = 0.5 * (low + high);
+            if axis(x1, x2, mid) < time {
+                low = mid;
+            } else {
+                high = mid;
+            }
         }
-        for layer in Layer::ALL {
-            assert_eq!(dark.z_index(layer), light.z_index(layer));
+        axis(y1, y2, 0.5 * (low + high))
+    }
+
+    /// A departure that decelerates reads as reluctance: the surface slows
+    /// down on its way off screen, after the reader has already said they are
+    /// finished with it. Arrivals do the opposite — most of the way there
+    /// quickly, then settle — so the two are told apart by which side of the
+    /// clock they sit on halfway through.
+    #[test]
+    fn arrivals_settle_into_place_and_departures_get_out_of_the_way() {
+        for tokens in all() {
+            let id = &tokens.meta.id;
+            let at = |easing: MotionEasing, t: f32| {
+                let [x1, y1, x2, y2] = tokens.easing(easing);
+                cubic_bezier_at([x1, y1, x2, y2], t)
+            };
+            for arriving in [
+                MotionEasing::Standard,
+                MotionEasing::EaseOut,
+                MotionEasing::Emphasized,
+                MotionEasing::Settle,
+            ] {
+                assert!(
+                    at(arriving, 0.5) > 0.5,
+                    "{id}: {arriving:?} is behind the clock at half its time, so it arrives late"
+                );
+            }
+            assert!(
+                at(MotionEasing::Exit, 0.5) < 0.5,
+                "{id}: the exit is more than half gone at half its time, so it \
+decelerates on the way out, which reads as reluctance"
+            );
+            // And it is over before any arrival is, for the same reason: a
+            // departure is not information, it is a wait.
+            for arriving in [
+                MotionDuration::Menu,
+                MotionDuration::Dialog,
+                MotionDuration::Entrance,
+            ] {
+                assert!(
+                    tokens.motion_duration(MotionDuration::Exit)
+                        <= tokens.motion_duration(arriving),
+                    "{id}: leaving takes longer than {arriving:?}"
+                );
+            }
         }
-        for easing in MotionEasing::ALL {
-            assert_eq!(dark.easing(easing), light.easing(easing));
+    }
+
+    /// The four spring presets are a ladder, and the ladder is the vocabulary:
+    /// a component picking `bouncy` is asking for overshoot and one picking
+    /// `grab` is asking to keep up with a pointer. Presets that drifted into
+    /// each other would leave every component's choice meaning nothing.
+    #[test]
+    fn the_spring_presets_stay_a_ladder_a_component_can_choose_from() {
+        for tokens in all() {
+            let id = &tokens.meta.id;
+            let ratio = |preset: SpringPreset| {
+                let spring = tokens.spring(preset);
+                spring.damping / (2.0 * (spring.stiffness * spring.mass).sqrt())
+            };
+            let settling = |preset: SpringPreset| {
+                let spring = tokens.spring(preset);
+                4.0 * 2.0 * spring.mass / spring.damping
+            };
+            for preset in SpringPreset::ALL {
+                let ratio = ratio(preset);
+                assert!(
+                    (0.4..=1.1).contains(&ratio),
+                    "{id}: {preset:?} damps at {ratio}, which either rings or is stuck"
+                );
+            }
+            // Bouncy is the one that visibly overshoots; grab follows a
+            // pointer, so it is the one that settles first.
+            assert!(
+                ratio(SpringPreset::Bouncy) < ratio(SpringPreset::Snappy),
+                "{id}"
+            );
+            assert!(
+                ratio(SpringPreset::Snappy) < ratio(SpringPreset::Grab),
+                "{id}"
+            );
+            assert!(
+                settling(SpringPreset::Grab) < settling(SpringPreset::Smooth),
+                "{id}: a value following a pointer settles slower than a surface arriving"
+            );
+            assert!(
+                settling(SpringPreset::Bouncy) > settling(SpringPreset::Snappy),
+                "{id}"
+            );
         }
     }
 

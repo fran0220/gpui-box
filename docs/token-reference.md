@@ -394,6 +394,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -424,7 +425,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -1152,6 +1153,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -1182,7 +1184,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -1910,6 +1912,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -1940,7 +1943,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -2668,6 +2671,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -2698,7 +2702,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -3426,6 +3430,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -3456,7 +3461,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -4184,6 +4189,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -4214,7 +4220,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -4942,6 +4948,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -4972,7 +4979,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -5700,6 +5707,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -5730,7 +5738,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -6458,6 +6466,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -6488,7 +6497,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |
@@ -7216,6 +7225,7 @@ Numeric readout scale: 1.6×
 |---|---:|
 | `motion.durationMs.instant` | 90 |
 | `motion.durationMs.quick` | 150 |
+| `motion.durationMs.exit` | 120 |
 | `motion.durationMs.menu` | 140 |
 | `motion.durationMs.dialog` | 180 |
 | `motion.durationMs.resize` | 200 |
@@ -7246,7 +7256,7 @@ Row stagger maximum items: `8`.
 | `easeInOut` | `[0.42, 0.0, 0.58, 1.0]` |
 | `emphasized` | `[0.2, 0.0, 0.0, 1.0]` |
 | `overshoot` | `[0.34, 1.56, 0.64, 1.0]` |
-| `exit` | `[0.0, 0.0, 0.58, 1.0]` |
+| `exit` | `[0.4, 0.0, 1.0, 1.0]` |
 | `settle` | `[0.16, 1.0, 0.3, 1.0]` |
 
 | Spring | Stiffness | Damping | Mass |

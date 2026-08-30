@@ -2198,6 +2198,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     for (name, value) in [
         ("instant", tokens.motion.duration_ms.instant),
         ("quick", tokens.motion.duration_ms.quick),
+        ("exit", tokens.motion.duration_ms.exit),
         ("menu", tokens.motion.duration_ms.menu),
         ("dialog", tokens.motion.duration_ms.dialog),
         ("resize", tokens.motion.duration_ms.resize),

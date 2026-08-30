@@ -555,6 +555,7 @@
     "durationMs": {
       "instant": 90,
       "quick": 150,
+      "exit": 120,
       "menu": 140,
       "dialog": 180,
       "resize": 200,
@@ -618,9 +619,9 @@
         1
       ],
       "exit": [
+        0.4,
         0,
-        0,
-        0.58,
+        1,
         1
       ],
       "settle": [
