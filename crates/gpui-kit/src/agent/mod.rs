@@ -6,6 +6,7 @@
 pub mod approval;
 pub mod artifact;
 pub mod canvas;
+pub mod clarification;
 pub mod cost;
 pub mod feedback;
 pub mod model;
@@ -23,6 +24,9 @@ pub mod tool_call;
 pub use approval::{AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus};
 pub use artifact::{ArtifactKind, ArtifactPreview, ArtifactPreviewState};
 pub use canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
+pub use clarification::{
+    ClarificationEvent, ClarificationOption, ClarificationPanel, ClarificationStatus,
+};
 pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading};
 pub use feedback::{FeedbackRating, FeedbackRatingEvent, FeedbackVote};
 pub use model::{

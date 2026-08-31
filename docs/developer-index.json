@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4159
+      "symbolCount": 4188
     },
     {
       "name": "gpui-box-kit-assets",
@@ -39905,6 +39905,422 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::agent::clarification::ClarificationEvent",
+      "name": "ClarificationEvent",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "What the panel reports without applying it.",
+      "documentation": "What the panel reports without applying it.",
+      "signature": "# [doc = \" What the panel reports without applying it.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum ClarificationEvent { # [doc = \" The ids that were picked, in the order they were picked.\"] Answered (Vec<SharedString>), # [doc = \" The reader chose to let the agent decide.\"] Skipped, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption",
+      "name": "ClarificationOption",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "One candidate answer the agent is offering.",
+      "documentation": "One candidate answer the agent is offering.",
+      "signature": "# [doc = \" One candidate answer the agent is offering.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct ClarificationOption { id : SharedString, label : SharedString, detail : Option<SharedString>, # [doc = \" Why this candidate cannot presently be picked, in the host's words.\"] # [doc = \" `None` is the available case, so an unavailable option cannot be built\"] # [doc = \" without saying what is wrong with it.\"] unavailable : Option<SharedString>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::detail",
+      "name": "detail",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "One more line about this candidate: the path it resolves to, the version it means, what picking it would cost.",
+      "documentation": "One more line about this candidate: the path it resolves to, the\nversion it means, what picking it would cost.",
+      "signature": "pub fn detail (mut self, detail : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::detail_text",
+      "name": "detail_text",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "The extra line about this candidate, if the caller gave one.",
+      "documentation": "The extra line about this candidate, if the caller gave one.",
+      "signature": "pub fn detail_text (& self) -> Option<& SharedString>",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::id",
+      "name": "id",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn id (& self) -> & SharedString",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::is_available",
+      "name": "is_available",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_available (& self) -> bool",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::label",
+      "name": "label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn label (& self) -> & SharedString",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "`id` is the business identity of the candidate, which is what the panel reports and what its semantic id derives from. It is never the position: reordering the candidates must not rename them.",
+      "documentation": "`id` is the business identity of the candidate, which is what the panel\nreports and what its semantic id derives from. It is never the\nposition: reordering the candidates must not rename them.",
+      "signature": "pub fn new (id : impl Into<SharedString>, label : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::unavailable",
+      "name": "unavailable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Marks the candidate as one that cannot be picked, and says why. The reason is shown; the option keeps its place and installs no handler.",
+      "documentation": "Marks the candidate as one that cannot be picked, and says why. The\nreason is shown; the option keeps its place and installs no handler.",
+      "signature": "pub fn unavailable (mut self, reason : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationOption::unavailable_reason",
+      "name": "unavailable_reason",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Why this candidate cannot be picked, if it cannot.",
+      "documentation": "Why this candidate cannot be picked, if it cannot.",
+      "signature": "pub fn unavailable_reason (& self) -> Option<& SharedString>",
+      "cfg": [],
+      "target": "ClarificationOption"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel",
+      "name": "ClarificationPanel",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "One clarifying question, with the answer left to the caller.",
+      "documentation": "One clarifying question, with the answer left to the caller.\n\nIt is a view rather than a builder because a multiple-answer question\naccumulates a selection across frames, and because where the keyboard is\nhas to survive one.",
+      "signature": "# [doc = \" One clarifying question, with the answer left to the caller.\"] # [doc = \"\"] # [doc = \" It is a view rather than a builder because a multiple-answer question\"] # [doc = \" accumulates a selection across frames, and because where the keyboard is\"] # [doc = \" has to survive one.\"] pub struct ClarificationPanel { ident : Ident, focus_handle : FocusHandle, option_focus : Vec<FocusHandle>, answer_focus : FocusHandle, skip_focus : FocusHandle, # [doc = \" What the agent needs to know, in its own words. Required by the\"] # [doc = \" constructor: a clarification with no question is not one this component\"] # [doc = \" can render.\"] question : SharedString, options : Vec<ClarificationOption>, multiple : bool, skippable : bool, # [doc = \" The ids picked so far, in the order they were picked, which is the\"] # [doc = \" order they are reported in.\"] picked : Vec<SharedString>, status : ClarificationStatus, # [doc = \" Cleared by the first frame that can act on it, as in `ApprovalPrompt`.\"] pending_focus : bool, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::answer",
+      "name": "answer",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Reports the accumulated answer. Refused while nothing is picked, so the question cannot be answered with silence.",
+      "documentation": "Reports the accumulated answer. Refused while nothing is picked, so the\nquestion cannot be answered with silence.",
+      "signature": "pub fn answer (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::candidates",
+      "name": "candidates",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "The candidates the panel was given.",
+      "documentation": "The candidates the panel was given.",
+      "signature": "pub fn candidates (& self) -> & [ClarificationOption]",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::choose",
+      "name": "choose",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Picks a candidate: toggles it when the question takes several answers, and answers the question outright when it takes one.",
+      "documentation": "Picks a candidate: toggles it when the question takes several answers,\nand answers the question outright when it takes one.\n\nRefused for an unavailable candidate, an unknown id, and a question\nthat is no longer pending, so a host driving the panel cannot reach a\nstate the pointer and the keyboard cannot.",
+      "signature": "pub fn choose (& mut self, id : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::chosen",
+      "name": "chosen",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "What is filled right now: the answer once there is one, and the selection in progress until then. One question, one place it is answered from.",
+      "documentation": "What is filled right now: the answer once there is one, and the\nselection in progress until then. One question, one place it is\nanswered from.",
+      "signature": "pub fn chosen (& self) -> & [SharedString]",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::current_status",
+      "name": "current_status",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn current_status (& self) -> & ClarificationStatus",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::multiple",
+      "name": "multiple",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Accepts more than one answer, which is what adds the confirming control. Without it the question takes exactly one answer and picking is answering.",
+      "documentation": "Accepts more than one answer, which is what adds the confirming\ncontrol. Without it the question takes exactly one answer and picking\nis answering.",
+      "signature": "pub fn multiple (mut self) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "`question` is what the agent needs to know, stated in full. There is no way to render the question as a category instead.",
+      "documentation": "`question` is what the agent needs to know, stated in full. There is no\nway to render the question as a category instead.",
+      "signature": "pub fn new (ident : impl Into<Ident>, question : impl Into<SharedString>, _window : & mut Window, cx : & mut Context<Self>,) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::option",
+      "name": "option",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn option (mut self, option : ClarificationOption) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::options",
+      "name": "options",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn options (mut self, options : impl IntoIterator<Item = ClarificationOption>) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::set_status",
+      "name": "set_status",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Records what happened to the question. A host that withdraws or supersedes one says so through here rather than by removing the panel, so the reader finds out why the controls went away.",
+      "documentation": "Records what happened to the question. A host that withdraws or\nsupersedes one says so through here rather than by removing the panel,\nso the reader finds out why the controls went away.",
+      "signature": "pub fn set_status (& mut self, status : ClarificationStatus, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::skip",
+      "name": "skip",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Reports that the reader would rather the agent decided. Refused unless the caller offered the choice.",
+      "documentation": "Reports that the reader would rather the agent decided. Refused unless\nthe caller offered the choice.",
+      "signature": "pub fn skip (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::skippable",
+      "name": "skippable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "Offers the reader a way to decline to choose and let the agent decide. Off by default, because a question the agent cannot proceed without is the ordinary case and a skip control on one is a lie.",
+      "documentation": "Offers the reader a way to decline to choose and let the agent decide.\nOff by default, because a question the agent cannot proceed without is\nthe ordinary case and a skip control on one is a lie.",
+      "signature": "pub fn skippable (mut self) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationPanel::status",
+      "name": "status",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn status (mut self, status : ClarificationStatus) -> Self",
+      "cfg": [],
+      "target": "ClarificationPanel"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationStatus",
+      "name": "ClarificationStatus",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "What happened to the question.",
+      "documentation": "What happened to the question.\n\nAnswered, skipped, withdrawn and superseded are four different facts and\nare kept apart for the same reason approval keeps declined, expired and\nsuperseded apart: a question nobody answered was not answered, and a\nquestion the agent stopped needing was not skipped by the reader.",
+      "signature": "# [doc = \" What happened to the question.\"] # [doc = \"\"] # [doc = \" Answered, skipped, withdrawn and superseded are four different facts and\"] # [doc = \" are kept apart for the same reason approval keeps declined, expired and\"] # [doc = \" superseded apart: a question nobody answered was not answered, and a\"] # [doc = \" question the agent stopped needing was not skipped by the reader.\"] # [derive (Debug, Clone, PartialEq, Eq, Default)] pub enum ClarificationStatus { # [doc = \" Still waiting on the reader.\"] # [default] Pending, # [doc = \" Answered, with the ids that were picked.\"] Answered (Vec<SharedString>), # [doc = \" The reader declined to choose and let the agent decide for itself.\"] # [doc = \" Only reachable when the panel is\"] # [doc = \" [`skippable`](ClarificationPanel::skippable).\"] Skipped, # [doc = \" The agent stopped needing the answer, in its own words.\"] Withdrawn (SharedString), # [doc = \" A later question took this one's place.\"] Superseded { by : SharedString }, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationStatus::answer",
+      "name": "answer",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "The ids that were picked, if the question was answered.",
+      "documentation": "The ids that were picked, if the question was answered.",
+      "signature": "pub fn answer (& self) -> Option<& [SharedString]>",
+      "cfg": [],
+      "target": "ClarificationStatus"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationStatus::is_pending",
+      "name": "is_pending",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_pending (& self) -> bool",
+      "cfg": [],
+      "target": "ClarificationStatus"
+    },
+    {
+      "id": "gpui_kit::agent::clarification::ClarificationStatus::name",
+      "name": "name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::clarification",
+      "path": "gpui_kit::agent::clarification",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "The stable name published on the semantic node, so a test tells the five apart without reading a colour.",
+      "documentation": "The stable name published on the semantic node, so a test tells the\nfive apart without reading a colour.",
+      "signature": "pub fn name (& self) -> & 'static str",
+      "cfg": [],
+      "target": "ClarificationStatus"
+    },
+    {
       "id": "gpui_kit::agent::cost::Basis",
       "name": "Basis",
       "kind": "enum",
@@ -44166,6 +44582,20 @@
     },
     {
       "id": "gpui_kit::agent::reexport-10",
+      "name": "persona :: { DialogueChoice , DialogueChoiceAvailability , DialogueTurn , PersonaDialogue , PersonaDialogueEvent , PersonaExpression , PersonaPortrait , VoiceField , VoiceReactive , VoiceSample , VoiceSampleError , VoiceSampleErrorKind , VoiceState , }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent",
+      "path": "gpui_kit::agent",
+      "source": "crates/gpui-kit/src/agent/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use persona::{ DialogueChoice, DialogueChoiceAvailability, DialogueTurn, PersonaDialogue, PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive, VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState, };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::reexport-11",
       "name": "plan :: { AgentPlan , PlanItem , PlanState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44179,7 +44609,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-11",
+      "id": "gpui_kit::agent::reexport-12",
       "name": "presentation :: { AgentActivityLine , AgentAppearance , AgentAvatar , AgentCard , AgentGroup , AgentRoster , AgentRunIssues , SubagentTree , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44193,7 +44623,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-12",
+      "id": "gpui_kit::agent::reexport-13",
       "name": "prompt :: { PromptBuilder , PromptBuilderEvent , PromptBuilderState , PromptSlot }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44207,7 +44637,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-13",
+      "id": "gpui_kit::agent::reexport-14",
       "name": "server_list :: { Catalog , Offering , OfferingKind , ServerEntry , ServerList , ServerState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44221,7 +44651,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-14",
+      "id": "gpui_kit::agent::reexport-15",
       "name": "step_list :: { RunLength , Step , StepList , StepState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44235,7 +44665,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-15",
+      "id": "gpui_kit::agent::reexport-16",
       "name": "thinking :: { Reasoning , ThinkingBlock }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44249,7 +44679,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-16",
+      "id": "gpui_kit::agent::reexport-17",
       "name": "tool_call :: { Elapsed , ToolBody , ToolCall , ToolCallState , ToolFamily , ToolOutput }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44292,6 +44722,20 @@
     },
     {
       "id": "gpui_kit::agent::reexport-4",
+      "name": "clarification :: { ClarificationEvent , ClarificationOption , ClarificationPanel , ClarificationStatus , }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent",
+      "path": "gpui_kit::agent",
+      "source": "crates/gpui-kit/src/agent/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use clarification::{ ClarificationEvent, ClarificationOption, ClarificationPanel, ClarificationStatus, };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::reexport-5",
       "name": "cost :: { Basis , ContextGauge , CostLine , CostMeter , LastVerified , Limit , Quantity , Reading }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44305,7 +44749,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-5",
+      "id": "gpui_kit::agent::reexport-6",
       "name": "feedback :: { FeedbackRating , FeedbackRatingEvent , FeedbackVote }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44319,7 +44763,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-6",
+      "id": "gpui_kit::agent::reexport-7",
       "name": "model :: { AgentActivity , AgentDescriptor , AgentExecutionState , AgentId , AgentModelIssue , AgentOutcome , AgentPresence , AgentRunSnapshot , AgentSnapshot , AgentTaskSnapshot , AgentUiAction , AgentVisualEvent , AgentVisualEventKind , AggregationSnapshot , InvocationId , RunId , RunLink , RunLinkId , RunLinkKind , RunSubjectId , TaskId , VisualEventId , WaitReason , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44333,7 +44777,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-7",
+      "id": "gpui_kit::agent::reexport-8",
       "name": "offering_catalog :: { OfferingCatalog , OfferingIdentity , OfferingSource , OfferingSourceState , SearchableOffering , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44347,7 +44791,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-8",
+      "id": "gpui_kit::agent::reexport-9",
       "name": "permission :: { PermissionAction , PermissionChange , PermissionEntry , PermissionMatrix , PermissionSource , PermissionState , PermissionSubject , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44358,20 +44802,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use permission::{ PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource, PermissionState, PermissionSubject, };",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::reexport-9",
-      "name": "persona :: { DialogueChoice , DialogueChoiceAvailability , DialogueTurn , PersonaDialogue , PersonaDialogueEvent , PersonaExpression , PersonaPortrait , VoiceField , VoiceReactive , VoiceSample , VoiceSampleError , VoiceSampleErrorKind , VoiceState , }",
-      "kind": "reexport",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent",
-      "path": "gpui_kit::agent",
-      "source": "crates/gpui-kit/src/agent/mod.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use persona::{ DialogueChoice, DialogueChoiceAvailability, DialogueTurn, PersonaDialogue, PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive, VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState, };",
       "cfg": []
     },
     {
@@ -78245,7 +78675,7 @@
       "source": "crates/gpui-kit/src/foundation/styled_ext.rs",
       "summary": "The one focus treatment in the library.",
       "documentation": "The one focus treatment in the library.\n\nEvery keyboard-reachable element wears the same ring from the same tokens,\nso \"the keyboard is here\" looks identical whether it is on a button, a\ntable header, or a tree row. It is a shadow rather than a border so turning\nfocus on never reflows what is around it.\n\nThe ring answers \"the keyboard is here\", so it is drawn for keyboard focus\nand not for a pointer that landed on the same element. A person who just\nclicked a strip knows where they clicked; outlining it tells them nothing\nand reads as chrome the borderless catalogue does not otherwise draw. An\neditable control is the case this does not cover, and it does not go\nthrough here: a field says where the caret is with [`StyledExt::well`] and\nits own focused state, which a click must show.",
-      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked; outlining it tells them nothing\"] # [doc = \" and reads as chrome the borderless catalogue does not otherwise draw. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with [`StyledExt::well`] and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Sized { fn focus_ring (self, theme : & Theme) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring ())) } # [doc = \" The same halo resolved against a control-owned resting fill.\"] fn focus_ring_on (self, theme : & Theme, background : gpui::Hsla) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring_on (background))) } }",
+      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked; outlining it tells them nothing\"] # [doc = \" and reads as chrome the borderless catalogue does not otherwise draw. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with [`StyledExt::well`] and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Sized { fn focus_ring (self, theme : & Theme) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring ())) } # [doc = \" The same halo resolved against a control-owned resting fill.\"] fn focus_ring_on (self, theme : & Theme, background : gpui::Hsla) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring_on (background))) } # [doc = \" The same halo for an element that has no resting fill of its own.\"] # [doc = \"\"] # [doc = \" The halo is a shadow, and a non-inset shadow is painted under the whole\"] # [doc = \" element rather than clipped to the outside of it the way CSS clips one.\"] # [doc = \" A control with a fill covers that interior and the halo reads as a\"] # [doc = \" ring. A transparent row does not, so the identical call that rings a\"] # [doc = \" button washes a row in the focus colour at its full ring alpha — which\"] # [doc = \" is louder than the selected fill and reads as a selection the reader\"] # [doc = \" did not make.\"] # [doc = \"\"] # [doc = \" This lays the ground the halo needs, for exactly as long as the halo is\"] # [doc = \" worn: `ground` is the colour already behind the element, so a focused\"] # [doc = \" row is its own resting colour plus a ring, and nothing moves.\"] fn focus_ring_over (self, theme : & Theme, ground : gpui::Hsla) -> Self { self . focus_visible (move | style | style . bg (ground) . shadow (theme . focus_ring_on (ground))) } }",
       "cfg": []
     },
     {
@@ -117264,6 +117694,39 @@
       ]
     },
     {
+      "name": "ClarificationPanel",
+      "kind": "view",
+      "path": "gpui_kit::agent::ClarificationPanel",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "One clarifying question, with the answer left to the caller.",
+      "construct": [
+        "new(ident: impl Into<Ident>, question: impl Into<SharedString>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "option(option: ClarificationOption) -> Self",
+        "options(options: impl IntoIterator<Item = ClarificationOption>) -> Self",
+        "multiple() -> Self",
+        "skippable() -> Self",
+        "status(status: ClarificationStatus) -> Self"
+      ],
+      "commands": [
+        "set_status(status: ClarificationStatus, cx: &mut Context<Self>)",
+        "choose(id: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "answer(cx: &mut Context<Self>)",
+        "skip(cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "current_status() -> &ClarificationStatus",
+        "candidates() -> &[ClarificationOption]",
+        "chosen() -> &[SharedString]"
+      ],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "clarification"
+      ]
+    },
+    {
       "name": "CodeView",
       "kind": "builder",
       "path": "gpui_kit::content::CodeView",
@@ -123220,6 +123683,60 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "ClarificationEvent",
+      "path": "gpui_kit::agent::ClarificationEvent",
+      "summary": "What the panel reports without applying it.",
+      "variants": [
+        "Answered",
+        "Skipped"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ClarificationOption",
+      "path": "gpui_kit::agent::ClarificationOption",
+      "summary": "One candidate answer the agent is offering.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "unavailable(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "detail_text() -> Option<&SharedString>",
+        "unavailable_reason() -> Option<&SharedString>",
+        "is_available() -> bool"
+      ]
+    },
+    {
+      "name": "ClarificationStatus",
+      "path": "gpui_kit::agent::ClarificationStatus",
+      "summary": "What happened to the question.",
+      "variants": [
+        "Pending",
+        "Answered",
+        "Skipped",
+        "Withdrawn",
+        "Superseded"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_pending() -> bool",
+        "name() -> &'static str",
+        "answer() -> Option<&[SharedString]>"
+      ]
     },
     {
       "name": "Clock",
@@ -141135,6 +141652,18 @@
         "ApprovalPrompt"
       ],
       "example": "fn approval(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneApprovals>() {\n        let pending = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.pending\",\n                \"Write to /work/report/summary.md\",\n                window,\n                cx,\n            )\n            .details([\n                DescriptionItem::new(\"tool\", \"Tool\", \"write-file\"),\n                DescriptionItem::new(\"path\", \"Path\", \"/work/report/summary.md\"),\n                DescriptionItem::new(\"bytes\", \"Size\", \"4 KB\"),\n            ])\n            .always(AlwaysScope::Session)\n            .always(AlwaysScope::path(\"/work/report\"))\n            .always(AlwaysScope::tool(\"write-file\"))\n        });\n        let declined = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.declined\",\n                \"Delete /work/report/draft.md\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Declined)\n        });\n        let expired = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.expired\",\n                \"Open a connection to build.internal:8443\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Expired)\n        });\n        let superseded = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.superseded\",\n                \"Run the test suite in /work\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Superseded {\n                by: \"a later request covering the whole workspace\".into(),\n            })\n        });\n        cx.set_global(SceneApprovals {\n            pending,\n            declined,\n            expired,\n            superseded,\n        });\n    }\n    let prompts = cx.global::<SceneApprovals>();\n    let pending = prompts.pending.clone();\n    let declined = prompts.declined.clone();\n    let expired = prompts.expired.clone();\n    let superseded = prompts.superseded.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(pending)\n        .child(\n            Divider::new()\n                .id(\"scene.approval.rule.resolved\")\n                .label(\"Answered, expired, and replaced are three different things\"),\n        )\n        .child(declined)\n        .child(expired)\n        .child(superseded)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "clarification",
+      "capture": "cargo run -p xtask -- headless capture clarification",
+      "kind": "exhibit",
+      "subjects": [
+        "ClarificationPanel"
+      ],
+      "uses": [
+        "ClarificationPanel"
+      ],
+      "example": "fn clarification(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneClarifications>() {\n        let candidates = || {\n            [\n                ClarificationOption::new(\"src\", \"src/camera/follow.ts\")\n                    .detail(\"Changed in this run\"),\n                ClarificationOption::new(\"test\", \"src/camera/follow.test.ts\")\n                    .detail(\"Covers the module above\"),\n                ClarificationOption::new(\"docs\", \"docs/camera.md\")\n                    .detail(\"Describes the behaviour\"),\n            ]\n        };\n        let one = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.one\",\n                \"Three files match \\\"follow\\\". Which one did you mean?\",\n                window,\n                cx,\n            )\n            .options(candidates())\n        });\n        let several = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.several\",\n                \"Which of these should the release note cover?\",\n                window,\n                cx,\n            )\n            .multiple()\n            .skippable()\n            .option(\n                ClarificationOption::new(\"radius\", \"The node card radius fix\")\n                    .detail(\"Landed in 2e79cbea\"),\n            )\n            .option(\n                ClarificationOption::new(\"cjk\", \"The bundled Chinese face\")\n                    .detail(\"Landed in 56c400bc\"),\n            )\n            // A candidate the agent offered and can no longer take. It keeps\n            // its place and says why, rather than leaving a list that silently\n            // shrank between two frames.\n            .option(\n                ClarificationOption::new(\"glass\", \"The glass radius override\")\n                    .unavailable(\"Not released yet, so it has no note to cover.\"),\n            )\n        });\n        let answered = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.answered\",\n                \"Three files match \\\"follow\\\". Which one did you mean?\",\n                window,\n                cx,\n            )\n            .options(candidates())\n            .status(ClarificationStatus::Answered(vec![\"test\".into()]))\n        });\n        let skipped = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.skipped\",\n                \"Should the summary quote the failing output in full?\",\n                window,\n                cx,\n            )\n            .skippable()\n            .option(ClarificationOption::new(\"full\", \"Quote all of it\"))\n            .option(ClarificationOption::new(\"head\", \"Quote the first failure\"))\n            .status(ClarificationStatus::Skipped)\n        });\n        let withdrawn = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.withdrawn\",\n                \"Which branch should the fix land on?\",\n                window,\n                cx,\n            )\n            .option(ClarificationOption::new(\"main\", \"main\"))\n            .option(ClarificationOption::new(\"release\", \"release/0.1\"))\n            .status(ClarificationStatus::Withdrawn(\n                \"the repository has only one branch\".into(),\n            ))\n        });\n        let superseded = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.superseded\",\n                \"Which test suite should run first?\",\n                window,\n                cx,\n            )\n            .option(ClarificationOption::new(\"unit\", \"The unit tests\"))\n            .option(ClarificationOption::new(\"visual\", \"The visual gate\"))\n            .status(ClarificationStatus::Superseded {\n                by: \"a later question covering the whole gate\".into(),\n            })\n        });\n        let empty = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.empty\",\n                \"Which of the cached results should be reused?\",\n                window,\n                cx,\n            )\n        });\n        cx.set_global(SceneClarifications {\n            one,\n            several,\n            answered,\n            skipped,\n            withdrawn,\n            superseded,\n            empty,\n        });\n    }\n    let panels = cx.global::<SceneClarifications>();\n    let one = panels.one.clone();\n    let several = panels.several.clone();\n    let answered = panels.answered.clone();\n    let skipped = panels.skipped.clone();\n    let withdrawn = panels.withdrawn.clone();\n    let superseded = panels.superseded.clone();\n    let empty = panels.empty.clone();\n    let theme = cx.theme().clone();\n\n    let asking = div()\n        .column()\n        .w(px(430.0))\n        .gap(px(theme.spacing.md))\n        .child(caption(\n            &theme,\n            \"One answer, one gesture: picking is answering, so there is no confirm\",\n        ))\n        .child(one)\n        .child(caption(\n            &theme,\n            \"Several accumulate, so these get a confirming control — and one candidate the agent can no longer take\",\n        ))\n        .child(several)\n        .child(caption(\n            &theme,\n            \"A question with nothing to pick from says so, rather than drawing an empty form\",\n        ))\n        .child(empty);\n\n    let settled = div()\n        .column()\n        .w(px(430.0))\n        .gap(px(theme.spacing.md))\n        .child(caption(\n            &theme,\n            \"Answered, left to the agent, withdrawn, and replaced are four different things\",\n        ))\n        .child(answered)\n        .child(skipped)\n        .child(withdrawn)\n        .child(superseded);\n\n    stack(&theme)\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap(px(theme.spacing.md))\n                .child(asking)\n                .child(settled),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "permission-matrix",

@@ -45,8 +45,8 @@ use crate::foundation::direction::LayoutDirection;
 
 use agent::{
     agent_avatar, agent_plan, agent_roster, agent_run_canvas, agent_run_issues, approval,
-    artifact_preview, cost_meter, feedback_rating, offering_catalog, permission_matrix, persona,
-    prompt_builder, server_list, step_list, thinking, tool_call,
+    artifact_preview, clarification, cost_meter, feedback_rating, offering_catalog,
+    permission_matrix, persona, prompt_builder, server_list, step_list, thinking, tool_call,
 };
 use canvas::{canvas_regions, canvas_tools, node_graph, node_graph_motion};
 use compositions::{motion_flip, motion_state, reading_direction};
@@ -695,6 +695,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "approval",
             build: approval,
             shows: Shows::Subjects(&["ApprovalPrompt"]),
+        },
+        Scene {
+            name: "clarification",
+            build: clarification,
+            shows: Shows::Subjects(&["ClarificationPanel"]),
         },
         Scene {
             name: "permission-matrix",

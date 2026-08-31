@@ -1071,6 +1071,39 @@
       ]
     },
     {
+      "name": "ClarificationPanel",
+      "kind": "view",
+      "path": "gpui_kit::agent::ClarificationPanel",
+      "source": "crates/gpui-kit/src/agent/clarification.rs",
+      "summary": "One clarifying question, with the answer left to the caller.",
+      "construct": [
+        "new(ident: impl Into<Ident>, question: impl Into<SharedString>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "option(option: ClarificationOption) -> Self",
+        "options(options: impl IntoIterator<Item = ClarificationOption>) -> Self",
+        "multiple() -> Self",
+        "skippable() -> Self",
+        "status(status: ClarificationStatus) -> Self"
+      ],
+      "commands": [
+        "set_status(status: ClarificationStatus, cx: &mut Context<Self>)",
+        "choose(id: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "answer(cx: &mut Context<Self>)",
+        "skip(cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "current_status() -> &ClarificationStatus",
+        "candidates() -> &[ClarificationOption]",
+        "chosen() -> &[SharedString]"
+      ],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "clarification"
+      ]
+    },
+    {
       "name": "CodeView",
       "kind": "builder",
       "path": "gpui_kit::content::CodeView",
@@ -7027,6 +7060,60 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "ClarificationEvent",
+      "path": "gpui_kit::agent::ClarificationEvent",
+      "summary": "What the panel reports without applying it.",
+      "variants": [
+        "Answered",
+        "Skipped"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ClarificationOption",
+      "path": "gpui_kit::agent::ClarificationOption",
+      "summary": "One candidate answer the agent is offering.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "unavailable(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "detail_text() -> Option<&SharedString>",
+        "unavailable_reason() -> Option<&SharedString>",
+        "is_available() -> bool"
+      ]
+    },
+    {
+      "name": "ClarificationStatus",
+      "path": "gpui_kit::agent::ClarificationStatus",
+      "summary": "What happened to the question.",
+      "variants": [
+        "Pending",
+        "Answered",
+        "Skipped",
+        "Withdrawn",
+        "Superseded"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_pending() -> bool",
+        "name() -> &'static str",
+        "answer() -> Option<&[SharedString]>"
+      ]
     },
     {
       "name": "Clock",
@@ -15986,6 +16073,18 @@
         "ApprovalPrompt"
       ],
       "example": "fn approval(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneApprovals>() {\n        let pending = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.pending\",\n                \"Write to /work/report/summary.md\",\n                window,\n                cx,\n            )\n            .details([\n                DescriptionItem::new(\"tool\", \"Tool\", \"write-file\"),\n                DescriptionItem::new(\"path\", \"Path\", \"/work/report/summary.md\"),\n                DescriptionItem::new(\"bytes\", \"Size\", \"4 KB\"),\n            ])\n            .always(AlwaysScope::Session)\n            .always(AlwaysScope::path(\"/work/report\"))\n            .always(AlwaysScope::tool(\"write-file\"))\n        });\n        let declined = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.declined\",\n                \"Delete /work/report/draft.md\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Declined)\n        });\n        let expired = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.expired\",\n                \"Open a connection to build.internal:8443\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Expired)\n        });\n        let superseded = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.superseded\",\n                \"Run the test suite in /work\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Superseded {\n                by: \"a later request covering the whole workspace\".into(),\n            })\n        });\n        cx.set_global(SceneApprovals {\n            pending,\n            declined,\n            expired,\n            superseded,\n        });\n    }\n    let prompts = cx.global::<SceneApprovals>();\n    let pending = prompts.pending.clone();\n    let declined = prompts.declined.clone();\n    let expired = prompts.expired.clone();\n    let superseded = prompts.superseded.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(pending)\n        .child(\n            Divider::new()\n                .id(\"scene.approval.rule.resolved\")\n                .label(\"Answered, expired, and replaced are three different things\"),\n        )\n        .child(declined)\n        .child(expired)\n        .child(superseded)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "clarification",
+      "capture": "cargo run -p xtask -- headless capture clarification",
+      "kind": "exhibit",
+      "subjects": [
+        "ClarificationPanel"
+      ],
+      "uses": [
+        "ClarificationPanel"
+      ],
+      "example": "fn clarification(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneClarifications>() {\n        let candidates = || {\n            [\n                ClarificationOption::new(\"src\", \"src/camera/follow.ts\")\n                    .detail(\"Changed in this run\"),\n                ClarificationOption::new(\"test\", \"src/camera/follow.test.ts\")\n                    .detail(\"Covers the module above\"),\n                ClarificationOption::new(\"docs\", \"docs/camera.md\")\n                    .detail(\"Describes the behaviour\"),\n            ]\n        };\n        let one = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.one\",\n                \"Three files match \\\"follow\\\". Which one did you mean?\",\n                window,\n                cx,\n            )\n            .options(candidates())\n        });\n        let several = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.several\",\n                \"Which of these should the release note cover?\",\n                window,\n                cx,\n            )\n            .multiple()\n            .skippable()\n            .option(\n                ClarificationOption::new(\"radius\", \"The node card radius fix\")\n                    .detail(\"Landed in 2e79cbea\"),\n            )\n            .option(\n                ClarificationOption::new(\"cjk\", \"The bundled Chinese face\")\n                    .detail(\"Landed in 56c400bc\"),\n            )\n            // A candidate the agent offered and can no longer take. It keeps\n            // its place and says why, rather than leaving a list that silently\n            // shrank between two frames.\n            .option(\n                ClarificationOption::new(\"glass\", \"The glass radius override\")\n                    .unavailable(\"Not released yet, so it has no note to cover.\"),\n            )\n        });\n        let answered = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.answered\",\n                \"Three files match \\\"follow\\\". Which one did you mean?\",\n                window,\n                cx,\n            )\n            .options(candidates())\n            .status(ClarificationStatus::Answered(vec![\"test\".into()]))\n        });\n        let skipped = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.skipped\",\n                \"Should the summary quote the failing output in full?\",\n                window,\n                cx,\n            )\n            .skippable()\n            .option(ClarificationOption::new(\"full\", \"Quote all of it\"))\n            .option(ClarificationOption::new(\"head\", \"Quote the first failure\"))\n            .status(ClarificationStatus::Skipped)\n        });\n        let withdrawn = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.withdrawn\",\n                \"Which branch should the fix land on?\",\n                window,\n                cx,\n            )\n            .option(ClarificationOption::new(\"main\", \"main\"))\n            .option(ClarificationOption::new(\"release\", \"release/0.1\"))\n            .status(ClarificationStatus::Withdrawn(\n                \"the repository has only one branch\".into(),\n            ))\n        });\n        let superseded = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.superseded\",\n                \"Which test suite should run first?\",\n                window,\n                cx,\n            )\n            .option(ClarificationOption::new(\"unit\", \"The unit tests\"))\n            .option(ClarificationOption::new(\"visual\", \"The visual gate\"))\n            .status(ClarificationStatus::Superseded {\n                by: \"a later question covering the whole gate\".into(),\n            })\n        });\n        let empty = cx.new(|cx| {\n            ClarificationPanel::new(\n                \"scene.clarification.empty\",\n                \"Which of the cached results should be reused?\",\n                window,\n                cx,\n            )\n        });\n        cx.set_global(SceneClarifications {\n            one,\n            several,\n            answered,\n            skipped,\n            withdrawn,\n            superseded,\n            empty,\n        });\n    }\n    let panels = cx.global::<SceneClarifications>();\n    let one = panels.one.clone();\n    let several = panels.several.clone();\n    let answered = panels.answered.clone();\n    let skipped = panels.skipped.clone();\n    let withdrawn = panels.withdrawn.clone();\n    let superseded = panels.superseded.clone();\n    let empty = panels.empty.clone();\n    let theme = cx.theme().clone();\n\n    let asking = div()\n        .column()\n        .w(px(430.0))\n        .gap(px(theme.spacing.md))\n        .child(caption(\n            &theme,\n            \"One answer, one gesture: picking is answering, so there is no confirm\",\n        ))\n        .child(one)\n        .child(caption(\n            &theme,\n            \"Several accumulate, so these get a confirming control — and one candidate the agent can no longer take\",\n        ))\n        .child(several)\n        .child(caption(\n            &theme,\n            \"A question with nothing to pick from says so, rather than drawing an empty form\",\n        ))\n        .child(empty);\n\n    let settled = div()\n        .column()\n        .w(px(430.0))\n        .gap(px(theme.spacing.md))\n        .child(caption(\n            &theme,\n            \"Answered, left to the agent, withdrawn, and replaced are four different things\",\n        ))\n        .child(answered)\n        .child(skipped)\n        .child(withdrawn)\n        .child(superseded);\n\n    stack(&theme)\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap(px(theme.spacing.md))\n                .child(asking)\n                .child(settled),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "permission-matrix",

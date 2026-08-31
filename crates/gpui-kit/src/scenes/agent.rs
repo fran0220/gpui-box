@@ -635,6 +635,188 @@ pub(super) fn approval(window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+pub(super) struct SceneClarifications {
+    one: Entity<ClarificationPanel>,
+    several: Entity<ClarificationPanel>,
+    answered: Entity<ClarificationPanel>,
+    skipped: Entity<ClarificationPanel>,
+    withdrawn: Entity<ClarificationPanel>,
+    superseded: Entity<ClarificationPanel>,
+    empty: Entity<ClarificationPanel>,
+}
+
+impl Global for SceneClarifications {}
+
+/// A question the agent cannot go on without: its own guesses at what was
+/// meant, one answer or several, and the four different things that can
+/// become of it.
+pub(super) fn clarification(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneClarifications>() {
+        let candidates = || {
+            [
+                ClarificationOption::new("src", "src/camera/follow.ts")
+                    .detail("Changed in this run"),
+                ClarificationOption::new("test", "src/camera/follow.test.ts")
+                    .detail("Covers the module above"),
+                ClarificationOption::new("docs", "docs/camera.md")
+                    .detail("Describes the behaviour"),
+            ]
+        };
+        let one = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.one",
+                "Three files match \"follow\". Which one did you mean?",
+                window,
+                cx,
+            )
+            .options(candidates())
+        });
+        let several = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.several",
+                "Which of these should the release note cover?",
+                window,
+                cx,
+            )
+            .multiple()
+            .skippable()
+            .option(
+                ClarificationOption::new("radius", "The node card radius fix")
+                    .detail("Landed in 2e79cbea"),
+            )
+            .option(
+                ClarificationOption::new("cjk", "The bundled Chinese face")
+                    .detail("Landed in 56c400bc"),
+            )
+            // A candidate the agent offered and can no longer take. It keeps
+            // its place and says why, rather than leaving a list that silently
+            // shrank between two frames.
+            .option(
+                ClarificationOption::new("glass", "The glass radius override")
+                    .unavailable("Not released yet, so it has no note to cover."),
+            )
+        });
+        let answered = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.answered",
+                "Three files match \"follow\". Which one did you mean?",
+                window,
+                cx,
+            )
+            .options(candidates())
+            .status(ClarificationStatus::Answered(vec!["test".into()]))
+        });
+        let skipped = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.skipped",
+                "Should the summary quote the failing output in full?",
+                window,
+                cx,
+            )
+            .skippable()
+            .option(ClarificationOption::new("full", "Quote all of it"))
+            .option(ClarificationOption::new("head", "Quote the first failure"))
+            .status(ClarificationStatus::Skipped)
+        });
+        let withdrawn = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.withdrawn",
+                "Which branch should the fix land on?",
+                window,
+                cx,
+            )
+            .option(ClarificationOption::new("main", "main"))
+            .option(ClarificationOption::new("release", "release/0.1"))
+            .status(ClarificationStatus::Withdrawn(
+                "the repository has only one branch".into(),
+            ))
+        });
+        let superseded = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.superseded",
+                "Which test suite should run first?",
+                window,
+                cx,
+            )
+            .option(ClarificationOption::new("unit", "The unit tests"))
+            .option(ClarificationOption::new("visual", "The visual gate"))
+            .status(ClarificationStatus::Superseded {
+                by: "a later question covering the whole gate".into(),
+            })
+        });
+        let empty = cx.new(|cx| {
+            ClarificationPanel::new(
+                "scene.clarification.empty",
+                "Which of the cached results should be reused?",
+                window,
+                cx,
+            )
+        });
+        cx.set_global(SceneClarifications {
+            one,
+            several,
+            answered,
+            skipped,
+            withdrawn,
+            superseded,
+            empty,
+        });
+    }
+    let panels = cx.global::<SceneClarifications>();
+    let one = panels.one.clone();
+    let several = panels.several.clone();
+    let answered = panels.answered.clone();
+    let skipped = panels.skipped.clone();
+    let withdrawn = panels.withdrawn.clone();
+    let superseded = panels.superseded.clone();
+    let empty = panels.empty.clone();
+    let theme = cx.theme().clone();
+
+    let asking = div()
+        .column()
+        .w(px(430.0))
+        .gap(px(theme.spacing.md))
+        .child(caption(
+            &theme,
+            "One answer, one gesture: picking is answering, so there is no confirm",
+        ))
+        .child(one)
+        .child(caption(
+            &theme,
+            "Several accumulate, so these get a confirming control — and one candidate the agent can no longer take",
+        ))
+        .child(several)
+        .child(caption(
+            &theme,
+            "A question with nothing to pick from says so, rather than drawing an empty form",
+        ))
+        .child(empty);
+
+    let settled = div()
+        .column()
+        .w(px(430.0))
+        .gap(px(theme.spacing.md))
+        .child(caption(
+            &theme,
+            "Answered, left to the agent, withdrawn, and replaced are four different things",
+        ))
+        .child(answered)
+        .child(skipped)
+        .child(withdrawn)
+        .child(superseded);
+
+    stack(&theme)
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap(px(theme.spacing.md))
+                .child(asking)
+                .child(settled),
+        )
+        .into_any_element()
+}
+
 pub(super) fn permission_matrix(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let actions = [

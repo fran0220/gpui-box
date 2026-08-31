@@ -417,6 +417,20 @@ string_keys! {
     ApprovalExpired => "approval.expired", "This request expired before it was answered";
     ApprovalSuperseded => "approval.superseded", "Replaced by {0}";
 
+    // Clarification. What was answered is drawn by the tonal fill on the
+    // candidates that were picked, so there is no key here that lists them
+    // again — a joined list of labels would need a separator this library has
+    // no token for, in every language it is read in.
+    ClarificationPickOne => "clarification.pick-one", "Pick one";
+    ClarificationPickMany => "clarification.pick-many", "Pick any that apply";
+    ClarificationAnswer => "clarification.answer", "Answer";
+    ClarificationSkip => "clarification.skip", "Let the agent decide";
+    ClarificationAnswered => "clarification.answered", "Answered";
+    ClarificationSkipped => "clarification.skipped", "You left this to the agent";
+    ClarificationWithdrawn => "clarification.withdrawn", "No longer needed: {0}";
+    ClarificationSuperseded => "clarification.superseded", "Replaced by {0}";
+    ClarificationNoOptions => "clarification.no-options", "No candidates were offered, so there is nothing to pick.";
+
     // Permission matrix.
     PermissionAllowed => "permission.allowed", "Allowed";
     PermissionDenied => "permission.denied", "Denied";

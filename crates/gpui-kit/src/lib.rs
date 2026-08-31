@@ -102,6 +102,9 @@ pub mod prelude {
     };
     pub use crate::agent::artifact::{ArtifactKind, ArtifactPreview, ArtifactPreviewState};
     pub use crate::agent::canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
+    pub use crate::agent::clarification::{
+        ClarificationEvent, ClarificationOption, ClarificationPanel, ClarificationStatus,
+    };
     pub use crate::agent::cost::{
         Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
     };
