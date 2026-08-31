@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4141
+      "symbolCount": 4140
     },
     {
       "name": "gpui-box-kit-assets",
@@ -95686,7 +95686,7 @@
       "path": "gpui_kit::overlay::panel",
       "source": "crates/gpui-kit/src/overlay/panel.rs",
       "summary": "The band a modal surface's title, body, or actions sit in.",
-      "documentation": "The band a modal surface's title, body, or actions sit in.\n\nOne inset for all three, so the title, the body and the buttons of a\ndialog and of a drawer line up on the same left edge and the rules between\nthem run the full width of the surface rather than being inset by whatever\neach section chose.",
+      "documentation": "The band a modal surface's title, body, or actions sit in.\n\nOne inset for all three, so the title, the body and the buttons of a\ndialog and of a drawer line up on the same left edge. Their own padding and\nplacement separate the bands without drawing full-width seams between\ncontent that already reads in order.",
       "signature": "pub fn band (theme : & Theme) -> Div",
       "cfg": []
     },
@@ -95716,20 +95716,6 @@
       "summary": "The title of a surface, published as its first-level heading.",
       "documentation": "The title of a surface, published as its first-level heading.",
       "signature": "pub fn heading (ident : & Ident, theme : & Theme, title : SharedString, cx : & App,) -> gpui::Stateful<gpui::Div>",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::overlay::panel::seam",
-      "name": "seam",
-      "kind": "function",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "overlay::panel",
-      "path": "gpui_kit::overlay::panel",
-      "source": "crates/gpui-kit/src/overlay/panel.rs",
-      "summary": "The full-bleed line between two bands of a modal surface.",
-      "documentation": "The full-bleed line between two bands of a modal surface.\n\nA dialog and a drawer separate their header, their body and their actions\nthe same way, which is what stops a footer's buttons from reading as\nfloating over the content above them.",
-      "signature": "pub fn seam (theme : & Theme) -> Div",
       "cfg": []
     },
     {

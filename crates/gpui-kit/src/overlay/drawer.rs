@@ -542,7 +542,7 @@ impl Render for Drawer {
                     .children(description),
             )
             .children(close);
-        // The body owns whatever room is left over between the two seams, so
+        // The body owns whatever room is left over between the outer bands, so
         // a panel taller than its content shows the gap as part of the body
         // rather than as a hole opened up above pinned actions.
         let body = body.map(|body| {
@@ -552,16 +552,9 @@ impl Render for Drawer {
                 .overflow_hidden()
                 .child(body)
         });
-        let footer = footer.map(|footer| {
-            div()
-                .column()
-                .flex_none()
-                .child(panel::seam(&theme))
-                .child(panel::band(&theme).child(footer))
-        });
+        let footer = footer.map(|footer| panel::band(&theme).flex_none().child(footer));
         let card = card
             .child(header)
-            .child(panel::seam(&theme))
             .children(body)
             .children(footer)
             .children(handle)

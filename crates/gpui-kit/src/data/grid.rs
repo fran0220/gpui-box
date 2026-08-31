@@ -47,7 +47,8 @@ use gpui::{
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
+    ActiveTheme, ControlSize, Elevation, Radius, SemanticWash, Space, Surface, TextTone, Theme,
+    TypeScale,
 };
 
 use crate::controls::input::{Cancel, Submit, TextInput};
@@ -92,111 +93,24 @@ type RangeHandler = Rc<dyn Fn(&CellRange, &mut Window, &mut App)>;
 type CopyHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RangeCover = (CellRange, usize, RangeMask);
 
-/// Which cells a caller's rectangle covers, and where its boundary runs.
-///
-/// The wash alone cannot say where the rectangle ends: a selected row already
-/// carries one, so a covered cell and an uncovered cell in the same selected
-/// row are the same colour. The boundary is what names the rectangle, and it
-/// needs the first and last row and column rather than a membership test.
+/// Which cells a caller's rectangle covers.
 #[derive(Clone, Default)]
 struct RangeMask {
     rows: HashSet<SharedString>,
     cols: HashSet<SharedString>,
-    first_row: Option<SharedString>,
-    last_row: Option<SharedString>,
-    first_col: Option<SharedString>,
-    last_col: Option<SharedString>,
 }
 
 impl RangeMask {
     fn covers(&self, row: &SharedString, column: &SharedString) -> bool {
         self.rows.contains(row) && self.cols.contains(column)
     }
-
-    fn edges(&self, row: &SharedString, column: &SharedString) -> RangeEdges {
-        RangeEdges {
-            top: self.first_row.as_ref() == Some(row),
-            bottom: self.last_row.as_ref() == Some(row),
-            start: self.first_col.as_ref() == Some(column),
-            end: self.last_col.as_ref() == Some(column),
-        }
-    }
 }
 
-/// Which sides of a covered cell sit on the rectangle's boundary.
-#[derive(Debug, Clone, Copy, Default)]
-struct RangeEdges {
-    top: bool,
-    bottom: bool,
-    start: bool,
-    end: bool,
-}
-
-/// A cell inside the caller's rectangle: the same wash a selected row wears,
-/// and the boundary of the rectangle drawn where this cell is on it.
-///
-/// The boundary is absolutely positioned rather than a border, so a cell that
-/// joins the rectangle does not move its own content by a pixel.
-fn range_cell<E: Styled + ParentElement + FluentBuilder>(
-    element: E,
-    theme: &Theme,
-    edges: RangeEdges,
-    rtl: bool,
-) -> E {
-    let line = px(theme.borders.hairline);
-    let color = theme.colors.accent;
-    let (leading, trailing) = if rtl {
-        (edges.end, edges.start)
-    } else {
-        (edges.start, edges.end)
-    };
-    element
-        .relative()
-        .bg(theme.colors.selected)
-        .when(edges.top, |element| {
-            element.child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .right_0()
-                    .h(line)
-                    .bg(color),
-            )
-        })
-        .when(edges.bottom, |element| {
-            element.child(
-                div()
-                    .absolute()
-                    .bottom_0()
-                    .left_0()
-                    .right_0()
-                    .h(line)
-                    .bg(color),
-            )
-        })
-        .when(leading, |element| {
-            element.child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .left_0()
-                    .w(line)
-                    .bg(color),
-            )
-        })
-        .when(trailing, |element| {
-            element.child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .right_0()
-                    .w(line)
-                    .bg(color),
-            )
-        })
+/// A cell range is a stronger accent wash than row selection. The distinct
+/// material answers where the rectangle ends even when it crosses a selected
+/// row, without drawing a second boundary language around the cells.
+fn range_cell<E: Styled>(element: E, theme: &Theme) -> E {
+    element.bg(theme.color_wash(theme.colors.accent, SemanticWash::Strong))
 }
 
 /// A caller-owned rectangle of cells, named by row and column identity.
@@ -2790,14 +2704,12 @@ fn cell_element(
     }
 
     let in_range = context.range.covers(&row.id, &column.key);
-    let edges = context.range.edges(&row.id, &column.key);
-    let rtl = cx.layout_direction().is_rtl();
     let ranged = context.on_range_change.is_some() && !context.disabled && !row.disabled;
 
     if !published && !ranged {
         return column_frame(div(), column, theme)
             .overflow_hidden()
-            .when(in_range, |element| range_cell(element, theme, edges, rtl))
+            .when(in_range, |element| range_cell(element, theme))
             .children(content)
             .into_any_element();
     }
@@ -2821,7 +2733,7 @@ fn cell_element(
 
     let mut frame = column_frame(div().id(cell_ident.element_id()), column, theme)
         .overflow_hidden()
-        .when(in_range, |element| range_cell(element, theme, edges, rtl))
+        .when(in_range, |element| range_cell(element, theme))
         .children(content);
 
     if let (true, Some(request)) = (editable, context.on_edit_request.clone()) {
@@ -3463,8 +3375,6 @@ fn resolve_range(
     let mut mask = RangeMask::default();
     if let (Some(first), Some(last)) = (start_i, end_i) {
         let span = &ids[first.min(last)..=first.max(last)];
-        mask.first_row = span.first().cloned();
-        mask.last_row = span.last().cloned();
         mask.rows = span.iter().cloned().collect();
     }
     let start_c = columns
@@ -3475,8 +3385,6 @@ fn resolve_range(
         .position(|column| column.key() == &range.end_column);
     if let (Some(first), Some(last)) = (start_c, end_c) {
         let span = &columns[first.min(last)..=first.max(last)];
-        mask.first_col = span.first().map(|column| column.key().clone());
-        mask.last_col = span.last().map(|column| column.key().clone());
         mask.cols = span.iter().map(|column| column.key().clone()).collect();
     }
     *state.range_cover.borrow_mut() = Some((range.clone(), count, mask.clone()));

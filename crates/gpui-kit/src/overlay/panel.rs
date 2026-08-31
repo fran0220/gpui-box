@@ -10,7 +10,7 @@ use gpui::{AnyElement, App, Div, ParentElement, SharedString, Styled, Window, di
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{Space, Theme};
 
-use crate::foundation::{Ident, StyledExt, rule};
+use crate::foundation::{Ident, StyledExt};
 
 /// Builds a surface body for one frame.
 ///
@@ -21,24 +21,15 @@ pub type Body = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 /// The band a modal surface's title, body, or actions sit in.
 ///
 /// One inset for all three, so the title, the body and the buttons of a
-/// dialog and of a drawer line up on the same left edge and the rules between
-/// them run the full width of the surface rather than being inset by whatever
-/// each section chose.
+/// dialog and of a drawer line up on the same left edge. Their own padding and
+/// placement separate the bands without drawing full-width seams between
+/// content that already reads in order.
 pub fn band(theme: &Theme) -> Div {
     div()
         .column()
         .px_token(theme, Space::Lg)
         .py_token(theme, Space::Md)
         .gap_token(theme, Space::Xs)
-}
-
-/// The full-bleed line between two bands of a modal surface.
-///
-/// A dialog and a drawer separate their header, their body and their actions
-/// the same way, which is what stops a footer's buttons from reading as
-/// floating over the content above them.
-pub fn seam(theme: &Theme) -> Div {
-    div().flex_none().child(rule(theme))
 }
 
 /// The title of a surface, published as its first-level heading.

@@ -98,7 +98,6 @@ fn pane(theme: &Theme, title: &'static str, rows: &'static [&'static str]) -> gp
                         .text_tone(theme, TextTone::Muted),
                 ),
         )
-        .child(crate::foundation::rule(theme))
         .child(
             div()
                 .column()

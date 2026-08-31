@@ -357,16 +357,10 @@ impl Render for Dialog {
         }
         let header = panel::band(&theme).children(heading).children(description);
         let body = body.map(|body| panel::band(&theme).child(body));
-        // The actions sit in their own band under a seam. A question and the
-        // answer to it are two things, and without the line the buttons read
-        // as floating on the same plane as the copy that asked.
-        let footer = actions.map(|actions| {
-            div()
-                .column()
-                .flex_none()
-                .child(panel::seam(&theme))
-                .child(panel::band(&theme).child(actions))
-        });
+        // The actions sit in their own padded band. Placement and breathing
+        // room distinguish the answer from the copy that asked without a
+        // full-width seam across the modal.
+        let footer = actions.map(|actions| panel::band(&theme).flex_none().child(actions));
         let card = card.child(header).children(body).children(footer);
         // The arrival wraps the card inside the element that publishes the
         // node, so the dialog is announced from its settled box and only the
