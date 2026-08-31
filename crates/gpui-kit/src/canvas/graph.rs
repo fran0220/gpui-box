@@ -2433,7 +2433,6 @@ impl RenderOnce for NodeGraph {
                     .top(px(at.y - diameter / 2.0))
                     .w(px(diameter))
                     .h(px(diameter))
-                    .relative()
                     .flex()
                     .items_center()
                     .justify_center()
