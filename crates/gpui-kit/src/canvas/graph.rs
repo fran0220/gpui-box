@@ -16,7 +16,8 @@ use std::{
 use gpui::{
     AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Pixels, Point, RenderOnce, ScrollDelta, SharedString, StatefulInteractiveElement, Styled,
-    Window, canvas, div, point, prelude::FluentBuilder, px, relative, size,
+    Window, canvas, div, linear_color_stop, linear_gradient_stops, point, prelude::FluentBuilder,
+    px, relative, size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -1394,7 +1395,10 @@ impl RenderOnce for NodeGraph {
             .size_full()
             .overflow_hidden()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
-            .surface(&theme, Surface::Canvas);
+            // The graph is the floor beneath window chrome, not another pane
+            // on the same plane. Sunken is the existing half-step down in the
+            // surface scale; top light below gives it depth without a vignette.
+            .surface(&theme, Surface::Sunken);
 
         // Route hover is visual transient state and exists even on an inspect-
         // only graph. The pointer is recorded here and resolved against the
@@ -1944,20 +1948,34 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let painted_preview = preview.clone();
+        let ground_light = linear_gradient_stops(
+            180.0,
+            [
+                linear_color_stop(
+                    theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
+                    0.0,
+                ),
+                linear_color_stop(gpui::transparent_black(), 0.38),
+                linear_color_stop(gpui::transparent_black(), 1.0),
+            ],
+        );
 
         // The ground the canvas stands on, under everything the caller put
-        // there. Painted rather than laid out, so it never intercepts a click
-        // meant for a card and adding it moves nothing.
-        let ground = canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
-                if draw_grid {
-                    paint_grid(window, bounds, viewport, grid_paint);
-                }
-            },
-        )
-        .absolute()
-        .inset_0();
+        // there. The only lighting is a top-origin material cast: no corner or
+        // edge is darkened, because that would imply depth the graph does not
+        // contain. The grid remains a painted child and intercepts nothing.
+        let ground = div().absolute().inset_0().bg(ground_light).child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    if draw_grid {
+                        paint_grid(window, bounds, viewport, grid_paint);
+                    }
+                },
+            )
+            .absolute()
+            .inset_0(),
+        );
 
         // Edges are their own painted layer above the regions and below the
         // cards: a connection crosses a region it does not belong to, and a
