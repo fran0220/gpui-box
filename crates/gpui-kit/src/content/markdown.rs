@@ -432,7 +432,27 @@ impl Painter {
         let Some(veil) = &self.veil else {
             return Vec::new();
         };
-        veil.borrow().spans(index, self.now)
+        // A span is recorded at the end of one frame and read by the next, so
+        // it describes the text as that frame drew it. A document that
+        // reflowed in between — a link resolved, a code span closed, a block
+        // split — leaves run `index` holding a different string, and the
+        // recorded byte range then belongs to nothing on screen.
+        //
+        // Applying it anyway aborts the process: `StyledText::with_highlights`
+        // asserts that both ends land on a character boundary, and an offset
+        // taken from one string lands mid-character in another as soon as the
+        // text is not ASCII. A Chinese transcript hits it almost immediately,
+        // where an English one runs for a long time before an end offset
+        // happens to overrun.
+        //
+        // The veil is a fade. A fade whose range no longer describes the text
+        // is not drawn, because the alternative is a renderer that stops the
+        // application to insist on decorating it.
+        veil.borrow()
+            .spans(index, self.now)
+            .into_iter()
+            .filter(|(range, _)| fits(text, range))
+            .collect()
     }
 
     /// An identity derived from what a part *is*, never from where it sits.
@@ -1300,6 +1320,23 @@ fn run(
         .into_any_element()
 }
 
+/// Whether a byte range still names a slice of `text`.
+///
+/// A highlight range that does not is not a cosmetic problem: `StyledText`
+/// asserts both ends are on a character boundary, so handing it a stale offset
+/// aborts the process. Both ends have to be checked and so does the length,
+/// because `is_char_boundary` is false for an index past the end as well as
+/// for one inside a character.
+///
+/// This is the same guard [`code_highlights`](crate::content::code_view) has
+/// always applied to syntax spans. The veil is the one place that trusted an
+/// offset it did not compute against the string in front of it.
+fn fits(text: &str, range: &Range<usize>) -> bool {
+    range.end <= text.len()
+        && text.is_char_boundary(range.start)
+        && text.is_char_boundary(range.end)
+}
+
 /// Turns opacities into the colours that express them.
 ///
 /// A fade is applied by naming the run's own colour at a lower alpha, so it
@@ -1394,5 +1431,34 @@ mod tests {
             panic!("expected a paragraph");
         };
         assert_eq!(flatten(inlines).as_ref(), "bold and code and a link");
+    }
+
+    /// The crash this guard exists for: a span recorded against one frame's
+    /// text, read by the next after the document reflowed. `跟随镜` is nine
+    /// bytes, so an offset taken from it lands inside a character of anything
+    /// shorter — and `StyledText::with_highlights` aborts rather than skips.
+    ///
+    /// An English transcript survives this for a long time because every byte
+    /// of ASCII is a boundary; a Chinese one hits it on the first reflow.
+    #[test]
+    fn a_span_from_a_frame_that_reflowed_is_not_applied_to_the_new_text() {
+        let settled = "跟随镜头 · src/camera/follow.ts";
+        let recorded = 0..9;
+        assert!(fits(settled, &recorded), "a live range still applies");
+
+        // The run now holds something shorter: the range overruns it.
+        assert!(!fits("·", &recorded));
+        // And something the same length in characters but not in bytes.
+        assert!(!fits("abc", &recorded));
+
+        // Mid-character is the case ASCII never produces. Byte 1 is inside
+        // `跟`, and asking StyledText to start a highlight there aborts.
+        assert!(!fits(settled, &(1..9)));
+        assert!(!fits(settled, &(0..4)));
+
+        // The boundaries either side of one CJK character are fine.
+        assert!(fits(settled, &(3..6)));
+        // An empty range at the very end is a boundary, and harmless.
+        assert!(fits(settled, &(settled.len()..settled.len())));
     }
 }
