@@ -353,7 +353,9 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .padding(Space::Lg)
                         .selected(true)
                         .header(CardHeader::new("Selected").subtitle("A stronger material wash"))
-                        .child(caption("Fill carries selection without moving the content.")),
+                        .child(caption(
+                            "Fill carries selection without moving the content.",
+                        )),
                 ))
                 .child(column(
                     Card::new()
