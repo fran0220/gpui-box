@@ -59,11 +59,11 @@ use std::time::Duration;
 use gpui::{
     App, AppContext, Bounds, Context, Element, ElementId, GlobalElementId, InspectorElementId,
     InteractiveElement, IntoElement, LayoutId, ParentElement, Pixels, Point, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, SemanticWash, Space, Surface};
 use web_time::Instant;
 
 use crate::display::icon::Icon as IconView;
@@ -789,9 +789,8 @@ fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gp
 
     // What is in the hand is a thing lifted off the surface, so it says so
     // the way every other lifted surface in this library does: an overlay
-    // colour and an overlay shadow. A refusal is the one case that draws a
-    // line, because refusal is exactly what a line is reserved for here, and
-    // it is the danger colour so it cannot be read as ordinary chrome.
+    // colour and an overlay shadow. A refusal adds a danger wash and halo,
+    // which carries the refusal without putting a hard frame around the item.
     let ghost = div()
         .row()
         .flex_none()
@@ -799,11 +798,10 @@ fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gp
         .px_token(&theme, Space::Sm)
         .py_token(&theme, Space::Xs)
         .frame(&theme, Surface::Overlay, Elevation::Overlay)
-        .border(px(theme.borders.hairline))
-        .border_color(if refused {
-            theme.colors.danger
-        } else {
-            gpui::transparent_black()
+        .when(refused, |ghost| {
+            ghost
+                .bg(theme.color_wash(theme.colors.danger, SemanticWash::Faint))
+                .shadow(theme.glow(theme.colors.danger))
         })
         .radius(&theme, Radius::Control)
         .text_color(theme.colors.text)

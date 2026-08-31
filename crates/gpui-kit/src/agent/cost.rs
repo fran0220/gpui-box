@@ -41,7 +41,7 @@ use gpui::{
     prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, Surface, TextTone, TypeScale};
 
 use crate::display::badge::{Badge, Tone};
 use crate::foundation::{CardVariant, Ident, StyledExt, text};
@@ -537,16 +537,14 @@ impl RenderOnce for ContextGauge {
                     ),
             )
             // A reading with no ceiling and a reading nobody has are not the
-            // same absence, so they are not the same shape: the first keeps
-            // its groove and shows nothing in it, the second has no groove to
-            // fill and is drawn as the outline of one.
+            // same absence. The unavailable reading gets a quiet sunken seat;
+            // the known-but-unbounded reading keeps its empty groove.
             .child(if unavailable {
                 div()
                     .w_full()
                     .h(px(GAUGE_HEIGHT))
                     .rounded_full()
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline_strong)
+                    .surface(&theme, Surface::Sunken)
             } else {
                 div()
                     .relative()

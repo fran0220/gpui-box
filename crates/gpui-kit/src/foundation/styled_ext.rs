@@ -186,13 +186,10 @@ pub trait StyledExt: Styled + Sized {
     ///
     /// A field is a well rather than an outlined box, so the resting state of
     /// every editable control in the library is a colour and nothing else.
-    /// The border it still carries is transparent and exists only to hold the
-    /// space that an invalid state will colour, so becoming invalid never
-    /// reflows the row the field is in.
+    /// Focus and invalidity are paint-only halos, so neither state needs a
+    /// transparent border to reserve geometry.
     fn well(self, theme: &Theme) -> Self {
         self.surface(theme, Surface::Sunken)
-            .border(px(theme.borders.hairline))
-            .border_color(gpui::transparent_black())
     }
 
     /// The colour a surface in a named state bleeds into the pixels around it.
@@ -212,19 +209,28 @@ pub trait StyledExt: Styled + Sized {
 
 impl<T: Styled + Sized> StyledExt for T {}
 
-/// The one line this library draws between two pieces of content.
+/// The soft, inset line this library draws between two pieces of content.
 ///
 /// A rule divides content that shares a surface; it is not an outline around
 /// the surface, which is what a colour step and an elevation are for. It is a
-/// child element rather than a border so it can be inset from the edges of
-/// what holds it, and so a component that already spends its border on focus
-/// or invalidity can still draw one.
+/// child element rather than a border so it stops short of both edges. The
+/// low-alpha rounded stroke carries the grouping without becoming a hard rule
+/// across the whole plane.
 pub fn rule(theme: &Theme) -> Div {
     div()
         .w_full()
-        .h(px(theme.borders.hairline))
         .flex_none()
-        .bg(theme.colors.divider)
+        .px_token(theme, Space::Sm)
+        .py_token(theme, Space::Xs)
+        .child(inset_rule(theme).w_full())
+}
+
+/// The stroke used by data rows that explicitly opt into alignment rules.
+pub(crate) fn inset_rule(theme: &Theme) -> Div {
+    div()
+        .h(px(theme.borders.hairline))
+        .rounded_full()
+        .bg(theme.colors.divider.opacity(theme.opacity.muted))
 }
 
 /// The one selected treatment shared by rows, tabs, tiles, and controls.

@@ -268,24 +268,6 @@ impl Render for KeybindingRecorder {
         let conflicted = self.conflict.is_some();
         let actionable = !self.disabled;
 
-        // Every state is the same opaque well and differs only in the line
-        // around it. A translucent fill let the focus ring — a hard shadow
-        // drawn behind the element — come through the field, which turned a
-        // recorder into a solid accent slab with accent words on it.
-        let border = if recording {
-            theme.colors.accent
-        } else if conflicted {
-            theme.colors.danger
-        } else {
-            // Every state of the recorder is drawn as a line around the same
-            // well, so the resting state needs a line a reader can actually
-            // see: at the field hairline, a bound recorder beside a
-            // conflicted one looked like a chip lying on the panel next to a
-            // field, which is two different controls rather than one in two
-            // states.
-            theme.colors.hairline_strong
-        };
-
         // Recording has to be unmistakable: a recorder that looks like a text
         // field invites someone to type into it and lose whatever they typed.
         let body = if recording {
@@ -356,13 +338,17 @@ impl Render for KeybindingRecorder {
             // it, so the four states of one control did not line up.
             .justify_center()
             .radius(&theme, Radius::Control)
-            .border(px(if recording {
-                theme.borders.thick
-            } else {
-                theme.borders.hairline
-            }))
-            .border_color(border)
             .surface(&theme, gpui_kit_theme::Surface::Sunken)
+            .when(recording, |field| {
+                field
+                    .bg(theme.color_wash(theme.colors.accent, gpui_kit_theme::SemanticWash::Faint))
+                    .shadow(theme.glow(theme.colors.accent))
+            })
+            .when(conflicted, |field| {
+                field
+                    .bg(theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint))
+                    .shadow(theme.glow(theme.colors.danger))
+            })
             .text_size(px(metrics.font_size))
             .text_color(theme.colors.text)
             .when(self.disabled, |element| {
@@ -372,11 +358,10 @@ impl Render for KeybindingRecorder {
                 element
                     .cursor_pointer()
                     .tab_index(0)
-                    .hover(|style| style.border_color(theme.colors.hairline_strong))
+                    .hover(|style| style.bg(theme.colors.hover))
             })
-            // The thick accent line is the recording mark; adding the focus
-            // ring under it is a second ring saying the same thing, and it is
-            // the one that bloomed into the rows above and below.
+            // The accent wash and glow are already the recording mark; adding
+            // a focus halo would repeat the same state and muddy the surface.
             .when(actionable && !recording, |element| {
                 element.focus_ring(&theme)
             })

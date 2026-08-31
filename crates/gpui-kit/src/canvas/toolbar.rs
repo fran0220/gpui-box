@@ -159,7 +159,7 @@ impl RenderOnce for CanvasToolbar {
                 .gap_token(&theme, Space::Sm)
                 .p_token(&theme, Space::Xs)
                 // The zoom is a reading, not a control: it wears the mono figures
-                // and a rule separates it from the three chips beside it, so a
+                // and a larger gap separates it from the chips beside it, so a
                 // reader does not try to press it.
                 .child(
                     div()
@@ -169,15 +169,10 @@ impl RenderOnce for CanvasToolbar {
                         .text_color(theme.colors.text_muted)
                         .child(self.zoom.clone()),
                 )
-                // The rule separates the reading from the controls, so it is
-                // drawn only when there are controls to separate it from.
+                // Air separates the reading from the controls without adding
+                // a decorative vertical stroke to the floating material.
                 .when(!self.actions.is_empty(), |element| {
-                    element.child(
-                        div()
-                            .w(px(theme.borders.hairline))
-                            .h(px(theme.typography.caption.line_height))
-                            .bg(theme.colors.divider),
-                    )
+                    element.child(div().w(px(theme.space(Space::Xs))).flex_none())
                 })
                 .children(self.actions.iter().map(|action| {
                     button(*action, *action == CanvasToolbarAction::Snap && self.snap)

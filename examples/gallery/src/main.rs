@@ -138,9 +138,8 @@ impl Gallery {
             ))
             .child(
                 div()
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
                     .rounded(px(theme.radii.card))
+                    .bg(theme.colors.panel)
                     .overflow_hidden()
                     .child(
                         List::new("gallery.queue", queue.len(), {
@@ -562,8 +561,7 @@ impl Render for Gallery {
                                         div()
                                             .w(px(300.0))
                                             .rounded(px(theme.radii.card))
-                                            .border(px(theme.borders.hairline))
-                                            .border_color(theme.colors.hairline)
+                                            .bg(theme.colors.panel)
                                             .overflow_hidden()
                                             .child(
                                                 List::new(
@@ -870,8 +868,7 @@ impl Render for Gallery {
                         div()
                             .h(px(240.0))
                             .rounded(px(theme.radii.card))
-                            .border(px(theme.borders.hairline))
-                            .border_color(theme.colors.hairline)
+                            .bg(theme.colors.panel)
                             .overflow_hidden()
                             .child(
                                 SplitPane::new("gallery.split")
@@ -1336,8 +1333,6 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
             .w(px(150.0))
             .p(px(theme.spacing.md))
             .rounded(px(theme.radii.card))
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
             .bg(theme.colors.raised)
             .cursor_pointer()
             .hover_lift(cx)
@@ -1992,8 +1987,7 @@ fn open_gallery(
                                 .w(px(360.0))
                                 .p(px(theme.spacing.md))
                                 .rounded(px(theme.radii.card))
-                                .border(px(theme.borders.hairline))
-                                .border_color(theme.colors.hairline)
+                                .bg(theme.colors.panel)
                                 .child("Right-click this fixture row")
                                 .into_any_element()
                         })
@@ -2795,8 +2789,6 @@ fn media_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                                     .items_center()
                                     .justify_center()
                                     .bg(theme.colors.accent.opacity(0.35))
-                                    .border(px(theme.borders.thick))
-                                    .border_color(theme.colors.accent)
                                     .text_color(theme.colors.text)
                                     .child(SharedString::from(format!(
                                         "Fixture image for {}",

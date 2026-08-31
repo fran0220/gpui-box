@@ -75,7 +75,8 @@ use crate::data::viewport::scroll_handle;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
+    inset_rule, text,
 };
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -494,19 +495,23 @@ impl Table {
     }
 
     fn header(&self, theme: &Theme, height: f32, cx: &mut App) -> AnyElement {
-        // The header carries no fill of its own. What separates it from the
-        // body is that its labels are a smaller, dimmer step and a single
-        // rule runs under it — a filled bar across the top of every table is
-        // a second surface the ramp never granted, and it is what made a
-        // six-row table read as a spreadsheet.
+        // The header carries no fill of its own. Its labels are a smaller,
+        // dimmer step, and a low-alpha inset rule keeps the columns aligned
+        // without cutting a hard line across the whole surface.
         let mut header = div()
             .row()
+            .relative()
             .w_full()
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.divider);
+            .child(
+                inset_rule(theme)
+                    .absolute()
+                    .bottom_0()
+                    .left(px(theme.space(Space::Sm)))
+                    .right(px(theme.space(Space::Sm))),
+            );
 
         for column in &self.columns {
             let ident = self.ident.child("header").child(column.key.as_ref());
@@ -609,14 +614,19 @@ impl Body {
         let mut element = div()
             .id(ident.element_id())
             .row()
+            .relative()
             .w_full()
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
             .when(self.lines == GridLines::Rows, |element| {
-                element
-                    .border_b(px(theme.borders.hairline))
-                    .border_color(theme.colors.divider)
+                element.child(
+                    inset_rule(theme)
+                        .absolute()
+                        .bottom_0()
+                        .left(px(theme.space(Space::Sm)))
+                        .right(px(theme.space(Space::Sm))),
+                )
             })
             .selected_fill(theme, selected)
             .when(actionable, |element| {

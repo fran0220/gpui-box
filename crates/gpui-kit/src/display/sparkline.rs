@@ -507,7 +507,8 @@ fn plot(
                 .right_0()
                 .top(relative(MIDLINE))
                 .h(px(theme.borders.hairline))
-                .bg(theme.colors.divider),
+                .rounded_full()
+                .bg(theme.colors.divider.opacity(theme.opacity.muted)),
         )
         .child(
             canvas(

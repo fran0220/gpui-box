@@ -238,8 +238,6 @@ impl RenderOnce for ArtifactPreview {
                     .justify_between()
                     .items_center()
                     .pb(px(theme.spacing.xs))
-                    .border_b(px(theme.borders.hairline))
-                    .border_color(theme.colors.divider)
                     .child(
                         div()
                             .type_scale(&theme, TypeScale::Subtitle)

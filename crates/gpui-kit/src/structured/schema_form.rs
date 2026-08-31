@@ -1889,7 +1889,7 @@ impl SchemaForm {
     /// Tells every control whether the form is showing an error about it.
     ///
     /// The message and the control it is about have to agree. A red sentence
-    /// under a field wearing its ordinary border says the field is fine and
+    /// under a field wearing its ordinary material says the field is fine and
     /// something else is wrong, which is the opposite of what happened. A
     /// number works this out for itself, so it is left alone.
     fn sync_control_validity(&mut self, cx: &mut Context<Self>) {

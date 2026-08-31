@@ -788,7 +788,7 @@ fn run_graph_picture(cx: &App) -> AnyElement {
                         .items_end()
                         .gap_token(&theme, Space::Xs)
                         .border_b(px(theme.borders.hairline))
-                        .border_color(theme.colors.divider)
+                        .border_color(theme.colors.divider.opacity(theme.opacity.muted))
                         .children(bars.into_iter().enumerate().map(|(index, height)| {
                             div()
                                 .flex_1()

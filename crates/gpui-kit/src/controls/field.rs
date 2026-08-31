@@ -4,7 +4,7 @@
 //! control wears. The editable surface itself arrives with `TextInput`.
 
 use gpui::{Styled, div, prelude::FluentBuilder, px};
-use gpui_kit_theme::{ControlSize, Radius, Space, Theme};
+use gpui_kit_theme::{ControlSize, Radius, SemanticWash, Space, Surface, Theme};
 
 use crate::foundation::StyledExt;
 
@@ -67,16 +67,19 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
         .well(theme)
-        // The recess is the whole resting treatment: a theme meeting the
-        // canvas-to-sunken floor has already said where the field is, and a
-        // line added on top of a step that works is the outline this library
-        // spends everywhere else. Invalidity colours the space the well is
-        // already holding, so becoming invalid reflows nothing, and focus
-        // stays the ring every other focusable thing in the library wears.
+        // The recess is the whole resting treatment. Invalidity deepens it
+        // with a danger wash and halo; focus is the shared soft halo resolved
+        // against this exact fill.
         .when(state.invalid, |field| {
-            field.border_color(theme.colors.danger)
+            field
+                .bg(theme
+                    .surface(Surface::Sunken)
+                    .blend(theme.color_wash(theme.colors.danger, SemanticWash::Faint)))
+                .shadow(theme.glow(theme.colors.danger))
         })
-        .when(state.focused, |field| field.shadow(theme.focus_ring()))
+        .when(state.focused && !state.invalid, |field| {
+            field.shadow(theme.focus_ring_on(theme.surface(Surface::Sunken)))
+        })
         .text_size(px(metrics.font_size))
         .font_fallbacks(gpui_kit_assets::text_fallbacks())
         .text_color(if state.disabled {

@@ -287,7 +287,8 @@ fn step_element(
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Md)))
-                    .bg(theme.colors.divider),
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted)),
             )
         });
 

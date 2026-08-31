@@ -365,9 +365,7 @@ fn legend(ramp: gpui::Hsla, theme: &gpui_kit_theme::Theme, cx: &App) -> gpui::An
                 .size(px(CELL))
                 .flex_none()
                 .radius(theme, Radius::Small)
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline_strong)
-                .surface(theme, Surface::Canvas),
+                .surface(theme, Surface::Sunken),
         )
         .child(caption(cx.strings().text(StringKey::HeatmapMissing)))
         .into_any_element()
@@ -508,16 +506,9 @@ fn heat_cell(
         .flex_none()
         .radius(theme, Radius::Small)
         .bg(fill)
-        // An unobserved cell is an outline with nothing in it, and the outline
-        // is the strong hairline rather than the quiet one: against the
-        // lowest step of the ramp a faint edge read as one more shade of the
-        // quantity instead of as the absence of a reading.
-        .when(missing, |element| {
-            element
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline_strong)
-                .surface(theme, Surface::Canvas)
-        });
+        // An unobserved cell recedes to the sunken plane. Against the lowest
+        // ramp step this remains an absence without adding an outline.
+        .when(missing, |element| element.surface(theme, Surface::Sunken));
 
     if let Some(cell) = cell.filter(|cell| !cell.value.is_empty()) {
         square = square.tip(ident.clone(), cell.value.clone());

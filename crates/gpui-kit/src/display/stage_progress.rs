@@ -255,10 +255,11 @@ fn connector(theme: &Theme, reached: bool) -> Div {
         .absolute()
         .left(px((NODE - theme.borders.thick) / 2.0))
         .w(px(theme.borders.thick))
+        .rounded_full()
         .bg(if reached {
-            theme.colors.success
+            theme.colors.success.opacity(theme.opacity.muted)
         } else {
-            theme.colors.divider
+            theme.colors.divider.opacity(theme.opacity.muted)
         })
 }
 
@@ -273,12 +274,13 @@ fn node(theme: &Theme, status: StageStatus, color: Hsla, numeral: SharedString) 
         .flex()
         .items_center()
         .justify_center()
-        .border(px(theme.borders.thick))
-        .border_color(match status {
-            StageStatus::Pending => theme.colors.hairline_strong,
-            _ => color,
-        })
-        .bg(if filled { color } else { theme.colors.panel });
+        .bg(if filled {
+            color
+        } else if status == StageStatus::Active {
+            color.opacity(theme.effects.semantic_wash_strong_alpha)
+        } else {
+            theme.colors.sunken
+        });
     match status.glyph() {
         Some(glyph) => mark.child(paint(
             glyph,

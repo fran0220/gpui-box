@@ -348,8 +348,17 @@ impl Drawer {
             .when(matches!(edge, Edge::Right), |element| element.left_0())
             .when(matches!(edge, Edge::Top), |element| element.bottom_0())
             .when(matches!(edge, Edge::Bottom), |element| element.top_0())
+            .flex()
+            .items_center()
+            .justify_center()
             .cursor_pointer()
-            .bg(theme.colors.hairline)
+            .child(
+                div()
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted))
+                    .when(horizontal, |grip| grip.w(px(2.0)).h(px(36.0)))
+                    .when(!horizontal, |grip| grip.h(px(2.0)).w(px(36.0))),
+            )
             .on_mouse_down(MouseButton::Left, {
                 let drawer = drawer.clone();
                 move |event, _, cx| {

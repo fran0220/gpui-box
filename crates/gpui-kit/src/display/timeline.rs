@@ -252,12 +252,6 @@ impl RenderOnce for Timeline {
                 .text_color(theme.colors.text_faint)
                 .child(div().w(px(theme.measures.timeline_rail_width)).flex_none())
                 .child(group.label.clone())
-                .child(
-                    div()
-                        .flex_1()
-                        .h(px(theme.borders.hairline))
-                        .bg(theme.colors.divider),
-                )
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child(group.id.as_ref()).semantic_id(), Role::Heading)
@@ -317,7 +311,8 @@ fn entry_element(
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Md)))
-                    .bg(theme.colors.divider),
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted)),
             )
         });
 

@@ -57,7 +57,8 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirect
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::window_state;
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
+    inset_rule, text,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -554,7 +555,7 @@ impl EditingCell {
 /// Whether a table or grid draws rules between its rows.
 ///
 /// Both [`crate::data::Table`] and [`DataGrid`] default to
-/// [`GridLines::None`]. Row height, the hover wash and the selection rail
+/// [`GridLines::None`]. Row height, the hover wash and the selection fill
 /// already say where one record ends and the next begins, and a rule per row
 /// on top of that is what turns a six-row summary into a spreadsheet. A
 /// caller with a dense log, where rows are short and the eye has to stay on
@@ -1279,14 +1280,20 @@ impl DataGrid {
         let has_disclosure = !self.hierarchy && self.on_expand.is_some();
         let mut header = div()
             .row()
+            .relative()
             .w_full()
             .h(px(height))
             .flex_none()
             .when(pinned == 0, |header| header.px_token(theme, Space::Sm))
-            // No fill: the header is named by its type step and by the one
-            // rule under it, the same way `Table`'s is.
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.divider)
+            // No fill: type names the header, while one low-alpha inset rule
+            // keeps its columns aligned with the body.
+            .child(
+                inset_rule(theme)
+                    .absolute()
+                    .bottom_0()
+                    .left(px(theme.space(Space::Sm)))
+                    .right(px(theme.space(Space::Sm))),
+            )
             .row_reading(direction);
 
         if pinned == 0 {
@@ -1507,12 +1514,18 @@ impl DataGrid {
         let mut row = div()
             .id(ident.element_id())
             .row()
+            .relative()
             .w_full()
             .h(px(height))
             .flex_none()
             .when(pinned == 0, |row| row.px_token(theme, Space::Sm))
-            .border_t(px(theme.borders.hairline))
-            .border_color(theme.colors.divider)
+            .child(
+                inset_rule(theme)
+                    .absolute()
+                    .top_0()
+                    .left(px(theme.space(Space::Sm)))
+                    .right(px(theme.space(Space::Sm))),
+            )
             .row_reading(direction);
         // A row of bare numbers under a table says nothing about what they
         // are, so the first column the caller left empty carries the name of
@@ -1626,13 +1639,11 @@ impl DataGrid {
             .justify_center()
             .flex_none()
             .radius(theme, Radius::Small)
-            .border(px(theme.borders.hairline))
-            .border_color(if all || mixed {
+            .bg(if all || mixed {
                 theme.colors.accent
             } else {
-                theme.colors.hairline_strong
+                theme.colors.sunken
             })
-            .when(all || mixed, |element| element.bg(theme.colors.accent))
             .when(all, |element| {
                 element.child(
                     icon(Icon::Check)
@@ -1904,9 +1915,12 @@ impl DataGrid {
                 // the pointer is on the handle and says what can be grabbed.
                 div()
                     .w(px(theme.borders.hairline))
-                    .h_full()
+                    .h(px(height * 0.5))
+                    .rounded_full()
                     .bg(gpui::transparent_black())
-                    .group_hover(hover_group, |style| style.bg(theme.colors.hairline_strong)),
+                    .group_hover(hover_group, |style| {
+                        style.bg(theme.colors.text_muted.opacity(theme.opacity.muted))
+                    }),
             )
             .hover(|style| style.bg(theme.colors.hover));
 
@@ -2383,9 +2397,13 @@ fn row_element(
         .h(px(height))
         .when(pinned == 0, |element| element.px_token(theme, Space::Sm))
         .when(context.lines == GridLines::Rows, |element| {
-            element
-                .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.divider)
+            element.child(
+                inset_rule(theme)
+                    .absolute()
+                    .bottom_0()
+                    .left(px(theme.space(Space::Sm)))
+                    .right(px(theme.space(Space::Sm))),
+            )
         })
         .when(pinned == 0, |element| {
             element.selected_fill(theme, selected)
@@ -2633,11 +2651,10 @@ fn row_mark(theme: &Theme, selected: bool) -> gpui::Div {
             .justify_center()
             .flex_none()
             .radius(theme, Radius::Small)
-            .border(px(theme.borders.hairline))
-            .border_color(if selected {
+            .bg(if selected {
                 theme.colors.accent
             } else {
-                theme.colors.hairline_strong
+                theme.colors.sunken
             })
             .when(selected, |element| {
                 element.bg(theme.colors.accent).child(
@@ -2906,8 +2923,7 @@ fn editor_cell(
         .px(px(theme.space(Space::Xs)))
         .radius(theme, Radius::Control)
         .well(theme)
-        .border_color(theme.colors.focus)
-        .shadow(theme.focus_ring())
+        .shadow(theme.focus_ring_on(theme.surface(Surface::Sunken)))
         .child(field);
     let frame = column_frame(div(), column, theme)
         .items_center()

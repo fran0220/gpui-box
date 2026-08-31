@@ -286,11 +286,6 @@ impl RenderOnce for InlineEdit {
                 .gap_token(&theme, Space::Sm)
                 .min_h(px(metrics.height))
                 .px(px(theme.space(Space::Xs)))
-                // The same transparent hairline the well carries, so the words
-                // sit on the exact left edge the field's words will sit on and
-                // the column does not step sideways when an edit opens.
-                .border(px(theme.borders.hairline))
-                .border_color(gpui::transparent_black())
                 .radius(&theme, Radius::Control)
                 // A value nobody on this machine can change is still a value in
                 // a field. Dropping the recess leaves it indistinguishable from
@@ -433,9 +428,16 @@ impl RenderOnce for InlineEdit {
                 // same field.
                 .map(|element| match self.failure.is_some() {
                     true => element
-                        .border_color(theme.colors.danger)
+                        .bg(theme.surface(gpui_kit_theme::Surface::Sunken).blend(
+                            theme.color_wash(
+                                theme.colors.danger,
+                                gpui_kit_theme::SemanticWash::Faint,
+                            ),
+                        ))
                         .glow(&theme, theme.colors.danger),
-                    false => element.shadow(theme.focus_ring()),
+                    false => element.shadow(
+                        theme.focus_ring_on(theme.surface(gpui_kit_theme::Surface::Sunken)),
+                    ),
                 })
                 .text_size(px(metrics.font_size))
                 .child(field),

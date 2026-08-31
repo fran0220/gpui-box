@@ -222,20 +222,28 @@ impl RenderOnce for Dropzone {
             .justify_center()
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Lg)
-            .border(px(theme.borders.thick))
-            .border_color(border)
-            // A solid ring is what a disabled field wears. A drop target is
-            // an opening, and the dashes are how every platform says so.
+            .border(px(theme.borders.hairline))
+            .border_color(border.opacity(theme.effects.semantic_wash_strong_alpha))
+            // A drop target is an opening, and the quiet dashes are the
+            // functional affordance every platform uses for that opening.
             .when(state == DropzoneState::Idle, |element| {
                 element.border_dashed()
             })
             .radius(&theme, Radius::Card)
             .when(state == DropzoneState::Accepting, |element| {
-                element.bg(theme
-                    .colors
-                    .accent
-                    .opacity(theme.effects.semantic_wash_alpha))
+                element
+                    .bg(theme.color_wash(theme.colors.accent, gpui_kit_theme::SemanticWash::Faint))
+                    .shadow(theme.glow(theme.colors.accent))
             })
+            .when(
+                state == DropzoneState::Refusing || self.invalid,
+                |element| {
+                    element
+                        .bg(theme
+                            .color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint))
+                        .shadow(theme.glow(theme.colors.danger))
+                },
+            )
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

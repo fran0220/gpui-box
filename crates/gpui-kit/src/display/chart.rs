@@ -1375,7 +1375,8 @@ fn value_rule(fraction: f32, height: f32, theme: &gpui_kit_theme::Theme) -> gpui
         .right_0()
         .top(px(top))
         .h(px(weight))
-        .bg(theme.colors.hairline)
+        .rounded_full()
+        .bg(theme.colors.hairline.opacity(theme.opacity.muted))
 }
 
 fn axis_offset(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> f32 {

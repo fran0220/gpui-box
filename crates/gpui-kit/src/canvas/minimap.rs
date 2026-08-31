@@ -136,11 +136,6 @@ impl RenderOnce for Minimap {
                     .h(relative(mark.height.clamp(0.04, 1.0)))
                     .radius(&theme, Radius::Small)
                     .bg(colors.map_or(theme.colors.loader_placeholder, |colors| colors.background))
-                    .when_some(colors, |element, colors| {
-                        element
-                            .border(px(theme.borders.hairline))
-                            .border_color(colors.text)
-                    })
                     .semantic_in(
                         cx,
                         NodeSpec::new(
@@ -198,8 +193,8 @@ impl RenderOnce for Minimap {
                         .w(relative(width))
                         .h(relative(height))
                         .radius(&theme, Radius::Small)
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.accent),
+                        .bg(theme
+                            .color_wash(theme.colors.accent, gpui_kit_theme::SemanticWash::Faint)),
                 )
         });
         let measured = measure::cell(&self.ident.semantic_id(), window, cx);

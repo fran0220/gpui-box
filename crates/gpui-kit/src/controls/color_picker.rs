@@ -12,7 +12,7 @@ use gpui::{
     linear_color_stop, linear_gradient_stops, prelude::FluentBuilder as _, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, TypeScale};
 
 use crate::foundation::{CardVariant, Disableable, FocusRing, Ident, StyledExt};
 use crate::layout::measure;
@@ -81,15 +81,8 @@ impl RenderOnce for ColorSwatch {
             .flex_none()
             .radius(&theme, Radius::Small)
             .bg(self.color)
-            .border(px(if self.selected {
-                theme.borders.thick
-            } else {
-                theme.borders.hairline
-            }))
-            .border_color(if self.selected {
-                theme.colors.accent_strong
-            } else {
-                theme.colors.hairline_strong
+            .when(self.selected, |chip| {
+                chip.shadow(theme.glow(theme.colors.accent))
             })
             .opacity(if self.disabled {
                 theme.opacity.disabled
@@ -301,9 +294,7 @@ impl RenderOnce for ColorPicker {
                             .size(px(28.0))
                             .flex_none()
                             .radius(&theme, Radius::Small)
-                            .bg(self.value)
-                            .border(px(theme.borders.hairline))
-                            .border_color(theme.colors.hairline_strong),
+                            .bg(self.value),
                     )
                     .child(
                         div()
@@ -379,8 +370,6 @@ fn saturation_board(
         // rectangle among rounded ones.
         .radius(&theme, Radius::Control)
         .overflow_hidden()
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline_strong)
         .cursor(CursorStyle::Crosshair)
         .bg(hsv_to_hsla(hue, 1.0, 1.0, 1.0))
         .child(div().absolute().inset_0().bg(linear_gradient_stops(
@@ -406,9 +395,10 @@ fn saturation_board(
                 .mt(px(-SATURATION_HANDLE / 2.0))
                 .size(px(SATURATION_HANDLE))
                 .rounded_full()
-                .border(px(theme.borders.thick))
-                .border_color(theme.colors.text_on_accent)
-                .bg(value),
+                .bg(theme.colors.raised)
+                .elevation(&theme, Elevation::Raised)
+                .p(px(theme.borders.thick))
+                .child(div().size_full().rounded_full().bg(value)),
         );
 
     if let Some(handler) = report {
@@ -520,16 +510,13 @@ fn channel_track(
         // The clipped part is the gradient, not the handle. Rounding the
         // whole thing cut the handle to a half-circle whenever the value sat
         // at either end of the run. A run of colour is a track, so it is
-        // rounded to its own height and carries the same line every other
-        // track in the library carries.
+        // rounded to its own height. Its own colour supplies the boundary.
         .child(
             div()
                 .absolute()
                 .inset_0()
                 .rounded(px(TRACK_HEIGHT / 2.0))
                 .overflow_hidden()
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline_strong)
                 .when(transparency, |element| {
                     element.children(checkerboard(theme))
                 })
@@ -555,8 +542,7 @@ fn channel_track(
                         .size(px(THUMB))
                         .rounded_full()
                         .bg(theme.colors.raised)
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline_strong),
+                        .elevation(theme, Elevation::Raised),
                 ),
         );
 

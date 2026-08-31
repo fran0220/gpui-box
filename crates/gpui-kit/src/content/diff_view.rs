@@ -1380,7 +1380,8 @@ fn split_line(
             div()
                 .flex_none()
                 .w(px(theme.borders.hairline))
-                .bg(theme.colors.divider),
+                .rounded_full()
+                .bg(theme.colors.divider.opacity(theme.opacity.muted)),
         )
         .child(code_side(id, "new", new, order * 2 + 1, theme, fit, cx))
         .into_any_element()

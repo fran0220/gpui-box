@@ -455,7 +455,7 @@ pub(crate) fn indent_guides(
                 .flex_none()
                 .row_reading(direction)
                 .border_s(direction, px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
+                .border_color(theme.colors.hairline.opacity(theme.opacity.muted))
         })
         .collect()
 }
@@ -991,7 +991,8 @@ impl Rows {
                             .bg(color.opacity(theme.effects.semantic_wash_alpha))
                             .border(px(theme.borders.hairline))
                             .border_dashed()
-                            .border_color(color)
+                            .border_color(color.opacity(theme.effects.semantic_wash_strong_alpha))
+                            .shadow(theme.glow(color))
                     }
                     position => dnd::indicator(&position, accepted, DropAxis::Vertical, cx),
                 }

@@ -251,8 +251,6 @@ fn ready_body(ident: &Ident, summary: &FrameTimingSummary, expanded: bool, cx: &
             .w_full()
             .gap_token(&theme, Space::Xs)
             .pt(px(theme.space(Space::Xs)))
-            .border_t_1()
-            .border_color(theme.colors.divider)
             .child(stat(
                 ident.child("p95-draw"),
                 &parent,

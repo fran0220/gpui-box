@@ -282,7 +282,8 @@ impl RenderOnce for SplitPane {
                     .justify_center()
                     .child(
                         div()
-                            .bg(theme.colors.divider)
+                            .rounded_full()
+                            .bg(theme.colors.divider.opacity(theme.opacity.muted))
                             .when(horizontal, |rule| {
                                 rule.w(px(theme.borders.hairline)).h_full()
                             })
@@ -302,7 +303,7 @@ impl RenderOnce for SplitPane {
                         .child(
                             div()
                                 .rounded_full()
-                                .bg(theme.colors.hairline_strong)
+                                .bg(theme.colors.active)
                                 .group_hover(divider_ident.child("hover").semantic_id(), |style| {
                                     style.bg(theme.colors.accent)
                                 })

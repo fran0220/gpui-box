@@ -293,11 +293,8 @@ impl RenderOnce for Slider {
                 .bottom_0()
                 .w(track_height)
                 .rounded_full()
-                // The groove is a recess, not a drawn line: without the
-                // boundary a 6px bar of `track` on `canvas` is a smudge.
+                // The groove is a tonal recess, not a drawn line.
                 .bg(theme.colors.track)
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
         } else {
             div()
                 .absolute()
@@ -305,11 +302,8 @@ impl RenderOnce for Slider {
                 .right_0()
                 .h(track_height)
                 .rounded_full()
-                // The groove is a recess, not a drawn line: without the
-                // boundary a 6px bar of `track` on `canvas` is a smudge.
+                // The groove is a tonal recess, not a drawn line.
                 .bg(theme.colors.track)
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
         };
         let fill = if let Some(high) = physical_high {
             let start = physical_fraction.min(high);
@@ -643,8 +637,7 @@ fn knob_at(
         } else {
             theme.colors.text
         })
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline_strong);
+        .shadow(theme.glow(theme.colors.text));
     if vertical {
         knob_view = knob_view
             .top(gpui::relative(fraction))

@@ -1705,9 +1705,20 @@ impl Render for RichTextEditor {
                     .radius(&theme, Radius::Control)
                     .well(&theme)
                     .when(self.invalid, |element| {
-                        element.border_color(theme.colors.danger)
+                        element
+                            .bg(theme.surface(gpui_kit_theme::Surface::Sunken).blend(
+                                theme.color_wash(
+                                    theme.colors.danger,
+                                    gpui_kit_theme::SemanticWash::Faint,
+                                ),
+                            ))
+                            .glow(&theme, theme.colors.danger)
                     })
-                    .when(focused, |element| element.shadow(theme.focus_ring()))
+                    .when(focused && !self.invalid, |element| {
+                        element.shadow(
+                            theme.focus_ring_on(theme.surface(gpui_kit_theme::Surface::Sunken)),
+                        )
+                    })
             })
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_color(if self.disabled {

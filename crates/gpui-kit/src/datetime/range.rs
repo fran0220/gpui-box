@@ -331,9 +331,9 @@ impl Render for RangePicker {
         let blocked = self.blocked();
         let calendar = if self.invalid {
             div()
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.danger)
                 .radius(&theme, Radius::Card)
+                .bg(theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint))
+                .shadow(theme.glow(theme.colors.danger))
                 .child(self.calendar.clone())
                 .into_any_element()
         } else {

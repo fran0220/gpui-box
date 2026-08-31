@@ -374,7 +374,7 @@ pub fn menu_heading_height(theme: &Theme) -> f32 {
 
 /// How tall a separator is, including its air.
 pub fn menu_separator_height(theme: &Theme) -> f32 {
-    theme.borders.hairline + 2.0 * theme.space(Space::Xs)
+    theme.space(Space::Sm)
 }
 
 /// One row of a menu-like surface, with the shared height, hover wash, and
@@ -451,16 +451,12 @@ pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
         )
 }
 
-/// The rule between two groups of menu rows.
+/// The air between two groups of menu rows.
 ///
-/// It runs the width of the rows rather than the width of the panel, because
-/// a highlight inset from the panel edge and a rule bleeding past it are two
-/// statements about where the list starts.
+/// The semantic separator remains addressable, but spacing already says that
+/// one run ended and another began; painting a line would say it twice.
 pub fn separator(theme: &Theme) -> gpui::Div {
-    div()
-        .h(px(theme.borders.hairline))
-        .my(px(theme.space(Space::Xs)))
-        .bg(theme.colors.divider)
+    div().h(px(theme.space(Space::Sm))).flex_none()
 }
 
 /// The shortcut cap a menu row carries on its trailing edge.

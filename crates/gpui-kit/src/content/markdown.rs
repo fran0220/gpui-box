@@ -41,8 +41,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, Elevation, Radius, SemanticBorder, SemanticColor, SemanticWash, Space, Surface,
-    SyntaxColor, Theme, TypeScale,
+    ActiveTheme, Elevation, Radius, SemanticColor, SemanticWash, Space, Surface, SyntaxColor,
+    Theme, TypeScale,
 };
 use web_time::Instant;
 
@@ -947,7 +947,7 @@ impl Painter {
                     .w(px(theme.effects.rail_width))
                     .flex_none()
                     .radius(&theme, Radius::Pill)
-                    .bg(theme.colors.hairline_strong),
+                    .bg(theme.colors.hairline_strong.opacity(theme.opacity.muted)),
             )
             .child(
                 div()
@@ -1071,10 +1071,7 @@ impl Painter {
     fn rule(&mut self, cx: &mut App) -> AnyElement {
         let theme = self.theme.clone();
         let ident = self.ident_for("rule", "break");
-        div()
-            .w_full()
-            .h(px(theme.borders.hairline))
-            .bg(theme.colors.divider)
+        crate::foundation::rule(&theme)
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Separator)
@@ -1158,8 +1155,6 @@ impl Painter {
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Small)
-            .border(px(theme.borders.hairline))
-            .border_color(theme.semantic_border(SemanticColor::Warning, SemanticBorder::Report))
             .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Faint))
             .child(
                 div()

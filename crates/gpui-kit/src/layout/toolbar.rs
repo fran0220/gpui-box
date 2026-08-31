@@ -393,7 +393,7 @@ impl RenderOnce for Toolbar {
                         continue;
                     }
                     if previous_group {
-                        drawn.push(rule(&group, &theme, &ident, cx));
+                        drawn.push(group_gap(&group, &theme, &ident, cx));
                     }
                     drawn.push(
                         div()
@@ -477,15 +477,13 @@ impl RenderOnce for Toolbar {
     }
 }
 
-fn rule(group: &Ident, theme: &Theme, toolbar: &Ident, cx: &App) -> AnyElement {
+fn group_gap(group: &Ident, theme: &Theme, toolbar: &Ident, cx: &App) -> AnyElement {
     div()
         .flex_none()
-        .w(px(theme.borders.hairline))
-        .h(px(theme.control.get(ControlSize::Sm).height))
-        .bg(theme.colors.divider)
+        .w(px(theme.space(Space::Xs)))
         .semantic_in(
             cx,
-            NodeSpec::new(group.child("rule").semantic_id(), Role::Separator)
+            NodeSpec::new(group.child("gap").semantic_id(), Role::Separator)
                 .parent(toolbar.semantic_id()),
         )
         .into_any_element()

@@ -154,14 +154,7 @@ impl RenderOnce for Checkbox {
             .flex_none()
             .relative()
             .radius(&theme, Radius::Small)
-            .border(px(theme.borders.hairline))
-            .border_color(
-                theme
-                    .colors
-                    .hairline_strong
-                    .lerp(theme.colors.accent, filled),
-            )
-            .bg(theme.colors.accent.opacity(filled))
+            .bg(theme.colors.sunken.lerp(theme.colors.accent, filled))
             .when(drawn.y > 0.0, |element| {
                 element.child(
                     div()
@@ -324,19 +317,13 @@ impl RenderOnce for Radio {
             .justify_center()
             .flex_none()
             .rounded_full()
-            .border(px(theme.borders.hairline))
-            .border_color(
-                theme
-                    .colors
-                    .hairline_strong
-                    .lerp(theme.colors.accent, drawn),
-            )
+            .bg(theme.colors.sunken.lerp(theme.colors.accent, drawn))
             .when(drawn > 0.0, |element| {
                 element.child(
                     div()
                         .size(side * 0.5 * drawn)
                         .rounded_full()
-                        .bg(theme.colors.accent),
+                        .bg(theme.colors.text_on_accent),
                 )
             });
 
@@ -494,14 +481,9 @@ impl RenderOnce for Switch {
             .items_center()
             .rounded_full()
             .p(px(theme.space(Space::Xxs)))
-            .bg(theme
-                .colors
-                .hairline_strong
-                .lerp(theme.colors.accent, drawn))
+            .bg(theme.colors.active.lerp(theme.colors.accent, drawn))
             .when(self.invalid, |track| {
-                track
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.danger)
+                track.shadow(theme.glow(theme.colors.danger))
             })
             .child(
                 div()

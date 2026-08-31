@@ -5,7 +5,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, SemanticBorder, SemanticWash, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, SemanticWash, Theme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::ActiveNumbers;
@@ -170,25 +170,13 @@ impl RenderOnce for Avatar {
                 .value(self.presence.name())
         });
 
-        let (background, border, foreground) = match (self.tint, anonymous) {
-            (Some(tint), _) => (
-                theme.color_wash(tint, SemanticWash::Strong),
-                theme.color_border(tint, SemanticBorder::Report),
-                tint,
-            ),
+        let (background, foreground) = match (self.tint, anonymous) {
+            (Some(tint), _) => (theme.color_wash(tint, SemanticWash::Strong), tint),
             // Nothing to derive a mark from is its own state, and it is drawn
-            // as one: a recessed well inside a stronger ring, which is what
-            // separates it from a filled disc whose picture failed to arrive.
-            (None, true) => (
-                theme.colors.sunken,
-                theme.colors.hairline_strong,
-                theme.colors.text_faint,
-            ),
-            (None, false) => (
-                theme.colors.raised,
-                theme.colors.hairline,
-                theme.colors.text_muted,
-            ),
+            // as one: a recessed well with a quiet center mark separates it
+            // from a filled disc whose picture failed to arrive.
+            (None, true) => (theme.colors.sunken, theme.colors.text_faint),
+            (None, false) => (theme.colors.raised, theme.colors.text_muted),
         };
 
         let disc = div()
@@ -200,8 +188,6 @@ impl RenderOnce for Avatar {
             .overflow_hidden()
             .rounded_full()
             .bg(background)
-            .border(px(theme.borders.hairline))
-            .border_color(border)
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .when_some(lettering, |element, size| element.text_size(px(size)))
             .text_color(foreground)
@@ -216,13 +202,15 @@ impl RenderOnce for Avatar {
                     div()
                         .size(px((self.size * 0.34).max(8.0)))
                         .rounded_full()
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline_strong),
+                        .bg(theme
+                            .colors
+                            .text_faint
+                            .opacity(theme.effects.semantic_wash_strong_alpha)),
                 )
             });
 
-        // A stack cuts each mark out of the one behind it, so overlapping
-        // never slices a neighbour's edge or its presence dot in half.
+        // A stack seats each mark on the surface behind it, so overlapping
+        // never slices a neighbour's presence dot in half.
         let cut = self.stacked_on.map(|_| theme.borders.thick * 1.5);
         let element = div()
             .relative()
@@ -242,15 +230,18 @@ impl RenderOnce for Avatar {
                     .bottom(px(cut.unwrap_or(0.0)))
                     .size(px(diameter))
                     .rounded_full()
-                    .border(px(theme.borders.thick))
-                    .border_color(theme.colors.canvas)
+                    .bg(theme.colors.canvas)
+                    .p(px(theme.borders.thick))
                     .child(
                         div()
                             .size_full()
                             .rounded_full()
-                            .border(px(theme.borders.thick))
-                            .border_color(color)
-                            .when(filled, |element| element.bg(color)),
+                            .bg(color.opacity(if filled {
+                                1.0
+                            } else {
+                                theme.effects.semantic_wash_strong_alpha
+                            }))
+                            .when(filled, |element| element.shadow(theme.glow(color))),
                     )
             }));
 
@@ -355,8 +346,6 @@ impl RenderOnce for AvatarGroup {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border(px(theme.borders.thick))
-                    .border_color(theme.colors.canvas)
                     .bg(theme.colors.raised)
                     .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.text_muted)

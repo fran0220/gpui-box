@@ -438,8 +438,7 @@ impl Render for Editor {
                 .w(gutter_width)
                 .h(line_height * self.rows as f32)
                 .overflow_hidden()
-                .border_r_1()
-                .border_color(theme.colors.divider)
+                .bg(theme.colors.sunken.opacity(theme.effects.area_wash_alpha))
                 .child(
                     div()
                         .absolute()

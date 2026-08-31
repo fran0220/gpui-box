@@ -547,8 +547,7 @@ impl RenderOnce for TransportBar {
                     .size(px(KNOB))
                     .radius(&theme, Radius::Pill)
                     .bg(theme.colors.text)
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline_strong),
+                    .shadow(theme.glow(theme.colors.text)),
             );
         }
 

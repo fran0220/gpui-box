@@ -621,27 +621,15 @@ impl Cascader {
         {
             columns.push(self.state_column(option, window, cx));
         }
-        // Each level is its own panel with its own rule beside it. Laid out
-        // as bare columns in one box they centred against each other, so a
-        // branch and the list it opened read as two unrelated lists that
-        // happened to be side by side rather than as one column and its
-        // child.
+        // Each level has its own air. The gap keeps parent and child columns
+        // legible without a hard vertical rule through the floating surface.
         let direction = cx.layout_direction();
-        let last = columns.len().saturating_sub(1);
-        let panels = columns.into_iter().enumerate().map(|(index, column)| {
+        let panels = columns.into_iter().map(|column| {
             div()
                 .flex_none()
                 .self_stretch()
                 .column()
                 .p(px(theme.space(Space::Xs)))
-                .when(index != last, |panel| {
-                    panel
-                        .border_color(theme.colors.divider)
-                        .map(|panel| match direction.is_rtl() {
-                            true => panel.border_l(px(theme.borders.hairline)),
-                            false => panel.border_r(px(theme.borders.hairline)),
-                        })
-                })
                 .child(column)
                 .into_any_element()
         });
@@ -649,6 +637,7 @@ impl Cascader {
             .flex()
             .row_reading(direction)
             .items_stretch()
+            .gap_token(&theme, Space::Xs)
             .children(panels)
             .id(self.ident.child("menu").element_id())
             .semantic_in(

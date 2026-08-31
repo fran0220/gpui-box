@@ -31,7 +31,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TextTone, Theme, TypeScale};
@@ -321,7 +321,8 @@ impl RenderOnce for PermissionMatrix {
         let rows: Vec<_> = self
             .subjects
             .iter()
-            .map(|subject| {
+            .enumerate()
+            .map(|(index, subject)| {
                 let row_ident = self.ident.child(subject.id.as_ref());
                 // Cells stretch to the tallest in their row: a provenance
                 // line that wrapped left the row with three different
@@ -333,10 +334,8 @@ impl RenderOnce for PermissionMatrix {
                     .gap_token(&theme, Space::Sm)
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
-                    // Drawn above each row rather than below it, so the last
-                    // row does not leave a rule hanging on the card edge.
-                    .border_t(px(theme.borders.hairline))
-                    .border_color(theme.colors.divider)
+                    .radius(&theme, Radius::Control)
+                    .when(index % 2 == 1, |row| row.surface(&theme, Surface::Sunken))
                     .child(
                         div()
                             .w(px(160.0))
@@ -453,7 +452,6 @@ fn cell(
         .flex_1()
         .min_w_0()
         .p_token(theme, Space::Sm)
-        .surface(theme, Surface::Sunken)
         .radius(theme, Radius::Control);
 
     match handler {
@@ -462,6 +460,7 @@ fn cell(
             let action_key = action.key.clone();
             frame
                 .id(ident.element_id())
+                .surface(theme, Surface::Sunken)
                 .tab_index(0)
                 .cursor_pointer()
                 .hover(|style| style.bg(theme.colors.hover))
@@ -486,10 +485,8 @@ fn cell(
         // rather than as an answer. A wholly read-only matrix drops every
         // box instead, so nothing in it looks pressable.
         None => frame
-            .border_color(if editable_matrix {
-                theme.colors.divider
-            } else {
-                gpui::transparent_black()
+            .when(editable_matrix, |frame| {
+                frame.surface(theme, Surface::Sunken)
             })
             .child(body)
             .semantic_in(cx, spec)

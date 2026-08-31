@@ -21,6 +21,7 @@ pub use direction::{
 pub use ident::Ident;
 pub use interaction::{HoverLift, Pressable};
 pub use slot::{SlotRender, Slots, Slotted};
+pub(crate) use styled_ext::inset_rule;
 pub use styled_ext::{CardVariant, FocusRing, Hoverable, SelectedFill, StyledExt, rule, text};
 pub use theme_overlay::ThemeOverlay;
 

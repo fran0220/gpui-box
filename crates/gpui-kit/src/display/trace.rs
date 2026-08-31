@@ -54,8 +54,6 @@ const NAME_AFTER_LIMIT: f32 = 0.7;
 /// waterfall vocabulary.
 const PENDING_ALPHA: f32 = 0.16;
 const PENDING_CURRENT_ALPHA: f32 = 0.24;
-const PENDING_BORDER_ALPHA: f32 = 0.62;
-const PENDING_CURRENT_BORDER_ALPHA: f32 = 0.82;
 const OBSERVED_ALPHA: f32 = 0.72;
 const OBSERVED_CURRENT_ALPHA: f32 = 0.92;
 
@@ -510,7 +508,8 @@ fn grid_layer(
             .bottom_0()
             .left(relative(tick.at))
             .w(px(theme.borders.hairline))
-            .bg(theme.colors.divider)
+            .rounded_full()
+            .bg(theme.colors.divider.opacity(theme.opacity.muted))
     });
     let mut layer = div().absolute().inset_0().flex().flex_row();
     layer = layer.gap_token(theme, Space::Sm);
@@ -525,7 +524,8 @@ fn grid_layer(
                     .bottom_0()
                     .right_0()
                     .w(px(theme.borders.hairline))
-                    .bg(theme.colors.divider),
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted)),
             ),
         );
     }
@@ -564,8 +564,8 @@ fn span_row(
         mark
     };
 
-    // Work that has not started yet is drawn as an outline: a filled bar is a
-    // claim that the interval happened.
+    // Work that has not started yet is a quieter tonal bar: its lower fill
+    // does not claim that the interval happened, and no outline is needed.
     let pending = span.state == SpanState::Pending;
     let mut fill = div()
         .absolute()
@@ -579,12 +579,6 @@ fn span_row(
             PENDING_CURRENT_ALPHA
         } else {
             PENDING_ALPHA
-        }))
-        .border(px(theme.borders.hairline))
-        .border_color(color.opacity(if current {
-            PENDING_CURRENT_BORDER_ALPHA
-        } else {
-            PENDING_BORDER_ALPHA
         }))
     } else {
         fill.bg(color.opacity(if current {
@@ -695,7 +689,8 @@ fn axis_row(
             .left(relative(tick.at))
             .w(px(theme.borders.hairline))
             .h(px(TICK_HEIGHT))
-            .bg(theme.colors.divider)
+            .rounded_full()
+            .bg(theme.colors.divider.opacity(theme.opacity.muted))
     });
     let labels = ticks.iter().filter_map(|tick| {
         let text = tick.label.clone()?;
@@ -729,7 +724,8 @@ fn axis_row(
         .left_0()
         .right_0()
         .h(px(theme.borders.hairline))
-        .bg(theme.colors.divider);
+        .rounded_full()
+        .bg(theme.colors.divider.opacity(theme.opacity.muted));
 
     let mut row = div()
         .flex()

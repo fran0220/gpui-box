@@ -209,13 +209,11 @@ pub enum DividerAxis {
     Vertical,
 }
 
-/// A rule between groups.
+/// A soft rule between groups.
 ///
-/// A divider separates content that shares a surface. It is drawn in the
-/// stronger of the two hairline roles rather than the one used inside a card:
-/// a rule that has to be looked for is a rule that is not doing the job it is
-/// on screen for, and the faint one belongs to rows that are already held
-/// together by a frame.
+/// A divider is an explicit author request for separation, so it remains a
+/// line. It uses the low-alpha divider paint, rounded ends, and an inset by
+/// default rather than cutting a hard rule from edge to edge.
 #[derive(Debug, IntoElement)]
 pub struct Divider {
     ident: Option<Ident>,
@@ -237,7 +235,7 @@ impl Divider {
             ident: None,
             label: None,
             axis: DividerAxis::default(),
-            inset: None,
+            inset: Some(Space::Sm),
         }
     }
 
@@ -277,9 +275,9 @@ impl RenderOnce for Divider {
         let theme = cx.theme().clone();
         let vertical = self.axis == DividerAxis::Vertical;
         let weight = px(theme.borders.hairline);
-        let color = theme.colors.hairline_strong;
+        let color = theme.colors.divider.opacity(theme.opacity.muted);
         let rule = move || {
-            let bar = div().flex_1().bg(color);
+            let bar = div().flex_1().rounded_full().bg(color);
             if vertical {
                 bar.w(weight)
             } else {

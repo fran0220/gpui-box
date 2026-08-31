@@ -16,8 +16,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, Elevation, Radius, SemanticColor, Space, Surface, TextTone, Theme,
-    TypeScale, Variant,
+    ActiveTheme, ColorChoice, Elevation, Radius, SemanticColor, SemanticWash, Space, Surface,
+    TextTone, Theme, TypeScale, Variant,
 };
 
 use crate::strings::{ActiveStrings, StringKey};
@@ -572,21 +572,17 @@ impl Calendar {
             .when_some(background, |element, color| element.bg(color))
             .when(in_band && !opens, open_flat)
             .when(in_band && !closes, close_flat)
-            // Today is not a choice anybody made, so it does not wear the
-            // colour a chosen day wears; a neutral ring says "you are here"
-            // without competing with the endpoints of a range.
+            // Today is not a choice anybody made, so it takes a neutral wash
+            // rather than the accent fill a chosen day wears.
             .when(is_today && !selected && !endpoint, |element| {
-                element
-                    .border(px(theme.borders.thick))
-                    .border_color(theme.colors.hairline_strong)
+                element.bg(theme.colors.active)
             })
             // A refused day inside a selected run must remain visible as a
             // refusal, not merely as a slightly warmer numeral on the range
-            // wash. The range stays continuous underneath this warning edge.
+            // wash. A warning wash remains distinct without putting a hard
+            // outline around the day.
             .when(blocked.is_some() && in_band, |element| {
-                element
-                    .border(px(theme.borders.thick))
-                    .border_color(theme.colors.warning)
+                element.bg(theme.color_wash(theme.colors.warning, SemanticWash::Strong))
             })
             .when(cursored, |element| element.shadow(theme.focus_ring()))
             .when(selectable, |element| {

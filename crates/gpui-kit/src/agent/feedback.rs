@@ -130,10 +130,7 @@ impl RenderOnce for FeedbackRating {
         );
         let selected_chip = |element: gpui::Stateful<gpui::Div>, selected: bool| {
             if selected {
-                element
-                    .bg(chosen.background)
-                    .border_color(chosen.text)
-                    .text_color(chosen.text)
+                element.bg(chosen.background).text_color(chosen.text)
             } else {
                 element
             }

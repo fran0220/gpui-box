@@ -246,7 +246,6 @@ impl RenderOnce for AnchorList {
         // The bar is a place, not a row of loose words: the track is what says
         // where the set of anchors starts and stops, and it is what the active
         // anchor's wash is read against.
-        let metrics = theme.control.get(self.size);
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)
@@ -313,17 +312,7 @@ impl RenderOnce for AnchorList {
                     .flex()
                     .flex_none()
                     .items_center()
-                    .gap(px(theme.space(Space::Xs)))
-                    // A way to the anchors that did not fit is not one of the
-                    // anchors, and the bar has to say so before it is opened:
-                    // without the break it read as the last section.
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(theme.borders.hairline))
-                            .h(px(metrics.height * 0.5))
-                            .bg(theme.colors.divider),
-                    )
+                    .gap(px(theme.space(Space::Sm)))
                     .child(menu)
                     .semantic_in(
                         cx,

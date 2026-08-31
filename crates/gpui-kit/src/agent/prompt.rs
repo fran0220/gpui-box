@@ -198,18 +198,13 @@ impl RenderOnce for PromptBuilder {
                         // said neither: it coloured both alike and sat below
                         // the contrast the caption size needs. A filled slot
                         // is a settled value on a raised chip; an empty one is
-                        // an outlined hole with the slot's name in it. The
-                        // line belongs to the hole, so the filled chip holds
-                        // its space transparently and filling a slot moves
-                        // nothing beside it.
+                        // a sunken tonal seat with the slot's name in it.
                         let mut chip = div()
                             .id(self.ident.child("slot").child(id.as_ref()).element_id())
                             .focus_ring(&theme)
                             .px(px(theme.space(Space::Xs)))
                             .py_token(&theme, Space::Xs)
                             .radius(&theme, Radius::Small)
-                            .border(px(theme.borders.hairline))
-                            .border_color(gpui::transparent_black())
                             .type_scale(&theme, TypeScale::Caption)
                             .map(|element| {
                                 if filled {
@@ -218,7 +213,7 @@ impl RenderOnce for PromptBuilder {
                                         .text_color(theme.colors.text)
                                 } else {
                                     element
-                                        .border_color(theme.colors.hairline_strong)
+                                        .surface(&theme, Surface::Sunken)
                                         .text_color(theme.colors.text_muted)
                                 }
                             })

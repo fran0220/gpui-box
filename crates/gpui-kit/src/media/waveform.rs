@@ -189,7 +189,8 @@ pub(crate) fn band(theme: &Theme) -> gpui::Div {
                 .right_0()
                 .top(px(BAND_HEIGHT / 2.0))
                 .h(px(theme.borders.hairline))
-                .bg(theme.colors.hairline),
+                .rounded_full()
+                .bg(theme.colors.hairline.opacity(theme.opacity.muted)),
         )
 }
 

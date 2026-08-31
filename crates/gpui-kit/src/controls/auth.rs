@@ -620,16 +620,9 @@ impl Render for OneTimeCodeInput {
             .flex_1()
             .px_0()
             .justify_center()
-            // A slot is a sixth of the width a text field gets, and at the
-            // field hairline six of them read as one unrendered strip rather
-            // than as six places. The line is drawn at the weight that
-            // survives being that narrow; the cell the caret is in takes the
-            // focus colour and the ring, so which place the next character
-            // lands in is never a guess.
-            .when(!self.invalid && !active, |slot| {
-                slot.border_color(theme.colors.hairline_strong)
-            })
-            .when(active, |slot| slot.border_color(theme.colors.focus))
+            // Each narrow slot is its own tonal well. The active one receives
+            // the shared focus halo from `field_shell`, so the next character
+            // has one soft location marker rather than an outlined box.
             .when(selected, |slot| slot.bg(theme.colors.selected))
             .child(
                 foundation_text(&theme, TypeScale::Label, if filled { "•" } else { "" })

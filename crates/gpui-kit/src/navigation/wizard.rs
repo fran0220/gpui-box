@@ -346,8 +346,6 @@ impl Wizard {
             window,
             cx,
         );
-        let marker_border_alpha = theme.effects.variant_light_hover_alpha
-            + (1.0 - theme.effects.variant_light_hover_alpha) * filled;
         let marker_fill_alpha = theme.effects.variant_subtle_hover_alpha
             + (theme.effects.variant_light_active_alpha - theme.effects.variant_subtle_hover_alpha)
                 * filled;
@@ -361,8 +359,6 @@ impl Wizard {
             .items_center()
             .justify_center()
             .rounded_full()
-            .border(px(theme.borders.hairline))
-            .border_color(color.opacity(marker_border_alpha))
             .bg(color.opacity(marker_fill_alpha))
             .text_color(color)
             .children(
@@ -646,7 +642,7 @@ fn connector(theme: &Theme, vertical: bool, behind: bool) -> AnyElement {
     // The line meets the marks, so it sits on the axis the markers are centred
     // on rather than on the middle of the step element.
     let axis = theme.space(Space::Xs) + MARKER / 2.0 - thickness / 2.0;
-    let line = div().bg(color);
+    let line = div().rounded_full().bg(color.opacity(theme.opacity.muted));
     if vertical {
         line.flex_none()
             .w(px(thickness))

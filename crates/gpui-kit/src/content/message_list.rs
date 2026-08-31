@@ -51,7 +51,6 @@ use crate::display::avatar::Avatar;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::display::timeline::EntryTime;
-use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::motion::{engage_end, follow_end, follows_end};
@@ -847,7 +846,6 @@ fn row(
     }
 
     let _ = window;
-    let direction = cx.layout_direction();
     // Every message is a surface of its own. Without one the byline, the body
     // and the delivery mark are three runs of text at the same left edge, and
     // which message a status line belongs to is a question about vertical
@@ -868,11 +866,6 @@ fn row(
                 .p_token(&theme, Space::Sm)
                 .radius(&theme, Radius::Bubble)
                 .surface(&theme, Surface::Raised)
-                // The rail keeps its width whether or not the speaker has a
-                // colour, so a thread of coloured and uncoloured turns still
-                // has one reading edge.
-                .border_s(direction, px(theme.effects.rail_width))
-                .border_color(message.tint.unwrap_or(gpui::transparent_black()))
                 .when_some(message.tint, |surface, tint| {
                     surface.bg(theme
                         .surface(Surface::Raised)

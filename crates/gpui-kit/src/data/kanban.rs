@@ -436,7 +436,17 @@ impl RenderOnce for KanbanBoard {
                                     .radius(&theme, Radius::Control)
                                     .border(px(theme.borders.hairline))
                                     .border_dashed()
-                                    .border_color(theme.colors.accent)
+                                    .border_color(
+                                        theme
+                                            .colors
+                                            .accent
+                                            .opacity(theme.effects.semantic_wash_strong_alpha),
+                                    )
+                                    .bg(theme.color_wash(
+                                        theme.colors.accent,
+                                        gpui_kit_theme::SemanticWash::Faint,
+                                    ))
+                                    .shadow(theme.glow(theme.colors.accent))
                                     .flex()
                                     .items_center()
                                     .justify_center()

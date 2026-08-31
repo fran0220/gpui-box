@@ -35,19 +35,9 @@ pub(super) fn kbd(_window: &mut Window, cx: &mut App) -> AnyElement {
                     "cmd-shift-p",
                     "scene.kbd.palette",
                 ))
-                .child(
-                    div()
-                        .w_full()
-                        .h(px(theme.borders.hairline))
-                        .bg(theme.colors.divider),
-                )
+                .child(div().w_full().h(px(theme.space(Space::Sm))))
                 .child(named("Copy the selection", "ctrl-c", "scene.kbd.copy"))
-                .child(
-                    div()
-                        .w_full()
-                        .h(px(theme.borders.hairline))
-                        .bg(theme.colors.divider),
-                )
+                .child(div().w_full().h(px(theme.space(Space::Sm))))
                 .child(named("Rename in place", "cmd-alt-r", "scene.kbd.rename")),
         )
         .child(caption(

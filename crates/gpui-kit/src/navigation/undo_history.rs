@@ -257,7 +257,8 @@ fn entry_element(
                     .h(px(lead))
                     .w(px(theme.borders.hairline))
                     .flex_none()
-                    .bg(theme.colors.divider),
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted)),
             )
         })
         .child(
@@ -266,9 +267,11 @@ fn entry_element(
                 .size(px(MARKER_SIZE))
                 .flex_none()
                 .rounded_full()
-                .border(px(theme.borders.hairline))
-                .border_color(marker_color)
-                .when(selected, |element| element.bg(marker_color)),
+                .bg(marker_color.opacity(if selected {
+                    1.0
+                } else {
+                    theme.effects.semantic_wash_strong_alpha
+                })),
         )
         .when(continues, |element| {
             element.child(
@@ -276,7 +279,8 @@ fn entry_element(
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Lg)))
-                    .bg(theme.colors.divider),
+                    .rounded_full()
+                    .bg(theme.colors.divider.opacity(theme.opacity.muted)),
             )
         });
 

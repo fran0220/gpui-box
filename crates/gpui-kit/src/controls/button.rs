@@ -456,7 +456,7 @@ impl RenderOnce for Button {
         .when(self.icon_only, |element| {
             element.w(px(metrics.height)).px(px(0.0))
         })
-        .map(|element| joined(element, &theme, self.join, direction))
+        .map(|element| joined(element, self.join, direction))
         .when(
             self.selected && !self.disabled && !on_shared_tiers,
             |element| element.bg(theme.colors.active),
@@ -518,20 +518,12 @@ impl RenderOnce for Button {
     }
 }
 
-/// Flattens the edges a joined button shares with its neighbour, and draws the
-/// one line the run needs on the seam between them.
+/// Flattens the edges a joined button shares with its neighbour.
 ///
-/// The buttons abut rather than overlap. Nothing in a run carries an outline
-/// now, so there is no second hairline to pull onto; what the run needs is a
-/// single rule where two tonal fills meet, and it belongs to the seam rather
-/// than to either button.
-fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirection) -> Div {
+/// Tonal fills meet directly; a line on the seam would add a decorative
+/// channel to controls whose separate labels and fills already name them.
+fn joined(element: Div, join: ButtonJoin, direction: LayoutDirection) -> Div {
     let flat = px(0.0);
-    let seam = |element: Div| {
-        element
-            .border_s(direction, px(theme.borders.hairline))
-            .border_color(theme.colors.divider)
-    };
     // Leading and trailing name places in a run, and a run is read rather
     // than measured: the first button keeps the corners on the side reading
     // starts at and gives up the ones it shares with the next.
@@ -552,8 +544,8 @@ fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirect
     match join {
         ButtonJoin::Alone => element,
         ButtonJoin::Leading => end_flat(element),
-        ButtonJoin::Middle => seam(end_flat(start_flat(element))),
-        ButtonJoin::Trailing => seam(start_flat(element)),
+        ButtonJoin::Middle => end_flat(start_flat(element)),
+        ButtonJoin::Trailing => start_flat(element),
     }
 }
 
