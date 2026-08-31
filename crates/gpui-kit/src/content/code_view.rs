@@ -121,41 +121,34 @@ impl LineMark {
         }
     }
 
-    /// The rail colour and the wash behind the row.
+    /// The wash behind the row.
+    ///
+    /// The mark is a wash across the whole line and no edge stripe beside it:
+    /// a called-out line is already a rectangle the width of the listing, and
+    /// a rule drawn down one side of it is a second geometry saying what the
+    /// fill has said.
     ///
     /// A line somebody deleted and a line the host says is wrong are two
     /// different claims, and drawing both in the danger colour at one strength
     /// left them the same row twice. The diff classes take the syntax table's
     /// own added and removed colours, which is where the rest of the library
     /// says "this line went" already, and a failure keeps danger to itself.
-    fn colors(self, theme: &Theme) -> (gpui::Hsla, gpui::Hsla) {
+    fn wash(self, theme: &Theme) -> gpui::Hsla {
         match self {
-            Self::Added => (theme.colors.syntax.added, theme.colors.syntax.added_wash),
-            Self::Removed => (
-                theme.colors.syntax.removed,
-                theme.colors.syntax.removed_wash,
-            ),
-            Self::Changed => (
-                theme.colors.warning,
-                theme
-                    .colors
-                    .warning
-                    .opacity(theme.effects.semantic_wash_faint_alpha),
-            ),
-            Self::Highlighted => (
-                theme.colors.accent,
-                theme
-                    .colors
-                    .accent
-                    .opacity(theme.effects.semantic_wash_faint_alpha),
-            ),
-            Self::Error => (
-                theme.colors.danger,
-                theme
-                    .colors
-                    .danger
-                    .opacity(theme.effects.semantic_wash_faint_alpha),
-            ),
+            Self::Added => theme.colors.syntax.added_wash,
+            Self::Removed => theme.colors.syntax.removed_wash,
+            Self::Changed => theme
+                .colors
+                .warning
+                .opacity(theme.effects.semantic_wash_faint_alpha),
+            Self::Highlighted => theme
+                .colors
+                .accent
+                .opacity(theme.effects.semantic_wash_faint_alpha),
+            Self::Error => theme
+                .colors
+                .danger
+                .opacity(theme.effects.semantic_wash_faint_alpha),
         }
     }
 
@@ -330,8 +323,7 @@ fn line_element(
 ) -> AnyElement {
     let wash = line
         .mark
-        .map(|mark| mark.colors(theme))
-        .map_or(gpui::transparent_black(), |(_, wash)| wash);
+        .map_or(gpui::transparent_black(), |mark| mark.wash(theme));
     let struck = line.mark.is_some_and(LineMark::struck);
 
     let text_ident = ident.child(format!("line-{}-text", line.number));
@@ -354,8 +346,8 @@ fn line_element(
                     .child(cx.numbers().count(line.number)),
             )
         })
-        // The rail is what a reader in monochrome sees, and it is drawn even
-        // when the gutter is off, because the mark is the fact. It is the
+        // A removed line is struck through as well as washed, so the mark
+        // survives a reader who cannot separate the wash from the surface.
         .child(
             div()
                 .flex_1()
