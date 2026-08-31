@@ -22,7 +22,8 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, T
 use crate::display::badge::Badge;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text as foundation_text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, rule,
+    text as foundation_text,
 };
 use crate::motion::{Flipping, flip};
 use crate::overlay::Tooltipped;
@@ -278,7 +279,7 @@ impl Sidebar {
             .pe(direction, px(theme.space(Space::Sm)))
             .radius(theme, Radius::Control)
             .when(self.collapsed, |element| element.justify_center())
-            .when(active, |element| element.bg(theme.colors.selected))
+            .selected_fill(theme, active)
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .child(
                 // The glyph is the one thing that survives collapsing, so it
@@ -318,7 +319,7 @@ impl Sidebar {
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.bg(theme.colors.hover))
+                    .when(!active, |element| element.hover_row(theme))
                     .focus_ring(theme)
             });
 

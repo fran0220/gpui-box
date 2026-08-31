@@ -11,10 +11,12 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ColorChoice, Radius, Space, Surface, TypeScale, Variant};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, SelectedFill, Sizable, StyledExt,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type VoteHandler = Rc<dyn Fn(FeedbackVote, &mut Window, &mut App)>;
@@ -117,23 +119,8 @@ impl Disableable for FeedbackRating {
 impl RenderOnce for FeedbackRating {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        // One selected treatment for both rows. A vote said "selected" with
-        // an accent wash and accent lettering while a tag said it with a wash
-        // alone, so the same fact was drawn two ways inside one control.
-        //
-        // The wash is the light tier of the accent rather than the neutral
-        // selected role: a cast vote sat one hairline away from an uncast
-        // one, and a rating whose two answers look alike reports nothing.
-        let chosen = theme.variant_colors(
-            Variant::Light,
-            &ColorChoice::Semantic(gpui_kit_theme::SemanticColor::Accent),
-        );
         let selected_chip = |element: gpui::Stateful<gpui::Div>, selected: bool| {
-            if selected {
-                element.bg(chosen.background).text_color(chosen.text)
-            } else {
-                element
-            }
+            element.selected_fill(&theme, selected)
         };
         let vote_chip = |vote: FeedbackVote, label: SharedString, selected: bool| {
             let handler = self.on_vote.clone().filter(|_| !self.disabled);

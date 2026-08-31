@@ -108,9 +108,9 @@ impl TreeNode {
 
     /// What is known about this node's children.
     ///
-    /// [`BranchState::Ready`] with no children is a leaf. Loading or
-    /// unavailable still offers a disclosure, because the host has said there
-    /// is a branch even when it cannot list it yet.
+    /// [`BranchState::Ready`] with no children is a leaf. Loading, unavailable,
+    /// or failed still offers a disclosure, because the host has said there is
+    /// a branch even when it cannot list it yet.
     pub fn branch(mut self, branch: BranchState) -> Self {
         self.branch = branch;
         self
@@ -127,6 +127,8 @@ pub enum BranchState {
     Loading,
     /// The host could not list this branch, in its own words.
     Unavailable(SharedString),
+    /// An attempt to list this branch failed, in its own words.
+    Failed(SharedString),
 }
 
 impl BranchState {
@@ -135,6 +137,7 @@ impl BranchState {
             Self::Ready => "ready",
             Self::Loading => "loading",
             Self::Unavailable(_) => "unavailable",
+            Self::Failed(_) => "failed",
         }
     }
 }
@@ -342,6 +345,7 @@ enum VisibleKind {
     Node,
     Loading,
     Unavailable,
+    Failed,
 }
 
 /// The nodes a frame shows, in the order the keyboard walks them.
@@ -363,7 +367,7 @@ fn fingerprint_tree(nodes: &[TreeNode], expanded: &[SharedString]) -> u64 {
             node.label.hash(hasher);
             node.disabled.hash(hasher);
             node.branch.name().hash(hasher);
-            if let BranchState::Unavailable(reason) = &node.branch {
+            if let BranchState::Unavailable(reason) | BranchState::Failed(reason) = &node.branch {
                 reason.hash(hasher);
             }
             walk(&node.children, hasher);
@@ -426,6 +430,20 @@ fn flatten(
                         parent: Some(node.id.clone()),
                         first_child: None,
                         kind: VisibleKind::Unavailable,
+                    });
+                }
+                BranchState::Failed(reason) if node.children.is_empty() => {
+                    out.push(Visible {
+                        id: SharedString::from(format!("{}.failed", node.id)),
+                        label: reason.clone(),
+                        icon: None,
+                        disabled: true,
+                        level: level + 1,
+                        open: false,
+                        has_children: false,
+                        parent: Some(node.id.clone()),
+                        first_child: None,
+                        kind: VisibleKind::Failed,
                     });
                 }
                 _ => flatten(&node.children, expanded, level + 1, Some(&node.id), out),
@@ -1082,22 +1100,48 @@ impl Rows {
                 "unavailable",
                 false,
             ),
+            VisibleKind::Failed => (
+                if node.label.is_empty() {
+                    cx.strings().text(StringKey::TreeChildrenUnavailable)
+                } else {
+                    node.label.clone()
+                },
+                "failed",
+                false,
+            ),
             VisibleKind::Node => unreachable!("status rows are not nodes"),
         };
         let direction = cx.layout_direction();
         let height = theme.control.get(self.size).height;
-        // Loading, unavailable and disabled are three different things, and a
-        // faint line of prose is only ever one of them. A branch that is
-        // fetching carries the library's moving mark; one that cannot be
-        // listed carries the refusal glyph and states the reason.
-        let mark: AnyElement = match node.kind {
-            VisibleKind::Loading => PulseLoader::new(ident.child("mark"))
-                .control_size(ControlSize::Xs)
-                .into_any_element(),
-            _ => icon(Icon::Danger)
-                .size(px(icon_size))
-                .text_color(theme.colors.warning)
-                .into_any_element(),
+        // Loading, refusal, failure, and disabled are different facts. A
+        // branch that is fetching moves, a refusal carries the forbidden
+        // mark, and a failed attempt carries the danger mark.
+        let (mark, mark_color) = match node.kind {
+            VisibleKind::Loading => (
+                PulseLoader::new(ident.child("mark"))
+                    .control_size(ControlSize::Xs)
+                    .into_any_element(),
+                theme.colors.text_muted,
+            ),
+            // A drawing carries its own colour: an SVG does not take the
+            // text colour of the box it is put in, so a mark tinted only by
+            // its parent came out invisible and left a refusal and a failure
+            // looking like the same row.
+            VisibleKind::Unavailable => (
+                icon(Icon::Forbidden)
+                    .size(px(icon_size))
+                    .text_color(theme.colors.warning)
+                    .into_any_element(),
+                theme.colors.warning,
+            ),
+            VisibleKind::Failed => (
+                icon(Icon::Danger)
+                    .size(px(icon_size))
+                    .text_color(theme.colors.danger)
+                    .into_any_element(),
+                theme.colors.danger,
+            ),
+            VisibleKind::Node => unreachable!("status rows are not nodes"),
         };
         let color = match node.kind {
             VisibleKind::Loading => theme.colors.text_muted,
@@ -1125,6 +1169,7 @@ impl Rows {
                         .flex()
                         .items_center()
                         .justify_center()
+                        .text_color(mark_color)
                         .child(mark),
                 )
                 .child(
@@ -1262,6 +1307,17 @@ mod tests {
         flatten(&nodes, &expanded, 1, None, &mut out);
         assert_eq!(out[1].kind, VisibleKind::Unavailable);
         assert_eq!(out[1].label.as_ref(), "host refused");
+    }
+
+    #[test]
+    fn a_failed_branch_publishes_the_attempt_failure() {
+        let nodes =
+            [TreeNode::new("src", "src").branch(BranchState::Failed("listing failed".into()))];
+        let expanded = [SharedString::from("src")];
+        let mut out = Vec::new();
+        flatten(&nodes, &expanded, 1, None, &mut out);
+        assert_eq!(out[1].kind, VisibleKind::Failed);
+        assert_eq!(out[1].label.as_ref(), "listing failed");
     }
 
     #[test]

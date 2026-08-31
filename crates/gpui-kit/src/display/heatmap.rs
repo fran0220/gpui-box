@@ -13,6 +13,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::state_view::StateView;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::overlay::tooltip::Tooltipped;
@@ -72,17 +73,21 @@ impl HeatCell {
 /// How the matrix was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeatmapState {
+    Loading,
     Ready,
     Empty,
     Unavailable(SharedString),
+    Error(SharedString),
 }
 
 impl HeatmapState {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Loading => "loading",
             Self::Ready => "ready",
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
         }
     }
 }
@@ -90,15 +95,17 @@ impl HeatmapState {
 impl HasPhase for HeatmapState {
     fn phase(&self) -> Phase {
         match self {
+            Self::Loading => Phase::Loading,
             Self::Ready => Phase::Ready,
             Self::Empty => Phase::Empty,
             Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
         }
     }
 
     fn reason(&self) -> Option<&str> {
         match self {
-            Self::Unavailable(reason) => Some(reason.as_ref()),
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
             _ => None,
         }
     }
@@ -260,6 +267,10 @@ impl RenderOnce for Heatmap {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, value): (gpui::AnyElement, SharedString) = match &self.state {
+            HeatmapState::Loading | HeatmapState::Error(_) => (
+                StateView::new(self.ident.child(self.state.name()), &self.state).into_any_element(),
+                SharedString::from(self.state.name()),
+            ),
             HeatmapState::Empty => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                     EmptyState::new(

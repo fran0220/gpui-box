@@ -410,11 +410,14 @@ impl Render for TagInput {
                                 .ok();
                         }
                     });
-                let editing = tag_value.clone();
-                let mut chip = div()
-                    .id(ident.child("chip").element_id())
-                    .child(tag)
-                    .on_click({
+                // The chip carries the gesture but not a node of its own: the
+                // tag inside already publishes one at `ident`, derived from
+                // what the tag says, and a second node over the top would put
+                // two answers in the tree for one thing a reader can point at.
+                let mut chip = div().id(ident.child("chip").element_id()).child(tag);
+                if !self.disabled {
+                    let editing = tag_value.clone();
+                    chip = chip.on_click({
                         let control = control.clone();
                         move |event, _, cx| {
                             if event.click_count() == 2 {
@@ -427,6 +430,7 @@ impl Render for TagInput {
                             }
                         }
                     });
+                }
                 if !self.disabled && self.reorderable {
                     let item = DragItem::new(surface.clone(), tag_value.clone(), tag_value.clone());
                     chip = dnd::draggable(chip, item);

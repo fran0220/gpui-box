@@ -132,9 +132,19 @@ fn run_issues_report_malformed_structure_and_are_absent_for_a_valid_run(cx: &mut
             .expect("issue wording")
             .contains("child")
     );
+    // A fault is addressable by what is wrong with it, not by where it landed
+    // in the list. An id built from the position renames every notice after
+    // the one a later snapshot inserts, so a test pinning the third fault
+    // starts asserting a different fault without changing.
     assert!(
-        harness.node("issues.invalid.issue-0").is_some(),
-        "individual faults remain addressable"
+        harness
+            .node("issues.invalid.duplicate-agent-child")
+            .is_some(),
+        "a fault is addressable by the identity it is about"
+    );
+    assert!(
+        harness.node("issues.invalid.issue-0").is_none(),
+        "no fault is named after its position in the list"
     );
     assert!(
         harness.node("issues.valid").is_none(),

@@ -529,6 +529,11 @@ string_keys! {
     GraphArrange => "graph.arrange", "Arrange";
     PromptEmpty => "prompt.empty", "No template";
     PromptUnavailable => "prompt.unavailable", "Template unavailable";
+    // A host that refused and a request that failed are two different facts,
+    // so they do not share a heading. Only the detail line differed before,
+    // and a reader deciding whether retrying is worth anything was reading the
+    // same three words either way.
+    PromptFailed => "prompt.failed", "Template could not be loaded";
     PromptSlot => "prompt.slot", "Slot";
     FeedbackUp => "feedback.up", "Helpful";
     FeedbackDown => "feedback.down", "Not helpful";

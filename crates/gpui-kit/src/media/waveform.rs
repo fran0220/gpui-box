@@ -12,6 +12,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::signature;
+use crate::display::state_view::StateView;
 use crate::foundation::Ident;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{StyledExt, text};
@@ -33,17 +34,21 @@ pub(crate) const BAND_HEIGHT: f32 = 56.0;
 /// How the envelope was asked for.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AudioWaveformState {
+    Loading,
     Ready,
     Empty,
     Unavailable(SharedString),
+    Error(SharedString),
 }
 
 impl AudioWaveformState {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Loading => "loading",
             Self::Ready => "ready",
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
         }
     }
 }
@@ -51,15 +56,17 @@ impl AudioWaveformState {
 impl HasPhase for AudioWaveformState {
     fn phase(&self) -> Phase {
         match self {
+            Self::Loading => Phase::Loading,
             Self::Ready => Phase::Ready,
             Self::Empty => Phase::Empty,
             Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
         }
     }
 
     fn reason(&self) -> Option<&str> {
         match self {
-            Self::Unavailable(reason) => Some(reason.as_ref()),
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
             _ => None,
         }
     }
@@ -115,6 +122,9 @@ impl RenderOnce for AudioWaveform {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         match &self.state {
+            AudioWaveformState::Loading | AudioWaveformState::Error(_) => {
+                StateView::new(self.ident.child(self.state.name()), &self.state).into_any_element()
+            }
             AudioWaveformState::Empty | AudioWaveformState::Ready if self.peaks.is_empty() => {
                 let ident = self.ident.child("empty");
                 let strings = cx.strings().clone();
@@ -124,6 +134,7 @@ impl RenderOnce for AudioWaveform {
                         strings.text(StringKey::WaveformEmpty),
                         None,
                         false,
+                        self.state.name(),
                         &theme,
                         cx,
                     )
@@ -139,6 +150,7 @@ impl RenderOnce for AudioWaveform {
                         strings.text(StringKey::WaveformUnavailable),
                         Some(reason.clone()),
                         true,
+                        self.state.name(),
                         &theme,
                         cx,
                     )
@@ -157,7 +169,8 @@ impl RenderOnce for AudioWaveform {
                         cx,
                         NodeSpec::new(self.ident.semantic_id(), Role::Image)
                             .text(cx.strings().text(StringKey::Waveform))
-                            .value(cx.numbers().count(count)),
+                            .value(self.state.name())
+                            .description(cx.numbers().count(count)),
                     )
                     .into_any_element()
             }
@@ -204,6 +217,7 @@ fn vacant(
     headline: SharedString,
     detail: Option<SharedString>,
     refused: bool,
+    state: &'static str,
     theme: &Theme,
     cx: &mut App,
 ) -> AnyElement {
@@ -212,6 +226,12 @@ fn vacant(
     } else {
         theme.colors.text_faint
     };
+    let mut spec = NodeSpec::new(ident.semantic_id(), Role::Status)
+        .text(headline.clone())
+        .value(state);
+    if let Some(detail) = detail.clone() {
+        spec = spec.description(detail);
+    }
     band(theme)
         .flex()
         .items_center()
@@ -235,12 +255,7 @@ fn vacant(
                     text(theme, TypeScale::Caption, detail).text_color(theme.colors.text_muted)
                 })),
         )
-        .semantic_in(
-            cx,
-            NodeSpec::new(ident.semantic_id(), Role::Status)
-                .text(headline)
-                .value(detail.unwrap_or_else(|| SharedString::new_static("empty"))),
-        )
+        .semantic_in(cx, spec)
         .into_any_element()
 }
 

@@ -184,13 +184,17 @@ impl RenderOnce for CanvasToolbar {
         if let Some(preset) = self.glass {
             Glass::new(self.ident.child("glass"))
                 .surface(Surface::Overlay)
-                .radius(Radius::Small)
+                // Both materials draw the same detached toolbar, so they take
+                // the card/popover step rather than a tiny-control radius.
+                .radius(Radius::Card)
                 .preset(preset)
                 .adaptive(true)
                 .child(body)
                 .into_any_element()
         } else {
-            body.radius(&theme, Radius::Small)
+            // The opaque fallback keeps the detached toolbar's geometry when
+            // glass is unavailable instead of becoming a tiny control.
+            body.radius(&theme, Radius::Card)
                 .surface(&theme, Surface::Overlay)
                 .into_any_element()
         }

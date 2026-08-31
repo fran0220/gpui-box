@@ -313,9 +313,15 @@ pub(super) fn audio_waveform(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .peaks(scene_peaks(48))
                 .playhead(0.38),
         )
+        .child(AudioWaveform::new("scene.waveform.loading").state(AudioWaveformState::Loading))
         .child(AudioWaveform::new("scene.waveform.empty").state(AudioWaveformState::Empty))
         .child(AudioWaveform::new("scene.waveform.unavailable").state(
             AudioWaveformState::Unavailable("The sampler host refused the request.".into()),
         ))
+        .child(
+            AudioWaveform::new("scene.waveform.error").state(AudioWaveformState::Error(
+                "The sampler request failed.".into(),
+            )),
+        )
         .into_any_element()
 }

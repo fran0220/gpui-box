@@ -6445,9 +6445,11 @@
       "path": "gpui_kit::media::AudioWaveformState",
       "summary": "How the envelope was asked for.",
       "variants": [
+        "Loading",
         "Ready",
         "Empty",
-        "Unavailable"
+        "Unavailable",
+        "Error"
       ],
       "construct": [],
       "options": [],
@@ -6584,7 +6586,8 @@
       "variants": [
         "Ready",
         "Loading",
-        "Unavailable"
+        "Unavailable",
+        "Failed"
       ],
       "construct": [],
       "options": [],
@@ -9555,9 +9558,11 @@
       "path": "gpui_kit::display::HeatmapState",
       "summary": "How the matrix was asked for.",
       "variants": [
+        "Loading",
         "Ready",
         "Empty",
-        "Unavailable"
+        "Unavailable",
+        "Error"
       ],
       "construct": [],
       "options": [],
@@ -9922,9 +9927,11 @@
       "path": "gpui_kit::data::KanbanState",
       "summary": "How the board was asked for.",
       "variants": [
+        "Loading",
         "Ready",
         "Empty",
-        "Unavailable"
+        "Unavailable",
+        "Error"
       ],
       "construct": [],
       "options": [],
@@ -12087,9 +12094,11 @@
       "path": "gpui_kit::agent::PromptBuilderState",
       "summary": "How the template was asked for.",
       "variants": [
+        "Loading",
         "Ready",
         "Empty",
-        "Unavailable"
+        "Unavailable",
+        "Error"
       ],
       "construct": [],
       "options": [],
@@ -15442,7 +15451,7 @@
       "uses": [
         "Tree"
       ],
-      "example": "fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(360.0))\n        .child(\n            Tree::new(\"scene.tree.workspace\")\n                .selected(\"tokens\")\n                .nodes([\n                    TreeNode::new(\"workspace\", \"workspace\")\n                        .icon(Icon::Folder)\n                        .children([\n                            TreeNode::new(\"crates\", \"crates\")\n                                .icon(Icon::Folder)\n                                .children([\n                                    TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                    TreeNode::new(\"tokens\", \"gpui-kit-tokens\").icon(Icon::Document),\n                                ]),\n                            TreeNode::new(\"docs\", \"docs\")\n                                .icon(Icon::Folder)\n                                .children([TreeNode::new(\"components\", \"components.md\")\n                                    .icon(Icon::Document)]),\n                        ]),\n                    TreeNode::new(\"target\", \"target\")\n                        .icon(Icon::Archive)\n                        .disabled(true)\n                        .children([TreeNode::new(\"debug\", \"debug\").icon(Icon::Folder)]),\n                    TreeNode::new(\"remote\", \"remote\")\n                        .icon(Icon::Folder)\n                        .branch(BranchState::Loading),\n                ])\n                .expanded_ids(&[\"workspace\", \"crates\", \"remote\"])\n                .on_toggle(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(360.0))\n        .child(\n            Tree::new(\"scene.tree.workspace\")\n                .selected(\"tokens\")\n                .nodes([\n                    TreeNode::new(\"workspace\", \"workspace\")\n                        .icon(Icon::Folder)\n                        .children([\n                            TreeNode::new(\"crates\", \"crates\")\n                                .icon(Icon::Folder)\n                                .children([\n                                    TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                    TreeNode::new(\"tokens\", \"gpui-kit-tokens\").icon(Icon::Document),\n                                ]),\n                            TreeNode::new(\"docs\", \"docs\")\n                                .icon(Icon::Folder)\n                                .children([TreeNode::new(\"components\", \"components.md\")\n                                    .icon(Icon::Document)]),\n                        ]),\n                    TreeNode::new(\"target\", \"target\")\n                        .icon(Icon::Archive)\n                        .disabled(true)\n                        .children([TreeNode::new(\"debug\", \"debug\").icon(Icon::Folder)]),\n                    TreeNode::new(\"remote\", \"remote\")\n                        .icon(Icon::Folder)\n                        .branch(BranchState::Loading),\n                    // A branch the host declined to list and one whose listing\n                    // failed are two different facts, and a reader deciding\n                    // whether to retry needs to know which one they are\n                    // looking at.\n                    TreeNode::new(\"vault\", \"vault\").icon(Icon::Folder).branch(\n                        BranchState::Unavailable(\n                            \"This workspace is not permitted to read it.\".into(),\n                        ),\n                    ),\n                    TreeNode::new(\"archive\", \"archive\")\n                        .icon(Icon::Folder)\n                        .branch(BranchState::Failed(\"The listing timed out.\".into())),\n                ])\n                .expanded_ids(&[\"workspace\", \"crates\", \"remote\", \"vault\", \"archive\"])\n                .on_toggle(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "split-pane",
@@ -16036,7 +16045,7 @@
       "uses": [
         "AudioWaveform"
       ],
-      "example": "fn audio_waveform(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"already-normalized peaks; a missing playhead draws no played split\",\n        ))\n        .child(\n            AudioWaveform::new(\"scene.waveform.ready\")\n                .peaks(scene_peaks(48))\n                .playhead(0.38),\n        )\n        .child(AudioWaveform::new(\"scene.waveform.empty\").state(AudioWaveformState::Empty))\n        .child(AudioWaveform::new(\"scene.waveform.unavailable\").state(\n            AudioWaveformState::Unavailable(\"The sampler host refused the request.\".into()),\n        ))\n        .into_any_element()\n}"
+      "example": "fn audio_waveform(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"already-normalized peaks; a missing playhead draws no played split\",\n        ))\n        .child(\n            AudioWaveform::new(\"scene.waveform.ready\")\n                .peaks(scene_peaks(48))\n                .playhead(0.38),\n        )\n        .child(AudioWaveform::new(\"scene.waveform.loading\").state(AudioWaveformState::Loading))\n        .child(AudioWaveform::new(\"scene.waveform.empty\").state(AudioWaveformState::Empty))\n        .child(AudioWaveform::new(\"scene.waveform.unavailable\").state(\n            AudioWaveformState::Unavailable(\"The sampler host refused the request.\".into()),\n        ))\n        .child(\n            AudioWaveform::new(\"scene.waveform.error\").state(AudioWaveformState::Error(\n                \"The sampler request failed.\".into(),\n            )),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "video-player",
@@ -16122,7 +16131,7 @@
       "uses": [
         "PromptBuilder"
       ],
-      "example": "fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned slots; activating one reports identity, never fills the prompt\",\n        ))\n        .child(\n            PromptBuilder::new(\"scene.prompt.ready\", \"Review template\")\n                .body(\"Review {path} for {concern} and return a verdict.\")\n                .slots([\n                    PromptSlot::new(\"path\", \"path\").value(\"src/lib.rs\"),\n                    PromptSlot::new(\"concern\", \"concern\"),\n                ])\n                .on_slot(|_, _, _| {}),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.empty\", \"Review template\")\n                .state(PromptBuilderState::Empty),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.unavailable\", \"Review template\").state(\n                PromptBuilderState::Unavailable(\"The template host refused the request.\".into()),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned slots; activating one reports identity, never fills the prompt\",\n        ))\n        .child(\n            PromptBuilder::new(\"scene.prompt.loading\", \"Review template\")\n                .state(PromptBuilderState::Loading),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.ready\", \"Review template\")\n                .body(\"Review {path} for {concern} and return a verdict.\")\n                .slots([\n                    PromptSlot::new(\"path\", \"path\").value(\"src/lib.rs\"),\n                    PromptSlot::new(\"concern\", \"concern\"),\n                ])\n                .on_slot(|_, _, _| {}),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.empty\", \"Review template\")\n                .state(PromptBuilderState::Empty),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.unavailable\", \"Review template\").state(\n                PromptBuilderState::Unavailable(\"The template host refused the request.\".into()),\n            ),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.error\", \"Review template\").state(\n                PromptBuilderState::Error(\"The template request failed.\".into()),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "feedback-rating",
@@ -16603,7 +16612,7 @@
       "uses": [
         "KanbanBoard"
       ],
-      "example": "fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"columns and cards are host-owned; a held card can report a move\",\n        ))\n        .child(\n            KanbanBoard::new(\"scene.kanban.ready\")\n                .columns([\n                    KanbanColumn::new(\"inbox\", \"Inbox\"),\n                    KanbanColumn::new(\"doing\", \"Doing\").limit(2),\n                    KanbanColumn::new(\"done\", \"Done\"),\n                ])\n                .cards([\n                    KanbanCard::new(\"triage\", \"Triage fixture\", \"inbox\")\n                        .detail(\"Waiting on review\"),\n                    KanbanCard::new(\"draw\", \"Draw scene\", \"doing\"),\n                    KanbanCard::new(\"caption\", \"Write captions\", \"doing\"),\n                    KanbanCard::new(\"audit\", \"Audit tokens\", \"doing\"),\n                    KanbanCard::new(\"ship\", \"Ship notes\", \"done\"),\n                ])\n                .held(\"triage\")\n                .on_card(|_, _, _| {})\n                .on_move(|_, _, _, _| {})\n                .on_add(|_, _, _| {}),\n        )\n        .child(KanbanBoard::new(\"scene.kanban.empty\").state(KanbanState::Empty))\n        .child(\n            KanbanBoard::new(\"scene.kanban.unavailable\").state(KanbanState::Unavailable(\n                \"The board host refused the request.\".into(),\n            )),\n        )\n        .into_any_element()\n}"
+      "example": "fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"columns and cards are host-owned; a held card can report a move\",\n        ))\n        .child(\n            KanbanBoard::new(\"scene.kanban.ready\")\n                .columns([\n                    KanbanColumn::new(\"inbox\", \"Inbox\"),\n                    KanbanColumn::new(\"doing\", \"Doing\").limit(2),\n                    KanbanColumn::new(\"done\", \"Done\"),\n                ])\n                .cards([\n                    KanbanCard::new(\"triage\", \"Triage fixture\", \"inbox\")\n                        .detail(\"Waiting on review\"),\n                    KanbanCard::new(\"draw\", \"Draw scene\", \"doing\"),\n                    KanbanCard::new(\"caption\", \"Write captions\", \"doing\"),\n                    KanbanCard::new(\"audit\", \"Audit tokens\", \"doing\"),\n                    KanbanCard::new(\"ship\", \"Ship notes\", \"done\"),\n                ])\n                .held(\"triage\")\n                .on_card(|_, _, _| {})\n                .on_move(|_, _, _, _| {})\n                .on_add(|_, _, _| {}),\n        )\n        .child(KanbanBoard::new(\"scene.kanban.loading\").state(KanbanState::Loading))\n        .child(KanbanBoard::new(\"scene.kanban.empty\").state(KanbanState::Empty))\n        .child(\n            KanbanBoard::new(\"scene.kanban.unavailable\").state(KanbanState::Unavailable(\n                \"The board host refused the request.\".into(),\n            )),\n        )\n        .child(\n            KanbanBoard::new(\"scene.kanban.error\")\n                .state(KanbanState::Error(\"The board request failed.\".into())),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "micro",
@@ -16641,7 +16650,7 @@
       "uses": [
         "Heatmap"
       ],
-      "example": "fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // A quarter of weekdays, which is the shape this component is actually\n    // asked for. Four columns of five said nothing about how the grid reads\n    // once it carries a period somebody would look at.\n    let days = [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\"];\n    // Week-starting dates. Each column is joined on by its own key and prints\n    // the day of the month, which is what fits over a cell; the month it came\n    // from is the group header over the run of columns that share it, because\n    // `3 10 17 24` three times over names nothing on its own.\n    let starts = [6, 13, 20, 27, 3, 10, 17, 24, 3, 10, 17, 24];\n    let month_of = |column: usize| [\"January\", \"February\", \"March\"][column / 4];\n    let weeks: Vec<HeatAxis> = starts\n        .iter()\n        .enumerate()\n        .map(|(column, day)| {\n            HeatAxis::new(format!(\"w{column}\"), day.to_string()).group(month_of(column))\n        })\n        .collect();\n    let mut cells = Vec::new();\n    for (row, day) in days.iter().enumerate() {\n        for (column, week) in weeks.iter().enumerate() {\n            let month = month_of(column);\n            let mut cell = HeatCell::new(format!(\"{day}-{}\", week.id), *day, week.id.clone())\n                .label(format!(\"{day}, {month} {}\", week.label));\n            // Deterministic, and holed in two places so the difference between\n            // \"nothing was measured\" and \"zero was measured\" has somewhere to\n            // show itself.\n            let sample = (row * 7 + column * 3 + (column * column) % 5) % 11;\n            if sample != 4 && sample != 9 {\n                let level = (sample % 5) as u8;\n                cell = cell.level(level).value(format!(\"{level} runs\"));\n            }\n            cells.push(cell);\n        }\n    }\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"January to March, by weekday: five intensity steps, and a missing \\\n             cell is not a measured zero\",\n        ))\n        .child(\n            Heatmap::new(\"scene.heatmap.ready\", \"Fixture activity\")\n                .rows(days)\n                // The ramp is neutral until a caller says whose quantity it\n                // is. This matrix is the run activity the rest of the frame\n                // is already reading in the accent, so it hands that over.\n                .tint(theme.colors.accent)\n                .columns(weeks.clone())\n                .cells(cells),\n        )\n        .child(caption(&theme, \"Nothing measured in the period at all\"))\n        .child(Heatmap::new(\"scene.heatmap.empty\", \"Fixture activity\").state(HeatmapState::Empty))\n        .into_any_element()\n}"
+      "example": "fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // A quarter of weekdays, which is the shape this component is actually\n    // asked for. Four columns of five said nothing about how the grid reads\n    // once it carries a period somebody would look at.\n    let days = [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\"];\n    // Week-starting dates. Each column is joined on by its own key and prints\n    // the day of the month, which is what fits over a cell; the month it came\n    // from is the group header over the run of columns that share it, because\n    // `3 10 17 24` three times over names nothing on its own.\n    let starts = [6, 13, 20, 27, 3, 10, 17, 24, 3, 10, 17, 24];\n    let month_of = |column: usize| [\"January\", \"February\", \"March\"][column / 4];\n    let weeks: Vec<HeatAxis> = starts\n        .iter()\n        .enumerate()\n        .map(|(column, day)| {\n            HeatAxis::new(format!(\"w{column}\"), day.to_string()).group(month_of(column))\n        })\n        .collect();\n    let mut cells = Vec::new();\n    for (row, day) in days.iter().enumerate() {\n        for (column, week) in weeks.iter().enumerate() {\n            let month = month_of(column);\n            let mut cell = HeatCell::new(format!(\"{day}-{}\", week.id), *day, week.id.clone())\n                .label(format!(\"{day}, {month} {}\", week.label));\n            // Deterministic, and holed in two places so the difference between\n            // \"nothing was measured\" and \"zero was measured\" has somewhere to\n            // show itself.\n            let sample = (row * 7 + column * 3 + (column * column) % 5) % 11;\n            if sample != 4 && sample != 9 {\n                let level = (sample % 5) as u8;\n                cell = cell.level(level).value(format!(\"{level} runs\"));\n            }\n            cells.push(cell);\n        }\n    }\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"January to March, by weekday: five intensity steps, and a missing \\\n             cell is not a measured zero\",\n        ))\n        .child(\n            Heatmap::new(\"scene.heatmap.ready\", \"Fixture activity\")\n                .rows(days)\n                // The ramp is neutral until a caller says whose quantity it\n                // is. This matrix is the run activity the rest of the frame\n                // is already reading in the accent, so it hands that over.\n                .tint(theme.colors.accent)\n                .columns(weeks.clone())\n                .cells(cells),\n        )\n        .child(\n            Heatmap::new(\"scene.heatmap.loading\", \"Fixture activity\").state(HeatmapState::Loading),\n        )\n        .child(caption(&theme, \"Nothing measured in the period at all\"))\n        .child(Heatmap::new(\"scene.heatmap.empty\", \"Fixture activity\").state(HeatmapState::Empty))\n        .child(\n            Heatmap::new(\"scene.heatmap.error\", \"Fixture activity\")\n                .state(HeatmapState::Error(\"The activity request failed.\".into())),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "color-picker",

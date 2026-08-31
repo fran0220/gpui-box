@@ -713,8 +713,20 @@ pub(super) fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {
                     TreeNode::new("remote", "remote")
                         .icon(Icon::Folder)
                         .branch(BranchState::Loading),
+                    // A branch the host declined to list and one whose listing
+                    // failed are two different facts, and a reader deciding
+                    // whether to retry needs to know which one they are
+                    // looking at.
+                    TreeNode::new("vault", "vault").icon(Icon::Folder).branch(
+                        BranchState::Unavailable(
+                            "This workspace is not permitted to read it.".into(),
+                        ),
+                    ),
+                    TreeNode::new("archive", "archive")
+                        .icon(Icon::Folder)
+                        .branch(BranchState::Failed("The listing timed out.".into())),
                 ])
-                .expanded_ids(&["workspace", "crates", "remote"])
+                .expanded_ids(&["workspace", "crates", "remote", "vault", "archive"])
                 .on_toggle(|_, _, _, _| {})
                 .on_select(|_, _, _| {}),
         )
@@ -866,11 +878,16 @@ pub(super) fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_move(|_, _, _, _| {})
                 .on_add(|_, _, _| {}),
         )
+        .child(KanbanBoard::new("scene.kanban.loading").state(KanbanState::Loading))
         .child(KanbanBoard::new("scene.kanban.empty").state(KanbanState::Empty))
         .child(
             KanbanBoard::new("scene.kanban.unavailable").state(KanbanState::Unavailable(
                 "The board host refused the request.".into(),
             )),
+        )
+        .child(
+            KanbanBoard::new("scene.kanban.error")
+                .state(KanbanState::Error("The board request failed.".into())),
         )
         .into_any_element()
 }

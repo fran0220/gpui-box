@@ -44,7 +44,8 @@ use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text,
+    CardVariant, Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable,
+    StyledExt, rule, text,
 };
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -526,9 +527,17 @@ impl ServerList {
                 });
             if let (true, Some(handler)) = (toggleable, self.on_toggle.clone()) {
                 let id = server.id.clone();
+                let click = Rc::clone(&handler);
+                let click_id = id.clone();
                 glyph = glyph.on_click(move |_, window, cx| {
-                    handler(id.clone(), !open, window, cx);
+                    click(click_id.clone(), !open, window, cx);
                     cx.stop_propagation();
+                });
+                glyph = glyph.on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(id.clone(), !open, window, cx);
+                        cx.stop_propagation();
+                    }
                 });
             }
             glyph.semantic_in(
@@ -550,9 +559,9 @@ impl ServerList {
             // The wash fills the card's own top corners rather than wearing a
             // second set inside them: rounded on all four it read as a pill
             // laid over the card instead of as the card's first row.
+            .selected_fill(theme, selected)
             .when(selected, |element| {
                 element
-                    .bg(theme.colors.selected)
                     .rounded_t(px(theme.radius(Radius::Card)))
                     .when(!has_body, |element| {
                         element.rounded_b(px(theme.radius(Radius::Card)))
@@ -563,9 +572,7 @@ impl ServerList {
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.subtle_hover()))
-                    })
+                    .when(!selected, |element| element.hover_row(theme))
                     .focus_ring(theme)
             })
             .child(chevron)
@@ -591,7 +598,16 @@ impl ServerList {
 
         if let (true, Some(handler)) = (selectable, self.on_select.clone()) {
             let id = server.id.clone();
-            header = header.on_click(move |_, window, cx| handler(id.clone(), window, cx));
+            let click = Rc::clone(&handler);
+            let click_id = id.clone();
+            header = header
+                .on_click(move |_, window, cx| click(click_id.clone(), window, cx))
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(id.clone(), window, cx);
+                        cx.stop_propagation();
+                    }
+                });
         }
 
         let header = header.semantic_in(

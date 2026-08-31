@@ -381,7 +381,9 @@ impl StatusBar {
                 div()
                     .flex_none()
                     .px(px(theme.spacing.xs / 2.0))
-                    .radius(theme, Radius::Small)
+                    // "Stale" is a compact status badge, so its silhouette is
+                    // the badge/status-dot pill rather than a tiny control.
+                    .radius(theme, Radius::Pill)
                     .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Strong))
                     .text_color(theme.colors.warning)
                     .child(cx.strings().text(StringKey::StatusStale)),

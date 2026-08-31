@@ -16,7 +16,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale
 use crate::controls::button::ButtonVariant;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
+};
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -183,14 +185,14 @@ impl AnchorList {
                     .text_size(px(metrics.font_size))
                     .text_color(color),
             )
-            .when(active, |element| element.bg(theme.colors.selected))
+            .selected_fill(&theme, active)
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.bg(theme.colors.hover))
+                    .when(!active, |element| element.hover_row(&theme))
                     .focus_ring(&theme)
             });
 

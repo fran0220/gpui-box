@@ -19,7 +19,9 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
+};
 use crate::interaction::dnd::{self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget};
 use crate::layout::dock::DockPanel;
 use crate::layout::split::SplitAxis;
@@ -956,13 +958,13 @@ impl DockTree {
                         .items_center()
                         .justify_center()
                         .radius(&theme, Radius::Control)
-                        .when(selected, |element| element.bg(theme.colors.selected))
+                        .selected_fill(&theme, selected)
                         .when(actionable, |element| {
                             element
                                 .cursor_pointer()
                                 .tab_index(0)
                                 .pressable(cx)
-                                .hover(|style| style.bg(theme.colors.hover))
+                                .when(!selected, |element| element.hover_row(&theme))
                                 .focus_ring(&theme)
                         })
                         .child(match panel.glyph() {

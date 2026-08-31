@@ -105,12 +105,12 @@ impl RenderOnce for AgentRunIssues {
             .iter()
             .map(|issue| issue_label(issue, cx.strings()))
             .collect();
-        let notices: Vec<_> = labels
+        let notices: Vec<_> = self
+            .issues
             .iter()
-            .enumerate()
-            .map(|(index, label)| {
-                Callout::new(label.clone(), Tone::Danger)
-                    .id(self.ident.child(format!("issue-{index}")))
+            .zip(labels.iter())
+            .map(|(issue, label)| {
+                Callout::new(label.clone(), Tone::Danger).id(self.ident.child(issue_key(issue)))
             })
             .collect();
         div()
@@ -127,6 +127,29 @@ impl RenderOnce for AgentRunIssues {
                 NodeSpec::new(self.ident.semantic_id(), Role::Status).text(labels.join("; ")),
             )
             .into_any_element()
+    }
+}
+
+fn issue_key(issue: &AgentModelIssue) -> String {
+    match issue {
+        AgentModelIssue::MissingRoot(root) => format!("missing-root-{}", root.as_str()),
+        AgentModelIssue::DuplicateAgent(agent) => format!("duplicate-agent-{}", agent.as_str()),
+        AgentModelIssue::DuplicateTask(task) => format!("duplicate-task-{}", task.as_str()),
+        AgentModelIssue::DuplicateLink(link) => format!("duplicate-link-{}", link.as_str()),
+        AgentModelIssue::MissingTaskOwner { task, owner } => {
+            format!("missing-task-owner-{}-{}", task.as_str(), owner.as_str())
+        }
+        AgentModelIssue::MissingLinkEndpoint { link, endpoint } => format!(
+            "missing-link-endpoint-{}-{}-{}",
+            link.as_str(),
+            match endpoint {
+                RunSubjectId::Agent(_) => "agent",
+                RunSubjectId::Task(_) => "task",
+                RunSubjectId::Invocation(_) => "invocation",
+            },
+            endpoint.as_str()
+        ),
+        AgentModelIssue::SelfLink(link) => format!("self-link-{}", link.as_str()),
     }
 }
 

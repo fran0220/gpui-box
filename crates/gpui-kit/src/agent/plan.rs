@@ -245,13 +245,21 @@ impl RenderOnce for AgentPlan {
                     .child(dot)
                     .tip(ident.clone(), tip.clone())
                     .when_some(picks, |element, picks| {
+                        let click = Rc::clone(&picks);
+                        let click_id = id.clone();
                         element
                             .cursor_pointer()
                             .tab_index(0)
                             .pressable(cx)
                             .hover_row(&theme)
                             .focus_ring(&theme)
-                            .on_click(move |_, window, cx| picks(id.clone(), window, cx))
+                            .on_click(move |_, window, cx| click(click_id.clone(), window, cx))
+                            .on_key_down(move |event, window, cx| {
+                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    picks(id.clone(), window, cx);
+                                    cx.stop_propagation();
+                                }
+                            })
                     })
                     .semantic_in(
                         cx,

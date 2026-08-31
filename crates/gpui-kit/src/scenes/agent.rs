@@ -1208,6 +1208,10 @@ pub(super) fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {
             "host-owned slots; activating one reports identity, never fills the prompt",
         ))
         .child(
+            PromptBuilder::new("scene.prompt.loading", "Review template")
+                .state(PromptBuilderState::Loading),
+        )
+        .child(
             PromptBuilder::new("scene.prompt.ready", "Review template")
                 .body("Review {path} for {concern} and return a verdict.")
                 .slots([
@@ -1223,6 +1227,11 @@ pub(super) fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             PromptBuilder::new("scene.prompt.unavailable", "Review template").state(
                 PromptBuilderState::Unavailable("The template host refused the request.".into()),
+            ),
+        )
+        .child(
+            PromptBuilder::new("scene.prompt.error", "Review template").state(
+                PromptBuilderState::Error("The template request failed.".into()),
             ),
         )
         .into_any_element()

@@ -258,7 +258,6 @@ array
 camelCase
 candidate value
 checked above
-empty
 empty array
 empty object
 end before start

@@ -458,6 +458,9 @@ fn cell(
         Some((handler, next)) => {
             let subject_id = subject.id.clone();
             let action_key = action.key.clone();
+            let click = Rc::clone(&handler);
+            let click_subject = subject_id.clone();
+            let click_action = action_key.clone();
             frame
                 .id(ident.element_id())
                 .surface(theme, Surface::Sunken)
@@ -466,15 +469,29 @@ fn cell(
                 .hover(|style| style.bg(theme.colors.hover))
                 .focus_ring(theme)
                 .on_click(move |_event, window, cx| {
-                    handler(
+                    click(
                         PermissionChange {
-                            subject: subject_id.clone(),
-                            action: action_key.clone(),
+                            subject: click_subject.clone(),
+                            action: click_action.clone(),
                             next,
                         },
                         window,
                         cx,
                     );
+                })
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(
+                            PermissionChange {
+                                subject: subject_id.clone(),
+                                action: action_key.clone(),
+                                next,
+                            },
+                            window,
+                            cx,
+                        );
+                        cx.stop_propagation();
+                    }
                 })
                 .child(body)
                 .semantic_in(cx, spec)

@@ -209,19 +209,6 @@ impl TransferList {
                         .when(!selected_item, |element| element.hover_row(&theme))
                 })
                 .child(
-                    gpui_kit_assets::icon(if selected_item {
-                        gpui_kit_assets::Icon::CheckboxChecked
-                    } else {
-                        gpui_kit_assets::Icon::CheckboxEmpty
-                    })
-                    .size(px(theme.control.sm.icon_size))
-                    .text_color(if disabled {
-                        theme.colors.text_disabled
-                    } else {
-                        theme.colors.text_muted
-                    }),
-                )
-                .child(
                     text(&theme, TypeScale::Body, item.label.clone()).text_color(if disabled {
                         theme.colors.text_disabled
                     } else {
@@ -234,7 +221,6 @@ impl TransferList {
                         .parent(list_id.semantic_id())
                         .text(item.label.clone())
                         .selected(selected_item)
-                        .checked(selected_item)
                         .disabled(disabled),
                 );
             if !disabled {

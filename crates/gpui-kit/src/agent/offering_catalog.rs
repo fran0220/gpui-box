@@ -21,7 +21,8 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text,
+    CardVariant, Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable,
+    StyledExt, rule, text,
 };
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -486,18 +487,13 @@ impl OfferingCatalog {
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
             .radius(theme, Radius::Control)
-            .when(selected, |element| element.bg(theme.colors.selected))
+            .selected_fill(theme, selected)
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    // A pointer resting on a row is the lightest state the
-                    // list has; at full strength the hover fill outshone the
-                    // selected row it sat next to.
-                    .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.subtle_hover()))
-                    })
+                    .when(!selected, |element| element.hover_row(theme))
                     .focus_ring(theme)
             })
             .child(
@@ -554,7 +550,16 @@ impl OfferingCatalog {
                     ),
             );
         if let (true, Some(handler)) = (actionable, self.on_activate.clone()) {
-            row = row.on_click(move |_, window, cx| handler(identity.clone(), window, cx));
+            let click = Rc::clone(&handler);
+            let click_identity = identity.clone();
+            row = row
+                .on_click(move |_, window, cx| click(click_identity.clone(), window, cx))
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(identity.clone(), window, cx);
+                        cx.stop_propagation();
+                    }
+                });
         }
         row.semantic_in(
             cx,

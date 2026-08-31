@@ -15,6 +15,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::loading::PulseLoader;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, StyledExt};
 use crate::state::{HasPhase, Phase};
@@ -48,17 +49,21 @@ impl PromptSlot {
 /// How the template was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptBuilderState {
+    Loading,
     Ready,
     Empty,
     Unavailable(SharedString),
+    Error(SharedString),
 }
 
 impl PromptBuilderState {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Loading => "loading",
             Self::Ready => "ready",
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
         }
     }
 }
@@ -66,15 +71,17 @@ impl PromptBuilderState {
 impl HasPhase for PromptBuilderState {
     fn phase(&self) -> Phase {
         match self {
+            Self::Loading => Phase::Loading,
             Self::Ready => Phase::Ready,
             Self::Empty => Phase::Empty,
             Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
         }
     }
 
     fn reason(&self) -> Option<&str> {
         match self {
-            Self::Unavailable(reason) => Some(reason.as_ref()),
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
             _ => None,
         }
     }
@@ -156,6 +163,15 @@ impl RenderOnce for PromptBuilder {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
+            PromptBuilderState::Loading => (
+                PulseLoader::new(self.ident.child("loading"))
+                    .label(cx.strings().text(StringKey::Loading))
+                    .into_any_element(),
+                NodeSpec::new(self.ident.semantic_id(), Role::Region)
+                    .text(self.label.clone())
+                    .value(self.state.name())
+                    .busy(true),
+            ),
             PromptBuilderState::Empty => (
                 self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
                     EmptyState::new(
@@ -177,6 +193,20 @@ impl RenderOnce for PromptBuilder {
                         cx.strings().text(StringKey::PromptUnavailable),
                     )
                     .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
+                NodeSpec::new(self.ident.semantic_id(), Role::Region)
+                    .text(self.label.clone())
+                    .value(self.state.name()),
+            ),
+            PromptBuilderState::Error(reason) => (
+                self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("error"),
+                        cx.strings().text(StringKey::PromptFailed),
+                    )
+                    .kind(EmptyKind::Failed)
                     .detail(reason.clone())
                     .into_any_element()
                 }),

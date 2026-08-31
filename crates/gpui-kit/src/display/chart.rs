@@ -2120,11 +2120,23 @@ impl RenderOnce for ChartLegend {
                             .child(series.label.clone()),
                     );
                 if let Some(handler) = self.on_toggle.clone() {
-                    let id = series.id.clone();
+                    let click_handler = Rc::clone(&handler);
+                    let click_id = series.id.clone();
+                    let key_id = series.id.clone();
                     let next = hidden;
-                    row = row.cursor_pointer().on_click(move |_, window, cx| {
-                        handler(id.clone(), next, window, cx);
-                    });
+                    row = row
+                        .cursor_pointer()
+                        .tab_index(0)
+                        .focus_ring(&theme)
+                        .on_click(move |_, window, cx| {
+                            click_handler(click_id.clone(), next, window, cx);
+                        })
+                        .on_key_down(move |event, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                handler(key_id.clone(), next, window, cx);
+                                cx.stop_propagation();
+                            }
+                        });
                 }
                 Some(
                     row.semantic_in(

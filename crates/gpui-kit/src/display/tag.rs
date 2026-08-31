@@ -11,7 +11,9 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ColorChoice, Radius, Space, TypeScale, Variant};
 
 use crate::display::badge::Tone;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Selectable, SelectedFill, StyledExt, text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -176,16 +178,8 @@ impl RenderOnce for Tag {
             .px(px(theme.space(Space::Sm)))
             .py(px(theme.space(Space::Xxs)))
             .radius(&theme, Radius::Pill)
-            // Selection is carried by the depth of the block rather than by an
-            // outline drawn round it, so the two states differ by more than a
-            // line a reader has to look for.
-            .map(|element| {
-                element.bg(if self.selected {
-                    surface.background_active
-                } else {
-                    surface.background
-                })
-            })
+            .bg(surface.background)
+            .selected_fill(&theme, self.selected)
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

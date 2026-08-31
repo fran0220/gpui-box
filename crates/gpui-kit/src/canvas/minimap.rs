@@ -241,7 +241,9 @@ impl RenderOnce for Minimap {
             .relative()
             .w(px(160.0))
             .h(px(100.0))
-            .radius(&theme, Radius::Small)
+            // The minimap is a detached overlay panel, so it takes the same
+            // rounding as a card or popover rather than a tiny control.
+            .radius(&theme, Radius::Card)
             .surface(&theme, Surface::Overlay)
             .elevation(&theme, Elevation::Raised)
             .overflow_hidden()

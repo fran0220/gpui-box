@@ -14,7 +14,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, TypeScale};
 
-use crate::foundation::{CardVariant, Disableable, FocusRing, Ident, StyledExt};
+use crate::foundation::{CardVariant, Disableable, FocusRing, Ident, SelectedFill, StyledExt};
 use crate::layout::measure;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -75,20 +75,23 @@ impl RenderOnce for ColorSwatch {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let hex = hex_of(self.color);
-        let mut chip = div()
-            .id(self.ident.element_id())
+        let swatch = div()
             .size(px(20.0))
             .flex_none()
             .radius(&theme, Radius::Small)
-            .bg(self.color)
-            .when(self.selected, |chip| {
-                chip.shadow(theme.glow(theme.colors.accent))
-            })
+            .bg(self.color);
+        let mut chip = div()
+            .id(self.ident.element_id())
+            .flex_none()
+            .p(px(theme.space(Space::Xxs)))
+            .radius(&theme, Radius::Control)
+            .selected_fill(&theme, self.selected)
             .opacity(if self.disabled {
                 theme.opacity.disabled
             } else {
                 1.0
-            });
+            })
+            .child(swatch);
         if let (false, Some(handler)) = (self.disabled, self.on_click.clone()) {
             let color = self.color;
             chip = chip

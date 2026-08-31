@@ -1111,8 +1111,15 @@ pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .columns(weeks.clone())
                 .cells(cells),
         )
+        .child(
+            Heatmap::new("scene.heatmap.loading", "Fixture activity").state(HeatmapState::Loading),
+        )
         .child(caption(&theme, "Nothing measured in the period at all"))
         .child(Heatmap::new("scene.heatmap.empty", "Fixture activity").state(HeatmapState::Empty))
+        .child(
+            Heatmap::new("scene.heatmap.error", "Fixture activity")
+                .state(HeatmapState::Error("The activity request failed.".into())),
+        )
         .into_any_element()
 }
 

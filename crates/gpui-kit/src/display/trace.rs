@@ -18,7 +18,7 @@ use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -656,10 +656,20 @@ fn span_row(
         );
     }
     if let Some(handler) = on_select {
-        let id = span.id.clone();
+        let click_handler = Rc::clone(&handler);
+        let click_id = span.id.clone();
+        let key_id = span.id.clone();
         row = row
             .cursor_pointer()
-            .on_click(move |_, window, cx| handler(id.clone(), window, cx));
+            .tab_index(0)
+            .focus_ring(theme)
+            .on_click(move |_, window, cx| click_handler(click_id.clone(), window, cx))
+            .on_key_down(move |event, window, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                    handler(key_id.clone(), window, cx);
+                    cx.stop_propagation();
+                }
+            });
     }
 
     let mut spec = NodeSpec::new(ident.semantic_id(), Role::TreeItem)

@@ -44,7 +44,9 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
+};
 use crate::interaction::dnd::{self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget};
 use crate::layout::tree::{SplitChange, SplitLayout, SplitPaneSpec, SplitTree};
 use crate::motion::{Flipping, flip};
@@ -650,7 +652,7 @@ impl Dock {
                     .justify_center()
                     .size(px(metrics.height))
                     .radius(theme, Radius::Control)
-                    .when(current, |element| element.bg(theme.colors.selected))
+                    .selected_fill(theme, current)
                     .child(match panel.icon {
                         Some(glyph) => icon(glyph)
                             .size(px(metrics.icon_size))
@@ -667,7 +669,7 @@ impl Dock {
                             .cursor_pointer()
                             .tab_index(0)
                             .pressable(cx)
-                            .hover(|style| style.bg(theme.colors.hover))
+                            .when(!current, |element| element.hover_row(theme))
                             .focus_ring(theme)
                     })
                     .tip(item.clone(), panel.title.clone());

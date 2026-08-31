@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface
 use crate::controls::button::{ButtonVariant, IconButton};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::state_view::StateView;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::state::{HasPhase, Phase};
@@ -91,17 +92,21 @@ impl KanbanColumn {
 /// How the board was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KanbanState {
+    Loading,
     Ready,
     Empty,
     Unavailable(SharedString),
+    Error(SharedString),
 }
 
 impl KanbanState {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Loading => "loading",
             Self::Ready => "ready",
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
         }
     }
 }
@@ -109,15 +114,17 @@ impl KanbanState {
 impl HasPhase for KanbanState {
     fn phase(&self) -> Phase {
         match self {
+            Self::Loading => Phase::Loading,
             Self::Ready => Phase::Ready,
             Self::Empty => Phase::Empty,
             Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
         }
     }
 
     fn reason(&self) -> Option<&str> {
         match self {
-            Self::Unavailable(reason) => Some(reason.as_ref()),
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
             _ => None,
         }
     }
@@ -248,6 +255,11 @@ impl RenderOnce for KanbanBoard {
                 .into_any_element()
         };
         match &self.state {
+            KanbanState::Loading | KanbanState::Error(_) => {
+                let inner = StateView::new(self.ident.child(self.state.name()), &self.state)
+                    .into_any_element();
+                board_frame(inner)
+            }
             KanbanState::Empty => {
                 let inner = self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                     EmptyState::new(
@@ -560,7 +572,11 @@ impl RenderOnce for KanbanBoard {
                     .gap_token(&theme, Space::Sm)
                     .w_full()
                     .children(columns)
-                    .semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Group))
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.semantic_id(), Role::Group)
+                            .value(self.state.name()),
+                    )
                     .into_any_element()
             }
         }
