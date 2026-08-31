@@ -97,6 +97,30 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
                 }),
             )
         }))
+        .child(caption(
+            &theme,
+            "the same tiers, chosen: selection is a stronger step of the ladder the \
+             caller picked, so the colour survives being the current answer",
+        ))
+        .child(
+            row(&theme).children(
+                [
+                    Variant::Filled,
+                    Variant::Light,
+                    Variant::Subtle,
+                    Variant::Default,
+                    Variant::Transparent,
+                ]
+                .map(|tier| {
+                    Button::new(format!("scene.button.chosen.{}", tier.name()))
+                        .label(tier.name())
+                        .variant(tier)
+                        .color(SharedString::from("indigo"))
+                        .selected(true)
+                        .on_click(|_, _| {})
+                }),
+            ),
+        )
         .into_any_element()
 }
 
