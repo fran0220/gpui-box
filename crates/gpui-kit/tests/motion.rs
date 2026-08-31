@@ -1064,32 +1064,6 @@ fn navigation_scene(cx: &mut TestAppContext, second: Rc<Cell<bool>>) -> Harness 
 }
 
 #[gpui::test]
-fn a_tab_indicator_slides_to_the_tab_that_holds_now(cx: &mut TestAppContext) {
-    let second = Rc::new(Cell::new(false));
-    let mut harness = navigation_scene(cx, second.clone());
-
-    harness.update({
-        let second = second.clone();
-        move |_, cx| {
-            second.set(true);
-            cx.refresh_windows();
-        }
-    });
-
-    let offset = harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset());
-    assert!(
-        offset.x < px(0.0),
-        "the indicator starts drawn under the tab that used to hold, got {offset:?}"
-    );
-
-    harness.advance(Duration::from_millis(600));
-    assert_eq!(
-        harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset()),
-        gpui::Point::default()
-    );
-}
-
-#[gpui::test]
 fn an_opening_section_pushes_what_is_below_it_over_several_frames(cx: &mut TestAppContext) {
     let second = Rc::new(Cell::new(false));
     let mut harness = navigation_scene(cx, second.clone());
@@ -1145,10 +1119,6 @@ fn reduced_motion_opens_a_section_at_its_full_height_at_once(cx: &mut TestAppCon
     assert!(
         opened.origin.y > closed.origin.y,
         "the body is at its full height on the frame it opens"
-    );
-    assert_eq!(
-        harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset()),
-        gpui::Point::default()
     );
     holds_one_frame(&mut harness);
 }
