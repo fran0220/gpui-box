@@ -25,6 +25,7 @@ AgentCard
 AgentDocument
 AgentDocumentBlock
 AgentGroup
+AgentPlan
 AgentRoster
 AgentRunCanvas
 AnchorList

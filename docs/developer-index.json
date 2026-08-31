@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4140
+      "symbolCount": 4158
     },
     {
       "name": "gpui-box-kit-assets",
@@ -43086,6 +43086,258 @@
       "target": "VoiceState"
     },
     {
+      "id": "gpui_kit::agent::plan::AgentPlan",
+      "name": "AgentPlan",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "A plan, as a run of marks and one line about the item in flight.",
+      "documentation": "A plan, as a run of marks and one line about the item in flight.",
+      "signature": "# [doc = \" A plan, as a run of marks and one line about the item in flight.\"] # [derive (IntoElement)] pub struct AgentPlan { ident : Ident, items : Vec<PlanItem>, on_pick : Option<PickHandler>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::plan::AgentPlan::done",
+      "name": "done",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "How many items have finished, which is what the summary publishes.",
+      "documentation": "How many items have finished, which is what the summary publishes.",
+      "signature": "pub fn done (& self) -> usize",
+      "cfg": [],
+      "target": "AgentPlan"
+    },
+    {
+      "id": "gpui_kit::agent::plan::AgentPlan::item",
+      "name": "item",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn item (mut self, item : PlanItem) -> Self",
+      "cfg": [],
+      "target": "AgentPlan"
+    },
+    {
+      "id": "gpui_kit::agent::plan::AgentPlan::items",
+      "name": "items",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn items (mut self, items : impl IntoIterator<Item = PlanItem>) -> Self",
+      "cfg": [],
+      "target": "AgentPlan"
+    },
+    {
+      "id": "gpui_kit::agent::plan::AgentPlan::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (ident : impl Into<Ident>) -> Self",
+      "cfg": [],
+      "target": "AgentPlan"
+    },
+    {
+      "id": "gpui_kit::agent::plan::AgentPlan::on_pick",
+      "name": "on_pick",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "Reports the id of the item that was picked. Without this the marks are a report and install no handler at all.",
+      "documentation": "Reports the id of the item that was picked. Without this the marks are\na report and install no handler at all.",
+      "signature": "pub fn on_pick (mut self, handler : impl Fn (SharedString, & mut Window, & mut App) + 'static,) -> Self",
+      "cfg": [],
+      "target": "AgentPlan"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem",
+      "name": "PlanItem",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "One item of a plan.",
+      "documentation": "One item of a plan.",
+      "signature": "# [doc = \" One item of a plan.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct PlanItem { id : SharedString, label : SharedString, state : PlanState, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::blocked",
+      "name": "blocked",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn blocked (self, reason : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::doing",
+      "name": "doing",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn doing (self) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::done",
+      "name": "done",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn done (self) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::dropped",
+      "name": "dropped",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn dropped (self, reason : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::label",
+      "name": "label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "What the reader is told this item is, in the caller's words.",
+      "documentation": "What the reader is told this item is, in the caller's words.",
+      "signature": "pub fn label (& self) -> & SharedString",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (id : impl Into<SharedString>, label : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanItem::state",
+      "name": "state",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn state (mut self, state : PlanState) -> Self",
+      "cfg": [],
+      "target": "PlanItem"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanState",
+      "name": "PlanState",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "Where one item of a plan stands.",
+      "documentation": "Where one item of a plan stands.\n\nAhead, doing and done are the three a plan is mostly made of. The other two\nare the ones a plan cannot be honest without: work that stopped, and work\nthe agent decided against, each in the host's own words.",
+      "signature": "# [doc = \" Where one item of a plan stands.\"] # [doc = \"\"] # [doc = \" Ahead, doing and done are the three a plan is mostly made of. The other two\"] # [doc = \" are the ones a plan cannot be honest without: work that stopped, and work\"] # [doc = \" the agent decided against, each in the host's own words.\"] # [derive (Debug, Clone, PartialEq, Eq, Default)] pub enum PlanState { # [doc = \" Not started. The reader is not waiting on it yet.\"] # [default] Ahead, # [doc = \" In flight. At most one item should be, and the plan draws whichever\"] # [doc = \" ones are.\"] Doing, Done, # [doc = \" Started and stopped, in the host's words.\"] Blocked (SharedString), # [doc = \" Decided against before it ran, in the host's words.\"] Dropped (SharedString), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanState::as_str",
+      "name": "as_str",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "The name the semantic node publishes, so a test tells the five apart without reading a colour.",
+      "documentation": "The name the semantic node publishes, so a test tells the five apart\nwithout reading a colour.",
+      "signature": "pub fn as_str (& self) -> & 'static str",
+      "cfg": [],
+      "target": "PlanState"
+    },
+    {
+      "id": "gpui_kit::agent::plan::PlanState::reason",
+      "name": "reason",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::plan",
+      "path": "gpui_kit::agent::plan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "The host's words for why this item is not moving, if it is not.",
+      "documentation": "The host's words for why this item is not moving, if it is not.",
+      "signature": "pub fn reason (& self) -> Option<& SharedString>",
+      "cfg": [],
+      "target": "PlanState"
+    },
+    {
       "id": "gpui_kit::agent::presentation::AgentActivityLine",
       "name": "AgentActivityLine",
       "kind": "struct",
@@ -43914,6 +44166,20 @@
     },
     {
       "id": "gpui_kit::agent::reexport-10",
+      "name": "plan :: { AgentPlan , PlanItem , PlanState }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent",
+      "path": "gpui_kit::agent",
+      "source": "crates/gpui-kit/src/agent/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use plan::{ AgentPlan, PlanItem, PlanState };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::reexport-11",
       "name": "presentation :: { AgentActivityLine , AgentAppearance , AgentAvatar , AgentCard , AgentGroup , AgentRoster , AgentRunIssues , SubagentTree , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -43927,7 +44193,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-11",
+      "id": "gpui_kit::agent::reexport-12",
       "name": "prompt :: { PromptBuilder , PromptBuilderEvent , PromptBuilderState , PromptSlot }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -43941,7 +44207,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-12",
+      "id": "gpui_kit::agent::reexport-13",
       "name": "server_list :: { Catalog , Offering , OfferingKind , ServerEntry , ServerList , ServerState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -43955,7 +44221,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-13",
+      "id": "gpui_kit::agent::reexport-14",
       "name": "step_list :: { RunLength , Step , StepList , StepState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -43969,7 +44235,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-14",
+      "id": "gpui_kit::agent::reexport-15",
       "name": "thinking :: { Reasoning , ThinkingBlock }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -43983,7 +44249,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-15",
+      "id": "gpui_kit::agent::reexport-16",
       "name": "tool_call :: { Elapsed , ToolBody , ToolCall , ToolCallState , ToolFamily , ToolOutput }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -116084,6 +116350,30 @@
       ]
     },
     {
+      "name": "AgentPlan",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentPlan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "A plan, as a run of marks and one line about the item in flight.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "item(item: PlanItem) -> Self",
+        "items(items: impl IntoIterator<Item = PlanItem>) -> Self",
+        "on_pick(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "done() -> usize"
+      ],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "agent-plan"
+      ]
+    },
+    {
       "name": "AgentRoster",
       "kind": "builder",
       "path": "gpui_kit::agent::AgentRoster",
@@ -127608,6 +127898,45 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "PlanItem",
+      "path": "gpui_kit::agent::PlanItem",
+      "summary": "One item of a plan.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "state(state: PlanState) -> Self",
+        "doing() -> Self",
+        "done() -> Self",
+        "blocked(reason: impl Into<SharedString>) -> Self",
+        "dropped(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "label() -> &SharedString"
+      ]
+    },
+    {
+      "name": "PlanState",
+      "path": "gpui_kit::agent::PlanState",
+      "summary": "Where one item of a plan stands.",
+      "variants": [
+        "Ahead",
+        "Doing",
+        "Done",
+        "Blocked",
+        "Dropped"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "reason() -> Option<&SharedString>"
+      ]
     },
     {
       "name": "PlatformMediaTransport",
@@ -140864,6 +141193,18 @@
         "ToolCall"
       ],
       "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-plan",
+      "capture": "cargo run -p xtask -- headless capture agent-plan",
+      "kind": "exhibit",
+      "subjects": [
+        "AgentPlan"
+      ],
+      "uses": [
+        "AgentPlan"
+      ],
+      "example": "fn agent_plan(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"Behind, in flight, ahead — and the two a plan cannot be honest without\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.running\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"search\", \"Search the workspace\").done())\n                .item(PlanItem::new(\"summarise\", \"Summarise what was found\").doing())\n                .item(PlanItem::new(\"publish\", \"Publish the summary\"))\n                .item(PlanItem::new(\"notify\", \"Notify the reviewers\"))\n                .on_pick(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"A plan that stopped, and one the agent decided against\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.stopped\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(\n                    PlanItem::new(\"notify\", \"Notify the reviewers\")\n                        .blocked(\"The notification service did not respond.\"),\n                )\n                .item(\n                    PlanItem::new(\"archive\", \"Archive the previous run\")\n                        .dropped(\"Nothing had been published yet.\"),\n                )\n                .item(PlanItem::new(\"close\", \"Close the run\")),\n        )\n        .child(caption(&theme, \"Nothing in flight, so nothing is said\"))\n        .child(\n            AgentPlan::new(\"scene.plan.settled\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"close\", \"Close the run\").done()),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "step-list",

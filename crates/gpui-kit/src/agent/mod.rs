@@ -12,6 +12,7 @@ pub mod model;
 pub mod offering_catalog;
 pub mod permission;
 pub mod persona;
+pub mod plan;
 pub mod presentation;
 pub mod prompt;
 pub mod server_list;
@@ -42,6 +43,7 @@ pub use persona::{
     PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive,
     VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState,
 };
+pub use plan::{AgentPlan, PlanItem, PlanState};
 pub use presentation::{
     AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
     AgentRunIssues, SubagentTree,

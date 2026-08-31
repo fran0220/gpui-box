@@ -124,6 +124,7 @@ pub mod prelude {
         PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive,
         VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState,
     };
+    pub use crate::agent::plan::{AgentPlan, PlanItem, PlanState};
     pub use crate::agent::presentation::{
         AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
         AgentRunIssues, SubagentTree,

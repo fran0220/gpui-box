@@ -598,6 +598,8 @@ string_keys! {
     AgentLinesMany => "agent.lines-many", "{0} lines";
     AgentMoreLineOne => "agent.more-line-one", "1 more line";
     AgentMoreLineMany => "agent.more-line-many", "{0} more lines";
+    AgentPlan => "agent.plan", "Plan";
+    AgentPlanReason => "agent.plan-reason", "{0} — {1}";
     AgentStepsDoneOne => "agent.steps-done-one", "1 step done";
     AgentStepsDoneMany => "agent.steps-done-many", "{0} steps done";
     AgentReasoning => "agent.reasoning", "Reasoning";

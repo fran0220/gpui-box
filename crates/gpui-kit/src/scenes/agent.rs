@@ -1107,3 +1107,48 @@ pub(super) fn artifact_preview(_window: &mut Window, cx: &mut App) -> AnyElement
         )
         .into_any_element()
 }
+
+/// The plan a run is working through, at the size it is actually read: a run
+/// of marks, and words spent once on the thing in flight.
+pub(super) fn agent_plan(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "Behind, in flight, ahead — and the two a plan cannot be honest without",
+        ))
+        .child(
+            AgentPlan::new("scene.plan.running")
+                .item(PlanItem::new("brief", "Read the brief").done())
+                .item(PlanItem::new("search", "Search the workspace").done())
+                .item(PlanItem::new("summarise", "Summarise what was found").doing())
+                .item(PlanItem::new("publish", "Publish the summary"))
+                .item(PlanItem::new("notify", "Notify the reviewers"))
+                .on_pick(|_, _, _| {}),
+        )
+        .child(caption(
+            &theme,
+            "A plan that stopped, and one the agent decided against",
+        ))
+        .child(
+            AgentPlan::new("scene.plan.stopped")
+                .item(PlanItem::new("brief", "Read the brief").done())
+                .item(
+                    PlanItem::new("notify", "Notify the reviewers")
+                        .blocked("The notification service did not respond."),
+                )
+                .item(
+                    PlanItem::new("archive", "Archive the previous run")
+                        .dropped("Nothing had been published yet."),
+                )
+                .item(PlanItem::new("close", "Close the run")),
+        )
+        .child(caption(&theme, "Nothing in flight, so nothing is said"))
+        .child(
+            AgentPlan::new("scene.plan.settled")
+                .item(PlanItem::new("brief", "Read the brief").done())
+                .item(PlanItem::new("close", "Close the run").done()),
+        )
+        .into_any_element()
+}

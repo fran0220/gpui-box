@@ -172,6 +172,30 @@
       ]
     },
     {
+      "name": "AgentPlan",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentPlan",
+      "source": "crates/gpui-kit/src/agent/plan.rs",
+      "summary": "A plan, as a run of marks and one line about the item in flight.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "item(item: PlanItem) -> Self",
+        "items(items: impl IntoIterator<Item = PlanItem>) -> Self",
+        "on_pick(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "done() -> usize"
+      ],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "agent-plan"
+      ]
+    },
+    {
       "name": "AgentRoster",
       "kind": "builder",
       "path": "gpui_kit::agent::AgentRoster",
@@ -11698,6 +11722,45 @@
       "queries": []
     },
     {
+      "name": "PlanItem",
+      "path": "gpui_kit::agent::PlanItem",
+      "summary": "One item of a plan.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "state(state: PlanState) -> Self",
+        "doing() -> Self",
+        "done() -> Self",
+        "blocked(reason: impl Into<SharedString>) -> Self",
+        "dropped(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "label() -> &SharedString"
+      ]
+    },
+    {
+      "name": "PlanState",
+      "path": "gpui_kit::agent::PlanState",
+      "summary": "Where one item of a plan stands.",
+      "variants": [
+        "Ahead",
+        "Doing",
+        "Done",
+        "Blocked",
+        "Dropped"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "reason() -> Option<&SharedString>"
+      ]
+    },
+    {
       "name": "PlatformMediaTransport",
       "path": "gpui_kit::media::PlatformMediaTransport",
       "summary": "The AVFoundation or Media Foundation player used by media components.",
@@ -15996,6 +16059,18 @@
         "ToolCall"
       ],
       "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-plan",
+      "capture": "cargo run -p xtask -- headless capture agent-plan",
+      "kind": "exhibit",
+      "subjects": [
+        "AgentPlan"
+      ],
+      "uses": [
+        "AgentPlan"
+      ],
+      "example": "fn agent_plan(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"Behind, in flight, ahead — and the two a plan cannot be honest without\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.running\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"search\", \"Search the workspace\").done())\n                .item(PlanItem::new(\"summarise\", \"Summarise what was found\").doing())\n                .item(PlanItem::new(\"publish\", \"Publish the summary\"))\n                .item(PlanItem::new(\"notify\", \"Notify the reviewers\"))\n                .on_pick(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"A plan that stopped, and one the agent decided against\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.stopped\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(\n                    PlanItem::new(\"notify\", \"Notify the reviewers\")\n                        .blocked(\"The notification service did not respond.\"),\n                )\n                .item(\n                    PlanItem::new(\"archive\", \"Archive the previous run\")\n                        .dropped(\"Nothing had been published yet.\"),\n                )\n                .item(PlanItem::new(\"close\", \"Close the run\")),\n        )\n        .child(caption(&theme, \"Nothing in flight, so nothing is said\"))\n        .child(\n            AgentPlan::new(\"scene.plan.settled\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"close\", \"Close the run\").done()),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "step-list",
