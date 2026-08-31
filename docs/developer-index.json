@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4138
+      "symbolCount": 4139
     },
     {
       "name": "gpui-box-kit-assets",
@@ -47202,7 +47202,7 @@
       "source": "crates/gpui-kit/src/canvas/toolbar.rs",
       "summary": "Compact canvas chrome: a host-formatted zoom and the intents the host can actually carry out.",
       "documentation": "Compact canvas chrome: a host-formatted zoom and the intents the host can\nactually carry out.",
-      "signature": "# [doc = \" Compact canvas chrome: a host-formatted zoom and the intents the host can\"] # [doc = \" actually carry out.\"] # [derive (IntoElement)] pub struct CanvasToolbar { ident : Ident, zoom : SharedString, actions : Vec<CanvasToolbarAction>, snap : bool, disabled : bool, on_action : Option<ActionHandler>, }",
+      "signature": "# [doc = \" Compact canvas chrome: a host-formatted zoom and the intents the host can\"] # [doc = \" actually carry out.\"] # [derive (IntoElement)] pub struct CanvasToolbar { ident : Ident, zoom : SharedString, actions : Vec<CanvasToolbarAction>, snap : bool, glass : Option<GlassPreset>, disabled : bool, on_action : Option<ActionHandler>, }",
       "cfg": []
     },
     {
@@ -47217,6 +47217,21 @@
       "summary": "The actions this toolbar offers, in the order it shows them.",
       "documentation": "The actions this toolbar offers, in the order it shows them.\n\nThe default is all three, which is the toolbar a graph editor wants.\nAn inspect-only canvas cannot snap or rearrange anything, and a chip\nthat reports an intent its host will not act on is a promise the\nreader is entitled to believe. Naming the actions is how a host says\nwhich promises it can keep; naming none leaves the zoom on its own,\nwhich is a legitimate readout.\n\nRepeats are dropped rather than drawn twice.",
       "signature": "pub fn actions (mut self, actions : impl IntoIterator<Item = CanvasToolbarAction>) -> Self",
+      "cfg": [],
+      "target": "CanvasToolbar"
+    },
+    {
+      "id": "gpui_kit::canvas::toolbar::CanvasToolbar::glass",
+      "name": "glass",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "canvas::toolbar",
+      "path": "gpui_kit::canvas::toolbar",
+      "source": "crates/gpui-kit/src/canvas/toolbar.rs",
+      "summary": "Places this floating chrome on one of the kit's glass materials.",
+      "documentation": "Places this floating chrome on one of the kit's glass materials.\n\nThe preset resolves exclusively through the theme's `effect.glass*`\ntokens and the shared [`Glass`] layer, including its renderer fallback\nand adaptive readability tint. Without this opt-in the toolbar keeps\nits ordinary opaque overlay surface.",
+      "signature": "pub fn glass (mut self, preset : GlassPreset) -> Self",
       "cfg": [],
       "target": "CanvasToolbar"
     },
@@ -116741,6 +116756,7 @@
       "options": [
         "actions(actions: impl IntoIterator<Item = CanvasToolbarAction>) -> Self",
         "snap(snap: bool) -> Self",
+        "glass(preset: GlassPreset) -> Self",
         "on_action(handler: impl Fn(CanvasToolbarAction, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],

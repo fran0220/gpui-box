@@ -804,6 +804,7 @@ fn canvas_toolbar_actions_share_pointer_keyboard_and_disabled_contracts(cx: &mut
             .column()
             .child(
                 CanvasToolbar::new("toolbar", "125%")
+                    .glass(GlassPreset::Liquid)
                     .snap(true)
                     .on_action(move |action, _, _| active_sink.borrow_mut().push(action)),
             )

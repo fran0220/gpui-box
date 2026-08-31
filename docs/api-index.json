@@ -861,6 +861,7 @@
       "options": [
         "actions(actions: impl IntoIterator<Item = CanvasToolbarAction>) -> Self",
         "snap(snap: bool) -> Self",
+        "glass(preset: GlassPreset) -> Self",
         "on_action(handler: impl Fn(CanvasToolbarAction, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],

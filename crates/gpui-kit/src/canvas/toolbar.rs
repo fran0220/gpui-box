@@ -14,6 +14,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale
 
 use crate::controls::button::Button;
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::overlay::{Glass, GlassPreset};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ActionHandler = Rc<dyn Fn(CanvasToolbarAction, &mut Window, &mut App)>;
@@ -62,6 +63,7 @@ pub struct CanvasToolbar {
     zoom: SharedString,
     actions: Vec<CanvasToolbarAction>,
     snap: bool,
+    glass: Option<GlassPreset>,
     disabled: bool,
     on_action: Option<ActionHandler>,
 }
@@ -73,6 +75,7 @@ impl CanvasToolbar {
             zoom: zoom.into(),
             actions: CanvasToolbarAction::ALL.to_vec(),
             snap: false,
+            glass: None,
             disabled: false,
             on_action: None,
         }
@@ -100,6 +103,17 @@ impl CanvasToolbar {
 
     pub fn snap(mut self, snap: bool) -> Self {
         self.snap = snap;
+        self
+    }
+
+    /// Places this floating chrome on one of the kit's glass materials.
+    ///
+    /// The preset resolves exclusively through the theme's `effect.glass*`
+    /// tokens and the shared [`Glass`] layer, including its renderer fallback
+    /// and adaptive readability tint. Without this opt-in the toolbar keeps
+    /// its ordinary opaque overlay surface.
+    pub fn glass(mut self, preset: GlassPreset) -> Self {
+        self.glass = Some(preset);
         self
     }
 
@@ -138,43 +152,53 @@ impl RenderOnce for CanvasToolbar {
             }
             chip
         };
-        div()
-            .row()
-            .items_center()
-            .gap_token(&theme, Space::Sm)
-            .p_token(&theme, Space::Xs)
-            .radius(&theme, Radius::Small)
-            .surface(&theme, Surface::Overlay)
-            // The zoom is a reading, not a control: it wears the mono figures
-            // and a rule separates it from the three chips beside it, so a
-            // reader does not try to press it.
-            .child(
-                div()
-                    .px_token(&theme, Space::Xs)
-                    .mono(&theme)
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(self.zoom.clone()),
-            )
-            // The rule separates the reading from the controls, so it is
-            // drawn only when there are controls to separate it from.
-            .when(!self.actions.is_empty(), |element| {
-                element.child(
+        let body =
+            div()
+                .row()
+                .items_center()
+                .gap_token(&theme, Space::Sm)
+                .p_token(&theme, Space::Xs)
+                // The zoom is a reading, not a control: it wears the mono figures
+                // and a rule separates it from the three chips beside it, so a
+                // reader does not try to press it.
+                .child(
                     div()
-                        .w(px(theme.borders.hairline))
-                        .h(px(theme.typography.caption.line_height))
-                        .bg(theme.colors.divider),
+                        .px_token(&theme, Space::Xs)
+                        .mono(&theme)
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_muted)
+                        .child(self.zoom.clone()),
                 )
-            })
-            .children(
-                self.actions.iter().map(|action| {
+                // The rule separates the reading from the controls, so it is
+                // drawn only when there are controls to separate it from.
+                .when(!self.actions.is_empty(), |element| {
+                    element.child(
+                        div()
+                            .w(px(theme.borders.hairline))
+                            .h(px(theme.typography.caption.line_height))
+                            .bg(theme.colors.divider),
+                    )
+                })
+                .children(self.actions.iter().map(|action| {
                     button(*action, *action == CanvasToolbarAction::Snap && self.snap)
-                }),
-            )
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Group).value(self.zoom),
-            )
+                }))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.semantic_id(), Role::Group).value(self.zoom),
+                );
+        if let Some(preset) = self.glass {
+            Glass::new(self.ident.child("glass"))
+                .surface(Surface::Overlay)
+                .radius(Radius::Small)
+                .preset(preset)
+                .adaptive(true)
+                .child(body)
+                .into_any_element()
+        } else {
+            body.radius(&theme, Radius::Small)
+                .surface(&theme, Surface::Overlay)
+                .into_any_element()
+        }
     }
 }
 
@@ -211,6 +235,14 @@ mod tests {
                 .actions([])
                 .actions
                 .is_empty()
+        );
+
+        assert_eq!(
+            CanvasToolbar::new("canvas", "100%")
+                .glass(GlassPreset::Frosted)
+                .glass,
+            Some(GlassPreset::Frosted),
+            "the toolbar carries the shared glass preset rather than a local material"
         );
     }
 }
