@@ -9,10 +9,13 @@ cargo run -p xtask -- performance check
 ```
 
 It writes a machine-readable report to
-`target/performance/report.json`. The report currently covers 10,000-item
-fixtures for List, DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument.
-The command also renders a deliberately unbounded 10,000-child fixture and
-fails if the budget does not reject it.
+`target/performance/report.json`. The report covers 10,000-item fixtures for
+List, DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument. It also draws
+a fully visible 64-node graph split between 32 zero-snapshot resting materials
+and 32 promoted glass requests. That promoted set deliberately exceeds the
+renderer admission limit, proving the bounded backdrop/fill-fallback path under
+the same structural budget. The command additionally renders a deliberately
+unbounded 10,000-child fixture and fails if the budget does not reject it.
 
 ## What is counted
 

@@ -6,10 +6,11 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use anyhow::{Context as _, Result, bail};
-use gpui::{AnyElement, IntoElement, ParentElement as _, TestAppContext, div};
+use gpui::{AnyElement, IntoElement, ParentElement as _, Styled as _, TestAppContext, div};
+use gpui_kit::foundation::Selectable as _;
 use gpui_kit::prelude::{
-    AgentDocument, AgentDocumentBlock, CodeLine, CodeView, DataGrid, GridColumn, GridRow, List,
-    ListItem, LogEntry, LogStream, TreeGrid, TreeGridRow,
+    AgentDocument, AgentDocumentBlock, CodeLine, CodeView, DataGrid, GraphInteraction, GraphNode,
+    GridColumn, GridRow, List, ListItem, LogEntry, LogStream, NodeGraph, TreeGrid, TreeGridRow,
 };
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -19,6 +20,10 @@ use gpui_kit_testkit::{
 
 const DATASET_ITEMS: usize = 10_000;
 const VISIBLE_ROWS: usize = 24;
+/// A full visible board rather than a virtualized row fixture: half ordinary
+/// pseudo-glass, half promoted glass requests.
+const MATERIAL_NODES: usize = 64;
+const PROMOTED_NODES: usize = 32;
 
 /// What a fixture hands the harness: one view builder, called every frame.
 type ViewBuilder = Box<dyn Fn(&mut gpui::Window, &mut gpui::App) -> AnyElement>;
@@ -32,6 +37,7 @@ fn main() -> Result<()> {
         run("code-view", code_view_fixture)?,
         run("log-stream", log_stream_fixture)?,
         run("agent-document", agent_document_fixture)?,
+        run("node-graph-material", node_graph_material_fixture)?,
     ];
     prove_unbounded_fixture_fails()?;
 
@@ -39,6 +45,9 @@ fn main() -> Result<()> {
         "schema_version": 1,
         "dataset_items": DATASET_ITEMS,
         "viewport_rows": VISIBLE_ROWS,
+        "node_graph_nodes": MATERIAL_NODES,
+        "node_graph_promoted": PROMOTED_NODES,
+        "backdrop_glass_admission": gpui::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME,
         "reports": reports,
         "detector_proof": "unbounded-10k-fixture-refused",
     });
@@ -195,6 +204,32 @@ fn agent_document_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
             }))
             .virtualized(VISIBLE_ROWS)
             .into_any_element()
+    })
+}
+
+fn node_graph_material_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
+    // Deliberately cross the renderer's admission ceiling. The admitted panes
+    // carry real Frosted snapshots; requests beyond it keep their material
+    // fill through the framework fallback. This is the high-state-density
+    // case the split material policy must bound, not only its easy rest case.
+    assert!(PROMOTED_NODES > gpui::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME);
+    Box::new(move |_, _| {
+        let mut graph = NodeGraph::new("perf.node-graph-material")
+            .interaction(GraphInteraction::Inspect)
+            .grid(false);
+        for index in 0..MATERIAL_NODES {
+            calls.set(calls.get().saturating_add(1));
+            let column = index % 8;
+            let row = index / 8;
+            graph = graph.node(
+                GraphNode::new(format!("material-node-{index}"), format!("Node {index}"))
+                    .width(84.0)
+                    .selected(index < PROMOTED_NODES),
+                10.0 + column as f32 * 96.0,
+                10.0 + row as f32 * 64.0,
+            );
+        }
+        div().size_full().child(graph).into_any_element()
     })
 }
 
