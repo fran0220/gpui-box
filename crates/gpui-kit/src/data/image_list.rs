@@ -207,8 +207,19 @@ impl RenderOnce for ImageList {
                         .disabled(disabled),
                 );
             if !disabled && let Some(handler) = self.on_select.clone() {
+                let press = handler.clone();
+                let pressed = item_id.clone();
                 tile = tile.on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                    handler(item_id.clone(), window, cx)
+                    press(pressed.clone(), window, cx)
+                });
+                // The tile is a tab stop that publishes `Role::Button`, so a
+                // keyboard that could reach it and not press it was the tile
+                // telling a reader to press something they could not press.
+                tile = tile.on_key_down(move |key: &gpui::KeyDownEvent, window, cx| {
+                    if matches!(key.keystroke.key.as_str(), "enter" | "space") {
+                        handler(item_id.clone(), window, cx);
+                        cx.stop_propagation();
+                    }
                 });
             }
             grid = grid.child(tile);

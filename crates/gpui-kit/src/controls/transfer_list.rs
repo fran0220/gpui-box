@@ -247,6 +247,18 @@ impl TransferList {
                     let event = event.clone();
                     cx.listener(move |_list, _, _, cx| cx.emit(event.clone()))
                 });
+                // The row is a tab stop that publishes `Role::Option`, so a
+                // keyboard that could reach it and not toggle it was the row
+                // promising a reader something it did not deliver.
+                row = row.on_key_down({
+                    let event = event.clone();
+                    cx.listener(move |_list, key: &gpui::KeyDownEvent, _, cx| {
+                        if matches!(key.keystroke.key.as_str(), "enter" | "space") {
+                            cx.emit(event.clone());
+                            cx.stop_propagation();
+                        }
+                    })
+                });
             }
             list = list.child(row);
         }
