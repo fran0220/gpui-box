@@ -544,7 +544,12 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
-        .w(px(760.0))
+        // The four columns are 860 wide between them. At 760 the grid was
+        // correct — a wide grid scrolls — but the exhibit was not: it sorts by
+        // duration and hid the duration column, so the one end-aligned column
+        // in the catalogue and the sort mark on it were both off the edge of
+        // the picture a reviewer is sent to.
+        .w(px(880.0))
         .child(
             DataGrid::new("scene.data-grid-editing.jobs", 6, |index, _, _| {
                 grid_row(index)
