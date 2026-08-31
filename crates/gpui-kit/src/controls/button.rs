@@ -345,10 +345,12 @@ impl RenderOnce for Button {
         // primary, so the current answer is the *lightest* thing in a run
         // instead of the darkest.
         //
-        // A button that opted into the shared tiers already carries a paint
-        // that says which answer is current, so selection leaves it alone:
-        // washing a tier over with the neutral one throws away the colour the
-        // caller asked for and leaves the rail as the only mark.
+        // A button that opted into the shared tiers keeps the colour the
+        // caller asked for: washing a tier over with the neutral one throws it
+        // away, and a tier that reported nothing while selected would publish
+        // `checked` with nothing on screen behind it. So it takes its own
+        // ladder's strongest step instead, which is the same answer the rest
+        // of the library gives — a stronger fill of the paint already there.
         let unified = self.unified(&theme);
         let paint = if self.disabled {
             theme.colors.text_disabled
@@ -457,10 +459,9 @@ impl RenderOnce for Button {
             element.w(px(metrics.height)).px(px(0.0))
         })
         .map(|element| joined(element, self.join, direction))
-        .when(
-            self.selected && !self.disabled && !on_shared_tiers,
-            |element| element.bg(theme.colors.active),
-        )
+        .when(self.selected && !self.disabled, |element| {
+            element.bg(selected_fill_for(&theme, unified))
+        })
         .id(self.ident.element_id())
         .when_some(self.focus_handle.clone(), |element, handle| {
             element.track_focus(&handle)
@@ -642,14 +643,34 @@ fn frame(
     }
 }
 
+/// The fill a chosen button wears, resolved against the paint it already has.
+///
+/// Selection is a stronger step of the same ladder rather than a second
+/// colour: the neutral active step for the built-in variants, and the tier's
+/// own active step for a button on the shared tiers, so a chosen tier keeps
+/// the colour the caller asked for instead of trading it for a grey wash.
+///
+/// [`Variant::Transparent`] is the one tier whose active step is nothing at
+/// all, because "no surface" is what that tier means to the pointer. It cannot
+/// mean it here: the button has already published `checked`, and a state
+/// nobody can see is the report this library refuses to make. So a tier with
+/// no active paint of its own falls back to the neutral wash — which is what
+/// the same button drawn without a tier already does.
+fn selected_fill_for(theme: &Theme, unified: Option<(Variant, VariantColors)>) -> Hsla {
+    match unified {
+        Some((_, resolved)) if resolved.background_active.a > 0.0 => resolved.background_active,
+        _ => theme.colors.active,
+    }
+}
+
 fn button_background(
     theme: &Theme,
     variant: ButtonVariant,
     unified: Option<(Variant, VariantColors)>,
     selected: bool,
 ) -> Hsla {
-    if selected && unified.is_none() {
-        return theme.colors.active;
+    if selected {
+        return selected_fill_for(theme, unified);
     }
     if let Some((_, colors)) = unified {
         return colors.background;
@@ -890,5 +911,77 @@ impl RenderOnce for ButtonGroup {
             .surface(&theme, gpui_kit_theme::Surface::Sunken)
             .children(buttons)
             .semantic_in(cx, NodeSpec::new(parent, Role::Toolbar))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit_theme::{ColorChoice, SemanticColor};
+
+    /// A button that reports `checked` has to have something on screen behind
+    /// the claim. Before this, a chosen button on the shared tiers took no
+    /// paint at all: it published the state and drew the resting fill, so the
+    /// current answer in a run of tier buttons was invisible.
+    #[test]
+    fn a_chosen_tier_button_is_painted_differently_from_a_resting_one() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            for tier in [
+                Variant::Default,
+                Variant::Filled,
+                Variant::Light,
+                Variant::Subtle,
+                Variant::Transparent,
+                Variant::White,
+            ] {
+                for choice in [
+                    ColorChoice::Semantic(SemanticColor::Accent),
+                    ColorChoice::Semantic(SemanticColor::Danger),
+                ] {
+                    let colors = theme.variant_colors(tier, &choice);
+                    let unified = Some((tier, colors));
+                    let resting =
+                        button_background(&theme, ButtonVariant::Secondary, unified, false);
+                    let chosen = button_background(&theme, ButtonVariant::Secondary, unified, true);
+                    assert_ne!(
+                        resting, chosen,
+                        "{tier:?} reports selection with the same paint it rests in"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Selection stays inside the ladder the caller chose: a tier keeps its
+    /// own colour rather than trading it for the neutral wash, which is what
+    /// made the tiers worth asking for.
+    #[test]
+    fn a_chosen_tier_keeps_its_own_colour() {
+        let theme = Theme::studio_dark();
+        let colors = theme.variant_colors(
+            Variant::Filled,
+            &ColorChoice::Semantic(SemanticColor::Danger),
+        );
+        let chosen = selected_fill_for(&theme, Some((Variant::Filled, colors)));
+        assert_eq!(chosen, colors.background_active);
+        assert_ne!(chosen, theme.colors.active);
+        assert_eq!(selected_fill_for(&theme, None), theme.colors.active);
+    }
+
+    /// The surfaceless tier is the one that cannot answer out of its own
+    /// ladder, so it borrows the neutral wash rather than reporting `checked`
+    /// with nothing on screen.
+    #[test]
+    fn a_chosen_surfaceless_tier_falls_back_to_the_neutral_wash() {
+        let theme = Theme::studio_dark();
+        let colors = theme.variant_colors(
+            Variant::Transparent,
+            &ColorChoice::Semantic(SemanticColor::Accent),
+        );
+        assert_eq!(colors.background_active.a, 0.0, "the tier paints nothing");
+        assert_eq!(
+            selected_fill_for(&theme, Some((Variant::Transparent, colors))),
+            theme.colors.active
+        );
     }
 }
