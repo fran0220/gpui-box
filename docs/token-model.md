@@ -387,12 +387,12 @@ Selection and focus live here too, and they are drawn differently on purpose:
 selection says which answer is current, focus says where the next keystroke
 goes, and a reader who cannot tell them apart cannot tell what pressing a key
 would do. `effect.focusRingWidth` and `effect.focusRingAlpha` draw an outset
-ring in `color.interactive.focus` around whatever holds the keyboard.
-`effect.selectionRailWidth` is the accent bar a collection puts at the reading
-edge of the row it is on, over a wash of `color.interactive.selected`.
-`effect.selectedRingAlpha` remains the weight of a state tint — a changed line
-in a diff, a matched range in a search, a drop target — rather than a ring drawn
-around a chosen thing.
+halo in `color.interactive.focus` around whatever holds the keyboard. The halo
+uses blur instead of a hard counter outline; a control with a different resting
+fill resolves the same single halo to a readable pole on that fill. Selection
+uses the stronger tonal fill at `color.interactive.selected`, never an outline
+or an edge rail. Component-owned state washes distinguish changed lines,
+matched ranges, and drop targets without adding another selection vocabulary.
 
 Gradients are not a token group. This library composes one from a base colour
 and an alpha ladder, the way `Theme::glow` composes a bloom from
@@ -407,7 +407,7 @@ owns is the scalars:
 | `effect.nodeActive*Alpha`, `nodeTrafficAlpha`, `nodePreviewAlpha`, `nodeMinimapAlpha` | the node-canvas paint ladder for active routes, traffic, connection previews, and minimap identity |
 | `effect.semanticWash*Alpha` | reusable weak, normal, and strong semantic-colour backgrounds |
 | `effect.semanticBorderAlpha`, `accentBorder*Alpha` | report, selected, and active-target boundary strengths |
-| `effect.variant*Alpha` | the shared Light, Outline, and Subtle state ladders |
+| `effect.variant*Alpha` | the shared Light and Subtle state ladders |
 | `effect.railWidth` | how wide an identity rail is, in pixels |
 | `effect.customColorReadable*`, `customColor*LightnessDelta` | fallback readability and interaction ladders for caller colours that have no authored palette ramp |
 
@@ -418,11 +418,10 @@ the same alpha that lights a dark card's edge has nowhere to go on a near-white
 one and reads as a smudge, and the same wash under a chart line swamps the line
 it is meant to support.
 
-`effect.railWidth` is a different thing from `effect.selectionRailWidth`, and
-both exist. A selection rail reports which row the collection is on and is
-gone the moment another row is chosen; an identity rail says what a thing *is*
-— a node's category, a callout's severity — and is drawn whether or not
-anybody is looking at it, which is why it is the wider of the two.
+`effect.railWidth` belongs only to an identity rail: it says what a thing *is*
+— a node's category or a callout's severity — and is drawn whether or not
+anybody is looking at it. Selection is deliberately not another rail use; its
+material wash says which answer is current without adding an ornamental line.
 
 ## Validation
 
@@ -439,7 +438,7 @@ anybody is looking at it, which is why it is the wider of the two.
   the farthest layer) is not strictly increasing;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1;
-- a non-positive selection rail width, or a non-positive identity rail width;
+- a non-positive identity rail width;
 - a series scale that does not carry exactly eight colors;
 - required foreground/background pairs below their contrast floor;
 - a decorative line, a canvas grid or a resting edge that composites into a

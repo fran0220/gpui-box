@@ -352,8 +352,8 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .id("scene.card.chosen")
                         .padding(Space::Lg)
                         .selected(true)
-                        .header(CardHeader::new("Selected").subtitle("A wash and a rail"))
-                        .child(caption("Both are drawn inside, so choosing moves nothing.")),
+                        .header(CardHeader::new("Selected").subtitle("A stronger material wash"))
+                        .child(caption("Fill carries selection without moving the content.")),
                 ))
                 .child(column(
                     Card::new()
