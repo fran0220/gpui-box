@@ -284,6 +284,23 @@ pub trait FocusRing: InteractiveElement + Sized {
     fn focus_ring_on(self, theme: &Theme, background: gpui::Hsla) -> Self {
         self.focus_visible(|style| style.shadow(theme.focus_ring_on(background)))
     }
+
+    /// The same halo for an element that has no resting fill of its own.
+    ///
+    /// The halo is a shadow, and a non-inset shadow is painted under the whole
+    /// element rather than clipped to the outside of it the way CSS clips one.
+    /// A control with a fill covers that interior and the halo reads as a
+    /// ring. A transparent row does not, so the identical call that rings a
+    /// button washes a row in the focus colour at its full ring alpha — which
+    /// is louder than the selected fill and reads as a selection the reader
+    /// did not make.
+    ///
+    /// This lays the ground the halo needs, for exactly as long as the halo is
+    /// worn: `ground` is the colour already behind the element, so a focused
+    /// row is its own resting colour plus a ring, and nothing moves.
+    fn focus_ring_over(self, theme: &Theme, ground: gpui::Hsla) -> Self {
+        self.focus_visible(move |style| style.bg(ground).shadow(theme.focus_ring_on(ground)))
+    }
 }
 
 impl<T: InteractiveElement + Sized> FocusRing for T {}
