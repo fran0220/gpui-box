@@ -158,7 +158,12 @@ impl NodeMetrics {
             icon_size: scaled(theme.control.sm.icon_size),
             badge: scaled(theme.control.xs.height),
             status: scaled(theme.control.xs.height),
-            radius: scaled(theme.radius(Radius::Bubble)),
+            // A node is a card, so it takes the card role: the same rounding
+            // the group box around it and every other card in the library
+            // already read. Bubble is the dialog and message step, and a board
+            // of cards rounded one step past the box enclosing them is the
+            // inconsistency a reader sees before they read anything.
+            radius: scaled(theme.radius(Radius::Card)),
         }
     }
 }
@@ -1164,13 +1169,19 @@ impl RenderOnce for GraphNode {
             .child(header)
             .children(body);
 
+        // A full-bleed layer inside the card carries the card's own rounding.
+        // `overflow_hidden` masks children to a rectangle, so a wash that
+        // fills the card without saying it is round paints square corners over
+        // the round ones underneath — which is why a plain node used to come
+        // out with right angles while a promoted one, drawn by Glass, did not.
+        // One radius, stated wherever something fills the card.
+        let fill = || div().absolute().inset_0().rounded(px(metrics.radius));
+
         // The ordinary card is a zero-snapshot glass reading: a quiet tonal
         // plane with a soft top-light gradient and an inset specular cast.
         // Promoted cards drop the opaque plane so the shared Glass layer below
         // can show its real backdrop through the same highlight.
-        let material = div()
-            .absolute()
-            .inset_0()
+        let material = fill()
             .when(!promoted, |element| {
                 element.bg(linear_gradient_stops(
                     180.0,
@@ -1180,7 +1191,7 @@ impl RenderOnce for GraphNode {
                     ],
                 ))
             })
-            .child(div().absolute().inset_0().bg(linear_gradient_stops(
+            .child(fill().bg(linear_gradient_stops(
                 180.0,
                 [
                     linear_color_stop(
@@ -1195,10 +1206,8 @@ impl RenderOnce for GraphNode {
         // rather than the ornamental edge stripe nodes used to wear.
         let category_wash = identity
             .filter(|_| self.icon.is_none() && self.kind.is_none())
-            .map(|identity| div().absolute().inset_0().bg(identity.background));
-        let selection_wash = self
-            .selected
-            .then(|| div().absolute().inset_0().bg(theme.colors.selected));
+            .map(|identity| fill().bg(identity.background));
+        let selection_wash = self.selected.then(|| fill().bg(theme.colors.selected));
         let inset = BoxShadow {
             color: theme
                 .colors
@@ -1303,7 +1312,11 @@ impl RenderOnce for GraphNode {
         let material = if promoted {
             Glass::new(self.ident.child("glass"))
                 .surface(Surface::Raised)
-                .radius(Radius::Bubble)
+                // The glass clips the blur, so it rounds by the card's own
+                // measured radius rather than resolving the role a second
+                // time: the card is scaled by the viewport's zoom and the role
+                // is not.
+                .radius_px(metrics.radius)
                 .preset(self.active_glass)
                 .child(card)
                 .into_any_element()
@@ -1662,6 +1675,21 @@ mod tests {
         assert_eq!(doubled.icon_size, theme.control.sm.icon_size * 2.0);
         assert_eq!(doubled.badge, theme.control.xs.height * 2.0);
         assert_eq!(doubled.status, theme.control.xs.height * 2.0);
-        assert_eq!(doubled.radius, theme.radius(Radius::Bubble) * 2.0);
+        assert_eq!(doubled.radius, theme.radius(Radius::Card) * 2.0);
+    }
+
+    /// A node is a card and is rounded like one. The group box that encloses a
+    /// run of nodes already reads the card role, so a node reading any other
+    /// step would be visibly rounder or squarer than the box around it in
+    /// every theme.
+    #[test]
+    fn a_node_is_rounded_by_the_card_role_in_every_theme() {
+        for theme in [
+            gpui_kit_theme::Theme::studio_dark(),
+            gpui_kit_theme::Theme::studio_light(),
+        ] {
+            let metrics = NodeMetrics::new(&theme, NODE_WIDTH, 1.0, None);
+            assert_eq!(metrics.radius, theme.radius(Radius::Card));
+        }
     }
 }
