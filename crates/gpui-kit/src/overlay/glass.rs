@@ -227,6 +227,7 @@ pub struct Glass {
     ident: Ident,
     surface: Surface,
     radius: Radius,
+    radius_px: Option<f32>,
     blur: Option<f32>,
     preset: GlassPreset,
     refraction: Option<f32>,
@@ -246,6 +247,7 @@ impl std::fmt::Debug for Glass {
             .field("ident", &self.ident)
             .field("surface", &self.surface)
             .field("radius", &self.radius)
+            .field("radius_px", &self.radius_px)
             .field("blur", &self.blur)
             .field("preset", &self.preset)
             .field("refraction", &self.refraction)
@@ -266,6 +268,7 @@ impl Glass {
             ident: ident.into(),
             surface: Surface::Overlay,
             radius: Radius::Card,
+            radius_px: None,
             blur: None,
             preset: GlassPreset::default(),
             refraction: None,
@@ -291,6 +294,19 @@ impl Glass {
     /// blur will show past the corners.
     pub fn radius(mut self, radius: Radius) -> Self {
         self.radius = radius;
+        self
+    }
+
+    /// The rounding of the glass in pixels, overriding the role.
+    ///
+    /// A canvas draws its cards at a zoom the theme knows nothing about, so
+    /// the card inside is rounded at a scaled radius while the role resolves
+    /// to its unscaled one. Since the glass clips the blur as well as the
+    /// fill, resolving the role again here would show the backdrop past the
+    /// card's corners at every zoom but one. A caller that already scaled the
+    /// radius hands over the number it used rather than the role it came from.
+    pub fn radius_px(mut self, radius: f32) -> Self {
+        self.radius_px = Some(radius);
         self
     }
 
@@ -404,7 +420,7 @@ impl Glass {
 impl RenderOnce for Glass {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let radius = theme.radius(self.radius);
+        let radius = self.radius_px.unwrap_or_else(|| theme.radius(self.radius));
         let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let mut material = self.material(&theme);
         let bevel = self.preset.bevel(&theme);

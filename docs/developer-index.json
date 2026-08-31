@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4158
+      "symbolCount": 4159
     },
     {
       "name": "gpui-box-kit-assets",
@@ -93224,7 +93224,7 @@
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "A glass surface: optionally scattered and bent backdrop, optional fill, and caller-owned content.",
       "documentation": "A glass surface: optionally scattered and bent backdrop, optional fill,\nand caller-owned content.",
-      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, radius : Radius, blur : Option<f32>, preset : GlassPreset, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, child : Option<AnyElement>, }",
+      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, radius : Radius, radius_px : Option<f32>, blur : Option<f32>, preset : GlassPreset, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, child : Option<AnyElement>, }",
       "cfg": []
     },
     {
@@ -93359,6 +93359,21 @@
       "summary": "The rounding of the glass. It clips the blur as well as the fill, so a caller rounding the card inside must say the same thing here or the blur will show past the corners.",
       "documentation": "The rounding of the glass. It clips the blur as well as the fill, so a\ncaller rounding the card inside must say the same thing here or the\nblur will show past the corners.",
       "signature": "pub fn radius (mut self, radius : Radius) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::Glass::radius_px",
+      "name": "radius_px",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "The rounding of the glass in pixels, overriding the role.",
+      "documentation": "The rounding of the glass in pixels, overriding the role.\n\nA canvas draws its cards at a zoom the theme knows nothing about, so\nthe card inside is rounded at a scaled radius while the role resolves\nto its unscaled one. Since the glass clips the blur as well as the\nfill, resolving the role again here would show the backdrop past the\ncard's corners at every zoom but one. A caller that already scaled the\nradius hands over the number it used rather than the role it came from.",
+      "signature": "pub fn radius_px (mut self, radius : f32) -> Self",
       "cfg": [],
       "target": "Glass"
     },
@@ -118285,6 +118300,7 @@
       "options": [
         "surface(surface: Surface) -> Self",
         "radius(radius: Radius) -> Self",
+        "radius_px(radius: f32) -> Self",
         "blur(blur: f32) -> Self",
         "preset(preset: GlassPreset) -> Self",
         "refraction(refraction: f32) -> Self",
