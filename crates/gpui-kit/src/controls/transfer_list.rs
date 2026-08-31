@@ -15,7 +15,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TextTone,
 use crate::controls::button::IconButton;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
-use crate::foundation::{Disableable, Hoverable, Ident, SelectedFill, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// An item in one side of a transfer list.
@@ -191,13 +193,20 @@ impl TransferList {
                 .py(px(theme.space(Space::Xs)))
                 .radius(&theme, Radius::Control)
                 .selected_fill(&theme, selected_item)
-                .when(!disabled, |element| element.cursor_pointer())
                 // A row that answers a click answers the pointer that is over
-                // it, the same way every other pickable row in the library
-                // does. The selected wash already occupies the row, so only an
-                // unselected one takes the hover step.
-                .when(!disabled && !selected_item, |element| {
-                    element.hover_row(&theme)
+                // it and can be reached without one, the same way every other
+                // pickable row in the library can. It publishes `Role::Option`
+                // either way, so a keyboard that could not reach it was the
+                // row promising a reader something it did not deliver. The
+                // selected wash already occupies the row, so only an unselected
+                // one takes the hover step.
+                .when(!disabled, |element| {
+                    element
+                        .cursor_pointer()
+                        .tab_index(0)
+                        .pressable(cx)
+                        .focus_ring(&theme)
+                        .when(!selected_item, |element| element.hover_row(&theme))
                 })
                 .child(
                     gpui_kit_assets::icon(if selected_item {

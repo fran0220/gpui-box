@@ -15,7 +15,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::button::IconButton;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(Option<f32>, &mut Window, &mut App)>;
@@ -154,6 +154,7 @@ impl RenderOnce for Rating {
             let half =
                 !filled && self.precision == RatingPrecision::Half && value >= star_value - 0.5;
             let star_id = self.ident.child(format!("value-{index}"));
+            let star_hover = star_id.child("hover").semantic_id();
             let mut star = div()
                 .id(star_id.element_id())
                 .relative()
@@ -162,10 +163,22 @@ impl RenderOnce for Rating {
                 .justify_center()
                 .w(star_size)
                 .h(star_size)
+                // A star answers the pointer the way every other control in
+                // the library does. SVG paint does not inherit the frame's
+                // text colour, so the empty star has to name the hover step
+                // itself through the group rather than let it fall through.
+                .when(actionable, |element| {
+                    element.group(star_hover.clone()).pressable(cx)
+                })
                 .child(
                     icon(Icon::Star)
                         .size(star_size)
-                        .text_color(theme.colors.hairline_strong),
+                        .text_color(theme.colors.hairline_strong)
+                        .when(actionable, |element| {
+                            element.group_hover(star_hover.clone(), |style| {
+                                style.text_color(theme.colors.warning)
+                            })
+                        }),
                 );
             if filled {
                 star = star.child(
@@ -267,6 +280,14 @@ impl RenderOnce for Rating {
             .gap(px(theme.space(Space::Sm)))
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
+            })
+            // The arrow, home, end and clear keys below are installed on this
+            // frame, and a frame that never takes focus never receives one of
+            // them. Without these two lines the whole keyboard path is written
+            // and unreachable, while every star still publishes `Role::Button`
+            // to a reader who is then told to press one.
+            .when(actionable, |element| {
+                element.tab_index(0).focus_ring(&theme)
             })
             .child(stars)
             .when_some(self.label.clone(), |element, label| {

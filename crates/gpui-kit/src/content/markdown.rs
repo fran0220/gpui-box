@@ -49,7 +49,7 @@ use web_time::Instant;
 use crate::content::code_view::styled_code;
 use crate::content::highlight::{Cache, Language};
 use crate::controls::button::Button;
-use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
 use crate::motion::{MotionPolicy, MotionRole, keyed};
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -706,7 +706,15 @@ impl Painter {
             .flex()
             .flex_row()
             .flex_wrap()
-            .when(!unfinished, |element| element.cursor_pointer())
+            // A link that can be followed can be reached. It publishes
+            // `Role::Link` whether or not anybody can get to it, so without a
+            // tab stop the document told a reader there were links in it and
+            // then handed them to the pointer alone. The underline stays: on a
+            // link it is not decoration but the second channel, so colour is
+            // not the only thing separating a link from the prose around it.
+            .when(!unfinished, |element| {
+                element.cursor_pointer().tab_index(0).focus_ring(&theme)
+            })
             .text_color(theme.colors.accent)
             .underline()
             .when(!help.is_empty(), |element| {

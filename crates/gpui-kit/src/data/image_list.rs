@@ -12,7 +12,9 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
-use crate::foundation::{Disableable, Hoverable, Ident, SelectedFill, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, StyledExt, text,
+};
 use crate::layout::{Breakpoint, GridColumns, measure};
 use crate::strings::ActiveNumbers;
 
@@ -168,11 +170,17 @@ impl RenderOnce for ImageList {
                 .selected_fill(&theme, selected)
                 .when(disabled, |element| element.opacity(theme.opacity.disabled))
                 .when(!disabled && self.on_select.is_some(), |element| {
-                    // A tile that answers a click answers the pointer over it.
-                    // The selected wash already fills the tile, so only an
-                    // unselected one takes the hover step.
+                    // A tile that answers a click answers the pointer over it
+                    // and can be reached without one. It publishes
+                    // `Role::Button`, so a tile the keyboard could not reach
+                    // was telling a reader to press something they could not
+                    // get to. The selected wash already fills the tile, so only
+                    // an unselected one takes the hover step.
                     element
                         .cursor_pointer()
+                        .tab_index(0)
+                        .pressable(cx)
+                        .focus_ring(&theme)
                         .when(!selected, |element| element.hover_row(&theme))
                 })
                 .child(

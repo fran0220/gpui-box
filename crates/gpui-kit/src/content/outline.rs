@@ -39,7 +39,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme};
 
 use crate::data::viewport::{glide_to_row, viewed_rows};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -240,7 +240,15 @@ impl Outline {
             .flex()
             .items_center()
             .justify_center()
+            // A mark publishes `Role::Button` and jumps the reader somewhere,
+            // so it takes the whole actionable recipe: the keyboard reaches it,
+            // the ring says so, and it sinks under a press like every other
+            // control. Without the first two it was a button a reader was told
+            // about and could never press.
             .cursor_pointer()
+            .tab_index(0)
+            .pressable(cx)
+            .focus_ring(theme)
             .child(
                 div()
                     .h(px(MARK_HEIGHT))
