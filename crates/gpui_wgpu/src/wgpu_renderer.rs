@@ -3452,6 +3452,12 @@ pub struct WgpuHeadlessRenderer {
 #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
 impl WgpuHeadlessRenderer {
     pub fn new() -> anyhow::Result<Self> {
+        // Inside this crate's own test binary, building a device without the
+        // serialising guard is what took Windows down, so it is refused here
+        // rather than left to each test to remember. Nothing outside the test
+        // target is affected.
+        #[cfg(all(test, not(target_family = "wasm")))]
+        crate::assert_serialised_gpu_test();
         let context = WgpuContext::new_headless()?;
         let atlas = Arc::new(WgpuAtlas::from_context(&context));
         let renderer = WgpuRenderer::new_headless(&context, atlas)?;
@@ -3781,6 +3787,7 @@ mod tests {
     #[test]
     fn a_probe_reads_the_backdrop_it_blurred() {
         use gpui::{DevicePixels, Hsla, size};
+        let _gpu = crate::serialised_gpu_test();
         let mut headless = match WgpuHeadlessRenderer::new() {
             Ok(headless) => headless,
             Err(error) => {

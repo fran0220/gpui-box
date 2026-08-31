@@ -14,24 +14,68 @@ pub use wgpu_renderer::{GpuContext, WgpuRenderer, WgpuSurfaceConfig};
 /// Serialises the tests in this crate that stand up a GPU device.
 ///
 /// None of them is testing concurrency. Each one creates an instance, an
-/// adapter and a device, and drops them again at the end; one of them does it
-/// four times over. Run in parallel on the Windows DX12 fallback adapter those
-/// lifetimes overlap, and the process dies with an access violation *after*
-/// every test has reported that it passed — so the gate fails on Windows with
-/// no assertion having failed and nothing to point at.
+/// adapter and a device and drops them again; one does it four times over.
+/// Run in parallel on the Windows DX12 fallback adapter those lifetimes
+/// overlap, and the process dies with an access violation partway through —
+/// so the gate fails on Windows with no assertion having failed and nothing
+/// to point at.
 ///
-/// One lock removes the overlap without changing what any test asserts. It is
-/// held for the whole body rather than taken inside the helper that builds the
-/// device, because the drop at the end of the test is half of what was racing.
+/// The guard is held for the whole test body rather than taken inside the
+/// helper that builds the device, because the drop at the end of the test is
+/// half of what was racing.
+///
+/// Forgetting it is the failure mode this is really guarding against: the
+/// first attempt at this fix missed one of the six tests, and the symptom of
+/// missing one is identical to the symptom of not having the lock at all, on
+/// a machine most of us cannot run. So every entry point that can build a
+/// device asserts the guard is held — see [`assert_serialised_gpu_test`] — and
+/// a test that forgets fails immediately, saying so, instead of crashing a
+/// process somewhere else.
 #[cfg(all(test, not(target_family = "wasm")))]
-pub(crate) fn serialised_gpu_test() -> std::sync::MutexGuard<'static, ()> {
+pub(crate) fn serialised_gpu_test() -> GpuTestGuard {
     static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    let lock = LOCK
+        .get_or_init(|| std::sync::Mutex::new(()))
         .lock()
         // A test that panicked while holding this has already failed. Poisoning
         // every test after it would report that one failure several more times
         // and bury the one that actually happened.
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    HOLDS_GPU_LOCK.with(|held| held.set(true));
+    GpuTestGuard { _lock: lock }
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+thread_local! {
+    static HOLDS_GPU_LOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+pub(crate) struct GpuTestGuard {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+impl Drop for GpuTestGuard {
+    fn drop(&mut self) {
+        HOLDS_GPU_LOCK.with(|held| held.set(false));
+    }
+}
+
+/// Refuses to build a GPU device in a test that did not take the lock.
+///
+/// This is the whole reason the lock is reliable rather than a convention:
+/// the cost of forgetting it is an access violation on one platform, which is
+/// the least debuggable outcome available.
+#[cfg(all(test, not(target_family = "wasm")))]
+pub(crate) fn assert_serialised_gpu_test() {
+    assert!(
+        HOLDS_GPU_LOCK.with(std::cell::Cell::get),
+        "this test builds a GPU device, so it must start with \
+         `let _gpu = crate::serialised_gpu_test();`. Without it the device \
+         overlaps another test's and the Windows DX12 fallback adapter takes \
+         the whole process down with an access violation."
+    );
 }
 
 // These pixel tests exercise the deterministic software-adapter contract:
