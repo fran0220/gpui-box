@@ -984,16 +984,7 @@ pub(crate) fn paint_route(
         }
     }
     if paint.reveal >= 1.0 {
-        paint_end_marker(
-            window,
-            theme,
-            route,
-            transform,
-            edge.edge_marker(),
-            paint.colors.to,
-            width,
-            selected || paint.hovered,
-        );
+        paint_end_marker(window, theme, edge, route, transform, paint, width);
     }
 }
 
@@ -1039,13 +1030,13 @@ fn paint_gradient(
 fn paint_end_marker(
     window: &mut Window,
     theme: &Theme,
+    edge: &GraphEdge,
     route: &OrthogonalRoute,
     transform: RouteTransform,
-    marker: EdgeMarker,
-    color: Hsla,
+    paint: EdgePaint,
     stroke: f32,
-    emphasized: bool,
 ) {
+    let marker = edge.edge_marker();
     if marker == EdgeMarker::None {
         return;
     }
@@ -1054,7 +1045,8 @@ fn paint_end_marker(
     };
     let tip = transform.point(world_tip);
     let unit = theme.measures.status_mark.max(stroke * 2.0);
-    if emphasized {
+    let color = paint.colors.to;
+    if edge.is_selected() || paint.hovered {
         for step in (1..=3).rev() {
             let radius = px(unit * (0.72 + step as f32 * 0.36));
             window.paint_quad(gpui::fill(
