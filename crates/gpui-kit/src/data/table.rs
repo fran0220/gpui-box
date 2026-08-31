@@ -73,10 +73,9 @@ use gpui_kit_theme::{
 use crate::data::grid::GridLines;
 use crate::data::viewport::scroll_handle;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::direction::ActiveDirection;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
 };
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -619,7 +618,7 @@ impl Body {
                     .border_b(px(theme.borders.hairline))
                     .border_color(theme.colors.divider)
             })
-            .selected_row(theme, cx.layout_direction(), selected)
+            .selected_fill(theme, selected)
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
@@ -797,7 +796,7 @@ impl Table {
                 .bg(theme
                     .colors
                     .danger
-                    .opacity(theme.effects.selected_ring_alpha))
+                    .opacity(theme.effects.semantic_wash_faint_alpha))
                 .child(
                     icon(Icon::Danger)
                         .size(px(theme.control.sm.icon_size))

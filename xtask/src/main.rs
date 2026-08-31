@@ -2306,20 +2306,8 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     output.push_str("\n### Effects\n\n| Token | Value |\n|---|---:|\n");
     for (name, value) in [
         ("effect.edgeFadeBand", tokens.effect.edge_fade_band),
-        (
-            "effect.selectedRingAlpha",
-            tokens.effect.selected_ring_alpha,
-        ),
-        (
-            "effect.selectionRailWidth",
-            tokens.effect.selection_rail_width,
-        ),
         ("effect.focusRingWidth", tokens.effect.focus_ring_width),
         ("effect.focusRingAlpha", tokens.effect.focus_ring_alpha),
-        (
-            "effect.focusRingCounterAlpha",
-            tokens.effect.focus_ring_counter_alpha,
-        ),
         ("effect.glowAlpha", tokens.effect.glow_alpha),
         ("effect.glowBlur", tokens.effect.glow_blur),
         ("effect.glowSpread", tokens.effect.glow_spread),
@@ -2463,14 +2451,6 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         (
             "effect.variantLightActiveAlpha",
             tokens.effect.variant_light_active_alpha,
-        ),
-        (
-            "effect.variantOutlineHoverAlpha",
-            tokens.effect.variant_outline_hover_alpha,
-        ),
-        (
-            "effect.variantOutlineActiveAlpha",
-            tokens.effect.variant_outline_active_alpha,
         ),
         (
             "effect.variantSubtleHoverAlpha",

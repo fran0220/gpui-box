@@ -2,7 +2,7 @@
 //!
 //! The selected tab is caller-owned. `Tabs` reports the id that was picked and
 //! renders whatever the caller says is current, so a host that refuses a move
-//! keeps the tab that still holds underlined.
+//! keeps the tab that still holds selected.
 //!
 //! `Tabs` renders the strip only. The body belongs to the caller, which is why
 //! no `Role::TabPanel` node is published here.
@@ -31,17 +31,19 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
+};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
 use crate::layout::ScrollFade;
-use crate::motion::{Flipping, flip, keyed};
+use crate::motion::keyed;
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -484,11 +486,8 @@ impl Tabs {
         cx: &App,
     ) -> Option<gpui::AnyElement> {
         let wording = tab.save_state.wording(cx)?;
-        let (color, filled) = match tab.save_state {
+        let (color, strength) = match tab.save_state {
             SaveState::Dirty => (theme.colors.accent, true),
-            // A save in flight is drawn as an outline of the dirty dot: the
-            // work is still not written down, and the ring says something is
-            // happening to it without claiming it landed.
             SaveState::Saving => (theme.colors.text_muted, false),
             SaveState::Failed { .. } => (theme.colors.danger, true),
             SaveState::Clean => return None,
@@ -498,10 +497,11 @@ impl Tabs {
                 .flex_none()
                 .size(px(theme.measures.status_mark))
                 .rounded_full()
-                .when(filled, |element| element.bg(color))
-                .when(!filled, |element| {
-                    element.border(px(theme.borders.thick)).border_color(color)
-                })
+                .bg(color.opacity(if strength {
+                    1.0
+                } else {
+                    theme.effects.semantic_wash_strong_alpha
+                }))
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("save").semantic_id(), Role::Status)
@@ -608,6 +608,8 @@ impl Tabs {
             .group(hover_group.clone())
             .flex_none()
             .column()
+            .radius(theme, Radius::Control)
+            .selected_fill(theme, selected)
             .child(
                 div()
                     .row()
@@ -632,32 +634,9 @@ impl Tabs {
                     .children(self.save_mark(tab, &ident, theme, cx))
                     .children(self.close_control(tab, &ident, theme, cx)),
             )
-            // The underline is a sibling rather than a border so an unselected
-            // tab reserves the same height and nothing shifts when it is
-            // chosen. The accent bar inside it is one element for the whole
-            // strip, so choosing another tab moves it instead of putting a
-            // second one somewhere else.
-            .child(
-                div()
-                    .relative()
-                    .h(px(theme.effects.selection_rail_width))
-                    .children(selected.then(|| {
-                        let indicator =
-                            flip(self.ident.child("indicator").semantic_id(), window, cx);
-                        // Inset from the tab's own padding and rounded at the
-                        // top, so the mark sits under the label rather than
-                        // under the gap between two labels.
-                        div()
-                            .absolute()
-                            .top_0()
-                            .bottom_0()
-                            .left(px(metrics.padding_x))
-                            .right(px(metrics.padding_x))
-                            .rounded_t(px(theme.effects.selection_rail_width / 2.0))
-                            .bg(theme.colors.accent)
-                            .flip(&indicator, window, cx)
-                    })),
-            )
+            .when(actionable && !selected, |element| {
+                element.hover(|style| style.bg(theme.colors.hover))
+            })
             .children(landing.map(|(position, accepted)| {
                 dnd::indicator(&position, accepted, DropAxis::Horizontal, cx)
             }))
@@ -902,14 +881,7 @@ impl RenderOnce for Tabs {
                 let overflow_ident = self.ident.child("overflow");
                 div()
                     .flex_none()
-                    .column()
-                    // The trigger stands where a tab would, so it is built
-                    // like one: a row of the tab height with the underline
-                    // lane beneath it. Without the lane the strip's own
-                    // bottom alignment hangs the trigger a rail's width
-                    // below the labels and breaks the line they sit on.
                     .child(div().row().h(px(metrics.height)).items_center().child(menu))
-                    .child(div().h(px(theme.effects.selection_rail_width)))
                     // The trigger says how many tabs moved here, so a snapshot
                     // shows that they were relocated and not dropped.
                     .semantic_in(

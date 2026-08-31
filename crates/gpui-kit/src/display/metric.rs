@@ -306,7 +306,7 @@ impl RenderOnce for MetricCard {
             .min_w(px(180.0))
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Filled)
             .child(
                 div()
                     .type_scale(&theme, TypeScale::Caption)
@@ -412,7 +412,6 @@ fn delta_colors(tone: Tone, theme: &Theme) -> VariantColors {
                 background_hover: theme.colors.track,
                 background_active: theme.colors.track,
                 text: theme.colors.text_muted,
-                border: None,
             };
         }
     };

@@ -57,8 +57,7 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirect
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::window_state;
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt,
-    selection_rail, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -1161,7 +1160,7 @@ impl DataGrid {
                 .bg(theme
                     .colors
                     .danger
-                    .opacity(theme.effects.selected_ring_alpha))
+                    .opacity(theme.effects.semantic_wash_faint_alpha))
                 .child(
                     icon(Icon::Danger)
                         .size(px(theme.control.sm.icon_size))
@@ -2389,7 +2388,7 @@ fn row_element(
                 .border_color(theme.colors.divider)
         })
         .when(pinned == 0, |element| {
-            element.selected_row(theme, direction, selected)
+            element.selected_fill(theme, selected)
         })
         .when(pinned > 0 && selected, |element| {
             element.bg(theme.colors.selected)
@@ -2455,9 +2454,7 @@ fn row_element(
                 let hover = theme.colors.hover;
                 element.group_hover(hover_group, move |style| style.bg(hover))
             })
-            .when(selected, |element| {
-                element.child(selection_rail(theme, direction))
-            })
+            .selected_fill(theme, selected)
             .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
         if context.selection_mode == SelectionMode::Multiple {
             held = held.child(row_mark(theme, selected));
@@ -2579,16 +2576,7 @@ fn row_element(
                 .relative()
                 .p_token(theme, Space::Sm)
                 .ps(cx.layout_direction(), px(theme.space(Space::Sm) + GUTTER))
-                .child(
-                    div()
-                        .absolute()
-                        .top_0()
-                        .bottom_0()
-                        .when(cx.layout_direction().is_rtl(), |element| element.right_0())
-                        .when(!cx.layout_direction().is_rtl(), |element| element.left_0())
-                        .w(px(theme.effects.selection_rail_width))
-                        .bg(theme.colors.divider),
-                )
+                .ps(cx.layout_direction(), px(theme.space(Space::Xs)))
                 .child(render(row.id.clone(), window, cx))
                 .semantic_in(
                     cx,

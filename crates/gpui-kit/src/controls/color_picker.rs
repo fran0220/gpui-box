@@ -285,7 +285,7 @@ impl RenderOnce for ColorPicker {
             // they are a stack of unrelated rectangles, and nothing says where
             // the picker ends and whatever it was placed next to begins.
             .p_token(&theme, Space::Sm)
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Filled)
             .opacity(if self.disabled {
                 theme.opacity.disabled
             } else {

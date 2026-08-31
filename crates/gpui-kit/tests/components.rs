@@ -476,33 +476,6 @@ fn row_slots_hold_their_place_across_rows(cx: &mut TestAppContext) {
     assert_eq!(first.size.width, second.size.width);
 }
 
-/// A divided card gains rules and nothing else: the rows keep their extent,
-/// so turning dividers on is not a layout change wearing a costume.
-#[gpui::test]
-fn dividing_a_card_does_not_move_its_rows(cx: &mut TestAppContext) {
-    let build = |divided: bool| {
-        move |_: &mut gpui::Window, _: &mut gpui::App| {
-            Card::new()
-                .id("providers")
-                .divided(divided)
-                .child(
-                    ListRow::new()
-                        .id("providers.anthropic")
-                        .child(div().child("Anthropic")),
-                )
-                .into_any_element()
-        }
-    };
-
-    let mut plain = harness(cx, build(false));
-    let plain_row = plain.bounds("providers.anthropic").expect("row");
-    let mut divided = harness(cx, build(true));
-    let divided_row = divided.bounds("providers.anthropic").expect("row");
-
-    assert_eq!(plain_row.origin, divided_row.origin);
-    assert_eq!(plain_row.size, divided_row.size);
-}
-
 #[gpui::test]
 fn an_actionable_row_reports_itself_and_stays_a_row(cx: &mut TestAppContext) {
     let taken = Rc::new(Cell::new(0));

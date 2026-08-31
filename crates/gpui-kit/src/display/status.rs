@@ -10,7 +10,6 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, SemanticWash, Space, Surf
 
 use crate::controls::button::IconButton;
 use crate::display::badge::Tone;
-use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
@@ -62,35 +61,6 @@ fn severity_mark(tone: Tone, theme: &gpui_kit_theme::Theme) -> AnyElement {
 /// than for a compact chip, and every tone takes the same theme-owned weight.
 fn banner_wash(theme: &gpui_kit_theme::Theme, color: gpui::Hsla) -> gpui::Hsla {
     theme.color_wash(color, SemanticWash::Faint)
-}
-
-/// The band at the reading edge that carries the severity.
-///
-/// A report used to be a wash of its own colour across the whole surface,
-/// which made a yellow one heavier than the red one above it for no reason
-/// anybody meant. The colour is spent on a rail and a glyph instead, so two
-/// severities differ by hue and by picture and never by weight.
-pub(crate) fn tone_rail(
-    theme: &gpui_kit_theme::Theme,
-    color: gpui::Hsla,
-    direction: crate::foundation::LayoutDirection,
-) -> gpui::Div {
-    // Inset by the corner it sits inside. `overflow_hidden` masks to the
-    // frame's box and not to its radius, so a rail run to the full height
-    // kept its square corners against a rounded report.
-    let bar = div()
-        .absolute()
-        .top(px(theme.radii.card))
-        .bottom(px(theme.radii.card))
-        .w(px(theme.effects.selection_rail_width))
-        .rounded_full()
-        .flex_none()
-        .bg(color);
-    if direction.is_rtl() {
-        bar.right_0()
-    } else {
-        bar.left_0()
-    }
 }
 
 /// A tone-colored dot, the smallest state indicator in the system.
@@ -299,7 +269,6 @@ impl RenderOnce for Callout {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let color = self.tone.color(&theme);
-        let direction = cx.layout_direction();
         let content = div()
             .w_full()
             .flex()
@@ -317,7 +286,7 @@ impl RenderOnce for Callout {
             .py_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
             .surface(&theme, Surface::Panel)
-            .child(tone_rail(&theme, color, direction))
+            .bg(banner_wash(&theme, color))
             .type_scale(&theme, TypeScale::Label)
             .line_height(px(theme.typography.body.line_height))
             .text_color(theme.colors.text);
@@ -433,7 +402,6 @@ impl RenderOnce for Banner {
                     .radius(&theme, Radius::Card)
                     .bg(banner_wash(&theme, color)),
             )
-            .child(tone_rail(&theme, color, cx.layout_direction()))
             .child(severity_mark(self.tone, &theme))
             .child(
                 div()

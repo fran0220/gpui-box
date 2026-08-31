@@ -1090,32 +1090,7 @@ impl RenderOnce for GraphNode {
                     inset: false,
                 }])
             })
-            // A node floats on the canvas rather than sitting in a column, so
-            // it is the one place selection cannot be a rail at a reading
-            // edge. It gets the accent all the way round instead, outward, so
-            // it reads as the node being picked up rather than as a border the
-            // node has always had.
-            //
-            // The ring stands off the card by a band of the card's own
-            // surface, and that gap is what carries the meaning rather than
-            // the hue: a node whose category is the accent colour would
-            // otherwise wear a ring indistinguishable from its own identity,
-            // and "selected" and "indigo" are not a distinction a reader
-            // should have to make by memory.
-            .when(self.selected, |element| {
-                let gap = theme.effects.selection_rail_width * 0.6;
-                let ring = |spread: f32, color: Hsla| gpui::BoxShadow {
-                    color,
-                    offset: gpui::point(px(0.0), px(0.0)),
-                    blur_radius: px(0.0),
-                    spread_radius: px(spread),
-                    inset: false,
-                };
-                element.shadow(vec![
-                    ring(gap * 2.0, theme.colors.accent),
-                    ring(gap, theme.colors.raised),
-                ])
-            })
+            .when(self.selected, |element| element.bg(theme.colors.selected))
             .children(rail)
             .child(stack);
 

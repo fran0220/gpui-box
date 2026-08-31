@@ -538,7 +538,7 @@ impl RenderOnce for Wizard {
         let body = self.body.map(|body| {
             div()
                 .w_full()
-                .card_surface(&theme, CardVariant::Outlined)
+                .card_surface(&theme, CardVariant::Filled)
                 .p_token(&theme, Space::Md)
                 .child(body)
                 .semantic_in(

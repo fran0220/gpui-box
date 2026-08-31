@@ -944,7 +944,7 @@ impl Painter {
             .surface(&theme, Surface::Sunken)
             .child(
                 div()
-                    .w(px(theme.effects.selection_rail_width))
+                    .w(px(theme.effects.rail_width))
                     .flex_none()
                     .radius(&theme, Radius::Pill)
                     .bg(theme.colors.hairline_strong),

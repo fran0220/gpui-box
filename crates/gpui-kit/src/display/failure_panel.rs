@@ -43,7 +43,6 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::Button;
-use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -214,11 +213,7 @@ impl RenderOnce for FailurePanel {
             .overflow_hidden()
             .relative()
             .frame(&theme, Surface::Panel, Elevation::Raised)
-            .child(crate::display::status::tone_rail(
-                &theme,
-                theme.colors.danger,
-                cx.layout_direction(),
-            ))
+            .bg(theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint))
             .child(
                 div()
                     .row()

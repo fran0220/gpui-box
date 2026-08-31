@@ -195,7 +195,7 @@ impl RenderOnce for HighlightedText {
                                 theme
                                     .colors
                                     .accent
-                                    .opacity(theme.effects.selected_ring_alpha)
+                                    .opacity(theme.effects.semantic_wash_alpha)
                             }),
                             background_radius: Some(px(theme.radius(Radius::Small))),
                             ..Default::default()

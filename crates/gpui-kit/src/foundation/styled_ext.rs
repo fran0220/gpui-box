@@ -1,8 +1,6 @@
 use gpui::{Div, FontWeight, InteractiveElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
-use super::direction::LayoutDirection;
-
 /// Creates text with an explicit complete type step and primary text tone.
 ///
 /// This is the only entry point for putting a string directly into the GPUI
@@ -31,10 +29,9 @@ pub enum CardVariant {
     /// A shadow. One card, or a few, on the surface behind them.
     #[default]
     Elevated,
-    /// A hairline and no shadow, for a grid of cards. Shadows are drawn per
-    /// card and know nothing of each other, so a dozen at close range stack
-    /// into a wash that reads as one smudged region instead of twelve things.
-    Outlined,
+    /// A filled plane with no shadow, for a dense grid of cards whose nearby
+    /// elevations would otherwise stack into a wash.
+    Filled,
     /// Neither: structure, padding, identity and interaction, without
     /// claiming to be a plane of its own.
     Ghost,
@@ -54,7 +51,7 @@ impl CardVariant {
     /// the wash any row gives.
     pub const fn claims_a_plane(self) -> bool {
         match self {
-            CardVariant::Elevated | CardVariant::Outlined => true,
+            CardVariant::Elevated | CardVariant::Filled => true,
             CardVariant::Ghost => false,
         }
     }
@@ -144,16 +141,6 @@ pub trait StyledExt: Styled + Sized {
         }
     }
 
-    fn hairline(self, theme: &Theme) -> Self {
-        self.border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
-    }
-
-    fn hairline_strong(self, theme: &Theme) -> Self {
-        self.border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline_strong)
-    }
-
     /// The shell every card-shaped surface in the library is made of.
     ///
     /// [`Card`](crate::display::card::Card) is the component a caller reaches
@@ -180,7 +167,7 @@ pub trait StyledExt: Styled + Sized {
         let element = self.radius(theme, Radius::Card);
         match variant {
             CardVariant::Elevated => element.frame(theme, plane, Elevation::Raised),
-            CardVariant::Outlined => element.surface(theme, plane).hairline(theme),
+            CardVariant::Filled => element.surface(theme, plane),
             CardVariant::Ghost => element,
         }
     }
@@ -240,86 +227,11 @@ pub fn rule(theme: &Theme) -> Div {
         .bg(theme.colors.divider)
 }
 
-/// The same rule, standing up.
-pub fn rule_vertical(theme: &Theme) -> Div {
-    div()
-        .h_full()
-        .w(px(theme.borders.hairline))
-        .flex_none()
-        .bg(theme.colors.divider)
-}
-
-/// The bar that marks the selected row of a collection.
+/// The one selected treatment shared by rows, tabs, tiles, and controls.
 ///
-/// Absolutely positioned, so it consumes no layout and a row does not reflow
-/// when the selection arrives on it. It is rounded on its outer end only,
-/// which is what keeps it reading as a mark against the edge rather than as a
-/// floating capsule.
-pub fn selection_rail(theme: &Theme, direction: LayoutDirection) -> Div {
-    let width = px(theme.effects.selection_rail_width);
-    let radius = width / 2.0;
-    let bar = div()
-        .absolute()
-        .top_0()
-        .bottom_0()
-        .w(width)
-        .flex_none()
-        .bg(theme.colors.accent);
-    if direction.is_rtl() {
-        bar.right_0().rounded_bl(radius).rounded_tl(radius)
-    } else {
-        bar.left_0().rounded_br(radius).rounded_tr(radius)
-    }
-}
-
-/// How every collection in this library says which row it is on.
-///
-/// One recipe, because selection that is drawn a dozen ways is a dozen
-/// different statements wearing one name. A neutral wash carries the row and
-/// an accent rail at the reading edge names it: the wash alone cannot be made
-/// strong enough in a light theme to read as *chosen* without also reading as
-/// *inactive*, and a whole row of accent would spend on one line the area
-/// this library reserves for the decision a surface is asking for.
-pub trait SelectedRow: Styled + ParentElement + Sized {
-    fn selected_row(self, theme: &Theme, direction: LayoutDirection, selected: bool) -> Self {
-        if !selected {
-            return self;
-        }
-        self.relative()
-            .bg(theme.colors.selected)
-            .child(selection_rail(theme, direction))
-    }
-
-    /// The same statement for a row that reads across, such as a tab in a
-    /// strip or a step in a wizard: the rail lies along the bottom edge.
-    fn selected_column(self, theme: &Theme, selected: bool) -> Self {
-        if !selected {
-            return self;
-        }
-        let width = px(theme.effects.selection_rail_width);
-        self.relative().child(
-            div()
-                .absolute()
-                .left_0()
-                .right_0()
-                .bottom_0()
-                .h(width)
-                .flex_none()
-                .rounded_t(width / 2.0)
-                .bg(theme.colors.accent),
-        )
-    }
-
-    /// The wash alone, for an option chosen among peers that all stay on
-    /// screen — a swatch, a tile, a segment of a chooser.
-    ///
-    /// The rail has exactly two homes: the reading edge of a collection's
-    /// selected row ([`SelectedRow::selected_row`]) and the bottom edge of a
-    /// selected tab or step ([`SelectedRow::selected_column`]). An option
-    /// grid is neither — every peer remains visible beside the chosen one —
-    /// so the wash says which answer is current, and a rail here would hang
-    /// a collection's mark on something that is not a collection's row.
-    fn selected_option(self, theme: &Theme, selected: bool) -> Self {
+/// Selection is a stronger tonal fill and never an outline or an edge rail.
+pub trait SelectedFill: Styled + Sized {
+    fn selected_fill(self, theme: &Theme, selected: bool) -> Self {
         if !selected {
             return self;
         }
@@ -327,7 +239,7 @@ pub trait SelectedRow: Styled + ParentElement + Sized {
     }
 }
 
-impl<T: Styled + ParentElement + Sized> SelectedRow for T {}
+impl<T: Styled + Sized> SelectedFill for T {}
 
 /// The wash a row takes while the pointer is over it.
 ///
@@ -359,11 +271,12 @@ impl<T: gpui::InteractiveElement + Sized> Hoverable for T {}
 /// its own focused state, which a click must show.
 pub trait FocusRing: InteractiveElement + Sized {
     fn focus_ring(self, theme: &Theme) -> Self {
-        self.focus_visible(|style| {
-            style
-                .border_color(theme.colors.focus)
-                .shadow(theme.focus_ring())
-        })
+        self.focus_visible(|style| style.shadow(theme.focus_ring()))
+    }
+
+    /// The same halo resolved against a control-owned resting fill.
+    fn focus_ring_on(self, theme: &Theme, background: gpui::Hsla) -> Self {
+        self.focus_visible(|style| style.shadow(theme.focus_ring_on(background)))
     }
 }
 

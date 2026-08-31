@@ -1287,7 +1287,7 @@ fn diff_row(
             .bg(theme
                 .colors
                 .accent
-                .opacity(theme.effects.selected_ring_alpha))
+                .opacity(theme.effects.semantic_wash_faint_alpha))
             .child(header.clone())
             .into_any_element(),
         FlatKind::Unified {
@@ -1333,7 +1333,7 @@ fn unified_line(
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
         .when(side.mark != DiffLineMark::Context, |element| {
-            element.bg(color.opacity(theme.effects.selected_ring_alpha))
+            element.bg(color.opacity(theme.effects.semantic_wash_faint_alpha))
         })
         .child(number(old_number, theme, cx))
         .child(number(new_number, theme, cx))
@@ -1406,7 +1406,7 @@ fn code_side(
         .flex_1()
         .min_w_0()
         .when(side.is_some() && mark != DiffLineMark::Context, |element| {
-            element.bg(color.opacity(theme.effects.selected_ring_alpha))
+            element.bg(color.opacity(theme.effects.semantic_wash_faint_alpha))
         })
         // A side with no line on it is a fact about the change — this file
         // gained a line the other did not have — so it is drawn as a stated

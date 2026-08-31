@@ -180,17 +180,11 @@ impl RenderOnce for Tag {
             // outline drawn round it, so the two states differ by more than a
             // line a reader has to look for.
             .map(|element| {
-                element
-                    .bg(if self.selected {
-                        surface.background_active
-                    } else {
-                        surface.background
-                    })
-                    .when_some(surface.border, |element, border| {
-                        element
-                            .border(px(theme.borders.hairline))
-                            .border_color(border)
-                    })
+                element.bg(if self.selected {
+                    surface.background_active
+                } else {
+                    surface.background
+                })
             })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)

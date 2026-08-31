@@ -275,11 +275,11 @@ impl SceneMotionPrimitives {
                         div()
                             .absolute()
                             .left(px(left))
-                            .bottom_0()
+                            .top_0()
                             .w(px(120.0))
-                            .h(px(theme.effects.selection_rail_width))
-                            .rounded(px(theme.effects.selection_rail_width / 2.0))
-                            .bg(theme.colors.accent)
+                            .h(px(theme.control.md.height))
+                            .radius(theme, Radius::Control)
+                            .bg(theme.colors.selected)
                             .semantic_in(
                                 cx,
                                 NodeSpec::new("scene.motion.spring.indicator", Role::Status)

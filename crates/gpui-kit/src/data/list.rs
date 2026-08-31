@@ -34,9 +34,8 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 use crate::data::flow::Flow;
 use crate::data::viewport::scroll_handle;
 pub use crate::data::viewport::{glide_to_row, reveal_row, scroll_to_row};
-use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
@@ -595,7 +594,7 @@ fn row_element(
         .when_some(height, |element, height| element.h(px(height)))
         .px(px(theme.space(Space::Sm)))
         .gap(px(theme.space(Space::Sm)))
-        .selected_row(theme, cx.layout_direction(), selected)
+        .selected_fill(theme, selected)
         .when(item.disabled, |element| {
             element.opacity(theme.opacity.disabled)
         })

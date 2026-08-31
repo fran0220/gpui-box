@@ -419,19 +419,11 @@ impl NotificationCenter {
             })
         };
 
-        // Unread is a rail at the reading edge rather than a second dot beside
-        // the title. The row already carries one dot, for severity, and two
-        // dot systems on one row are two vocabularies a reader has to keep
-        // apart while scanning.
         let unread_mark = (!notification.read).then(|| {
             div()
                 .absolute()
-                .left_0()
-                .top_0()
-                .bottom_0()
-                .w(px(theme.effects.selection_rail_width))
-                .flex_none()
-                .bg(theme.colors.accent)
+                .inset_0()
+                .bg(theme.colors.selected)
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("unread").semantic_id(), Role::Status)

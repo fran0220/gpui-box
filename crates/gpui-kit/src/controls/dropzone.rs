@@ -234,7 +234,7 @@ impl RenderOnce for Dropzone {
                 element.bg(theme
                     .colors
                     .accent
-                    .opacity(theme.effects.selected_ring_alpha))
+                    .opacity(theme.effects.semantic_wash_alpha))
             })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)

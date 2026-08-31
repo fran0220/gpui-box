@@ -468,11 +468,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -527,8 +524,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -1250,11 +1245,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.12 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.8 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -1309,8 +1301,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -2032,11 +2022,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -2091,8 +2078,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -2814,11 +2799,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.12 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -2873,8 +2855,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -3596,11 +3576,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -3655,8 +3632,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -4378,11 +4353,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -4437,8 +4409,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -5160,11 +5130,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -5219,8 +5186,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -5942,11 +5907,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -6001,8 +5963,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -6724,11 +6684,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.09 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.26 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -6783,8 +6740,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |
@@ -7506,11 +7461,8 @@ Row stagger maximum items: `8`.
 | Token | Value |
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
-| `effect.selectedRingAlpha` | 0.12 |
-| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
-| `effect.focusRingCounterAlpha` | 0.4 |
 | `effect.glowAlpha` | 0.18 |
 | `effect.glowBlur` | 12 |
 | `effect.glowSpread` | -5 |
@@ -7565,8 +7517,6 @@ Row stagger maximum items: `8`.
 | `effect.variantLightAlpha` | 0.15 |
 | `effect.variantLightHoverAlpha` | 0.22 |
 | `effect.variantLightActiveAlpha` | 0.28 |
-| `effect.variantOutlineHoverAlpha` | 0.08 |
-| `effect.variantOutlineActiveAlpha` | 0.12 |
 | `effect.variantSubtleHoverAlpha` | 0.12 |
 | `effect.variantSubtleActiveAlpha` | 0.18 |
 | `effect.primaryHoverOpacity` | 0.9 |

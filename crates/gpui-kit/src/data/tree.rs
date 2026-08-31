@@ -49,7 +49,7 @@ use crate::display::loading::PulseLoader;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
@@ -943,7 +943,7 @@ impl Rows {
                 theme.control.get(self.size).height,
             ))
             .text_color(color)
-            .selected_row(theme, direction, selected)
+            .selected_fill(theme, selected)
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(selectable, |element| {
@@ -988,7 +988,7 @@ impl Rows {
                             .absolute()
                             .inset_0()
                             .radius(theme, Radius::Small)
-                            .bg(color.opacity(theme.effects.selected_ring_alpha))
+                            .bg(color.opacity(theme.effects.semantic_wash_alpha))
                             .border(px(theme.borders.hairline))
                             .border_dashed()
                             .border_color(color)

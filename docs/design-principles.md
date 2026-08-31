@@ -40,20 +40,17 @@ documented floor: composited over each surface, a line must move it by at least
 1.5 L\*, which is what `contrast::line_report` checks and the token gate
 enforces.
 
-## Selection is a wash and a rail
+## Selection is a tonal fill
 
-Every collection in the library says which row it is on the same way: a neutral
-wash from `interactive.selected` carries the row, and an accent rail
-`effect.selectionRailWidth` wide sits at the reading edge. Neither consumes
-layout, so arriving on a row moves nothing. The recipes are
-`SelectedRow::selected_row` and `selected_column`.
+Every collection in the library says which row it is on the same way: the
+stronger neutral wash from `interactive.selected` carries the whole selected
+shape. It consumes no layout, so arriving on a row moves nothing. The shared
+recipe is `SelectedFill::selected_fill`.
 
-The wash alone cannot be pushed hard enough in a light theme to read as *chosen*
-without also reading as *inactive*, and a whole row of accent would spend on one
-line the area this library reserves for the decision a surface is asking for.
-Where a row is not a row — a node on a canvas, a chip, a segment of a strip —
-selection is the accent in the foreground or all the way round the object, never
-a neutral outline a reader has to hunt for.
+Selection never adds an edge rail, underline, or outline. Those marks create a
+second decorative geometry beside a shape whose fill already has enough area
+to state the answer. A row, node, chip, or segment may strengthen its text or
+semantic tint as a second channel, but it remains one rounded filled shape.
 
 ## Accent has limited area
 

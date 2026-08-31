@@ -183,7 +183,7 @@ pub(super) fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
     let steps = cx.global::<SceneQueue>().steps.clone();
     let theme = cx.theme().clone();
 
-    let mut queue = Card::new().id("scene.motion.queue").divided(true);
+    let mut queue = Card::new().id("scene.motion.queue");
     for (index, (id, label)) in steps.iter().enumerate() {
         let ident = format!("scene.motion.{id}");
         let handle = flip(ident.clone(), window, cx);

@@ -1236,7 +1236,7 @@ fn theme_switcher(theme: &Theme, cx: &App) -> impl IntoElement {
             .map(|(label, option)| {
                 Button::new(Ident::new("gallery.density").child(label))
                     .label(label)
-                    .ghost()
+                    .secondary()
                     .selected(density == option)
                     .on_click(move |_, cx| set_density(option, cx))
             }),

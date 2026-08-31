@@ -159,7 +159,7 @@ impl RenderOnce for PerformanceHud {
             .min_w(px(280.0))
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Filled)
             .child(
                 div()
                     .row()

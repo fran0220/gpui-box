@@ -15,7 +15,7 @@ use gpui_kit_theme::{
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, Selectable, SelectedRow, Sizable, StyledExt,
+    Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
     text as foundation_text,
 };
 
@@ -343,8 +343,7 @@ impl RenderOnce for Button {
         // A chosen button rises rather than sinks: it takes the brightest
         // neutral wash the interactive scale has and its label goes to full
         // primary, so the current answer is the *lightest* thing in a run
-        // instead of the darkest. The accent is spent on one rail along the
-        // bottom edge, which is the same mark a chosen tab or step carries.
+        // instead of the darkest.
         //
         // A button that opted into the shared tiers already carries a paint
         // that says which answer is current, so selection leaves it alone:
@@ -462,10 +461,6 @@ impl RenderOnce for Button {
             self.selected && !self.disabled && !on_shared_tiers,
             |element| element.bg(theme.colors.active),
         )
-        // The rail is the neutral treatment's half of the statement. A tier
-        // already says which answer is current in colour, and the rail then
-        // squares off the two corners the chip is rounded on.
-        .selected_column(&theme, self.selected && !self.disabled && !on_shared_tiers)
         .id(self.ident.element_id())
         .when_some(self.focus_handle.clone(), |element, handle| {
             element.track_focus(&handle)
@@ -476,7 +471,10 @@ impl RenderOnce for Button {
             element
                 .cursor_pointer()
                 .tab_index(0)
-                .focus_ring(&theme)
+                .focus_ring_on(
+                    &theme,
+                    button_background(&theme, self.variant, unified, self.selected),
+                )
                 .pressable(cx)
         })
         .children(content);
@@ -617,11 +615,6 @@ fn frame(
     if let Some((tier, resolved)) = unified {
         return base
             .bg(resolved.background)
-            .when_some(resolved.border, |element, border| {
-                element
-                    .border(px(theme.borders.hairline))
-                    .border_color(border)
-            })
             .when(!inert && tier != Variant::Transparent, |element| {
                 element.hover(move |style| style.bg(resolved.background_hover))
             });
@@ -654,6 +647,33 @@ fn frame(
             })
         }
         ButtonVariant::Link => base.px(px(0.0)),
+    }
+}
+
+fn button_background(
+    theme: &Theme,
+    variant: ButtonVariant,
+    unified: Option<(Variant, VariantColors)>,
+    selected: bool,
+) -> Hsla {
+    if selected && unified.is_none() {
+        return theme.colors.active;
+    }
+    if let Some((_, colors)) = unified {
+        return colors.background;
+    }
+    match variant {
+        ButtonVariant::Primary => theme.colors.primary_fill,
+        ButtonVariant::Secondary => theme.colors.raised,
+        ButtonVariant::Ghost | ButtonVariant::Link => theme.colors.canvas,
+        ButtonVariant::Danger => {
+            theme
+                .variant_colors(
+                    Variant::Light,
+                    &ColorChoice::Semantic(SemanticColor::Danger),
+                )
+                .background
+        }
     }
 }
 

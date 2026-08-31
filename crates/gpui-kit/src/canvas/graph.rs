@@ -2895,16 +2895,10 @@ fn graph_minimap(
             .w(relative((view.size.width / width).clamp(0.04, 1.0 - x)))
             .h(relative((view.size.height / height).clamp(0.04, 1.0 - y)))
             .radius(theme, Radius::Small)
-            // The rectangle is where the reader already is, so it is drawn as
-            // a frame rather than as a highlight: filling it in the text
-            // colour made the one part of the overview they can already see
-            // the loudest thing in it.
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.accent)
             .bg(theme
                 .colors
                 .accent
-                .opacity(theme.effects.selected_ring_alpha))
+                .opacity(theme.effects.semantic_wash_alpha))
     });
     div()
         .id(ident.element_id())

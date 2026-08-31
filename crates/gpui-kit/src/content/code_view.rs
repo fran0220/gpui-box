@@ -140,21 +140,21 @@ impl LineMark {
                 theme
                     .colors
                     .warning
-                    .opacity(theme.effects.selected_ring_alpha),
+                    .opacity(theme.effects.semantic_wash_faint_alpha),
             ),
             Self::Highlighted => (
                 theme.colors.accent,
                 theme
                     .colors
                     .accent
-                    .opacity(theme.effects.selected_ring_alpha),
+                    .opacity(theme.effects.semantic_wash_faint_alpha),
             ),
             Self::Error => (
                 theme.colors.danger,
                 theme
                     .colors
                     .danger
-                    .opacity(theme.effects.selected_ring_alpha),
+                    .opacity(theme.effects.semantic_wash_faint_alpha),
             ),
         }
     }
@@ -317,7 +317,7 @@ impl Sizable for CodeView {
     }
 }
 
-/// One rendered line: the gutter number, the rail, and the coloured runs.
+/// One rendered line: the gutter number, the state wash, and the coloured runs.
 #[allow(clippy::too_many_arguments)]
 fn line_element(
     ident: &Ident,
@@ -328,10 +328,10 @@ fn line_element(
     theme: &Theme,
     cx: &App,
 ) -> AnyElement {
-    let (rail, wash) = line
+    let wash = line
         .mark
         .map(|mark| mark.colors(theme))
-        .unzip_or(theme.colors.hairline, gpui::transparent_black());
+        .map_or(gpui::transparent_black(), |(_, wash)| wash);
     let struck = line.mark.is_some_and(LineMark::struck);
 
     let text_ident = ident.child(format!("line-{}-text", line.number));
@@ -356,15 +356,6 @@ fn line_element(
         })
         // The rail is what a reader in monochrome sees, and it is drawn even
         // when the gutter is off, because the mark is the fact. It is the
-        // library's one rail width, so a marked line and a selected row are
-        // marked by the same object.
-        .child(
-            div()
-                .flex_none()
-                .w(px(theme.effects.selection_rail_width))
-                .h_full()
-                .when(line.mark.is_some(), |element| element.bg(rail)),
-        )
         .child(
             div()
                 .flex_1()
@@ -458,18 +449,6 @@ fn code_highlights(
             })
         })
         .collect()
-}
-
-/// Splits an optional pair into two values with defaults, so a marked and an
-/// unmarked line take the same code path.
-trait UnzipOr<A, B> {
-    fn unzip_or(self, first: A, second: B) -> (A, B);
-}
-
-impl<A, B> UnzipOr<A, B> for Option<(A, B)> {
-    fn unzip_or(self, first: A, second: B) -> (A, B) {
-        self.unwrap_or((first, second))
-    }
 }
 
 impl Slotted for CodeView {

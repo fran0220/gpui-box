@@ -165,7 +165,7 @@ impl RenderOnce for ImageList {
                 .p(px(theme.space(Space::Xs)))
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
-                .when(selected, |element| element.shadow(theme.selected_ring()))
+                .when(selected, |element| element.bg(theme.colors.selected))
                 .when(disabled, |element| element.opacity(theme.opacity.disabled))
                 .when(!disabled && self.on_select.is_some(), |element| {
                     element.cursor_pointer()

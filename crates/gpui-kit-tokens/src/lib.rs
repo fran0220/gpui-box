@@ -317,10 +317,6 @@ impl TokenDocument {
             return invalid("effect.focusRingWidth", "must be positive");
         }
 
-        if self.effect.selection_rail_width <= 0.0 {
-            return invalid("effect.selectionRailWidth", "must be positive");
-        }
-
         if self.effect.rail_width <= 0.0 {
             return invalid("effect.railWidth", "must be positive");
         }
@@ -374,12 +370,7 @@ impl TokenDocument {
         }
 
         for (path, value) in [
-            ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
-            (
-                "effect.focusRingCounterAlpha",
-                self.effect.focus_ring_counter_alpha,
-            ),
             ("effect.glowAlpha", self.effect.glow_alpha),
             ("effect.sheenAlpha", self.effect.sheen_alpha),
             ("effect.areaWashAlpha", self.effect.area_wash_alpha),
@@ -451,14 +442,6 @@ impl TokenDocument {
             (
                 "effect.variantLightActiveAlpha",
                 self.effect.variant_light_active_alpha,
-            ),
-            (
-                "effect.variantOutlineHoverAlpha",
-                self.effect.variant_outline_hover_alpha,
-            ),
-            (
-                "effect.variantOutlineActiveAlpha",
-                self.effect.variant_outline_active_alpha,
             ),
             (
                 "effect.variantSubtleHoverAlpha",
@@ -2538,30 +2521,9 @@ pub struct EasingTokens {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EffectTokens {
     pub edge_fade_band: f32,
-    pub selected_ring_alpha: f32,
-    /// How wide the bar marking the selected row in a collection is, in
-    /// pixels.
-    ///
-    /// A row's selection is a wash plus this rail at the reading edge. The
-    /// wash alone is a neutral tint that a light theme cannot make strong
-    /// enough to read as *chosen* without also reading as *disabled*; the
-    /// rail is what says which row the collection is on, at a colour and an
-    /// area small enough that a hundred rows do not become a field of accent.
-    pub selection_rail_width: f32,
     /// How wide the ring around the focused control is drawn, in pixels.
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
-    /// How strongly the outer band of the focus ring is drawn.
-    ///
-    /// A focus ring is one colour, and one colour cannot be seen on every
-    /// background. The theme's focus paint disappears on a control of the
-    /// same family; a neutral disappears on the surface. So the ring is two
-    /// bands — the focus paint against pale surfaces, and the text pole
-    /// against the focus paint and against dark ones — and whichever
-    /// background the focused thing turns out to be sitting on, one of them
-    /// is visible. This is the second band's strength; it is quieter than the
-    /// first because it is a guarantee rather than the mark itself.
-    pub focus_ring_counter_alpha: f32,
     /// How strongly a surface that carries a state colour bleeds it into the
     /// pixels around its edge.
     pub glow_alpha: f32,
@@ -2664,14 +2626,7 @@ pub struct EffectTokens {
     pub node_edge_hover_width_scale: f32,
     pub node_edge_selected_width_scale: f32,
     pub node_edge_glow_width_scale: f32,
-    /// How wide an identity rail is, in pixels: a node's category stripe, a
-    /// callout's edge.
-    ///
-    /// Distinct from [`Self::selection_rail_width`], which marks *which row
-    /// the collection is on* and is therefore transient. This one says what a
-    /// thing is, is drawn whether or not anybody is looking at it, and is
-    /// wider because it has to read as part of the surface rather than as a
-    /// state on top of it.
+    /// How wide an information-bearing identity mark is, in pixels.
     pub rail_width: f32,
     /// The weakest semantic-colour wash, used behind supporting prose.
     pub semantic_wash_faint_alpha: f32,
@@ -2701,8 +2656,6 @@ pub struct EffectTokens {
     pub variant_light_alpha: f32,
     pub variant_light_hover_alpha: f32,
     pub variant_light_active_alpha: f32,
-    pub variant_outline_hover_alpha: f32,
-    pub variant_outline_active_alpha: f32,
     pub variant_subtle_hover_alpha: f32,
     pub variant_subtle_active_alpha: f32,
     pub primary_hover_opacity: f32,

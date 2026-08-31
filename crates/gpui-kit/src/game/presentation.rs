@@ -182,12 +182,7 @@ fn party_member(
         .gap_token(theme, Space::Sm)
         .w(px(286.0))
         .p_token(theme, Space::Sm)
-        .card_surface(theme, CardVariant::Outlined)
-        .border_color(if chosen {
-            theme.colors.hairline_strong
-        } else {
-            theme.colors.hairline
-        })
+        .card_surface(theme, CardVariant::Filled)
         .bg(if chosen {
             theme.colors.selected
         } else {
@@ -440,7 +435,7 @@ fn objective_row(
         .ms(direction, px(depth as f32 * theme.space(Space::Lg)))
         .me(direction, px(depth as f32 * theme.space(Space::Lg)))
         .p_token(theme, Space::Sm)
-        .card_surface(theme, CardVariant::Outlined)
+        .card_surface(theme, CardVariant::Filled)
         .bg(if chosen {
             theme.colors.selected
         } else {
@@ -794,7 +789,7 @@ fn ability_control(
         .gap_token(theme, Space::Xs)
         .w(px(174.0))
         .p_token(theme, Space::Sm)
-        .card_surface(theme, CardVariant::Outlined)
+        .card_surface(theme, CardVariant::Filled)
         .child(action)
         .child(status_row)
         .children(has_numbers.then_some(numbers))
@@ -1037,7 +1032,7 @@ impl RenderOnce for RewardReveal {
             .gap_token(&theme, Space::Md)
             .w_full()
             .p_token(&theme, Space::Lg)
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Filled)
             .overflow_hidden()
             .child(
                 div()

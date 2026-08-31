@@ -159,24 +159,6 @@ pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .id("scene.badge.refused"),
                 ),
         )
-        .child(caption(
-            &theme,
-            "Outlined, for a badge landing on a surface that is already washed",
-        ))
-        .child(
-            row(&theme)
-                .child(
-                    Badge::new("Warning")
-                        .warning()
-                        .outlined(true)
-                        .id("scene.badge.outlined-warning"),
-                )
-                .child(
-                    Badge::new("Neutral")
-                        .outlined(true)
-                        .id("scene.badge.outlined-neutral"),
-                ),
-        )
         .child(caption(&theme, "The size ramp"))
         .child(
             row(&theme)
@@ -212,13 +194,7 @@ pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .children(["grape", "cyan"].map(|group| {
             row(&theme).children(
-                [
-                    Variant::Filled,
-                    Variant::Light,
-                    Variant::Outline,
-                    Variant::Subtle,
-                ]
-                .map(|tier| {
+                [Variant::Filled, Variant::Light, Variant::Subtle].map(|tier| {
                     Badge::new(tier.name())
                         .variant(tier)
                         .color(SharedString::from(group))
@@ -267,7 +243,6 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 .into_any_element()
                         }),
                 )
-                .divided(true)
                 .child(
                     ListRow::new()
                         .id("scene.card.runtime")
@@ -335,15 +310,11 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                 ))
                 .child(column(
                     Card::new()
-                        .id("scene.card.outlined")
-                        .variant(CardVariant::Outlined)
+                        .id("scene.card.filled")
+                        .variant(CardVariant::Filled)
                         .padding(Space::Lg)
-                        .child(crate::foundation::text(
-                            &theme,
-                            TypeScale::Strong,
-                            "Outlined",
-                        ))
-                        .child(caption("A hairline. A grid of them.")),
+                        .child(crate::foundation::text(&theme, TypeScale::Strong, "Filled"))
+                        .child(caption("A tonal plane for a dense grid.")),
                 ))
                 .child(column(
                     Card::new()
@@ -1375,13 +1346,7 @@ pub(super) fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             row(&theme).children(
-                [
-                    Variant::Filled,
-                    Variant::Light,
-                    Variant::Outline,
-                    Variant::Subtle,
-                ]
-                .map(|tier| {
+                [Variant::Filled, Variant::Light, Variant::Subtle].map(|tier| {
                     Tag::new(format!("scene.tag.lime.{}", tier.name()), tier.name())
                         .variant(tier)
                         .color("lime")
@@ -1777,7 +1742,7 @@ pub(super) fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement 
             .min_w_0()
             .gap(px(theme.space(Space::Xs)))
             .p(px(theme.space(Space::Md)))
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Filled)
             .child(
                 crate::foundation::text(&theme, TypeScale::Caption, label)
                     .text_tone(&theme, TextTone::Muted),

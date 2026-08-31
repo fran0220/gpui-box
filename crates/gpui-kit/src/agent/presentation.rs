@@ -30,7 +30,7 @@ use crate::display::avatar::Avatar;
 use crate::display::badge::{Badge, Tone};
 use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, SelectedRow, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, SelectedFill, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
@@ -494,7 +494,7 @@ impl RenderOnce for AgentCard {
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(body)
-            .selected_row(&theme, direction, self.selected);
+            .selected_fill(&theme, self.selected);
         if let Some(handler) = self.on_action {
             let keyboard_handler = handler.clone();
             let keyboard_id = agent_id.clone();

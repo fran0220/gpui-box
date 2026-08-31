@@ -321,9 +321,7 @@ impl RenderOnce for KanbanBoard {
                                     // The card the reader is carrying stays
                                     // where the host still says it is and
                                     // says so by receding, not by leaving.
-                                    .when(lifted, |tile| {
-                                        tile.opacity(theme.opacity.muted).hairline_strong(&theme)
-                                    })
+                                    .when(lifted, |tile| tile.opacity(theme.opacity.muted))
                                     .child(
                                         div()
                                             .type_scale(&theme, TypeScale::Label)
@@ -504,11 +502,11 @@ impl RenderOnce for KanbanBoard {
                                             .text_color(theme.colors.text)
                                             .child(column.title.clone()),
                                     )
-                                    .child(
-                                        Badge::new(tally.clone())
-                                            .tone(if over { Tone::Warning } else { Tone::Neutral })
-                                            .outlined(!over),
-                                    )
+                                    .child(Badge::new(tally.clone()).tone(if over {
+                                        Tone::Warning
+                                    } else {
+                                        Tone::Neutral
+                                    }))
                                     .children(adding),
                             )
                             .when(over, |lane| {

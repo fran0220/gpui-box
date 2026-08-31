@@ -5,7 +5,7 @@ use gpui::{
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, ControlSize, SemanticBorder, SemanticWash, Theme, TypeScale, Variant,
+    ActiveTheme, ColorChoice, ControlSize, SemanticWash, Theme, TypeScale, Variant,
 };
 
 use crate::foundation::{Ident, Sizable, StyledExt};
@@ -79,7 +79,6 @@ pub struct Badge {
     size: ControlSize,
     glyph: Option<Glyph>,
     dot: bool,
-    outlined: bool,
 }
 
 impl Badge {
@@ -94,7 +93,6 @@ impl Badge {
             size: ControlSize::Sm,
             glyph: None,
             dot: false,
-            outlined: false,
         }
     }
 
@@ -109,16 +107,6 @@ impl Badge {
     /// two marks for one claim is one mark too many.
     pub fn dot(mut self, dot: bool) -> Self {
         self.dot = dot;
-        self
-    }
-
-    /// Trades the wash for a hairline in the same colour.
-    ///
-    /// For a badge sitting on a surface that is already washed — a selected
-    /// row, a tinted callout — where a second wash reads as a smudge rather
-    /// than as a shape.
-    pub fn outlined(mut self, outlined: bool) -> Self {
-        self.outlined = outlined;
         self
     }
 
@@ -205,7 +193,7 @@ impl RenderOnce for Badge {
         // word, and a word sitting in a saturated pill is a word that has to
         // be read through its own background; what identifies it is the
         // colour of the text, with just enough behind it to bound the shape.
-        let (foreground, background, tier_border) = if let Some(variant) = self.variant {
+        let (foreground, background) = if let Some(variant) = self.variant {
             // On the shared tiers the badge reads the same resolver as every
             // other coloured surface. The colour is the caller's choice,
             // falling back to the tint or to the tone's own colour, so a
@@ -218,7 +206,7 @@ impl RenderOnce for Badge {
                 },
             });
             let resolved = theme.variant_colors(variant, &choice);
-            (resolved.text, resolved.background, resolved.border)
+            (resolved.text, resolved.background)
         } else {
             let (foreground, background) = match (self.tint, self.tone) {
                 // A tint is a colour the caller chose on purpose, so it takes
@@ -232,7 +220,7 @@ impl RenderOnce for Badge {
                     (color, theme.color_wash(color, SemanticWash::Standard))
                 }
             };
-            (foreground, background, None)
+            (foreground, background)
         };
 
         let step = theme.control.get(self.size);
@@ -243,20 +231,7 @@ impl RenderOnce for Badge {
             .h(px(step.height * 0.72))
             .px(px(step.padding_x * 0.6))
             .rounded_full()
-            .map(|element| {
-                if let Some(border) = tier_border {
-                    element
-                        .bg(background)
-                        .border(px(theme.borders.hairline))
-                        .border_color(border)
-                } else if self.outlined {
-                    element
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.color_border(foreground, SemanticBorder::Report))
-                } else {
-                    element.bg(background)
-                }
-            })
+            .bg(background)
             .type_scale(&theme, TypeScale::Caption)
             .font_weight(gpui::FontWeight(theme.typography.label.weight))
             .text_color(foreground)
@@ -267,7 +242,7 @@ impl RenderOnce for Badge {
                 element.child(
                     div()
                         .flex_none()
-                        .size(px(theme.effects.selection_rail_width))
+                        .size(px(theme.measures.status_mark * 0.5))
                         .rounded_full()
                         .bg(foreground),
                 )

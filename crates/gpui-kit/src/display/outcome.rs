@@ -7,7 +7,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, SemanticWash, Space, Surface, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::foundation::{Ident, StyledExt};
@@ -132,19 +132,7 @@ impl RenderOnce for OutcomePanel {
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
-            // The outcome is carried by a rail and a glyph rather than by a
-            // halo around the card. A bloom the size of the panel it reports
-            // on is the loudest thing on the page and says nothing the mark
-            // has not already said.
-            .child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .left_0()
-                    .w(px(theme.effects.selection_rail_width))
-                    .bg(color),
-            )
+            .bg(theme.color_wash(color, SemanticWash::Faint))
             .child(
                 div()
                     .row()

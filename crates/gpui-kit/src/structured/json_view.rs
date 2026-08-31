@@ -69,7 +69,7 @@ use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::window_state;
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+    Disableable, FocusRing, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
 };
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -794,7 +794,7 @@ fn row_element(
         .pe(direction, px(theme.space(Space::Sm)))
         .ps(direction, px(theme.space(Space::Sm)))
         .gap(px(theme.space(Space::Xs)))
-        .selected_row(theme, direction, selected)
+        .selected_fill(theme, selected)
         .when(view.disabled, |element| {
             element.opacity(theme.opacity.disabled)
         })

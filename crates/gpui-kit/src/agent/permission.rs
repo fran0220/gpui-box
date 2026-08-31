@@ -34,7 +34,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 use crate::foundation::{CardVariant, FocusRing, Ident, StyledExt, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -447,17 +447,13 @@ fn cell(
     .value(SharedString::new_static(state.name()))
     .parent(row_ident.semantic_id());
 
-    // Both arms carry a border so the two matrices line up; only the editable
-    // one is drawn. Hover and the focus ring arrive too late to answer "can I
-    // change this?", and for a permission that question has to be answerable
-    // at rest.
-    // A provenance line that wraps needs room under it: at the tighter step
-    // the second line sat on the cell's own border.
+    // The tonal well answers "this is a permission value" without wrapping
+    // every cell in a decorative outline.
     let frame = div()
         .flex_1()
         .min_w_0()
         .p_token(theme, Space::Sm)
-        .hairline(theme)
+        .surface(theme, Surface::Sunken)
         .radius(theme, Radius::Control);
 
     match handler {

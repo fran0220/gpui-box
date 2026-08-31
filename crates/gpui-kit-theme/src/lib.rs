@@ -41,8 +41,6 @@ pub enum Variant {
     Filled,
     /// A wash of the colour under text in the colour.
     Light,
-    /// A hairline of the colour around text in the colour.
-    Outline,
     /// Text in the colour that gains a wash only under the pointer.
     Subtle,
     /// The neutral control surface; the colour choice is not consulted.
@@ -85,7 +83,6 @@ impl Variant {
         match self {
             Self::Filled => "filled",
             Self::Light => "light",
-            Self::Outline => "outline",
             Self::Subtle => "subtle",
             Self::Default => "default",
             Self::Transparent => "transparent",
@@ -141,8 +138,6 @@ pub struct VariantColors {
     pub background_hover: Hsla,
     pub background_active: Hsla,
     pub text: Hsla,
-    /// Only the Outline tier draws one.
-    pub border: Option<Hsla>,
 }
 
 #[derive(Debug, Clone)]
@@ -624,11 +619,8 @@ impl ZIndices {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Effects {
     pub edge_fade_band: f32,
-    pub selected_ring_alpha: f32,
-    pub selection_rail_width: f32,
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
-    pub focus_ring_counter_alpha: f32,
     pub glow_alpha: f32,
     pub glow_blur: f32,
     /// The bloom budget, negative: how far a state glow is pulled in before
@@ -674,9 +666,8 @@ pub struct Effects {
     pub node_edge_hover_width_scale: f32,
     pub node_edge_selected_width_scale: f32,
     pub node_edge_glow_width_scale: f32,
-    /// How wide an identity rail is, in pixels: a node's category stripe, a
-    /// callout's edge. Distinct from `selection_rail_width`, which reports a
-    /// transient state rather than what a thing is.
+    /// How wide an identity rail is, in pixels: a node's category stripe or a
+    /// callout's edge.
     pub rail_width: f32,
     pub semantic_wash_faint_alpha: f32,
     pub semantic_wash_alpha: f32,
@@ -694,8 +685,6 @@ pub struct Effects {
     pub variant_light_alpha: f32,
     pub variant_light_hover_alpha: f32,
     pub variant_light_active_alpha: f32,
-    pub variant_outline_hover_alpha: f32,
-    pub variant_outline_active_alpha: f32,
     pub variant_subtle_hover_alpha: f32,
     pub variant_subtle_active_alpha: f32,
     pub primary_hover_opacity: f32,
@@ -970,11 +959,8 @@ impl Theme {
             },
             effects: Effects {
                 edge_fade_band: tokens.effect.edge_fade_band,
-                selected_ring_alpha: tokens.effect.selected_ring_alpha,
-                selection_rail_width: tokens.effect.selection_rail_width,
                 focus_ring_width: tokens.effect.focus_ring_width,
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
-                focus_ring_counter_alpha: tokens.effect.focus_ring_counter_alpha,
                 glow_alpha: tokens.effect.glow_alpha,
                 glow_blur: tokens.effect.glow_blur,
                 glow_spread: tokens.effect.glow_spread,
@@ -1029,8 +1015,6 @@ impl Theme {
                 variant_light_alpha: tokens.effect.variant_light_alpha,
                 variant_light_hover_alpha: tokens.effect.variant_light_hover_alpha,
                 variant_light_active_alpha: tokens.effect.variant_light_active_alpha,
-                variant_outline_hover_alpha: tokens.effect.variant_outline_hover_alpha,
-                variant_outline_active_alpha: tokens.effect.variant_outline_active_alpha,
                 variant_subtle_hover_alpha: tokens.effect.variant_subtle_hover_alpha,
                 variant_subtle_active_alpha: tokens.effect.variant_subtle_active_alpha,
                 primary_hover_opacity: tokens.effect.primary_hover_opacity,
@@ -1332,54 +1316,30 @@ impl Theme {
         cx.global::<ThemeRegistry>().active()
     }
 
-    /// The ring drawn around whichever control currently has the keyboard.
+    /// The soft halo drawn around whichever control currently has the keyboard.
     ///
-    /// It spreads outward in the focus colour, so it reads differently from
-    /// [`Self::selected_ring`]: focus says where the next keystroke goes,
-    /// selection says which answer is current, and a reader that cannot tell
-    /// the two apart cannot tell what pressing a key would do.
-    /// It is two bands and not one, because one colour cannot be seen on
-    /// every background. The focus paint vanishes on a control of its own
-    /// family — a focused accent button wore a ring the same colour as
-    /// itself — and a neutral vanishes on the surface. The inner band is the
-    /// focus paint and the outer band is the text pole, which stands opposite
-    /// the surfaces in both appearances; whichever background the focused
-    /// thing turns out to be sitting on, one of the two is visible.
-    ///
-    /// Neither band offsets layout: both are outward shadows, so a control
-    /// taking the keyboard does not move the ones beside it.
+    /// The page ground is the default substrate. A control that paints a
+    /// different fill calls [`Self::focus_ring_on`] so the single focus colour
+    /// can switch to a readable pole instead of gaining a permanent counter
+    /// outline.
     pub fn focus_ring(&self) -> Vec<BoxShadow> {
-        let band = |color: Hsla, spread: f32| BoxShadow {
-            color,
-            offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(spread),
-            inset: false,
-        };
-        let width = self.effects.focus_ring_width;
-        vec![
-            // The nearer band is listed first, which is the order a shadow
-            // list paints in: it sits on top of the wider one behind it.
-            band(
-                self.colors.focus.opacity(self.effects.focus_ring_alpha),
-                width,
-            ),
-            band(
-                self.colors
-                    .text
-                    .opacity(self.effects.focus_ring_counter_alpha),
-                width * 2.0,
-            ),
-        ]
+        self.focus_ring_on(self.colors.canvas)
     }
 
-    pub fn selected_ring(&self) -> Vec<BoxShadow> {
+    /// The focus halo resolved against the control's own resting fill.
+    pub fn focus_ring_on(&self, background: Hsla) -> Vec<BoxShadow> {
+        let focus = if self.contrast(self.colors.focus, background) >= 3.0 {
+            self.colors.focus
+        } else {
+            self.readable_on(background)
+        };
+        let width = self.effects.focus_ring_width;
         vec![BoxShadow {
-            color: self.colors.text.opacity(self.effects.selected_ring_alpha),
+            color: focus.opacity(self.effects.focus_ring_alpha),
             offset: point(px(0.0), px(0.0)),
-            blur_radius: px(0.0),
-            spread_radius: px(self.borders.hairline),
-            inset: true,
+            blur_radius: px(width * 2.0),
+            spread_radius: px(width * 0.5),
+            inset: false,
         }]
     }
 
@@ -1406,7 +1366,6 @@ impl Theme {
                 background_hover: self.colors.active,
                 background_active: self.colors.active,
                 text: self.colors.text,
-                border: None,
             };
         }
 
@@ -1429,7 +1388,6 @@ impl Theme {
                     } else {
                         self.colors.text
                     },
-                    border: None,
                 }
             }
             Variant::Light => VariantColors {
@@ -1437,35 +1395,24 @@ impl Theme {
                 background_hover: base.opacity(self.effects.variant_light_hover_alpha),
                 background_active: base.opacity(self.effects.variant_light_active_alpha),
                 text: readable,
-                border: None,
-            },
-            Variant::Outline => VariantColors {
-                background: transparent,
-                background_hover: base.opacity(self.effects.variant_outline_hover_alpha),
-                background_active: base.opacity(self.effects.variant_outline_active_alpha),
-                text: readable,
-                border: Some(readable),
             },
             Variant::Subtle => VariantColors {
                 background: transparent,
                 background_hover: base.opacity(self.effects.variant_subtle_hover_alpha),
                 background_active: base.opacity(self.effects.variant_subtle_active_alpha),
                 text: readable,
-                border: None,
             },
             Variant::Transparent => VariantColors {
                 background: transparent,
                 background_hover: transparent,
                 background_active: transparent,
                 text: readable,
-                border: None,
             },
             Variant::White => VariantColors {
                 background: self.colors.white_fill,
                 background_hover: self.colors.white_fill_hover,
                 background_active: self.colors.white_fill_active,
                 text: base,
-                border: None,
             },
         }
     }
@@ -1848,7 +1795,6 @@ mod tests {
             let indigo: ColorChoice = "indigo".into();
             let filled = theme.variant_colors(Variant::Filled, &indigo);
             let light = theme.variant_colors(Variant::Light, &indigo);
-            let outline = theme.variant_colors(Variant::Outline, &indigo);
             let subtle = theme.variant_colors(Variant::Subtle, &indigo);
             let transparent = theme.variant_colors(Variant::Transparent, &indigo);
 
@@ -1876,12 +1822,6 @@ mod tests {
             // Light is a wash of the same colour, never a solid.
             assert!(light.background.a < 0.5);
             assert!(light.background.a > 0.0);
-
-            // Only Outline carries a border.
-            assert!(outline.border.is_some());
-            for resolved in [filled, light, subtle, transparent] {
-                assert!(resolved.border.is_none());
-            }
 
             // Subtle and Transparent rest without a surface; only Subtle
             // gains one under the pointer.
@@ -2157,35 +2097,27 @@ mod tests {
     }
 
     #[test]
-    fn focus_and_selection_do_not_look_alike() {
+    fn focus_is_one_soft_halo_readable_on_its_own_colour() {
         for theme in gpui_kit_tokens::all()
             .into_iter()
             .map(|tokens| Theme::from_tokens(tokens, Density::Comfortable))
         {
             let focus = theme.focus_ring();
-            let selected = theme.selected_ring();
-            // Two bands, because one colour cannot be seen on every
-            // background: the focus paint disappears on a control of its own
-            // family, and the text pole disappears on the page.
-            assert_eq!(focus.len(), 2, "{}", theme.id);
-            assert_ne!(focus[0].color, focus[1].color, "{}", theme.id);
-            assert_ne!(focus[0].color, selected[0].color, "{}", theme.id);
-            // The nearer band is first, which is the order a shadow list
-            // paints in.
-            assert!(
-                focus[0].spread_radius < focus[1].spread_radius,
-                "{}",
-                theme.id
-            );
+            assert_eq!(focus.len(), 1, "{}", theme.id);
             for band in &focus {
                 assert!(!band.inset, "{}", theme.id);
                 // A ring that reserved space would move the layout the moment
                 // the keyboard arrived on a control.
                 assert_eq!(band.offset, point(px(0.0), px(0.0)), "{}", theme.id);
                 assert!(band.spread_radius > px(0.0), "{}", theme.id);
-                assert_eq!(band.blur_radius, px(0.0), "{}", theme.id);
+                assert!(band.blur_radius > px(0.0), "{}", theme.id);
             }
-            assert!(selected[0].inset, "{}", theme.id);
+            let on_focus = theme.focus_ring_on(theme.colors.focus);
+            let pole = theme.readable_on(theme.colors.focus);
+            assert_eq!(on_focus.len(), 1, "{}", theme.id);
+            assert_eq!(on_focus[0].color.h, pole.h, "{}", theme.id);
+            assert_eq!(on_focus[0].color.s, pole.s, "{}", theme.id);
+            assert_eq!(on_focus[0].color.l, pole.l, "{}", theme.id);
         }
     }
 
@@ -2225,15 +2157,6 @@ mod tests {
                 theme.id
             );
         }
-    }
-
-    #[test]
-    fn selected_ring_does_not_change_layout() {
-        let theme = Theme::studio_dark();
-        let ring = theme.selected_ring();
-        assert_eq!(ring.len(), 1);
-        assert!(ring[0].inset);
-        assert_eq!(ring[0].spread_radius, px(1.0));
     }
 
     #[test]

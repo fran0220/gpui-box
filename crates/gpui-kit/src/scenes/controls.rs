@@ -84,7 +84,6 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
                 [
                     Variant::Filled,
                     Variant::Light,
-                    Variant::Outline,
                     Variant::Subtle,
                     Variant::Default,
                     Variant::Transparent,

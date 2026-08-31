@@ -9,7 +9,7 @@ use gpui_kit_theme::{ActiveTheme, Space, Surface, TextTone, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
-    Disableable, FocusRing, HoverLift, Hoverable, Ident, Pressable, Selectable, SelectedRow,
+    Disableable, FocusRing, HoverLift, Hoverable, Ident, Pressable, Selectable, SelectedFill,
     StyledExt, text,
 };
 
@@ -77,7 +77,6 @@ pub struct Card {
     media: Option<SlotRender>,
     footer: Option<SlotRender>,
     children: Vec<AnyElement>,
-    divided: bool,
     padding: Option<Space>,
     selected: bool,
     disabled: bool,
@@ -94,7 +93,6 @@ impl std::fmt::Debug for Card {
             .field("has_media", &self.media.is_some())
             .field("has_footer", &self.footer.is_some())
             .field("children", &self.children.len())
-            .field("divided", &self.divided)
             .field("selected", &self.selected)
             .field("disabled", &self.disabled)
             .finish()
@@ -118,7 +116,6 @@ impl Card {
             media: None,
             footer: None,
             children: Vec::new(),
-            divided: false,
             padding: None,
             selected: false,
             disabled: false,
@@ -180,18 +177,6 @@ impl Card {
         self
     }
 
-    /// Draws a hairline between every adjacent region and between body rows.
-    ///
-    /// This is the one place the library draws a line that is not focus,
-    /// invalidity or a drop target, and it is a line between two pieces of
-    /// content on one surface rather than a line around the surface. A list
-    /// of rows and a footer of actions want it; a card holding one paragraph
-    /// does not, which is why it is off by default.
-    pub fn divided(mut self, divided: bool) -> Self {
-        self.divided = divided;
-        self
-    }
-
     /// Adds interior padding. Row-based cards leave this off so a row's own
     /// hover wash can reach the card edge.
     ///
@@ -249,13 +234,10 @@ impl RenderOnce for Card {
         let direction = cx.layout_direction();
         let actionable = self.actionable();
         let disabled = self.disabled;
-        let divided = self.divided;
         let announced = self
             .name
             .clone()
             .or_else(|| self.header.as_ref().map(|header| header.title.clone()));
-
-        let rule = || crate::foundation::rule(&theme);
 
         // A card that is one action renders no second target inside itself.
         let header = self.header.map(|header| {
@@ -308,21 +290,16 @@ impl RenderOnce for Card {
         let leads = header.is_some() || media.is_some();
         let trails = self.footer.is_some();
         let body = (!self.children.is_empty()).then(|| {
-            // A region above or below already put space there, unless a rule
-            // divides them, in which case both sides want their own margin.
             let mut body = div().w_full().column().when_some(
                 self.padding.map(|padding| theme.space(padding)),
                 |element, padding| {
                     element
                         .px(px(padding))
-                        .pt(px(if leads && !divided { 0.0 } else { padding }))
-                        .pb(px(if trails && !divided { 0.0 } else { padding }))
+                        .pt(px(if leads { 0.0 } else { padding }))
+                        .pb(px(if trails { 0.0 } else { padding }))
                 },
             );
-            for (index, child) in self.children.into_iter().enumerate() {
-                if divided && index > 0 {
-                    body = body.child(rule());
-                }
+            for child in self.children {
                 body = body.child(child);
             }
             body
@@ -351,15 +328,8 @@ impl RenderOnce for Card {
             self.variant,
             self.ground,
         );
-        if self.selected {
-            frame = frame.relative().bg(theme.colors.selected).child(
-                crate::foundation::selection_rail(&theme, cx.layout_direction()),
-            );
-        }
-        for (index, region) in regions.into_iter().enumerate() {
-            if divided && index > 0 {
-                frame = frame.child(rule());
-            }
+        frame = frame.selected_fill(&theme, self.selected);
+        for region in regions {
             frame = frame.child(region);
         }
 
@@ -516,7 +486,7 @@ impl RenderOnce for ListRow {
             .w_full()
             .px(px(theme.spacing.lg + theme.spacing.xs))
             .py(px(theme.spacing.md + theme.spacing.xxs))
-            .selected_row(&theme, direction, selected)
+            .selected_fill(&theme, selected)
             .when(!selected && !disabled, |element| element.hover_row(&theme))
             // A disabled row states that it is unavailable and stays legible
             // doing it: the text tone changes and the content does not fade
