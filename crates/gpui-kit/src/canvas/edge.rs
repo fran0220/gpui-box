@@ -1,6 +1,6 @@
 //! Static edge data and orthogonal geometry for a node graph.
 
-use gpui::{Bounds, Hsla, PathBuilder, Pixels, Point, SharedString, Window, point, px};
+use gpui::{Bounds, Hsla, PathBuilder, Pixels, Point, SharedString, Window, point, px, size};
 use gpui_kit_theme::{Radius, Theme};
 
 /// The routing treatment of an edge.
@@ -47,6 +47,24 @@ pub enum EdgeState {
     Active,
     Succeeded,
     Failed,
+}
+
+/// The terminal mark a connection places at its destination.
+///
+/// The mark carries direction only when the host asks for it. Dense lane
+/// diagrams generally need the whole corridor more than another glyph, while
+/// a sparse curved graph can use a cap or arrow to make its reading direction
+/// immediate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EdgeMarker {
+    /// The route ends cleanly at the destination port.
+    #[default]
+    None,
+    /// A filled terminal bead, useful when destination is the emphasis but an
+    /// arrow would overstate movement.
+    Dot,
+    /// A filled arrow following the route's exact terminal tangent.
+    Arrow,
 }
 
 impl EdgeState {
@@ -173,6 +191,7 @@ pub struct GraphEdge {
     to_port: Option<SharedString>,
     label: Option<SharedString>,
     state: EdgeState,
+    marker: EdgeMarker,
     selected: bool,
     lane: i16,
 }
@@ -188,6 +207,7 @@ impl GraphEdge {
             to_port: None,
             label: None,
             state: EdgeState::Idle,
+            marker: EdgeMarker::None,
             selected: false,
             lane: 0,
         }
@@ -227,6 +247,11 @@ impl GraphEdge {
         self.state = state;
         self
     }
+    /// Places an optional direction mark at the destination port.
+    pub fn marker(mut self, marker: EdgeMarker) -> Self {
+        self.marker = marker;
+        self
+    }
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
@@ -254,6 +279,9 @@ impl GraphEdge {
     }
     pub(crate) fn edge_state(&self) -> EdgeState {
         self.state
+    }
+    pub(crate) fn edge_marker(&self) -> EdgeMarker {
+        self.marker
     }
     pub(crate) fn is_selected(&self) -> bool {
         self.selected
@@ -344,6 +372,29 @@ impl OrthogonalRoute {
     }
     pub(crate) fn points(&self) -> &[Point<f32>] {
         &self.points
+    }
+    fn terminal_tangent(&self) -> Point<f32> {
+        let Some(pair) = self.points.windows(2).next_back() else {
+            return point(1.0, 0.0);
+        };
+        let run = point(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+        let length = run.x.hypot(run.y);
+        if length <= f32::EPSILON {
+            point(1.0, 0.0)
+        } else {
+            point(run.x / length, run.y / length)
+        }
+    }
+
+    /// Sparse curves grow gently towards their destination, carrying flow
+    /// direction without changing the width of orthogonal lane diagrams.
+    fn width_scale(&self, progress: f32) -> f32 {
+        if !self.curved {
+            return 1.0;
+        }
+        let progress = progress.clamp(0.0, 1.0);
+        let eased = progress * progress * (3.0 - 2.0 * progress);
+        0.78 + 0.52 * eased
     }
     #[cfg(test)]
     pub(crate) fn total_length(&self) -> f32 {
@@ -635,9 +686,12 @@ pub enum GraphRouting {
 }
 
 /// How far a curve leaves its port before it starts turning, at the least.
-const CURVE_LEAD: f32 = 46.0;
+const CURVE_LEAD: f32 = 32.0;
+/// Long routes stop increasing their handles here, avoiding the broad loops
+/// that make two nearby endpoint tangents look unrelated.
+const CURVE_MAX_LEAD: f32 = 180.0;
 /// How finely a curve is cut into the polyline everything else measures.
-const CURVE_STEPS: usize = 24;
+const CURVE_STEPS: usize = 32;
 
 /// A single curve between two ports, leaving and arriving along the sides they
 /// face.
@@ -646,10 +700,11 @@ const CURVE_STEPS: usize = 24;
 /// be routed around an obstacle without ceasing to be one curve. That is why
 /// it is the caller's choice and not the default.
 pub(crate) fn route_curved(from: Anchor, to: Anchor) -> OrthogonalRoute {
-    let span = (to.point.x - from.point.x)
-        .abs()
-        .max((to.point.y - from.point.y).abs());
-    let lead = (span * 0.45).max(CURVE_LEAD);
+    let span = (to.point.x - from.point.x).hypot(to.point.y - from.point.y);
+    // A cubic already guarantees the declared endpoint tangents. Bounded
+    // handles make those tangents relax into the body of the curve rather than
+    // crossing on short hops or producing loops on very long ones.
+    let lead = (span * 0.42).clamp(CURVE_LEAD.min(span * 0.5), CURVE_MAX_LEAD);
     let first = from.outward_point(lead);
     let last = to.outward_point(lead);
     let points = (0..=CURVE_STEPS)
@@ -928,6 +983,18 @@ pub(crate) fn paint_route(
             paint_comet(window, route, transform, trail, head);
         }
     }
+    if paint.reveal >= 1.0 {
+        paint_end_marker(
+            window,
+            theme,
+            route,
+            transform,
+            edge.edge_marker(),
+            paint.colors.to,
+            width,
+            selected || paint.hovered,
+        );
+    }
 }
 
 /// A source-to-destination colour gradient cut from the same route path used
@@ -959,10 +1026,82 @@ fn paint_gradient(
             transform,
             Stroke {
                 color: theme.mix(colors.from, colors.to, middle),
+                width: stroke.width * route.width_scale(middle),
                 trim: Some((from, to)),
                 ..stroke
             },
         );
+    }
+}
+
+/// Draws a filled cap on the destination tangent. It never uses an outline:
+/// selection and hover add a low-alpha halo underneath the information mark.
+fn paint_end_marker(
+    window: &mut Window,
+    theme: &Theme,
+    route: &OrthogonalRoute,
+    transform: RouteTransform,
+    marker: EdgeMarker,
+    color: Hsla,
+    stroke: f32,
+    emphasized: bool,
+) {
+    if marker == EdgeMarker::None {
+        return;
+    }
+    let Some(&world_tip) = route.points().last() else {
+        return;
+    };
+    let tip = transform.point(world_tip);
+    let unit = theme.measures.status_mark.max(stroke * 2.0);
+    if emphasized {
+        for step in (1..=3).rev() {
+            let radius = px(unit * (0.72 + step as f32 * 0.36));
+            window.paint_quad(gpui::fill(
+                Bounds::new(
+                    point(tip.x - radius, tip.y - radius),
+                    size(radius * 2.0, radius * 2.0),
+                ),
+                color.opacity(theme.effects.node_active_wash_alpha / (step as f32 + 1.5)),
+            ));
+        }
+    }
+    match marker {
+        EdgeMarker::None => {}
+        EdgeMarker::Dot => {
+            let radius = px(unit * 0.42);
+            window.paint_quad(gpui::fill(
+                Bounds::new(
+                    point(tip.x - radius, tip.y - radius),
+                    size(radius * 2.0, radius * 2.0),
+                ),
+                color,
+            ));
+        }
+        EdgeMarker::Arrow => {
+            let tangent = route.terminal_tangent();
+            let length = unit * 1.75;
+            let half_width = unit * 0.72;
+            let base = point(
+                tip.x - px(tangent.x * length),
+                tip.y - px(tangent.y * length),
+            );
+            let perpendicular = point(-tangent.y, tangent.x);
+            let mut builder = PathBuilder::fill();
+            builder.move_to(tip);
+            builder.line_to(point(
+                base.x + px(perpendicular.x * half_width),
+                base.y + px(perpendicular.y * half_width),
+            ));
+            builder.line_to(point(
+                base.x - px(perpendicular.x * half_width),
+                base.y - px(perpendicular.y * half_width),
+            ));
+            builder.close();
+            if let Ok(path) = builder.build() {
+                window.paint_path(path, color);
+            }
+        }
     }
 }
 
@@ -1355,17 +1494,38 @@ mod tests {
         // the length lands halfway along what the eye follows.
         let straight = (to.point.x - from.point.x).hypot(to.point.y - from.point.y);
         assert!(route.total_length() > straight);
+
+        // The same eased taper every curved paint slice uses stays gentle at
+        // both ends and grows towards the destination.
+        assert!((route.width_scale(0.0) - 0.78).abs() < f32::EPSILON);
+        assert!(route.width_scale(0.5) > route.width_scale(0.0));
+        assert!((route.width_scale(1.0) - 1.30).abs() < f32::EPSILON);
+        let tangent = route.terminal_tangent();
+        assert!(tangent.x > 0.0);
+        assert!(tangent.y.abs() < 0.05);
     }
 
     #[test]
-    fn a_short_hop_still_leaves_its_port_far_enough_to_read_as_a_curve() {
-        // Below the floor both control points would sit on the ports and the
-        // curve would collapse into the straight line it replaces.
+    fn lane_routes_keep_one_width_from_source_to_destination() {
+        let route = OrthogonalRoute::new(vec![point(0.0, 0.0), point(40.0, 0.0)]);
+        for progress in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            assert_eq!(route.width_scale(progress), 1.0);
+        }
+    }
+
+    #[test]
+    fn a_short_facing_hop_relaxes_without_looping_past_either_port() {
+        // Two facing ports on one axis have no second fact for a decorative
+        // bend to carry. The curve may settle to a line, but it may not cross
+        // its handles and hook backwards on the short run.
         let from = anchor(PortSide::Right, bounds(0.0, 0.0));
         let to = anchor(PortSide::Left, bounds(60.0, 0.0));
         let route = route_curved(from, to);
         assert!(route.points()[1].x - from.point.x > 0.0);
-        assert!(route.total_length() > to.point.x - from.point.x);
+        assert!(route.points().windows(2).all(|pair| pair[0].x <= pair[1].x));
+        assert!(route.points().iter().all(|point| {
+            point.x >= from.point.x && point.x <= to.point.x && point.y == from.point.y
+        }));
     }
 
     #[test]
@@ -1477,6 +1637,11 @@ mod tests {
         assert_eq!(a.edge_label().expect("edge label"), "work");
         assert!(a.is_active());
         assert_eq!(a.edge_state(), EdgeState::Active);
+        assert_eq!(a.edge_marker(), EdgeMarker::None);
+        assert_eq!(
+            a.clone().marker(EdgeMarker::Arrow).edge_marker(),
+            EdgeMarker::Arrow
+        );
         assert!(!a.is_selected());
         assert!(a.clone().selected(true).is_selected());
         assert_eq!(

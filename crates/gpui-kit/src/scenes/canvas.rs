@@ -337,10 +337,12 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .edges(vec![
                         GraphEdge::new("scene.graph.curves.brief", "scene.graph.curves.render")
                             .id("scene.graph.curves.edge.render")
-                            .ports("out", "in"),
+                            .ports("out", "in")
+                            .marker(EdgeMarker::Arrow),
                         GraphEdge::new("scene.graph.curves.render", "scene.graph.curves.grade")
                             .id("scene.graph.curves.edge.grade")
-                            .ports("out", "in"),
+                            .ports("out", "in")
+                            .marker(EdgeMarker::Dot),
                     ]),
             ),
         )
