@@ -850,6 +850,72 @@ fn canvas_toolbar_actions_share_pointer_keyboard_and_disabled_contracts(cx: &mut
 }
 
 #[gpui::test]
+fn node_graph_seats_toolbar_and_frames_its_complete_world(cx: &mut TestAppContext) {
+    let viewports = Calls::default();
+    let actions = Rc::new(RefCell::new(Vec::new()));
+    let viewport_sink = Rc::clone(&viewports);
+    let action_sink = Rc::clone(&actions);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let viewport_sink = Rc::clone(&viewport_sink);
+        let action_sink = Rc::clone(&action_sink);
+        div()
+            .w(px(720.0))
+            .h(px(420.0))
+            .child(
+                NodeGraph::new("fit-graph")
+                    .toolbar(
+                        CanvasToolbar::new("fit-graph.toolbar", "100%")
+                            .actions([CanvasToolbarAction::Fit])
+                            .glass(GlassPreset::Liquid)
+                            .on_action(move |action, _, _| action_sink.borrow_mut().push(action)),
+                    )
+                    .minimap(true)
+                    .fit(GraphFit::Whole(7))
+                    .band(GraphBand::new(
+                        "fit-graph.band",
+                        "Complete world",
+                        -240.0,
+                        -80.0,
+                        1_360.0,
+                        520.0,
+                    ))
+                    .node(GraphNode::new("fit-graph.node", "Node"), 120.0, 80.0)
+                    .on_event(move |event, _, _| viewport_sink.borrow_mut().push(event.clone())),
+            )
+            .into_any_element()
+    });
+
+    // The graph waits for both the card and the finished toolbar subtree, then
+    // proposes one caller-owned viewport for this token.
+    for _ in 0..3 {
+        harness.frame();
+    }
+    let proposed = viewports
+        .borrow()
+        .iter()
+        .find_map(|event| match event {
+            NodeGraphEvent::ViewportChanged(viewport) => Some(*viewport),
+            _ => None,
+        })
+        .expect("the measured complete-world frame");
+    assert!(
+        proposed.zoom < 1.0,
+        "the world-space band participates in the fit: {proposed:?}"
+    );
+    assert!(harness.node("fit-graph.minimap").is_some());
+    assert_eq!(
+        harness
+            .node("fit-graph.toolbar.fit")
+            .expect("the seated toolbar action")
+            .parent
+            .as_deref(),
+        Some("fit-graph.toolbar")
+    );
+    harness.click("fit-graph.toolbar.fit");
+    assert_eq!(actions.borrow().as_slice(), [CanvasToolbarAction::Fit]);
+}
+
+#[gpui::test]
 fn minimap_pointer_and_keyboard_pan_report_normalized_caller_owned_points(cx: &mut TestAppContext) {
     let calls = Rc::new(RefCell::new(Vec::new()));
     let sink = Rc::clone(&calls);

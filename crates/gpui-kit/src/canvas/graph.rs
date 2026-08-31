@@ -42,6 +42,7 @@ use super::edge::{
     route_curved_preview, route_orthogonal, route_preview,
 };
 use super::node::{GraphNode, GraphPort, PortDirection};
+use super::toolbar::CanvasToolbar;
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
@@ -400,6 +401,76 @@ fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
 /// How much of the surface is kept clear when framing, so a card at the edge
 /// of the graph does not end up against the edge of the panel.
 const FIT_MARGIN: f32 = 48.0;
+const GRAPH_MINIMAP_WIDTH: f32 = 140.0;
+const GRAPH_MINIMAP_HEIGHT: f32 = 88.0;
+
+#[derive(Debug, Clone, Copy)]
+enum FitCorner {
+    TopLeft,
+    BottomRight,
+}
+
+/// One piece of canvas-owned chrome that fitted world content must not sit
+/// beneath. The extent includes the chrome's offset from its two edges.
+#[derive(Debug, Clone, Copy)]
+struct FitObstacle {
+    corner: FitCorner,
+    width: f32,
+    height: f32,
+}
+
+impl FitObstacle {
+    fn new(corner: FitCorner, width: f32, height: f32) -> Self {
+        Self {
+            corner,
+            width: width.max(0.0),
+            height: height.max(0.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct FitInsets {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+}
+
+impl FitInsets {
+    /// Excludes the obstacle with a full-height strip on its horizontal side.
+    fn beside(mut self, obstacle: FitObstacle) -> Self {
+        match obstacle.corner {
+            FitCorner::TopLeft => self.left = self.left.max(obstacle.width),
+            FitCorner::BottomRight => self.right = self.right.max(obstacle.width),
+        }
+        self
+    }
+
+    /// Excludes the obstacle with a full-width strip on its vertical side.
+    fn beyond(mut self, obstacle: FitObstacle) -> Self {
+        match obstacle.corner {
+            FitCorner::TopLeft => self.top = self.top.max(obstacle.height),
+            FitCorner::BottomRight => self.bottom = self.bottom.max(obstacle.height),
+        }
+        self
+    }
+}
+
+/// Every rectangular content area that can avoid the corner obstacles. A
+/// corner can be cleared along either adjacent edge; trying both lets a wide,
+/// shallow toolbar consume height while a tall rail consumes width, without a
+/// host choosing insets or the graph hard-coding that policy per component.
+fn fit_inset_candidates(obstacles: &[FitObstacle]) -> Vec<FitInsets> {
+    obstacles
+        .iter()
+        .fold(vec![FitInsets::default()], |areas, obstacle| {
+            areas
+                .into_iter()
+                .flat_map(|area| [area.beside(*obstacle), area.beyond(*obstacle)])
+                .collect()
+        })
+}
 
 /// The token to frame for, or `None` when this canvas has already framed for
 /// the one the caller is holding. Separated from the drawing so the rule —
@@ -416,43 +487,66 @@ fn wants_frame(fit: GraphFit, framed: Option<u64>) -> Option<u64> {
 /// or nowhere to hold it yet.
 fn frame_all(
     nodes: &[NodeGeometry],
+    bands: &[GraphBand],
     surface: Bounds<Pixels>,
     zoom_range: (f32, f32),
+    obstacles: &[FitObstacle],
 ) -> Option<GraphViewport> {
     let width = f32::from(surface.size.width);
     let height = f32::from(surface.size.height);
     if width <= FIT_MARGIN || height <= FIT_MARGIN {
         return None;
     }
-    let (min, max) = nodes
+    let content = nodes
         .iter()
-        .fold(None::<(Point<f32>, Point<f32>)>, |acc, node| {
-            let low = node.bounds.origin;
-            let high = point(
-                node.bounds.origin.x + node.bounds.size.width,
-                node.bounds.origin.y + node.bounds.size.height,
+        .map(|node| node.bounds)
+        .chain(bands.iter().map(GraphBand::bounds));
+    let (min, max) = content.fold(None::<(Point<f32>, Point<f32>)>, |acc, bounds| {
+        let low = bounds.origin;
+        let high = point(
+            bounds.origin.x + bounds.size.width,
+            bounds.origin.y + bounds.size.height,
+        );
+        Some(match acc {
+            None => (low, high),
+            Some((left, right)) => (
+                point(left.x.min(low.x), left.y.min(low.y)),
+                point(right.x.max(high.x), right.y.max(high.y)),
+            ),
+        })
+    })?;
+    fit_inset_candidates(obstacles)
+        .into_iter()
+        .filter_map(|insets| {
+            let available_width = width - insets.left - insets.right - FIT_MARGIN;
+            let available_height = height - insets.top - insets.bottom - FIT_MARGIN;
+            if available_width <= 0.0 || available_height <= 0.0 {
+                return None;
+            }
+            let zoom = (available_width / (max.x - min.x).max(1.0))
+                .min(available_height / (max.y - min.y).max(1.0))
+                .clamp(zoom_range.0, zoom_range.1)
+                // Never magnify. A graph of three cards blown up to fill a
+                // panel reads as a mistake, and the reader can still zoom in
+                // themselves.
+                .min(1.0);
+            let available_center = point(
+                insets.left + (width - insets.left - insets.right) / 2.0,
+                insets.top + (height - insets.top - insets.bottom) / 2.0,
             );
-            Some(match acc {
-                None => (low, high),
-                Some((left, right)) => (
-                    point(left.x.min(low.x), left.y.min(low.y)),
-                    point(right.x.max(high.x), right.y.max(high.y)),
+            Some(GraphViewport::new(
+                point(
+                    available_center.x - (min.x + max.x) * zoom / 2.0,
+                    available_center.y - (min.y + max.y) * zoom / 2.0,
                 ),
-            })
-        })?;
-    let zoom = ((width - FIT_MARGIN) / (max.x - min.x).max(1.0))
-        .min((height - FIT_MARGIN) / (max.y - min.y).max(1.0))
-        .clamp(zoom_range.0, zoom_range.1)
-        // Never magnify. A graph of three cards blown up to fill a panel reads
-        // as a mistake, and the reader can still zoom in themselves.
-        .min(1.0);
-    Some(GraphViewport::new(
-        point(
-            (width - (min.x + max.x) * zoom) / 2.0,
-            (height - (min.y + max.y) * zoom) / 2.0,
-        ),
-        zoom,
-    ))
+                zoom,
+            ))
+        })
+        .max_by(|left, right| {
+            left.zoom
+                .partial_cmp(&right.zoom)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
 }
 
 fn bounds_overlap(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> bool {
@@ -724,6 +818,7 @@ pub struct NodeGraph {
     on_event: Option<EventHandler>,
     can_connect: Option<ConnectionValidator>,
     minimap: bool,
+    toolbar: Option<CanvasToolbar>,
     fit: GraphFit,
     routing: GraphRouting,
 }
@@ -746,10 +841,12 @@ pub enum GraphFit {
     /// The viewport is the caller's from the first frame.
     #[default]
     Never,
-    /// Frame every node as soon as the cards have been laid out and their
-    /// real heights are known, and again each time this value changes — which
-    /// is what a caller's own Fit control bumps, since the caller cannot
-    /// compute the frame itself. Reported as an ordinary
+    /// Frame every node and world-space band as soon as the cards and
+    /// canvas-owned chrome have been laid out, and again each time this value
+    /// changes — which is what a caller's own Fit control bumps, since the
+    /// caller cannot compute the frame itself. The fitted content clears the
+    /// graph's minimap and toolbar rather than remaining technically inside
+    /// the viewport underneath them. Reported as an ordinary
     /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
     /// its viewport needs nothing else. Between framings the viewport is the
     /// reader's and the canvas never moves it on its own, so a caller that
@@ -794,6 +891,7 @@ impl NodeGraph {
             on_event: None,
             can_connect: None,
             minimap: false,
+            toolbar: None,
             fit: GraphFit::Never,
             routing: GraphRouting::Lanes,
         }
@@ -913,6 +1011,18 @@ impl NodeGraph {
     /// Draws a small overview of the placed nodes in the corner.
     pub fn minimap(mut self, show: bool) -> Self {
         self.minimap = show;
+        self
+    }
+
+    /// Seats canvas chrome in the graph's top-left overlay layer.
+    ///
+    /// The graph measures the finished toolbar rather than duplicating its
+    /// control geometry. [`GraphFit::Whole`] then keeps world content out from
+    /// under it, just as it does for the graph's own minimap. This is the
+    /// complete overlay path: paint order and fit geometry cannot disagree,
+    /// and the host supplies no pixel inset.
+    pub fn toolbar(mut self, toolbar: CanvasToolbar) -> Self {
+        self.toolbar = Some(toolbar);
         self
     }
 
@@ -1213,6 +1323,10 @@ impl RenderOnce for NodeGraph {
         let spec = NodeSpec::new(self.ident.semantic_id(), Role::Group).busy(graph_busy);
 
         let measured = measure::cell(&self.ident.child("viewport").semantic_id(), window, cx);
+        let toolbar_measured = self
+            .toolbar
+            .as_ref()
+            .map(|_| measure::cell(&self.ident.child("toolbar-seat").semantic_id(), window, cx));
         let record = Rc::clone(&measured);
         let mut frame = div()
             .on_children_prepainted(move |bounds, window, _| {
@@ -1550,9 +1664,37 @@ impl RenderOnce for NodeGraph {
         let every_card_measured = geometry
             .iter()
             .all(|node| measured_heights.contains_key(&node.id));
+        let overlay_offset = theme.space(Space::Sm);
+        let every_overlay_measured = toolbar_measured.as_ref().is_none_or(|measured| {
+            let size = measured.get().size;
+            size.width > px(0.0) && size.height > px(0.0)
+        });
+        let mut fit_obstacles = Vec::new();
+        if let Some(measured) = &toolbar_measured {
+            let size = measured.get().size;
+            fit_obstacles.push(FitObstacle::new(
+                FitCorner::TopLeft,
+                f32::from(size.width) + overlay_offset,
+                f32::from(size.height) + overlay_offset,
+            ));
+        }
+        if self.minimap {
+            fit_obstacles.push(FitObstacle::new(
+                FitCorner::BottomRight,
+                GRAPH_MINIMAP_WIDTH + overlay_offset,
+                GRAPH_MINIMAP_HEIGHT + overlay_offset,
+            ));
+        }
         if let Some(token) = pending_frame
             && every_card_measured
-            && let Some(framed) = frame_all(&geometry, measured.get(), self.zoom_range)
+            && every_overlay_measured
+            && let Some(framed) = frame_all(
+                &geometry,
+                &self.bands,
+                measured.get(),
+                self.zoom_range,
+                &fit_obstacles,
+            )
             && let Some(report) = self.on_event.as_ref().cloned()
         {
             gesture.borrow_mut().framed = Some(token);
@@ -2658,6 +2800,21 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
+        let toolbar = self.toolbar.map(|toolbar| {
+            let measured = toolbar_measured.expect("a toolbar seat has a measurement");
+            div()
+                .on_children_prepainted(move |bounds, window, _| {
+                    if let Some(first) = bounds.first() {
+                        measure::record(&measured, *first, window);
+                    }
+                })
+                .absolute()
+                .top(px(overlay_offset))
+                .left(px(overlay_offset))
+                .child(toolbar)
+                .into_any_element()
+        });
+
         frame
             .child(ground)
             .children(if compact { Vec::new() } else { bands })
@@ -2669,6 +2826,7 @@ impl RenderOnce for NodeGraph {
             .children(edge_nodes)
             .children(marquee)
             .children(overview)
+            .children(toolbar)
             .semantic_in(cx, spec.value(viewport_value("ready", asked)))
             .into_any_element()
     }
@@ -2753,8 +2911,8 @@ fn graph_minimap(
         .absolute()
         .right(px(theme.space(Space::Sm)))
         .bottom(px(theme.space(Space::Sm)))
-        .w(px(140.0))
-        .h(px(88.0))
+        .w(px(GRAPH_MINIMAP_WIDTH))
+        .h(px(GRAPH_MINIMAP_HEIGHT))
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Overlay)
         .elevation(theme, Elevation::Raised)
@@ -2777,29 +2935,6 @@ struct GridPaint {
     major: Hsla,
     axis: Hsla,
     dot: f32,
-}
-
-/// The canvas ground on its own, unpanned and unzoomed.
-///
-/// A region, a lasso or a piece of canvas chrome has to be shown standing on
-/// the same ground a graph does, and painting a second grid next to this one
-/// is how the two come to disagree about what a canvas looks like. This is
-/// that ground without a graph on it: no nodes, no edges, no viewport.
-pub(crate) fn grid_ground(theme: &gpui_kit_theme::Theme) -> impl IntoElement {
-    let paint = GridPaint {
-        minor: theme.colors.node.grid,
-        major: theme.colors.node.grid_strong,
-        axis: theme.colors.node.grid_axis,
-        dot: theme.borders.hairline,
-    };
-    canvas(
-        |_, _, _| {},
-        move |bounds, _, window, _| {
-            paint_grid(window, bounds, GraphViewport::default(), paint);
-        },
-    )
-    .absolute()
-    .inset_0()
 }
 
 /// Every dot the same weight is a texture, not a grid: it says the canvas has
@@ -3120,7 +3255,7 @@ mod tests {
         // origin, which is the case a default viewport shows nothing of.
         let nodes = geometry_at(&[(400.0, 300.0, 200.0, 160.0), (1600.0, 900.0, 200.0, 400.0)]);
         let surface = surface(640.0, 480.0);
-        let framed = frame_all(&nodes, surface, (0.2, 2.0)).expect("a frame");
+        let framed = frame_all(&nodes, &[], surface, (0.2, 2.0), &[]).expect("a frame");
         let view = world_view(framed, surface);
         for node in &nodes {
             assert!(
@@ -3139,14 +3274,16 @@ mod tests {
     #[test]
     fn a_frame_never_magnifies_and_never_leaves_its_zoom_range() {
         let one = geometry_at(&[(0.0, 0.0, 40.0, 40.0)]);
-        let framed = frame_all(&one, surface(1200.0, 900.0), (0.2, 2.0)).expect("a frame");
+        let framed =
+            frame_all(&one, &[], surface(1200.0, 900.0), (0.2, 2.0), &[]).expect("a frame");
         assert_eq!(
             framed.zoom, 1.0,
             "a small graph is shown at its own size, not blown up"
         );
 
         let wide = geometry_at(&[(0.0, 0.0, 100_000.0, 100.0)]);
-        let floored = frame_all(&wide, surface(640.0, 480.0), (0.4, 2.0)).expect("a frame");
+        let floored =
+            frame_all(&wide, &[], surface(640.0, 480.0), (0.4, 2.0), &[]).expect("a frame");
         assert_eq!(
             floored.zoom, 0.4,
             "a graph too wide to fit is held at the caller's floor rather than \
@@ -3156,15 +3293,71 @@ mod tests {
 
     #[test]
     fn there_is_no_frame_without_something_to_frame_or_somewhere_to_put_it() {
-        assert!(frame_all(&[], surface(640.0, 480.0), (0.2, 2.0)).is_none());
+        assert!(frame_all(&[], &[], surface(640.0, 480.0), (0.2, 2.0), &[]).is_none());
         assert!(
             frame_all(
                 &geometry_at(&[(0.0, 0.0, 40.0, 40.0)]),
+                &[],
                 surface(4.0, 4.0),
-                (0.2, 2.0)
+                (0.2, 2.0),
+                &[],
             )
             .is_none(),
             "a canvas that has not been laid out yet is not a frame of zero size"
+        );
+    }
+
+    #[test]
+    fn a_frame_holds_world_bands_as_well_as_cards() {
+        let nodes = geometry_at(&[(120.0, 80.0, 160.0, 120.0)]);
+        let bands = [GraphBand::new(
+            "evaluation.scope",
+            "Evaluation scope",
+            -240.0,
+            -60.0,
+            1_200.0,
+            420.0,
+        )];
+        let surface = surface(720.0, 480.0);
+        let framed = frame_all(&nodes, &bands, surface, (0.2, 2.0), &[]).expect("a frame");
+        let view = world_view(framed, surface);
+        let band = bands[0].bounds();
+        assert!(
+            band.left() >= view.left()
+                && band.top() >= view.top()
+                && band.right() <= view.right()
+                && band.bottom() <= view.bottom(),
+            "the declared world region {band:?} fell outside {view:?}"
+        );
+    }
+
+    #[test]
+    fn fitted_content_clears_canvas_owned_corner_chrome() {
+        let nodes = geometry_at(&[(0.0, 0.0, 1_000.0, 520.0)]);
+        let surface = surface(800.0, 560.0);
+        let obstacles = [
+            FitObstacle::new(FitCorner::TopLeft, 320.0, 56.0),
+            FitObstacle::new(FitCorner::BottomRight, 152.0, 100.0),
+        ];
+        let framed = frame_all(&nodes, &[], surface, (0.2, 2.0), &obstacles).expect("a frame");
+        let node = nodes[0].bounds;
+        let origin = world_to_screen(node.origin, framed);
+        let content = Bounds::new(
+            origin,
+            size(
+                node.size.width * framed.zoom,
+                node.size.height * framed.zoom,
+            ),
+        );
+        let toolbar = Bounds::new(point(0.0, 0.0), size(320.0, 56.0));
+        let minimap = Bounds::new(point(800.0 - 152.0, 560.0 - 100.0), size(152.0, 100.0));
+        assert!(
+            !bounds_overlap(content, toolbar, 0.0),
+            "fitted content {content:?} remained underneath the toolbar {toolbar:?}"
+        );
+        assert!(
+            !bounds_overlap(content, minimap, 0.0),
+            "fitted content {content:?} remained underneath the minimap {minimap:?}"
         );
     }
 
