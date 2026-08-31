@@ -431,7 +431,7 @@ pub(super) fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(caption(
             &theme,
-            "A report: a rail and a glyph carry the severity, so two of them differ \
+            "A report: a wash and a glyph carry the severity, so two of them differ \
              by meaning and never by weight",
         ))
         .child(

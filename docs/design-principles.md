@@ -119,7 +119,7 @@ Frost and edge fades are structural paint effects:
 - a scroll shadow is a gradient band of `backdrop`, not a line: content that
   continues past an edge is a soft fact, and a hard rule there reads as a
   boundary that has been reached;
-- selection washes and rails are painted inside and consume no layout space;
+- selection washes are painted inside and consume no layout space;
 - non-macOS platforms use an opaque fallback instead of exposing the desktop
   through unsupported transparency.
 

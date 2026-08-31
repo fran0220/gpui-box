@@ -250,9 +250,10 @@ impl Message {
     ///
     /// A transcript in which every turn is the same grey slab makes the
     /// reader work out who is talking from the byline alone, which is the one
-    /// line a continued turn does not draw. The colour is carried as a rail
-    /// at the reading edge and a wash behind the turn, quiet enough that a
-    /// long thread still reads as one document.
+    /// line a continued turn does not draw. The colour is carried as a wash
+    /// behind the turn and nothing else — no stripe beside the bubble, which
+    /// would be a second geometry saying what the wash has said — quiet enough
+    /// that a long thread still reads as one document.
     ///
     /// It is never derived from the author's name, for the reason
     /// [`Avatar::tint`](crate::display::avatar::Avatar::tint) gives: this

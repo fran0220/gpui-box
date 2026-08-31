@@ -2501,9 +2501,8 @@ fn row_element(
                 .h(px(height * detail_rows as f32))
                 .overflow_hidden()
                 // A detail belongs to the row above it, so it is recessed
-                // under it and carries a rail at the reading edge: a region
-                // drawn on the body's own surface reads as an unexplained
-                // gap between two rows instead.
+                // under it: a region drawn on the body's own surface reads as
+                // an unexplained gap between two rows instead.
                 .surface(theme, Surface::Sunken)
                 .relative()
                 .p_token(theme, Space::Sm)

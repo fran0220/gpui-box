@@ -158,8 +158,8 @@ for what they alone can say — focus, invalidity, a drop target — and `divide
 is the deliberate exception, because it draws a line *between two pieces of
 content on one surface* rather than around the surface.
 
-`selected` is a wash and a rail at the reading edge, both painted inside, so
-choosing a card moves nothing around it.
+`selected` is a wash and nothing else, painted inside, so choosing a card moves
+nothing around it and adds no second geometry beside the fill.
 `disabled` publishes the refusal, changes the text tone, and installs no
 handler at all; it does not fade the card out from under the reader, because
 unavailable is a fact to be read and not a thing to be hidden. A card that is
@@ -1198,8 +1198,9 @@ ring, from `effect.focusRingWidth` and `effect.focusRingAlpha` in the focus
 colour, applied through `FocusRing::focus_ring`. The ring is a shadow rather
 than a border, so focus never reflows what is around it, and it is a different
 treatment from selection on purpose: focus says where the next keystroke goes,
-selection says which answer is current. Selection is a neutral wash and an
-accent rail at the reading edge, so the two never wear one appearance.
+selection says which answer is current. Selection is a neutral wash and nothing
+else, so the two never wear one appearance: focus is a halo around the shape,
+selection is the shape's own fill.
 
 ## What a node's `value` means
 
