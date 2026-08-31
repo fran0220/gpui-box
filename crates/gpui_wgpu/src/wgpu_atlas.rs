@@ -442,6 +442,7 @@ mod tests {
 
     #[test]
     fn before_frame_skips_uploads_for_removed_texture() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
         let (device, queue) = test_device_and_queue()?;
 
         let atlas = WgpuAtlas::new(device, queue, wgpu::TextureFormat::Bgra8Unorm);
@@ -466,6 +467,7 @@ mod tests {
 
     #[test]
     fn remove_deallocates_tile_space_for_reuse() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
         let (device, queue) = test_device_and_queue()?;
         let atlas = WgpuAtlas::new(device, queue, wgpu::TextureFormat::Bgra8Unorm);
 

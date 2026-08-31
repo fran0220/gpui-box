@@ -11,6 +11,29 @@ pub use wgpu_context::*;
 pub use wgpu_renderer::WgpuHeadlessRenderer;
 pub use wgpu_renderer::{GpuContext, WgpuRenderer, WgpuSurfaceConfig};
 
+/// Serialises the tests in this crate that stand up a GPU device.
+///
+/// None of them is testing concurrency. Each one creates an instance, an
+/// adapter and a device, and drops them again at the end; one of them does it
+/// four times over. Run in parallel on the Windows DX12 fallback adapter those
+/// lifetimes overlap, and the process dies with an access violation *after*
+/// every test has reported that it passed — so the gate fails on Windows with
+/// no assertion having failed and nothing to point at.
+///
+/// One lock removes the overlap without changing what any test asserts. It is
+/// held for the whole body rather than taken inside the helper that builds the
+/// device, because the drop at the end of the test is half of what was racing.
+#[cfg(all(test, not(target_family = "wasm")))]
+pub(crate) fn serialised_gpu_test() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        // A test that panicked while holding this has already failed. Poisoning
+        // every test after it would report that one failure several more times
+        // and bury the one that actually happened.
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 // These pixel tests exercise the deterministic software-adapter contract:
 // llvmpipe on Linux and WARP on Windows. macOS headless rendering uses the
 // separate Metal renderer and has no wgpu fallback adapter to request.
@@ -201,6 +224,7 @@ mod tests {
 
     #[test]
     fn test_headless_rendering_is_deterministic() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
         if let Err(error) = env_logger::builder()
             .is_test(true)
             .filter_module("gpui_wgpu", log::LevelFilter::Info)
@@ -266,6 +290,7 @@ mod tests {
 
     #[test]
     fn test_runtime_primitives_render_headlessly() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
         let text_system = Arc::new(CosmicTextSystem::new("DejaVu Sans"));
         let mut cx = HeadlessAppContext::with_platform(text_system, Arc::new(()), || {
             Some(Box::new(
@@ -299,6 +324,7 @@ mod tests {
 
     #[test]
     fn test_backdrop_blur_pixels_clipping_order_and_determinism() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
         let unblurred = capture_backdrop_blur_test_image(0)?;
         let once_blurred = capture_backdrop_blur_test_image(1)?;
         let twice_blurred = capture_backdrop_blur_test_image(2)?;
