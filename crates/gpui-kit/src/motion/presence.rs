@@ -229,10 +229,11 @@ impl Presenting {
     ///
     /// The role decides the arrival: a menu answers the action that opened it,
     /// a modal arrives with weight, and content that becomes part of the
-    /// surface rises. Every departure is [`MotionRole::Exit`], because leaving
-    /// is one thing however the surface arrived — a surface that took its
-    /// entrance curve back out would decelerate on the way off screen, which
-    /// reads as reluctance rather than dismissal.
+    /// surface rises. Every departure is
+    /// [`MotionRole::Exit`](crate::motion::MotionRole::Exit), because leaving is
+    /// one thing however the surface arrived — a surface that took its entrance
+    /// curve back out would decelerate on the way off screen, which reads as
+    /// reluctance rather than dismissal.
     pub fn closed(theme: &gpui_kit_theme::Theme, role: super::MotionRole) -> Self {
         Self {
             presence: Presence::hidden(

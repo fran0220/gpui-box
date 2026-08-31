@@ -87811,7 +87811,7 @@
       "path": "gpui_kit::motion::presence",
       "source": "crates/gpui-kit/src/motion/presence.rs",
       "summary": "Starts closed, so the first [`open`](Self::open) animates in.",
-      "documentation": "Starts closed, so the first [`open`](Self::open) animates in.\n\nThe role decides the arrival: a menu answers the action that opened it,\na modal arrives with weight, and content that becomes part of the\nsurface rises. Every departure is [`MotionRole::Exit`], because leaving\nis one thing however the surface arrived — a surface that took its\nentrance curve back out would decelerate on the way off screen, which\nreads as reluctance rather than dismissal.",
+      "documentation": "Starts closed, so the first [`open`](Self::open) animates in.\n\nThe role decides the arrival: a menu answers the action that opened it,\na modal arrives with weight, and content that becomes part of the\nsurface rises. Every departure is\n[`MotionRole::Exit`](crate::motion::MotionRole::Exit), because leaving is\none thing however the surface arrived — a surface that took its entrance\ncurve back out would decelerate on the way off screen, which reads as\nreluctance rather than dismissal.",
       "signature": "pub fn closed (theme : & gpui_kit_theme::Theme, role : super::MotionRole) -> Self",
       "cfg": [],
       "target": "Presenting"
