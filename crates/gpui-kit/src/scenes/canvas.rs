@@ -43,10 +43,17 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .id("scene.graph.edge.valid")
                     .ports("valid", "records")
                     .active(true),
+                // A relationship label carrying a localized sentence, which
+                // is what a host writing in Chinese actually hands this: the
+                // ideographs advance about twice what a count of characters
+                // suggests, and the sentence is longer than the route it
+                // annotates. Fit has to frame the width the label really
+                // takes, and the label has to stop rather than run out over
+                // the cards either side of it.
                 GraphEdge::new("scene.graph.validate", "scene.graph.observe")
                     .id("scene.graph.edge.telemetry")
                     .ports("telemetry", "events")
-                    .label("telemetry")
+                    .label("跟随镜头 · src/camera/follow.ts")
                     .lane(-1),
                 GraphEdge::new("scene.graph.persist", "scene.graph.publish")
                     .id("scene.graph.edge.commit")

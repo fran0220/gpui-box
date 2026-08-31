@@ -466,6 +466,22 @@ const RELATIONSHIP_LABEL_PROGRESS: [f32; 7] = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8
 const RELATIONSHIP_LABEL_GAP: f32 = 6.0;
 /// Air around cards and other relationship labels while choosing a seat.
 const RELATIONSHIP_LABEL_CLEARANCE: f32 = 4.0;
+/// The widest a relationship label is drawn, in world units, before it
+/// truncates.
+///
+/// A relationship label is an annotation on a route, not the content of the
+/// graph. A caller whose label is a whole sentence — and a localized sentence
+/// is often exactly that — on a short edge between two stacked cards has no
+/// room for it: an unbounded run that refuses to wrap runs out across its
+/// neighbours and reads as a defect rather than as an annotation. Truncating
+/// keeps the head of the sentence, which is the part that says what the
+/// relationship *is*, and the whole string stays in the semantic tree for a
+/// reader that needs it.
+///
+/// Local geometry: it occurs here and nowhere else, and it is a property of
+/// how much annotation a route can carry rather than a value any other
+/// component would consume.
+const RELATIONSHIP_LABEL_MEASURE: f32 = 220.0;
 
 #[derive(Debug, Clone, Copy)]
 enum FitCorner {
@@ -782,6 +798,80 @@ fn place_relationship_labels(
     placed
 }
 
+/// Roughly how much of an em one character advances, before it is shaped.
+///
+/// A count of characters is not a width. East Asian characters are drawn on a
+/// square body and advance about a full em, where Latin ones average a little
+/// over half of one, so a label of Chinese is close to twice as wide as a
+/// count of its characters suggests. Estimating both at the Latin average is
+/// what let a graph frame itself around a relationship label and still clip
+/// the words at its right-hand end.
+///
+/// This is deliberately a table of blocks rather than a dependency: the
+/// estimate only has to survive until the shaped run is measured, and being
+/// approximately right for the scripts that are twice as wide is the whole
+/// difference between a frame that fits and one that does not.
+fn advance_factor(glyph: char) -> f32 {
+    const WIDE: f32 = 1.0;
+    const NARROW: f32 = 0.56;
+    match glyph as u32 {
+        // CJK symbols and punctuation, Hiragana, Katakana, Bopomofo, Hangul
+        // compatibility jamo, and the enclosed forms that sit with them.
+        0x3000..=0x303F
+        | 0x3040..=0x30FF
+        | 0x3100..=0x312F
+        | 0x3130..=0x318F
+        | 0x3200..=0x32FF
+        // CJK ideographs: extension A, then the main block.
+        | 0x3400..=0x4DBF
+        | 0x4E00..=0x9FFF
+        // Hangul syllables.
+        | 0xAC00..=0xD7AF
+        // Compatibility ideographs, and the fullwidth Latin/symbol forms.
+        | 0xF900..=0xFAFF
+        | 0xFF00..=0xFF60
+        | 0xFFE0..=0xFFE6
+        // Ideographic extensions beyond the basic plane.
+        | 0x20000..=0x3FFFD => WIDE,
+        _ => NARROW,
+    }
+}
+
+/// The label as it is drawn: the head of it, stopping at the measure a route
+/// can carry.
+///
+/// A relationship label is an annotation, not the content of the graph. A
+/// localized sentence — which is what a caller writing prose hands this — on a
+/// short edge between two stacked cards has nowhere to go: the run refuses to
+/// wrap, so it lies across whatever is beside it. Cutting keeps the part that
+/// says what the relationship is.
+///
+/// Nothing is lost. The whole string stays on the edge's semantic node, so a
+/// reader, a test, and a tooltip all still have it.
+fn truncated_label(label: &SharedString, theme: &gpui_kit_theme::Theme) -> SharedString {
+    let em = theme.typography.caption.size;
+    let budget = RELATIONSHIP_LABEL_MEASURE - theme.spacing.xs * 2.0;
+    let mut width = 0.0;
+    let mut end = label.len();
+    for (at, glyph) in label.char_indices() {
+        width += advance_factor(glyph) * em;
+        if width > budget {
+            end = at;
+            break;
+        }
+    }
+    if end == label.len() {
+        return label.clone();
+    }
+    // Back off one more character so the ellipsis itself fits the budget the
+    // measurement and the frame were both computed from.
+    let cut = label[..end]
+        .char_indices()
+        .next_back()
+        .map_or(0, |(at, _)| at);
+    SharedString::from(format!("{}…", &label[..cut]))
+}
+
 fn estimated_relationship_label_size(
     label: &SharedString,
     theme: &gpui_kit_theme::Theme,
@@ -789,9 +879,13 @@ fn estimated_relationship_label_size(
     // GPUI's exact shaped run is recorded on the next prepaint. This first
     // frame estimate exists only to put the child somewhere measurable; Fit
     // waits for the real size before it promises that every word is visible.
-    let glyphs = label.chars().count().max(1) as f32;
+    let ems: f32 = label.chars().map(advance_factor).sum();
+    let width =
+        ems.max(advance_factor('n')) * theme.typography.caption.size + theme.spacing.xs * 2.0;
     size(
-        glyphs * theme.typography.caption.size * 0.56 + theme.spacing.xs * 2.0,
+        // The drawn label truncates at the same measure, so an estimate wider
+        // than that would frame around words the label never shows.
+        width.min(RELATIONSHIP_LABEL_MEASURE),
         theme.typography.caption.line_height,
     )
 }
@@ -2311,7 +2405,12 @@ impl RenderOnce for NodeGraph {
         let edge_labels: Vec<AnyElement> = routes
             .iter()
             .filter_map(|routed| {
-                let label = routed.edge.edge_label()?.clone();
+                // A label seats itself on a zero-size anchor at its point on
+                // the route, so a width on the element has nothing to resolve
+                // against: the string itself is what has to stop. The head is
+                // what names the relationship, and the whole of it stays on
+                // the edge's semantic node for a reader who needs the rest.
+                let label = truncated_label(routed.edge.edge_label()?, &theme);
                 let id = routed.edge.edge_id();
                 let placement = relationship_placements.get(&id)?;
                 let measurement = relationship_measurements.get(&id)?.clone();
@@ -2325,7 +2424,10 @@ impl RenderOnce for NodeGraph {
                     .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
                     .bg(theme.colors.node.label_wash)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
-                    .text_color(theme.colors.text_muted)
+                    // The wash exists to lift the label off the ground; a
+                    // muted tone on top of it spent that lift and left the
+                    // words unreadable against a lit canvas.
+                    .text_color(theme.colors.text)
                     .child(label);
                 Some(
                     div()
@@ -3377,6 +3479,52 @@ fn paint_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A count of characters is not a width, and this is the string that
+    /// proved it: four Chinese characters on a square body plus an ASCII
+    /// path. Estimating every character at the Latin average made the label
+    /// look about two thirds of its real width, so `GraphFit::Whole` framed a
+    /// box the words did not fit in and the right-hand end was clipped on the
+    /// opening frame.
+    #[test]
+    fn a_chinese_relationship_label_is_not_estimated_as_latin() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let chinese = SharedString::from("\u{8ddf}\u{968f}\u{955c}\u{5934}");
+        let latin = SharedString::from("abcd");
+        let wide = estimated_relationship_label_size(&chinese, &theme);
+        let narrow = estimated_relationship_label_size(&latin, &theme);
+        assert!(
+            wide.width > narrow.width,
+            "four ideographs are wider than four letters: {} vs {}",
+            wide.width,
+            narrow.width
+        );
+
+        // Each ideograph advances about a full em against a little over half
+        // of one, so the ratio of the text parts is close to two.
+        let pad = theme.spacing.xs * 2.0;
+        let ratio = (wide.width - pad) / (narrow.width - pad);
+        assert!(
+            (1.7..=1.9).contains(&ratio),
+            "an ideograph should be about twice a letter, got {ratio}"
+        );
+    }
+
+    /// The drawn label truncates at one measure, so the estimate Fit frames
+    /// from must not exceed it. A localized sentence on a short edge is the
+    /// case: framing the whole sentence would push every card away to leave
+    /// room for words the label never shows.
+    #[test]
+    fn a_sentence_label_is_estimated_no_wider_than_it_is_drawn() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let sentence = SharedString::from(
+            "\u{8fd9}\u{4e2a} Project \u{7684}\u{6761}\u{76ee}\u{66ff}\u{6362}\u{4e86}\
+             \u{57fa}\u{7ebf}\u{6761}\u{76ee}",
+        );
+        let estimated = estimated_relationship_label_size(&sentence, &theme);
+        assert!(estimated.width <= RELATIONSHIP_LABEL_MEASURE);
+    }
+
     use crate::canvas::edge::EdgeKind;
     use crate::canvas::node::NodeState;
 
