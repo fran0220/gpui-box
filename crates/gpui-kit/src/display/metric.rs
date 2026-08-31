@@ -22,6 +22,7 @@ use crate::display::sparkline::{Sparkline, SparklinePoint, SparklineReading, Spa
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{CardVariant, Ident, StyledExt};
+use crate::motion;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -300,6 +301,20 @@ impl RenderOnce for MetricCard {
             }
         };
 
+        // Real content replacing a stand-in fades up in the box the stand-in
+        // already reserved, which is the one thing the caption above promised
+        // and nothing delivered: the card used to cut from a skeleton to a
+        // reading between two frames.
+        //
+        // The key is what makes the swap the animation and not the value. A
+        // reading and a stale reading share it, so a refresh that failed keeps
+        // the last verified number sitting exactly where it was instead of
+        // fading it back in and implying it is new.
+        let arrival = self.ident.child("body").child(match &self.state {
+            MetricState::Ready(_) | MetricState::Stale { .. } => "reading",
+            standing_in => standing_in.name(),
+        });
+
         div()
             .column()
             .w_full()
@@ -313,14 +328,16 @@ impl RenderOnce for MetricCard {
                     .text_tone(&theme, TextTone::Muted)
                     .child(self.label.clone()),
             )
-            .child(
+            .child(motion::surface_in(
+                arrival.element_id(),
+                &theme,
                 div()
                     .column()
                     .justify_center()
                     .w_full()
                     .min_h(px(BODY_HEIGHT))
                     .child(body),
-            )
+            ))
             .semantic_in(cx, spec)
     }
 }
