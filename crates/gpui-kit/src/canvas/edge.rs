@@ -439,19 +439,23 @@ impl OrthogonalRoute {
             .fold(f32::INFINITY, f32::min)
     }
 
-    pub(crate) fn midpoint_axis(&self) -> Axis {
+    pub(crate) fn axis_at(&self, progress: f32) -> Axis {
         if self.points.len() < 2 {
             return Axis::Horizontal;
         }
-        let target = self.total * 0.5;
+        let target = progress.clamp(0.0, 1.0) * self.total;
         let index = self
             .cumulative
             .partition_point(|length| *length < target)
             .clamp(1, self.points.len() - 1);
-        if self.points[index - 1].x == self.points[index].x {
-            Axis::Vertical
-        } else {
+        let run = point(
+            self.points[index].x - self.points[index - 1].x,
+            self.points[index].y - self.points[index - 1].y,
+        );
+        if run.x.abs() >= run.y.abs() {
             Axis::Horizontal
+        } else {
+            Axis::Vertical
         }
     }
 }
@@ -1458,6 +1462,9 @@ mod tests {
         let r = OrthogonalRoute::new(vec![point(0.0, 0.0), point(10.0, 0.0), point(10.0, 30.0)]);
         assert_eq!(r.total_length(), 40.0);
         assert_eq!(r.midpoint(), point(10.0, 10.0));
+        assert_eq!(r.axis_at(0.2), Axis::Horizontal);
+        assert_eq!(r.axis_at(0.5), Axis::Vertical);
+        assert_eq!(r.axis_at(0.9), Axis::Vertical);
         assert_eq!(r.sample(2.0), point(10.0, 30.0));
         assert_eq!(r.distance_to(point(4.0, 3.0)), 3.0);
         assert_eq!(r.distance_to(point(13.0, 20.0)), 3.0);

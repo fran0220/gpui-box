@@ -15,7 +15,7 @@ use std::{
 
 use gpui::{
     AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Pixels, Point, RenderOnce, ScrollDelta, SharedString, StatefulInteractiveElement, Styled,
+    Pixels, Point, RenderOnce, ScrollDelta, SharedString, Size, StatefulInteractiveElement, Styled,
     Window, canvas, div, linear_color_stop, linear_gradient_stops, point, prelude::FluentBuilder,
     px, relative, size,
 };
@@ -459,6 +459,13 @@ fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
 const FIT_MARGIN: f32 = 48.0;
 const GRAPH_MINIMAP_WIDTH: f32 = 140.0;
 const GRAPH_MINIMAP_HEIGHT: f32 = 88.0;
+/// Relationship labels try progressively farther points on their route before
+/// accepting an overlap. Midpoint remains the first answer when it is clear.
+const RELATIONSHIP_LABEL_PROGRESS: [f32; 7] = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8];
+/// Air between a relationship label and the route it describes.
+const RELATIONSHIP_LABEL_GAP: f32 = 6.0;
+/// Air around cards and other relationship labels while choosing a seat.
+const RELATIONSHIP_LABEL_CLEARANCE: f32 = 4.0;
 
 #[derive(Debug, Clone, Copy)]
 enum FitCorner {
@@ -544,6 +551,7 @@ fn wants_frame(fit: GraphFit, framed: Option<u64>) -> Option<u64> {
 fn frame_all(
     nodes: &[NodeGeometry],
     bands: &[GraphBand],
+    relationship_labels: &[Bounds<f32>],
     surface: Bounds<Pixels>,
     zoom_range: (f32, f32),
     obstacles: &[FitObstacle],
@@ -556,7 +564,8 @@ fn frame_all(
     let content = nodes
         .iter()
         .map(|node| node.bounds)
-        .chain(bands.iter().map(GraphBand::bounds));
+        .chain(bands.iter().map(GraphBand::bounds))
+        .chain(relationship_labels.iter().copied());
     let (min, max) = content.fold(None::<(Point<f32>, Point<f32>)>, |acc, bounds| {
         let low = bounds.origin;
         let high = point(
@@ -603,6 +612,188 @@ fn frame_all(
                 .partial_cmp(&right.zoom)
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RelationshipLabelPlacement {
+    /// The route-relative world box. Fit frames this box rather than a
+    /// viewport-clamped substitute, so the relationship keeps its place once
+    /// the viewport has travelled there.
+    desired: Bounds<f32>,
+    /// The box actually drawn. A caller-owned viewport may leave an endpoint
+    /// at the edge, in which case the label slides just inside the surface
+    /// rather than clipping its words.
+    shown: Bounds<f32>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RelationshipLabelScore {
+    node_collisions: usize,
+    label_collisions: usize,
+    overlap_area: f32,
+    outside_area: f32,
+    progress_rank: usize,
+    side_rank: usize,
+}
+
+impl RelationshipLabelScore {
+    fn better_than(self, other: Self) -> bool {
+        if self.node_collisions != other.node_collisions {
+            return self.node_collisions < other.node_collisions;
+        }
+        if self.label_collisions != other.label_collisions {
+            return self.label_collisions < other.label_collisions;
+        }
+        if (self.overlap_area - other.overlap_area).abs() >= f32::EPSILON {
+            return self.overlap_area < other.overlap_area;
+        }
+        if (self.outside_area - other.outside_area).abs() >= f32::EPSILON {
+            return self.outside_area < other.outside_area;
+        }
+        if self.progress_rank != other.progress_rank {
+            return self.progress_rank < other.progress_rank;
+        }
+        self.side_rank < other.side_rank
+    }
+}
+
+fn overlap_area(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> f32 {
+    let width = (left.right() + pad - (left.left() - pad).max(right.left()))
+        .min(right.right() - (left.left() - pad).max(right.left()));
+    let height = (left.bottom() + pad - (left.top() - pad).max(right.top()))
+        .min(right.bottom() - (left.top() - pad).max(right.top()));
+    width.max(0.0) * height.max(0.0)
+}
+
+fn outside_area(bounds: Bounds<f32>, surface: Bounds<f32>) -> f32 {
+    let inside_width =
+        (bounds.right().min(surface.right()) - bounds.left().max(surface.left())).max(0.0);
+    let inside_height =
+        (bounds.bottom().min(surface.bottom()) - bounds.top().max(surface.top())).max(0.0);
+    (bounds.size.width * bounds.size.height - inside_width * inside_height).max(0.0)
+}
+
+fn clamp_relationship_label(bounds: Bounds<f32>, surface: Bounds<f32>) -> Bounds<f32> {
+    let left = surface.left() + RELATIONSHIP_LABEL_CLEARANCE;
+    let top = surface.top() + RELATIONSHIP_LABEL_CLEARANCE;
+    let right = (surface.right() - RELATIONSHIP_LABEL_CLEARANCE - bounds.size.width).max(left);
+    let bottom = (surface.bottom() - RELATIONSHIP_LABEL_CLEARANCE - bounds.size.height).max(top);
+    Bounds::new(
+        point(
+            bounds.origin.x.clamp(left, right),
+            bounds.origin.y.clamp(top, bottom),
+        ),
+        bounds.size,
+    )
+}
+
+fn relationship_label_candidate(
+    at: Point<f32>,
+    size: Size<f32>,
+    axis: Axis,
+    positive_side: bool,
+    gap: f32,
+) -> Bounds<f32> {
+    let origin = match (axis, positive_side) {
+        (Axis::Horizontal, false) => point(at.x - size.width * 0.5, at.y - gap - size.height),
+        (Axis::Horizontal, true) => point(at.x - size.width * 0.5, at.y + gap),
+        (Axis::Vertical, false) => point(at.x - gap - size.width, at.y - size.height * 0.5),
+        (Axis::Vertical, true) => point(at.x + gap, at.y - size.height * 0.5),
+    };
+    Bounds::new(origin, size)
+}
+
+/// Seats every relationship on its own route, away from cards and labels
+/// already placed. A visible surface participates in the choice and clamps the
+/// painted answer; it is deliberately omitted while Fit is pending, because
+/// the old viewport must not pull the new frame's labels to its edge.
+fn place_relationship_labels(
+    routes: &[RoutedEdge],
+    nodes: &[NodeGeometry],
+    sizes: &HashMap<SharedString, Size<f32>>,
+    visible_surface: Option<Bounds<f32>>,
+    disconnect_controls: bool,
+) -> HashMap<SharedString, RelationshipLabelPlacement> {
+    let mut placed = HashMap::new();
+    let mut occupied = Vec::new();
+    for routed in routes {
+        let id = routed.edge.edge_id();
+        if routed.edge.edge_label().is_none() {
+            continue;
+        }
+        let Some(label_size) = sizes.get(&id).copied() else {
+            continue;
+        };
+        let from = nodes.iter().find(|node| node.id == *routed.edge.from());
+        let to = nodes.iter().find(|node| node.id == *routed.edge.to());
+        let relation_center = match (from, to) {
+            (Some(from), Some(to)) => point(
+                (from.bounds.center().x + to.bounds.center().x) * 0.5,
+                (from.bounds.center().y + to.bounds.center().y) * 0.5,
+            ),
+            _ => routed.route.midpoint(),
+        };
+        let gap = RELATIONSHIP_LABEL_GAP + if disconnect_controls { 9.0 } else { 0.0 };
+        let mut best: Option<(RelationshipLabelPlacement, RelationshipLabelScore)> = None;
+        for (progress_rank, progress) in RELATIONSHIP_LABEL_PROGRESS.into_iter().enumerate() {
+            let at = routed.route.sample(progress);
+            let axis = routed.route.axis_at(progress);
+            let preferred_positive = match axis {
+                Axis::Horizontal => at.y > relation_center.y,
+                Axis::Vertical => at.x > relation_center.x,
+            };
+            for (side_rank, positive) in [preferred_positive, !preferred_positive]
+                .into_iter()
+                .enumerate()
+            {
+                let desired = relationship_label_candidate(at, label_size, axis, positive, gap);
+                let shown = visible_surface
+                    .map(|surface| clamp_relationship_label(desired, surface))
+                    .unwrap_or(desired);
+                let (node_collisions, node_overlap_area) =
+                    nodes.iter().fold((0, 0.0), |(count, total), node| {
+                        let area = overlap_area(shown, node.bounds, RELATIONSHIP_LABEL_CLEARANCE);
+                        (count + usize::from(area > 0.0), total + area)
+                    });
+                let (label_collisions, label_overlap_area) =
+                    occupied.iter().fold((0, 0.0), |(count, total), bounds| {
+                        let area = overlap_area(shown, *bounds, RELATIONSHIP_LABEL_CLEARANCE);
+                        (count + usize::from(area > 0.0), total + area)
+                    });
+                let score = RelationshipLabelScore {
+                    node_collisions,
+                    label_collisions,
+                    overlap_area: node_overlap_area + label_overlap_area,
+                    outside_area: visible_surface
+                        .map_or(0.0, |surface| outside_area(desired, surface)),
+                    progress_rank,
+                    side_rank,
+                };
+                if best.is_none_or(|(_, current)| score.better_than(current)) {
+                    best = Some((RelationshipLabelPlacement { desired, shown }, score));
+                }
+            }
+        }
+        if let Some((placement, _)) = best {
+            occupied.push(placement.shown);
+            placed.insert(id, placement);
+        }
+    }
+    placed
+}
+
+fn estimated_relationship_label_size(
+    label: &SharedString,
+    theme: &gpui_kit_theme::Theme,
+) -> Size<f32> {
+    // GPUI's exact shaped run is recorded on the next prepaint. This first
+    // frame estimate exists only to put the child somewhere measurable; Fit
+    // waits for the real size before it promises that every word is visible.
+    let glyphs = label.chars().count().max(1) as f32;
+    size(
+        glyphs * theme.typography.caption.size * 0.56 + theme.spacing.xs * 2.0,
+        theme.typography.caption.line_height,
+    )
 }
 
 fn bounds_overlap(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> bool {
@@ -897,12 +1088,12 @@ pub enum GraphFit {
     /// The viewport is the caller's from the first frame.
     #[default]
     Never,
-    /// Frame every node and world-space band as soon as the cards and
-    /// canvas-owned chrome have been laid out, and again each time this value
-    /// changes — which is what a caller's own Fit control bumps, since the
-    /// caller cannot compute the frame itself. The fitted content clears the
-    /// graph's minimap and toolbar rather than remaining technically inside
-    /// the viewport underneath them. Reported as an ordinary
+    /// Frame every node, world-space band, and measured relationship label as
+    /// soon as the cards and canvas-owned chrome have been laid out, and again
+    /// each time this value changes — which is what a caller's own Fit control
+    /// bumps, since the caller cannot compute the frame itself. The fitted
+    /// content clears the graph's minimap and toolbar rather than remaining
+    /// technically inside the viewport underneath them. Reported as an ordinary
     /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
     /// its viewport needs nothing else. Between framings the viewport is the
     /// reader's and the canvas never moves it on its own, so a caller that
@@ -1715,6 +1906,55 @@ impl RenderOnce for NodeGraph {
         // cell mutably to record what it framed.
         let already_framed = gesture.borrow().framed;
         let pending_frame = wants_frame(self.fit, already_framed);
+        let relationship_measurements: HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>> = routes
+            .iter()
+            .filter_map(|routed| {
+                routed.edge.edge_label().map(|_| {
+                    let id = routed.edge.edge_id();
+                    let measurement_id = composite_id("edge-label-measure", &[id.as_ref()]);
+                    (id, measure::cell(&measurement_id, window, cx))
+                })
+            })
+            .collect();
+        let every_relationship_measured = routes
+            .iter()
+            .filter(|routed| routed.edge.edge_label().is_some())
+            .all(|routed| {
+                relationship_measurements
+                    .get(&routed.edge.edge_id())
+                    .is_some_and(|measured| {
+                        let size = measured.get().size;
+                        size.width > px(0.0) && size.height > px(0.0)
+                    })
+            });
+        let relationship_sizes: HashMap<SharedString, Size<f32>> = routes
+            .iter()
+            .filter_map(|routed| {
+                let label = routed.edge.edge_label()?;
+                let id = routed.edge.edge_id();
+                let measured = relationship_measurements.get(&id)?.get().size;
+                let measured = size(f32::from(measured.width), f32::from(measured.height));
+                Some((
+                    id,
+                    if measured.width > 0.0 && measured.height > 0.0 {
+                        measured
+                    } else {
+                        estimated_relationship_label_size(label, &theme)
+                    },
+                ))
+            })
+            .collect();
+        let relationship_placements = place_relationship_labels(
+            &routes,
+            &geometry,
+            &relationship_sizes,
+            pending_frame.is_none().then_some(view).flatten(),
+            self.on_event.is_some() && self.interaction.edits_topology(),
+        );
+        let relationship_bounds: Vec<Bounds<f32>> = relationship_placements
+            .values()
+            .map(|placement| placement.desired)
+            .collect();
         // Waiting for real heights is the whole point: framing from the
         // estimate would leave the tallest card half outside the frame it was
         // supposed to guarantee. Every card has to be measured, not just one —
@@ -1746,10 +1986,12 @@ impl RenderOnce for NodeGraph {
         }
         if let Some(token) = pending_frame
             && every_card_measured
+            && every_relationship_measured
             && every_overlay_measured
             && let Some(framed) = frame_all(
                 &geometry,
                 &self.bands,
+                &relationship_bounds,
                 measured.get(),
                 self.zoom_range,
                 &fit_obstacles,
@@ -2070,35 +2312,14 @@ impl RenderOnce for NodeGraph {
             .iter()
             .filter_map(|routed| {
                 let label = routed.edge.edge_label()?.clone();
-                let at = world_to_screen(routed.route.midpoint(), viewport);
-                let from = geometry
-                    .iter()
-                    .find(|node| &node.id == routed.edge.from())?;
-                let to = geometry.iter().find(|node| &node.id == routed.edge.to())?;
-                let center = world_to_screen(
-                    point(
-                        (from.bounds.center().x + to.bounds.center().x) * 0.5,
-                        (from.bounds.center().y + to.bounds.center().y) * 0.5,
-                    ),
-                    viewport,
-                );
-                let left_edge = world_to_screen(
-                    point(
-                        from.bounds.left().max(to.bounds.left()),
-                        from.bounds.top().max(to.bounds.top()),
-                    ),
-                    viewport,
-                );
-                // The disconnect chip is drawn on the same midpoint, so the
-                // label has to clear its radius rather than the line's.
-                let chip_radius = if self.on_event.is_some() && self.interaction.edits_topology() {
-                    9.0
-                } else {
-                    0.0
-                };
-                let gap = (chip_radius + 6.0) * viewport.zoom;
+                let id = routed.edge.edge_id();
+                let placement = relationship_placements.get(&id)?;
+                let measurement = relationship_measurements.get(&id)?.clone();
+                let at = world_to_screen(placement.shown.origin, viewport);
                 let label = div()
                     .absolute()
+                    .left_0()
+                    .top_0()
                     .whitespace_nowrap()
                     .px(px(theme.spacing.xs * viewport.zoom))
                     .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
@@ -2106,28 +2327,21 @@ impl RenderOnce for NodeGraph {
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
                     .text_color(theme.colors.text_muted)
                     .child(label);
-                let label = match routed.route.midpoint_axis() {
-                    Axis::Vertical if at.x <= left_edge.x => label.right(px(gap)).top(px(-theme
-                        .typography
-                        .caption
-                        .line_height
-                        * viewport.zoom
-                        * 0.5)),
-                    Axis::Vertical => label.left(px(gap)).top(px(-theme
-                        .typography
-                        .caption
-                        .line_height
-                        * viewport.zoom
-                        * 0.5)),
-                    Axis::Horizontal if at.y <= center.y && at.x >= center.x => {
-                        label.right(px(gap)).bottom(px(gap))
-                    }
-                    Axis::Horizontal if at.y <= center.y => label.left(px(gap)).bottom(px(gap)),
-                    Axis::Horizontal if at.x >= center.x => label.right(px(gap)).top(px(gap)),
-                    Axis::Horizontal => label.left(px(gap)).top(px(gap)),
-                };
                 Some(
                     div()
+                        .on_children_prepainted(move |bounds, window, _| {
+                            let Some(first) = bounds.first() else {
+                                return;
+                            };
+                            let logical = Bounds::new(
+                                point(px(0.0), px(0.0)),
+                                size(
+                                    px(f32::from(first.size.width) / viewport.zoom),
+                                    px(f32::from(first.size.height) / viewport.zoom),
+                                ),
+                            );
+                            measure::record(&measurement, logical, window);
+                        })
                         .absolute()
                         .left(px(at.x))
                         .top(px(at.y))
@@ -2908,7 +3122,11 @@ impl RenderOnce for NodeGraph {
             .child(ground)
             .children(if compact { Vec::new() } else { bands })
             .child(beneath)
-            .children(if compact { Vec::new() } else { edge_labels })
+            .children(if compact && pending_frame.is_none() {
+                Vec::new()
+            } else {
+                edge_labels
+            })
             .children(group)
             .children(cards)
             .children(ports)
@@ -3385,7 +3603,7 @@ mod tests {
         // origin, which is the case a default viewport shows nothing of.
         let nodes = geometry_at(&[(400.0, 300.0, 200.0, 160.0), (1600.0, 900.0, 200.0, 400.0)]);
         let surface = surface(640.0, 480.0);
-        let framed = frame_all(&nodes, &[], surface, (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(&nodes, &[], &[], surface, (0.2, 2.0), &[]).expect("a frame");
         let view = world_view(framed, surface);
         for node in &nodes {
             assert!(
@@ -3405,7 +3623,7 @@ mod tests {
     fn a_frame_never_magnifies_and_never_leaves_its_zoom_range() {
         let one = geometry_at(&[(0.0, 0.0, 40.0, 40.0)]);
         let framed =
-            frame_all(&one, &[], surface(1200.0, 900.0), (0.2, 2.0), &[]).expect("a frame");
+            frame_all(&one, &[], &[], surface(1200.0, 900.0), (0.2, 2.0), &[]).expect("a frame");
         assert_eq!(
             framed.zoom, 1.0,
             "a small graph is shown at its own size, not blown up"
@@ -3413,7 +3631,7 @@ mod tests {
 
         let wide = geometry_at(&[(0.0, 0.0, 100_000.0, 100.0)]);
         let floored =
-            frame_all(&wide, &[], surface(640.0, 480.0), (0.4, 2.0), &[]).expect("a frame");
+            frame_all(&wide, &[], &[], surface(640.0, 480.0), (0.4, 2.0), &[]).expect("a frame");
         assert_eq!(
             floored.zoom, 0.4,
             "a graph too wide to fit is held at the caller's floor rather than \
@@ -3423,10 +3641,11 @@ mod tests {
 
     #[test]
     fn there_is_no_frame_without_something_to_frame_or_somewhere_to_put_it() {
-        assert!(frame_all(&[], &[], surface(640.0, 480.0), (0.2, 2.0), &[]).is_none());
+        assert!(frame_all(&[], &[], &[], surface(640.0, 480.0), (0.2, 2.0), &[],).is_none());
         assert!(
             frame_all(
                 &geometry_at(&[(0.0, 0.0, 40.0, 40.0)]),
+                &[],
                 &[],
                 surface(4.0, 4.0),
                 (0.2, 2.0),
@@ -3449,7 +3668,7 @@ mod tests {
             420.0,
         )];
         let surface = surface(720.0, 480.0);
-        let framed = frame_all(&nodes, &bands, surface, (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(&nodes, &bands, &[], surface, (0.2, 2.0), &[]).expect("a frame");
         let view = world_view(framed, surface);
         let band = bands[0].bounds();
         assert!(
@@ -3462,6 +3681,87 @@ mod tests {
     }
 
     #[test]
+    fn relationship_labels_choose_a_clear_route_seat_inside_the_surface() {
+        let nodes = vec![
+            NodeGeometry {
+                id: "from".into(),
+                bounds: Bounds::new(point(0.0, 70.0), size(100.0, 60.0)),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.accent,
+                ports: Vec::new(),
+            },
+            NodeGeometry {
+                id: "to".into(),
+                bounds: Bounds::new(point(300.0, 70.0), size(100.0, 60.0)),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.accent,
+                ports: Vec::new(),
+            },
+            // The midpoint's preferred seat is above the wire. This card
+            // occupies it, so the relationship must take the clear side.
+            NodeGeometry {
+                id: "blocker".into(),
+                bounds: Bounds::new(point(150.0, 60.0), size(100.0, 35.0)),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.accent,
+                ports: Vec::new(),
+            },
+        ];
+        let edge = GraphEdge::new("from", "to").label("relationship");
+        let id = edge.edge_id();
+        let routes = [RoutedEdge {
+            edge,
+            route: route_curved(
+                Anchor {
+                    point: point(100.0, 100.0),
+                    side: PortSide::Right,
+                },
+                Anchor {
+                    point: point(300.0, 100.0),
+                    side: PortSide::Left,
+                },
+            ),
+        }];
+        let sizes = HashMap::from([(id.clone(), size(96.0, 20.0))]);
+        let surface = Bounds::new(point(0.0, 0.0), size(400.0, 200.0));
+        let labels = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false);
+        let label = labels.get(&id).expect("placed relationship").shown;
+
+        assert!(
+            label.left() >= surface.left()
+                && label.top() >= surface.top()
+                && label.right() <= surface.right()
+                && label.bottom() <= surface.bottom(),
+            "relationship {label:?} escaped {surface:?}"
+        );
+        for node in &nodes {
+            assert!(
+                !bounds_overlap(label, node.bounds, 0.0),
+                "relationship {label:?} overlapped {:?}",
+                node.bounds
+            );
+        }
+        assert!(
+            label.top() > 100.0,
+            "the blocked upper seat was chosen instead of the clear lower one"
+        );
+    }
+
+    #[test]
+    fn a_frame_holds_relationship_labels_as_well_as_cards() {
+        let nodes = geometry_at(&[(0.0, 0.0, 160.0, 120.0)]);
+        let relationship = Bounds::new(point(-260.0, 40.0), size(180.0, 24.0));
+        let surface = surface(640.0, 480.0);
+        let framed =
+            frame_all(&nodes, &[], &[relationship], surface, (0.2, 2.0), &[]).expect("a frame");
+        let view = world_view(framed, surface);
+        assert!(
+            relationship.left() >= view.left()
+                && relationship.top() >= view.top()
+                && relationship.right() <= view.right()
+                && relationship.bottom() <= view.bottom(),
+            "the measured relationship {relationship:?} fell outside {view:?}"
+        );
+    }
+
+    #[test]
     fn fitted_content_clears_canvas_owned_corner_chrome() {
         let nodes = geometry_at(&[(0.0, 0.0, 1_000.0, 520.0)]);
         let surface = surface(800.0, 560.0);
@@ -3469,7 +3769,7 @@ mod tests {
             FitObstacle::new(FitCorner::TopLeft, 320.0, 56.0),
             FitObstacle::new(FitCorner::BottomRight, 152.0, 100.0),
         ];
-        let framed = frame_all(&nodes, &[], surface, (0.2, 2.0), &obstacles).expect("a frame");
+        let framed = frame_all(&nodes, &[], &[], surface, (0.2, 2.0), &obstacles).expect("a frame");
         let node = nodes[0].bounds;
         let origin = world_to_screen(node.origin, framed);
         let content = Bounds::new(
