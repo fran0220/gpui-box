@@ -11,16 +11,20 @@ use std::rc::Rc;
 use web_time::Instant;
 
 use gpui::{
-    AnyElement, App, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, BoxShadow, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, linear_color_stop,
+    linear_gradient_stops, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Theme, Variant};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, Elevation, Radius, SemanticWash, Surface, Theme, Variant,
+};
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
 use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, ResolvedMotion, keyed};
+use crate::overlay::{Glass, GlassPreset};
 use crate::strings::ActiveNumbers;
 
 use super::edge::PortSide;
@@ -119,8 +123,6 @@ struct NodeMetrics {
     /// The vertical inset of the header band, tighter than the body's so the
     /// name reads as a title bar rather than as the first row of content.
     header_padding: f32,
-    /// The identity stripe down the reading edge.
-    rail: f32,
     gap: f32,
     figure_gap: f32,
     label_size: f32,
@@ -128,6 +130,8 @@ struct NodeMetrics {
     caption_size: f32,
     caption_height: f32,
     icon_size: f32,
+    badge: f32,
+    status: f32,
     radius: f32,
 }
 
@@ -145,7 +149,6 @@ impl NodeMetrics {
             height: height.map(scaled),
             padding: scaled(theme.spacing.sm),
             header_padding: scaled(theme.spacing.xs),
-            rail: scaled(theme.effects.rail_width),
             gap: scaled(theme.spacing.xs),
             figure_gap: scaled(theme.spacing.sm),
             label_size: scaled(theme.typography.label.size),
@@ -153,7 +156,9 @@ impl NodeMetrics {
             caption_size: scaled(theme.typography.caption.size),
             caption_height: scaled(theme.typography.caption.line_height),
             icon_size: scaled(theme.control.sm.icon_size),
-            radius: scaled(theme.radius(Radius::Card)),
+            badge: scaled(theme.control.xs.height),
+            status: scaled(theme.control.xs.height),
+            radius: scaled(theme.radius(Radius::Bubble)),
         }
     }
 }
@@ -353,6 +358,7 @@ pub(crate) type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 pub struct GraphNode {
     ident: Ident,
     title: SharedString,
+    icon: Option<Icon>,
     thumbnail: Option<AnyElement>,
     thumbnail_ratio: f32,
     /// What the step is doing now, for a step that is doing something.
@@ -365,7 +371,9 @@ pub struct GraphNode {
     metrics: Vec<NodeMetric>,
     ports: Vec<GraphPort>,
     diff: Option<Diff>,
+    status: Option<SharedString>,
     selected: bool,
+    active_glass: GlassPreset,
     width: f32,
     display_zoom: f32,
     declared_height: Option<f32>,
@@ -393,6 +401,7 @@ impl GraphNode {
         Self {
             ident: ident.into(),
             title: title.into(),
+            icon: None,
             thumbnail: None,
             thumbnail_ratio: DEFAULT_THUMBNAIL_RATIO,
             action: None,
@@ -402,7 +411,9 @@ impl GraphNode {
             metrics: Vec::new(),
             ports: Vec::new(),
             diff: None,
+            status: None,
             selected: false,
+            active_glass: GlassPreset::Frosted,
             width: NODE_WIDTH,
             display_zoom: 1.0,
             declared_height: None,
@@ -411,6 +422,16 @@ impl GraphNode {
             on_click: None,
             on_delete: None,
         }
+    }
+
+    /// Seats a caller-owned category glyph in the leading badge.
+    ///
+    /// The node resolves its wash from [`GraphNode::color`] and never infers a
+    /// category from the glyph. A host that has no category icon leaves the
+    /// seat absent rather than receiving a generic substitute.
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
+        self
     }
 
     /// Supplies the caller-owned visual preview for this node.
@@ -504,6 +525,27 @@ impl GraphNode {
     /// caller knows which one it has.
     pub fn diff(mut self, diff: Diff) -> Self {
         self.diff = Some(diff);
+        self
+    }
+
+    /// Seats the caller's current status words in the card footer.
+    ///
+    /// [`GraphNode::state`] still owns the semantic state, colour and motion;
+    /// this text is caller-owned because products use different operational
+    /// vocabulary for the same state.
+    pub fn status(mut self, status: impl Into<SharedString>) -> Self {
+        self.status = Some(status.into());
+        self
+    }
+
+    /// Chooses the shared glass preset used while the node is running,
+    /// selected, or under the pointer.
+    ///
+    /// Resting cards remain the zero-snapshot pseudo-glass material. The
+    /// promoted state uses [`Glass`] itself, so blur, refraction, fallback and
+    /// renderer admission stay one framework contract. Frosted is the default.
+    pub fn active_glass(mut self, preset: GlassPreset) -> Self {
+        self.active_glass = preset;
         self
     }
 
@@ -628,19 +670,29 @@ impl GraphNode {
     /// with three, and an edge that misses the card it joins is the one
     /// detail a reader will read as meaningful.
     pub(crate) fn measured_height(&self, theme: &gpui_kit_theme::Theme) -> f32 {
-        let header = theme.typography.label.line_height + theme.spacing.xs * 2.0;
+        let title = if self.icon.is_some() {
+            theme
+                .typography
+                .label
+                .line_height
+                .max(theme.control.xs.height)
+        } else {
+            theme.typography.label.line_height
+        };
+        let header = title + theme.spacing.xs * 2.0;
         if self.compact {
             return header;
         }
         let mut rows = Vec::new();
         if self.thumbnail.is_some() {
-            // The stripe takes its width off the content before the padding
-            // does, so a picture measured here is the width one actually gets.
-            let content = self.width - theme.effects.rail_width - theme.spacing.sm * 2.0;
+            let content = self.width - theme.spacing.sm * 2.0;
             rows.push(content.max(0.0) / self.thumbnail_ratio);
         }
         if self.action.is_some() {
             rows.push(theme.typography.caption.line_height);
+        }
+        if self.status.is_some() {
+            rows.push(theme.control.xs.height);
         }
         // The figure strip wraps, so a card carrying three figures on a narrow
         // node is two rows tall. An estimate that always answered one row
@@ -649,7 +701,7 @@ impl GraphNode {
         // clipped to.
         let figures = self.figure_widths(theme);
         if !figures.is_empty() {
-            let content = (self.width - theme.effects.rail_width - theme.spacing.sm * 2.0).max(0.0);
+            let content = (self.width - theme.spacing.sm * 2.0).max(0.0);
             let lines = wrapped_rows(&figures, content, theme.spacing.sm);
             rows.push(
                 theme.typography.caption.line_height * lines as f32
@@ -660,7 +712,7 @@ impl GraphNode {
             return header;
         }
         let gaps = theme.spacing.xs * (rows.len() - 1) as f32;
-        header + theme.borders.hairline + theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
+        header + theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
     }
 }
 
@@ -795,6 +847,13 @@ struct AuraClock {
     started: Option<Instant>,
 }
 
+/// Visual state local to one node material. The caller owns selection and
+/// execution; hover is the only transient fact the material keeps itself.
+#[derive(Debug, Clone, Copy, Default)]
+struct NodeMaterialState {
+    hovered: bool,
+}
+
 impl GraphNode {
     /// The paint and glow strength this card is showing, partway between the
     /// state it had and the state it has.
@@ -866,6 +925,13 @@ impl GraphNode {
 impl RenderOnce for GraphNode {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let material_state = keyed::slot::<NodeMaterialState>(
+            &self.ident.child("material").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let promoted =
+            self.selected || self.state == NodeState::Running || material_state.borrow().hovered;
         // A state change is the one thing a reader watching a canvas is
         // watching for, and it used to be a hard cut: a node went from running
         // to failed between two frames, so anybody who blinked saw a failed
@@ -901,6 +967,29 @@ impl RenderOnce for GraphNode {
             .as_ref()
             .map(|category| theme.variant_colors(Variant::Light, category));
 
+        let badge = self.icon.map(|glyph| {
+            let (background, foreground) = identity.map_or(
+                (
+                    theme.color_wash(paint.mark, SemanticWash::Faint),
+                    paint.mark,
+                ),
+                |identity| (identity.background, identity.text),
+            );
+            div()
+                .flex_none()
+                .size(px(metrics.badge))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(theme.radius(Radius::Control) * metrics.scale))
+                .bg(background)
+                .child(
+                    icon(glyph)
+                        .size(px(metrics.icon_size))
+                        .text_color(foreground),
+                )
+        });
+
         // The word for the kind, with the category's wash behind it. A canvas
         // is read by scanning for one kind among many, and a chip is the
         // smallest mark that answers that: tinting the whole title bar answers
@@ -929,6 +1018,7 @@ impl RenderOnce for GraphNode {
             .gap(px(metrics.gap))
             .px(px(metrics.padding))
             .py(px(metrics.header_padding))
+            .children(badge)
             .children(kind)
             .child(
                 div()
@@ -936,7 +1026,7 @@ impl RenderOnce for GraphNode {
                     .flex_1()
                     .text_size(px(metrics.label_size))
                     .line_height(px(metrics.label_height))
-                    .font_weight(FontWeight(theme.typography.label.weight))
+                    .font_weight(FontWeight(theme.typography.strong.weight))
                     .text_color(theme.colors.text)
                     .truncate()
                     .child(self.title.clone()),
@@ -1012,6 +1102,27 @@ impl RenderOnce for GraphNode {
                 .children(figures)
         });
 
+        let status = self.status.clone().map(|status| {
+            div()
+                .self_start()
+                .h(px(metrics.status))
+                .row()
+                .gap(px(metrics.gap))
+                .px(px(metrics.gap))
+                .rounded_full()
+                .bg(theme.color_wash(paint.mark, SemanticWash::Faint))
+                .text_size(px(metrics.caption_size))
+                .font_weight(FontWeight(theme.typography.label.weight))
+                .text_color(paint.mark)
+                .child(
+                    div()
+                        .size(px(theme.measures.status_mark * metrics.scale))
+                        .rounded_full()
+                        .bg(paint.mark),
+                )
+                .child(status)
+        });
+
         let thumbnail = self.thumbnail.map(|thumbnail| {
             div()
                 .w_full()
@@ -1032,31 +1143,19 @@ impl RenderOnce for GraphNode {
         // so the header's tint has something to stop against. A node with
         // nothing but a name has no body at all: an empty padded box below the
         // title would claim there is content that failed to arrive.
-        let body = (!self.compact && (thumbnail.is_some() || action.is_some() || strip.is_some()))
-            .then(|| {
-                div()
-                    .w_full()
-                    .column()
-                    .gap(px(metrics.gap))
-                    .p(px(metrics.padding))
-                    .children(thumbnail)
-                    .children(action)
-                    .children(strip)
-            });
-
-        // A category stripe runs the whole height, so a node that has scrolled
-        // until only its edge is visible still says what it is. A node without
-        // a category gets no neutral substitute: a stripe with no meaning is
-        // decoration that invites the reader to search for one.
-        //
-        // It is drawn only where nothing else is saying the same thing: with a
-        // kind chip present the card has already said what it is, and a stripe
-        // beside it is the second telling that made every card read as a block
-        // of colour. Compact cards have no chip — they are a title and nothing
-        // else — so there the stripe is the whole answer.
-        let rail = identity
-            .filter(|_| self.compact || self.kind.is_none())
-            .map(|identity| div().flex_none().w(px(metrics.rail)).bg(identity.text));
+        let body = (!self.compact
+            && (thumbnail.is_some() || action.is_some() || strip.is_some() || status.is_some()))
+        .then(|| {
+            div()
+                .w_full()
+                .column()
+                .gap(px(metrics.gap))
+                .p(px(metrics.padding))
+                .children(thumbnail)
+                .children(action)
+                .children(strip)
+                .children(status)
+        });
 
         let stack = div()
             .flex_1()
@@ -1065,34 +1164,74 @@ impl RenderOnce for GraphNode {
             .child(header)
             .children(body);
 
-        let card = div()
+        // The ordinary card is a zero-snapshot glass reading: a quiet tonal
+        // plane with a soft top-light gradient and an inset specular cast.
+        // Promoted cards drop the opaque plane so the shared Glass layer below
+        // can show its real backdrop through the same highlight.
+        let material = div()
+            .absolute()
+            .inset_0()
+            .when(!promoted, |element| {
+                element.bg(linear_gradient_stops(
+                    180.0,
+                    [
+                        linear_color_stop(theme.colors.raised, 0.0),
+                        linear_color_stop(theme.colors.panel, 1.0),
+                    ],
+                ))
+            })
+            .child(div().absolute().inset_0().bg(linear_gradient_stops(
+                180.0,
+                [
+                    linear_color_stop(
+                        theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
+                        0.0,
+                    ),
+                    linear_color_stop(gpui::transparent_black(), 0.42),
+                    linear_color_stop(gpui::transparent_black(), 1.0),
+                ],
+            )));
+        // A category with no badge or kind remains visible as a material wash
+        // rather than the ornamental edge stripe nodes used to wear.
+        let category_wash = identity
+            .filter(|_| self.icon.is_none() && self.kind.is_none())
+            .map(|identity| div().absolute().inset_0().bg(identity.background));
+        let selection_wash = self
+            .selected
+            .then(|| div().absolute().inset_0().bg(theme.colors.selected));
+        let inset = BoxShadow {
+            color: theme
+                .colors
+                .white_fill
+                .opacity(theme.effects.glass_specular.max(theme.effects.sheen_alpha)),
+            offset: point(px(0.0), px(theme.effects.glass_hairline)),
+            blur_radius: px(theme.effects.glass_hairline * 2.0),
+            spread_radius: px(-theme.effects.glass_hairline),
+            inset: true,
+        };
+        let mut card = div()
+            .id(self.ident.element_id())
             .w(px(metrics.width))
             .when_some(metrics.height, |element, height| element.h(px(height)))
-            // Not `row()`: that centres its children, and a stripe centred on
-            // its own zero content height is a stripe nobody can see.
             .flex()
             .flex_row()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .rounded(px(metrics.radius))
             .overflow_hidden()
-            .frame(&theme, Surface::Raised, Elevation::Raised)
-            // The state bleeds out of the card rather than being drawn round
-            // it, so a running node and a failed one differ by the colour the
-            // canvas takes near them and not by which of two lines they wear.
-            .when(paint.aura_alpha > 0.0, |element| {
-                element.shadow(vec![gpui::BoxShadow {
-                    color: paint
-                        .aura
-                        .opacity(theme.effects.glow_alpha * paint.aura_alpha),
-                    offset: gpui::point(px(0.0), px(0.0)),
-                    blur_radius: px(theme.effects.glow_blur * (1.0 + aura_expansion)),
-                    spread_radius: px(theme.effects.glow_spread * (1.0 + aura_expansion)),
-                    inset: false,
-                }])
-            })
-            .when(self.selected, |element| element.bg(theme.colors.selected))
-            .children(rail)
+            .shadow(vec![inset])
+            .child(material)
+            .children(category_wash)
+            .children(selection_wash)
             .child(stack);
+
+        let hover_state = Rc::clone(&material_state);
+        card = card.on_hover(move |hovered, window, _| {
+            let mut state = hover_state.borrow_mut();
+            if state.hovered != *hovered {
+                state.hovered = *hovered;
+                window.refresh();
+            }
+        });
 
         // A node that takes a click is a button and a node that does not is a
         // group, so the role is decided before the spec is built rather than
@@ -1109,43 +1248,73 @@ impl RenderOnce for GraphNode {
             .busy(self.state.is_busy())
             .invalid(self.state.is_invalid());
 
-        if self.on_click.is_none() && self.on_delete.is_none() {
-            return card.semantic_in(cx, spec).into_any_element();
-        }
-
-        let mut card = card
-            .id(self.ident.element_id())
-            .cursor_pointer()
-            .tab_index(0)
-            .focus_ring(&theme)
-            .pressable(cx);
-        if self.pointer_click
-            && let Some(handler) = self.on_click.as_ref()
-        {
-            let click = Rc::clone(handler);
-            card.interactivity()
-                .on_click(move |_, window, cx| click(window, cx));
-        }
-        let activate = self.on_click;
-        let delete = self.on_delete;
-        card.interactivity().on_key_down(move |event, window, cx| {
-            match event.keystroke.key.as_str() {
-                "enter" | "space" => {
-                    if let Some(handler) = &activate {
-                        handler(window, cx);
-                        cx.stop_propagation();
-                    }
-                }
-                "backspace" | "delete" => {
-                    if let Some(handler) = &delete {
-                        handler(window, cx);
-                        cx.stop_propagation();
-                    }
-                }
-                _ => {}
+        let card = if self.on_click.is_none() && self.on_delete.is_none() {
+            card.semantic_in(cx, spec).into_any_element()
+        } else {
+            let mut card = card
+                .cursor_pointer()
+                .tab_index(0)
+                .focus_ring_on(&theme, theme.colors.raised)
+                .pressable(cx);
+            if self.pointer_click
+                && let Some(handler) = self.on_click.as_ref()
+            {
+                let click = Rc::clone(handler);
+                card.interactivity()
+                    .on_click(move |_, window, cx| click(window, cx));
             }
-        });
-        card.semantic_in(cx, spec).into_any_element()
+            let activate = self.on_click;
+            let delete = self.on_delete;
+            card.interactivity().on_key_down(move |event, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "enter" | "space" => {
+                        if let Some(handler) = &activate {
+                            handler(window, cx);
+                            cx.stop_propagation();
+                        }
+                    }
+                    "backspace" | "delete" => {
+                        if let Some(handler) = &delete {
+                            handler(window, cx);
+                            cx.stop_propagation();
+                        }
+                    }
+                    _ => {}
+                }
+            });
+            card.semantic_in(cx, spec).into_any_element()
+        };
+
+        // Elevation and state light are outside the material. A promoted
+        // surface snapshots them before drawing its frost, which is what lets
+        // the aura enter the card body instead of stopping at its perimeter.
+        let mut shadows = theme.shadow(Elevation::Raised).to_vec();
+        if paint.aura_alpha > 0.0 {
+            shadows.push(BoxShadow {
+                color: paint
+                    .aura
+                    .opacity(theme.effects.glow_alpha * paint.aura_alpha),
+                offset: point(px(0.0), px(0.0)),
+                blur_radius: px(theme.effects.glow_blur * (1.0 + aura_expansion)),
+                spread_radius: px(theme.effects.glow_spread * (1.0 + aura_expansion)),
+                inset: false,
+            });
+        }
+        let material = if promoted {
+            Glass::new(self.ident.child("glass"))
+                .surface(Surface::Raised)
+                .radius(Radius::Bubble)
+                .preset(self.active_glass)
+                .child(card)
+                .into_any_element()
+        } else {
+            card
+        };
+        div()
+            .rounded(px(metrics.radius))
+            .shadow(shadows)
+            .child(material)
+            .into_any_element()
     }
 }
 
@@ -1368,8 +1537,20 @@ mod tests {
     fn a_node_starts_pending_and_at_the_shared_width() {
         let node = GraphNode::new("run.plan", "Plan");
         assert_eq!(node.state, NodeState::Pending);
+        assert_eq!(node.active_glass, GlassPreset::Frosted);
         assert_eq!(node.node_width(), NODE_WIDTH);
         assert_eq!(node.ident().as_str(), "run.plan");
+    }
+
+    #[test]
+    fn anatomy_seats_are_opt_in_and_use_the_shared_material_axis() {
+        let node = GraphNode::new("render", "Render")
+            .icon(Icon::Image)
+            .status("Rendering")
+            .active_glass(GlassPreset::Lens);
+        assert_eq!(node.icon, Some(Icon::Image));
+        assert_eq!(node.status.as_deref(), Some("Rendering"));
+        assert_eq!(node.active_glass, GlassPreset::Lens);
     }
 
     #[test]
@@ -1418,12 +1599,10 @@ mod tests {
             .thumbnail(div())
             .measured_height(&theme);
         // A node with nothing but a name is its header band alone. Giving it a
-        // picture opens the body zone, so it gains that zone's rule and
-        // padding as well as the picture itself.
-        let expected = theme.borders.hairline
-            + theme.spacing.sm * 2.0
-            + (NODE_WIDTH - theme.effects.rail_width - theme.spacing.sm * 2.0)
-                / DEFAULT_THUMBNAIL_RATIO;
+        // picture opens the body zone, so it gains that zone's padding as well
+        // as the picture itself. Material separation never changes geometry.
+        let expected = theme.spacing.sm * 2.0
+            + (NODE_WIDTH - theme.spacing.sm * 2.0) / DEFAULT_THUMBNAIL_RATIO;
         assert!((thumbnail - plain - expected).abs() < 0.001);
 
         let square = GraphNode::new("square", "Square")
@@ -1481,6 +1660,8 @@ mod tests {
         assert_eq!(doubled.padding, theme.spacing.sm * 2.0);
         assert_eq!(doubled.caption_size, theme.typography.caption.size * 2.0);
         assert_eq!(doubled.icon_size, theme.control.sm.icon_size * 2.0);
-        assert_eq!(doubled.radius, theme.radius(Radius::Card) * 2.0);
+        assert_eq!(doubled.badge, theme.control.xs.height * 2.0);
+        assert_eq!(doubled.status, theme.control.xs.height * 2.0);
+        assert_eq!(doubled.radius, theme.radius(Radius::Bubble) * 2.0);
     }
 }
