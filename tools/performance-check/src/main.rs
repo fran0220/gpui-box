@@ -24,6 +24,7 @@ const VISIBLE_ROWS: usize = 24;
 /// pseudo-glass, half promoted glass requests.
 const MATERIAL_NODES: usize = 64;
 const PROMOTED_NODES: usize = 32;
+const _: () = assert!(PROMOTED_NODES > gpui::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME);
 
 /// What a fixture hands the harness: one view builder, called every frame.
 type ViewBuilder = Box<dyn Fn(&mut gpui::Window, &mut gpui::App) -> AnyElement>;
@@ -212,7 +213,6 @@ fn node_graph_material_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
     // carry real Frosted snapshots; requests beyond it keep their material
     // fill through the framework fallback. This is the high-state-density
     // case the split material policy must bound, not only its easy rest case.
-    assert!(PROMOTED_NODES > gpui::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME);
     Box::new(move |_, _| {
         let mut graph = NodeGraph::new("perf.node-graph-material")
             .interaction(GraphInteraction::Inspect)
