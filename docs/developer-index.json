@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2456
+      "symbolCount": 2460
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -30895,7 +30895,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Shadow { pub order : DrawOrder, pub blur_radius : ScaledPixels, pub bounds : Bounds<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub element_bounds : Bounds<ScaledPixels>, pub element_corner_radii : Corners<ScaledPixels>, # [doc = \" 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).\"] pub inset : u32, pub pad : u32, }",
+      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Shadow { pub order : DrawOrder, pub blur_radius : ScaledPixels, pub bounds : Bounds<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub element_bounds : Bounds<ScaledPixels>, pub element_corner_radii : Corners<ScaledPixels>, # [doc = \" 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).\"] pub inset : u32, # [doc = \" 1 = cut the element's own rounded shape out of the shadow, so it reads\"] # [doc = \" as a ring rather than painting under the element. Only consulted for a\"] # [doc = \" drop shadow; an inset shadow is already clipped to the element.\"] pub outer_only : u32, }",
       "cfg": []
     },
     {
@@ -31374,7 +31374,7 @@
       "source": "crates/gpui/src/style.rs",
       "summary": "The possible values of the box-shadow property",
       "documentation": "The possible values of the box-shadow property",
-      "signature": "# [doc = \" The possible values of the box-shadow property\"] # [derive (Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)] pub struct BoxShadow { # [doc = \" What color should the shadow have?\"] pub color : Hsla, # [doc = \" How should it be offset from its element?\"] pub offset : Point<Pixels>, # [doc = \" How much should the shadow be blurred?\"] pub blur_radius : Pixels, # [doc = \" How much should the shadow spread?\"] pub spread_radius : Pixels, # [doc = \" Whether this is an inset shadow (drawn inside the element's bounds).\"] pub inset : bool, }",
+      "signature": "# [doc = \" The possible values of the box-shadow property\"] # [derive (Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)] pub struct BoxShadow { # [doc = \" What color should the shadow have?\"] pub color : Hsla, # [doc = \" How should it be offset from its element?\"] pub offset : Point<Pixels>, # [doc = \" How much should the shadow be blurred?\"] pub blur_radius : Pixels, # [doc = \" How much should the shadow spread?\"] pub spread_radius : Pixels, # [doc = \" Whether the shadow is cast outward, outward-clipped, or inward.\"] pub style : ShadowStyle, }",
       "cfg": []
     },
     {
@@ -31419,6 +31419,21 @@
       "summary": "Creates a new [`BoxShadow`] with the given offset and color, matching the order of the CSS `box-shadow` property. Use the builder methods to set blur radius, spread radius, and inset.",
       "documentation": "Creates a new [`BoxShadow`] with the given offset and color, matching the order\nof the CSS `box-shadow` property. Use the builder methods to set blur radius,\nspread radius, and inset.",
       "signature": "pub fn new (offset_x : Pixels, offset_y : Pixels, color : Hsla) -> Self",
+      "cfg": [],
+      "target": "BoxShadow"
+    },
+    {
+      "id": "gpui::style::BoxShadow::ring",
+      "name": "ring",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "style",
+      "path": "gpui::style",
+      "source": "crates/gpui/src/style.rs",
+      "summary": "Cuts the element's own shape out of the shadow, so it reads as a ring whether or not the element it rings has a fill.",
+      "documentation": "Cuts the element's own shape out of the shadow, so it reads as a ring\nwhether or not the element it rings has a fill.",
+      "signature": "pub fn ring (mut self) -> Self",
       "cfg": [],
       "target": "BoxShadow"
     },
@@ -31694,6 +31709,50 @@
       "documentation": "The positioning strategy for this item.\n\nThis controls both how the origin is determined for the [`Style::position`] field,\nand whether or not the item will be controlled by flexbox's layout algorithm.\n\nWARNING: this enum follows the behavior of [CSS's `position` property](https://developer.mozilla.org/en-US/docs/Web/CSS/position),\nwhich can be unintuitive.\n\n[`Position::Relative`] is the default value, in contrast to the default behavior in CSS.",
       "signature": "# [doc = \" The positioning strategy for this item.\"] # [doc = \"\"] # [doc = \" This controls both how the origin is determined for the [`Style::position`] field,\"] # [doc = \" and whether or not the item will be controlled by flexbox's layout algorithm.\"] # [doc = \"\"] # [doc = \" WARNING: this enum follows the behavior of [CSS's `position` property](https://developer.mozilla.org/en-US/docs/Web/CSS/position),\"] # [doc = \" which can be unintuitive.\"] # [doc = \"\"] # [doc = \" [`Position::Relative`] is the default value, in contrast to the default behavior in CSS.\"] # [derive (Copy, Clone, PartialEq, Eq, Debug, Default, Serialize, Deserialize, JsonSchema)] pub enum Position { # [doc = \" The offset is computed relative to the final position given by the layout algorithm.\"] # [doc = \" Offsets do not affect the position of any other items; they are effectively a correction factor applied at the end.\"] # [default] Relative, # [doc = \" The offset is computed relative to this item's closest positioned ancestor, if any.\"] # [doc = \" Otherwise, it is placed relative to the origin.\"] # [doc = \" No space is created for the item in the page layout, and its size will not be altered.\"] # [doc = \"\"] # [doc = \" WARNING: to opt-out of layouting entirely, you must use [`Display::None`] instead on your [`Style`] object.\"] Absolute, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::style::ShadowStyle",
+      "name": "ShadowStyle",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "style",
+      "path": "gpui::style",
+      "source": "crates/gpui/src/style.rs",
+      "summary": "How a shadow is cast relative to the element that owns it.",
+      "documentation": "How a shadow is cast relative to the element that owns it.\n\nThe three are genuinely different pictures, which is why this is not two\nbooleans: a shadow cannot be cast inward and clipped outward at once.",
+      "signature": "# [doc = \" How a shadow is cast relative to the element that owns it.\"] # [doc = \"\"] # [doc = \" The three are genuinely different pictures, which is why this is not two\"] # [doc = \" booleans: a shadow cannot be cast inward and clipped outward at once.\"] # [derive (Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)] pub enum ShadowStyle { # [doc = \" Cast outward, and painted under the element as well as around it.\"] # [doc = \"\"] # [doc = \" A translucent or empty element shows it, which is what lets a glow\"] # [doc = \" reach into the body of the thing casting it instead of stopping at its\"] # [doc = \" perimeter.\"] # [default] Drop, # [doc = \" Cast outward and clipped to outside the element's own rounded shape,\"] # [doc = \" the way CSS clips an outer `box-shadow` to the border box.\"] # [doc = \"\"] # [doc = \" This is what a halo wants. A `Drop` halo reads as a ring only because\"] # [doc = \" the element it rings happens to be opaque; on a transparent element the\"] # [doc = \" same shadow floods the element instead. A `Ring` reads as a ring\"] # [doc = \" whatever it is drawn on.\"] Ring, # [doc = \" Cast inward, inside the element's bounds.\"] Inset, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::style::ShadowStyle::is_inset",
+      "name": "is_inset",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "style",
+      "path": "gpui::style",
+      "source": "crates/gpui/src/style.rs",
+      "summary": "Whether the shadow is drawn inside the element.",
+      "documentation": "Whether the shadow is drawn inside the element.",
+      "signature": "pub fn is_inset (self) -> bool",
+      "cfg": [],
+      "target": "ShadowStyle"
+    },
+    {
+      "id": "gpui::style::ShadowStyle::is_ring",
+      "name": "is_ring",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "style",
+      "path": "gpui::style",
+      "source": "crates/gpui/src/style.rs",
+      "summary": "Whether the element's own shape is cut out of the shadow.",
+      "documentation": "Whether the element's own shape is cut out of the shadow.",
+      "signature": "pub fn is_ring (self) -> bool",
+      "cfg": [],
+      "target": "ShadowStyle"
     },
     {
       "id": "gpui::style::StrikethroughStyle",
@@ -78675,7 +78734,7 @@
       "source": "crates/gpui-kit/src/foundation/styled_ext.rs",
       "summary": "The one focus treatment in the library.",
       "documentation": "The one focus treatment in the library.\n\nEvery keyboard-reachable element wears the same ring from the same tokens,\nso \"the keyboard is here\" looks identical whether it is on a button, a\ntable header, or a tree row. It is a shadow rather than a border so turning\nfocus on never reflows what is around it.\n\nThe ring answers \"the keyboard is here\", so it is drawn for keyboard focus\nand not for a pointer that landed on the same element. A person who just\nclicked a strip knows where they clicked; outlining it tells them nothing\nand reads as chrome the borderless catalogue does not otherwise draw. An\neditable control is the case this does not cover, and it does not go\nthrough here: a field says where the caret is with [`StyledExt::well`] and\nits own focused state, which a click must show.",
-      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked; outlining it tells them nothing\"] # [doc = \" and reads as chrome the borderless catalogue does not otherwise draw. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with [`StyledExt::well`] and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Sized { fn focus_ring (self, theme : & Theme) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring ())) } # [doc = \" The same halo resolved against a control-owned resting fill.\"] fn focus_ring_on (self, theme : & Theme, background : gpui::Hsla) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring_on (background))) } # [doc = \" The same halo for an element that has no resting fill of its own.\"] # [doc = \"\"] # [doc = \" The halo is a shadow, and a non-inset shadow is painted under the whole\"] # [doc = \" element rather than clipped to the outside of it the way CSS clips one.\"] # [doc = \" A control with a fill covers that interior and the halo reads as a\"] # [doc = \" ring. A transparent row does not, so the identical call that rings a\"] # [doc = \" button washes a row in the focus colour at its full ring alpha — which\"] # [doc = \" is louder than the selected fill and reads as a selection the reader\"] # [doc = \" did not make.\"] # [doc = \"\"] # [doc = \" This lays the ground the halo needs, for exactly as long as the halo is\"] # [doc = \" worn: `ground` is the colour already behind the element, so a focused\"] # [doc = \" row is its own resting colour plus a ring, and nothing moves.\"] fn focus_ring_over (self, theme : & Theme, ground : gpui::Hsla) -> Self { self . focus_visible (move | style | style . bg (ground) . shadow (theme . focus_ring_on (ground))) } }",
+      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked; outlining it tells them nothing\"] # [doc = \" and reads as chrome the borderless catalogue does not otherwise draw. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with [`StyledExt::well`] and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Sized { fn focus_ring (self, theme : & Theme) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring ())) } # [doc = \" The same halo resolved against a control-owned resting fill.\"] fn focus_ring_on (self, theme : & Theme, background : gpui::Hsla) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring_on (background))) } }",
       "cfg": []
     },
     {

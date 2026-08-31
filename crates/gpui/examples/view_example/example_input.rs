@@ -106,7 +106,7 @@ impl gpui::View for Input {
                     offset: point(px(0.), px(0.)),
                     blur_radius: px(4.),
                     spread_radius: px(1.),
-                    inset: false,
+                    style: gpui::ShadowStyle::Drop,
                 }])
             })
             .rounded(px(4.))

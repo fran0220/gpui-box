@@ -461,11 +461,6 @@ impl Render for ClarificationPanel {
 
         let options_ident = self.ident.child("options");
         let actionable = pending;
-        // The colour the candidates stand on, which is the card's own plane.
-        // A focused candidate needs it under the halo, and a chosen one paints
-        // over it.
-        let ground = theme.surface(gpui_kit_theme::Surface::Panel);
-
         let rows: Vec<AnyElement> = self
             .options
             .iter()
@@ -521,12 +516,7 @@ impl Render for ClarificationPanel {
                         .tab_index(0)
                         .track_focus(&self.option_focus[at])
                         .pressable(cx)
-                        // A candidate has no fill until it is the answer, so
-                        // the halo is laid over the card's own colour. Ringing
-                        // a transparent row instead washes it in the focus
-                        // colour, which reads louder than the fill that means
-                        // "this is your answer".
-                        .focus_ring_over(&theme, ground)
+                        .focus_ring(&theme)
                         .on_click(cx.listener(move |panel, _, _, cx| {
                             panel.choose(click.clone(), cx);
                         }))

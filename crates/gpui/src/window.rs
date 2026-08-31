@@ -4635,7 +4635,7 @@ impl Window {
         let element_bounds = self.cover_bounds(bounds);
         let element_corner_radii = corner_radii.scale(scale_factor);
         for shadow in shadows {
-            if shadow.inset {
+            if shadow.style.is_inset() {
                 continue;
             }
             let shadow_bounds = (bounds + shadow.offset).dilate(shadow.spread_radius);
@@ -4649,7 +4649,7 @@ impl Window {
                 element_bounds,
                 element_corner_radii,
                 inset: 0,
-                pad: 0,
+                outer_only: u32::from(shadow.style.is_ring()),
             });
         }
     }
@@ -4671,7 +4671,7 @@ impl Window {
         let element_bounds = self.cover_bounds(bounds);
         let element_corner_radii = corner_radii.scale(scale_factor);
         for shadow in shadows {
-            if !shadow.inset {
+            if !shadow.style.is_inset() {
                 continue;
             }
             let hole = (bounds + shadow.offset).dilate(-shadow.spread_radius);
@@ -4694,7 +4694,7 @@ impl Window {
                 element_bounds,
                 element_corner_radii,
                 inset: 1,
-                pad: 0,
+                outer_only: 0,
             });
         }
     }
@@ -4849,7 +4849,7 @@ impl Window {
             element_bounds: bounds.scale(scale_factor),
             element_corner_radii: corner_radii.scale(scale_factor),
             inset: 0,
-            pad: 0,
+            outer_only: 0,
         });
 
         // Every length the surface carries is scaled here, the material's and

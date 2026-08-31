@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use gpui::{App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
+use gpui::{
+    App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, ShadowStyle, SharedString, point, px,
+};
 use gpui_kit_tokens::{
     BorderWeight, Color, DensityScale, InteractiveColor, OpacityRole, TokenDocument, TokenError,
     bundled, contrast_ratio, over, presets,
@@ -1339,7 +1341,12 @@ impl Theme {
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(width * 2.0),
             spread_radius: px(width * 0.5),
-            inset: false,
+            // The halo answers "the keyboard is here" about the element's
+            // edge, so the element's own shape is cut out of it. A drop
+            // shadow is painted under the element as well as around it, which
+            // an opaque control hides and a transparent row does not: the same
+            // halo that rings a button floods a list row at its full alpha.
+            style: ShadowStyle::Ring,
         }]
     }
 
@@ -1507,7 +1514,7 @@ impl Theme {
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(self.effects.glow_blur),
             spread_radius: px(self.effects.glow_spread),
-            inset: false,
+            style: ShadowStyle::Drop,
         }]
     }
 }
@@ -1677,7 +1684,7 @@ fn shadow(tokens: &TokenDocument, level: Elevation) -> Vec<BoxShadow> {
             offset: point(px(0.0), px(layer.y)),
             blur_radius: px(layer.blur),
             spread_radius: px(layer.spread),
-            inset: false,
+            style: ShadowStyle::Drop,
         })
         .collect()
 }
@@ -2105,7 +2112,10 @@ mod tests {
             let focus = theme.focus_ring();
             assert_eq!(focus.len(), 1, "{}", theme.id);
             for band in &focus {
-                assert!(!band.inset, "{}", theme.id);
+                // A halo is a ring: cast outward, with the element it rings
+                // cut out of it, so it never floods a control that has no
+                // fill of its own.
+                assert_eq!(band.style, ShadowStyle::Ring, "{}", theme.id);
                 // A ring that reserved space would move the layout the moment
                 // the keyboard arrived on a control.
                 assert_eq!(band.offset, point(px(0.0), px(0.0)), "{}", theme.id);

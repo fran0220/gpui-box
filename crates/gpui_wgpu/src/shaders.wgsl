@@ -1044,7 +1044,9 @@ struct Shadow {
     element_corner_radii: Corners,
     // 0 = drop shadow, 1 = inset shadow.
     inset: u32,
-    pad: u32, // align to 8 bytes
+    // 1 = cut the element's own shape out of a drop shadow, so it rings the
+    // element instead of painting under it.
+    outer_only: u32,
 }
 
 struct ShadowVarying {
@@ -1123,6 +1125,14 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
         let element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
                                         shadow.element_corner_radii);
         alpha *= saturate(0.5 - element_distance);
+    } else if (shadow.outer_only != 0u) {
+        // A ring keeps only what falls outside the element, the way CSS clips an
+        // outer box-shadow to the border box. Without this the shadow is painted
+        // under the element too, which is invisible behind a fill and floods a
+        // transparent one.
+        let element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
+                                        shadow.element_corner_radii);
+        alpha *= saturate(0.5 + element_distance);
     }
 
     return blend_color(input.color, alpha);

@@ -936,7 +936,9 @@ struct Shadow {
     Bounds element_bounds;
     Corners element_corner_radii;
     uint inset;
-    uint pad; // align to 8 bytes
+    // 1 = cut the element's own shape out of a drop shadow, so it rings the
+    // element instead of painting under it.
+    uint outer_only;
 };
 
 struct ShadowVertexOutput {
@@ -1021,6 +1023,12 @@ float4 shadow_fragment(ShadowFragmentInput input): SV_TARGET {
         float element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
                                           shadow.element_corner_radii);
         alpha *= saturate(0.5 - element_distance);
+    } else if (shadow.outer_only != 0u) {
+        // A ring keeps only what falls outside the element, the way CSS clips an
+        // outer box-shadow to the border box.
+        float element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
+                                          shadow.element_corner_radii);
+        alpha *= saturate(0.5 + element_distance);
     }
 
     return input.color * float4(1., 1., 1., alpha);

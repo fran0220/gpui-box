@@ -344,6 +344,43 @@ pub enum Visibility {
     Hidden,
 }
 
+/// How a shadow is cast relative to the element that owns it.
+///
+/// The three are genuinely different pictures, which is why this is not two
+/// booleans: a shadow cannot be cast inward and clipped outward at once.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub enum ShadowStyle {
+    /// Cast outward, and painted under the element as well as around it.
+    ///
+    /// A translucent or empty element shows it, which is what lets a glow
+    /// reach into the body of the thing casting it instead of stopping at its
+    /// perimeter.
+    #[default]
+    Drop,
+    /// Cast outward and clipped to outside the element's own rounded shape,
+    /// the way CSS clips an outer `box-shadow` to the border box.
+    ///
+    /// This is what a halo wants. A `Drop` halo reads as a ring only because
+    /// the element it rings happens to be opaque; on a transparent element the
+    /// same shadow floods the element instead. A `Ring` reads as a ring
+    /// whatever it is drawn on.
+    Ring,
+    /// Cast inward, inside the element's bounds.
+    Inset,
+}
+
+impl ShadowStyle {
+    /// Whether the shadow is drawn inside the element.
+    pub fn is_inset(self) -> bool {
+        matches!(self, Self::Inset)
+    }
+
+    /// Whether the element's own shape is cut out of the shadow.
+    pub fn is_ring(self) -> bool {
+        matches!(self, Self::Ring)
+    }
+}
+
 /// The possible values of the box-shadow property
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct BoxShadow {
@@ -355,8 +392,8 @@ pub struct BoxShadow {
     pub blur_radius: Pixels,
     /// How much should the shadow spread?
     pub spread_radius: Pixels,
-    /// Whether this is an inset shadow (drawn inside the element's bounds).
-    pub inset: bool,
+    /// Whether the shadow is cast outward, outward-clipped, or inward.
+    pub style: ShadowStyle,
 }
 
 impl BoxShadow {
@@ -369,7 +406,7 @@ impl BoxShadow {
             offset: point(offset_x, offset_y),
             blur_radius: px(0.),
             spread_radius: px(0.),
-            inset: false,
+            style: ShadowStyle::Drop,
         }
     }
 
@@ -387,7 +424,14 @@ impl BoxShadow {
 
     /// Marks the shadow as inset (drawn inside the element's bounds).
     pub fn inset(mut self) -> Self {
-        self.inset = true;
+        self.style = ShadowStyle::Inset;
+        self
+    }
+
+    /// Cuts the element's own shape out of the shadow, so it reads as a ring
+    /// whether or not the element it rings has a fill.
+    pub fn ring(mut self) -> Self {
+        self.style = ShadowStyle::Ring;
         self
     }
 }
@@ -1344,6 +1388,42 @@ mod tests {
     use super::*;
 
     use util_macros::perf;
+
+    /// A shadow is cast one way. Inward and outward-clipped are different
+    /// pictures and cannot both be asked for, which is the reason this is an
+    /// enum rather than a pair of flags.
+    #[test]
+    fn a_shadow_is_cast_exactly_one_way() {
+        let drop = BoxShadow::new(px(0.), px(1.), red());
+        assert_eq!(drop.style, ShadowStyle::Drop);
+        assert!(!drop.style.is_inset());
+        assert!(!drop.style.is_ring());
+
+        let ring = BoxShadow::new(px(0.), px(0.), blue()).ring();
+        assert!(ring.style.is_ring());
+        assert!(!ring.style.is_inset());
+
+        let inset = BoxShadow::new(px(0.), px(0.), green()).inset();
+        assert!(inset.style.is_inset());
+        assert!(!inset.style.is_ring());
+
+        // The last one asked for wins, so neither builder can leave a shadow
+        // claiming to be two things at once.
+        assert!(
+            BoxShadow::new(px(0.), px(0.), red())
+                .ring()
+                .inset()
+                .style
+                .is_inset()
+        );
+        assert!(
+            BoxShadow::new(px(0.), px(0.), red())
+                .inset()
+                .ring()
+                .style
+                .is_ring()
+        );
+    }
 
     #[perf]
     fn test_basic_highlight_style_combination() {

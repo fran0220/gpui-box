@@ -582,6 +582,14 @@ fragment float4 shadow_fragment(ShadowFragmentInput input [[stage_in]],
     float element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
                                       shadow.element_corner_radii);
     alpha *= saturate(0.5 - element_distance);
+  } else if (shadow.outer_only != 0u) {
+    // A ring keeps only what falls outside the element, the way CSS clips an
+    // outer box-shadow to the border box. Without this the shadow is painted
+    // under the element too, which is invisible behind a fill and floods a
+    // transparent one.
+    float element_distance = quad_sdf(input.position.xy, shadow.element_bounds,
+                                      shadow.element_corner_radii);
+    alpha *= saturate(0.5 + element_distance);
   }
 
   return input.color * float4(1., 1., 1., alpha);

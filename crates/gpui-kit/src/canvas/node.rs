@@ -1216,7 +1216,7 @@ impl RenderOnce for GraphNode {
             offset: point(px(0.0), px(theme.effects.glass_hairline)),
             blur_radius: px(theme.effects.glass_hairline * 2.0),
             spread_radius: px(-theme.effects.glass_hairline),
-            inset: true,
+            style: gpui::ShadowStyle::Inset,
         };
         let mut card = div()
             .id(self.ident.element_id())
@@ -1306,7 +1306,7 @@ impl RenderOnce for GraphNode {
                 offset: point(px(0.0), px(0.0)),
                 blur_radius: px(theme.effects.glow_blur * (1.0 + aura_expansion)),
                 spread_radius: px(theme.effects.glow_spread * (1.0 + aura_expansion)),
-                inset: false,
+                style: gpui::ShadowStyle::Drop,
             });
         }
         let material = if promoted {

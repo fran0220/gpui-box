@@ -922,7 +922,7 @@ mod tests {
             element_bounds: Bounds::default(),
             element_corner_radii: Corners::default(),
             inset: 0,
-            pad: 0,
+            outer_only: 0,
         };
         let mut scene = Scene {
             shadows: vec![shadow(1), shadow(2), shadow(4)],
@@ -1970,7 +1970,10 @@ pub struct Shadow {
     pub element_corner_radii: Corners<ScaledPixels>,
     /// 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).
     pub inset: u32,
-    pub pad: u32, // align to 8 bytes
+    /// 1 = cut the element's own rounded shape out of the shadow, so it reads
+    /// as a ring rather than painting under the element. Only consulted for a
+    /// drop shadow; an inset shadow is already clipped to the element.
+    pub outer_only: u32,
 }
 
 impl From<Shadow> for Primitive {
