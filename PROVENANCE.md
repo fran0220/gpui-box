@@ -289,6 +289,20 @@ licensed under OFL 1.1 with no Reserved Font Name, and live at
 `NotoSansHebrew.ttf`. Exact SHA-256 checksums are recorded in the asset crate's
 `assets/SOURCE.md`.
 
+The Simplified Chinese language subset of Noto Sans CJK comes from
+<https://github.com/notofonts/noto-cjk> revision `f8d157532fbfaeda587e826d4cd5b21a49186f7c`, path
+`Sans/SubsetOTF/SC/NotoSansSC-Regular.otf`. It is unmodified, licensed under
+OFL 1.1 with no Reserved Font Name, and lives at
+`crates/gpui-kit-assets/assets/fonts/NotoSansSC.otf`. Its SHA-256 checksum is
+recorded in the asset crate's `assets/SOURCE.md`.
+
+It is bundled for the same reason the Arabic and Hebrew faces are: so that the
+script renders the same in the headless harness, on each native platform, and
+in the browser, rather than depending on what the machine happens to have
+installed. Adding it changes no Latin output — the fallback is consulted only
+for glyphs Geist does not carry, and a rendered scene is byte-identical with
+and without it.
+
 ## P06: Framework test and fallback fonts
 
 - IBM Plex Sans source: <https://github.com/IBM/plex>

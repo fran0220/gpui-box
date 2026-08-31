@@ -100582,7 +100582,7 @@
       "source": "crates/gpui-kit-assets/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn font_bytes () -> [& 'static [u8]; 8]",
+      "signature": "pub fn font_bytes () -> [& 'static [u8]; 9]",
       "cfg": []
     },
     {

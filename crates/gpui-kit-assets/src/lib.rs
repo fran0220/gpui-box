@@ -173,8 +173,13 @@ static FONT_NOTO_SANS_HEBREW: &[u8] = include_bytes!("../assets/fonts/NotoSansHe
 /// font that covers them, which made the library's own output depend on what
 /// the host machine had installed. See `assets/SOURCE.md`.
 static FONT_KEY_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/KeySymbols.ttf");
+/// Simplified Chinese, and with it the Han characters Japanese and Korean
+/// share. Geist covers none of them, so without this every CJK string in a
+/// component renders as whatever the host machine happens to have — and, in
+/// the headless harness, which deliberately has nothing, as tofu.
+static FONT_NOTO_SANS_SC: &[u8] = include_bytes!("../assets/fonts/NotoSansSC.otf");
 
-pub fn font_bytes() -> [&'static [u8]; 8] {
+pub fn font_bytes() -> [&'static [u8]; 9] {
     [
         FONT_GEIST,
         FONT_GEIST_MONO,
@@ -183,6 +188,7 @@ pub fn font_bytes() -> [&'static [u8]; 8] {
         FONT_GEIST_BOLD,
         FONT_NOTO_SANS_ARABIC,
         FONT_NOTO_SANS_HEBREW,
+        FONT_NOTO_SANS_SC,
         FONT_KEY_SYMBOLS,
     ]
 }
@@ -195,6 +201,7 @@ pub fn text_fallbacks() -> FontFallbacks {
             FontFallbacks::from_fonts(vec![
                 "Noto Sans Arabic".to_owned(),
                 "Noto Sans Hebrew".to_owned(),
+                "Noto Sans SC".to_owned(),
             ])
         })
         .clone()
@@ -301,7 +308,23 @@ mod tests {
     fn script_fallbacks_are_stable_and_ordered() {
         assert_eq!(
             text_fallbacks().fallback_list(),
-            ["Noto Sans Arabic", "Noto Sans Hebrew"]
+            ["Noto Sans Arabic", "Noto Sans Hebrew", "Noto Sans SC"]
+        );
+    }
+
+    /// A face that is bundled but not named in the fallback list is a face the
+    /// shaper never reaches, which is the mistake `key_fallbacks` documents.
+    /// CJK is the case where it costs the most: Geist covers none of it, so an
+    /// unnamed face means every Chinese string in the library falls through to
+    /// whatever the host happens to have — and in the headless harness, which
+    /// deliberately has nothing, to tofu in a picture nobody can fail.
+    #[test]
+    fn the_cjk_face_is_bundled_and_named() {
+        assert!(font_bytes().contains(&FONT_NOTO_SANS_SC));
+        assert!(
+            text_fallbacks()
+                .fallback_list()
+                .contains(&"Noto Sans SC".to_owned())
         );
     }
 

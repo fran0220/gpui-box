@@ -47,6 +47,27 @@ registered with Geist and carried as an explicit ordered fallback chain, so
 Arabic and Hebrew output is reproducible in headless, native, and browser
 renderers instead of depending on machine fonts.
 
+`NotoSansSC.otf` is the unmodified Simplified Chinese language subset of Noto
+Sans CJK, from `notofonts/noto-cjk` revision
+`f8d157532fbfaeda587e826d4cd5b21a49186f7c`:
+
+| File | Upstream path | SHA-256 |
+|---|---|---|
+| `NotoSansSC.otf` | `Sans/SubsetOTF/SC/NotoSansSC-Regular.otf` | `faa6c9df652116dde789d351359f3d7e5d2285a2b2a1f04a2d7244df706d5ea9` |
+
+It carries the Han characters, so it answers for Japanese and Korean text as
+well as Chinese wherever those share an ideograph. It is the language subset
+rather than the pan-CJK collection because a product writing Simplified
+Chinese does not need four regional variants of the same character to be
+reproducible, and the collection is several times the size.
+
+Without it every CJK string in the library fell through to whatever face the
+host machine happened to carry, and in the headless harness — which carries
+nothing on purpose, so shaping cannot vary by machine — to tofu. That is not
+only an ugly baseline: it means no snapshot can fail on a CJK layout defect,
+which is how a byte-offset crash and a label-width miscalculation both reached
+a product before anybody saw them.
+
 ## Icons
 
 Most icons are Solar Icons, Linear weight, by 480 Design, licensed under

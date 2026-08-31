@@ -31,6 +31,17 @@ Files: assets/fonts/NotoSansArabic.ttf, assets/fonts/NotoSansHebrew.ttf
 Checksums and exact upstream paths: assets/SOURCE.md
 License text: licenses/OFL-1.1.txt
 
+Noto Sans CJK SC
+--------------------------------------------------------------------------------
+Source: https://github.com/notofonts/noto-cjk
+Revision: f8d157532fbfaeda587e826d4cd5b21a49186f7c
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name
+'Source'. Noto is a trademark of Google Inc.
+Files: assets/fonts/NotoSansSC.otf
+Checksums and exact upstream paths: assets/SOURCE.md
+License text: licenses/OFL-1.1.txt
+
 Solar Icons
 --------------------------------------------------------------------------------
 Source: Solar Icons, Linear weight, by 480 Design

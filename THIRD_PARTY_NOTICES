@@ -170,6 +170,18 @@ Scope: deterministic script fallbacks under crates/gpui-kit-assets/assets/fonts.
 Checksums and exact upstream paths: crates/gpui-kit-assets/assets/SOURCE.md
 License text: licenses/NOTO-OFL-1.1.txt
 
+Noto Sans CJK SC
+--------------------------------------------------------------------------------
+Source: https://github.com/notofonts/noto-cjk
+Revision: f8d157532fbfaeda587e826d4cd5b21a49186f7c
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2014-2021 Adobe (http://www.adobe.com/). Noto is a trademark of
+Google Inc.
+Scope: the Simplified Chinese script fallback under
+crates/gpui-kit-assets/assets/fonts.
+Checksums and exact upstream paths: crates/gpui-kit-assets/assets/SOURCE.md
+License text: licenses/NOTO-OFL-1.1.txt
+
 Solar Icons
 --------------------------------------------------------------------------------
 Source: Solar Icons, Linear weight, by 480 Design
