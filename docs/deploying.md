@@ -39,9 +39,13 @@ tools/site/deploy.sh
 ```
 
 On macOS the release build uses `cargo-zigbuild`; Linux uses `musl-tools`.
-Normal deployments run in `.github/workflows/deploy-site.yml` after the full
-`CI` workflow succeeds on `main`. The only repository secret is the restricted
-private key `BWG_GPUI_BOX_DEPLOY_KEY`.
+Normal deployments run in `.github/workflows/deploy-site.yml` on every push to
+`main`, in parallel with the platform CI. The release builder independently
+checks the generated indexes, builds the site, semantic snapshots, and static
+MCP binary, and validates the complete immutable bundle before BWG accepts it.
+This keeps the hosted catalog on the exact `origin/main` revision even when an
+unrelated platform CI job is unavailable or failing. The only repository
+secret is the restricted private key `BWG_GPUI_BOX_DEPLOY_KEY`.
 
 ## One-time host bootstrap
 
