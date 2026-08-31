@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Serve this checkout's catalog over stdio MCP.
 #
-# crates.io `gpui-box-mcp` and https://gpui-box.origingame.dev/mcp are the last
-# published cohort. This script is the working tree. Do not call `cargo metadata`
-# on the hot path: Cursor times out stdio MCP startup if another cargo holds
-# the package-cache lock.
+# The remote Developer MCP is one immutable deployment; this script is the
+# working tree and adds live session tools. Do not call `cargo metadata` on the
+# hot path: clients time out stdio startup if another cargo holds the package
+# cache lock.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export GPUI_BOX_ROOT="${GPUI_BOX_ROOT:-$root}"
 
-if [[ ! -f "$GPUI_BOX_ROOT/package-authority.toml" || ! -f "$GPUI_BOX_ROOT/docs/api-index.json" ]]; then
+if [[ ! -f "$GPUI_BOX_ROOT/package-authority.toml" \
+  || ! -f "$GPUI_BOX_ROOT/docs/api-index.json" \
+  || ! -f "$GPUI_BOX_ROOT/docs/developer-index.json" ]]; then
   echo "gpui-box-mcp: GPUI_BOX_ROOT=$GPUI_BOX_ROOT is not a GPUI Box checkout" >&2
   exit 1
 fi

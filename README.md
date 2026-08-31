@@ -12,7 +12,7 @@ deterministic scene fixtures. It contains no OriginGame/Forge domain logic,
 credentials, transports, accounts, or product models.
 
 **Catalog endpoint:** <https://gpui-box.origingame.dev> ·
-**Hosted MCP (last deploy of this tree):** <https://gpui-box.origingame.dev/mcp> ·
+**Remote Developer MCP:** <https://gpui-box.origingame.dev/mcp> ·
 **Checkout MCP:** `tools/mcp/run.sh`
 
 ## Packages
@@ -29,7 +29,7 @@ names and Rust crate names intentionally differ:
 | `gpui-box-collections`, `-http-client`, `-macros`, `-media`, `-refineable`, `-refineable-derive`, `-scheduler`, `-shared-string`, `-sum-tree`, `-util`, `-util-macros` | manifest-defined | Framework support crates | Apache-2.0 |
 | `gpui-box-kit` | `gpui_kit` | Components, scenes, motion, strings, themes, and truthful state | MIT |
 | `gpui-box-kit-tokens`, `-theme`, `-assets`, `-semantics`, `-testkit` | `gpui_kit_*` | Kit package family | MIT (bundled assets retain their licenses) |
-| `gpui-box-mcp` | binary | Checkout-backed MCP catalog tools | MIT |
+| `gpui-box-mcp` | binary | Stateless remote and checkout-backed Developer MCP | MIT |
 
 Gallery, browser-gallery, headless, perf, and `xtask` packages are workspace
 tools and are not published. `package-authority.toml` is the exact authority
@@ -141,6 +141,6 @@ and Noto fonts are OFL 1.1; Solar Icons are CC BY 4.0; other derived assets
 retain their stated terms. See [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
 The former <https://gpui-kit.origingame.dev> endpoint remains a compatibility
-alias backed by the same Worker; it is not a second deployment. Deployment
-details are in [`docs/deploying.md`](docs/deploying.md), and release operations
-are in [`docs/releasing.md`](docs/releasing.md).
+alias backed by the same immutable BWG release; it is not a second deployment.
+Deployment details are in [`docs/deploying.md`](docs/deploying.md), and release
+operations are in [`docs/releasing.md`](docs/releasing.md).

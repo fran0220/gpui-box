@@ -28,10 +28,11 @@
   invents a host fact, a locale, a transport, or OS chrome. Do not keep
   refusing charts, form shapes, or other application primitives because an
   earlier Kit coverage note called them another library.
-- After every push to `main`, redeploy the hosted MCP with
-  `tools/site/deploy.sh` and check that `/api-index.json` matches the
-  commit. crates.io `gpui-box-mcp` is the last published cohort, not the
-  live catalog. Do not treat a successful git push as a catalog update.
+- After every push to `main`, require the BWG deployment workflow (or a manual
+  `tools/site/deploy.sh`) to publish that exact commit, then check
+  `/build-info.json` and the remote MCP counts. crates.io `gpui-box-mcp` is the
+  last published cohort, not the live catalog. Do not treat a successful Git
+  push as a catalog update.
 
 ## 2026-08-12: CI cache cleanup must also invalidate polluted restore keys
 

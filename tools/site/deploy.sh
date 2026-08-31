@@ -1,32 +1,24 @@
 #!/usr/bin/env bash
-# Builds the site and the MCP endpoint from the checked-in catalog, then
-# deploys both as one Worker.
-#
-# Everything it publishes is derived: the pages come from `docs/api-index.json`
-# and `docs/*.md`, the images come from `snapshots/headless/macos/scenes`, the
-# live compose surface comes from the browser-gallery WASM build, and the tool list
-# comes from `tools/mcp/tools.json`. Nothing here is authored twice, so a deploy
-# cannot say something the repository does not.
+# Build and stream one immutable release to GPUI Box's restricted BWG receiver.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$root"
+host="${GPUI_BOX_DEPLOY_HOST:-bwg}"
+key="${GPUI_BOX_DEPLOY_SSH_KEY:-}"
+out="${GPUI_BOX_RELEASE_OUT:-$root/target/site-release}"
 
-if [[ -n "${AMP_ORB:-}" ]]; then
-  : "${CLOUDFLARE_ACCOUNT_ID:?Set CLOUDFLARE_ACCOUNT_ID as an Amp project environment variable}"
-  : "${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN as an Amp project secret}"
+archive="$("$root/tools/site/build-release.sh" "$out" | tail -n 1)"
+[[ -f "$archive" ]] || { echo "release archive was not built: $archive" >&2; exit 1; }
+
+ssh_args=(
+  -o BatchMode=yes
+  -o ConnectTimeout=15
+  -o ServerAliveInterval=15
+  -o ServerAliveCountMax=4
+)
+if [[ -n "$key" ]]; then
+  ssh_args+=(-i "$key" -o IdentitiesOnly=yes)
 fi
 
-# The index is what both the pages and the tools answer out of, so a stale one
-# would publish signatures that no longer compile.
-cargo run -q -p xtask -- api check
-
-# `site generate` builds and bundles the browser gallery before projecting the
-# static catalog, so the Worker receives one self-contained output directory.
-cargo run -q -p xtask -- site generate tools/site/public
-
-# The tool surface is shared with the stdio server rather than written twice.
-cp tools/mcp/tools.json tools/site/worker/tools.json
-
-cd tools/site
-npx --yes wrangler@4 deploy "$@"
+echo "deploying $(basename "$archive") to $host"
+ssh "${ssh_args[@]}" "$host" /usr/local/sbin/receive-gpui-box-release < "$archive"

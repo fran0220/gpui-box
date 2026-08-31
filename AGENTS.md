@@ -131,10 +131,11 @@ So a new component needs a scene that builds it, in the family file next to
 the components it sits with — not a mention inside a shell.
 
 `docs/llms.txt` is the entry point for a program reading this repository, and
-`tools/mcp` serves the same catalog as MCP tools, including one that renders a
-scene and returns the image. The stdio server and the hosted Worker both read
-this tree's index, not crates.io `gpui-box-mcp`. Hosted `/mcp` is the last
-deploy of the repository; stdio (`tools/mcp/run.sh`) is the working copy.
+`tools/mcp` serves the generated developer catalog as MCP tools and resources.
+The stateless remote server and checkout stdio server both read this tree's
+indexes, not crates.io `gpui-box-mcp`. Remote `/mcp` is the immutable BWG
+deployment; stdio (`tools/mcp/run.sh`) is the working copy and additionally
+owns live headless sessions.
 
 ## Hosted MCP after every push
 
@@ -142,17 +143,15 @@ The public catalog at `https://gpui-box.origingame.dev/mcp` must track
 `origin/main`, not crates.io. Do not publish a crates.io MCP bump as part of
 ordinary Kit work.
 
-After every `git push` to `main`:
+After every `git push` to `main`, the `Deploy site and MCP` workflow waits for
+the full `CI` workflow and deploys one static Linux/x86-64 bundle through the
+restricted BWG receiver. A manual deployment uses `tools/site/deploy.sh`.
 
-1. `tools/site/deploy.sh` (set `CLOUDFLARE_ACCOUNT_ID` when more than one
-   Cloudflare account is logged in);
-2. confirm hosted `/api-index.json` has the same component and scene counts
-   as `docs/api-index.json` on that commit;
-3. confirm `POST /mcp` `search_components` with an empty query returns that
-   same count.
-
-A push that changes the catalog and leaves the Worker on the previous
-deploy is unfinished.
+Confirm hosted `/build-info.json` names that commit and has the same package,
+symbol, component, type, and scene counts as `docs/developer-index.json`.
+Confirm `POST /mcp` `tools/list` returns ten remote tools and
+`search_components` with an empty query returns every component. A push that
+changes the catalog and leaves BWG on the previous release is unfinished.
 
 ## Validation
 

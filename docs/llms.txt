@@ -11,6 +11,8 @@ repository rather than linked as a Git dependency.
 ## Read first
 
 1. `docs/api-index.json`: generated exact component signatures and scenes.
+   `docs/developer-index.json`: packages, public source declarations, tokens,
+   guides, recipes, assets, compatibility, and the same Kit catalog.
 2. `AGENTS.md`: enforced repository rules.
 3. `docs/design-principles.md`, `docs/compatibility.md`, and `PROVENANCE.md`.
 
@@ -49,18 +51,20 @@ accessibility limits. See `docs/compatibility.md`.
 
 ## Generated artifacts
 
-Do not hand-edit `docs/api-index.json`, `docs/token-reference.md`,
-`docs/strings-allowlist.txt`, or headless PNGs. Their `xtask` generate/capture
-commands own them.
+Do not hand-edit `docs/api-index.json`, `docs/developer-index.json`,
+`docs/token-reference.md`, `docs/strings-allowlist.txt`, or headless PNGs.
+Their `xtask` generate/capture commands own them.
 
 The checkout-backed `gpui-box-mcp` (`tools/mcp/run.sh`) reads `GPUI_BOX_ROOT`
 or discovers upward from cwd and is the catalog for this working copy.
 `render_scene` and `session_*` require the complete checkout and drive
-`headless-visual serve`. The hosted endpoint at
-<https://gpui-box.origingame.dev> deploys the same repository catalog; it is
-not a crates.io install, and it refuses session tools because it has no
-runtime. crates.io `gpui-box-mcp` without a git revision is still the last
-published cohort (`0.1.1`).
+`headless-visual serve`. The hosted Developer MCP at
+<https://gpui-box.origingame.dev/mcp> is a stateless, read-only deployment of
+the same repository catalog on BWG. It publishes package/symbol/component,
+token, guide/recipe, scene, image, and semantic-snapshot tools and resources;
+checkout-only sessions are absent rather than remotely emulated. It is not a
+crates.io install. crates.io `gpui-box-mcp` without a git revision is still the
+last published cohort (`0.1.1`).
 
 References: `docs/components.md`, `docs/component-contracts.md`,
 `docs/coverage.md`, `docs/truthful-ui.md`, `docs/token-model.md`,

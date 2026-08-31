@@ -68,23 +68,33 @@ pub fn generate(root: &Path) -> Result<()> {
     let index = build(root)?;
     let path = index_path(root);
     fs::write(&path, &index)?;
+    let developer = crate::developer::build(root, &index)?;
+    let developer_path = developer_index_path(root);
+    fs::write(&developer_path, &developer)?;
     println!("wrote {} to {}", size(&index), path.display());
+    println!("wrote {} to {}", size(&developer), developer_path.display());
     Ok(())
 }
 
 pub fn check(root: &Path) -> Result<()> {
     let path = index_path(root);
     let current = fs::read_to_string(&path).unwrap_or_default();
-    if same_index(&current, &build(root)?) {
+    let expected = build(root)?;
+    let developer_path = developer_index_path(root);
+    let current_developer = fs::read_to_string(&developer_path).unwrap_or_default();
+    let expected_developer = crate::developer::build(root, &expected)?;
+    if same_index(&current, &expected) && same_index(&current_developer, &expected_developer) {
         println!("{} is current", path.display());
+        println!("{} is current", developer_path.display());
         return Ok(());
     }
     bail!(
-        "{} is stale. Run `cargo run -p xtask -- api generate`. An agent reads \
-         this file to find out what exists and what it is called, so a stale \
+        "{} or {} is stale. Run `cargo run -p xtask -- api generate`. An agent reads \
+         these files to find out what exists and what it is called, so a stale \
          entry is a signature somebody will be told to write and the compiler \
          will reject.",
-        path.display()
+        path.display(),
+        developer_path.display()
     );
 }
 
@@ -97,6 +107,10 @@ fn same_index(current: &str, expected: &str) -> bool {
 
 fn index_path(root: &Path) -> PathBuf {
     root.join("docs").join("api-index.json")
+}
+
+fn developer_index_path(root: &Path) -> PathBuf {
+    root.join("docs").join("developer-index.json")
 }
 
 fn size(index: &str) -> String {

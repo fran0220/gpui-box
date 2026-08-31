@@ -12,6 +12,7 @@ use anyhow::{Context, Result, bail};
 
 mod api;
 mod dependencies;
+mod developer;
 mod package;
 mod site;
 mod strings;

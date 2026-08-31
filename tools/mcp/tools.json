@@ -1,76 +1,109 @@
 [
   {
-    "name": "search_components",
-    "description": "Find components or supporting types by name, summary, or module. Returns each match with its kind, path, one-line summary, and the scenes that render it. An empty query lists components only. Start here.",
+    "name": "search_library",
+    "description": "Search the complete GPUI Box developer catalog: packages, public Rust symbols and methods, components, supporting types, themes/tokens, guides/recipes, scenes, and assets. Results are paginated and identify the exact catalog revision.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "query": {
-          "type": "string",
-          "description": "Words to match, or empty for every component"
+        "query": { "type": "string", "description": "Words matched against names, docs, signatures, paths, and package identities. Empty lists the selected kinds." },
+        "kinds": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["package", "symbol", "component", "type", "theme", "guide", "recipe", "scene", "asset"] },
+          "description": "Optional catalog kinds. All kinds are searched when omitted."
         },
-        "kind": {
-          "type": "string",
-          "enum": ["builder", "view", "type"],
-          "description": "Optional: builders mount in one expression, views are held in an Entity, types are constructed and passed in"
-        }
+        "package": { "type": "string", "description": "Optional exact package filter for Rust symbols" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+        "cursor": { "type": "string", "description": "Opaque cursor returned by the previous page" }
+      }
+    }
+  },
+  {
+    "name": "library_item",
+    "description": "Read one exact package, Rust symbol/method, component/type, theme, guide, recipe, scene, or asset from the generated developer index. Prefer an id returned by search_library; name plus kind is also accepted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Stable result id, such as gpui::window::Window, component:Button, package:gpui-box, or guide:motion" },
+        "name": { "type": "string", "description": "Exact item name when id is unavailable" },
+        "kind": { "type": "string", "enum": ["package", "symbol", "component", "type", "theme", "guide", "recipe", "scene", "asset"] }
+      },
+      "anyOf": [{ "required": ["id"] }, { "required": ["name"] }]
+    }
+  },
+  {
+    "name": "recipe",
+    "description": "Return the most relevant verified GPUI Box implementation recipe or guide section for a development goal, including its exact guide source and related catalog revision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "goal": { "type": "string", "description": "What you need to implement or verify" },
+        "id": { "type": "string", "description": "Optional exact recipe id returned by search_library" }
+      },
+      "anyOf": [{ "required": ["goal"] }, { "required": ["id"] }]
+    }
+  },
+  {
+    "name": "render_scene",
+    "description": "Return a canonical scene PNG. Hosted MCP returns the immutable gate-produced capture for its declared revision; checkout stdio renders the working tree now.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Exact scene name" },
+        "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "default": "studio-dark" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "scene_snapshot",
+    "description": "Return the redacted semantic tree for a canonical scene. Hosted MCP reads a deploy-time offscreen snapshot; checkout stdio drives the current headless renderer.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Exact scene name" },
+        "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "default": "studio-dark" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "release_info",
+    "description": "Report the exact deployed or working-copy revision, release cohort, Rust compatibility, package/component/symbol/scene counts, and available MCP capabilities.",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "search_components",
+    "description": "Compatibility alias for component/type search. New clients should use search_library.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "kind": { "type": "string", "enum": ["builder", "view", "type"] }
       },
       "required": ["query"]
     }
   },
   {
     "name": "component",
-    "description": "The exact public API of one component or supporting type: constructors, chainable options, commands that need a Context, queries, reported events, variants, and scenes. These signatures are generated from the source, so prefer them over recall.",
+    "description": "Compatibility alias for reading one component or supporting type. New clients should use library_item.",
     "inputSchema": {
       "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Component name, such as Badge or DataGrid"
-        }
-      },
+      "properties": { "name": { "type": "string" } },
       "required": ["name"]
     }
   },
   {
     "name": "scene",
-    "description": "The source of one canonical scene. This code compiles and renders inside the repository's gate, so it is a verified example rather than a written one.",
+    "description": "Compatibility alias returning one canonical compiling scene example. New clients should use library_item.",
     "inputSchema": {
       "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Scene name, such as badge or data-grid"
-        }
-      },
-      "required": ["name"]
-    }
-  },
-  {
-    "name": "render_scene",
-    "description": "The image of a scene, in one theme. Use it to check what something actually looks like instead of assuming. A still frame holds a repeating animation at its first frame, so review motion by running the gallery.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Scene name"
-        },
-        "theme": {
-          "type": "string",
-          "enum": ["studio-dark", "studio-light"],
-          "description": "Defaults to studio-dark"
-        }
-      },
+      "properties": { "name": { "type": "string" } },
       "required": ["name"]
     }
   },
   {
     "name": "rules",
-    "description": "The conventions this repository enforces through its gate: no literal strings in components, no hard-coded visual values, truthful states, stable semantic ids. Read this before writing a component.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {}
-    }
+    "description": "Compatibility alias returning the repository's agent entry point and enforced development rules.",
+    "inputSchema": { "type": "object", "properties": {} }
   }
 ]

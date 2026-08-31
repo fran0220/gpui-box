@@ -29,9 +29,14 @@ use gpui_kit_tokens::{
 use pulldown_cmark::{Options, Parser, html};
 use serde_json::Value;
 
-/// Prose worth publishing. `strings-allowlist.txt` and `api-index.json` are
-/// machine artifacts, and `llms.txt` is served as itself rather than as a page.
-const OMIT: &[&str] = &["strings-allowlist.txt", "api-index.json", "llms.txt"];
+/// Prose worth publishing. Generated indexes are machine artifacts, and
+/// `llms.txt` is served as itself rather than as a page.
+const OMIT: &[&str] = &[
+    "strings-allowlist.txt",
+    "api-index.json",
+    "developer-index.json",
+    "llms.txt",
+];
 const BROWSER_GALLERY_FILES: &[&str] = &[
     "index.html",
     "gpui_kit_browser_gallery.js",
@@ -64,6 +69,10 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
     write(
         &out.join("api-index.json"),
         &fs::read_to_string(root.join("docs/api-index.json"))?,
+    )?;
+    write(
+        &out.join("developer-index.json"),
+        &fs::read_to_string(root.join("docs/developer-index.json"))?,
     )?;
 
     let pages = doc_pages(root)?;
@@ -99,6 +108,7 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
 
     for page in &pages {
         let body = fs::read_to_string(root.join("docs").join(format!("{page}.md")))?;
+        write(&out.join(format!("resources/guides/{page}.md")), &body)?;
         write(
             &out.join(format!("docs/{page}.html")),
             &doc_page(page, &body, &pages),
@@ -122,6 +132,21 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
         &out.join("assets/search.json"),
         &search(&components, &scenes),
     )?;
+    let token_root = root.join("crates/gpui-kit-tokens/tokens");
+    for entry in fs::read_dir(&token_root)? {
+        let path = entry?.path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "json")
+        {
+            let name = path
+                .file_name()
+                .context("a token document has a name")?
+                .to_owned();
+            fs::create_dir_all(out.join("resources/tokens"))?;
+            fs::copy(&path, out.join("resources/tokens").join(name))?;
+        }
+    }
     copy_browser_gallery(browser_gallery, &out.join("compose"))?;
     write(
         &out.join("playground/index.html"),
@@ -958,6 +983,8 @@ fn mcp_page(
     let tools = fs::read_to_string(root.join("tools/mcp/tools.json"))
         .context("tools/mcp/tools.json is missing")?;
     let tools: Value = serde_json::from_str(&tools)?;
+    let developer: Value =
+        serde_json::from_str(&fs::read_to_string(root.join("docs/developer-index.json"))?)?;
     let items = tools
         .as_array()
         .into_iter()
@@ -975,11 +1002,12 @@ fn mcp_page(
         r#"<div class="library">
 {rail}
   <div class="library-main">
-    <h1>MCP</h1>
-    <p class="lead">The same catalog as this repository, answered for an agent —
-    not the crates.io cohort. Hosted <code>render_scene</code> returns the
-    committed capture. Working-copy rendering needs the stdio server from a
-    checkout.</p>
+    <h1>Developer MCP</h1>
+    <p class="lead">The complete generated developer catalog of this repository,
+    answered by a stateless remote server — not the crates.io cohort. Search
+    packages, Rust symbols, components, tokens, guides, recipes, scenes, and
+    assets. Working-copy rendering and interactive sessions stay in checkout
+    stdio.</p>
     <div class="copy-block">
       <button type="button" class="copy" data-copy>Copy</button>
       <pre><code>{{
@@ -988,17 +1016,21 @@ fn mcp_page(
   }}
 }}</code></pre>
     </div>
-    <p class="note">People read this page. Agents POST JSON-RPC to
-    <code>/mcp</code>. A GET there is refused because that endpoint opens no
-    stream.</p>
+    <p class="note">People read this page. Agents POST Streamable HTTP JSON-RPC
+    to <code>/mcp</code>. The public service is read-only, stateless, and pinned
+    to one Git revision.</p>
     <h2>Tools</h2>
     <ul class="mcp-tools">{items}</ul>
-    <p class="note">{components} indexed components · {scenes} verified scenes.
-    Also published as <a href="/llms.txt">llms.txt</a> and
-    <a href="/api-index.json">api-index.json</a>.</p>
+    <p class="note">{packages} packages · {symbols} indexed source symbols ·
+    {components} indexed components · {scenes} verified scenes. Also published
+    as <a href="/llms.txt">llms.txt</a>,
+    <a href="/api-index.json">api-index.json</a>, and
+    <a href="/developer-index.json">developer-index.json</a>.</p>
   </div>
 </div>"#,
         rail = doc_rail(pages, "mcp"),
+        packages = array(&developer, "packages").len(),
+        symbols = array(&developer, "symbols").len(),
         components = components.len(),
         scenes = scenes.len(),
     );

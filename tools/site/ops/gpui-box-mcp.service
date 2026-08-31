@@ -1,0 +1,37 @@
+[Unit]
+Description=GPUI Box stateless remote MCP
+After=network.target
+
+[Service]
+Type=simple
+User=gpui-box
+Group=gpui-box
+WorkingDirectory=/opt/gpui-box/current
+ExecStart=/opt/gpui-box/current/bin/gpui-box-mcp serve --listen 127.0.0.1:9350 --catalog /opt/gpui-box/current/public
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+LimitNOFILE=4096
+TasksMax=64
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

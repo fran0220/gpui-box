@@ -1,0 +1,81 @@
+[
+  {
+    "name": "session_open",
+    "description": "Checkout only: open one canonical scene in a persistent offscreen GPUI window and return its session id and semantic generation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scene": { "type": "string" },
+        "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "default": "studio-dark" }
+      },
+      "required": ["scene"]
+    }
+  },
+  {
+    "name": "session_snapshot",
+    "description": "Checkout only: return the current redacted semantic tree and generation for a session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "session": { "type": "string" } },
+      "required": ["session"]
+    }
+  },
+  {
+    "name": "session_act",
+    "description": "Checkout only: click a semantic id, send text or keystrokes, or scroll at a semantic id in a session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": { "type": "string" },
+        "action": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["click", "text", "keystrokes", "scroll"] },
+            "id": { "type": "string" },
+            "text": { "type": "string" },
+            "keys": { "type": "string" },
+            "pixels": { "type": "number" }
+          },
+          "required": ["type"]
+        }
+      },
+      "required": ["session", "action"]
+    }
+  },
+  {
+    "name": "session_advance",
+    "description": "Checkout only: advance simulated time and deliver one animation frame.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "session": { "type": "string" }, "ms": { "type": "integer", "minimum": 0 } },
+      "required": ["session", "ms"]
+    }
+  },
+  {
+    "name": "session_screenshot",
+    "description": "Checkout only: return a PNG of the current offscreen session frame.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "session": { "type": "string" }, "path": { "type": "string" } },
+      "required": ["session"]
+    }
+  },
+  {
+    "name": "session_audit",
+    "description": "Checkout only: run the semantic accessibility audit against the current session tree.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "session": { "type": "string" } },
+      "required": ["session"]
+    }
+  },
+  {
+    "name": "session_close",
+    "description": "Checkout only: close an offscreen scene session and release its resources.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "session": { "type": "string" } },
+      "required": ["session"]
+    }
+  }
+]

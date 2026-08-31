@@ -1,27 +1,33 @@
-# GPUI Box catalog tools
+# GPUI Box Developer MCP
 
-The catalog is this repository, not the last crates.io cohort (`0.1.1`).
-Workspace `main` is ahead of that cohort. Both MCP surfaces read the generated
-index from this tree:
+The MCP is the generated developer surface of this repository, not a wrapper
+around the last crates.io cohort. It covers the complete package authority,
+public Rust source declarations and methods, Kit's compiler-checked component
+API, themes and token documents, guides and guide-section recipes, assets,
+compatibility data, scenes, committed captures, and redacted semantic trees.
 
-| Surface | What it serves |
+| Surface | Contract |
 |---|---|
-| Stdio `gpui-box-mcp` / `tools/mcp/run.sh` | This checkout. `render_scene` and `session_*` drive `headless-visual serve`. |
-| Hosted `https://gpui-box.origingame.dev/mcp` | The last **deploy** of this repository. `render_scene` returns committed captures. `session_*` is refused: there is no GPUI runtime. |
+| Remote `https://gpui-box.origingame.dev/mcp` | Public, read-only, stateless Streamable HTTP. It reads one immutable deployment and starts no compiler, shell, GPU, or caller session. |
+| Checkout `tools/mcp/run.sh` | Stdio over the current checkout. It adds live rendering and persistent offscreen `session_*` tools. |
 
-Neither surface reads a crates.io install. `cargo install gpui-box-mcp`
-without a git revision still installs `0.1.1`. Do not pass `--version 0.1.2`:
-that tag was never published.
+Both surfaces report their exact Git revision through `release_info` and every
+search result. The remote process runs on BWG behind Nginx; a browser GET of
+`/mcp/` serves the human page, while MCP clients POST JSON-RPC to `/mcp`.
 
-```bash
-tools/mcp/run.sh --help
-cargo build -p gpui-box-mcp
+## Connect
+
+Remote clients need no checkout:
+
+```json
+{
+  "mcpServers": {
+    "gpui-box": { "url": "https://gpui-box.origingame.dev/mcp" }
+  }
+}
 ```
 
-The stdio server contains no embedded static catalog. Set `GPUI_BOX_ROOT` to
-the checkout root, or start it with cwd inside the checkout and it discovers
-the root by walking upward. It does not infer a checkout from the installed
-binary.
+Use stdio when an agent must inspect uncommitted code or interact with a scene:
 
 ```json
 {
@@ -34,27 +40,54 @@ binary.
 }
 ```
 
+Set `GPUI_BOX_ROOT` to the checkout root, or start the server from anywhere
+inside the checkout. Stdio discovers upward; it never guesses a checkout from
+an installed binary.
+
+## Remote tools
+
 | Tool | Result |
 |---|---|
-| `search_components` | Matches catalog names, summaries, and modules. A non-empty query also matches supporting types (`CardHeader`, `CardVariant`, `AsyncValue`). `kind=type` lists only those. |
-| `component` | Exact constructors, options, commands, queries, reports, and variants |
-| `scene` | Canonical compiling scene source |
-| `render_scene` | PNG from the headless session host (stdio) or the committed capture (hosted). `real_window=true` still opens the gallery, which is how a text caret is reviewed. |
-| `session_open` | Start a headless scene an agent can drive. Hosted refuses. |
-| `session_snapshot` | Redacted semantic tree and generation |
-| `session_act` | Click, type, keystroke, or scroll by semantic id |
-| `session_advance` | Push the simulated clock and deliver one animation frame |
-| `session_screenshot` | PNG of the current session frame |
-| `session_audit` | Semantic audit findings for the current tree |
-| `session_close` | Release the session |
-| `rules` | This checkout's `docs/llms.txt` |
+| `search_library` | Paginated search across packages, symbols, components, types, themes, guides, recipes, scenes, and assets, with optional kind/package filters |
+| `library_item` | One exact item by the stable id returned from search; guide and recipe results include their source content |
+| `recipe` | The closest documented implementation recipe for a development goal |
+| `render_scene` | Immutable gate-produced PNG for the deployed revision |
+| `scene_snapshot` | Deploy-time redacted semantic tree for a scene |
+| `release_info` | Revision, compatibility, package and catalog counts, and server mode |
 
-Stdio session tools start `headless-visual serve` once and reuse it. That
-requires a **complete checkout**, Rust toolchain, dependencies, and the
-platform headless renderer. A crate installation alone cannot render. The
-server reads and renders but does not edit files; it does not replace
-`cargo run -p xtask -- gate`.
+`search_components`, `component`, `scene`, and `rules` remain compatibility
+aliases. New integrations should use the general developer tools.
 
-The hosted endpoint deploys with [`tools/site/deploy.sh`](deploying.md). A
-browser GET lands on the human MCP page; agents POST JSON-RPC to the same
-path. See [`deploying.md`](deploying.md).
+MCP resources expose the same authority without forcing a tool call. Static
+resources list packages, components, tokens, guides, recipes, scenes, assets,
+compatibility, release data, and the complete developer index. Templates read
+one package, symbol, component, type, theme, guide, recipe, scene, or deployed
+semantic snapshot.
+
+## Checkout-only sessions
+
+Stdio additionally publishes `session_open`, `session_snapshot`,
+`session_act`, `session_advance`, `session_screenshot`, `session_audit`, and
+`session_close`. The server starts `tools/headless-visual serve` once and
+reuses it, so actions operate on real GPUI layout, hit testing, input delivery,
+semantics, simulated time, and offscreen rendering.
+
+These tools require a complete checkout, Rust toolchain, native dependencies,
+and the platform headless renderer. They read and render but do not edit files,
+compile caller projects, or replace `cargo run -p xtask -- gate`. They are not
+present in the remote tool list rather than being advertised and refused.
+
+## Generated authority
+
+`docs/api-index.json` remains Kit's compiler-checked component and scene
+contract. `docs/developer-index.json` adds every package, indexed public source
+symbols and their declaration variants, plus the documentation, token, asset,
+and compatibility catalogs. Both are generated by
+`cargo run -p xtask -- api generate`, checked by `api check`, and must agree on
+components, supporting types, and scenes.
+
+The remote catalog also contains raw guide Markdown and token JSON. Its
+`build-info.json` pins all counts to one 40-character commit. The release
+installer rejects a bundle if indexes disagree, files fail their SHA-256
+manifest, semantic/image artifacts are missing, or the MCP does not report the
+declared revision. See [`deploying.md`](deploying.md).

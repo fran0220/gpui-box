@@ -1,0 +1,77 @@
+name: Deploy site and MCP
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-box-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_RELEASE_DEBUG: "0"
+      GPUI_BOX_DEPLOY_HOST: root@67.230.183.147
+      GPUI_BOX_DEPLOY_SSH_KEY: /home/runner/.ssh/gpui-box-production
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          fetch-depth: 0
+      - name: Require the deploy revision to be on origin/main
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+      - name: Install Linux build and headless-renderer libraries
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev
+          libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev
+          libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev
+          libxkbcommon-x11-dev mesa-vulkan-drivers musl-tools
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+          targets: wasm32-unknown-unknown,x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with: { tool: "wasm-bindgen-cli@0.2.127" }
+      - name: Install the restricted BWG deployment identity
+        env:
+          DEPLOY_KEY: ${{ secrets.BWG_GPUI_BOX_DEPLOY_KEY }}
+        run: |
+          test -n "$DEPLOY_KEY"
+          install -d -m 0700 /home/runner/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > "$GPUI_BOX_DEPLOY_SSH_KEY"
+          chmod 0600 "$GPUI_BOX_DEPLOY_SSH_KEY"
+          install -m 0600 tools/site/ops/bwg-known-hosts /home/runner/.ssh/known_hosts
+      - name: Build and deploy the immutable release
+        run: tools/site/deploy.sh
+      - name: Verify the BWG origin before relying on public DNS
+        run: |
+          revision="$(git rev-parse HEAD)"
+          for host in gpui-box.origingame.dev gpui-kit.origingame.dev; do
+            curl --fail --silent --show-error \
+              --resolve "$host:443:67.230.183.147" \
+              "https://$host/build-info.json" \
+              | jq -e --arg revision "$revision" '.revision == $revision and .counts.tools == 10'
+          done
+          curl --fail --silent --show-error \
+            --resolve gpui-box.origingame.dev:443:67.230.183.147 \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+            https://gpui-box.origingame.dev/mcp \
+            | jq -e '.result.tools | length == 10'

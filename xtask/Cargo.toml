@@ -14,6 +14,7 @@ gpui-kit = { workspace = true, features = ["fixtures"] }
 serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sha2.workspace = true
+quote.workspace = true
 syn = { workspace = true, features = ["visit"] }
 toml.workspace = true
 # The site is the one thing here that does produce HTML. `gpui-kit` takes this
