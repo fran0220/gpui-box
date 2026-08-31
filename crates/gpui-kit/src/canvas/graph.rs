@@ -21,8 +21,7 @@ use gpui::{
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, Elevation, Radius, SemanticBorder, SemanticColor, SemanticWash, Space, Surface,
-    TypeScale, Variant,
+    ActiveTheme, Elevation, Radius, SemanticWash, Space, Surface, TypeScale, Variant,
 };
 use web_time::Instant;
 
@@ -195,6 +194,9 @@ struct GestureState {
     /// Whether the first frame has been drawn, which is what makes the
     /// distinction above possible.
     opened: bool,
+    /// Which sockets have already been seen connected and the short visual
+    /// settle for a newly landed connection.
+    port_settles: PortSettles,
     /// Where the canvas is looking, while that is somewhere other than where
     /// the caller has put it.
     travel: Travel,
@@ -207,6 +209,59 @@ struct GestureState {
     /// Recording what was proposed is how the two are told apart exactly,
     /// rather than by guessing from how far the viewport moved.
     direct: Option<GraphViewport>,
+}
+
+type PortKey = (SharedString, SharedString);
+
+/// Paint history for the one-shot contraction when a connection lands.
+///
+/// The caller owns the wired set. This state remembers only what this canvas
+/// has already shown, just as `arrived` above remembers which edges have
+/// already entered. Opening onto existing wiring never replays old work.
+#[derive(Debug, Default)]
+struct PortSettles {
+    previous: HashSet<PortKey>,
+    started: HashMap<PortKey, Instant>,
+    opened: bool,
+}
+
+impl PortSettles {
+    /// Returns the remaining expansion for every socket still contracting,
+    /// where one is the first frame and zero is settled.
+    fn show(
+        &mut self,
+        wired: &HashSet<PortKey>,
+        now: Instant,
+        spec: MotionSpec,
+        animates: bool,
+    ) -> (HashMap<PortKey, f32>, bool) {
+        if !self.opened || !animates {
+            self.previous = wired.clone();
+            self.started.clear();
+            self.opened = true;
+            return (HashMap::new(), false);
+        }
+
+        for key in wired.difference(&self.previous) {
+            self.started.insert(key.clone(), now);
+        }
+        self.previous = wired.clone();
+        let span = spec.total().as_secs_f32().max(f32::EPSILON);
+        let mut shown = HashMap::new();
+        self.started.retain(|key, started| {
+            if !wired.contains(key) {
+                return false;
+            }
+            let raw = (now.duration_since(*started).as_secs_f32() / span).clamp(0.0, 1.0);
+            if raw >= 1.0 {
+                return false;
+            }
+            shown.insert(key.clone(), 1.0 - spec.progress(raw));
+            true
+        });
+        let animating = !shown.is_empty();
+        (shown, animating)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1968,16 +2023,24 @@ impl RenderOnce for NodeGraph {
                         bounds.origin.y + px(head.y * viewport.zoom + viewport.offset.y),
                     );
                     let radius = px(PREVIEW_HEAD * viewport.zoom.clamp(0.5, 1.5));
-                    window.paint_quad(gpui::quad(
+                    for step in (1..=3).rev() {
+                        let halo = radius * (1.0 + step as f32 * 0.38);
+                        window.paint_quad(gpui::fill(
+                            Bounds::new(
+                                point(head.x - halo, head.y - halo),
+                                size(halo * 2.0, halo * 2.0),
+                            ),
+                            color.opacity(
+                                edge_theme.effects.node_active_wash_alpha / (step as f32 + 1.5),
+                            ),
+                        ));
+                    }
+                    window.paint_quad(gpui::fill(
                         Bounds::new(
                             point(head.x - radius, head.y - radius),
                             size(radius * 2.0, radius * 2.0),
                         ),
-                        radius,
                         color.opacity(edge_theme.effects.node_active_stroke_alpha),
-                        px(edge_theme.borders.hairline),
-                        edge_theme.colors.canvas,
-                        gpui::BorderStyle::Solid,
                     ));
                 }
             },
@@ -2103,8 +2166,6 @@ impl RenderOnce for NodeGraph {
                         // connections was read as ten buttons. The chip
                         // assembles itself under the pointer, where it is
                         // about to be used.
-                        .border(px(theme.borders.hairline))
-                        .border_color(gpui::transparent_black())
                         .cursor_pointer()
                         .tab_index(0)
                         .focus_ring(&theme)
@@ -2112,7 +2173,7 @@ impl RenderOnce for NodeGraph {
                         .hover(|style| {
                             style
                                 .bg(theme.colors.hover)
-                                .border_color(theme.colors.hairline_strong)
+                                .shadow(theme.glow(theme.colors.accent))
                         })
                         .child(
                             icon(Icon::Close)
@@ -2190,6 +2251,16 @@ impl RenderOnce for NodeGraph {
             })
             .flatten()
             .collect();
+        let feedback = MotionPolicy::resolve(MotionRole::Feedback, cx);
+        let (port_settles, ports_animating) = gesture.borrow_mut().port_settles.show(
+            &wired,
+            cx.background_executor().now(),
+            feedback.spec(),
+            feedback.animates(),
+        );
+        if ports_animating {
+            window.request_animation_frame();
+        }
 
         let mut ports = Vec::new();
         for node in geometry.iter().filter(|_| !compact) {
@@ -2241,11 +2312,15 @@ impl RenderOnce for NodeGraph {
                     })
                 });
                 let connected = wired.contains(&(node.id.clone(), port_geometry.id.clone()));
+                let contraction = port_settles
+                    .get(&(node.id.clone(), port_geometry.id.clone()))
+                    .copied()
+                    .unwrap_or(0.0);
                 // A wired port wears the connection's own colour and a free
                 // one stays neutral, so "what is already joined up" is read
-                // off the ports without tracing a single wire. The two states
-                // differ in fill as well as in hue, which is what keeps them
-                // apart for a reader who cannot separate the two colours.
+                // off the ports without tracing a single wire. The outer wash
+                // and inner bead differ in area as well as hue, keeping them
+                // apart without drawing an outline round either one.
                 let color = match target {
                     Some(true) => theme.colors.success,
                     Some(false) => theme.colors.danger,
@@ -2253,7 +2328,27 @@ impl RenderOnce for NodeGraph {
                     None if connected => theme.colors.node.port_connected,
                     None => theme.colors.node.port_idle,
                 };
-                let filled = target.is_some() || connected;
+                let emphatic = target.is_some() || candidate == Some(true) || connected;
+                let outer = theme.color_wash(
+                    color,
+                    if emphatic {
+                        SemanticWash::Standard
+                    } else {
+                        SemanticWash::Faint
+                    },
+                );
+                let inner_diameter = diameter * if emphatic { 0.48 } else { 0.34 };
+                let settle = (contraction > 0.0).then(|| {
+                    let size = diameter * (1.0 + contraction * 0.9);
+                    let offset = (size - diameter) * 0.5;
+                    div()
+                        .absolute()
+                        .left(px(-offset))
+                        .top(px(-offset))
+                        .size(px(size))
+                        .rounded_full()
+                        .bg(color.opacity(theme.effects.semantic_wash_faint_alpha * contraction))
+                });
                 // A port's name answers "what would I be joining to", which is
                 // a question asked while reaching for it and at no other time.
                 // Held open, one name per port turns the space between cards
@@ -2320,43 +2415,26 @@ impl RenderOnce for NodeGraph {
                     .top(px(at.y - diameter / 2.0))
                     .w(px(diameter))
                     .h(px(diameter))
+                    .relative()
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .rounded_full()
-                    // A free port is a ring on the canvas and a wired one is
-                    // solid. The ring is drawn in the port's own colour and
-                    // filled with the canvas, so an empty socket reads as
-                    // empty rather than as a paler version of a full one.
-                    .when(filled, |element| {
-                        element
-                            .bg(color)
-                            .border(px(theme.borders.hairline))
-                            .border_color(theme.colors.canvas)
-                    })
-                    .when(!filled, |element| {
-                        element
-                            .bg(theme.colors.canvas)
-                            .border(px(theme.borders.hairline * 2.0))
-                            .border_color(color)
-                    })
+                    .bg(outer)
+                    .when(emphatic, |element| element.shadow(theme.glow(color)))
                     .when(candidate == Some(false) && target.is_none(), |element| {
                         element.opacity(theme.opacity.disabled)
                     })
-                    // Reaching for a 12px target is easier when the target
-                    // answers, and a port that reacts under the pointer is the
-                    // one affordance a connection gesture has before it starts.
-                    //
-                    // The answer is a ring rather than the connected paint.
-                    // Wearing the connected paint on hover, as this did, says
-                    // an edge is already attached — which is the one thing the
-                    // reader is hovering to find out. The ring is a channel
-                    // colour is not using, so it separates a port that can be
-                    // grabbed from a port that is wired without either of them
-                    // borrowing the other's meaning.
+                    // Hover strengthens the same material hierarchy rather
+                    // than drawing a third outline language around it.
                     .hover(|style| {
                         style
-                            .bg(theme.colors.node.port_hover)
-                            .border_color(theme.colors.node.port_hover)
+                            .bg(theme
+                                .color_wash(theme.colors.node.port_hover, SemanticWash::Strong))
                             .shadow(theme.glow(theme.colors.node.port_hover))
                     })
+                    .children(settle)
+                    .child(div().size(px(inner_diameter)).rounded_full().bg(color))
                     .child(label);
                 if editable {
                     view = view.cursor_pointer();
@@ -2696,10 +2774,8 @@ impl RenderOnce for NodeGraph {
                         .w(px((max.x - min.x) + 16.0))
                         .h(px((max.y - min.y) + 16.0))
                         .rounded(px(theme.radius(Radius::Card)))
-                        .border(px(theme.borders.hairline))
-                        .border_color(
-                            theme.semantic_border(SemanticColor::Accent, SemanticBorder::Selected),
-                        )
+                        .bg(theme.color_wash(theme.colors.accent, SemanticWash::Faint))
+                        .shadow(theme.glow(theme.colors.accent))
                         .into_any_element(),
                 )
             })
@@ -2720,12 +2796,9 @@ impl RenderOnce for NodeGraph {
                             .top(px(top))
                             .w(px(width))
                             .h(px(height))
-                            .border(px(theme.borders.hairline))
-                            .border_color(
-                                theme
-                                    .semantic_border(SemanticColor::Accent, SemanticBorder::Target),
-                            )
-                            .bg(theme.semantic_wash(SemanticColor::Accent, SemanticWash::Faint))
+                            .rounded(px(theme.radius(Radius::Small)))
+                            .bg(theme.color_wash(theme.colors.accent, SemanticWash::Faint))
+                            .shadow(theme.glow(theme.colors.accent))
                             .into_any_element(),
                     )
                 }
@@ -2757,12 +2830,10 @@ impl RenderOnce for NodeGraph {
                 let wash = colors.map_or(theme.colors.sunken, |colors| {
                     colors.background.opacity(theme.effects.area_wash_alpha)
                 });
-                let line = if band.selected {
-                    theme.colors.accent
+                let wash = if band.selected {
+                    theme.color_wash(theme.colors.accent, SemanticWash::Standard)
                 } else {
-                    colors.map_or(theme.colors.hairline, |colors| {
-                        colors.text.opacity(theme.effects.semantic_border_alpha)
-                    })
+                    wash
                 };
                 div()
                     .absolute()
@@ -2772,8 +2843,9 @@ impl RenderOnce for NodeGraph {
                     .h(px(band.bounds().size.height * viewport.zoom))
                     .rounded(px(theme.radius(Radius::Card)))
                     .bg(wash)
-                    .border(px(theme.borders.hairline))
-                    .border_color(line)
+                    .when(band.selected, |element| {
+                        element.shadow(theme.glow(theme.colors.accent))
+                    })
                     .child(
                         div()
                             .absolute()
@@ -3140,6 +3212,53 @@ mod tests {
         assert_eq!(paint, active);
         assert!(!animating);
         assert!(transition.started.is_none());
+    }
+
+    #[test]
+    fn a_new_wire_contracts_once_but_existing_wiring_does_not_replay() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let spec = MotionPolicy::spec(MotionRole::Feedback, &theme);
+        let start = Instant::now();
+        let key: PortKey = ("node".into(), "port".into());
+        let empty = HashSet::new();
+        let wired = HashSet::from([key.clone()]);
+        let mut settles = PortSettles::default();
+
+        // Opening on existing wiring draws the current graph and does not
+        // pretend that a historical connection just landed.
+        let (shown, animating) = settles.show(&wired, start, spec, true);
+        assert!(shown.is_empty());
+        assert!(!animating);
+
+        // Once removed and added again, the same business endpoint is a new
+        // landing and starts from its expanded feedback frame.
+        settles.show(&empty, start, spec, true);
+        let landed = start + spec.total();
+        let (shown, animating) = settles.show(&wired, landed, spec, true);
+        assert_eq!(shown.get(&key), Some(&1.0));
+        assert!(animating);
+
+        let (shown, animating) = settles.show(&wired, landed + spec.total() / 2, spec, true);
+        let contraction = shown.get(&key).copied().expect("mid-settle port");
+        assert!(contraction > 0.0 && contraction < 1.0);
+        assert!(animating);
+
+        let (shown, animating) = settles.show(&wired, landed + spec.total(), spec, true);
+        assert!(shown.is_empty());
+        assert!(!animating);
+    }
+
+    #[test]
+    fn reduced_motion_lands_a_wire_without_a_timeline() {
+        let spec = MotionPolicy::spec(MotionRole::Feedback, &gpui_kit_theme::Theme::studio_dark());
+        let start = Instant::now();
+        let mut settles = PortSettles::default();
+        settles.show(&HashSet::new(), start, spec, true);
+        let wired = HashSet::from([("node".into(), "port".into())]);
+        let (shown, animating) = settles.show(&wired, start, spec, false);
+        assert!(shown.is_empty());
+        assert!(!animating);
+        assert!(settles.started.is_empty());
     }
 
     /// A frame is a jump the reader did not make, and a jump that is not
