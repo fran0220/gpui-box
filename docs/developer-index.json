@@ -103466,8 +103466,8 @@
       "module": "",
       "path": "gpui_kit_theme",
       "source": "crates/gpui-kit-theme/src/lib.rs",
-      "summary": "The focus halo resolved against the control's own resting fill.",
-      "documentation": "The focus halo resolved against the control's own resting fill.",
+      "summary": "The focus halo resolved against the surface it will be drawn on.",
+      "documentation": "The focus halo resolved against the surface it will be drawn on.\n\n`background` is what lies *behind* the control — the well a field sits\nin, the card a node stands on, the page. It is not the control's own\nfill. The halo is a ring, cast outside the element's shape, so the fill\nis the one surface it never touches; choosing a colour legible against\nthe fill picks for a surface the ring is never drawn on.\n\nThat distinction used to be academic, because the halo was a drop\nshadow painted under the element as well as around it. It stopped being\nacademic the moment the element was cut out of it: a primary button\nwhose fill is the accent asks this for a pole readable on accent, gets\nnear-black on a dark theme, and paints it onto a dark dialog.",
       "signature": "pub fn focus_ring_on (& self, background : Hsla) -> Vec<BoxShadow>",
       "cfg": [],
       "target": "Theme"

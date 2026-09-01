@@ -472,10 +472,14 @@ impl RenderOnce for Button {
             element
                 .cursor_pointer()
                 .tab_index(0)
-                .focus_ring_on(
-                    &theme,
-                    button_background(&theme, self.variant, unified, self.selected),
-                )
+                // Against the page, not against the button's own fill. The
+                // halo is cast outside the button, so the fill is the one
+                // surface it never lands on — and a primary button's fill is
+                // the accent, which is the focus colour, so asking for a pole
+                // readable on it returned near-black on a dark theme and pure
+                // white on a light one. Both were drawn onto a dialog of very
+                // nearly that colour and could not be seen at all.
+                .focus_ring(&theme)
                 .pressable(cx)
         })
         .children(content);
@@ -660,33 +664,6 @@ fn selected_fill_for(theme: &Theme, unified: Option<(Variant, VariantColors)>) -
     match unified {
         Some((_, resolved)) if resolved.background_active.a > 0.0 => resolved.background_active,
         _ => theme.colors.active,
-    }
-}
-
-fn button_background(
-    theme: &Theme,
-    variant: ButtonVariant,
-    unified: Option<(Variant, VariantColors)>,
-    selected: bool,
-) -> Hsla {
-    if selected {
-        return selected_fill_for(theme, unified);
-    }
-    if let Some((_, colors)) = unified {
-        return colors.background;
-    }
-    match variant {
-        ButtonVariant::Primary => theme.colors.primary_fill,
-        ButtonVariant::Secondary => theme.colors.raised,
-        ButtonVariant::Ghost | ButtonVariant::Link => theme.colors.canvas,
-        ButtonVariant::Danger => {
-            theme
-                .variant_colors(
-                    Variant::Light,
-                    &ColorChoice::Semantic(SemanticColor::Danger),
-                )
-                .background
-        }
     }
 }
 
@@ -940,9 +917,10 @@ mod tests {
                 ] {
                     let colors = theme.variant_colors(tier, &choice);
                     let unified = Some((tier, colors));
-                    let resting =
-                        button_background(&theme, ButtonVariant::Secondary, unified, false);
-                    let chosen = button_background(&theme, ButtonVariant::Secondary, unified, true);
+                    // Read from the paths that actually paint, so this asserts
+                    // the button rather than a second description of it.
+                    let resting = colors.background;
+                    let chosen = selected_fill_for(&theme, unified);
                     assert_ne!(
                         resting, chosen,
                         "{tier:?} reports selection with the same paint it rests in"

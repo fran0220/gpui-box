@@ -1328,7 +1328,19 @@ impl Theme {
         self.focus_ring_on(self.colors.canvas)
     }
 
-    /// The focus halo resolved against the control's own resting fill.
+    /// The focus halo resolved against the surface it will be drawn on.
+    ///
+    /// `background` is what lies *behind* the control — the well a field sits
+    /// in, the card a node stands on, the page. It is not the control's own
+    /// fill. The halo is a ring, cast outside the element's shape, so the fill
+    /// is the one surface it never touches; choosing a colour legible against
+    /// the fill picks for a surface the ring is never drawn on.
+    ///
+    /// That distinction used to be academic, because the halo was a drop
+    /// shadow painted under the element as well as around it. It stopped being
+    /// academic the moment the element was cut out of it: a primary button
+    /// whose fill is the accent asks this for a pole readable on accent, gets
+    /// near-black on a dark theme, and paints it onto a dark dialog.
     pub fn focus_ring_on(&self, background: Hsla) -> Vec<BoxShadow> {
         let focus = if self.contrast(self.colors.focus, background) >= 3.0 {
             self.colors.focus
@@ -2130,6 +2142,27 @@ mod tests {
                 assert_eq!(band.offset, point(px(0.0), px(0.0)), "{}", theme.id);
                 assert!(band.spread_radius > px(0.0), "{}", theme.id);
                 assert!(band.blur_radius > px(0.0), "{}", theme.id);
+            }
+            // The halo is cast outside the control, so it lands on whatever
+            // surface the control stands on. It has to be legible there in
+            // every theme — a ring nobody can see is not a focus indication,
+            // and the way that happened was a caller passing its own fill as
+            // the ground, which is the one surface the ring never touches.
+            for surface in [
+                Surface::Canvas,
+                Surface::Panel,
+                Surface::Raised,
+                Surface::Overlay,
+                Surface::Sunken,
+            ] {
+                let ground = theme.surface(surface);
+                let ring = theme.focus_ring_on(ground)[0].color;
+                let contrast = theme.contrast(ring, ground);
+                assert!(
+                    contrast >= 3.0,
+                    "{}: a focus ring on {surface:?} is {contrast:.2}:1 and cannot be seen",
+                    theme.id
+                );
             }
             let on_focus = theme.focus_ring_on(theme.colors.focus);
             let pole = theme.readable_on(theme.colors.focus);
