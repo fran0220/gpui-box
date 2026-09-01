@@ -334,8 +334,6 @@ agent product model to GPUI Box Kit.
 
 **Current Rust types.** Product-neutral agent primitives now include:
 
-- `RunLength`, `StepState`, `Step`, and `StepList` in
-  `crates/gpui-kit/src/agent/step_list.rs`;
 - `ToolBody`, `ToolOutput`, `ToolCallState`, `ToolFamily`, `Elapsed`, and
   `ToolCall` in `agent/tool_call.rs`;
 - `Reasoning` and `ThinkingBlock` in `agent/thinking.rs`;
@@ -365,7 +363,7 @@ the remaining interactive builders store callbacks over `Window` and `App`.
 `ThinkingBlock` reports the requested expanded state; `ApprovalEvent` reports approved scope or declined;
 `PermissionMatrix` reports `PermissionChange`; and `ServerList` reports select,
 retry, and expanded state. `PersonaDialogue` reports choices and unchanged
-Markdown events with turn identity. `StepList`, cost views, portraits, voice
+Markdown events with turn identity. Cost views, portraits, voice
 meters, and `Timeline` are display-only unless their composed details carry
 controls.
 

@@ -191,8 +191,6 @@ SplitTree
 StateView
 StatusBar
 StatusItem
-Step
-StepList
 SubagentTree
 Submit
 Switch

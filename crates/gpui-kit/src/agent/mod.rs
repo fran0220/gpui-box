@@ -17,7 +17,6 @@ pub mod plan;
 pub mod presentation;
 pub mod prompt;
 pub mod server_list;
-pub mod step_list;
 pub mod thinking;
 pub mod tool_call;
 
@@ -54,6 +53,5 @@ pub use presentation::{
 };
 pub use prompt::{PromptBuilder, PromptBuilderEvent, PromptBuilderState, PromptSlot};
 pub use server_list::{Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState};
-pub use step_list::{RunLength, Step, StepList, StepState};
 pub use thinking::{Reasoning, ThinkingBlock};
 pub use tool_call::{Elapsed, ToolBody, ToolCall, ToolCallState, ToolFamily, ToolOutput};

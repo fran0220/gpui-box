@@ -3,11 +3,14 @@
 //! # Why this is not a list
 //!
 //! A plan is read at a glance, repeatedly, while something else holds the
-//! reader's attention. [`StepList`](crate::agent::StepList) spends a full row
-//! of prose on every step and says each state three times — a coloured dot, a
-//! word at the trailing edge, and a tinted reason — which is right when the
-//! steps are the content and each one carries a body. It is wrong when the
-//! plan is context beside a transcript that is itself moving.
+//! reader's attention. A list spends a full row of prose on every step and
+//! says each state three times — a coloured dot, a word at the trailing edge,
+//! and a tinted reason — which is right when the steps are the content and
+//! each one carries a body, and wrong when the plan is context beside a
+//! transcript that is itself moving. This library used to carry both shapes;
+//! the row-per-step one was retired once nothing consumed it, because two
+//! components answering the same question is how a caller ends up picking the
+//! wrong one.
 //!
 //! So the marks carry the plan and the words are spent once, on the item
 //! actually in flight. Everything else is a shape: what is behind the reader,

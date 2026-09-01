@@ -46,7 +46,7 @@ use crate::foundation::direction::LayoutDirection;
 use agent::{
     agent_avatar, agent_plan, agent_roster, agent_run_canvas, agent_run_issues, approval,
     artifact_preview, clarification, cost_meter, feedback_rating, offering_catalog,
-    permission_matrix, persona, prompt_builder, server_list, step_list, thinking, tool_call,
+    permission_matrix, persona, prompt_builder, server_list, thinking, tool_call,
 };
 use canvas::{canvas_regions, canvas_tools, node_graph, node_graph_motion};
 use compositions::{motion_flip, motion_state, reading_direction};
@@ -735,11 +735,6 @@ pub fn catalog() -> Vec<Scene> {
             name: "agent-plan",
             build: agent_plan,
             shows: Shows::Subjects(&["AgentPlan"]),
-        },
-        Scene {
-            name: "step-list",
-            build: step_list,
-            shows: Shows::Subjects(&["StepList"]),
         },
         Scene {
             name: "node-graph",

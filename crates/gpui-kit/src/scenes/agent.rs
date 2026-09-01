@@ -928,13 +928,6 @@ pub(super) fn cost_meter(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn scene_arguments() -> ToolBody {
-    ToolBody::new(
-        "{\n  \"path\": \"docs/coverage.md\",\n  \"pattern\": \"unknown\",\n  \"limit\": 20\n}",
-    )
-    .max_lines(2)
-}
-
 /// Every state a call can be in, side by side.
 ///
 /// Two columns because a captured image is one screen: stacked, the refusal
@@ -1000,56 +993,6 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .arguments("{ \"command\": \"rm -rf build\" }")
                         .state(ToolCallState::refused("Shell commands are not allowed.")),
                 ),
-        )
-        .into_any_element()
-}
-
-pub(super) fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
-    let theme = cx.theme().clone();
-    stack(&theme)
-        // A step list fills the column it is given. Given the whole canvas the
-        // status column ended up a screen away from the step it reports on.
-        .w(px(560.0))
-        .child(caption(&theme, "A run somebody counted"))
-        .child(
-            StepList::new("scene.steps.counted")
-                .step(Step::new("read", "Read the brief").state(StepState::Done))
-                .step(
-                    Step::new("search", "Search the workspace")
-                        .state(StepState::Running)
-                        .body(
-                            ToolCall::new(
-                                "scene.steps.search.call",
-                                ToolFamily::Read,
-                                "workspace.search",
-                            )
-                            .summary("unknown · docs/coverage.md")
-                            .arguments(scene_arguments())
-                            .state(ToolCallState::Running)
-                            .elapsed("1.1 s"),
-                        ),
-                )
-                .step(Step::new("summarise", "Summarise what was found"))
-                .step(
-                    Step::new("publish", "Publish the summary").state(StepState::Skipped(
-                        "Publishing is turned off for this workspace.".into(),
-                    )),
-                )
-                .step(
-                    // A failure, not a refusal: the skipped step above is what
-                    // a refusal looks like, and the two must not be worded
-                    // into each other.
-                    Step::new("notify", "Notify the reviewers").state(StepState::Failed(
-                        "The notification service did not respond.".into(),
-                    )),
-                ),
-        )
-        .child(caption(&theme, "A run still being decided"))
-        .child(
-            StepList::new("scene.steps.open")
-                .length(RunLength::Unknown)
-                .step(Step::new("read", "Read the brief").state(StepState::Done))
-                .step(Step::new("plan", "Decide what to do next").state(StepState::Running)),
         )
         .into_any_element()
 }

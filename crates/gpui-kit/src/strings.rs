@@ -608,8 +608,6 @@ string_keys! {
     AgentFailed => "agent.failed", "Failed";
     AgentDeclined => "agent.declined", "Declined";
     AgentPending => "agent.pending", "Pending";
-    AgentDone => "agent.done", "Done";
-    AgentSkipped => "agent.skipped", "Skipped";
     AgentNoOutput => "agent.no-output", "This tool returned nothing";
     AgentElapsedUnknown => "agent.elapsed-unknown", "Elapsed time unknown";
     AgentTruncated => "agent.truncated", "{0} of {1} lines shown";

@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4188
+      "symbolCount": 4171
     },
     {
       "name": "gpui-box-kit-assets",
@@ -44711,20 +44711,6 @@
     },
     {
       "id": "gpui_kit::agent::reexport-15",
-      "name": "step_list :: { RunLength , Step , StepList , StepState }",
-      "kind": "reexport",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent",
-      "path": "gpui_kit::agent",
-      "source": "crates/gpui-kit/src/agent/mod.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use step_list::{ RunLength, Step, StepList, StepState };",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::reexport-16",
       "name": "thinking :: { Reasoning , ThinkingBlock }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44738,7 +44724,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-17",
+      "id": "gpui_kit::agent::reexport-16",
       "name": "tool_call :: { Elapsed , ToolBody , ToolCall , ToolCallState , ToolFamily , ToolOutput }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -45366,242 +45352,6 @@
       "signature": "pub fn name (& self) -> & 'static str",
       "cfg": [],
       "target": "ServerState"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::RunLength",
-      "name": "RunLength",
-      "kind": "enum",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "Whether the caller has counted the run.",
-      "documentation": "Whether the caller has counted the run.\n\nThis is [`PageTotal`](crate::navigation::pagination::PageTotal) for a run:\na host streaming steps as they are decided knows only that more are coming,\nso that is all the list claims.",
-      "signature": "# [doc = \" Whether the caller has counted the run.\"] # [doc = \"\"] # [doc = \" This is [`PageTotal`](crate::navigation::pagination::PageTotal) for a run:\"] # [doc = \" a host streaming steps as they are decided knows only that more are coming,\"] # [doc = \" so that is all the list claims.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum RunLength { # [doc = \" Every step in the run is in this list.\"] # [default] Known, # [doc = \" More steps will arrive and nobody knows how many.\"] Unknown, }",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::step_list::RunLength::as_str",
-      "name": "as_str",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn as_str (self) -> & 'static str",
-      "cfg": [],
-      "target": "RunLength"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::Step",
-      "name": "Step",
-      "kind": "struct",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "One step of a run.",
-      "documentation": "One step of a run.",
-      "signature": "# [doc = \" One step of a run.\"] pub struct Step { id : SharedString, title : SharedString, state : StepState, body : Option<AnyElement>, }",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::step_list::Step::body",
-      "name": "body",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "What the step is made of, usually a [`ToolCall`](crate::agent::tool_call::ToolCall).",
-      "documentation": "What the step is made of, usually a\n[`ToolCall`](crate::agent::tool_call::ToolCall).",
-      "signature": "pub fn body (mut self, body : impl IntoElement) -> Self",
-      "cfg": [],
-      "target": "Step"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::Step::id",
-      "name": "id",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn id (& self) -> & SharedString",
-      "cfg": [],
-      "target": "Step"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::Step::new",
-      "name": "new",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn new (id : impl Into<SharedString>, title : impl Into<SharedString>) -> Self",
-      "cfg": [],
-      "target": "Step"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::Step::state",
-      "name": "state",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn state (mut self, state : StepState) -> Self",
-      "cfg": [],
-      "target": "Step"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepList",
-      "name": "StepList",
-      "kind": "struct",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "An ordered run of steps with a summary of how far it has got.",
-      "documentation": "An ordered run of steps with a summary of how far it has got.",
-      "signature": "# [doc = \" An ordered run of steps with a summary of how far it has got.\"] # [derive (IntoElement)] pub struct StepList { ident : Ident, steps : Vec<Step>, length : RunLength, }",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepList::length",
-      "name": "length",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "Whether every step of the run is already in this list.",
-      "documentation": "Whether every step of the run is already in this list.",
-      "signature": "pub fn length (mut self, length : RunLength) -> Self",
-      "cfg": [],
-      "target": "StepList"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepList::new",
-      "name": "new",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn new (ident : impl Into<Ident>) -> Self",
-      "cfg": [],
-      "target": "StepList"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepList::step",
-      "name": "step",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn step (mut self, step : Step) -> Self",
-      "cfg": [],
-      "target": "StepList"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepList::steps",
-      "name": "steps",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn steps (mut self, steps : impl IntoIterator<Item = Step>) -> Self",
-      "cfg": [],
-      "target": "StepList"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepState",
-      "name": "StepState",
-      "kind": "enum",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "Where one step has got to.",
-      "documentation": "Where one step has got to.\n\nA step that did not run and a step that ran and failed are different\nsentences, and both carry the host's reason rather than a word this crate\nchose.",
-      "signature": "# [doc = \" Where one step has got to.\"] # [doc = \"\"] # [doc = \" A step that did not run and a step that ran and failed are different\"] # [doc = \" sentences, and both carry the host's reason rather than a word this crate\"] # [doc = \" chose.\"] # [derive (Debug, Clone, PartialEq, Eq, Default)] pub enum StepState { # [default] Pending, Running, Done, # [doc = \" The step ran and did not succeed, in the host's own words.\"] Failed (SharedString), # [doc = \" The step never ran, and this is why.\"] Skipped (SharedString), }",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepState::as_str",
-      "name": "as_str",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "The name the semantic node publishes.",
-      "documentation": "The name the semantic node publishes.",
-      "signature": "pub fn as_str (& self) -> & 'static str",
-      "cfg": [],
-      "target": "StepState"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepState::reason",
-      "name": "reason",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "The host's words, where the host said any.",
-      "documentation": "The host's words, where the host said any.",
-      "signature": "pub fn reason (& self) -> Option<& SharedString>",
-      "cfg": [],
-      "target": "StepState"
-    },
-    {
-      "id": "gpui_kit::agent::step_list::StepState::tone",
-      "name": "tone",
-      "kind": "method",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent::step_list",
-      "path": "gpui_kit::agent::step_list",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub fn tone (& self) -> Tone",
-      "cfg": [],
-      "target": "StepState"
     },
     {
       "id": "gpui_kit::agent::thinking::Reasoning",
@@ -121425,28 +121175,6 @@
       ]
     },
     {
-      "name": "StepList",
-      "kind": "builder",
-      "path": "gpui_kit::agent::StepList",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "An ordered run of steps with a summary of how far it has got.",
-      "construct": [
-        "new(ident: impl Into<Ident>) -> Self"
-      ],
-      "options": [
-        "step(step: Step) -> Self",
-        "steps(steps: impl IntoIterator<Item = Step>) -> Self",
-        "length(length: RunLength) -> Self"
-      ],
-      "commands": [],
-      "queries": [],
-      "slots": [],
-      "reports": [],
-      "scenes": [
-        "step-list"
-      ]
-    },
-    {
       "name": "SubagentTree",
       "kind": "builder",
       "path": "gpui_kit::agent::SubagentTree",
@@ -129378,21 +129106,6 @@
       ]
     },
     {
-      "name": "RunLength",
-      "path": "gpui_kit::agent::RunLength",
-      "summary": "Whether the caller has counted the run.",
-      "variants": [
-        "Known",
-        "Unknown"
-      ],
-      "construct": [],
-      "options": [
-        "as_str() -> &'static str"
-      ],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "RunLink",
       "path": "gpui_kit::agent::RunLink",
       "summary": "One typed relationship between two run subjects.",
@@ -130374,43 +130087,6 @@
         "id() -> &SharedString",
         "label() -> &SharedString",
         "is_stale() -> bool"
-      ]
-    },
-    {
-      "name": "Step",
-      "path": "gpui_kit::agent::Step",
-      "summary": "One step of a run.",
-      "variants": [],
-      "construct": [
-        "new(id: impl Into<SharedString>, title: impl Into<SharedString>) -> Self"
-      ],
-      "options": [
-        "state(state: StepState) -> Self",
-        "body(body: impl IntoElement) -> Self"
-      ],
-      "commands": [],
-      "queries": [
-        "id() -> &SharedString"
-      ]
-    },
-    {
-      "name": "StepState",
-      "path": "gpui_kit::agent::StepState",
-      "summary": "Where one step has got to.",
-      "variants": [
-        "Pending",
-        "Running",
-        "Done",
-        "Failed",
-        "Skipped"
-      ],
-      "construct": [],
-      "options": [],
-      "commands": [],
-      "queries": [
-        "as_str() -> &'static str",
-        "reason() -> Option<&SharedString>",
-        "tone() -> Tone"
       ]
     },
     {
@@ -141818,18 +141494,6 @@
         "AgentPlan"
       ],
       "example": "fn agent_plan(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"Behind, in flight, ahead — and the two a plan cannot be honest without\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.running\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"search\", \"Search the workspace\").done())\n                .item(PlanItem::new(\"summarise\", \"Summarise what was found\").doing())\n                .item(PlanItem::new(\"publish\", \"Publish the summary\"))\n                .item(PlanItem::new(\"notify\", \"Notify the reviewers\"))\n                .on_pick(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"A plan that stopped, and one the agent decided against\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.stopped\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(\n                    PlanItem::new(\"notify\", \"Notify the reviewers\")\n                        .blocked(\"The notification service did not respond.\"),\n                )\n                .item(\n                    PlanItem::new(\"archive\", \"Archive the previous run\")\n                        .dropped(\"Nothing had been published yet.\"),\n                )\n                .item(PlanItem::new(\"close\", \"Close the run\")),\n        )\n        .child(caption(&theme, \"Nothing in flight, so nothing is said\"))\n        .child(\n            AgentPlan::new(\"scene.plan.settled\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"close\", \"Close the run\").done()),\n        )\n        .into_any_element()\n}"
-    },
-    {
-      "name": "step-list",
-      "capture": "cargo run -p xtask -- headless capture step-list",
-      "kind": "exhibit",
-      "subjects": [
-        "StepList"
-      ],
-      "uses": [
-        "StepList"
-      ],
-      "example": "fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        // A step list fills the column it is given. Given the whole canvas the\n        // status column ended up a screen away from the step it reports on.\n        .w(px(560.0))\n        .child(caption(&theme, \"A run somebody counted\"))\n        .child(\n            StepList::new(\"scene.steps.counted\")\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(\n                    Step::new(\"search\", \"Search the workspace\")\n                        .state(StepState::Running)\n                        .body(\n                            ToolCall::new(\n                                \"scene.steps.search.call\",\n                                ToolFamily::Read,\n                                \"workspace.search\",\n                            )\n                            .summary(\"unknown · docs/coverage.md\")\n                            .arguments(scene_arguments())\n                            .state(ToolCallState::Running)\n                            .elapsed(\"1.1 s\"),\n                        ),\n                )\n                .step(Step::new(\"summarise\", \"Summarise what was found\"))\n                .step(\n                    Step::new(\"publish\", \"Publish the summary\").state(StepState::Skipped(\n                        \"Publishing is turned off for this workspace.\".into(),\n                    )),\n                )\n                .step(\n                    // A failure, not a refusal: the skipped step above is what\n                    // a refusal looks like, and the two must not be worded\n                    // into each other.\n                    Step::new(\"notify\", \"Notify the reviewers\").state(StepState::Failed(\n                        \"The notification service did not respond.\".into(),\n                    )),\n                ),\n        )\n        .child(caption(&theme, \"A run still being decided\"))\n        .child(\n            StepList::new(\"scene.steps.open\")\n                .length(RunLength::Unknown)\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(Step::new(\"plan\", \"Decide what to do next\").state(StepState::Running)),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "node-graph",

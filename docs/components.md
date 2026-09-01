@@ -891,7 +891,6 @@ plainer component would have to collapse two facts into one.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `ToolCall`, `ToolFamily` | builder, data | retry and the requested expanded state | One caption-sized evidence row. The required family selects a shared low-saturation tool tint; the host supplies a display-safe summary. Arguments and results are collapsed, bounded to four lines by default, and publish their shape rather than their text |
-| `StepList` | builder | — | An ordered run of steps, each with its own state, each able to hold a `ToolCall`. A run whose length nobody knows gets an indeterminate summary rather than an invented fraction |
 | `ThinkingBlock` | builder | the state the disclosure should take | A quiet “Thinking…” or “Thought for …” row. Expanded reasoning is muted italic text; withheld, absent, and collapsed remain three different facts |
 | `NodeGraph`, `GraphInteraction` | builder, policy | viewport and selection; Arrange adds node moves; Edit adds node deletion and connection/disconnection proposals | A controlled run canvas over caller-positioned `GraphNode`s and caller-owned `GraphEdge`s. Loading, refusal, failure, and a ready graph with no nodes use the shared state surface and truthful replaceable slots instead of canvas text. `Inspect` never installs topology-edit actions, while the default `Edit` preserves the complete editor. A node thumbnail is a caller-rendered element slot; the graph fetches and decodes nothing |
 | `CanvasToolbar` | builder | fit, snap, and arrange requests | Compact canvas chrome over one host-formatted zoom value. It applies no viewport, snapping, or arrangement policy, and can use the shared glass presets when floated over a canvas |
@@ -935,13 +934,6 @@ drawn beside the block, so the cut is stated where it happens rather than
 implied by a fade, and it is stated whether or not anything was cut, so
 "there is more" is read off the same line every time.
 
-### A run nobody counted has no progress
-
-`RunLength::Known` and `RunLength::Unknown` are `PageTotal`'s distinction for a
-run. With a known length the summary is `ProgressBar::count`, which publishes a
-position; with an unknown one the bar is indeterminate, publishes no fraction,
-and states only what has finished — `1 step done`. A bar crawling toward a
-total nobody established would be a number this library invented.
 
 A step's state is `Pending`, `Running`, `Done`, `Failed`, or `Skipped`, and the
 last two carry the host's own words: a step that never ran and a step that ran

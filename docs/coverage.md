@@ -31,7 +31,7 @@ input, and an entry in `docs/components.md`.
 | Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
-| Agent run and persona | `AgentAvatar`, `AgentActivityLine`, `AgentCard`, `AgentGroup`, `AgentRunIssues`, `ToolCall`, `StepList`, `ThinkingBlock`, `NodeGraph`, `GraphNode`, `NodeGroup`, `CanvasToolbar`, `Minimap`, `TraceView`, `SpanTimeline`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue`, `FeedbackRating`, `PromptBuilder` |
+| Agent run and persona | `AgentAvatar`, `AgentActivityLine`, `AgentCard`, `AgentGroup`, `AgentRunIssues`, `ToolCall`, `ThinkingBlock`, `NodeGraph`, `GraphNode`, `NodeGroup`, `CanvasToolbar`, `Minimap`, `TraceView`, `SpanTimeline`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue`, `FeedbackRating`, `PromptBuilder` |
 | Permission and cost | `ApprovalPrompt`, `PermissionMatrix`, `CostMeter`, `ContextGauge` |
 | Game experience | `PartyRoster`, `ObjectiveTracker`, `AbilityBar`, `RewardReveal` |
 | Visual effects | `EffectParticles`, `CinematicEffect` |
@@ -364,7 +364,6 @@ that rubric, not that every possible interaction was exercised.
 | `sparkline` | Medium: dark minimum/maximum values are too faint. |
 | `split-pane`, `split-tree` | High: dark dividers and drag handles nearly disappear. |
 | `status` | Medium: two short status messages stretch nearly the full canvas. |
-| `step-list` | Medium: dark status/detail text is weak and the status column is too distant. |
 | `table` | Low: the scene now shows ready, a stale refresh, and empty. Managed rows keep their badges; hover and selected are separate washes. |
 | `tabs` | Medium: scene body falls back to large default text and dark disabled tab is too faint. |
 | `textarea` | High: dark placeholders, disabled text, and field surfaces disappear. |
@@ -518,7 +517,7 @@ capabilities below, but it is not counted as an additional shadcn entry.
 | Data display | 10 | `Avatar`, `Badge`, `Tag`, `Divider`, `Icon`, `List`, `Table`, `ImageList`, `Tooltip`, foundation text/type scale | Strong coverage; typography and icon families are correctly foundation/catalog concerns rather than duplicate leaf components. |
 | Feedback | 6 | `Callout`/`Banner`/`StateView`, `Overlay`, `Dialog`, `ProgressBar`/`ProgressCircle`, `Rating`, `Skeleton`, `Toast`/`ToastLayer` | Strong product-neutral coverage, with feedback states retained as caller-owned facts. |
 | Surface | 4 | `Accordion`, `DesktopTitlebar`/`Toolbar`, `Card`, theme surface recipes plus `Frost`/`Glass` | Strong coverage by composition and complete surface recipes; no need for a second `Paper` shell. |
-| Navigation | 9 | `Tabs`, `Breadcrumb`, `Drawer`, `Menu`, `Pagination`, `Wizard`/`StepList`, `Sidebar` | Strong desktop coverage; Bottom Navigation and Speed Dial are mobile-oriented patterns, not missing desktop primitives. |
+| Navigation | 9 | `Tabs`, `Breadcrumb`, `Drawer`, `Menu`, `Pagination`, `Wizard`, `Sidebar` | Strong desktop coverage; Bottom Navigation and Speed Dial are mobile-oriented patterns, not missing desktop primitives. |
 | Layout | 5 | `Responsive`, `SplitPane`, `SplitTree`, `AspectRatio`, `Grid`/`Container` | Strong coverage; measured breakpoints preserve source order and caller-owned content. |
 | Lab | 2 | `Timeline`, `Masonry` | Strong coverage with caller-measured tile heights and a documented non-virtualized boundary. |
 | Utils | 10 | `Popover`, `Overlay`, positioner/focus/portal internals, `TextArea`, motion system, `Responsive` | Foundation coverage is present; these are not all user-facing components and should not inflate the public component count. |

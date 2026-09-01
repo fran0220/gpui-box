@@ -4743,28 +4743,6 @@
       ]
     },
     {
-      "name": "StepList",
-      "kind": "builder",
-      "path": "gpui_kit::agent::StepList",
-      "source": "crates/gpui-kit/src/agent/step_list.rs",
-      "summary": "An ordered run of steps with a summary of how far it has got.",
-      "construct": [
-        "new(ident: impl Into<Ident>) -> Self"
-      ],
-      "options": [
-        "step(step: Step) -> Self",
-        "steps(steps: impl IntoIterator<Item = Step>) -> Self",
-        "length(length: RunLength) -> Self"
-      ],
-      "commands": [],
-      "queries": [],
-      "slots": [],
-      "reports": [],
-      "scenes": [
-        "step-list"
-      ]
-    },
-    {
       "name": "SubagentTree",
       "kind": "builder",
       "path": "gpui_kit::agent::SubagentTree",
@@ -12696,21 +12674,6 @@
       ]
     },
     {
-      "name": "RunLength",
-      "path": "gpui_kit::agent::RunLength",
-      "summary": "Whether the caller has counted the run.",
-      "variants": [
-        "Known",
-        "Unknown"
-      ],
-      "construct": [],
-      "options": [
-        "as_str() -> &'static str"
-      ],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "RunLink",
       "path": "gpui_kit::agent::RunLink",
       "summary": "One typed relationship between two run subjects.",
@@ -13692,43 +13655,6 @@
         "id() -> &SharedString",
         "label() -> &SharedString",
         "is_stale() -> bool"
-      ]
-    },
-    {
-      "name": "Step",
-      "path": "gpui_kit::agent::Step",
-      "summary": "One step of a run.",
-      "variants": [],
-      "construct": [
-        "new(id: impl Into<SharedString>, title: impl Into<SharedString>) -> Self"
-      ],
-      "options": [
-        "state(state: StepState) -> Self",
-        "body(body: impl IntoElement) -> Self"
-      ],
-      "commands": [],
-      "queries": [
-        "id() -> &SharedString"
-      ]
-    },
-    {
-      "name": "StepState",
-      "path": "gpui_kit::agent::StepState",
-      "summary": "Where one step has got to.",
-      "variants": [
-        "Pending",
-        "Running",
-        "Done",
-        "Failed",
-        "Skipped"
-      ],
-      "construct": [],
-      "options": [],
-      "commands": [],
-      "queries": [
-        "as_str() -> &'static str",
-        "reason() -> Option<&SharedString>",
-        "tone() -> Tone"
       ]
     },
     {
@@ -16180,18 +16106,6 @@
         "AgentPlan"
       ],
       "example": "fn agent_plan(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"Behind, in flight, ahead — and the two a plan cannot be honest without\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.running\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"search\", \"Search the workspace\").done())\n                .item(PlanItem::new(\"summarise\", \"Summarise what was found\").doing())\n                .item(PlanItem::new(\"publish\", \"Publish the summary\"))\n                .item(PlanItem::new(\"notify\", \"Notify the reviewers\"))\n                .on_pick(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"A plan that stopped, and one the agent decided against\",\n        ))\n        .child(\n            AgentPlan::new(\"scene.plan.stopped\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(\n                    PlanItem::new(\"notify\", \"Notify the reviewers\")\n                        .blocked(\"The notification service did not respond.\"),\n                )\n                .item(\n                    PlanItem::new(\"archive\", \"Archive the previous run\")\n                        .dropped(\"Nothing had been published yet.\"),\n                )\n                .item(PlanItem::new(\"close\", \"Close the run\")),\n        )\n        .child(caption(&theme, \"Nothing in flight, so nothing is said\"))\n        .child(\n            AgentPlan::new(\"scene.plan.settled\")\n                .item(PlanItem::new(\"brief\", \"Read the brief\").done())\n                .item(PlanItem::new(\"close\", \"Close the run\").done()),\n        )\n        .into_any_element()\n}"
-    },
-    {
-      "name": "step-list",
-      "capture": "cargo run -p xtask -- headless capture step-list",
-      "kind": "exhibit",
-      "subjects": [
-        "StepList"
-      ],
-      "uses": [
-        "StepList"
-      ],
-      "example": "fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        // A step list fills the column it is given. Given the whole canvas the\n        // status column ended up a screen away from the step it reports on.\n        .w(px(560.0))\n        .child(caption(&theme, \"A run somebody counted\"))\n        .child(\n            StepList::new(\"scene.steps.counted\")\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(\n                    Step::new(\"search\", \"Search the workspace\")\n                        .state(StepState::Running)\n                        .body(\n                            ToolCall::new(\n                                \"scene.steps.search.call\",\n                                ToolFamily::Read,\n                                \"workspace.search\",\n                            )\n                            .summary(\"unknown · docs/coverage.md\")\n                            .arguments(scene_arguments())\n                            .state(ToolCallState::Running)\n                            .elapsed(\"1.1 s\"),\n                        ),\n                )\n                .step(Step::new(\"summarise\", \"Summarise what was found\"))\n                .step(\n                    Step::new(\"publish\", \"Publish the summary\").state(StepState::Skipped(\n                        \"Publishing is turned off for this workspace.\".into(),\n                    )),\n                )\n                .step(\n                    // A failure, not a refusal: the skipped step above is what\n                    // a refusal looks like, and the two must not be worded\n                    // into each other.\n                    Step::new(\"notify\", \"Notify the reviewers\").state(StepState::Failed(\n                        \"The notification service did not respond.\".into(),\n                    )),\n                ),\n        )\n        .child(caption(&theme, \"A run still being decided\"))\n        .child(\n            StepList::new(\"scene.steps.open\")\n                .length(RunLength::Unknown)\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(Step::new(\"plan\", \"Decide what to do next\").state(StepState::Running)),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "node-graph",

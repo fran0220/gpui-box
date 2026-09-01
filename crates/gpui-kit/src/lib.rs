@@ -138,7 +138,6 @@ pub mod prelude {
     pub use crate::agent::server_list::{
         Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState,
     };
-    pub use crate::agent::step_list::{RunLength, Step, StepList, StepState};
     pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
     pub use crate::agent::tool_call::{
         Elapsed, ToolBody, ToolCall, ToolCallState, ToolFamily, ToolOutput,
