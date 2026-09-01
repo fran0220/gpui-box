@@ -1,15 +1,15 @@
 //! A per-frame semantic tree for native GPUI applications.
 //!
-//! Native windows have no DOM. Views attach a zero-paint probe to meaningful
-//! elements; prepaint records the bounds GPUI actually produced. Nodes absent
+//! Native windows have no DOM. Views decorate meaningful elements; prepaint
+//! records the bounds and focus handle GPUI actually resolved. Nodes absent
 //! from the next frame disappear instead of lingering as stale claims.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gpui::{
-    App, Bounds, FocusHandle, Global, InteractiveElement, IntoElement, ParentElement, Pixels,
-    SharedString, StatefulInteractiveElement, Styled, Toggled, Window, WindowId, canvas,
+    App, Bounds, FocusHandle, Global, InteractiveElement, Pixels, SharedString,
+    StatefulInteractiveElement, Styled, Toggled, Window, WindowId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -697,10 +697,11 @@ impl Semantic for gpui::Div {
             self_ = self_.relative();
         }
         self_ = platform_accessible(self_, &spec);
-        self_.child(diagnostic_probe(
+        diagnostic_element(
+            self_,
             Some(DiagnosticTarget::Direct(registry.clone())),
             spec,
-        ))
+        )
     }
 
     fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self::Output {
@@ -710,7 +711,7 @@ impl Semantic for gpui::Div {
         }
         self_ = platform_accessible(self_, &spec);
         let coordinator = SemanticCoordinator::try_global(cx).map(DiagnosticTarget::Installed);
-        self_.child(diagnostic_probe(coordinator, spec))
+        diagnostic_element(self_, coordinator, spec)
     }
 }
 
@@ -722,10 +723,7 @@ impl Semantic for gpui::Stateful<gpui::Div> {
             self = self.relative();
         }
         self = platform_accessible(self, &spec);
-        self.child(diagnostic_probe(
-            Some(DiagnosticTarget::Direct(registry.clone())),
-            spec,
-        ))
+        diagnostic_element(self, Some(DiagnosticTarget::Direct(registry.clone())), spec)
     }
 
     fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self::Output {
@@ -734,8 +732,21 @@ impl Semantic for gpui::Stateful<gpui::Div> {
         }
         self = platform_accessible(self, &spec);
         let coordinator = SemanticCoordinator::try_global(cx).map(DiagnosticTarget::Installed);
-        self.child(diagnostic_probe(coordinator, spec))
+        diagnostic_element(self, coordinator, spec)
     }
+}
+
+fn diagnostic_element<E>(element: E, target: Option<DiagnosticTarget>, spec: NodeSpec) -> E
+where
+    E: InteractiveElement,
+{
+    let Some(target) = target else {
+        return element;
+    };
+    element.on_focus_resolved(move |bounds, focus, window, _| {
+        let focused = focus.is_some_and(|handle| handle.is_focused(window));
+        record_diagnostic(Some(&target), &spec, bounds, focused, window);
+    })
 }
 
 fn platform_accessible<E>(mut element: E, spec: &NodeSpec) -> E
@@ -880,67 +891,63 @@ impl DiagnosticTarget {
     }
 }
 
-fn diagnostic_probe(target: Option<DiagnosticTarget>, spec: NodeSpec) -> impl IntoElement {
-    canvas(
-        move |bounds: Bounds<Pixels>, window, _| {
-            let Some(target) = &target else {
-                return;
-            };
-            window.record_semantic_node();
-            let rect = Rect {
-                x: f32::from(bounds.origin.x),
-                y: f32::from(bounds.origin.y),
-                width: f32::from(bounds.size.width),
-                height: f32::from(bounds.size.height),
-            };
-            target.record(
-                window,
-                Node {
-                    id: spec.id.to_string(),
-                    role: spec.role,
-                    parent: spec.parent.as_ref().map(ToString::to_string),
-                    labels: spec.labels.as_ref().map(ToString::to_string),
-                    describes: spec.describes.as_ref().map(ToString::to_string),
-                    text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
-                    description: spec
-                        .description
-                        .as_ref()
-                        .map(|description| redact_sensitive_text(description)),
-                    bounds: rect,
-                    visible: rect.area() > 0.0,
-                    focused: spec
-                        .focus
-                        .as_ref()
-                        .is_some_and(|handle| handle.is_focused(window)),
-                    disabled: spec.disabled,
-                    read_only: spec.read_only,
-                    selected: spec.selected,
-                    hovered: spec.hovered,
-                    pressed: spec.pressed,
-                    checked: spec.checked,
-                    expanded: spec.expanded,
-                    value: spec
-                        .value
-                        .as_ref()
-                        .map(|value| redact_sensitive_text(value)),
-                    placeholder: spec.placeholder.as_ref().map(ToString::to_string),
-                    value_min: spec.range.map(|(min, _, _)| min),
-                    value_max: spec.range.map(|(_, max, _)| max),
-                    value_now: spec.range.map(|(_, _, now)| now),
-                    level: spec.level,
-                    busy: spec.busy,
-                    invalid: spec.invalid,
-                    required: spec.required,
-                    live: spec.live,
-                    live_atomic: spec.live_atomic,
-                    modal: spec.modal,
-                },
-            );
+fn record_diagnostic(
+    target: Option<&DiagnosticTarget>,
+    spec: &NodeSpec,
+    bounds: Bounds<Pixels>,
+    focused: bool,
+    window: &mut Window,
+) {
+    let Some(target) = target else {
+        return;
+    };
+    window.record_semantic_node();
+    let rect = Rect {
+        x: f32::from(bounds.origin.x),
+        y: f32::from(bounds.origin.y),
+        width: f32::from(bounds.size.width),
+        height: f32::from(bounds.size.height),
+    };
+    target.record(
+        window,
+        Node {
+            id: spec.id.to_string(),
+            role: spec.role,
+            parent: spec.parent.as_ref().map(ToString::to_string),
+            labels: spec.labels.as_ref().map(ToString::to_string),
+            describes: spec.describes.as_ref().map(ToString::to_string),
+            text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
+            description: spec
+                .description
+                .as_ref()
+                .map(|description| redact_sensitive_text(description)),
+            bounds: rect,
+            visible: rect.area() > 0.0,
+            focused,
+            disabled: spec.disabled,
+            read_only: spec.read_only,
+            selected: spec.selected,
+            hovered: spec.hovered,
+            pressed: spec.pressed,
+            checked: spec.checked,
+            expanded: spec.expanded,
+            value: spec
+                .value
+                .as_ref()
+                .map(|value| redact_sensitive_text(value)),
+            placeholder: spec.placeholder.as_ref().map(ToString::to_string),
+            value_min: spec.range.map(|(min, _, _)| min),
+            value_max: spec.range.map(|(_, max, _)| max),
+            value_now: spec.range.map(|(_, _, now)| now),
+            level: spec.level,
+            busy: spec.busy,
+            invalid: spec.invalid,
+            required: spec.required,
+            live: spec.live,
+            live_atomic: spec.live_atomic,
+            modal: spec.modal,
         },
-        |_, _, _, _| {},
-    )
-    .absolute()
-    .inset_0()
+    );
 }
 
 pub fn redact_sensitive_text(text: &str) -> String {
@@ -980,7 +987,8 @@ fn looks_like_secret_assignment(text: &str) -> bool {
 mod tests {
     use super::*;
     use gpui::{
-        AnyWindowHandle, AppContext as _, Context, Render, TestAppContext, Window, div, px,
+        AnyWindowHandle, AppContext as _, Context, IntoElement, ParentElement, Render,
+        TestAppContext, Window, div, px,
     };
     use std::cell::Cell;
     use std::rc::Rc;
@@ -1252,6 +1260,35 @@ mod tests {
         }
     }
 
+    struct FocusDiagnosticFixture {
+        registry: SemanticRegistry,
+        explicit: FocusHandle,
+    }
+
+    impl Render for FocusDiagnosticFixture {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            self.registry.begin_frame();
+            div()
+                .child(div().tab_index(0).w(px(120.0)).h(px(24.0)).semantic(
+                    &self.registry,
+                    NodeSpec::new("implicit", Role::Button).text("Implicit"),
+                ))
+                .child(
+                    div()
+                        .track_focus(&self.explicit)
+                        .tab_index(0)
+                        .w(px(120.0))
+                        .h(px(24.0))
+                        .semantic(
+                            &self.registry,
+                            NodeSpec::new("explicit", Role::Button)
+                                .text("Explicit")
+                                .focus(&self.explicit),
+                        ),
+                )
+        }
+    }
+
     struct WindowFixture(&'static str);
 
     impl Render for WindowFixture {
@@ -1345,6 +1382,49 @@ mod tests {
             assert_eq!(window.frame_stats().semantic_nodes, 1);
         })
         .expect("window remains available");
+    }
+
+    #[gpui::test]
+    fn diagnostics_use_generated_and_caller_owned_focus_handles(cx: &mut TestAppContext) {
+        let registry = SemanticRegistry::new();
+        let explicit = cx.update(|cx| cx.focus_handle());
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let registry = registry.clone();
+                let explicit = explicit.clone();
+                move |_, _| FocusDiagnosticFixture { registry, explicit }
+            })
+            .into();
+
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("initial frame");
+        cx.update_window(window, |_, window, cx| {
+            window.focus_next(cx);
+            window.draw(cx).clear(cx);
+        })
+        .expect("implicit focus frame");
+        let implicit = registry.snapshot();
+        assert!(implicit.find("implicit").expect("implicit node").focused);
+        assert!(!implicit.find("explicit").expect("explicit node").focused);
+
+        cx.update_window(window, |_, window, cx| {
+            window.focus(&explicit, cx);
+            window.draw(cx).clear(cx);
+        })
+        .expect("explicit focus frame");
+        let explicit_snapshot = registry.snapshot();
+        assert!(
+            !explicit_snapshot
+                .find("implicit")
+                .expect("implicit node")
+                .focused
+        );
+        assert!(
+            explicit_snapshot
+                .find("explicit")
+                .expect("explicit node")
+                .focused
+        );
     }
 
     #[gpui::test]

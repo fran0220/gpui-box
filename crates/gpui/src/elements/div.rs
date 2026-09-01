@@ -115,6 +115,17 @@ impl Interactivity {
         }
     }
 
+    /// Returns the focus handle GPUI resolved for this element in the current
+    /// draw.
+    ///
+    /// A handle passed to [`InteractiveElement::track_focus`] is available as
+    /// soon as it is attached. For an implicitly focusable element, such as
+    /// one configured with [`InteractiveElement::tab_index`], the generated
+    /// handle becomes available after the element requests layout.
+    pub fn focus_handle(&self) -> Option<&FocusHandle> {
+        self.tracked_focus_handle.as_ref()
+    }
+
     /// Bind the given callback to the mouse down event for the given mouse button, during the bubble phase.
     /// The imperative API equivalent of [`InteractiveElement::on_mouse_down`].
     ///
@@ -796,6 +807,20 @@ pub trait InteractiveElement: Sized {
     fn track_focus(mut self, focus_handle: &FocusHandle) -> Self {
         self.interactivity().focusable = true;
         self.interactivity().tracked_focus_handle = Some(focus_handle.clone());
+        self
+    }
+
+    /// Observe this element after its subtree has prepainted, with the exact
+    /// focus handle GPUI resolved for it during layout.
+    ///
+    /// The handle is `None` when the element is not focusable. This keeps
+    /// framework integrations on the same focus authority used for event
+    /// dispatch and platform accessibility without creating another handle.
+    fn on_focus_resolved(
+        mut self,
+        listener: impl Fn(Bounds<Pixels>, Option<&FocusHandle>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.interactivity().focus_resolved_listener = Some(Box::new(listener));
         self
     }
 
@@ -1825,6 +1850,8 @@ pub(crate) type PinchListener =
     Box<dyn Fn(&PinchEvent, DispatchPhase, &Hitbox, &mut Window, &mut App) + 'static>;
 
 pub(crate) type ClickListener = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
+type FocusResolvedListener =
+    Box<dyn Fn(Bounds<Pixels>, Option<&FocusHandle>, &mut Window, &mut App) + 'static>;
 
 pub(crate) struct DragListener {
     value: Arc<dyn Any>,
@@ -2215,6 +2242,7 @@ pub struct Interactivity {
     pub(crate) key_context: Option<KeyContext>,
     pub(crate) focusable: bool,
     pub(crate) tracked_focus_handle: Option<FocusHandle>,
+    pub(crate) focus_resolved_listener: Option<FocusResolvedListener>,
     pub(crate) focus_reveal: Option<(ScrollHandle, Edges<Pixels>)>,
     pub(crate) tracked_scroll_handle: Option<ScrollHandle>,
     pub(crate) scroll_anchor: Option<ScrollAnchor>,
@@ -2432,7 +2460,7 @@ impl Interactivity {
                 .a11y
                 .set_active_descendant(global_id.accesskit_node_id());
         }
-        window.with_optional_element_state::<InteractiveElementState, _>(
+        let result = window.with_optional_element_state::<InteractiveElementState, _>(
             global_id,
             |element_state, window| {
                 let mut element_state =
@@ -2480,7 +2508,11 @@ impl Interactivity {
                     )
                 })
             },
-        )
+        );
+        if let Some(listener) = self.focus_resolved_listener.as_ref() {
+            listener(bounds, self.tracked_focus_handle.as_ref(), window, cx);
+        }
+        result
     }
 
     fn should_insert_hitbox(&self, style: &Style, window: &Window, cx: &App) -> bool {
@@ -4529,7 +4561,10 @@ mod tests {
         MouseDownEvent, MouseMoveEvent, MouseUpEvent, TestAppContext, canvas,
         util::FluentBuilder as _,
     };
-    use std::{cell::Cell, rc::Weak};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Weak,
+    };
 
     struct PointerCaptureTestView {
         moves: Rc<Cell<usize>>,
@@ -4577,6 +4612,61 @@ mod tests {
                         .tab_index(1),
                 )
         }
+    }
+
+    struct ResolvedFocusTestView {
+        generated: Rc<RefCell<Option<FocusHandle>>>,
+        non_focusable_was_none: Rc<Cell<bool>>,
+    }
+
+    impl Render for ResolvedFocusTestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            let generated = self.generated.clone();
+            let non_focusable_was_none = self.non_focusable_was_none.clone();
+            div()
+                .child(div().id("generated-focus").tab_index(0).on_focus_resolved(
+                    move |_, focus, _, _| {
+                        *generated.borrow_mut() = focus.cloned();
+                    },
+                ))
+                .child(
+                    div()
+                        .id("not-focusable")
+                        .on_focus_resolved(move |_, focus, _, _| {
+                            non_focusable_was_none.set(focus.is_none());
+                        }),
+                )
+        }
+    }
+
+    #[test]
+    fn resolved_focus_observers_receive_the_elements_actual_handle() {
+        let mut cx = TestAppContext::single();
+        let generated = Rc::new(RefCell::new(None));
+        let non_focusable_was_none = Rc::new(Cell::new(false));
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let generated = generated.clone();
+                let non_focusable_was_none = non_focusable_was_none.clone();
+                move |_, _| ResolvedFocusTestView {
+                    generated,
+                    non_focusable_was_none,
+                }
+            })
+            .into();
+
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("initial frame");
+        let first = generated.borrow().clone().expect("generated handle");
+        assert!(non_focusable_was_none.get());
+
+        cx.update_window(window, |_, window, cx| {
+            window.focus_next(cx);
+            window.draw(cx).clear(cx);
+            assert!(first.is_focused(window));
+        })
+        .expect("focused frame");
+        assert_eq!(generated.borrow().as_ref(), Some(&first));
     }
 
     fn setup_focus_visibility_test() -> (TestAppContext, AnyWindowHandle, FocusHandle, FocusHandle)

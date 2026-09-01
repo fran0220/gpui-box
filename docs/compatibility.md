@@ -163,6 +163,13 @@ do not consume the references uniformly, resolution also derives an absent
 scalar label or description from the related node text. Explicit scalar values
 still win and the references remain present.
 
+`InteractiveElement::on_focus_resolved` runs after the element's subtree has
+prepainted and receives the exact handle GPUI resolved during layout. An
+explicit `track_focus` handle remains authoritative; `tab_index` elements use
+their stable framework-generated handle; and non-focusable elements receive no
+handle. Kit semantic diagnostics read focus through this observer, while
+AccessKit continues to use the same existing handle and node projection.
+
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.
 Kit scrollbars bind to that target instead of wrapping a virtualized list in a

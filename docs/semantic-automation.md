@@ -17,14 +17,17 @@ button.semantic_in(
 )
 ```
 
-The probe stretches over its parent and records bounds during prepaint. It
-paints nothing and does not consume input. The same call also projects the
-supported role, name, value, control state, focus, range, and widget selection
-into GPUI's AccessKit tree. `NodeSpec::labels` and `NodeSpec::describes` also
-become native labelled-by and described-by relationships when both stable ids
-resolve uniquely in the active window, including across deferred overlays. See
-[Accessibility](accessibility.md) for the exact platform capability matrix and
-unsupported boundaries.
+The decorated element records its bounds and GPUI-resolved focus handle after
+subtree prepaint; diagnostics add no layout or paint element and consume no
+input. A caller-owned handle declared with `NodeSpec::focus` remains
+authoritative. Otherwise a focusable element publishes the stable handle GPUI
+created for `tab_index`; a non-focusable element remains unfocused. The same
+call also projects the supported role, name, value, control state, focus,
+range, and widget selection into GPUI's AccessKit tree. `NodeSpec::labels` and
+`NodeSpec::describes` also become native labelled-by and described-by
+relationships when both stable ids resolve uniquely in the active window,
+including across deferred overlays. See [Accessibility](accessibility.md) for
+the exact platform capability matrix and unsupported boundaries.
 
 ## Frame lifecycle
 

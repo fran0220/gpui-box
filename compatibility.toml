@@ -46,6 +46,7 @@ contract = "Window::show_context_menu consumes the shared Menu action tree, pres
 [framework_accessibility]
 cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."
 clipped_role_bounds = "Role-bearing element bounds are intersected with the active content mask before AccessKit publication; fully clipped nodes are omitted for that frame."
+resolved_element_focus = "InteractiveElement::on_focus_resolved observes the exact explicit or framework-generated handle after subtree prepaint; non-focusable elements report no handle, and Kit diagnostics use this authority without changing AccessKit focus."
 
 [framework_layout]
 measured_reveal = "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."

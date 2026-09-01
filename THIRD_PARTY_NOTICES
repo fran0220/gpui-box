@@ -63,6 +63,9 @@ resolver, inverse relationship declarations, deferred-subtree resolution,
 focused-owner validation, stale-endpoint removal, and absent-scalar
 name/description fallback are GPUI Box work over AccessKit's existing
 relationship/focus projection and import no additional source.
+The resolved-focus prepaint observer and Kit diagnostic projection are GPUI Box
+work over the same explicit and framework-generated focus handles used by
+dispatch and AccessKit; they import no additional source.
 The window-owned document-selection coordinator, isolated selection scopes,
 virtualized-copy coverage, and generic scroll-target contract are GPUI Box work
 over existing framework state and import no editor, product, or third-party

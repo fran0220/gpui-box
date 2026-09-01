@@ -64,6 +64,32 @@ fn clicking_a_tab_reports_it_without_moving_the_selection(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+fn clicking_a_tab_publishes_focus_on_only_that_tab(cx: &mut TestAppContext) {
+    let (mut harness, _calls) = tabs(cx, "runs");
+
+    assert!(
+        !harness
+            .node("workspace.tabs.overview")
+            .expect("published")
+            .focused
+    );
+    harness.click("workspace.tabs.overview");
+
+    assert!(
+        harness
+            .node("workspace.tabs.overview")
+            .expect("published")
+            .focused
+    );
+    assert!(
+        !harness
+            .node("workspace.tabs.runs")
+            .expect("published")
+            .focused
+    );
+}
+
+#[gpui::test]
 fn a_tab_publishes_its_label_under_the_strip(cx: &mut TestAppContext) {
     let (mut harness, _calls) = tabs(cx, "runs");
     let node = harness.node("workspace.tabs.runs").expect("published");

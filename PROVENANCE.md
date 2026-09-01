@@ -125,6 +125,12 @@ element identities while supplying native adapters the same resolved name/help
 text when they do not consume those properties. It imports no accessibility
 adapter, product, or UI source.
 
+The resolved-focus prepaint observer is subsequent GPUI Box work at that same
+element boundary. It exposes the exact explicit or framework-generated handle
+already used for dispatch and AccessKit, allowing diagnostics to publish focus
+without allocating a second handle or maintaining a parallel identity map. It
+imports no accessibility adapter, product, or UI source.
+
 The window-owned document-selection coordinator, caller-declared reading order,
 overlay scope isolation, truthful virtualized-copy coverage, and aggregate
 clipboard path are subsequent GPUI Box work above that selectable-text
