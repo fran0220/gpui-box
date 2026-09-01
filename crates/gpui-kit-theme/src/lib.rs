@@ -1339,7 +1339,16 @@ impl Theme {
         vec![BoxShadow {
             color: focus.opacity(self.effects.focus_ring_alpha),
             offset: point(px(0.0), px(0.0)),
-            blur_radius: px(width * 2.0),
+            // Softened by well under its own width, so the band has an edge.
+            //
+            // This used to blur by twice the width, which was invisible while
+            // the halo was a drop shadow: an opaque control covered the
+            // interior and only the outer falloff showed. Cutting the element
+            // out of it exposed the whole band, and eight device pixels of
+            // bloom around a row reads as a smudge rather than as a ring —
+            // worst on a light theme, where it spreads across the surface
+            // instead of dying into it.
+            blur_radius: px(width * 0.75),
             spread_radius: px(width * 0.5),
             // The halo answers "the keyboard is here" about the element's
             // edge, so the element's own shape is cut out of it. A drop
