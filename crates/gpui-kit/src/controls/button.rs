@@ -5,14 +5,14 @@ use gpui::{
     RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use gpui_kit_assets::{Icon, icon};
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
     ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Radius, SemanticColor, Theme, TypeScale,
     Variant, VariantColors,
 };
 
-use crate::display::icon::{Icon as IconView, IconTone};
+use crate::display::icon::{Icon as IconView, IconTone, flips, paint as paint_icon};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
@@ -387,12 +387,11 @@ impl RenderOnce for Button {
             );
         }
         let glyph = self.glyph.filter(|_| !self.loading).map(|glyph| {
+            let glyph = if self.selected { glyph.filled() } else { glyph };
             // SVG paint does not inherit the frame's text color, so the icon
             // has to name the variant foreground itself.
-            icon(glyph)
-                .size(px(metrics.icon_size))
+            paint_icon(glyph, metrics.icon_size, paint, flips(glyph, direction))
                 .flex_none()
-                .text_color(paint)
                 .when(
                     !inert && !on_shared_tiers && self.variant == ButtonVariant::Ghost,
                     |element| {

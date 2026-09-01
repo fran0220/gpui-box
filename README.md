@@ -137,7 +137,7 @@ Zed is neither a linked package nor an ongoing development source. See
 ## License
 
 The framework cohort is Apache-2.0. GPUI Box Kit and MCP are MIT. Bundled Geist
-and Noto fonts are OFL 1.1; Solar Icons are CC BY 4.0; other derived assets
+and Noto fonts are OFL 1.1; Phosphor Icons are MIT; other derived assets
 retain their stated terms. See [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
 The former <https://gpui-kit.origingame.dev> endpoint remains a compatibility

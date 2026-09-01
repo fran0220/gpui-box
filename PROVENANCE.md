@@ -256,20 +256,25 @@ License text: `licenses/COMET-MIT.txt`.
 - Files: `crates/gpui-kit-assets/assets/fonts/Geist*.ttf`
 - License text: `licenses/GEIST-OFL-1.1.txt`
 
-## P04: Solar Icons
+## P04: Phosphor Icons Core 2.1.1
 
-- Source: Solar Icons, Linear weight, by 480 Design
-- URL: <https://www.figma.com/community/file/1166831539721848736>
-- License: Creative Commons Attribution 4.0 International
-- Attribution: “Solar Icons by 480 Design.”
-- Files: most SVGs under `crates/gpui-kit-assets/assets/icons/`
-- License text: `crates/gpui-kit-assets/licenses/CC-BY-4.0.txt`
+- Source: <https://github.com/phosphor-icons/core>
+- Revision: `2b75f3ad12b420c9504ef05df8d2564a28f8500e`
+- Package version: 2.1.1
+- License: MIT; Copyright (c) 2023 Phosphor Icons
+- Scope: the controlled Regular and Fill subset under
+  `crates/gpui-kit-assets/assets/icons/`
+- Selection and reading-direction decisions:
+  `crates/gpui-kit-assets/assets/PHOSPHOR.toml`
+- Exact byte receipts: `crates/gpui-kit-assets/assets/icons/SHA256SUMS`
+- License text: `crates/gpui-kit-assets/licenses/PHOSPHOR-MIT.txt`
 
-The `star` and `star-filled` glyphs are original repository drawings and are
-covered by the repository license rather than the Solar Icons attribution.
-
-Comet-authored generic glyphs in that directory remain under MIT and are
-identified by the adjacent `assets/SOURCE.md`.
+`cargo run -p xtask -- icons import <phosphor-core-checkout>` accepts only that
+package version and exact Git revision, copies only the manifest selection,
+and regenerates the Rust path catalog and SHA-256 receipts. `icons check`, also
+part of the gate, rejects stale generated source, added or missing SVGs,
+non-256-unit/non-`currentColor` SVGs, external references, scripts, and byte
+drift.
 
 ## P05: Noto Sans Symbols and script fallback families
 

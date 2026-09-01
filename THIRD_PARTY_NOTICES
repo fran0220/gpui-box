@@ -185,18 +185,16 @@ crates/gpui-kit-assets/assets/fonts.
 Checksums and exact upstream paths: crates/gpui-kit-assets/assets/SOURCE.md
 License text: licenses/NOTO-OFL-1.1.txt
 
-Solar Icons
+Phosphor Icons Core 2.1.1
 --------------------------------------------------------------------------------
-Source: Solar Icons, Linear weight, by 480 Design
-https://www.figma.com/community/file/1166831539721848736
-License: Creative Commons Attribution 4.0 International
-https://creativecommons.org/licenses/by/4.0/
-Attribution: “Solar Icons by 480 Design.”
-Scope: product-neutral SVGs under crates/gpui-kit-assets/assets/icons. Generic
-Comet glyphs identified in assets/SOURCE.md are covered by Comet's MIT license.
-The `star` and `star-filled` glyphs are original repository drawings covered by
-the repository license.
-License text: crates/gpui-kit-assets/licenses/CC-BY-4.0.txt
+Source: https://github.com/phosphor-icons/core
+Revision: 2b75f3ad12b420c9504ef05df8d2564a28f8500e
+License: MIT
+Copyright (c) 2023 Phosphor Icons
+Scope: the controlled Regular and Fill subset under
+crates/gpui-kit-assets/assets/icons. Selection, checksums, and the exact import
+recipe live beside the assets.
+License text: crates/gpui-kit-assets/licenses/PHOSPHOR-MIT.txt
 
 IBM Plex Sans and Lilex
 --------------------------------------------------------------------------------

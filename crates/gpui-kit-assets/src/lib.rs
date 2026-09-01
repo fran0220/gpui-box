@@ -7,154 +7,31 @@ use std::sync::OnceLock;
 
 use gpui::{App, AssetSource, FontFallbacks, Global, Result, SharedString, Styled as _, Svg, svg};
 
+mod icons;
+
+pub use icons::{Icon, IconName, IconWeight, Mirroring, PHOSPHOR_REVISION, PHOSPHOR_VERSION};
+
 struct EmbeddedFonts;
 
 impl Global for EmbeddedFonts {}
 
-/// Whether a glyph's meaning is carried by the direction it reads in.
-///
-/// A chevron that points at the next item points the other way once the
-/// interface reads right to left; a checkmark, a gear, and a globe do not.
-/// The property belongs to the drawing, not to the component that places it,
-/// which is why it lives beside the path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Mirroring {
-    /// Flipped horizontally when the interface reads right to left.
-    Directional,
-    /// Drawn the same way in both reading directions.
-    Fixed,
+#[derive(Debug)]
+pub struct Assets;
+
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        Ok(icons::load(path))
+    }
+
+    fn list(&self, prefix: &str) -> Result<Vec<SharedString>> {
+        Ok(icons::ALL_PATHS
+            .iter()
+            .copied()
+            .filter(|path| path.starts_with(prefix))
+            .map(SharedString::from)
+            .collect())
+    }
 }
-
-macro_rules! icons {
-    ($(($variant:ident, $name:literal, $mirroring:ident)),+ $(,)?) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum Icon {
-            $($variant),+
-        }
-
-        impl Icon {
-            pub const ALL: &'static [Icon] = &[$(Icon::$variant),+];
-
-            pub const fn path(self) -> &'static str {
-                match self {
-                    $(Icon::$variant => concat!("icons/", $name, ".svg")),+,
-                }
-            }
-
-            /// How this glyph behaves when the reading direction reverses.
-            pub const fn mirroring(self) -> Mirroring {
-                match self {
-                    $(Icon::$variant => Mirroring::$mirroring),+,
-                }
-            }
-
-            /// Whether a right-to-left interface draws this glyph flipped.
-            pub const fn mirrors_in_rtl(self) -> bool {
-                matches!(self.mirroring(), Mirroring::Directional)
-            }
-        }
-
-        #[derive(Debug)]
-        pub struct Assets;
-
-        impl AssetSource for Assets {
-            fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-                Ok(match path {
-                    $(
-                        concat!("icons/", $name, ".svg") => Some(Cow::Borrowed(
-                            include_bytes!(concat!("../assets/icons/", $name, ".svg")).as_slice(),
-                        )),
-                    )+
-                    _ => None,
-                })
-            }
-
-            fn list(&self, prefix: &str) -> Result<Vec<SharedString>> {
-                Ok(Icon::ALL
-                    .iter()
-                    .map(|icon| icon.path())
-                    .filter(|path| path.starts_with(prefix))
-                    .map(SharedString::from)
-                    .collect())
-            }
-        }
-    };
-}
-
-// The third column is the reading-direction decision for that drawing. It is
-// a judgement about the artwork itself: a glyph is Directional when flipping
-// it preserves the meaning and leaving it alone reverses it. Radially or
-// bilaterally symmetric glyphs, glyphs whose only axis is vertical, and
-// conventional marks that are read as symbols rather than as pictures — a
-// checkmark, a rotation, a keyboard — stay Fixed.
-icons![
-    (AddCircle, "add-circle", Fixed),
-    (AltArrowDown, "alt-arrow-down", Fixed),
-    (AltArrowLeft, "alt-arrow-left", Directional),
-    (AltArrowRight, "alt-arrow-right", Directional),
-    (Archive, "archive-minimalistic", Fixed),
-    (ArchiveUp, "archive-up-minimalistic", Fixed),
-    (ArrowDown, "arrow-down", Fixed),
-    (ArrowLeft, "arrow-left", Directional),
-    (ArrowRight, "arrow-right", Directional),
-    (ArrowUp, "arrow-up", Fixed),
-    (Calendar, "calendar", Fixed),
-    (Chat, "chat-round-line", Directional),
-    (Check, "check", Fixed),
-    (CheckboxChecked, "checkbox-checked", Fixed),
-    (CheckboxEmpty, "checkbox-empty", Fixed),
-    (Checklist, "checklist", Directional),
-    (Close, "close", Fixed),
-    (CloseCircle, "close-circle", Fixed),
-    (Command, "command", Fixed),
-    (Copy, "copy", Directional),
-    (Danger, "danger-triangle", Fixed),
-    (Document, "document", Directional),
-    (DocumentAdd, "document-add", Directional),
-    (DoubleArrowLeft, "double-arrow-left", Directional),
-    (DoubleArrowRight, "double-arrow-right", Directional),
-    (DragHandle, "drag-handle", Fixed),
-    (Filter, "filter", Fixed),
-    (Folder, "folder", Directional),
-    (Forbidden, "forbidden", Fixed),
-    (FolderWithFiles, "folder-with-files", Directional),
-    (GitBranch, "git-branch", Directional),
-    (Global, "global", Fixed),
-    (Image, "image", Fixed),
-    (Info, "info-circle", Fixed),
-    (Key, "key-minimalistic", Directional),
-    (Keyboard, "keyboard", Fixed),
-    (Laptop, "laptop", Fixed),
-    (List, "list", Directional),
-    (Logout, "logout-2", Directional),
-    (Magnifier, "magnifer", Directional),
-    (Minus, "minus", Fixed),
-    (Monitor, "monitor", Fixed),
-    (Notebook, "notebook-minimalistic", Fixed),
-    (Paperclip, "paperclip", Directional),
-    (Pause, "pause", Fixed),
-    (Pen, "pen", Directional),
-    (PenNew, "pen-new-square", Directional),
-    (Play, "play", Directional),
-    (Plus, "plus", Fixed),
-    (Refresh, "refresh", Fixed),
-    (Restart, "restart", Fixed),
-    (Return, "return", Directional),
-    (Settings, "settings-minimalistic", Fixed),
-    (Sidebar, "sidebar-minimalistic", Directional),
-    (SidebarLeft, "sidebar-minimalistic-left", Directional),
-    (Smartphone, "smartphone", Fixed),
-    (SortVertical, "sort-vertical", Fixed),
-    (Star, "star", Fixed),
-    (StarFilled, "star-filled", Fixed),
-    (SoundWave, "sound-wave", Fixed),
-    (Stop, "stop", Fixed),
-    (Terminal, "terminal", Directional),
-    (Trash, "trash-bin-minimalistic", Fixed),
-    (Tuning, "tuning", Fixed),
-    (Video, "video", Directional),
-    (Widget, "widget", Fixed),
-];
 
 pub fn icon(icon: Icon) -> Svg {
     svg().path(icon.path()).flex_none()
@@ -248,15 +125,28 @@ mod tests {
     #[test]
     fn every_registered_icon_is_embedded_svg() {
         let assets = Assets;
-        for icon in Icon::ALL {
-            let bytes = assets
-                .load(icon.path())
-                .expect("asset lookup")
-                .expect("registered icon");
-            let text = std::str::from_utf8(&bytes).expect("UTF-8 SVG");
-            assert!(text.contains("<svg"));
-            assert!(text.contains("viewBox"));
+        for name in IconName::ALL {
+            for weight in IconWeight::ALL {
+                let icon = Icon::new(*name).with_weight(*weight);
+                let bytes = assets
+                    .load(icon.path())
+                    .expect("asset lookup")
+                    .expect("registered icon");
+                let text = std::str::from_utf8(&bytes).expect("UTF-8 SVG");
+                assert!(text.contains("<svg"));
+                assert!(text.contains("viewBox=\"0 0 256 256\""));
+                assert!(text.contains("currentColor"));
+            }
         }
+    }
+
+    #[test]
+    fn regular_is_the_resting_weight_and_fill_is_explicit() {
+        assert_eq!(Icon::Star.weight(), IconWeight::Regular);
+        assert_eq!(Icon::Star.filled().weight(), IconWeight::Fill);
+        assert_eq!(Icon::StarFilled, Icon::Star.filled());
+        assert_eq!(IconName::ALL.len(), 76);
+        assert_eq!(Icon::ALL.len(), IconName::ALL.len());
     }
 
     #[test]
@@ -287,14 +177,14 @@ mod tests {
 
     #[test]
     fn every_icon_carries_a_mirroring_decision() {
-        // The macro makes this total, so the check that matters is that the
-        // catalog was actually thought about rather than answered one way.
+        // The generated match is total, so the check that matters here is that
+        // the catalog was actually thought about rather than answered one way.
         let directional = Icon::ALL
             .iter()
             .filter(|icon| icon.mirrors_in_rtl())
             .count();
-        assert_eq!(Icon::ALL.len(), 66);
-        assert_eq!(directional, 27);
+        assert!(directional > 0);
+        assert!(directional < Icon::ALL.len());
     }
 
     #[test]

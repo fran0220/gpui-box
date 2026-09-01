@@ -14,15 +14,15 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
     IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, NativeMenuOutcome, ParentElement,
-    Pixels, Point, Render, SharedString, StatefulInteractiveElement, Styled, Transformation,
-    Window, div, prelude::FluentBuilder, px,
+    Pixels, Point, Render, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
-use gpui_kit_assets::{Icon, icon};
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
-use crate::display::icon::flips;
+use crate::display::icon::{flips, paint as paint_icon};
 use crate::foundation::direction::{ActiveDirection, LayoutDirection};
 use crate::foundation::{Ident, Pressable, Selectable, Sizable, StyledExt, text};
 use crate::motion;
@@ -515,7 +515,7 @@ fn row<V: 'static>(
             }
 
             let glyph = match (checked, item.icon) {
-                (Some(true), _) => Some(Icon::Check),
+                (Some(true), _) => Some(Icon::Check.filled()),
                 (Some(false), _) => None,
                 (None, glyph) => glyph,
             };
@@ -537,9 +537,12 @@ fn row<V: 'static>(
                         .w(px(GLYPH_SLOT))
                         .justify_center()
                         .children(glyph.map(|glyph| {
-                            icon(glyph)
-                                .size(px(theme.control.sm.icon_size))
-                                .text_color(color)
+                            paint_icon(
+                                glyph,
+                                theme.control.sm.icon_size,
+                                color,
+                                flips(glyph, cx.layout_direction()),
+                            )
                         })),
                 )
                 .child(
@@ -555,21 +558,17 @@ fn row<V: 'static>(
                 .when(submenu, |element| {
                     // The chevron says "there is more this way", and this
                     // way is the way the menu reads.
-                    let flipped = flips(Icon::AltArrowRight, cx.layout_direction());
-                    element.child(
-                        icon(Icon::AltArrowRight)
-                            .size(px(theme.control.xs.icon_size))
-                            .text_color(if item.destructive {
-                                theme.colors.danger
-                            } else {
-                                theme.colors.text_muted
-                            })
-                            .when(flipped, |glyph| {
-                                glyph.with_transformation(Transformation::scale(gpui::size(
-                                    -1.0, 1.0,
-                                )))
-                            }),
-                    )
+                    let glyph = Icon::AltArrowRight;
+                    element.child(paint_icon(
+                        glyph,
+                        theme.control.xs.icon_size,
+                        if item.destructive {
+                            theme.colors.danger
+                        } else {
+                            theme.colors.text_muted
+                        },
+                        flips(glyph, cx.layout_direction()),
+                    ))
                 })
                 .when(!item.disabled, |element| {
                     element.on_click(cx.listener(move |view, _, window, cx| {

@@ -70,22 +70,28 @@ a product before anybody saw them.
 
 ## Icons
 
-Most icons are Solar Icons, Linear weight, by 480 Design, licensed under
-CC BY 4.0. Attribution: “Solar Icons by 480 Design.”
+The generic catalog is a controlled subset of Phosphor Icons Core 2.1.1,
+Copyright (c) 2023 Phosphor Icons and licensed under MIT:
 
-The terminal, plus, close, check, copy, return, info-circle, git-branch,
-and mirrored sidebar glyphs are product-neutral icons derived from Comet,
-Copyright (c) 2026 Wing, MIT licensed.
+- source: <https://github.com/phosphor-icons/core>;
+- revision: `2b75f3ad12b420c9504ef05df8d2564a28f8500e`;
+- selected weights: Regular, the one resting visual language, and Fill, its
+  selected or committed state;
+- selection and reading-direction decisions: `PHOSPHOR.toml`;
+- imported-byte receipts: `icons/SHA256SUMS`;
+- generated Rust catalog: `../src/icons.rs`.
 
-The calendar, checkbox-empty, checkbox-checked, double-arrow-left,
-double-arrow-right, drag-handle, filter, forbidden, image, minus, pause, play,
-sound-wave, star, star-filled, stop and video glyphs are original drawings for
-this repository, on
-the same sixteen-unit grid and 1.25 stroke as the set around them. They exist
-because the components that needed them were drawing a character the embedded
-fonts do not cover — a task list rendered its boxes as tofu, a date field
-borrowed the checklist glyph, a transport had no play or pause of its own, and
-a refused run wore the stop square that a running one stops with.
+Import only from a checkout at the pinned revision:
+
+```bash
+cargo run -p xtask -- icons import /path/to/phosphor-icons-core
+cargo run -p xtask -- icons check
+```
+
+The importer validates the package identity and version, exact Git revision,
+controlled asset set, 256-unit view box, `currentColor` paint, self-contained
+SVG shape, and SHA-256 receipts. Thin, Light, Bold, and Duotone remain upstream
+choices rather than additional Kit visual dialects.
 
 Product and provider marks from the source application are deliberately not
 included in this generic asset crate.

@@ -13,6 +13,7 @@ use anyhow::{Context, Result, bail};
 mod api;
 mod dependencies;
 mod developer;
+mod icons;
 mod package;
 mod site;
 mod strings;
@@ -30,6 +31,14 @@ fn main() -> Result<()> {
     match (command.0.as_deref(), command.1.as_deref()) {
         (Some("tokens"), Some("generate")) => tokens(false),
         (Some("tokens"), Some("check")) => tokens(true),
+        (Some("icons"), Some("check")) => icons::check(&root()),
+        (Some("icons"), Some("import")) => {
+            let source = rest
+                .first()
+                .map(PathBuf::from)
+                .context("usage: cargo xtask icons import <phosphor-core-checkout>")?;
+            icons::import(&root(), &source)
+        }
         (Some("strings"), Some("check")) => strings::check(&root()),
         (Some("strings"), Some("generate")) => strings::generate(&root()),
         (Some("typography"), Some("check")) => typography::check(&root()),
@@ -72,7 +81,7 @@ fn main() -> Result<()> {
         (Some("gate"), Some("full")) => gate(true),
         (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
-            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|site generate [output]|site check|accessibility check|performance check|tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|site generate [output]|site check|accessibility check|performance check|tokens generate|tokens check|icons check|icons import <phosphor-core-checkout>|strings check|\
              strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
@@ -1080,6 +1089,7 @@ fn scenes_render(only: &[String]) -> Result<()> {
 /// and the visual regression, and is what a commit wants.
 fn gate(full: bool) -> Result<()> {
     step("cargo", &["fmt", "--all", "--", "--check"], None)?;
+    icons::check(&root())?;
     dependencies::check(&root(), &[])?;
     future_compatibility_check()?;
     step("cargo", &["test", "--workspace"], None)?;
@@ -1179,6 +1189,7 @@ fn gate_only(scenes: &[String]) -> Result<()> {
         }
     }
     step("cargo", &["fmt", "--all", "--", "--check"], None)?;
+    icons::check(&root())?;
     step(
         "cargo",
         &[

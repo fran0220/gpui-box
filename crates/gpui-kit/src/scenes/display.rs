@@ -2003,16 +2003,76 @@ pub(super) fn icon(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .child(caption(
             &theme,
-            "The whole catalog, so a glyph that goes missing is visible here",
+            "Phosphor Regular is the resting catalog; every glyph is rendered at a real control size",
+        ))
+        .child(
+            row(&theme)
+                .gap(px(theme.space(Space::Xs)))
+                .children(Icon::ALL.iter().map(|glyph| {
+                    let name = glyph.name().source_name();
+                    div()
+                        .row()
+                        .items_center()
+                        .gap(px(theme.space(Space::Xs)))
+                        .w(px(160.0))
+                        .h(px(32.0))
+                        .px(px(theme.space(Space::Xs)))
+                        .radius(&theme, Radius::Control)
+                        .well(&theme)
+                        .child(IconView::named(
+                            format!("scene.icon.glyph.{name}"),
+                            *glyph,
+                            name,
+                        ))
+                        .child(
+                            crate::foundation::text(&theme, TypeScale::Caption, name)
+                                .text_tone(&theme, TextTone::Muted)
+                                .text_ellipsis(),
+                        )
+                        .into_any_element()
+                })),
+        )
+        .child(caption(
+            &theme,
+            "Fill is the selected or committed state of the same symbol, never an ornamental weight",
+        ))
+        .child(
+            row(&theme).gap(px(theme.space(Space::Md))).children(
+                [
+                    (Icon::Star, "star"),
+                    (Icon::CheckCircle, "check-circle"),
+                    (Icon::Home, "home"),
+                    (Icon::Browser, "browser"),
+                ]
+                .map(|(glyph, label)| {
+                    div()
+                        .row()
+                        .items_center()
+                        .gap(px(theme.space(Space::Sm)))
+                        .p(px(theme.space(Space::Sm)))
+                        .radius(&theme, Radius::Card)
+                        .surface(&theme, Surface::Panel)
+                        .child(IconView::new(glyph).large().muted())
+                        .child(IconView::new(glyph.filled()).large().accent())
+                        .child(
+                            crate::foundation::text(&theme, TypeScale::Caption, label)
+                                .text_tone(&theme, TextTone::Muted),
+                        )
+                        .into_any_element()
+                }),
+            ),
+        )
+        .child(caption(
+            &theme,
+            "The token size ramp keeps icon and control geometry on the same scale",
         ))
         .child(
             row(&theme)
                 .gap(px(theme.space(Space::Md)))
-                .children(Icon::ALL.iter().map(|glyph| {
-                    let name = SharedString::from(format!("{glyph:?}"));
-                    IconView::named(format!("scene.icon.glyph.{name}"), *glyph, name.clone())
-                        .into_any_element()
-                })),
+                .child(IconView::new(Icon::Sparkle).xs().faint())
+                .child(IconView::new(Icon::Sparkle).small().muted())
+                .child(IconView::new(Icon::Sparkle).medium())
+                .child(IconView::new(Icon::Sparkle).large().accent()),
         )
         .child(caption(
             &theme,
@@ -2031,7 +2091,7 @@ pub(super) fn icon(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .column()
                         .items_center()
                         .gap(px(theme.space(Space::Xs)))
-                        .w(px(96.0))
+                        .w(px(88.0))
                         .p(px(theme.space(Space::Sm)))
                         .radius(&theme, Radius::Card)
                         .surface(&theme, Surface::Panel)
@@ -2075,6 +2135,45 @@ pub(super) fn icon(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .into_any_element()
                 }),
             ),
+        )
+        .child(caption(
+            &theme,
+            "Semantic motion recipes: ongoing work spins, deliberation breathes, and settled feedback reacts once",
+        ))
+        .child(
+            row(&theme)
+                .gap(px(theme.space(Space::Lg)))
+                .child(
+                    IconView::named("scene.icon.motion.working", Icon::Spinner, "Working")
+                        .large()
+                        .accent()
+                        .spinning("scene.icon.motion.working.spin"),
+                )
+                .child(
+                    IconView::named(
+                        "scene.icon.motion.deliberating",
+                        Icon::Sparkle,
+                        "Deliberating",
+                    )
+                    .large()
+                    .breathing("scene.icon.motion.deliberating.breathe"),
+                )
+                .child(
+                    IconView::named(
+                        "scene.icon.motion.success",
+                        Icon::CheckCircle.filled(),
+                        "Succeeded",
+                    )
+                    .large()
+                    .success()
+                    .reacting("scene.icon.motion.success.pop", crate::motion::Micro::Pop),
+                )
+                .child(
+                    IconView::named("scene.icon.motion.error", Icon::Danger, "Failed")
+                        .large()
+                        .danger()
+                        .reacting("scene.icon.motion.error.wobble", crate::motion::Micro::Wobble),
+                ),
         )
         .into_any_element()
 }

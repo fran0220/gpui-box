@@ -5,7 +5,12 @@
 //! clicked is [`IconButton`](crate::controls::button::IconButton), which
 //! already exists and is not reimplemented here.
 //!
-//! Three things are deliberately not caller-supplied numbers:
+//! The catalog has one resting visual language: Phosphor Regular. A caller may
+//! choose the matching Fill drawing with [`Glyph::filled`] when the same symbol
+//! reports a selected, checked, or committed state. Fill is state, not a second
+//! decorative style.
+//!
+//! Three other things are deliberately not caller-supplied numbers:
 //!
 //! - **Size** comes from the token control scale, the same `iconSize` step
 //!   [`Button`](crate::controls::button::Button) already resolves, so a glyph
@@ -95,6 +100,8 @@ pub struct Icon {
     /// How this glyph reports work in progress, and the identity that
     /// animation runs under. `None` is a glyph reporting a settled state.
     activity: Option<(motion::Activity, Ident)>,
+    /// A bounded response to a state change, distinct from ongoing activity.
+    reaction: Option<(motion::Micro, Ident)>,
 }
 
 impl Icon {
@@ -107,6 +114,7 @@ impl Icon {
             announcement: Announcement::Decorative,
             follow_direction: true,
             activity: None,
+            reaction: None,
         }
     }
 
@@ -122,6 +130,7 @@ impl Icon {
     /// glyph has none, and an animation needs something stable to run under.
     pub fn spinning(mut self, ident: impl Into<Ident>) -> Self {
         self.activity = Some((motion::Activity::Working, ident.into()));
+        self.reaction = None;
         self
     }
 
@@ -129,6 +138,19 @@ impl Icon {
     /// getting through work. The quieter of the two claims.
     pub fn breathing(mut self, ident: impl Into<Ident>) -> Self {
         self.activity = Some((motion::Activity::Deliberating, ident.into()));
+        self.reaction = None;
+        self
+    }
+
+    /// Reacts once to a settled state change with a named micro-motion.
+    ///
+    /// Typical pairings are [`motion::Micro::Pop`] for success,
+    /// [`motion::Micro::Wobble`] for refusal or error, and
+    /// [`motion::Micro::Sparkle`] for a newly available result. Reduced-motion
+    /// policy is resolved by the shared motion authority, not by the caller.
+    pub fn reacting(mut self, ident: impl Into<Ident>, reaction: motion::Micro) -> Self {
+        self.activity = None;
+        self.reaction = Some((reaction, ident.into()));
         self
     }
 
@@ -229,12 +251,15 @@ impl RenderOnce for Icon {
             self.resolved_color(&theme),
             self.flips_in(direction),
         );
-        let drawing = match self.activity {
-            Some((motion::Activity::Working, ident)) => {
+        let drawing = match (self.activity, self.reaction) {
+            (_, Some((reaction, ident))) => {
+                motion::micro(drawing, ident.element_id(), reaction, cx)
+            }
+            (Some((motion::Activity::Working, ident)), None) => {
                 motion::spin(drawing, ident.element_id(), &theme, cx)
             }
-            Some((_, ident)) => motion::breathe(drawing, ident.element_id(), &theme, cx),
-            None => drawing.into_any_element(),
+            (Some((_, ident)), None) => motion::breathe(drawing, ident.element_id(), &theme, cx),
+            (None, None) => drawing.into_any_element(),
         };
 
         match self.announcement {

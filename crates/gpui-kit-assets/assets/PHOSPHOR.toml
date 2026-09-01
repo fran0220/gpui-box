@@ -1,0 +1,394 @@
+# Regular is the one resting product weight. Fill is the selected/committed
+# counterpart on the same 256-unit geometry. Thin, Light, Bold, and Duotone
+# remain upstream choices rather than additional visual dialects in the Kit.
+weights = ["regular", "fill"]
+
+[source]
+url = "https://github.com/phosphor-icons/core"
+revision = "2b75f3ad12b420c9504ef05df8d2564a28f8500e"
+version = "2.1.1"
+
+[[icon]]
+variant = "AddCircle"
+source = "plus-circle"
+mirroring = "fixed"
+
+[[icon]]
+variant = "AltArrowDown"
+source = "caret-down"
+mirroring = "fixed"
+
+[[icon]]
+variant = "AltArrowLeft"
+source = "caret-left"
+mirroring = "directional"
+
+[[icon]]
+variant = "AltArrowRight"
+source = "caret-right"
+mirroring = "directional"
+
+[[icon]]
+variant = "Archive"
+source = "archive"
+mirroring = "fixed"
+
+[[icon]]
+variant = "ArchiveUp"
+source = "box-arrow-up"
+mirroring = "fixed"
+
+[[icon]]
+variant = "ArrowDown"
+source = "arrow-down"
+mirroring = "fixed"
+
+[[icon]]
+variant = "ArrowLeft"
+source = "arrow-left"
+mirroring = "directional"
+
+[[icon]]
+variant = "ArrowRight"
+source = "arrow-right"
+mirroring = "directional"
+
+[[icon]]
+variant = "ArrowUp"
+source = "arrow-up"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Browser"
+source = "browser"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Calendar"
+source = "calendar"
+mirroring = "fixed"
+
+[[icon]]
+variant = "CalendarDots"
+source = "calendar-dots"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Chat"
+source = "chat-circle-text"
+mirroring = "directional"
+
+[[icon]]
+variant = "Check"
+source = "check"
+mirroring = "fixed"
+
+[[icon]]
+variant = "CheckboxChecked"
+source = "check-square"
+mirroring = "fixed"
+
+[[icon]]
+variant = "CheckboxEmpty"
+source = "square"
+mirroring = "fixed"
+
+[[icon]]
+variant = "CheckCircle"
+source = "check-circle"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Checklist"
+source = "list-checks"
+mirroring = "directional"
+
+[[icon]]
+variant = "ClockCountdown"
+source = "clock-countdown"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Close"
+source = "x"
+mirroring = "fixed"
+
+[[icon]]
+variant = "CloseCircle"
+source = "x-circle"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Command"
+source = "command"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Copy"
+source = "copy"
+mirroring = "directional"
+
+[[icon]]
+variant = "CornersIn"
+source = "corners-in"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Danger"
+source = "warning"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Document"
+source = "file-text"
+mirroring = "directional"
+
+[[icon]]
+variant = "DocumentAdd"
+source = "file-plus"
+mirroring = "directional"
+
+[[icon]]
+variant = "DoubleArrowLeft"
+source = "caret-double-left"
+mirroring = "directional"
+
+[[icon]]
+variant = "DoubleArrowRight"
+source = "caret-double-right"
+mirroring = "directional"
+
+[[icon]]
+variant = "DragHandle"
+source = "dots-six-vertical"
+mirroring = "fixed"
+
+[[icon]]
+variant = "ExternalLink"
+source = "arrow-square-out"
+mirroring = "directional"
+
+[[icon]]
+variant = "Filter"
+source = "funnel-simple"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Folder"
+source = "folder"
+mirroring = "directional"
+
+[[icon]]
+variant = "Forbidden"
+source = "prohibit"
+mirroring = "fixed"
+
+[[icon]]
+variant = "FolderWithFiles"
+source = "folders"
+mirroring = "directional"
+
+[[icon]]
+variant = "GitBranch"
+source = "git-branch"
+mirroring = "directional"
+
+[[icon]]
+variant = "GitDiff"
+source = "git-diff"
+mirroring = "directional"
+
+[[icon]]
+variant = "Global"
+source = "globe"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Graph"
+source = "graph"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Home"
+source = "house"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Image"
+source = "image"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Info"
+source = "info"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Key"
+source = "key"
+mirroring = "directional"
+
+[[icon]]
+variant = "Keyboard"
+source = "keyboard"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Laptop"
+source = "laptop"
+mirroring = "fixed"
+
+[[icon]]
+variant = "List"
+source = "list"
+mirroring = "directional"
+
+[[icon]]
+variant = "Logout"
+source = "sign-out"
+mirroring = "directional"
+
+[[icon]]
+variant = "Magnifier"
+source = "magnifying-glass"
+mirroring = "directional"
+
+[[icon]]
+variant = "Minus"
+source = "minus"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Monitor"
+source = "monitor"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Notebook"
+source = "notebook"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Paperclip"
+source = "paperclip"
+mirroring = "directional"
+
+[[icon]]
+variant = "Pause"
+source = "pause"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Pen"
+source = "pencil-simple"
+mirroring = "directional"
+
+[[icon]]
+variant = "PenNew"
+source = "note-pencil"
+mirroring = "directional"
+
+[[icon]]
+variant = "Play"
+source = "play"
+mirroring = "directional"
+
+[[icon]]
+variant = "Plus"
+source = "plus"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Refresh"
+source = "arrow-clockwise"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Restart"
+source = "arrows-counter-clockwise"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Return"
+source = "arrow-bend-up-left"
+mirroring = "directional"
+
+[[icon]]
+variant = "Settings"
+source = "gear-six"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Sidebar"
+source = "sidebar"
+mirroring = "directional"
+
+[[icon]]
+variant = "SidebarLeft"
+source = "sidebar-simple"
+mirroring = "directional"
+
+[[icon]]
+variant = "Smartphone"
+source = "device-mobile"
+mirroring = "fixed"
+
+[[icon]]
+variant = "SortVertical"
+source = "arrows-down-up"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Sparkle"
+source = "sparkle"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Spinner"
+source = "spinner-gap"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Star"
+source = "star"
+mirroring = "fixed"
+
+[[icon]]
+variant = "SoundWave"
+source = "waveform"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Stop"
+source = "stop"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Terminal"
+source = "terminal-window"
+mirroring = "directional"
+
+[[icon]]
+variant = "Trash"
+source = "trash"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Tuning"
+source = "sliders-horizontal"
+mirroring = "fixed"
+
+[[icon]]
+variant = "Video"
+source = "video-camera"
+mirroring = "directional"
+
+[[icon]]
+variant = "Widget"
+source = "squares-four"
+mirroring = "fixed"
+
+[[alias]]
+variant = "StarFilled"
+target = "Star"
+weight = "fill"

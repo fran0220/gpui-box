@@ -42,20 +42,13 @@ Files: assets/fonts/NotoSansSC.otf
 Checksums and exact upstream paths: assets/SOURCE.md
 License text: licenses/OFL-1.1.txt
 
-Solar Icons
+Phosphor Icons Core 2.1.1
 --------------------------------------------------------------------------------
-Source: Solar Icons, Linear weight, by 480 Design
-https://www.figma.com/community/file/1166831539721848736
-License: Creative Commons Attribution 4.0 International
-Attribution: “Solar Icons by 480 Design.”
-Files: Solar-derived SVGs identified by assets/SOURCE.md
-License text: licenses/CC-BY-4.0.txt
-
-Comet
---------------------------------------------------------------------------------
-Source: https://github.com/zeronsh/comet
-Revision: fb22e269ac57331ee7aa4a9673530acf3299a886
+Source: https://github.com/phosphor-icons/core
+Revision: 2b75f3ad12b420c9504ef05df8d2564a28f8500e
 License: MIT
-Copyright (c) 2026 Wing
-Files: generic glyphs identified by assets/SOURCE.md
-License text: licenses/COMET-MIT.txt
+Copyright (c) 2023 Phosphor Icons
+Files: the Regular and Fill subset under assets/icons
+Selection, checksums, and import recipe: assets/PHOSPHOR.toml,
+assets/icons/SHA256SUMS, and assets/SOURCE.md
+License text: licenses/PHOSPHOR-MIT.txt

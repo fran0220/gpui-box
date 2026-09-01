@@ -29,11 +29,12 @@ use gpui::{
     RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window, div, point,
     prelude::FluentBuilder, px,
 };
-use gpui_kit_assets::{Icon, icon};
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
+use crate::display::icon::{flips, paint as paint_icon};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{
@@ -550,11 +551,12 @@ impl Tabs {
                 .tab_index(0)
                 .hover(|style| style.bg(theme.colors.hover))
                 .focus_ring(theme)
-                .child(
-                    icon(Icon::Close)
-                        .size(px(close_metrics.icon_size))
-                        .text_color(theme.colors.text_muted),
-                )
+                .child(paint_icon(
+                    Icon::Close,
+                    close_metrics.icon_size,
+                    theme.colors.text_muted,
+                    flips(Icon::Close, cx.layout_direction()),
+                ))
                 .on_click(move |_, window, cx| {
                     cx.stop_propagation();
                     handler(id.clone(), window, cx);
@@ -616,10 +618,15 @@ impl Tabs {
                     .h(px(metrics.height))
                     .px(px(metrics.padding_x))
                     .gap(px(metrics.gap))
-                    .children(
-                        tab.icon
-                            .map(|glyph| icon(glyph).size(px(metrics.icon_size)).text_color(color)),
-                    )
+                    .children(tab.icon.map(|glyph| {
+                        let glyph = if selected { glyph.filled() } else { glyph };
+                        paint_icon(
+                            glyph,
+                            metrics.icon_size,
+                            color,
+                            flips(glyph, cx.layout_direction()),
+                        )
+                    }))
                     .child(
                         text(theme, TypeScale::Label, tab.label.clone())
                             .text_size(px(metrics.font_size))
