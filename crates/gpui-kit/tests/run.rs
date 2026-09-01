@@ -342,6 +342,69 @@ fn a_tool_row_reports_its_family_summary_and_requested_disclosure(cx: &mut TestA
     assert_eq!(*calls.borrow(), vec!["open:true".to_string()]);
 }
 
+#[gpui::test]
+fn flow_disclosures_keep_tool_and_reasoning_behavior(cx: &mut TestAppContext) {
+    let calls: Calls = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&calls);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let tool = Rc::clone(&sink);
+        let thinking = Rc::clone(&sink);
+        gpui::div()
+            .child(
+                ToolCall::new("call.flow", ToolFamily::Read, "workspace.read")
+                    .arguments("{ \"path\": \"README.md\" }")
+                    .state(ToolCallState::succeeded("one\ntwo"))
+                    .expanded(true)
+                    .presentation(AgentDisclosurePresentation::Flow)
+                    .on_toggle(move |open, _, _| tool.borrow_mut().push(format!("tool:{open}"))),
+            )
+            .child(
+                ThinkingBlock::new(
+                    "turn.flow",
+                    Reasoning::present("Read both files.\nThen answer."),
+                )
+                .expanded(true)
+                .presentation(AgentDisclosurePresentation::Flow)
+                .on_toggle(move |open, _, _| {
+                    thinking.borrow_mut().push(format!("thinking:{open}"))
+                }),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("call.flow.arguments")
+            .expect("arguments remain disclosed")
+            .value
+            .as_deref(),
+        Some("1 line")
+    );
+    assert_eq!(
+        harness
+            .node("call.flow.result")
+            .expect("result remains disclosed")
+            .value
+            .as_deref(),
+        Some("2 lines")
+    );
+    assert_eq!(
+        harness
+            .node("turn.flow.body")
+            .expect("reasoning remains disclosed")
+            .value
+            .as_deref(),
+        Some("present")
+    );
+
+    harness.click("call.flow.toggle");
+    harness.click("turn.flow");
+    assert_eq!(
+        calls.borrow().as_slice(),
+        ["tool:false".to_string(), "thinking:false".to_string()]
+    );
+}
+
 // ------------------------------------------------------------------ step list
 
 fn reasoning(cx: &mut TestAppContext) -> Harness {

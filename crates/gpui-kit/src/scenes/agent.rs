@@ -992,6 +992,15 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .summary("rm -rf build")
                         .arguments("{ \"command\": \"rm -rf build\" }")
                         .state(ToolCallState::refused("Shell commands are not allowed.")),
+                )
+                .child(
+                    ToolCall::new("scene.tool.flow", ToolFamily::Read, "workspace.read")
+                        .summary("README.md · flow")
+                        .arguments("{ \"path\": \"README.md\" }")
+                        .state(ToolCallState::succeeded("Product-neutral components."))
+                        .expanded(true)
+                        .presentation(AgentDisclosurePresentation::Flow)
+                        .on_toggle(|_, _, _| {}),
                 ),
         )
         .into_any_element()
@@ -1026,6 +1035,15 @@ pub(super) fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .expanded(true)
             .elapsed("8.4 s")
+            .on_toggle(|_, _, _| {}),
+        )
+        .child(
+            ThinkingBlock::new(
+                "scene.thinking.flow",
+                Reasoning::present("The same evidence stays indented.\nIt has no body plane."),
+            )
+            .expanded(true)
+            .presentation(AgentDisclosurePresentation::Flow)
             .on_toggle(|_, _, _| {}),
         )
         // Withheld and absent are two different facts, and neither is the

@@ -229,6 +229,46 @@ fn a_code_block_publishes_the_info_string_it_was_given(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn flat_code_keeps_the_default_fence_contract_without_the_card_inset(cx: &mut TestAppContext) {
+    const FENCE: &str =
+        "```rust\nfn main() { println!(\"a deliberately long line stays code\"); }\n```";
+    let (events, into) = sink::<MarkdownEvent>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let into = into.clone();
+        gpui::div()
+            .w(gpui::px(320.0))
+            .child(Markdown::new("card", FENCE))
+            .child(
+                Markdown::new("flat", FENCE)
+                    .code_presentation(MarkdownCodePresentation::Flat)
+                    .on_event(move |event, _, _| into.borrow_mut().push(event.clone())),
+            )
+            .into_any_element()
+    });
+
+    let card = harness.node("card.code-rust").expect("default fence");
+    let flat = harness.node("flat.code-rust").expect("flat fence");
+    assert_eq!(flat.role, card.role);
+    assert_eq!(flat.text, card.text);
+    assert_eq!(flat.value, card.value);
+    assert!(
+        flat.bounds.height < card.bounds.height,
+        "Flat removes the card's all-side inset: card={}, flat={}",
+        card.bounds.height,
+        flat.bounds.height
+    );
+
+    harness.click("flat.code-rust.copy");
+    assert_eq!(
+        events.borrow().as_slice(),
+        [MarkdownEvent::CodeCopied {
+            language: Some("rust".into()),
+            text: "fn main() { println!(\"a deliberately long line stays code\"); }".into(),
+        }]
+    );
+}
+
+#[gpui::test]
 fn every_heading_publishes_its_level(cx: &mut TestAppContext) {
     let (mut harness, _events) = markdown(cx, DOCUMENT, None);
 

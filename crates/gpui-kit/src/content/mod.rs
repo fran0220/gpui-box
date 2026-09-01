@@ -53,7 +53,7 @@ pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, 
 pub use log_stream::{LogEntry, LogStream, LogStreamState};
 pub use markdown::{
     Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown,
-    MarkdownEvent,
+    MarkdownCodePresentation, MarkdownEvent,
 };
 pub use message_list::{
     Attachment, DeliveryState, Message, MessageBody, MessageList, Reaction, streaming_since,

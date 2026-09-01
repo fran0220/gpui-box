@@ -97,6 +97,7 @@ use gpui::App;
 
 /// Everything a view needs to build with this library.
 pub mod prelude {
+    pub use crate::agent::AgentDisclosurePresentation;
     pub use crate::agent::approval::{
         AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus,
     };
@@ -155,13 +156,13 @@ pub mod prelude {
         CodeView, DeliveryState, DiffCursor, DiffFile, DiffHunk, DiffLine, DiffNote,
         DiffPresentation, DiffView, DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize,
         ImageState, ImageViewer, ImageViewerEvent, Language, LineMark, LogEntry, LogStream,
-        LogStreamState, Mark, Markdown, MarkdownEvent, Message, MessageBody, MessageList, Outline,
-        Reaction, RichTextAlignment, RichTextBlock, RichTextBlockId, RichTextDocument,
-        RichTextEditResult, RichTextEditSession, RichTextError, RichTextFormat,
-        RichTextInlineStyle, RichTextInputKind, RichTextIntent, RichTextListItem, RichTextListKind,
-        RichTextParagraphStyle, RichTextPosition, RichTextRange, RichTextSelection, TrackStep,
-        TransportBar, TransportDuration, TransportEvent, TransportState, ViewportState, strip_ansi,
-        word_spans,
+        LogStreamState, Mark, Markdown, MarkdownCodePresentation, MarkdownEvent, Message,
+        MessageBody, MessageList, Outline, Reaction, RichTextAlignment, RichTextBlock,
+        RichTextBlockId, RichTextDocument, RichTextEditResult, RichTextEditSession, RichTextError,
+        RichTextFormat, RichTextInlineStyle, RichTextInputKind, RichTextIntent, RichTextListItem,
+        RichTextListKind, RichTextParagraphStyle, RichTextPosition, RichTextRange,
+        RichTextSelection, TrackStep, TransportBar, TransportDuration, TransportEvent,
+        TransportState, ViewportState, strip_ansi, word_spans,
     };
     pub use crate::controls::auth::{
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,

@@ -30,6 +30,7 @@ use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
+use crate::agent::AgentDisclosurePresentation;
 use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::StatusDot;
@@ -114,6 +115,7 @@ pub struct ThinkingBlock {
     thinking: bool,
     /// How long the host says this turn has been thinking, already formatted.
     elapsed: Option<SharedString>,
+    presentation: AgentDisclosurePresentation,
     on_toggle: Option<ToggleHandler>,
 }
 
@@ -124,6 +126,7 @@ impl std::fmt::Debug for ThinkingBlock {
             .field("ident", &self.ident)
             .field("reasoning", &self.reasoning.as_str())
             .field("expanded", &self.expanded)
+            .field("presentation", &self.presentation)
             .field("has_handler", &self.on_toggle.is_some())
             .finish()
     }
@@ -139,6 +142,7 @@ impl ThinkingBlock {
             expanded: false,
             thinking: false,
             elapsed: None,
+            presentation: AgentDisclosurePresentation::Inset,
             on_toggle: None,
         }
     }
@@ -147,6 +151,15 @@ impl ThinkingBlock {
     /// be disclosed stays shut whatever the caller says.
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = expanded;
+        self
+    }
+
+    /// Chooses the body treatment when reasoning is disclosed.
+    ///
+    /// The default is [`AgentDisclosurePresentation::Inset`]. Flow preserves
+    /// the body's indentation and content without drawing a separate surface.
+    pub fn presentation(mut self, presentation: AgentDisclosurePresentation) -> Self {
+        self.presentation = presentation;
         self
     }
 
@@ -303,9 +316,14 @@ impl RenderOnce for ThinkingBlock {
                     .w_full()
                     .column()
                     .ms(direction, px(theme.space(Space::Lg)))
-                    .p_token(&theme, Space::Sm)
-                    .radius(&theme, Radius::Control)
-                    .well(&theme)
+                    .when(
+                        self.presentation == AgentDisclosurePresentation::Inset,
+                        |body| {
+                            body.p_token(&theme, Space::Sm)
+                                .radius(&theme, Radius::Control)
+                                .well(&theme)
+                        },
+                    )
                     // The header is a label and this is what it labels, so
                     // the order of emphasis runs the other way: reasoning
                     // drawn fainter than the word "Thought" and standing on

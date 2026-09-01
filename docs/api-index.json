@@ -2754,6 +2754,7 @@
         "on_event(handler: impl Fn(&MarkdownEvent, &mut Window, &mut App) + 'static) -> Self",
         "image(source: impl Fn(&ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
         "streaming(streaming: bool) -> Self",
+        "code_presentation(presentation: MarkdownCodePresentation) -> Self",
         "highlight(highlighter: impl Fn(&CodeBlock) -> Vec<CodeSpan> + 'static) -> Self"
       ],
       "commands": [],
@@ -5102,6 +5103,7 @@
       ],
       "options": [
         "expanded(expanded: bool) -> Self",
+        "presentation(presentation: AgentDisclosurePresentation) -> Self",
         "thinking(thinking: bool) -> Self",
         "elapsed(elapsed: impl Into<SharedString>) -> Self",
         "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
@@ -5273,6 +5275,7 @@
         "elapsed(elapsed: impl Into<Elapsed>) -> Self",
         "diff(diff: impl IntoElement) -> Self",
         "expanded(expanded: bool) -> Self",
+        "presentation(presentation: AgentDisclosurePresentation) -> Self",
         "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
         "on_retry(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
@@ -5859,6 +5862,19 @@
         "role(role: impl Into<SharedString>) -> Self",
         "capabilities(capabilities: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentDisclosurePresentation",
+      "path": "gpui_kit::agent::AgentDisclosurePresentation",
+      "summary": "How agent evidence is presented when a disclosure is open.",
+      "variants": [
+        "Inset",
+        "Flow"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -10270,6 +10286,19 @@
       "path": "gpui_kit::content::MarkSpan",
       "summary": "",
       "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MarkdownCodePresentation",
+      "path": "gpui_kit::content::MarkdownCodePresentation",
+      "summary": "How fenced code blocks are presented inside a Markdown document.",
+      "variants": [
+        "Card",
+        "Flat"
+      ],
       "construct": [],
       "options": [],
       "commands": [],
@@ -15787,7 +15816,7 @@
       "uses": [
         "Markdown"
       ],
-      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-document",
@@ -16095,7 +16124,7 @@
       "uses": [
         "ToolCall"
       ],
-      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                )\n                .child(\n                    ToolCall::new(\"scene.tool.flow\", ToolFamily::Read, \"workspace.read\")\n                        .summary(\"README.md · flow\")\n                        .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                        .state(ToolCallState::succeeded(\"Product-neutral components.\"))\n                        .expanded(true)\n                        .presentation(AgentDisclosurePresentation::Flow)\n                        .on_toggle(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-plan",
@@ -16187,7 +16216,7 @@
       "uses": [
         "ThinkingBlock"
       ],
-      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.collapsed\",\n                Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n            )\n            .elapsed(\"2.1 s\"),\n        )\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .elapsed(\"8.4 s\")\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
+      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.collapsed\",\n                Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n            )\n            .elapsed(\"2.1 s\"),\n        )\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .elapsed(\"8.4 s\")\n            .on_toggle(|_, _, _| {}),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.flow\",\n                Reasoning::present(\"The same evidence stays indented.\\nIt has no body plane.\"),\n            )\n            .expanded(true)\n            .presentation(AgentDisclosurePresentation::Flow)\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "json-view",

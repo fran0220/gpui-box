@@ -8,6 +8,7 @@ pub mod artifact;
 pub mod canvas;
 pub mod clarification;
 pub mod cost;
+mod disclosure;
 pub mod feedback;
 pub mod model;
 pub mod offering_catalog;
@@ -27,6 +28,7 @@ pub use clarification::{
     ClarificationEvent, ClarificationOption, ClarificationPanel, ClarificationStatus,
 };
 pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading};
+pub use disclosure::AgentDisclosurePresentation;
 pub use feedback::{FeedbackRating, FeedbackRatingEvent, FeedbackVote};
 pub use model::{
     AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome,
