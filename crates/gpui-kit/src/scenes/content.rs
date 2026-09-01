@@ -211,10 +211,11 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             // Given a height rather than a row count, the way a pane gives one.
-            // Kept short enough that the wrapping card below still finishes
-            // inside the frame: a scene whose last words are cut off is the
-            // defect its own caption is about.
-            div().w(px(840.0)).h(px(220.0)).child(
+            // Kept short enough that the wrapping example below still finishes
+            // inside the frame, but tall enough to show the next file header:
+            // a scene whose last words are cut off is the defect its own
+            // caption is about.
+            div().w(px(840.0)).h(px(232.0)).child(
                 DiffView::shared("scene.diff.review", std::sync::Arc::new(scene_review()))
                     .language("rust")
                     .fills()
