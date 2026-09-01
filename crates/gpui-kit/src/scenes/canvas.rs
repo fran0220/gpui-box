@@ -37,11 +37,12 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                 GraphEdge::new("scene.graph.ingest", "scene.graph.validate")
                     .id("scene.graph.edge.rows")
                     .ports("rows", "records")
-                    .label("12.4k rows")
+                    .label("批量导入行 · src/ingest/rows.ts")
                     .active(true),
                 GraphEdge::new("scene.graph.validate", "scene.graph.persist")
                     .id("scene.graph.edge.valid")
                     .ports("valid", "records")
+                    .label("校验通过的记录 · src/validate/ok.ts")
                     .active(true),
                 // A relationship label carrying a localized sentence, which
                 // is what a host writing in Chinese actually hands this: the
@@ -58,12 +59,18 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                 GraphEdge::new("scene.graph.persist", "scene.graph.publish")
                     .id("scene.graph.edge.commit")
                     .ports("commit", "artifact")
-                    .label("commit 8f72")
+                    .label("提交产物快照 · src/publish/commit.ts")
                     .active(true),
+                // A second long localized label, on the route that runs back
+                // through the same band as the one above. Two annotations
+                // competing for the same air is the case a real board hits
+                // constantly and this catalogue did not cover: with one long
+                // label the seating always found somewhere to put it, so
+                // nothing here ever exercised what happens when it cannot.
                 GraphEdge::new("scene.graph.observe", "scene.graph.validate")
                     .id("scene.graph.edge.retry")
                     .ports("retry", "retry")
-                    .label("retry policy")
+                    .label("跳跃核心循环 · src/player/jump.ts")
                     .lane(1)
                     .feedback(),
             ],

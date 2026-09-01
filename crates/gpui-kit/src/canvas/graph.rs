@@ -462,6 +462,18 @@ const GRAPH_MINIMAP_HEIGHT: f32 = 88.0;
 /// Relationship labels try progressively farther points on their route before
 /// accepting an overlap. Midpoint remains the first answer when it is clear.
 const RELATIONSHIP_LABEL_PROGRESS: [f32; 7] = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8];
+/// How many label-depths out from its route an annotation may be seated.
+///
+/// Sliding along the route is not enough on its own. Every seat it can reach
+/// that way lies in one band hugging the route, one label deep, so a second
+/// annotation that needs that band has nowhere left to go and the search ends
+/// up choosing which collision to accept rather than avoiding one. Stacking
+/// outward is what a drawn diagram does when annotations compete, and it is
+/// the difference between a search that can fail and one that mostly cannot.
+///
+/// Three deep, because a fourth is further from the route than from its
+/// neighbours and stops reading as that route's annotation.
+const RELATIONSHIP_LABEL_LANES: usize = 3;
 /// Air between a relationship label and the route it describes.
 const RELATIONSHIP_LABEL_GAP: f32 = 6.0;
 /// Air around cards and other relationship labels while choosing a seat.
@@ -648,6 +660,7 @@ struct RelationshipLabelScore {
     label_collisions: usize,
     overlap_area: f32,
     outside_area: f32,
+    lane_rank: usize,
     progress_rank: usize,
     side_rank: usize,
 }
@@ -665,6 +678,13 @@ impl RelationshipLabelScore {
         }
         if (self.outside_area - other.outside_area).abs() >= f32::EPSILON {
             return self.outside_area < other.outside_area;
+        }
+        // Hugging the route matters more than sitting near its midpoint: an
+        // annotation stacked two deep beside the middle of a route reads as
+        // belonging to whatever else is in that stack, while one sitting
+        // against the route further along still plainly belongs to it.
+        if self.lane_rank != other.lane_rank {
+            return self.lane_rank < other.lane_rank;
         }
         if self.progress_rank != other.progress_rank {
             return self.progress_rank < other.progress_rank;
@@ -762,31 +782,48 @@ fn place_relationship_labels(
                 .into_iter()
                 .enumerate()
             {
-                let desired = relationship_label_candidate(at, label_size, axis, positive, gap);
-                let shown = visible_surface
-                    .map(|surface| clamp_relationship_label(desired, surface))
-                    .unwrap_or(desired);
-                let (node_collisions, node_overlap_area) =
-                    nodes.iter().fold((0, 0.0), |(count, total), node| {
-                        let area = overlap_area(shown, node.bounds, RELATIONSHIP_LABEL_CLEARANCE);
-                        (count + usize::from(area > 0.0), total + area)
-                    });
-                let (label_collisions, label_overlap_area) =
-                    occupied.iter().fold((0, 0.0), |(count, total), bounds| {
-                        let area = overlap_area(shown, *bounds, RELATIONSHIP_LABEL_CLEARANCE);
-                        (count + usize::from(area > 0.0), total + area)
-                    });
-                let score = RelationshipLabelScore {
-                    node_collisions,
-                    label_collisions,
-                    overlap_area: node_overlap_area + label_overlap_area,
-                    outside_area: visible_surface
-                        .map_or(0.0, |surface| outside_area(desired, surface)),
-                    progress_rank,
-                    side_rank,
-                };
-                if best.is_none_or(|(_, current)| score.better_than(current)) {
-                    best = Some((RelationshipLabelPlacement { desired, shown }, score));
+                // The depth of one seat, measured across the route rather than
+                // along it: a label beside a horizontal run stacks by its
+                // height, and one beside a vertical run by its width.
+                let depth = match axis {
+                    Axis::Horizontal => label_size.height,
+                    Axis::Vertical => label_size.width,
+                } + RELATIONSHIP_LABEL_CLEARANCE;
+                for lane_rank in 0..RELATIONSHIP_LABEL_LANES {
+                    let desired = relationship_label_candidate(
+                        at,
+                        label_size,
+                        axis,
+                        positive,
+                        gap + lane_rank as f32 * depth,
+                    );
+                    let shown = visible_surface
+                        .map(|surface| clamp_relationship_label(desired, surface))
+                        .unwrap_or(desired);
+                    let (node_collisions, node_overlap_area) =
+                        nodes.iter().fold((0, 0.0), |(count, total), node| {
+                            let area =
+                                overlap_area(shown, node.bounds, RELATIONSHIP_LABEL_CLEARANCE);
+                            (count + usize::from(area > 0.0), total + area)
+                        });
+                    let (label_collisions, label_overlap_area) =
+                        occupied.iter().fold((0, 0.0), |(count, total), bounds| {
+                            let area = overlap_area(shown, *bounds, RELATIONSHIP_LABEL_CLEARANCE);
+                            (count + usize::from(area > 0.0), total + area)
+                        });
+                    let score = RelationshipLabelScore {
+                        node_collisions,
+                        label_collisions,
+                        overlap_area: node_overlap_area + label_overlap_area,
+                        outside_area: visible_surface
+                            .map_or(0.0, |surface| outside_area(desired, surface)),
+                        lane_rank,
+                        progress_rank,
+                        side_rank,
+                    };
+                    if best.is_none_or(|(_, current)| score.better_than(current)) {
+                        best = Some((RelationshipLabelPlacement { desired, shown }, score));
+                    }
                 }
             }
         }
@@ -3890,6 +3927,86 @@ mod tests {
             label.top() > 100.0,
             "the blocked upper seat was chosen instead of the clear lower one"
         );
+    }
+
+    /// Two annotations that both want the band beside their route stack out of
+    /// each other's way instead of one of them being seated on top of the
+    /// other.
+    ///
+    /// Sliding along the route cannot answer this: every seat reachable that
+    /// way is in the same one-label-deep band, so the search used to run out
+    /// of candidates and pick whichever collision was smallest. The labels are
+    /// wide enough here that sliding cannot separate them, which is what makes
+    /// this a test of stacking rather than of the search's first instinct.
+    #[test]
+    fn two_relationships_competing_for_one_band_do_not_overlap() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let nodes = vec![
+            NodeGeometry {
+                id: "from".into(),
+                bounds: Bounds::new(point(0.0, 70.0), size(100.0, 60.0)),
+                tint: theme.colors.accent,
+                ports: Vec::new(),
+            },
+            NodeGeometry {
+                id: "to".into(),
+                bounds: Bounds::new(point(300.0, 70.0), size(100.0, 60.0)),
+                tint: theme.colors.accent,
+                ports: Vec::new(),
+            },
+        ];
+        // Two routes running the same span, close enough that the preferred
+        // seat of each is the seat of the other.
+        let wires = [(100.0, 0.0), (104.0, 8.0)];
+        let mut routes = Vec::new();
+        let mut sizes = HashMap::new();
+        for (index, (start_x, drop)) in wires.into_iter().enumerate() {
+            let edge = GraphEdge::new("from", "to")
+                .id(format!("edge-{index}"))
+                .label("a relationship whose name is a whole sentence");
+            sizes.insert(edge.edge_id(), size(210.0, 20.0));
+            routes.push(RoutedEdge {
+                edge,
+                route: route_curved(
+                    Anchor {
+                        point: point(start_x, 100.0 + drop),
+                        side: PortSide::Right,
+                    },
+                    Anchor {
+                        point: point(300.0, 100.0 + drop),
+                        side: PortSide::Left,
+                    },
+                ),
+            });
+        }
+        let surface = Bounds::new(point(-200.0, -200.0), size(800.0, 600.0));
+        let placed = place_relationship_labels(&routes, &nodes, &sizes, Some(surface), false);
+        assert_eq!(placed.len(), 2, "both relationships were seated");
+
+        let seats: Vec<Bounds<f32>> = routes
+            .iter()
+            .map(|routed| {
+                placed
+                    .get(&routed.edge.edge_id())
+                    .expect("placed relationship")
+                    .shown
+            })
+            .collect();
+        assert!(
+            !bounds_overlap(seats[0], seats[1], 0.0),
+            "two relationships were seated on top of each other: {:?} and {:?}",
+            seats[0],
+            seats[1]
+        );
+        for seat in &seats {
+            for node in &nodes {
+                assert!(
+                    !bounds_overlap(*seat, node.bounds, 0.0),
+                    "relationship {seat:?} overlapped {:?}",
+                    node.bounds
+                );
+            }
+        }
     }
 
     #[test]
