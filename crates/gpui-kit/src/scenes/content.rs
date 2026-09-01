@@ -232,14 +232,14 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
              the frame wraps instead of being cut off",
         ))
         .child(
-            // Every card in this scene is the same width, so a difference
+            // Every example in this scene is the same width, so a difference
             // between two of them is about the diff and not about the frame.
             div().w(px(840.0)).child(
                 DiffView::new("scene.diff.wrapping", scene_long_line())
                     .wrapping(true)
                     // Room for both lines *after* they wrap. A budget counted
                     // in unwrapped rows cuts the last line in half, which is
-                    // the one thing this card exists to show does not happen.
+                    // the one thing this example exists to show does not happen.
                     .visible_rows(6)
                     .on_event(|_, _, _| {}),
             ),
