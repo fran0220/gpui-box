@@ -181,6 +181,11 @@ struct GestureState {
     /// gesture because it is the same kind of fact: what this one canvas has
     /// been through, not what the caller asked for.
     framed: Option<u64>,
+    /// The fit token whose surface measurement has been cleared and measured
+    /// again. A caller can change the canvas layout at the same time it asks
+    /// for a new frame; reusing the previous token's bounds would frame the
+    /// new content for the old rectangle and then mark that answer complete.
+    measuring: Option<u64>,
     /// When each connection this canvas is drawing was first seen, so a new
     /// one can arrive rather than appear.
     ///
@@ -1705,6 +1710,18 @@ impl RenderOnce for NodeGraph {
             .toolbar
             .as_ref()
             .map(|_| measure::cell(&self.ident.child("toolbar-seat").semantic_id(), window, cx));
+        let previously_framed = gesture.borrow().framed;
+        if let Some(token) = wants_frame(self.fit, previously_framed) {
+            let mut state = gesture.borrow_mut();
+            if state.measuring != Some(token) {
+                state.measuring = Some(token);
+                // This render will record the current rectangle during
+                // prepaint and request the frame that can use it. Holding the
+                // previous rectangle for even this one fit is not conservative:
+                // the fit would settle and never revisit the new bounds.
+                measured.set(Bounds::default());
+            }
+        }
         let record = Rc::clone(&measured);
         let mut frame = div()
             .on_children_prepainted(move |bounds, window, _| {
