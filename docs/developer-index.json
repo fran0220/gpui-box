@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4171
+      "symbolCount": 4172
     },
     {
       "name": "gpui-box-kit-assets",
@@ -81920,8 +81920,23 @@
       "source": "crates/gpui-kit/src/layout/responsive.rs",
       "summary": "A container that builds its content from its own measured width.",
       "documentation": "A container that builds its content from its own measured width.\n\n```ignore\nResponsive::new(\"settings.body\", |size, _, _| {\nif size.at_least(720.0) {\ntwo_columns().into_any_element()\n} else {\none_column().into_any_element()\n}\n})\n```",
-      "signature": "# [doc = \" A container that builds its content from its own measured width.\"] # [doc = \"\"] # [doc = \" ```ignore\"] # [doc = \" Responsive::new(\\\"settings.body\\\", |size, _, _| {\"] # [doc = \" if size.at_least(720.0) {\"] # [doc = \" two_columns().into_any_element()\"] # [doc = \" } else {\"] # [doc = \" one_column().into_any_element()\"] # [doc = \" }\"] # [doc = \" })\"] # [doc = \" ```\"] # [derive (IntoElement)] pub struct Responsive { ident : Ident, build : Build, }",
+      "signature": "# [doc = \" A container that builds its content from its own measured width.\"] # [doc = \"\"] # [doc = \" ```ignore\"] # [doc = \" Responsive::new(\\\"settings.body\\\", |size, _, _| {\"] # [doc = \" if size.at_least(720.0) {\"] # [doc = \" two_columns().into_any_element()\"] # [doc = \" } else {\"] # [doc = \" one_column().into_any_element()\"] # [doc = \" }\"] # [doc = \" })\"] # [doc = \" ```\"] # [derive (IntoElement)] pub struct Responsive { ident : Ident, build : Build, fill : bool, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::responsive::Responsive::fill",
+      "name": "fill",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::responsive",
+      "path": "gpui_kit::layout::responsive",
+      "source": "crates/gpui-kit/src/layout/responsive.rs",
+      "summary": "Fill the height the parent assigned as well as its width.",
+      "documentation": "Fill the height the parent assigned as well as its width.\n\nThe default keeps content-height behavior for document layouts. Use\nthis for bounded workspaces whose responsive child contains absolute\npanes and therefore contributes no intrinsic height of its own.",
+      "signature": "pub fn fill (mut self) -> Self",
+      "cfg": [],
+      "target": "Responsive"
     },
     {
       "id": "gpui_kit::layout::responsive::Responsive::new",
@@ -120349,7 +120364,9 @@
       "construct": [
         "new(ident: impl Into<Ident>, build: impl FnOnce(ContainerSize, &mut Window, &mut App) -> AnyElement + 'static) -> Self"
       ],
-      "options": [],
+      "options": [
+        "fill() -> Self"
+      ],
       "commands": [],
       "queries": [],
       "slots": [],

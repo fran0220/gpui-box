@@ -3902,7 +3902,9 @@
       "construct": [
         "new(ident: impl Into<Ident>, build: impl FnOnce(ContainerSize, &mut Window, &mut App) -> AnyElement + 'static) -> Self"
       ],
-      "options": [],
+      "options": [
+        "fill() -> Self"
+      ],
       "commands": [],
       "queries": [],
       "slots": [],

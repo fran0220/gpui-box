@@ -22,7 +22,7 @@
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled, Window,
-    div,
+    div, prelude::FluentBuilder,
 };
 
 use crate::foundation::Ident;
@@ -93,6 +93,7 @@ type Build = Box<dyn FnOnce(ContainerSize, &mut Window, &mut App) -> AnyElement>
 pub struct Responsive {
     ident: Ident,
     build: Build,
+    fill: bool,
 }
 
 impl std::fmt::Debug for Responsive {
@@ -112,7 +113,18 @@ impl Responsive {
         Self {
             ident: ident.into(),
             build: Box::new(build),
+            fill: false,
         }
+    }
+
+    /// Fill the height the parent assigned as well as its width.
+    ///
+    /// The default keeps content-height behavior for document layouts. Use
+    /// this for bounded workspaces whose responsive child contains absolute
+    /// panes and therefore contributes no intrinsic height of its own.
+    pub fn fill(mut self) -> Self {
+        self.fill = true;
+        self
     }
 }
 
@@ -120,7 +132,12 @@ impl RenderOnce for Responsive {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let size = size_of(&measured);
+        let fill = self.fill;
         let content = (self.build)(size, window, cx);
+        let content = div()
+            .w_full()
+            .when(fill, |content| content.h_full())
+            .child(content);
 
         div()
             .on_children_prepainted({
@@ -133,10 +150,11 @@ impl RenderOnce for Responsive {
             })
             .id(self.ident.element_id())
             .w_full()
+            .when(fill, |container| container.h_full())
             // The measured child is a full-width wrapper rather than the
             // caller's element, so the reading is the room the container had
             // and not the room its content chose to take.
-            .child(div().w_full().child(content))
+            .child(content)
     }
 }
 

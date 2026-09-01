@@ -581,6 +581,39 @@ fn a_container_reports_its_own_width_from_the_frame_after_it_was_laid_out(cx: &m
 }
 
 #[gpui::test]
+fn a_filling_container_reports_both_axes_of_its_parent(cx: &mut TestAppContext) {
+    let seen: Rc<RefCell<Vec<ContainerSize>>> = Rc::new(RefCell::new(Vec::new()));
+    let recorder = Rc::clone(&seen);
+    let mut harness = harness(cx, move |_, _| {
+        let recorder = Rc::clone(&recorder);
+        div()
+            .w(px(640.0))
+            .h(px(420.0))
+            .child(
+                Responsive::new("workspace.body", move |size, _, _| {
+                    recorder.borrow_mut().push(size);
+                    div().absolute().inset_0().into_any_element()
+                })
+                .fill(),
+            )
+            .into_any_element()
+    });
+
+    harness.frame();
+    harness.frame();
+
+    let measured = seen
+        .borrow()
+        .iter()
+        .rev()
+        .copied()
+        .find(|size| size.width().is_some())
+        .expect("a later frame carries the measured bounds");
+    assert_eq!(measured.width(), Some(640.0));
+    assert_eq!(measured.height(), Some(420.0));
+}
+
+#[gpui::test]
 fn an_unmeasured_container_claims_neither_width(_cx: &mut TestAppContext) {
     let unmeasured = ContainerSize::Unmeasured;
     assert!(!unmeasured.at_least(320.0));
