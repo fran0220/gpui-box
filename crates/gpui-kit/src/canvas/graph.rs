@@ -1988,6 +1988,7 @@ impl RenderOnce for NodeGraph {
                 .justify_center()
                 .child(empty);
             return frame
+                .child(graph_ground(&theme, viewport, self.grid))
                 .child(empty)
                 .semantic_in(cx, spec.value(viewport_value("empty", asked)))
                 .into_any_element();
@@ -2269,13 +2270,6 @@ impl RenderOnce for NodeGraph {
             }
         };
         let stroke = theme.borders.hairline;
-        let grid_paint = GridPaint {
-            minor: theme.colors.node.grid,
-            major: theme.colors.node.grid_strong,
-            axis: theme.colors.node.grid_axis,
-            dot: theme.borders.hairline,
-        };
-        let draw_grid = self.grid;
         let edge_theme = theme.clone();
         // How far each connection has got into arriving. A connection the
         // canvas has drawn before is simply there; one it has not is drawn
@@ -2321,34 +2315,7 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let painted_preview = preview.clone();
-        let ground_light = linear_gradient_stops(
-            180.0,
-            [
-                linear_color_stop(
-                    theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
-                    0.0,
-                ),
-                linear_color_stop(gpui::transparent_black(), 0.38),
-                linear_color_stop(gpui::transparent_black(), 1.0),
-            ],
-        );
-
-        // The ground the canvas stands on, under everything the caller put
-        // there. The only lighting is a top-origin material cast: no corner or
-        // edge is darkened, because that would imply depth the graph does not
-        // contain. The grid remains a painted child and intercepts nothing.
-        let ground = div().absolute().inset_0().bg(ground_light).child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, _| {
-                    if draw_grid {
-                        paint_grid(window, bounds, viewport, grid_paint);
-                    }
-                },
-            )
-            .absolute()
-            .inset_0(),
-        );
+        let ground = graph_ground(&theme, viewport, self.grid);
 
         // Edges are their own painted layer above the regions and below the
         // cards: a connection crosses a region it does not belong to, and a
@@ -3375,6 +3342,57 @@ struct GridPaint {
     major: Hsla,
     axis: Hsla,
     dot: f32,
+}
+
+/// The canvas material beneath cards and empty-state content alike.
+///
+/// Empty is still a ready canvas: an editor with nothing placed on it must
+/// retain the same spatial ground and grid as one with cards. Loading,
+/// refusal, and failure remain complete replacement states and do not use it.
+fn graph_ground(
+    theme: &gpui_kit_theme::Theme,
+    viewport: GraphViewport,
+    draw_grid: bool,
+) -> AnyElement {
+    let light = linear_gradient_stops(
+        180.0,
+        [
+            linear_color_stop(
+                theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
+                0.0,
+            ),
+            linear_color_stop(gpui::transparent_black(), 0.38),
+            linear_color_stop(gpui::transparent_black(), 1.0),
+        ],
+    );
+    let paint = GridPaint {
+        minor: theme.colors.node.grid,
+        major: theme.colors.node.grid_strong,
+        axis: theme.colors.node.grid_axis,
+        dot: theme.borders.hairline,
+    };
+
+    // The ground the canvas stands on, under everything the caller put there.
+    // The only lighting is a top-origin material cast: no corner or edge is
+    // darkened, because that would imply depth the graph does not contain.
+    // The grid remains a painted child and intercepts nothing.
+    div()
+        .absolute()
+        .inset_0()
+        .bg(light)
+        .child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    if draw_grid {
+                        paint_grid(window, bounds, viewport, paint);
+                    }
+                },
+            )
+            .absolute()
+            .inset_0(),
+        )
+        .into_any_element()
 }
 
 /// Every dot the same weight is a texture, not a grid: it says the canvas has
