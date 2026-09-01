@@ -100,17 +100,45 @@ mod imp {
 
     use crate::Shard;
 
+    /// Accepts what `check` would have rejected, and leaves the rest alone.
+    ///
+    /// A baseline the new frame agrees with to within one step is not rewritten.
+    /// `check` already treats those as matching, so rewriting them recorded a
+    /// change nothing had made: a full run's sprite atlas has accumulated
+    /// different state by its ninetieth scene, which moves an antialiased pixel
+    /// or two in a handful of scenes that nobody touched. Every full pass then
+    /// had to be hand-sorted, and the reviewer had to tell one-step noise from
+    /// the change under review before committing — three consecutive passes on
+    /// two platforms did exactly that, by hand, for the same three scenes.
+    ///
+    /// Writing only what moved further than the gate's own tolerance makes the
+    /// diff of a capture mean what a reader assumes it means.
     pub fn capture(only: &[String], shard: Option<Shard>) -> Result<()> {
         let directory = snapshots();
         fs::create_dir_all(&directory)
             .with_context(|| format!("create {}", directory.display()))?;
+        let mut kept = 0usize;
+        let mut written = 0usize;
         let count = capture_frames(only, shard, |name, frame| {
             let path = directory.join(name);
+            if path.exists() {
+                let expected = image::open(&path)
+                    .with_context(|| format!("read {}", path.display()))?
+                    .into_rgba8();
+                if within_one_step(&expected, frame) {
+                    kept += 1;
+                    return Ok(());
+                }
+            }
+            written += 1;
             frame
                 .save(&path)
                 .with_context(|| format!("write {}", path.display()))
         })?;
-        println!("captured {count} images into {}", directory.display());
+        println!(
+            "captured {count} images into {}: {written} written, {kept} already within tolerance",
+            directory.display()
+        );
         Ok(())
     }
 
