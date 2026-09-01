@@ -112,6 +112,24 @@ impl CanvasToolbar {
     /// tokens and the shared [`Glass`] layer, including its renderer fallback
     /// and adaptive readability tint. Without this opt-in the toolbar keeps
     /// its ordinary opaque overlay surface.
+    ///
+    /// # Prefer a preset that scatters
+    ///
+    /// A canvas is line work — a grid, an axis rule, an edge, a region
+    /// boundary — and this toolbar floats over it, so whatever is behind it is
+    /// a hairline sooner or later. [`GlassPreset::Liquid`] and
+    /// [`GlassPreset::Lens`] are clear by default: their blur is zero, so a
+    /// line arrives on the far side at full contrast and crosses the
+    /// toolbar's own readout. That is the material behaving as documented,
+    /// and it is still a toolbar whose zoom percentage has a rule through it.
+    ///
+    /// An adaptive tint cannot answer this. Tint darkens what shows through;
+    /// it does not remove the *structure* of a line crossing a glyph, and a
+    /// tint heavy enough to hide one is no longer glass. Scattering removes
+    /// the structure, which is the thing in the way. Reach for
+    /// [`GlassPreset::Frosted`], or compose blur onto another preset with
+    /// [`Glass::blur`], unless the surface behind this toolbar is known not to
+    /// carry line work.
     pub fn glass(mut self, preset: GlassPreset) -> Self {
         self.glass = Some(preset);
         self

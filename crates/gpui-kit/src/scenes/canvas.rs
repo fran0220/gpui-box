@@ -98,7 +98,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         // can keep without inventing arrangement or snapping
                         // policy.
                         .actions([CanvasToolbarAction::Fit])
-                        .glass(GlassPreset::Liquid)
+                        .glass(GlassPreset::Frosted)
                         .on_action(|_, _, cx| {
                             cx.update_global::<SceneGraph, ()>(|scene, _| {
                                 scene.fit = scene.fit.wrapping_add(1);
@@ -473,7 +473,7 @@ pub(super) fn node_graph_motion(_window: &mut Window, cx: &mut App) -> AnyElemen
                             cx.numbers().percent(viewport.zoom),
                         )
                         .actions([CanvasToolbarAction::Fit])
-                        .glass(GlassPreset::Liquid)
+                        .glass(GlassPreset::Frosted)
                         .on_action(|_, _, cx| {
                             cx.update_global::<SceneGraphMotion, ()>(|scene, _| {
                                 scene.fit = scene.fit.wrapping_add(1);
@@ -704,7 +704,7 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
                                         cx.numbers().percent(viewport.zoom),
                                     )
                                     .snap(snap)
-                                    .glass(GlassPreset::Liquid)
+                                    .glass(GlassPreset::Frosted)
                                     .on_action(|action, _, cx| {
                                         cx.update_global::<SceneCanvasTools, ()>(
                                             |scene, _| match action {
@@ -949,7 +949,7 @@ pub(super) fn canvas_regions(_window: &mut Window, cx: &mut App) -> AnyElement {
                         // and rearranges nothing, so it names the one
                         // intent it can carry out.
                         .actions([CanvasToolbarAction::Fit])
-                        .glass(GlassPreset::Liquid)
+                        .glass(GlassPreset::Frosted)
                         .on_action(|_, _, cx| {
                             cx.update_global::<SceneCanvasRegions, ()>(|scene, _| {
                                 scene.fit = scene.fit.wrapping_add(1);
