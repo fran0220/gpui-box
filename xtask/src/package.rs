@@ -390,7 +390,7 @@ fn check_archive_legal(name: &str, cohort: &str, listing: &str) -> Result<()> {
             has("third_party_notices"),
             "asset archive lacks THIRD_PARTY_NOTICES"
         );
-        for license in ["ofl", "cc-by", "mit"] {
+        for license in ["ofl-1.1", "phosphor-mit"] {
             ensure!(
                 has(license),
                 "asset archive lacks the {license} license bundle"
@@ -1218,7 +1218,7 @@ mod tests {
             check_archive_legal(
                 "gpui-box-kit-assets",
                 "kit",
-                "x/license-mit\nx/third_party_notices\nx/ofl\nx/cc-by"
+                "x/license-mit\nx/third_party_notices\nx/ofl-1.1\nx/phosphor-mit"
             )
             .is_ok()
         );
@@ -1226,7 +1226,7 @@ mod tests {
             check_archive_legal(
                 "gpui-box-kit-assets",
                 "kit",
-                "x/license-mit\nx/third_party_notices\nx/ofl"
+                "x/license-mit\nx/third_party_notices\nx/ofl-1.1"
             )
             .is_err()
         );
