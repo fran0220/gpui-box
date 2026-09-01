@@ -76,6 +76,21 @@ impl MinimapView {
     }
 }
 
+/// Keeps a normalized viewport rectangle inside the minimap without changing
+/// the extent it represents. Clamp the extent first, then seat its origin in
+/// the remaining space: clamping width against `1 - x` panics when a caller
+/// truthfully reports a view whose origin has reached the far edge.
+pub(super) fn bounded_view(view: MinimapView) -> MinimapView {
+    let width = view.width.clamp(0.04, 1.0);
+    let height = view.height.clamp(0.04, 1.0);
+    MinimapView {
+        x: view.x.clamp(0.0, 1.0 - width),
+        y: view.y.clamp(0.0, 1.0 - height),
+        width,
+        height,
+    }
+}
+
 /// What a click on the overview reported.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MinimapEvent {
@@ -161,10 +176,12 @@ impl RenderOnce for Minimap {
         // than one shape because a rectangular hole is not a shape a fill can
         // have.
         let viewport = self.view.map(|view| {
-            let x = view.x.clamp(0.0, 1.0);
-            let y = view.y.clamp(0.0, 1.0);
-            let width = view.width.clamp(0.04, 1.0 - x);
-            let height = view.height.clamp(0.04, 1.0 - y);
+            let MinimapView {
+                x,
+                y,
+                width,
+                height,
+            } = bounded_view(view);
             let veil = theme
                 .colors
                 .canvas
@@ -298,5 +315,11 @@ mod tests {
     fn a_mark_keeps_the_category_the_caller_gave_it() {
         let mark = MinimapMark::new("ingest", 0.1, 0.2, 0.3, 0.4).color("teal");
         assert_eq!(mark.color, Some(ColorChoice::Palette("teal".into())));
+    }
+
+    #[test]
+    fn a_view_at_the_far_edge_keeps_its_extent_inside_the_minimap() {
+        let view = bounded_view(MinimapView::new(1.0, 1.0, 0.0, 0.25));
+        assert_eq!(view, MinimapView::new(0.96, 0.75, 0.04, 0.25));
     }
 }

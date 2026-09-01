@@ -41,6 +41,7 @@ use super::edge::{
     OrthogonalRoute, PortSide, RouteTransform, paint_route, paint_route_stroke, route_curved,
     route_curved_preview, route_orthogonal, route_preview,
 };
+use super::minimap::{MinimapView, bounded_view};
 use super::node::{GraphNode, GraphPort, PortDirection};
 use super::toolbar::CanvasToolbar;
 
@@ -3316,14 +3317,18 @@ fn graph_minimap(
     let indicator = world.zip(view).map(|((min, max), view)| {
         let width = (max.x - min.x).max(1.0);
         let height = (max.y - min.y).max(1.0);
-        let x = ((view.origin.x - min.x) / width).clamp(0.0, 1.0);
-        let y = ((view.origin.y - min.y) / height).clamp(0.0, 1.0);
+        let view = bounded_view(MinimapView::new(
+            (view.origin.x - min.x) / width,
+            (view.origin.y - min.y) / height,
+            view.size.width / width,
+            view.size.height / height,
+        ));
         div()
             .absolute()
-            .left(relative(x))
-            .top(relative(y))
-            .w(relative((view.size.width / width).clamp(0.04, 1.0 - x)))
-            .h(relative((view.size.height / height).clamp(0.04, 1.0 - y)))
+            .left(relative(view.x))
+            .top(relative(view.y))
+            .w(relative(view.width))
+            .h(relative(view.height))
             .radius(theme, Radius::Small)
             .bg(theme
                 .colors
