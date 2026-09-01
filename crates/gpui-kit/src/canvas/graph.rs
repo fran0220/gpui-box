@@ -178,10 +178,10 @@ struct GestureState {
     animation_started: Option<Instant>,
     /// The visible colour crossover for each caller-owned edge.
     edge_transitions: HashMap<SharedString, EdgeTransition>,
-    /// The fit token this canvas last framed itself for. Kept beside the
-    /// gesture because it is the same kind of fact: what this one canvas has
-    /// been through, not what the caller asked for.
-    framed: Option<u64>,
+    /// The last frame this canvas proposed. Kept beside the gesture because it
+    /// is the same kind of fact: what this one canvas has been through, not
+    /// what the caller asked for.
+    framed: Option<FramedViewport>,
     /// The fit token whose surface measurement has been cleared and measured
     /// again. A caller can change the canvas layout at the same time it asks
     /// for a new frame; reusing the previous token's bounds would frame the
@@ -216,6 +216,13 @@ struct GestureState {
     /// Recording what was proposed is how the two are told apart exactly,
     /// rather than by guessing from how far the viewport moved.
     direct: Option<GraphViewport>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FramedViewport {
+    token: u64,
+    viewport: GraphViewport,
+    surface: Size<Pixels>,
 }
 
 type PortKey = (SharedString, SharedString);
@@ -569,14 +576,28 @@ fn fit_inset_candidates(obstacles: &[FitObstacle]) -> Vec<FitInsets> {
         })
 }
 
-/// The token to frame for, or `None` when this canvas has already framed for
-/// the one the caller is holding. Separated from the drawing so the rule —
-/// framing happens once per token, and a reader's own panning never earns
-/// another one — can be read and tested without a window.
-fn wants_frame(fit: GraphFit, framed: Option<u64>) -> Option<u64> {
+/// The token to frame for, or `None` when the current frame already answers it.
+/// Separated from drawing so both rules can be read and tested without a
+/// window: an untouched fitted viewport follows its container, while a
+/// reader- or caller-moved viewport never gets taken back by a resize.
+fn wants_frame(
+    fit: GraphFit,
+    framed: Option<FramedViewport>,
+    asked: GraphViewport,
+    surface: Size<Pixels>,
+) -> Option<u64> {
     match fit {
         GraphFit::Never => None,
-        GraphFit::Whole(token) => (framed != Some(token)).then_some(token),
+        GraphFit::Whole(token) => match framed {
+            Some(framed) if framed.token == token => {
+                // A fitted canvas follows a container resize only while the
+                // caller still holds the exact viewport the fit proposed. A
+                // pan, wheel or restored caller viewport differs from that
+                // proposal and makes the view the reader's again.
+                (asked == framed.viewport && surface != framed.surface).then_some(token)
+            }
+            _ => Some(token),
+        },
     }
 }
 
@@ -1233,8 +1254,10 @@ pub enum GraphFit {
     /// technically inside the viewport underneath them. Reported as an ordinary
     /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
     /// its viewport needs nothing else. Between framings the viewport is the
-    /// reader's and the canvas never moves it on its own, so a caller that
-    /// holds one value is framed exactly once, when the canvas first opens.
+    /// reader's and the canvas never moves it on its own. While the caller
+    /// still holds the exact fitted viewport, a changed container rectangle is
+    /// framed again; the first pan, wheel or caller-restored viewport ends that
+    /// resize following without requiring a second mode flag.
     Whole(u64),
 }
 
@@ -1712,7 +1735,7 @@ impl RenderOnce for NodeGraph {
             .as_ref()
             .map(|_| measure::cell(&self.ident.child("toolbar-seat").semantic_id(), window, cx));
         let previously_framed = gesture.borrow().framed;
-        if let Some(token) = wants_frame(self.fit, previously_framed) {
+        if let Some(token) = wants_frame(self.fit, previously_framed, asked, measured.get().size) {
             let mut state = gesture.borrow_mut();
             if state.measuring != Some(token) {
                 state.measuring = Some(token);
@@ -2055,7 +2078,7 @@ impl RenderOnce for NodeGraph {
         // scrutinee lives as long as the block, and the block takes the same
         // cell mutably to record what it framed.
         let already_framed = gesture.borrow().framed;
-        let pending_frame = wants_frame(self.fit, already_framed);
+        let pending_frame = wants_frame(self.fit, already_framed, asked, measured.get().size);
         let relationship_measurements: HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>> = routes
             .iter()
             .filter_map(|routed| {
@@ -2148,7 +2171,11 @@ impl RenderOnce for NodeGraph {
             )
             && let Some(report) = self.on_event.as_ref().cloned()
         {
-            gesture.borrow_mut().framed = Some(token);
+            gesture.borrow_mut().framed = Some(FramedViewport {
+                token,
+                viewport: framed,
+                surface: measured.get().size,
+            });
             // Reported rather than applied: the viewport belongs to the caller
             // and this is the same proposal a pan or a wheel makes. Deferred
             // because a caller answers it by writing its own state, which it
@@ -4097,23 +4124,71 @@ mod tests {
     }
 
     #[test]
-    fn a_canvas_frames_once_per_token_and_never_takes_the_view_back() {
+    fn a_canvas_follows_its_frame_through_a_resize_until_the_reader_moves_it() {
+        let initial_surface = size(px(640.0), px(480.0));
+        let resized_surface = size(px(520.0), px(480.0));
+        let opening_viewport = GraphViewport::new(point(12.0, 18.0), 0.72);
         assert_eq!(
-            wants_frame(GraphFit::Never, None),
+            wants_frame(
+                GraphFit::Never,
+                None,
+                GraphViewport::default(),
+                initial_surface,
+            ),
             None,
             "a canvas the caller never asked to frame stays where the caller put it"
         );
 
-        let opening = wants_frame(GraphFit::Whole(0), None).expect("the opening frame");
-        assert_eq!(opening, 0);
-        assert_eq!(
-            wants_frame(GraphFit::Whole(0), Some(opening)),
+        let opening = wants_frame(
+            GraphFit::Whole(0),
             None,
-            "once framed, the view is the reader's: panning away does not earn \
-             it back"
+            GraphViewport::default(),
+            initial_surface,
+        )
+        .expect("the opening frame");
+        assert_eq!(opening, 0);
+        let framed = FramedViewport {
+            token: opening,
+            viewport: opening_viewport,
+            surface: initial_surface,
+        };
+        assert_eq!(
+            wants_frame(
+                GraphFit::Whole(0),
+                Some(framed),
+                opening_viewport,
+                initial_surface,
+            ),
+            None,
+            "an unchanged fitted surface does not keep asking for the same frame"
         );
         assert_eq!(
-            wants_frame(GraphFit::Whole(1), Some(0)),
+            wants_frame(
+                GraphFit::Whole(0),
+                Some(framed),
+                opening_viewport,
+                resized_surface,
+            ),
+            Some(0),
+            "an untouched fitted view follows the rectangle that now contains it"
+        );
+        assert_eq!(
+            wants_frame(
+                GraphFit::Whole(0),
+                Some(framed),
+                GraphViewport::new(point(40.0, 18.0), opening_viewport.zoom),
+                resized_surface,
+            ),
+            None,
+            "once the reader moves the viewport, a resize never takes it back"
+        );
+        assert_eq!(
+            wants_frame(
+                GraphFit::Whole(1),
+                Some(framed),
+                opening_viewport,
+                initial_surface,
+            ),
             Some(1),
             "a caller's own Fit control bumps the token, which is how it asks \
              for a frame it cannot compute itself"
