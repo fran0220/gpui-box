@@ -256,22 +256,17 @@ The active baselines live in `snapshots/headless/{macos,windows}/scenes`.
 Metal and WARP land antialiased edges differently, so each supported
 renderer verifies its own baseline.
 
-One divergence is larger than antialiasing and is easy to mistake for a
-regression, so it is written down. **The DX12 software adapter does not
-scatter a backdrop the way Metal and llvmpipe do.** A frosted surface over
-line work keeps its tint and its glass character on WARP, but a hairline
-behind it arrives sharp instead of blurred: on `node-graph-motion` the
-world-origin axis rule stops at the toolbar edge on macOS and Linux, and
-crosses `100%` on Windows. The Windows baseline records that, because a
-baseline's job is to say what its renderer produces.
-
-Two things follow. A reviewer comparing the macOS and Windows images of a
-frosted surface will find a real difference and should not open it again as a
-defect. And whether the same thing happens on a *real* DirectX window is a
-separate question from what WARP does — the software adapter is a determinism
-tool, not the surface a reader ever looks at — so it is not yet known whether
-this reaches a product. Until somebody runs the real-window check on Windows,
-this note says only what the headless harness shows.
+Read a frosted surface with a pixel probe, not with your eyes. A blurred
+backdrop and a sharp one look alike at review scale when the thing behind is a
+hairline, because the line's exterior segments go on pointing at where they
+would have continued, and the eye joins them up through the glyphs. That
+illusion cost this repository a documented renderer divergence that did not
+exist: the `node-graph-motion` axis rule was reported as crossing `100%` on
+WARP, believed, and written down here, before anybody sampled the columns it
+runs in. They read 96–99 above the toolbar, a flat 32–33 for every interior
+row, and 87–90 below it, with a neighbouring column reading 148 inside — so
+the line is gone and the interior is not merely flat everywhere. WARP scatters
+a backdrop exactly as Metal and llvmpipe do.
 
 A token change moves every image on every renderer, and each set can only be
 accepted on a machine with that renderer. The surface-separation and
