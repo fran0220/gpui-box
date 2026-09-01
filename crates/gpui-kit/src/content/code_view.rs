@@ -64,9 +64,7 @@ use gpui::{
     RenderOnce, SharedString, Styled, StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
-};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 
 use crate::content::highlight::{Cache, Language};
 use crate::content::markdown::CodeSpan;
@@ -561,14 +559,14 @@ impl RenderOnce for CodeView {
             .column()
             .w_full()
             .gap_token(&theme, Space::Xs)
-            // The block's rows run edge to edge and pad themselves: a row
-            // inset by the card's own padding leaves its mark's wash stopping
-            // short of the card, which reads as a band that failed to finish
-            // rather than as a line that is marked.
+            // Code is information on the caller's reading plane, not a raised
+            // object. Rows still run edge to edge so a line mark spans the
+            // whole reading width; one rule ends the block without promoting
+            // it into a card.
             .py_token(&theme, Space::Sm)
-            .radius(&theme, Radius::Card)
             .overflow_hidden()
-            .frame(&theme, Surface::Raised, Elevation::Raised)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider.opacity(theme.opacity.muted))
             .when(self.language.is_some() || copy.is_some(), |element| {
                 element.child(
                     div()
@@ -591,27 +589,10 @@ impl RenderOnce for CodeView {
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
                     .text_color(theme.colors.text)
-                    .child(body)
-                    // A column carries meaning in code, so a long line runs off
-                    // the edge rather than wrapping — and the edge it runs off
-                    // is a fade, not a cut through the middle of a word that
-                    // reads as a rendering failure.
-                    .child(
-                        div()
-                            .absolute()
-                            .top_0()
-                            .bottom_0()
-                            .right_0()
-                            .w(px(theme.effects.edge_fade_band))
-                            .bg(gpui::linear_gradient(
-                                90.0,
-                                gpui::linear_color_stop(
-                                    theme.surface(Surface::Raised).opacity(0.0),
-                                    0.0,
-                                ),
-                                gpui::linear_color_stop(theme.surface(Surface::Raised), 1.0),
-                            )),
-                    ),
+                    // A column carries meaning in code, so a long line scrolls
+                    // rather than wrapping. There is no backdrop-coloured fade:
+                    // this component no longer owns a backdrop to match.
+                    .child(body),
             )
             .semantic_in(
                 cx,

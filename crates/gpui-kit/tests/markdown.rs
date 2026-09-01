@@ -229,7 +229,7 @@ fn a_code_block_publishes_the_info_string_it_was_given(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
-fn flat_code_keeps_the_default_fence_contract_without_the_card_inset(cx: &mut TestAppContext) {
+fn default_code_stays_flat_without_losing_the_fence_contract(cx: &mut TestAppContext) {
     const FENCE: &str =
         "```rust\nfn main() { println!(\"a deliberately long line stays code\"); }\n```";
     let (events, into) = sink::<MarkdownEvent>();
@@ -237,10 +237,9 @@ fn flat_code_keeps_the_default_fence_contract_without_the_card_inset(cx: &mut Te
         let into = into.clone();
         gpui::div()
             .w(gpui::px(320.0))
-            .child(Markdown::new("card", FENCE))
+            .child(Markdown::new("card", FENCE).code_presentation(MarkdownCodePresentation::Card))
             .child(
                 Markdown::new("flat", FENCE)
-                    .code_presentation(MarkdownCodePresentation::Flat)
                     .on_event(move |event, _, _| into.borrow_mut().push(event.clone())),
             )
             .into_any_element()
@@ -253,7 +252,7 @@ fn flat_code_keeps_the_default_fence_contract_without_the_card_inset(cx: &mut Te
     assert_eq!(flat.value, card.value);
     assert!(
         flat.bounds.height < card.bounds.height,
-        "Flat removes the card's all-side inset: card={}, flat={}",
+        "the default removes the opt-in card's inset: card={}, flat={}",
         card.bounds.height,
         flat.bounds.height
     );

@@ -109,6 +109,12 @@ whole-value copy action that puts its exact bytes on the clipboard and reports
 mounted or visible range. Nothing is reflowed, retyped, or re-indented on the
 way.
 
+Code fences, quotes, tables, code views, diffs, and log streams stay on their
+caller's reading plane. Their type, whitespace, rails, marks, and row rules
+state their hierarchy; raised rounded frames are reserved for supplied or
+missing media and other content that owns a visual plane. This keeps ordinary
+information from turning into a stack of competing cards.
+
 ### Truncation says how much it cut
 
 `Markdown::max_lines(n)` keeps the first `n` lines and offers the rest by name:

@@ -50208,7 +50208,7 @@
       "path": "gpui_kit::content::markdown",
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "Chooses how fenced code blocks are presented inside this document.",
-      "documentation": "Chooses how fenced code blocks are presented inside this document.\n\nThe default is [`MarkdownCodePresentation::Card`]. Flat presentation\nchanges only the fence's container treatment; its header, Copy action,\nhighlighting, selection, line count, and overflow behavior are the\nsame as the default presentation.",
+      "documentation": "Chooses how fenced code blocks are presented inside this document.\n\nThe default is [`MarkdownCodePresentation::Flat`]. Card presentation\nchanges only the fence's container treatment; its header, Copy action,\nhighlighting, selection, line count, and overflow behavior are the\nsame as the default presentation.",
       "signature": "pub fn code_presentation (mut self, presentation : MarkdownCodePresentation) -> Self",
       "cfg": [],
       "target": "Markdown"
@@ -50329,7 +50329,7 @@
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "How fenced code blocks are presented inside a Markdown document.",
       "documentation": "How fenced code blocks are presented inside a Markdown document.",
-      "signature": "# [doc = \" How fenced code blocks are presented inside a Markdown document.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum MarkdownCodePresentation { # [doc = \" A raised card that separates code from the surrounding document.\"] # [default] Card, # [doc = \" An inline block without a raised surface, elevation, or card frame.\"] Flat, }",
+      "signature": "# [doc = \" How fenced code blocks are presented inside a Markdown document.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum MarkdownCodePresentation { # [doc = \" A raised card that separates code from the surrounding document.\"] Card, # [doc = \" An inline block without a raised surface, elevation, or card frame.\"] # [default] Flat, }",
       "cfg": []
     },
     {

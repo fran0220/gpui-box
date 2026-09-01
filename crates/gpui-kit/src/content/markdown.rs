@@ -113,9 +113,9 @@ pub struct CodeSpan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MarkdownCodePresentation {
     /// A raised card that separates code from the surrounding document.
-    #[default]
     Card,
     /// An inline block without a raised surface, elevation, or card frame.
+    #[default]
     Flat,
 }
 
@@ -164,7 +164,7 @@ impl Markdown {
             on_event: None,
             image: None,
             highlighter: None,
-            code_presentation: MarkdownCodePresentation::Card,
+            code_presentation: MarkdownCodePresentation::Flat,
             streaming: false,
         }
     }
@@ -236,7 +236,7 @@ impl Markdown {
 
     /// Chooses how fenced code blocks are presented inside this document.
     ///
-    /// The default is [`MarkdownCodePresentation::Card`]. Flat presentation
+    /// The default is [`MarkdownCodePresentation::Flat`]. Card presentation
     /// changes only the fence's container treatment; its header, Copy action,
     /// highlighting, selection, line count, and overflow behavior are the
     /// same as the default presentation.
@@ -969,7 +969,14 @@ impl Painter {
             )
             .when(
                 self.code_presentation == MarkdownCodePresentation::Flat,
-                |block| block.py_token(&theme, Space::Xs),
+                // A fence is part of the document's reading flow, not a
+                // second surface asking to become its visual focus.
+                |block| {
+                    block
+                        .py_token(&theme, Space::Xs)
+                        .border_b(px(theme.borders.hairline))
+                        .border_color(theme.colors.divider.opacity(theme.opacity.muted))
+                },
             )
             .semantic_in(
                 cx,
@@ -996,18 +1003,15 @@ impl Painter {
         for block in blocks {
             column = column.child(self.block(block, window, cx));
         }
-        // A quote is a rail and a recess, not a line: the code block beside it
-        // is drawn with a border of the same weight, and two blocks separated
-        // only by what is inside them read as one kind of thing.
+        // A quote stays on the document plane. Its rail states the hierarchy;
+        // a recessed rounded surface would repeat that fact and make ordinary
+        // quoted prose compete with media for attention.
         div()
             .row()
             .items_stretch()
             .w_full()
             .gap_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
-            .pr(px(theme.space(Space::Sm)))
-            .radius(&theme, Radius::Small)
-            .surface(&theme, Surface::Sunken)
             .child(
                 div()
                     .w(px(theme.effects.rail_width))
@@ -1158,19 +1162,18 @@ impl Painter {
         let name = flatten(head.first().map(Vec::as_slice).unwrap_or_default());
         let ident = self.ident_for("table", name.as_ref());
 
-        let mut frame = div()
-            .column()
-            .w_full()
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
-            .overflow_hidden();
+        // A table is structured information in this document, not a durable
+        // result or a media object. Row rules carry its structure directly on
+        // the reading plane instead of enclosing it in another raised card.
+        let mut frame = div().column().w_full();
 
         if !head.is_empty() {
             let mut header = div()
                 .row()
                 .items_stretch()
                 .w_full()
-                .bg(theme.colors.raised)
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider)
                 .type_scale(&theme, TypeScale::Caption)
                 .text_color(theme.colors.text_muted);
             for (column, cell) in head.iter().enumerate() {
@@ -1186,6 +1189,8 @@ impl Painter {
                 .row()
                 .items_stretch()
                 .w_full()
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider.opacity(theme.opacity.muted))
                 .type_scale(&theme, TypeScale::Label)
                 .text_color(theme.colors.text);
             for (column, cell) in row.iter().enumerate() {
