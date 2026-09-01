@@ -429,6 +429,19 @@ pub(super) fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(640.0))
         .child(Markdown::new("scene.markdown.document", SCENE_DOCUMENT).on_event(|_, _, _| {}))
+        .child(
+            Divider::new()
+                .id("scene.markdown.flat-rule")
+                .label("The same fence in flat presentation"),
+        )
+        .child(
+            Markdown::new(
+                "scene.markdown.flat",
+                "```rust\nfn main() { println!(\"a long line keeps its horizontal code overflow\"); }\n```",
+            )
+            .code_presentation(MarkdownCodePresentation::Flat)
+            .on_event(|_, _, _| {}),
+        )
         .child(Divider::new().id("scene.markdown.rule").label("Truncated"))
         .child(
             Markdown::new("scene.markdown.short", SCENE_DOCUMENT)

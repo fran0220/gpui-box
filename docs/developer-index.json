@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4172
+      "symbolCount": 4178
     },
     {
       "name": "gpui-box-kit-assets",
@@ -40987,6 +40987,20 @@
       "target": "Reading"
     },
     {
+      "id": "gpui_kit::agent::disclosure::AgentDisclosurePresentation",
+      "name": "AgentDisclosurePresentation",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::disclosure",
+      "path": "gpui_kit::agent::disclosure",
+      "source": "crates/gpui-kit/src/agent/disclosure.rs",
+      "summary": "How agent evidence is presented when a disclosure is open.",
+      "documentation": "How agent evidence is presented when a disclosure is open.",
+      "signature": "# [doc = \" How agent evidence is presented when a disclosure is open.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum AgentDisclosurePresentation { # [doc = \" Evidence sits on a distinct inset body surface.\"] # [default] Inset, # [doc = \" Evidence remains inline in the surrounding information flow.\"] Flow, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::agent::feedback::FeedbackRating",
       "name": "FeedbackRating",
       "kind": "struct",
@@ -44656,6 +44670,20 @@
     },
     {
       "id": "gpui_kit::agent::reexport-10",
+      "name": "permission :: { PermissionAction , PermissionChange , PermissionEntry , PermissionMatrix , PermissionSource , PermissionState , PermissionSubject , }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent",
+      "path": "gpui_kit::agent",
+      "source": "crates/gpui-kit/src/agent/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use permission::{ PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource, PermissionState, PermissionSubject, };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::reexport-11",
       "name": "persona :: { DialogueChoice , DialogueChoiceAvailability , DialogueTurn , PersonaDialogue , PersonaDialogueEvent , PersonaExpression , PersonaPortrait , VoiceField , VoiceReactive , VoiceSample , VoiceSampleError , VoiceSampleErrorKind , VoiceState , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44669,7 +44697,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-11",
+      "id": "gpui_kit::agent::reexport-12",
       "name": "plan :: { AgentPlan , PlanItem , PlanState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44683,7 +44711,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-12",
+      "id": "gpui_kit::agent::reexport-13",
       "name": "presentation :: { AgentActivityLine , AgentAppearance , AgentAvatar , AgentCard , AgentGroup , AgentRoster , AgentRunIssues , SubagentTree , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44697,7 +44725,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-13",
+      "id": "gpui_kit::agent::reexport-14",
       "name": "prompt :: { PromptBuilder , PromptBuilderEvent , PromptBuilderState , PromptSlot }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44711,7 +44739,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-14",
+      "id": "gpui_kit::agent::reexport-15",
       "name": "server_list :: { Catalog , Offering , OfferingKind , ServerEntry , ServerList , ServerState }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44725,7 +44753,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-15",
+      "id": "gpui_kit::agent::reexport-16",
       "name": "thinking :: { Reasoning , ThinkingBlock }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44739,7 +44767,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-16",
+      "id": "gpui_kit::agent::reexport-17",
       "name": "tool_call :: { Elapsed , ToolBody , ToolCall , ToolCallState , ToolFamily , ToolOutput }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44810,6 +44838,20 @@
     },
     {
       "id": "gpui_kit::agent::reexport-6",
+      "name": "disclosure :: AgentDisclosurePresentation",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent",
+      "path": "gpui_kit::agent",
+      "source": "crates/gpui-kit/src/agent/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use disclosure::AgentDisclosurePresentation;",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::agent::reexport-7",
       "name": "feedback :: { FeedbackRating , FeedbackRatingEvent , FeedbackVote }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44823,7 +44865,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-7",
+      "id": "gpui_kit::agent::reexport-8",
       "name": "model :: { AgentActivity , AgentDescriptor , AgentExecutionState , AgentId , AgentModelIssue , AgentOutcome , AgentPresence , AgentRunSnapshot , AgentSnapshot , AgentTaskSnapshot , AgentUiAction , AgentVisualEvent , AgentVisualEventKind , AggregationSnapshot , InvocationId , RunId , RunLink , RunLinkId , RunLinkKind , RunSubjectId , TaskId , VisualEventId , WaitReason , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44837,7 +44879,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::agent::reexport-8",
+      "id": "gpui_kit::agent::reexport-9",
       "name": "offering_catalog :: { OfferingCatalog , OfferingIdentity , OfferingSource , OfferingSourceState , SearchableOffering , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -44848,20 +44890,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use offering_catalog::{ OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering, };",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::agent::reexport-9",
-      "name": "permission :: { PermissionAction , PermissionChange , PermissionEntry , PermissionMatrix , PermissionSource , PermissionState , PermissionSubject , }",
-      "kind": "reexport",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "agent",
-      "path": "gpui_kit::agent",
-      "source": "crates/gpui-kit/src/agent/mod.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use permission::{ PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource, PermissionState, PermissionSubject, };",
       "cfg": []
     },
     {
@@ -45453,7 +45481,7 @@
       "source": "crates/gpui-kit/src/agent/thinking.rs",
       "summary": "A collapsed block of model reasoning.",
       "documentation": "A collapsed block of model reasoning.\n\nWhether it is open is the caller's, as it is for\n[`Accordion`](crate::navigation::accordion::Accordion): the block reports\nthe state it should take and shows exactly the state it was given.",
-      "signature": "# [doc = \" A collapsed block of model reasoning.\"] # [doc = \"\"] # [doc = \" Whether it is open is the caller's, as it is for\"] # [doc = \" [`Accordion`](crate::navigation::accordion::Accordion): the block reports\"] # [doc = \" the state it should take and shows exactly the state it was given.\"] # [derive (IntoElement)] pub struct ThinkingBlock { ident : Ident, reasoning : Reasoning, expanded : bool, # [doc = \" Whether the reasoning is still arriving. Separate from the reasoning\"] # [doc = \" itself, because text that has stopped growing and text that is still\"] # [doc = \" growing look identical and mean different things.\"] thinking : bool, # [doc = \" How long the host says this turn has been thinking, already formatted.\"] elapsed : Option<SharedString>, on_toggle : Option<ToggleHandler>, }",
+      "signature": "# [doc = \" A collapsed block of model reasoning.\"] # [doc = \"\"] # [doc = \" Whether it is open is the caller's, as it is for\"] # [doc = \" [`Accordion`](crate::navigation::accordion::Accordion): the block reports\"] # [doc = \" the state it should take and shows exactly the state it was given.\"] # [derive (IntoElement)] pub struct ThinkingBlock { ident : Ident, reasoning : Reasoning, expanded : bool, # [doc = \" Whether the reasoning is still arriving. Separate from the reasoning\"] # [doc = \" itself, because text that has stopped growing and text that is still\"] # [doc = \" growing look identical and mean different things.\"] thinking : bool, # [doc = \" How long the host says this turn has been thinking, already formatted.\"] elapsed : Option<SharedString>, presentation : AgentDisclosurePresentation, on_toggle : Option<ToggleHandler>, }",
       "cfg": []
     },
     {
@@ -45513,6 +45541,21 @@
       "summary": "Reports the state the block should take next.",
       "documentation": "Reports the state the block should take next.",
       "signature": "pub fn on_toggle (mut self, handler : impl Fn (bool, & mut Window, & mut App) + 'static) -> Self",
+      "cfg": [],
+      "target": "ThinkingBlock"
+    },
+    {
+      "id": "gpui_kit::agent::thinking::ThinkingBlock::presentation",
+      "name": "presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::thinking",
+      "path": "gpui_kit::agent::thinking",
+      "source": "crates/gpui-kit/src/agent/thinking.rs",
+      "summary": "Chooses the body treatment when reasoning is disclosed.",
+      "documentation": "Chooses the body treatment when reasoning is disclosed.\n\nThe default is [`AgentDisclosurePresentation::Inset`]. Flow preserves\nthe body's indentation and content without drawing a separate surface.",
+      "signature": "pub fn presentation (mut self, presentation : AgentDisclosurePresentation) -> Self",
       "cfg": [],
       "target": "ThinkingBlock"
     },
@@ -45720,7 +45763,7 @@
       "source": "crates/gpui-kit/src/agent/tool_call.rs",
       "summary": "One quiet evidence row for a tool invocation.",
       "documentation": "One quiet evidence row for a tool invocation.\n\nThe row is collapsed by default. Arguments, output and an optional diff\nappear only when the caller advances `expanded`; the component reports the\nrequested next state through `on_toggle` and runs no tool itself.",
-      "signature": "# [doc = \" One quiet evidence row for a tool invocation.\"] # [doc = \"\"] # [doc = \" The row is collapsed by default. Arguments, output and an optional diff\"] # [doc = \" appear only when the caller advances `expanded`; the component reports the\"] # [doc = \" requested next state through `on_toggle` and runs no tool itself.\"] # [derive (IntoElement)] pub struct ToolCall { ident : Ident, family : ToolFamily, tool : SharedString, summary : Option<SharedString>, arguments : Option<ToolBody>, state : ToolCallState, elapsed : Elapsed, diff : Option<AnyElement>, expanded : bool, on_toggle : Option<ToggleHandler>, on_retry : Option<RetryHandler>, }",
+      "signature": "# [doc = \" One quiet evidence row for a tool invocation.\"] # [doc = \"\"] # [doc = \" The row is collapsed by default. Arguments, output and an optional diff\"] # [doc = \" appear only when the caller advances `expanded`; the component reports the\"] # [doc = \" requested next state through `on_toggle` and runs no tool itself.\"] # [derive (IntoElement)] pub struct ToolCall { ident : Ident, family : ToolFamily, tool : SharedString, summary : Option<SharedString>, arguments : Option<ToolBody>, state : ToolCallState, elapsed : Elapsed, diff : Option<AnyElement>, expanded : bool, presentation : AgentDisclosurePresentation, on_toggle : Option<ToggleHandler>, on_retry : Option<RetryHandler>, }",
       "cfg": []
     },
     {
@@ -45825,6 +45868,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn on_toggle (mut self, handler : impl Fn (bool, & mut Window, & mut App) + 'static) -> Self",
+      "cfg": [],
+      "target": "ToolCall"
+    },
+    {
+      "id": "gpui_kit::agent::tool_call::ToolCall::presentation",
+      "name": "presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::tool_call",
+      "path": "gpui_kit::agent::tool_call",
+      "source": "crates/gpui-kit/src/agent/tool_call.rs",
+      "summary": "Chooses the body treatment for disclosed arguments and results.",
+      "documentation": "Chooses the body treatment for disclosed arguments and results.\n\nThe default is [`AgentDisclosurePresentation::Inset`]. Flow keeps the\nsame disclosure content and indentation without placing it on a\nseparate evidence surface.",
+      "signature": "pub fn presentation (mut self, presentation : AgentDisclosurePresentation) -> Self",
       "cfg": [],
       "target": "ToolCall"
     },
@@ -50137,8 +50195,23 @@
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "A rendered Markdown document.",
       "documentation": "A rendered Markdown document.",
-      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, streaming : bool, }",
+      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, code_presentation : MarkdownCodePresentation, streaming : bool, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::content::markdown::Markdown::code_presentation",
+      "name": "code_presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown",
+      "path": "gpui_kit::content::markdown",
+      "source": "crates/gpui-kit/src/content/markdown.rs",
+      "summary": "Chooses how fenced code blocks are presented inside this document.",
+      "documentation": "Chooses how fenced code blocks are presented inside this document.\n\nThe default is [`MarkdownCodePresentation::Flat`]. Card presentation\nchanges only the fence's container treatment; its header, Copy action,\nhighlighting, selection, line count, and overflow behavior are the\nsame as the default presentation.",
+      "signature": "pub fn code_presentation (mut self, presentation : MarkdownCodePresentation) -> Self",
+      "cfg": [],
+      "target": "Markdown"
     },
     {
       "id": "gpui_kit::content::markdown::Markdown::highlight",
@@ -50244,6 +50317,20 @@
       "signature": "pub fn streaming (mut self, streaming : bool) -> Self",
       "cfg": [],
       "target": "Markdown"
+    },
+    {
+      "id": "gpui_kit::content::markdown::MarkdownCodePresentation",
+      "name": "MarkdownCodePresentation",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown",
+      "path": "gpui_kit::content::markdown",
+      "source": "crates/gpui-kit/src/content/markdown.rs",
+      "summary": "How fenced code blocks are presented inside a Markdown document.",
+      "documentation": "How fenced code blocks are presented inside a Markdown document.",
+      "signature": "# [doc = \" How fenced code blocks are presented inside a Markdown document.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum MarkdownCodePresentation { # [doc = \" A raised card that separates code from the surrounding document.\"] Card, # [doc = \" An inline block without a raised surface, elevation, or card frame.\"] # [default] Flat, }",
+      "cfg": []
     },
     {
       "id": "gpui_kit::content::markdown::MarkdownEvent",
@@ -51870,7 +51957,7 @@
     },
     {
       "id": "gpui_kit::content::reexport-9",
-      "name": "markdown :: { Block , CellAlign , CodeBlock , CodeSpan , Document , ImageRequest , Inline , ListEntry , Markdown , MarkdownEvent , }",
+      "name": "markdown :: { Block , CellAlign , CodeBlock , CodeSpan , Document , ImageRequest , Inline , ListEntry , Markdown , MarkdownCodePresentation , MarkdownEvent , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
       "crate": "gpui_kit",
@@ -51879,7 +51966,7 @@
       "source": "crates/gpui-kit/src/content/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use markdown::{ Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown, MarkdownEvent, };",
+      "signature": "pub use markdown::{ Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown, MarkdownCodePresentation, MarkdownEvent, };",
       "cfg": []
     },
     {
@@ -119216,6 +119303,7 @@
         "on_event(handler: impl Fn(&MarkdownEvent, &mut Window, &mut App) + 'static) -> Self",
         "image(source: impl Fn(&ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
         "streaming(streaming: bool) -> Self",
+        "code_presentation(presentation: MarkdownCodePresentation) -> Self",
         "highlight(highlighter: impl Fn(&CodeBlock) -> Vec<CodeSpan> + 'static) -> Self"
       ],
       "commands": [],
@@ -121564,6 +121652,7 @@
       ],
       "options": [
         "expanded(expanded: bool) -> Self",
+        "presentation(presentation: AgentDisclosurePresentation) -> Self",
         "thinking(thinking: bool) -> Self",
         "elapsed(elapsed: impl Into<SharedString>) -> Self",
         "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
@@ -121735,6 +121824,7 @@
         "elapsed(elapsed: impl Into<Elapsed>) -> Self",
         "diff(diff: impl IntoElement) -> Self",
         "expanded(expanded: bool) -> Self",
+        "presentation(presentation: AgentDisclosurePresentation) -> Self",
         "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
         "on_retry(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
@@ -122321,6 +122411,19 @@
         "role(role: impl Into<SharedString>) -> Self",
         "capabilities(capabilities: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentDisclosurePresentation",
+      "path": "gpui_kit::agent::AgentDisclosurePresentation",
+      "summary": "How agent evidence is presented when a disclosure is open.",
+      "variants": [
+        "Inset",
+        "Flow"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -126732,6 +126835,19 @@
       "path": "gpui_kit::content::MarkSpan",
       "summary": "",
       "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MarkdownCodePresentation",
+      "path": "gpui_kit::content::MarkdownCodePresentation",
+      "summary": "How fenced code blocks are presented inside a Markdown document.",
+      "variants": [
+        "Card",
+        "Flat"
+      ],
       "construct": [],
       "options": [],
       "commands": [],
@@ -141205,7 +141321,7 @@
       "uses": [
         "Markdown"
       ],
-      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-document",
@@ -141513,7 +141629,7 @@
       "uses": [
         "ToolCall"
       ],
-      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                )\n                .child(\n                    ToolCall::new(\"scene.tool.flow\", ToolFamily::Read, \"workspace.read\")\n                        .summary(\"README.md · flow\")\n                        .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                        .state(ToolCallState::succeeded(\"Product-neutral components.\"))\n                        .expanded(true)\n                        .presentation(AgentDisclosurePresentation::Flow)\n                        .on_toggle(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-plan",
@@ -141605,7 +141721,7 @@
       "uses": [
         "ThinkingBlock"
       ],
-      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.collapsed\",\n                Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n            )\n            .elapsed(\"2.1 s\"),\n        )\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .elapsed(\"8.4 s\")\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
+      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.collapsed\",\n                Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n            )\n            .elapsed(\"2.1 s\"),\n        )\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .elapsed(\"8.4 s\")\n            .on_toggle(|_, _, _| {}),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.flow\",\n                Reasoning::present(\"The same evidence stays indented.\\nIt has no body plane.\"),\n            )\n            .expanded(true)\n            .presentation(AgentDisclosurePresentation::Flow)\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "json-view",

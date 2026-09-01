@@ -109,6 +109,16 @@ pub struct CodeSpan {
     pub role: SyntaxColor,
 }
 
+/// How fenced code blocks are presented inside a Markdown document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MarkdownCodePresentation {
+    /// A raised card that separates code from the surrounding document.
+    Card,
+    /// An inline block without a raised surface, elevation, or card frame.
+    #[default]
+    Flat,
+}
+
 type EventHandler = Rc<dyn Fn(&MarkdownEvent, &mut Window, &mut App)>;
 type ImageSource = Rc<dyn Fn(&ImageRequest, &mut Window, &mut App) -> Option<AnyElement>>;
 type Highlighter = Rc<dyn Fn(&CodeBlock) -> Vec<CodeSpan>>;
@@ -125,6 +135,7 @@ pub struct Markdown {
     on_event: Option<EventHandler>,
     image: Option<ImageSource>,
     highlighter: Option<Highlighter>,
+    code_presentation: MarkdownCodePresentation,
     streaming: bool,
 }
 
@@ -137,6 +148,7 @@ impl std::fmt::Debug for Markdown {
             .field("max_lines", &self.max_lines)
             .field("has_images", &self.image.is_some())
             .field("has_highlighter", &self.highlighter.is_some())
+            .field("code_presentation", &self.code_presentation)
             .field("streaming", &self.streaming)
             .finish()
     }
@@ -152,6 +164,7 @@ impl Markdown {
             on_event: None,
             image: None,
             highlighter: None,
+            code_presentation: MarkdownCodePresentation::Flat,
             streaming: false,
         }
     }
@@ -221,6 +234,17 @@ impl Markdown {
         self
     }
 
+    /// Chooses how fenced code blocks are presented inside this document.
+    ///
+    /// The default is [`MarkdownCodePresentation::Flat`]. Card presentation
+    /// changes only the fence's container treatment; its header, Copy action,
+    /// highlighting, selection, line count, and overflow behavior are the
+    /// same as the default presentation.
+    pub fn code_presentation(mut self, presentation: MarkdownCodePresentation) -> Self {
+        self.code_presentation = presentation;
+        self
+    }
+
     /// Colours code blocks from spans the host computed.
     ///
     /// A fence whose info string names a language
@@ -278,6 +302,7 @@ impl RenderOnce for Markdown {
             on_event: self.on_event.clone(),
             image: self.image.clone(),
             highlighter: self.highlighter.clone(),
+            code_presentation: self.code_presentation,
             used: HashMap::new(),
             reading_order: self.selection_order_start,
             requested: Vec::new(),
@@ -397,6 +422,7 @@ struct Painter {
     on_event: Option<EventHandler>,
     image: Option<ImageSource>,
     highlighter: Option<Highlighter>,
+    code_presentation: MarkdownCodePresentation,
     /// How many parts have already claimed each id stem, so a document that
     /// links to the same place twice still publishes two distinct nodes.
     used: HashMap<String, usize>,
@@ -902,13 +928,10 @@ impl Painter {
                 )
             });
 
-        div()
+        let block = div()
             .column()
             .w_full()
             .gap_token(&theme, Space::Xs)
-            .p_token(&theme, Space::Sm)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Raised, Elevation::Raised)
             .child(
                 div()
                     .row()
@@ -932,7 +955,29 @@ impl Painter {
                             }),
                     ),
             )
-            .child(body)
+            .child(body);
+
+        block
+            .when(
+                self.code_presentation == MarkdownCodePresentation::Card,
+                |block| {
+                    block
+                        .p_token(&theme, Space::Sm)
+                        .radius(&theme, Radius::Card)
+                        .frame(&theme, Surface::Raised, Elevation::Raised)
+                },
+            )
+            .when(
+                self.code_presentation == MarkdownCodePresentation::Flat,
+                // A fence is part of the document's reading flow, not a
+                // second surface asking to become its visual focus.
+                |block| {
+                    block
+                        .py_token(&theme, Space::Xs)
+                        .border_b(px(theme.borders.hairline))
+                        .border_color(theme.colors.divider.opacity(theme.opacity.muted))
+                },
+            )
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Text)
@@ -958,18 +1003,15 @@ impl Painter {
         for block in blocks {
             column = column.child(self.block(block, window, cx));
         }
-        // A quote is a rail and a recess, not a line: the code block beside it
-        // is drawn with a border of the same weight, and two blocks separated
-        // only by what is inside them read as one kind of thing.
+        // A quote stays on the document plane. Its rail states the hierarchy;
+        // a recessed rounded surface would repeat that fact and make ordinary
+        // quoted prose compete with media for attention.
         div()
             .row()
             .items_stretch()
             .w_full()
             .gap_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
-            .pr(px(theme.space(Space::Sm)))
-            .radius(&theme, Radius::Small)
-            .surface(&theme, Surface::Sunken)
             .child(
                 div()
                     .w(px(theme.effects.rail_width))
@@ -1120,19 +1162,18 @@ impl Painter {
         let name = flatten(head.first().map(Vec::as_slice).unwrap_or_default());
         let ident = self.ident_for("table", name.as_ref());
 
-        let mut frame = div()
-            .column()
-            .w_full()
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
-            .overflow_hidden();
+        // A table is structured information in this document, not a durable
+        // result or a media object. Row rules carry its structure directly on
+        // the reading plane instead of enclosing it in another raised card.
+        let mut frame = div().column().w_full();
 
         if !head.is_empty() {
             let mut header = div()
                 .row()
                 .items_stretch()
                 .w_full()
-                .bg(theme.colors.raised)
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider)
                 .type_scale(&theme, TypeScale::Caption)
                 .text_color(theme.colors.text_muted);
             for (column, cell) in head.iter().enumerate() {
@@ -1148,6 +1189,8 @@ impl Painter {
                 .row()
                 .items_stretch()
                 .w_full()
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider.opacity(theme.opacity.muted))
                 .type_scale(&theme, TypeScale::Label)
                 .text_color(theme.colors.text);
             for (column, cell) in row.iter().enumerate() {

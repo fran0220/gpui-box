@@ -31,7 +31,7 @@ use gpui::{
     Styled, StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::content::ansi::{ansi_highlights, strip_ansi};
 use crate::controls::button::Button;
@@ -458,8 +458,8 @@ impl RenderOnce for LogStream {
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Sm)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Raised, Elevation::Raised)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider.opacity(theme.opacity.muted))
             .children(extra)
             .children(toolbar)
             .children(stale)

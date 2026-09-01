@@ -36,6 +36,7 @@ use gpui_kit_theme::{
     ActiveTheme, AgentColor, ControlSize, Radius, Space, TextTone, Theme, TypeScale,
 };
 
+use crate::agent::AgentDisclosurePresentation;
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
@@ -362,6 +363,7 @@ pub struct ToolCall {
     elapsed: Elapsed,
     diff: Option<AnyElement>,
     expanded: bool,
+    presentation: AgentDisclosurePresentation,
     on_toggle: Option<ToggleHandler>,
     on_retry: Option<RetryHandler>,
 }
@@ -376,6 +378,7 @@ impl std::fmt::Debug for ToolCall {
             .field("state", &self.state)
             .field("elapsed", &self.elapsed)
             .field("expanded", &self.expanded)
+            .field("presentation", &self.presentation)
             .field("has_arguments", &self.arguments.is_some())
             .field("has_toggle_handler", &self.on_toggle.is_some())
             .field("has_retry_handler", &self.on_retry.is_some())
@@ -397,6 +400,7 @@ impl ToolCall {
             elapsed: Elapsed::Unknown,
             diff: None,
             expanded: false,
+            presentation: AgentDisclosurePresentation::Inset,
             on_toggle: None,
             on_retry: None,
         }
@@ -436,6 +440,16 @@ impl ToolCall {
 
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = expanded;
+        self
+    }
+
+    /// Chooses the body treatment for disclosed arguments and results.
+    ///
+    /// The default is [`AgentDisclosurePresentation::Inset`]. Flow keeps the
+    /// same disclosure content and indentation without placing it on a
+    /// separate evidence surface.
+    pub fn presentation(mut self, presentation: AgentDisclosurePresentation) -> Self {
+        self.presentation = presentation;
         self
     }
 
@@ -654,6 +668,7 @@ impl RenderOnce for ToolCall {
                 &theme,
                 cx.strings().text(StringKey::AgentArguments),
                 &body,
+                self.presentation,
                 cx,
             )
         });
@@ -666,6 +681,7 @@ impl RenderOnce for ToolCall {
                 &theme,
                 cx.strings().text(StringKey::AgentResult),
                 body,
+                self.presentation,
                 cx,
             )),
             _ => None,
@@ -720,6 +736,7 @@ fn evidence_body(
     theme: &Theme,
     label: SharedString,
     body: &ToolBody,
+    presentation: AgentDisclosurePresentation,
     cx: &mut App,
 ) -> AnyElement {
     let shape = body.shape(cx);
@@ -741,10 +758,12 @@ fn evidence_body(
             div()
                 .w_full()
                 .column()
-                .px_token(theme, Space::Sm)
-                .py_token(theme, Space::Xs)
-                .radius(theme, Radius::Small)
-                .bg(theme.colors.agent.evidence_wash)
+                .when(presentation == AgentDisclosurePresentation::Inset, |body| {
+                    body.px_token(theme, Space::Sm)
+                        .py_token(theme, Space::Xs)
+                        .radius(theme, Radius::Small)
+                        .bg(theme.colors.agent.evidence_wash)
+                })
                 .mono(theme)
                 .children(body.shown_lines().into_iter().map(|line| {
                     text(theme, TypeScale::Caption, line)

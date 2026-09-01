@@ -71,9 +71,7 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, SyntaxColor, Theme, TypeScale,
-};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, SyntaxColor, Theme, TypeScale};
 
 use crate::content::code_view::styled_code;
 use crate::content::highlight::{Carry, Language, line_spans};
@@ -945,8 +943,8 @@ impl RenderOnce for DiffView {
             .when(self.fills, |element| element.h_full().min_h_0())
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .p_token(&theme, Space::Sm)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Raised, Elevation::Raised)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider.opacity(theme.opacity.muted))
             .child(body)
             .semantic_in(
                 cx,
