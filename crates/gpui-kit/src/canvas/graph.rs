@@ -1217,6 +1217,7 @@ pub struct NodeGraph {
     empty: Option<EmptyState>,
     slots: Slots,
     grid: bool,
+    ground_light: bool,
     viewport: GraphViewport,
     zoom_range: (f32, f32),
     interaction: GraphInteraction,
@@ -1292,6 +1293,7 @@ impl NodeGraph {
             empty: None,
             slots: Slots::default(),
             grid: true,
+            ground_light: true,
             viewport: GraphViewport::default(),
             zoom_range: (0.5, 2.0),
             interaction: GraphInteraction::default(),
@@ -1357,6 +1359,20 @@ impl NodeGraph {
     /// has a texture of its own.
     pub fn grid(mut self, grid: bool) -> Self {
         self.grid = grid;
+        self
+    }
+
+    /// Turns off the ground's top-origin cast, for a canvas whose contents
+    /// are the lit things on it.
+    ///
+    /// The cast says the ground is a material with a light above it, which is
+    /// what a diagram of boxes and lines wants. A board of pictures does not:
+    /// each picture carries its own light, and a sheen running down behind
+    /// them is a second one arriving from somewhere else. Turning it off
+    /// leaves a flat ground and nothing else — the sunken frame and the grid
+    /// are what they were.
+    pub fn ground_light(mut self, ground_light: bool) -> Self {
+        self.ground_light = ground_light;
         self
     }
 
@@ -2029,7 +2045,7 @@ impl RenderOnce for NodeGraph {
                 .justify_center()
                 .child(empty);
             return frame
-                .child(graph_ground(&theme, viewport, self.grid))
+                .child(graph_ground(&theme, viewport, self.grid, self.ground_light))
                 .child(empty)
                 .semantic_in(cx, spec.value(viewport_value("empty", asked)))
                 .into_any_element();
@@ -2360,7 +2376,7 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let painted_preview = preview.clone();
-        let ground = graph_ground(&theme, viewport, self.grid);
+        let ground = graph_ground(&theme, viewport, self.grid, self.ground_light);
 
         // Edges are their own painted layer above the regions and below the
         // cards: a connection crosses a region it does not belong to, and a
@@ -3393,6 +3409,28 @@ struct GridPaint {
     dot: f32,
 }
 
+/// The light the ground is under, when it is under one.
+///
+/// A canvas that refuses the cast gets no gradient at all rather than one
+/// whose stops are transparent: a ground that is flat and a ground that is
+/// faintly lit are different claims about what the canvas is made of, and
+/// only the first of them is what a board of pictures wants.
+fn ground_cast(theme: &gpui_kit_theme::Theme, cast_light: bool) -> Option<gpui::Background> {
+    cast_light.then(|| {
+        linear_gradient_stops(
+            180.0,
+            [
+                linear_color_stop(
+                    theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
+                    0.0,
+                ),
+                linear_color_stop(gpui::transparent_black(), 0.38),
+                linear_color_stop(gpui::transparent_black(), 1.0),
+            ],
+        )
+    })
+}
+
 /// The canvas material beneath cards and empty-state content alike.
 ///
 /// Empty is still a ready canvas: an editor with nothing placed on it must
@@ -3402,18 +3440,9 @@ fn graph_ground(
     theme: &gpui_kit_theme::Theme,
     viewport: GraphViewport,
     draw_grid: bool,
+    cast_light: bool,
 ) -> AnyElement {
-    let light = linear_gradient_stops(
-        180.0,
-        [
-            linear_color_stop(
-                theme.colors.white_fill.opacity(theme.effects.sheen_alpha),
-                0.0,
-            ),
-            linear_color_stop(gpui::transparent_black(), 0.38),
-            linear_color_stop(gpui::transparent_black(), 1.0),
-        ],
-    );
+    let light = ground_cast(theme, cast_light);
     let paint = GridPaint {
         minor: theme.colors.node.grid,
         major: theme.colors.node.grid_strong,
@@ -3423,12 +3452,14 @@ fn graph_ground(
 
     // The ground the canvas stands on, under everything the caller put there.
     // The only lighting is a top-origin material cast: no corner or edge is
-    // darkened, because that would imply depth the graph does not contain.
+    // darkened, because that would imply depth the graph does not contain. A
+    // canvas that refuses the cast paints no gradient at all rather than a
+    // transparent one, so the ground is flat and not merely faintly lit.
     // The grid remains a painted child and intercepts nothing.
     div()
         .absolute()
         .inset_0()
-        .bg(light)
+        .when_some(light, |ground, light| ground.bg(light))
         .child(
             canvas(
                 |_, _, _| {},
@@ -3627,6 +3658,28 @@ mod tests {
         );
         let estimated = estimated_relationship_label_size(&sentence, &theme);
         assert!(estimated.width <= RELATIONSHIP_LABEL_MEASURE);
+    }
+
+    /// A flat ground is the absence of the cast, not a cast turned down. A
+    /// gradient whose stops happen to be transparent still says the canvas is
+    /// a lit material, and a board of pictures is not one.
+    #[test]
+    fn a_ground_that_refuses_the_cast_paints_no_gradient() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        assert!(ground_cast(&theme, true).is_some());
+        assert!(ground_cast(&theme, false).is_none());
+    }
+
+    /// Every canvas that has not said otherwise stands on a lit ground, which
+    /// is what every graph built before the setting existed was drawn on.
+    #[test]
+    fn a_canvas_stands_on_a_lit_ground_until_it_says_otherwise() {
+        assert!(NodeGraph::new("run").ground_light);
+        assert!(!NodeGraph::new("run").ground_light(false).ground_light);
+        assert!(
+            NodeGraph::new("run").ground_light(false).grid,
+            "refusing the light leaves the grid alone"
+        );
     }
 
     use crate::canvas::edge::EdgeKind;
