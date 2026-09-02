@@ -25,13 +25,15 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, Entity, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement,
+    App, Entity, Hsla, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement,
     RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window, div, point,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlMetrics, ControlSize, Radius, SemanticWash, Space, Theme, TypeScale,
+};
 
 use crate::display::badge::Badge;
 use crate::display::icon::{flips, paint as paint_icon};
@@ -133,6 +135,7 @@ pub struct TabItem {
     pub label: SharedString,
     pub icon: Option<Icon>,
     pub badge: Option<SharedString>,
+    pub tint: Option<Hsla>,
     pub disabled: bool,
     pub save_state: SaveState,
     pub closable: bool,
@@ -145,6 +148,7 @@ impl TabItem {
             label: label.into(),
             icon: None,
             badge: None,
+            tint: None,
             disabled: false,
             save_state: SaveState::Clean,
             closable: false,
@@ -159,6 +163,25 @@ impl TabItem {
     /// A count shown next to the label, such as how many items the tab holds.
     pub fn badge(mut self, badge: impl Into<SharedString>) -> Self {
         self.badge = Some(badge.into());
+        self
+    }
+
+    /// The colour this tab is known by, in place of nothing.
+    ///
+    /// For a strip whose tabs are colour-identified things — a Studio, a
+    /// branch, an environment — where each one already has a colour the
+    /// reader knows it by, and a row of otherwise identical capsules is
+    /// otherwise read by name alone. The tint is worn by the glyph and, on
+    /// the current tab, by the fill that says it is current: the tint's wash
+    /// replaces the neutral selected fill rather than sitting beside it, so a
+    /// selected tab is still one fill and not two. Everything else — the
+    /// label, hover, the focus ring, the badge, the save mark, the close
+    /// control, the drag ghost, and what the node publishes — is what an
+    /// untinted tab has, so a colour cannot turn one tab into a second tab
+    /// shape. A refused tab is refused first: it wears the disabled colour,
+    /// because "you cannot have this" outranks "this is which one".
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
         self
     }
 
@@ -604,6 +627,11 @@ impl Tabs {
         } else {
             theme.colors.text_muted
         };
+        // The colour the tab is known by is worn by the glyph, which is the
+        // one part of a tab that carries no words. A refusal outranks it, so
+        // a tab nobody can reach is the disabled grey whatever it belongs to.
+        let tint = tab.tint.filter(|_| !disabled);
+        let glyph_color = tint.unwrap_or(color);
 
         let mut element = div()
             .id(ident.element_id())
@@ -612,6 +640,12 @@ impl Tabs {
             .column()
             .radius(theme, Radius::Control)
             .selected_fill(theme, selected)
+            // The current tab's fill becomes the tint at the strength the
+            // theme washes a caller's colour at, in place of the neutral
+            // selected fill rather than over it.
+            .when_some(tint.filter(|_| selected), |element, tint| {
+                element.bg(theme.color_wash(tint, SemanticWash::Standard))
+            })
             .child(
                 div()
                     .row()
@@ -623,7 +657,7 @@ impl Tabs {
                         paint_icon(
                             glyph,
                             metrics.icon_size,
-                            color,
+                            glyph_color,
                             flips(glyph, cx.layout_direction()),
                         )
                     }))
@@ -1013,6 +1047,16 @@ mod tests {
         assert_eq!(fade_nudge(0.0, 200.0, FADE_BAND), -FADE_BAND);
         // Part of the way under a fade is moved by what is left of it.
         assert_eq!(fade_nudge(200.0, 10.0, FADE_BAND), FADE_BAND - 10.0);
+    }
+
+    /// A tint is carried on the tab that asked for one. There is no strip-wide
+    /// colour a tab could inherit, because the whole point is that a row of
+    /// otherwise identical capsules says which thing each of them belongs to.
+    #[test]
+    fn only_the_tab_that_asked_for_a_colour_carries_one() {
+        let studio = gpui::hsla(0.58, 0.72, 0.56, 1.0);
+        assert_eq!(TabItem::new("code", "Code").tint, None);
+        assert_eq!(TabItem::new("code", "Code").tint(studio).tint, Some(studio));
     }
 
     #[test]

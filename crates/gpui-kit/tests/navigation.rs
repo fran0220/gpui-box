@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use gpui::{IntoElement, SharedString, TestAppContext, div, prelude::*};
 use gpui_kit::prelude::*;
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
 
@@ -172,6 +173,46 @@ fn a_move_past_the_last_tab_reports_nothing(cx: &mut TestAppContext) {
     harness.keystrokes("right");
 
     assert!(calls.borrow().is_empty());
+}
+
+/// A tint says which colour-identified thing a tab belongs to and nothing
+/// else. The whole tree the strip publishes — every id, every role, every
+/// state, and every measured rectangle — is what the same strip published
+/// untinted, so a colour cannot turn one tab into a second tab shape and no
+/// assertion can be written against one that would not hold for the other.
+#[gpui::test]
+fn tinting_a_tab_changes_nothing_the_strip_publishes(cx: &mut TestAppContext) {
+    /// Icons and a refusal, because the tint is worn by the glyph and a
+    /// refused tab must stay refused whatever colour it was given.
+    fn studio_tabs() -> Vec<TabItem> {
+        vec![
+            TabItem::new("code", "Code").icon(Icon::Notebook),
+            TabItem::new("game", "Game").icon(Icon::Play).badge("3"),
+            TabItem::new("design", "Design")
+                .icon(Icon::Image)
+                .disabled(true),
+        ]
+    }
+
+    let studio = gpui::hsla(0.58, 0.72, 0.56, 1.0);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        Tabs::new("studio.tabs")
+            .tabs(studio_tabs())
+            .selected("game")
+            .on_select(|_, _, _| {})
+            .into_any_element()
+    });
+    let plain = harness.snapshot();
+
+    harness.remount(move |_, _| {
+        Tabs::new("studio.tabs")
+            .tabs(studio_tabs().into_iter().map(move |tab| tab.tint(studio)))
+            .selected("game")
+            .on_select(|_, _, _| {})
+            .into_any_element()
+    });
+
+    assert_eq!(harness.snapshot().nodes, plain.nodes);
 }
 
 fn accordion(
