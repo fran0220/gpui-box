@@ -7,7 +7,7 @@ use std::{
 };
 
 use gpui::{
-    Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, SharedString, TestAppContext,
+    Edges, Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, SharedString, TestAppContext,
     TouchPhase, div, point, prelude::*, px,
 };
 use gpui_kit::prelude::*;
@@ -913,6 +913,52 @@ fn node_graph_seats_toolbar_and_frames_its_complete_world(cx: &mut TestAppContex
     );
     harness.click("fit-graph.toolbar.fit");
     assert_eq!(actions.borrow().as_slice(), [CanvasToolbarAction::Fit]);
+}
+
+#[gpui::test]
+fn fit_clearance_does_not_change_the_node_graph_semantic_tree(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(720.0))
+            .h(px(420.0))
+            .child(
+                NodeGraph::new("clearance-graph")
+                    .fit(GraphFit::Whole(4))
+                    .minimap(true)
+                    .node(
+                        GraphNode::new("clearance-graph.node", "Measured node"),
+                        120.0,
+                        80.0,
+                    ),
+            )
+            .into_any_element()
+    });
+    let plain = harness.snapshot();
+
+    harness.remount(|_, _| {
+        div()
+            .w(px(720.0))
+            .h(px(420.0))
+            .child(
+                NodeGraph::new("clearance-graph")
+                    .fit(GraphFit::Whole(4))
+                    .fit_clearance(Edges {
+                        top: 32.0,
+                        right: 180.0,
+                        bottom: 64.0,
+                        left: 240.0,
+                    })
+                    .minimap(true)
+                    .node(
+                        GraphNode::new("clearance-graph.node", "Measured node"),
+                        120.0,
+                        80.0,
+                    ),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(harness.snapshot().nodes, plain.nodes);
 }
 
 #[gpui::test]

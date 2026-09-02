@@ -256,6 +256,19 @@ should add a tinted strip beside the untinted one in the navigation family and
 a flat ground to the canvas family, and review the images rather than accept
 them.
 
+### Fit clearance with no scene of its own, 2026-09-02
+
+`NodeGraph::fit_clearance` reserves caller-owned canvas edge bands when the
+graph frames its measured world. No gallery state was added from Linux: the
+active visual baselines are Metal on macOS and WARP on Windows, and adding a
+state without captures from both would leave the release gate incomplete.
+
+The framing arithmetic instead covers zero, asymmetric, composed and
+oversized clearances, and a mounted graph with clearance publishes the same
+semantic tree as one without it. Whoever next captures baselines on macOS and
+Windows should add a fit-clearance state to the canvas family and review both
+active images.
+
 ### Shared presentation tiers and semantic token authority, 2026-08-27
 
 `Theme::variant_colors` resolves the seven shared tiers (`Filled`, `Light`,

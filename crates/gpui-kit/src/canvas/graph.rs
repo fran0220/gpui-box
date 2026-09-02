@@ -14,10 +14,10 @@ use std::{
 };
 
 use gpui::{
-    AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Pixels, Point, RenderOnce, ScrollDelta, SharedString, Size, StatefulInteractiveElement, Styled,
-    Window, canvas, div, linear_color_stop, linear_gradient_stops, point, prelude::FluentBuilder,
-    px, relative, size,
+    AnyElement, App, Bounds, Edges, Hsla, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Pixels, Point, RenderOnce, ScrollDelta, SharedString, Size,
+    StatefulInteractiveElement, Styled, Window, canvas, div, linear_color_stop,
+    linear_gradient_stops, point, prelude::FluentBuilder, px, relative, size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -470,6 +470,8 @@ fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
 /// How much of the surface is kept clear when framing, so a card at the edge
 /// of the graph does not end up against the edge of the panel.
 const FIT_MARGIN: f32 = 48.0;
+/// The smallest inset frame retains one usable pixel inside the fit margin.
+const MIN_FIT_FRAME: f32 = FIT_MARGIN + 1.0;
 const GRAPH_MINIMAP_WIDTH: f32 = 140.0;
 const GRAPH_MINIMAP_HEIGHT: f32 = 88.0;
 /// Relationship labels try progressively farther points on their route before
@@ -542,6 +544,15 @@ struct FitInsets {
 }
 
 impl FitInsets {
+    fn from_clearance(clearance: Edges<f32>) -> Self {
+        Self {
+            top: clearance.top,
+            right: clearance.right,
+            bottom: clearance.bottom,
+            left: clearance.left,
+        }
+    }
+
     /// Excludes the obstacle with a full-height strip on its horizontal side.
     fn beside(mut self, obstacle: FitObstacle) -> Self {
         match obstacle.corner {
@@ -559,21 +570,50 @@ impl FitInsets {
         }
         self
     }
+
+    /// Keeps impossible caller bands or chrome measurements from collapsing
+    /// the frame into negative geometry. Normal insets pass through unchanged.
+    fn clamped_to(mut self, width: f32, height: f32) -> Self {
+        (self.left, self.right) = clamp_fit_axis(self.left, self.right, width);
+        (self.top, self.bottom) = clamp_fit_axis(self.top, self.bottom, height);
+        self
+    }
+}
+
+fn clamp_fit_axis(start: f32, end: f32, extent: f32) -> (f32, f32) {
+    let bounded = |value: f32| {
+        if value.is_nan() || value <= 0.0 {
+            0.0
+        } else {
+            value.min(extent)
+        }
+    };
+    let start = bounded(start);
+    let end = bounded(end);
+    let maximum = (extent - MIN_FIT_FRAME).max(0.0);
+    let total = start + end;
+    if total <= maximum || total == 0.0 {
+        (start, end)
+    } else {
+        let scale = maximum / total;
+        (start * scale, end * scale)
+    }
 }
 
 /// Every rectangular content area that can avoid the corner obstacles. A
 /// corner can be cleared along either adjacent edge; trying both lets a wide,
 /// shallow toolbar consume height while a tall rail consumes width, without a
 /// host choosing insets or the graph hard-coding that policy per component.
-fn fit_inset_candidates(obstacles: &[FitObstacle]) -> Vec<FitInsets> {
-    obstacles
-        .iter()
-        .fold(vec![FitInsets::default()], |areas, obstacle| {
+fn fit_inset_candidates(clearance: Edges<f32>, obstacles: &[FitObstacle]) -> Vec<FitInsets> {
+    obstacles.iter().fold(
+        vec![FitInsets::from_clearance(clearance)],
+        |areas, obstacle| {
             areas
                 .into_iter()
                 .flat_map(|area| [area.beside(*obstacle), area.beyond(*obstacle)])
                 .collect()
-        })
+        },
+    )
 }
 
 /// The token to frame for, or `None` when the current frame already answers it.
@@ -609,6 +649,7 @@ fn frame_all(
     relationship_labels: &[Bounds<f32>],
     surface: Bounds<Pixels>,
     zoom_range: (f32, f32),
+    clearance: Edges<f32>,
     obstacles: &[FitObstacle],
 ) -> Option<GraphViewport> {
     let width = f32::from(surface.size.width);
@@ -635,8 +676,9 @@ fn frame_all(
             ),
         })
     })?;
-    fit_inset_candidates(obstacles)
+    fit_inset_candidates(clearance, obstacles)
         .into_iter()
+        .map(|insets| insets.clamped_to(width, height))
         .filter_map(|insets| {
             let available_width = width - insets.left - insets.right - FIT_MARGIN;
             let available_height = height - insets.top - insets.bottom - FIT_MARGIN;
@@ -1226,6 +1268,7 @@ pub struct NodeGraph {
     minimap: bool,
     toolbar: Option<CanvasToolbar>,
     fit: GraphFit,
+    fit_clearance: Edges<f32>,
     routing: GraphRouting,
 }
 
@@ -1251,14 +1294,15 @@ pub enum GraphFit {
     /// soon as the cards and canvas-owned chrome have been laid out, and again
     /// each time this value changes — which is what a caller's own Fit control
     /// bumps, since the caller cannot compute the frame itself. The fitted
-    /// content clears the graph's minimap and toolbar rather than remaining
-    /// technically inside the viewport underneath them. Reported as an ordinary
-    /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores
-    /// its viewport needs nothing else. Between framings the viewport is the
-    /// reader's and the canvas never moves it on its own. While the caller
-    /// still holds the exact fitted viewport, a changed container rectangle is
-    /// framed again; the first pan, wheel or caller-restored viewport ends that
-    /// resize following without requiring a second mode flag.
+    /// content clears the caller's [`NodeGraph::fit_clearance`], the graph's
+    /// minimap, and its toolbar rather than remaining technically inside the
+    /// viewport underneath them. Reported as an ordinary
+    /// [`NodeGraphEvent::ViewportChanged`], so a caller that already stores its
+    /// viewport needs nothing else. Between framings the viewport is the reader's
+    /// and the canvas never moves it on its own. While the caller still holds the
+    /// exact fitted viewport, a changed container rectangle is framed again; the
+    /// first pan, wheel or caller-restored viewport ends that resize following
+    /// without requiring a second mode flag.
     Whole(u64),
 }
 
@@ -1302,6 +1346,7 @@ impl NodeGraph {
             minimap: false,
             toolbar: None,
             fit: GraphFit::Never,
+            fit_clearance: Edges::default(),
             routing: GraphRouting::Lanes,
         }
     }
@@ -1453,6 +1498,14 @@ impl NodeGraph {
     /// it. See [`GraphFit`].
     pub fn fit(mut self, fit: GraphFit) -> Self {
         self.fit = fit;
+        self
+    }
+
+    /// The canvas edge bands covered by the caller's own overlays, in canvas
+    /// pixels, so framing a fit keeps content clear of them as it already keeps
+    /// clear of the graph's toolbar and minimap.
+    pub fn fit_clearance(mut self, clearance: Edges<f32>) -> Self {
+        self.fit_clearance = clearance;
         self
     }
 
@@ -2183,6 +2236,7 @@ impl RenderOnce for NodeGraph {
                 &relationship_bounds,
                 measured.get(),
                 self.zoom_range,
+                self.fit_clearance,
                 &fit_obstacles,
             )
             && let Some(report) = self.on_event.as_ref().cloned()
@@ -3908,7 +3962,8 @@ mod tests {
         // origin, which is the case a default viewport shows nothing of.
         let nodes = geometry_at(&[(400.0, 300.0, 200.0, 160.0), (1600.0, 900.0, 200.0, 400.0)]);
         let surface = surface(640.0, 480.0);
-        let framed = frame_all(&nodes, &[], &[], surface, (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(&nodes, &[], &[], surface, (0.2, 2.0), Edges::default(), &[])
+            .expect("a frame");
         let view = world_view(framed, surface);
         for node in &nodes {
             assert!(
@@ -3925,18 +3980,99 @@ mod tests {
     }
 
     #[test]
+    fn zero_fit_clearance_keeps_the_existing_frame() {
+        let nodes = geometry_at(&[(0.0, 0.0, 100.0, 80.0)]);
+        let framed = frame_all(
+            &nodes,
+            &[],
+            &[],
+            surface(400.0, 300.0),
+            (0.2, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a frame");
+
+        assert_eq!(framed, GraphViewport::new(point(150.0, 110.0), 1.0));
+    }
+
+    #[test]
+    fn fit_clearance_centers_content_in_the_uncovered_canvas() {
+        let nodes = geometry_at(&[(0.0, 0.0, 100.0, 80.0)]);
+        let framed = frame_all(
+            &nodes,
+            &[],
+            &[],
+            surface(800.0, 400.0),
+            (0.2, 2.0),
+            Edges {
+                left: 240.0,
+                ..Edges::default()
+            },
+            &[],
+        )
+        .expect("a frame");
+
+        assert_eq!(framed, GraphViewport::new(point(470.0, 160.0), 1.0));
+    }
+
+    #[test]
+    fn oversized_fit_clearance_keeps_a_finite_minimum_frame() {
+        let surface = surface(640.0, 480.0);
+        let clearance = Edges {
+            top: 10_000.0,
+            right: 10_000.0,
+            bottom: 10_000.0,
+            left: 10_000.0,
+        };
+        let insets = fit_inset_candidates(clearance, &[])[0].clamped_to(640.0, 480.0);
+        assert_eq!(640.0 - insets.left - insets.right, MIN_FIT_FRAME);
+        assert_eq!(480.0 - insets.top - insets.bottom, MIN_FIT_FRAME);
+
+        let framed = frame_all(
+            &geometry_at(&[(0.0, 0.0, 100.0, 80.0)]),
+            &[],
+            &[],
+            surface,
+            (0.2, 2.0),
+            clearance,
+            &[],
+        )
+        .expect("oversized clearance is clamped to a usable frame");
+        assert!(framed.offset.x.is_finite());
+        assert!(framed.offset.y.is_finite());
+        assert!(framed.zoom.is_finite());
+    }
+
+    #[test]
     fn a_frame_never_magnifies_and_never_leaves_its_zoom_range() {
         let one = geometry_at(&[(0.0, 0.0, 40.0, 40.0)]);
-        let framed =
-            frame_all(&one, &[], &[], surface(1200.0, 900.0), (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(
+            &one,
+            &[],
+            &[],
+            surface(1200.0, 900.0),
+            (0.2, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a frame");
         assert_eq!(
             framed.zoom, 1.0,
             "a small graph is shown at its own size, not blown up"
         );
 
         let wide = geometry_at(&[(0.0, 0.0, 100_000.0, 100.0)]);
-        let floored =
-            frame_all(&wide, &[], &[], surface(640.0, 480.0), (0.4, 2.0), &[]).expect("a frame");
+        let floored = frame_all(
+            &wide,
+            &[],
+            &[],
+            surface(640.0, 480.0),
+            (0.4, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a frame");
         assert_eq!(
             floored.zoom, 0.4,
             "a graph too wide to fit is held at the caller's floor rather than \
@@ -3946,7 +4082,18 @@ mod tests {
 
     #[test]
     fn there_is_no_frame_without_something_to_frame_or_somewhere_to_put_it() {
-        assert!(frame_all(&[], &[], &[], surface(640.0, 480.0), (0.2, 2.0), &[],).is_none());
+        assert!(
+            frame_all(
+                &[],
+                &[],
+                &[],
+                surface(640.0, 480.0),
+                (0.2, 2.0),
+                Edges::default(),
+                &[],
+            )
+            .is_none()
+        );
         assert!(
             frame_all(
                 &geometry_at(&[(0.0, 0.0, 40.0, 40.0)]),
@@ -3954,6 +4101,7 @@ mod tests {
                 &[],
                 surface(4.0, 4.0),
                 (0.2, 2.0),
+                Edges::default(),
                 &[],
             )
             .is_none(),
@@ -3973,7 +4121,16 @@ mod tests {
             420.0,
         )];
         let surface = surface(720.0, 480.0);
-        let framed = frame_all(&nodes, &bands, &[], surface, (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(
+            &nodes,
+            &bands,
+            &[],
+            surface,
+            (0.2, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a frame");
         let view = world_view(framed, surface);
         let band = bands[0].bounds();
         assert!(
@@ -4134,8 +4291,16 @@ mod tests {
         let nodes = geometry_at(&[(0.0, 0.0, 160.0, 120.0)]);
         let relationship = Bounds::new(point(-260.0, 40.0), size(180.0, 24.0));
         let surface = surface(640.0, 480.0);
-        let framed =
-            frame_all(&nodes, &[], &[relationship], surface, (0.2, 2.0), &[]).expect("a frame");
+        let framed = frame_all(
+            &nodes,
+            &[],
+            &[relationship],
+            surface,
+            (0.2, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a frame");
         let view = world_view(framed, surface);
         assert!(
             relationship.left() >= view.left()
@@ -4147,14 +4312,26 @@ mod tests {
     }
 
     #[test]
-    fn fitted_content_clears_canvas_owned_corner_chrome() {
+    fn fitted_content_clears_caller_and_canvas_owned_chrome() {
         let nodes = geometry_at(&[(0.0, 0.0, 1_000.0, 520.0)]);
         let surface = surface(800.0, 560.0);
         let obstacles = [
             FitObstacle::new(FitCorner::TopLeft, 320.0, 56.0),
             FitObstacle::new(FitCorner::BottomRight, 152.0, 100.0),
         ];
-        let framed = frame_all(&nodes, &[], &[], surface, (0.2, 2.0), &obstacles).expect("a frame");
+        let framed = frame_all(
+            &nodes,
+            &[],
+            &[],
+            surface,
+            (0.2, 2.0),
+            Edges {
+                left: 240.0,
+                ..Edges::default()
+            },
+            &obstacles,
+        )
+        .expect("a frame");
         let node = nodes[0].bounds;
         let origin = world_to_screen(node.origin, framed);
         let content = Bounds::new(
@@ -4166,6 +4343,10 @@ mod tests {
         );
         let toolbar = Bounds::new(point(0.0, 0.0), size(320.0, 56.0));
         let minimap = Bounds::new(point(800.0 - 152.0, 560.0 - 100.0), size(152.0, 100.0));
+        assert!(
+            content.left() >= 240.0,
+            "fitted content {content:?} remained underneath caller chrome"
+        );
         assert!(
             !bounds_overlap(content, toolbar, 0.0),
             "fitted content {content:?} remained underneath the toolbar {toolbar:?}"

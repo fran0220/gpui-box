@@ -3098,6 +3098,7 @@
         "minimap(show: bool) -> Self",
         "toolbar(toolbar: CanvasToolbar) -> Self",
         "fit(fit: GraphFit) -> Self",
+        "fit_clearance(clearance: Edges<f32>) -> Self",
         "routing(routing: GraphRouting) -> Self"
       ],
       "commands": [],
