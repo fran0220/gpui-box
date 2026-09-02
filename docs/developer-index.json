@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4179
+      "symbolCount": 4181
     },
     {
       "name": "gpui-box-kit-assets",
@@ -46632,7 +46632,7 @@
       "source": "crates/gpui-kit/src/canvas/graph.rs",
       "summary": "A run drawn as connected steps.",
       "documentation": "A run drawn as connected steps.",
-      "signature": "# [doc = \" A run drawn as connected steps.\"] # [derive (IntoElement)] pub struct NodeGraph { ident : Ident, nodes : Vec<Placed>, edges : Vec<GraphEdge>, bands : Vec<GraphBand>, state : GraphState, empty : Option<EmptyState>, slots : Slots, grid : bool, viewport : GraphViewport, zoom_range : (f32, f32), interaction : GraphInteraction, on_event : Option<EventHandler>, can_connect : Option<ConnectionValidator>, minimap : bool, toolbar : Option<CanvasToolbar>, fit : GraphFit, routing : GraphRouting, }",
+      "signature": "# [doc = \" A run drawn as connected steps.\"] # [derive (IntoElement)] pub struct NodeGraph { ident : Ident, nodes : Vec<Placed>, edges : Vec<GraphEdge>, bands : Vec<GraphBand>, state : GraphState, empty : Option<EmptyState>, slots : Slots, grid : bool, ground_light : bool, viewport : GraphViewport, zoom_range : (f32, f32), interaction : GraphInteraction, on_event : Option<EventHandler>, can_connect : Option<ConnectionValidator>, minimap : bool, toolbar : Option<CanvasToolbar>, fit : GraphFit, routing : GraphRouting, }",
       "cfg": []
     },
     {
@@ -46752,6 +46752,21 @@
       "summary": "Turns off the dot grid, for a canvas embedded somewhere that already has a texture of its own.",
       "documentation": "Turns off the dot grid, for a canvas embedded somewhere that already\nhas a texture of its own.",
       "signature": "pub fn grid (mut self, grid : bool) -> Self",
+      "cfg": [],
+      "target": "NodeGraph"
+    },
+    {
+      "id": "gpui_kit::canvas::graph::NodeGraph::ground_light",
+      "name": "ground_light",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "canvas::graph",
+      "path": "gpui_kit::canvas::graph",
+      "source": "crates/gpui-kit/src/canvas/graph.rs",
+      "summary": "Turns off the ground's top-origin cast, for a canvas whose contents are the lit things on it.",
+      "documentation": "Turns off the ground's top-origin cast, for a canvas whose contents\nare the lit things on it.\n\nThe cast says the ground is a material with a light above it, which is\nwhat a diagram of boxes and lines wants. A board of pictures does not:\neach picture carries its own light, and a sheen running down behind\nthem is a second one arriving from somewhere else. Turning it off\nleaves a flat ground and nothing else — the sunken frame and the grid\nare what they were.",
+      "signature": "pub fn ground_light (mut self, ground_light : bool) -> Self",
       "cfg": [],
       "target": "NodeGraph"
     },
@@ -91705,7 +91720,7 @@
       "source": "crates/gpui-kit/src/navigation/tabs.rs",
       "summary": "One tab, identified by business identity rather than by position.",
       "documentation": "One tab, identified by business identity rather than by position.",
-      "signature": "# [doc = \" One tab, identified by business identity rather than by position.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct TabItem { pub id : SharedString, pub label : SharedString, pub icon : Option<Icon>, pub badge : Option<SharedString>, pub disabled : bool, pub save_state : SaveState, pub closable : bool, }",
+      "signature": "# [doc = \" One tab, identified by business identity rather than by position.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct TabItem { pub id : SharedString, pub label : SharedString, pub icon : Option<Icon>, pub badge : Option<SharedString>, pub tint : Option<Hsla>, pub disabled : bool, pub save_state : SaveState, pub closable : bool, }",
       "cfg": []
     },
     {
@@ -91840,6 +91855,21 @@
       "summary": "A save is in flight. Distinct from clean, because it has not landed.",
       "documentation": "A save is in flight. Distinct from clean, because it has not landed.",
       "signature": "pub fn saving (self) -> Self",
+      "cfg": [],
+      "target": "TabItem"
+    },
+    {
+      "id": "gpui_kit::navigation::tabs::TabItem::tint",
+      "name": "tint",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::tabs",
+      "path": "gpui_kit::navigation::tabs",
+      "source": "crates/gpui-kit/src/navigation/tabs.rs",
+      "summary": "The colour this tab is known by, in place of nothing.",
+      "documentation": "The colour this tab is known by, in place of nothing.\n\nFor a strip whose tabs are colour-identified things — a Studio, a\nbranch, an environment — where each one already has a colour the\nreader knows it by, and a row of otherwise identical capsules is\notherwise read by name alone. The tint is worn by the glyph and, on\nthe current tab, by the fill that says it is current: the tint's wash\nreplaces the neutral selected fill rather than sitting beside it, so a\nselected tab is still one fill and not two. Everything else — the\nlabel, hover, the focus ring, the badge, the save mark, the close\ncontrol, the drag ghost, and what the node publishes — is what an\nuntinted tab has, so a colour cannot turn one tab into a second tab\nshape. A refused tab is refused first: it wears the disabled colour,\nbecause \"you cannot have this\" outranks \"this is which one\".",
+      "signature": "pub fn tint (mut self, tint : Hsla) -> Self",
       "cfg": [],
       "target": "TabItem"
     },
@@ -119927,6 +119957,7 @@
         "state(state: GraphState) -> Self",
         "empty(empty: EmptyState) -> Self",
         "grid(grid: bool) -> Self",
+        "ground_light(ground_light: bool) -> Self",
         "offset(x: f32, y: f32) -> Self",
         "viewport(viewport: GraphViewport) -> Self",
         "zoom(zoom: f32) -> Self",
@@ -130596,6 +130627,7 @@
       "options": [
         "icon(icon: Icon) -> Self",
         "badge(badge: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
         "disabled(disabled: bool) -> Self",
         "save_state(state: SaveState) -> Self",
         "dirty() -> Self",

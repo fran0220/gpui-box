@@ -237,6 +237,25 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Two colour settings with no scene of their own, 2026-09-02
+
+`TabItem::tint` and `NodeGraph::ground_light` change what a strip and a canvas
+look like, and neither is drawn by any scene in the catalog. That is a
+deliberate deferral, not an oversight, and it is a renderer boundary rather
+than a component one: an active visual baseline can only be captured on a
+machine with that renderer, and the two active sets are Metal on macOS and
+WARP on Windows. A scene added without both is a `headless check` that fails
+for missing baselines on the two platforms that gate a release, so the picture
+would be added by breaking the thing that reviews pictures.
+
+Both are covered by behaviour: a tinted strip publishes the same tree as an
+untinted one down to the measured bounds, a refused ground paints no gradient
+at all, and a canvas that has not asked is still lit. What is not covered is
+what they look like. Whoever next captures baselines on macOS and Windows
+should add a tinted strip beside the untinted one in the navigation family and
+a flat ground to the canvas family, and review the images rather than accept
+them.
+
 ### Shared presentation tiers and semantic token authority, 2026-08-27
 
 `Theme::variant_colors` resolves the seven shared tiers (`Filled`, `Light`,

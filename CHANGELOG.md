@@ -8,6 +8,29 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**A tab can wear the colour of the thing it stands for.** A strip whose tabs
+are Studios, branches, or environments was read by name alone, because the one
+language the library had for "which one is this" was the accent, and the accent
+already means "this is the current answer". `TabItem::tint` puts a caller-owned
+colour on the tab's glyph and, on the current tab, replaces the neutral
+selected fill with that colour washed at the theme's own strength — one fill,
+not a fill and a stripe. It is the tint `SegmentedControl` already had, spelled
+for a strip whose tabs move: the label, hover, focus ring, badge, save mark,
+close control, drag ghost, and every node the strip publishes are what an
+untinted tab has, and a refused tab is refused first. Rust API addition:
+`TabItem` gains a public `tint` field and `TabItem::tint`.
+
+**A canvas can be a board rather than a lit material.** `NodeGraph` painted a
+top-origin cast under the grid on every ground, which says the canvas is a
+surface with a light above it — right for boxes and lines, wrong for a board of
+pictures that each carry their own light and now have a second one running down
+behind them. `NodeGraph::ground_light(false)` paints no gradient at all rather
+than a transparent one, and leaves the sunken frame and the grid exactly where
+they were. Every canvas that does not ask stays lit. Rust API addition:
+`NodeGraph::ground_light`.
+
 ### Changed
 
 **Colour is measured in a space that can see what the reader sees.** The
