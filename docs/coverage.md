@@ -237,6 +237,29 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Metal and WARP baselines outstanding for this wave, 2026-09-03
+
+Three light-appearance fixes landed from a Linux orb, which can run neither
+active renderer. Twenty-two images across eleven scenes are therefore stale on
+macOS and Windows until someone captures them there:
+
+| Change | Scenes, in both Studio themes |
+|---|---|
+| Sprite corner coverage | `visual-effects`, `cinematic-effects`, `game-ui` |
+| Washed panel surface | `failure-panel`, `outcome-panel`, `state-ladder`, `kanban`, `heatmap`, `audio-waveform`, `node-graph` |
+| Scrolling menu edge fade | `form` |
+
+Every claim recorded for them is a Linux llvmpipe claim and says so. The
+renderers were compared with a full catalog capture taken immediately before
+each change and re-checked after it, so the counts above are what those changes
+moved and not accumulated drift; `snapshots/headless/linux` itself stays as it
+was, retired and stale, rather than being refreshed for three scenes and left
+alone for the rest.
+
+Nothing here asserts what Metal or WARP drew before the change or draws after
+it. Whoever captures on those platforms reviews the images against the entries
+below rather than accepting them unseen.
+
 ### Sprite corner coverage reviewed on a retired renderer, 2026-09-03
 
 The polychrome sprite corner mask's dependence on `fwidth(distance)` was found
