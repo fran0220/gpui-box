@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4183
+      "symbolCount": 4187
     },
     {
       "name": "gpui-box-kit-assets",
@@ -54732,7 +54732,7 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "A labeled action.",
       "documentation": "A labeled action.\n\nThe click handler is only installed when the button is enabled and not\nloading, so an unavailable action cannot fire through a stray event.",
-      "signature": "# [doc = \" A labeled action.\"] # [doc = \"\"] # [doc = \" The click handler is only installed when the button is enabled and not\"] # [doc = \" loading, so an unavailable action cannot fire through a stray event.\"] # [derive (IntoElement)] pub struct Button { ident : Ident, semantic_parent : Option<SharedString>, focus_handle : Option<FocusHandle>, label : Option<SharedString>, # [doc = \" What the button is called when the label is not what it is called, or\"] # [doc = \" when there is no label at all.\"] name : Option<SharedString>, description : Option<SharedString>, glyph : Option<Icon>, icon_position : IconPosition, variant : ButtonVariant, tier : Option<Variant>, color : Option<ColorChoice>, size : ControlSize, disabled : bool, selected : bool, checked : Option<bool>, loading : bool, full_width : bool, icon_only : bool, join : ButtonJoin, on_click : Option<ClickHandler>, }",
+      "signature": "# [doc = \" A labeled action.\"] # [doc = \"\"] # [doc = \" The click handler is only installed when the button is enabled and not\"] # [doc = \" loading, so an unavailable action cannot fire through a stray event.\"] # [derive (IntoElement)] pub struct Button { ident : Ident, semantic_parent : Option<SharedString>, focus_handle : Option<FocusHandle>, label : Option<SharedString>, # [doc = \" What the button is called when the label is not what it is called, or\"] # [doc = \" when there is no label at all.\"] name : Option<SharedString>, description : Option<SharedString>, glyph : Option<Icon>, icon_position : IconPosition, variant : ButtonVariant, tier : Option<Variant>, color : Option<ColorChoice>, ground : Surface, size : ControlSize, disabled : bool, selected : bool, checked : Option<bool>, loading : bool, full_width : bool, icon_only : bool, join : ButtonJoin, on_click : Option<ClickHandler>, }",
       "cfg": []
     },
     {
@@ -54837,6 +54837,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn ghost (self) -> Self",
+      "cfg": [],
+      "target": "Button"
+    },
+    {
+      "id": "gpui_kit::controls::button::Button::ground",
+      "name": "ground",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::button",
+      "path": "gpui_kit::controls::button",
+      "source": "crates/gpui-kit/src/controls/button.rs",
+      "summary": "The surface this control stands on.",
+      "documentation": "The surface this control stands on.\n\nA neutral button normally takes the raised surface step above a panel.\nWhen that step does not clear the theme's surface-separation floor over\nthe ground named here, it uses the shared light-tier neutral wash\ninstead. The default remains [`Surface::Panel`], preserving the paint\nof buttons built before this setting existed.",
+      "signature": "pub fn ground (mut self, ground : Surface) -> Self",
       "cfg": [],
       "target": "Button"
     },
@@ -55207,6 +55222,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn ghost (self) -> Self",
+      "cfg": [],
+      "target": "IconButton"
+    },
+    {
+      "id": "gpui_kit::controls::button::IconButton::ground",
+      "name": "ground",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::button",
+      "path": "gpui_kit::controls::button",
+      "source": "crates/gpui-kit/src/controls/button.rs",
+      "summary": "The surface this control stands on. See [`Button::ground`].",
+      "documentation": "The surface this control stands on. See [`Button::ground`].",
+      "signature": "pub fn ground (mut self, ground : Surface) -> Self",
       "cfg": [],
       "target": "IconButton"
     },
@@ -63459,7 +63489,7 @@
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "summary": "A button that stays in.",
       "documentation": "A button that stays in.\n\nWhether it is in belongs to the caller: the toggle draws the state it was\nhanded and reports the state pressing it asks for. A host that refuses the\npress simply does not apply it, and the button keeps showing what is true.",
-      "signature": "# [doc = \" A button that stays in.\"] # [doc = \"\"] # [doc = \" Whether it is in belongs to the caller: the toggle draws the state it was\"] # [doc = \" handed and reports the state pressing it asks for. A host that refuses the\"] # [doc = \" press simply does not apply it, and the button keeps showing what is true.\"] # [derive (IntoElement)] pub struct Toggle { ident : Ident, label : Option<SharedString>, name : Option<SharedString>, glyph : Option<Icon>, icon_only : bool, pressed : bool, disabled : bool, size : ControlSize, variant : ButtonVariant, join : ButtonJoin, semantic_parent : Option<SharedString>, focus_handle : Option<FocusHandle>, on_press : Option<PressHandler>, }",
+      "signature": "# [doc = \" A button that stays in.\"] # [doc = \"\"] # [doc = \" Whether it is in belongs to the caller: the toggle draws the state it was\"] # [doc = \" handed and reports the state pressing it asks for. A host that refuses the\"] # [doc = \" press simply does not apply it, and the button keeps showing what is true.\"] # [derive (IntoElement)] pub struct Toggle { ident : Ident, label : Option<SharedString>, name : Option<SharedString>, glyph : Option<Icon>, icon_only : bool, pressed : bool, disabled : bool, size : ControlSize, variant : ButtonVariant, ground : Surface, join : ButtonJoin, semantic_parent : Option<SharedString>, focus_handle : Option<FocusHandle>, on_press : Option<PressHandler>, }",
       "cfg": []
     },
     {
@@ -63504,6 +63534,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn ghost (self) -> Self",
+      "cfg": [],
+      "target": "Toggle"
+    },
+    {
+      "id": "gpui_kit::controls::toggle_button::Toggle::ground",
+      "name": "ground",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::toggle_button",
+      "path": "gpui_kit::controls::toggle_button",
+      "source": "crates/gpui-kit/src/controls/toggle_button.rs",
+      "summary": "The surface this control stands on. See [`Button::ground`].",
+      "documentation": "The surface this control stands on. See [`Button::ground`].",
+      "signature": "pub fn ground (mut self, ground : Surface) -> Self",
       "cfg": [],
       "target": "Toggle"
     },
@@ -63683,7 +63728,7 @@
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "summary": "A run of toggles where none, one, or several may be in.",
       "documentation": "A run of toggles where none, one, or several may be in.\n\nThe set is the caller's. The group reports the set pressing one toggle asks\nfor, and draws whichever set the caller handed it, so a host that applies\nonly part of the report gets exactly what it applied.\n\nEvery toggle is its own tab stop, because every one of them is separately\nactionable — unlike a segmented control, where the whole strip is one stop\nand the arrows move the single answer around inside it.",
-      "signature": "# [doc = \" A run of toggles where none, one, or several may be in.\"] # [doc = \"\"] # [doc = \" The set is the caller's. The group reports the set pressing one toggle asks\"] # [doc = \" for, and draws whichever set the caller handed it, so a host that applies\"] # [doc = \" only part of the report gets exactly what it applied.\"] # [doc = \"\"] # [doc = \" Every toggle is its own tab stop, because every one of them is separately\"] # [doc = \" actionable — unlike a segmented control, where the whole strip is one stop\"] # [doc = \" and the arrows move the single answer around inside it.\"] # [derive (IntoElement)] pub struct ToggleGroup { ident : Ident, label : Option<SharedString>, items : Vec<ToggleItem>, pressed : Vec<SharedString>, selection : ToggleSelection, size : ControlSize, variant : ButtonVariant, disabled : bool, on_change : Option<ChangeHandler>, }",
+      "signature": "# [doc = \" A run of toggles where none, one, or several may be in.\"] # [doc = \"\"] # [doc = \" The set is the caller's. The group reports the set pressing one toggle asks\"] # [doc = \" for, and draws whichever set the caller handed it, so a host that applies\"] # [doc = \" only part of the report gets exactly what it applied.\"] # [doc = \"\"] # [doc = \" Every toggle is its own tab stop, because every one of them is separately\"] # [doc = \" actionable — unlike a segmented control, where the whole strip is one stop\"] # [doc = \" and the arrows move the single answer around inside it.\"] # [derive (IntoElement)] pub struct ToggleGroup { ident : Ident, label : Option<SharedString>, items : Vec<ToggleItem>, pressed : Vec<SharedString>, selection : ToggleSelection, size : ControlSize, variant : ButtonVariant, ground : Surface, disabled : bool, on_change : Option<ChangeHandler>, }",
       "cfg": []
     },
     {
@@ -63698,6 +63743,21 @@
       "summary": "Draws the set the caller's [`Binding`] holds, and writes the set a press asks for. Sugar for [`Self::pressed`] and [`Self::on_change`].",
       "documentation": "Draws the set the caller's [`Binding`] holds, and writes the set a\npress asks for. Sugar for [`Self::pressed`] and [`Self::on_change`].\n\nThe set is the whole answer, in both directions, so\n[`ToggleSelection`] keeps deciding what a press does to it.",
       "signature": "pub fn bind (self, binding : & Binding<Vec<SharedString>>, cx : & App) -> Self",
+      "cfg": [],
+      "target": "ToggleGroup"
+    },
+    {
+      "id": "gpui_kit::controls::toggle_button::ToggleGroup::ground",
+      "name": "ground",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::toggle_button",
+      "path": "gpui_kit::controls::toggle_button",
+      "source": "crates/gpui-kit/src/controls/toggle_button.rs",
+      "summary": "The surface every toggle in this group stands on. See [`Button::ground`].",
+      "documentation": "The surface every toggle in this group stands on. See\n[`Button::ground`].",
+      "signature": "pub fn ground (mut self, ground : Surface) -> Self",
       "cfg": [],
       "target": "ToggleGroup"
     },
@@ -117644,6 +117704,7 @@
         "icon_position(position: IconPosition) -> Self",
         "variant(variant: impl Into<ButtonStyle>) -> Self",
         "color(color: impl Into<ColorChoice>) -> Self",
+        "ground(ground: Surface) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -119258,6 +119319,7 @@
       "options": [
         "variant(variant: impl Into<ButtonStyle>) -> Self",
         "color(color: impl Into<ColorChoice>) -> Self",
+        "ground(ground: Surface) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -122122,6 +122184,7 @@
         "variant(variant: ButtonVariant) -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
+        "ground(ground: Surface) -> Self",
         "join(join: ButtonJoin) -> Self",
         "semantic_parent(parent: impl Into<SharedString>) -> Self",
         "track_focus(handle: &FocusHandle) -> Self",
@@ -122152,6 +122215,7 @@
         "pressed(ids: impl IntoIterator<Item = SharedString>) -> Self",
         "pressed_ids<S: AsRef<str>>(ids: &[S]) -> Self",
         "variant(variant: ButtonVariant) -> Self",
+        "ground(ground: Surface) -> Self",
         "on_change(handler: impl Fn(Vec<SharedString>, SharedString, &mut Window, &mut App) + 'static) -> Self",
         "bind(binding: &Binding<Vec<SharedString>>, cx: &App) -> Self"
       ],

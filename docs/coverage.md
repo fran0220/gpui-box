@@ -237,6 +237,30 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Three opt-in states with no active baseline, 2026-09-03
+
+An `InlineEdit` reading a long multi-line value, a `NodeGraph` that keeps its
+dot grid but refuses the origin axes, and neutral controls declaring an
+overlay ground now have complete layout or paint behavior but no permanent
+catalog state. Existing scenes intentionally keep their defaults, so their
+Metal and WARP pixels do not move; Linux's llvmpipe baseline set is retired
+and cannot author either active renderer's new images.
+
+The reading layout is covered by measured bounds, including the pen remaining
+inside a bounded single-line row. The graph's default-on axes and independent
+grid/ground settings are covered by behavior. Overlay-grounded Secondary,
+Default, refused, icon, and toggle paths share one resolver whose composited
+resting fill clears the 2 L* surface floor in both bundled themes, while the
+implicit panel ground resolves to the historical `raised`/`active` paints.
+A temporary llvmpipe exhibit put a Secondary button, an unpressed Toggle, and
+a Secondary IconButton on `OverlaySurface::FLOATING`; resting and hovered
+captures in both Studio themes were reviewed before the exhibit was removed.
+
+Whoever next captures on macOS and Windows should add a long multi-line
+reading value to `inline-edit`, an axes-free state to `node-graph`, and the
+three grounded controls to the overlay or button family, then review both
+active renderer images rather than accepting them unseen.
+
 ### Two colour settings with no scene of their own, 2026-09-02
 
 `TabItem::tint` and `NodeGraph::ground_light` change what a strip and a canvas

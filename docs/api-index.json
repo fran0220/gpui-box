@@ -744,6 +744,7 @@
         "icon_position(position: IconPosition) -> Self",
         "variant(variant: impl Into<ButtonStyle>) -> Self",
         "color(color: impl Into<ColorChoice>) -> Self",
+        "ground(ground: Surface) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -2358,6 +2359,7 @@
       "options": [
         "variant(variant: impl Into<ButtonStyle>) -> Self",
         "color(color: impl Into<ColorChoice>) -> Self",
+        "ground(ground: Surface) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -5222,6 +5224,7 @@
         "variant(variant: ButtonVariant) -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
+        "ground(ground: Surface) -> Self",
         "join(join: ButtonJoin) -> Self",
         "semantic_parent(parent: impl Into<SharedString>) -> Self",
         "track_focus(handle: &FocusHandle) -> Self",
@@ -5252,6 +5255,7 @@
         "pressed(ids: impl IntoIterator<Item = SharedString>) -> Self",
         "pressed_ids<S: AsRef<str>>(ids: &[S]) -> Self",
         "variant(variant: ButtonVariant) -> Self",
+        "ground(ground: Surface) -> Self",
         "on_change(handler: impl Fn(Vec<SharedString>, SharedString, &mut Window, &mut App) + 'static) -> Self",
         "bind(binding: &Binding<Vec<SharedString>>, cx: &App) -> Self"
       ],

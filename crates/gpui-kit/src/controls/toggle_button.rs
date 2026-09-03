@@ -39,7 +39,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Variant};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, Variant};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
@@ -65,6 +65,7 @@ pub struct Toggle {
     disabled: bool,
     size: ControlSize,
     variant: ButtonVariant,
+    ground: Surface,
     join: ButtonJoin,
     semantic_parent: Option<SharedString>,
     focus_handle: Option<FocusHandle>,
@@ -101,6 +102,7 @@ impl Toggle {
             // row; the tonal fill is what says there is something here to
             // press before anybody presses it.
             variant: ButtonVariant::Secondary,
+            ground: Surface::Panel,
             join: ButtonJoin::Alone,
             semantic_parent: None,
             focus_handle: None,
@@ -156,6 +158,12 @@ impl Toggle {
 
     pub fn ghost(self) -> Self {
         self.variant(ButtonVariant::Ghost)
+    }
+
+    /// The surface this control stands on. See [`Button::ground`].
+    pub fn ground(mut self, ground: Surface) -> Self {
+        self.ground = ground;
+        self
     }
 
     /// Where the toggle sits in a joined run of them.
@@ -216,6 +224,7 @@ impl RenderOnce for Toggle {
 
         Button::new(self.ident.clone())
             .variant(self.variant)
+            .ground(self.ground)
             // In is a different surface, not the same surface with a line
             // under it. A toggle out is a neutral chip, so a toggle in takes
             // the light tier of the accent: the wash and the lettering both
@@ -347,6 +356,7 @@ pub struct ToggleGroup {
     selection: ToggleSelection,
     size: ControlSize,
     variant: ButtonVariant,
+    ground: Surface,
     disabled: bool,
     on_change: Option<ChangeHandler>,
 }
@@ -375,6 +385,7 @@ impl ToggleGroup {
             selection: ToggleSelection::default(),
             size: ControlSize::Md,
             variant: ButtonVariant::Secondary,
+            ground: Surface::Panel,
             disabled: false,
             on_change: None,
         }
@@ -413,6 +424,13 @@ impl ToggleGroup {
 
     pub fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = variant;
+        self
+    }
+
+    /// The surface every toggle in this group stands on. See
+    /// [`Button::ground`].
+    pub fn ground(mut self, ground: Surface) -> Self {
+        self.ground = ground;
         self
     }
 
@@ -500,6 +518,7 @@ impl RenderOnce for ToggleGroup {
 
                 Toggle::new(self.ident.child(item.id.as_ref()))
                     .variant(self.variant)
+                    .ground(self.ground)
                     .control_size(self.size)
                     .semantic_parent(parent.clone())
                     .pressed(self.pressed.contains(&item.id))
