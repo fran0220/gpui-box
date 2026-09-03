@@ -1259,6 +1259,7 @@ pub struct NodeGraph {
     empty: Option<EmptyState>,
     slots: Slots,
     grid: bool,
+    axes: bool,
     ground_light: bool,
     viewport: GraphViewport,
     zoom_range: (f32, f32),
@@ -1337,6 +1338,7 @@ impl NodeGraph {
             empty: None,
             slots: Slots::default(),
             grid: true,
+            axes: true,
             ground_light: true,
             viewport: GraphViewport::default(),
             zoom_range: (0.5, 2.0),
@@ -1404,6 +1406,18 @@ impl NodeGraph {
     /// has a texture of its own.
     pub fn grid(mut self, grid: bool) -> Self {
         self.grid = grid;
+        self
+    }
+
+    /// Turns off the two rules through the world origin while leaving the dot
+    /// grid in place.
+    ///
+    /// The axes say the origin is a landmark. That is useful on a diagram
+    /// whose positions carry meaning; a board whose cards were merely laid
+    /// out on a plane has no distinguished zero, so the rules would claim a
+    /// boundary the content does not have.
+    pub fn axes(mut self, axes: bool) -> Self {
+        self.axes = axes;
         self
     }
 
@@ -2098,7 +2112,13 @@ impl RenderOnce for NodeGraph {
                 .justify_center()
                 .child(empty);
             return frame
-                .child(graph_ground(&theme, viewport, self.grid, self.ground_light))
+                .child(graph_ground(
+                    &theme,
+                    viewport,
+                    self.grid,
+                    self.axes,
+                    self.ground_light,
+                ))
                 .child(empty)
                 .semantic_in(cx, spec.value(viewport_value("empty", asked)))
                 .into_any_element();
@@ -2430,7 +2450,7 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let painted_preview = preview.clone();
-        let ground = graph_ground(&theme, viewport, self.grid, self.ground_light);
+        let ground = graph_ground(&theme, viewport, self.grid, self.axes, self.ground_light);
 
         // Edges are their own painted layer above the regions and below the
         // cards: a connection crosses a region it does not belong to, and a
@@ -3494,6 +3514,7 @@ fn graph_ground(
     theme: &gpui_kit_theme::Theme,
     viewport: GraphViewport,
     draw_grid: bool,
+    draw_axes: bool,
     cast_light: bool,
 ) -> AnyElement {
     let light = ground_cast(theme, cast_light);
@@ -3519,7 +3540,7 @@ fn graph_ground(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
                     if draw_grid {
-                        paint_grid(window, bounds, viewport, paint);
+                        paint_grid(window, bounds, viewport, paint, draw_axes);
                     }
                 },
             )
@@ -3581,23 +3602,24 @@ fn grid_level(zoom: f32) -> (f32, f32) {
     (world, fade)
 }
 
-/// Paints the dot grid the canvas sits on, and the two rules through its
-/// origin.
+/// Paints the dot grid the canvas sits on, and, when asked, the two rules
+/// through its origin.
 ///
 /// The grid is anchored to the pan offset rather than to the viewport, so it
 /// travels with the graph and reports that the canvas moved. A grid pinned to
 /// the viewport would sit still under a graph that was moving, which reads as
 /// the graph having stayed where it was.
 ///
-/// The axes are where the origin is. Every interval of a grid looks like every
-/// other one, so a grid alone says how far the canvas has been dragged and
-/// never where the reader has arrived; the axes are the one place on the
-/// canvas that is somewhere in particular.
+/// When present, the axes are where the origin is. Every interval of a grid
+/// looks like every other one, so a grid alone says how far the canvas has
+/// been dragged and never where the reader has arrived; the axes are the one
+/// place on the canvas that is somewhere in particular.
 fn paint_grid(
     window: &mut Window,
     bounds: Bounds<Pixels>,
     viewport: GraphViewport,
     paint: GridPaint,
+    draw_axes: bool,
 ) {
     let (world_step, fade) = grid_level(viewport.zoom);
     let width = f32::from(bounds.size.width);
@@ -3643,25 +3665,27 @@ fn paint_grid(
         world_y += world_step;
     }
 
-    let origin_x = viewport.offset.x;
-    let origin_y = viewport.offset.y;
-    if (0.0..width).contains(&origin_x) {
-        window.paint_quad(gpui::fill(
-            Bounds::new(
-                point(bounds.origin.x + px(origin_x), bounds.origin.y),
-                size(px(AXIS_WIDTH), bounds.size.height),
-            ),
-            paint.axis,
-        ));
-    }
-    if (0.0..height).contains(&origin_y) {
-        window.paint_quad(gpui::fill(
-            Bounds::new(
-                point(bounds.origin.x, bounds.origin.y + px(origin_y)),
-                size(bounds.size.width, px(AXIS_WIDTH)),
-            ),
-            paint.axis,
-        ));
+    if draw_axes {
+        let origin_x = viewport.offset.x;
+        let origin_y = viewport.offset.y;
+        if (0.0..width).contains(&origin_x) {
+            window.paint_quad(gpui::fill(
+                Bounds::new(
+                    point(bounds.origin.x + px(origin_x), bounds.origin.y),
+                    size(px(AXIS_WIDTH), bounds.size.height),
+                ),
+                paint.axis,
+            ));
+        }
+        if (0.0..height).contains(&origin_y) {
+            window.paint_quad(gpui::fill(
+                Bounds::new(
+                    point(bounds.origin.x, bounds.origin.y + px(origin_y)),
+                    size(bounds.size.width, px(AXIS_WIDTH)),
+                ),
+                paint.axis,
+            ));
+        }
     }
 }
 
@@ -3733,6 +3757,21 @@ mod tests {
         assert!(
             NodeGraph::new("run").ground_light(false).grid,
             "refusing the light leaves the grid alone"
+        );
+    }
+
+    /// Every canvas built before the setting existed marked its origin. A
+    /// board may refuse that landmark without also giving up its dot ruler or
+    /// changing the material underneath it.
+    #[test]
+    fn a_canvas_marks_its_origin_until_it_says_otherwise() {
+        assert!(NodeGraph::new("run").axes);
+        let board = NodeGraph::new("run").axes(false);
+        assert!(!board.axes);
+        assert!(board.grid, "refusing the axes leaves the grid alone");
+        assert!(
+            board.ground_light,
+            "refusing the axes leaves the ground alone"
         );
     }
 

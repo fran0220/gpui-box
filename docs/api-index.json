@@ -3087,6 +3087,7 @@
         "state(state: GraphState) -> Self",
         "empty(empty: EmptyState) -> Self",
         "grid(grid: bool) -> Self",
+        "axes(axes: bool) -> Self",
         "ground_light(ground_light: bool) -> Self",
         "offset(x: f32, y: f32) -> Self",
         "viewport(viewport: GraphViewport) -> Self",

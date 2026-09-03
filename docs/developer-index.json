@@ -1082,7 +1082,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4182
+      "symbolCount": 4183
     },
     {
       "name": "gpui-box-kit-assets",
@@ -46632,8 +46632,23 @@
       "source": "crates/gpui-kit/src/canvas/graph.rs",
       "summary": "A run drawn as connected steps.",
       "documentation": "A run drawn as connected steps.",
-      "signature": "# [doc = \" A run drawn as connected steps.\"] # [derive (IntoElement)] pub struct NodeGraph { ident : Ident, nodes : Vec<Placed>, edges : Vec<GraphEdge>, bands : Vec<GraphBand>, state : GraphState, empty : Option<EmptyState>, slots : Slots, grid : bool, ground_light : bool, viewport : GraphViewport, zoom_range : (f32, f32), interaction : GraphInteraction, on_event : Option<EventHandler>, can_connect : Option<ConnectionValidator>, minimap : bool, toolbar : Option<CanvasToolbar>, fit : GraphFit, fit_clearance : Edges<f32>, routing : GraphRouting, }",
+      "signature": "# [doc = \" A run drawn as connected steps.\"] # [derive (IntoElement)] pub struct NodeGraph { ident : Ident, nodes : Vec<Placed>, edges : Vec<GraphEdge>, bands : Vec<GraphBand>, state : GraphState, empty : Option<EmptyState>, slots : Slots, grid : bool, axes : bool, ground_light : bool, viewport : GraphViewport, zoom_range : (f32, f32), interaction : GraphInteraction, on_event : Option<EventHandler>, can_connect : Option<ConnectionValidator>, minimap : bool, toolbar : Option<CanvasToolbar>, fit : GraphFit, fit_clearance : Edges<f32>, routing : GraphRouting, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::canvas::graph::NodeGraph::axes",
+      "name": "axes",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "canvas::graph",
+      "path": "gpui_kit::canvas::graph",
+      "source": "crates/gpui-kit/src/canvas/graph.rs",
+      "summary": "Turns off the two rules through the world origin while leaving the dot grid in place.",
+      "documentation": "Turns off the two rules through the world origin while leaving the dot\ngrid in place.\n\nThe axes say the origin is a landmark. That is useful on a diagram\nwhose positions carry meaning; a board whose cards were merely laid\nout on a plane has no distinguished zero, so the rules would claim a\nboundary the content does not have.",
+      "signature": "pub fn axes (mut self, axes : bool) -> Self",
+      "cfg": [],
+      "target": "NodeGraph"
     },
     {
       "id": "gpui_kit::canvas::graph::NodeGraph::band",
@@ -119972,6 +119987,7 @@
         "state(state: GraphState) -> Self",
         "empty(empty: EmptyState) -> Self",
         "grid(grid: bool) -> Self",
+        "axes(axes: bool) -> Self",
         "ground_light(ground_light: bool) -> Self",
         "offset(x: f32, y: f32) -> Self",
         "viewport(viewport: GraphViewport) -> Self",
