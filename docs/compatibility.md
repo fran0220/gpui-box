@@ -94,6 +94,18 @@ lands immediately. Finite eased values may exceed 0–1, so an underdamped
 spring's overshoot is preserved. Kit retains the token, semantic-role, visual
 settle, transition, presence, and FLIP policy above this scalar primitive.
 
+Raw touch also has one portable framework path. GPUI recognizes one contact at
+a time as a synthesized tap/multi-tap, an axis-locked phased scroll with
+least-squares release velocity and catchable fling momentum, or a phased
+touch-drag/long-press stream explicitly claimed by an element. Predicted touch
+positions can lead visual pan output but never classification, hit testing, or
+velocity, and later samples reconcile the prediction. `PlatformGestures`
+selects exponential iOS-style or Android friction-spline deceleration while
+the existing `GestureTuning::momentum_decay_per_ms` field remains source
+compatible. This contract begins when a platform emits `TouchEvent`; GPUI Box
+does not yet supply native iOS/Android producers, a portable pinch recognizer,
+or a multi-touch arena. Platform-provided trackpad pinch remains unchanged.
+
 Application-provided native context menus use the framework's existing
 `Menu`/`MenuItem` action tree rather than a platform-specific component model.
 macOS maps it to `NSMenu`; Windows maps it to `HMENU` and

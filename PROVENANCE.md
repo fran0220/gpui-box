@@ -589,11 +589,13 @@ hooks, or source files, and adds no dependency.
 - Package checksum: `c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad`
 - Package source revision: `zed@801c087af22dd189dc1aa49e2f370b4f04190b19`
 - License: Apache-2.0
-- Source locations: `gpui-pre/src/spring.rs` and
-  `gpui-pre/src/elements/animation.rs`
+- Source locations: `gpui-pre/src/spring.rs`,
+  `gpui-pre/src/elements/animation.rs`, `gpui-pre/src/gestures.rs`,
+  `gpui-pre/src/interactive.rs`, and `gpui-pre/src/window.rs`
 - Destinations: `crates/gpui/src/spring.rs`,
   `crates/gpui/src/elements/animation.rs`, and
-  `crates/gpui-kit/src/motion/spring.rs`
+  `crates/gpui-kit/src/motion/spring.rs`; `crates/gpui/src/gestures.rs`,
+  `crates/gpui/src/interactive.rs`, and `crates/gpui/src/window.rs`
 
 The 0.6 release was audited as a capability delta, not installed as a package:
 its crates resolve through `gpui-pre`, which would create a second GPUI type
@@ -604,5 +606,21 @@ Local changes retain reduced-motion behavior, use the repository's scheduler,
 and add coverage for every damping regime, retargeted velocity, playback
 states, and finite overshoot. Kit's existing token/perceptual `Spring`, visual
 settling policy, transitions, presence, and FLIP remain its policy layer but
-delegate scalar evolution to the framework solver. No `gpui-pre`, Longbridge,
-Zed Git source, or Cargo patch was added.
+delegate scalar evolution to the framework solver.
+
+The package's portable touch recognizer, least-squares release velocity,
+prediction reconciliation, tap/multi-tap synthesis, axis-locked pan, catchable
+fling momentum, phased touch-drag/long-press claiming, cancellation, and window
+dispatch were adapted at the same framework boundary. GPUI Box retains the
+public `GestureTuning::momentum_decay_per_ms` field and adds
+`PlatformGestures::scroll_physics` for selecting the package's exponential or
+Android friction-spline model. The spline is the package's Apache-2.0
+transcription of AOSP `OverScroller.SplineOverScroller`
+(<https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/widget/OverScroller.java>;
+Copyright 2006 The Android Open Source Project). The complete imported bytes are
+fixed by the package checksum and source revision above.
+
+This is a portable single-touch input path, not a claim of a complete gesture
+arena: additional contacts are ignored while one touch is active, pinch remains
+a platform event, and no native iOS/Android touch producer is added. No
+`gpui-pre`, Longbridge, Zed Git source, or Cargo patch was added.

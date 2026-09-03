@@ -590,6 +590,15 @@ playback state, projected targets, and finite overshoot. Kit owns the theme and
 component policy above it. This is an invisible framework primitive and does
 not add a scene merely to increase catalog coverage.
 
+Single-touch recognition is no longer a local component approximation either.
+When a platform supplies raw `TouchEvent`s, GPUI resolves tap/multi-tap, phased
+axis-locked pan and frame-rate-independent momentum, prediction correction,
+touch-drag, long press, cancellation, and fling interruption through the same
+window dispatch used by mouse and scroll consumers. The remaining boundary is
+explicit: native iOS/Android touch production, a real multi-contact arena, and
+portable pinch recognition are not implemented. Existing platform-generated
+trackpad pinch events are a separate input path.
+
 | Framework boundary | Why it matters |
 |---|---|
 | Shape in `flip` | `Flip::shape` interpolates radius, border width, border colour and background over the same spring that carries position and size, and `Shaping::shaped` applies the result, so a row becoming a card travels between the two forms. The caller states both forms and applies what comes back, because `Flipped` wraps an element it did not build and cannot reach the style inside it. What is still not interpolated is anything with no numeric path between the two forms — a shadow set, a gradient, or a change of element kind. |

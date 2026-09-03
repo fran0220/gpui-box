@@ -70,6 +70,26 @@ delegating their scalar spring evolution to GPUI's one solver. The source port
 is from Apache-2.0 `gpui-pre` 0.3.2 as identified through the Longbridge GPUI
 Kit 0.6 audit; no second GPUI package or Git dependency enters the graph.
 
+**Raw touch now reaches one complete portable single-contact recognizer.** GPUI
+resolves taps and multi-taps through the existing mouse click path, locks pans
+to their initial dominant axis, estimates release velocity by least squares,
+and continues fast releases on a closed-form, frame-rate-independent fling.
+Prediction can lead a pan without changing hit testing or velocity and is
+reconciled by later samples; a new touch can catch an active fling without a
+jump. Elements can claim phased `TouchDragEvent` and `LongPressEvent` streams,
+and cancellation, stale timers, unrelated touch ids, and concurrent contacts
+have explicit tests. `ScrollPhysics` supplies iOS-style exponential and Android
+`OverScroller` friction-spline models; `PlatformGestures::scroll_physics`
+selects one while the existing `GestureTuning::momentum_decay_per_ms` field
+remains source-compatible. `Window` gains long-press capture and a switch for
+prediction. `TouchEvent` gains `predicted_position`; `PlatformInput` gains
+`LongPress` and `TouchDrag`, plus stable diagnostic names. This changes public
+struct literals and exhaustive matches. It does not add native iOS/Android
+touch producers, portable pinch, or a multi-touch arena; trackpad pinch remains
+platform-provided. The source port is from the same Apache-2.0 `gpui-pre` 0.3.2
+package audited through Longbridge GPUI Kit 0.6, with its AOSP-derived spline
+recorded in the provenance and notices.
+
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs
 are Studios, branches, or environments was read by name alone, because the one
 language the library had for "which one is this" was the accent, and the accent

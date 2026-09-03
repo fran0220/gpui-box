@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2489
+      "symbolCount": 2498
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -20790,9 +20790,9 @@
       "module": "gestures",
       "path": "gpui::gestures",
       "source": "crates/gpui/src/gestures.rs",
-      "summary": "The set of gesture kinds that participate in recognition.",
-      "documentation": "The set of gesture kinds that participate in recognition.\n\nUsed by [`PlatformGestures::native_recognizers`] to declare which gestures\nthe platform recognizes natively rather than leaving to gpui core's\nportable recognizers.",
-      "signature": "# [doc = \" The set of gesture kinds that participate in recognition.\"] # [doc = \"\"] # [doc = \" Used by [`PlatformGestures::native_recognizers`] to declare which gestures\"] # [doc = \" the platform recognizes natively rather than leaving to gpui core's\"] # [doc = \" portable recognizers.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct GestureKinds { # [doc = \" Tap (and multi-tap), surfaced as [`ClickEvent::Touch`](crate::ClickEvent).\"] pub tap : bool, # [doc = \" Long press, surfaced as [`LongPressEvent`].\"] pub long_press : bool, # [doc = \" Pan/scroll (including fling momentum), surfaced as\"] # [doc = \" [`ScrollWheelEvent`](crate::ScrollWheelEvent)s.\"] pub pan : bool, # [doc = \" Pinch to zoom, surfaced as [`PinchEvent`](crate::PinchEvent)s.\"] pub pinch : bool, }",
+      "summary": "The gesture capabilities a platform can declare as natively recognized.",
+      "documentation": "The gesture capabilities a platform can declare as natively recognized.\n\nUsed by [`PlatformGestures::native_recognizers`] to declare which gestures\nthe platform handles instead of forwarding their raw contacts to GPUI's\nportable single-touch recognizer.",
+      "signature": "# [doc = \" The gesture capabilities a platform can declare as natively recognized.\"] # [doc = \"\"] # [doc = \" Used by [`PlatformGestures::native_recognizers`] to declare which gestures\"] # [doc = \" the platform handles instead of forwarding their raw contacts to GPUI's\"] # [doc = \" portable single-touch recognizer.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct GestureKinds { # [doc = \" Tap and multi-tap. GPUI's portable path synthesizes mouse presses so\"] # [doc = \" existing click behavior remains compatible.\"] pub tap : bool, # [doc = \" Long press, surfaced as [`LongPressEvent`].\"] pub long_press : bool, # [doc = \" Pan/scroll (including fling momentum), surfaced as\"] # [doc = \" [`ScrollWheelEvent`](crate::ScrollWheelEvent)s.\"] pub pan : bool, # [doc = \" Pinch to zoom, surfaced as [`PinchEvent`](crate::PinchEvent)s.\"] pub pinch : bool, }",
       "cfg": []
     },
     {
@@ -20806,7 +20806,7 @@
       "source": "crates/gpui/src/gestures.rs",
       "summary": "Feel constants consumed by gesture recognizers. Provided on a best-effort basis, depending on each platform's support, defaulting to GPUI's own (iOS flavored) values",
       "documentation": "Feel constants consumed by gesture recognizers. Provided on a best-effort\nbasis, depending on each platform's support, defaulting to GPUI's own\n(iOS flavored) values",
-      "signature": "# [doc = \" Feel constants consumed by gesture recognizers. Provided on a best-effort\"] # [doc = \" basis, depending on each platform's support, defaulting to GPUI's own\"] # [doc = \" (iOS flavored) values\"] # [derive (Clone, Copy, Debug, PartialEq)] pub struct GestureTuning { # [doc = \" Distance a touch may travel before it stops being a potential tap and\"] # [doc = \" becomes a pan/drag.\"] pub touch_slop : Pixels, # [doc = \" Maximum interval between taps for them to accumulate a tap count.\"] pub multi_tap_interval : Duration, # [doc = \" Maximum distance between taps for them to accumulate a tap count.\"] pub multi_tap_slop : Pixels, # [doc = \" How long a touch must remain within [`Self::touch_slop`] to be\"] # [doc = \" recognized as a long press.\"] pub long_press_duration : Duration, # [doc = \" Per-millisecond decay factor applied to scroll momentum after a fling.\"] # [doc = \" (`UIScrollView` uses `0.998` per millisecond for its normal\"] # [doc = \" deceleration rate.)\"] pub momentum_decay_per_ms : f32, # [doc = \" Minimum release velocity, in pixels per second, required to start\"] # [doc = \" scroll momentum.\"] pub min_fling_velocity : f32, }",
+      "signature": "# [doc = \" Feel constants consumed by gesture recognizers. Provided on a best-effort\"] # [doc = \" basis, depending on each platform's support, defaulting to GPUI's own\"] # [doc = \" (iOS flavored) values\"] # [derive (Clone, Copy, Debug, PartialEq)] pub struct GestureTuning { # [doc = \" Distance a touch may travel before it stops being a potential tap and\"] # [doc = \" becomes a pan/drag.\"] pub touch_slop : Pixels, # [doc = \" Maximum interval between taps for them to accumulate a tap count.\"] pub multi_tap_interval : Duration, # [doc = \" Maximum distance between taps for them to accumulate a tap count.\"] pub multi_tap_slop : Pixels, # [doc = \" How long a touch must remain within [`Self::touch_slop`] to be\"] # [doc = \" recognized as a long press.\"] pub long_press_duration : Duration, # [doc = \" Per-millisecond decay factor applied to exponential scroll momentum.\"] # [doc = \" (`UIScrollView` uses `0.998` per millisecond for its normal\"] # [doc = \" deceleration rate.)\"] # [doc = \"\"] # [doc = \" This field is retained for source compatibility. A platform that needs\"] # [doc = \" a different model can override [`PlatformGestures::scroll_physics`].\"] pub momentum_decay_per_ms : f32, # [doc = \" Minimum release velocity, in pixels per second, required to start\"] # [doc = \" scroll momentum.\"] pub min_fling_velocity : f32, }",
       "cfg": []
     },
     {
@@ -20818,9 +20818,9 @@
       "module": "gestures",
       "path": "gpui::gestures",
       "source": "crates/gpui/src/gestures.rs",
-      "summary": "A long-press gesture, mobile's context-menu trigger.",
-      "documentation": "A long-press gesture, mobile's context-menu trigger.\n\nA bare long press is surfaced as a [`ClickEvent`](crate::ClickEvent) with\n`long_press: true`, delivered to aux-click listeners alongside right\nclicks. This event is the raw hook for elements that need the gesture\nitself (e.g. long-press to start a drag); the registration API ships\ntogether with the gesture arena.",
-      "signature": "# [doc = \" A long-press gesture, mobile's context-menu trigger.\"] # [doc = \"\"] # [doc = \" A bare long press is surfaced as a [`ClickEvent`](crate::ClickEvent) with\"] # [doc = \" `long_press: true`, delivered to aux-click listeners alongside right\"] # [doc = \" clicks. This event is the raw hook for elements that need the gesture\"] # [doc = \" itself (e.g. long-press to start a drag); the registration API ships\"] # [doc = \" together with the gesture arena.\"] # [derive (Clone, Debug, Default)] pub struct LongPressEvent { # [doc = \" The position of the touch that was recognized as a long press.\"] pub position : Point<Pixels>, }",
+      "summary": "A phased long-press gesture recognized from a touch.",
+      "documentation": "A phased long-press gesture recognized from a touch.",
+      "signature": "# [doc = \" A phased long-press gesture recognized from a touch.\"] # [derive (Clone, Debug)] pub struct LongPressEvent { # [doc = \" The phase of the long press.\"] pub phase : TouchPhase, # [doc = \" The position where the touch started.\"] pub start_position : Point<Pixels>, # [doc = \" The touch's current position.\"] pub position : Point<Pixels>, }",
       "cfg": []
     },
     {
@@ -20877,7 +20877,65 @@
       "source": "crates/gpui/src/gestures.rs",
       "summary": "Platform gesture recognition services.",
       "documentation": "Platform gesture recognition services.\n\nIf your mobile platform supports native gesture recognition, use this\nto share it with GPUI.",
-      "signature": "# [doc = \" Platform gesture recognition services.\"] # [doc = \"\"] # [doc = \" If your mobile platform supports native gesture recognition, use this\"] # [doc = \" to share it with GPUI.\"] pub trait PlatformGestures { # [doc = \" Feel constants for the portable recognizers on this platform.\"] fn tuning (& self) -> GestureTuning { GestureTuning::default () } # [doc = \" The gesture kinds this platform recognizes natively.\"] fn native_recognizers (& self) -> GestureKinds { GestureKinds::NONE } }",
+      "signature": "# [doc = \" Platform gesture recognition services.\"] # [doc = \"\"] # [doc = \" If your mobile platform supports native gesture recognition, use this\"] # [doc = \" to share it with GPUI.\"] pub trait PlatformGestures { # [doc = \" Feel constants for the portable recognizers on this platform.\"] fn tuning (& self) -> GestureTuning { GestureTuning::default () } # [doc = \" The deceleration model used by portable touch-pan momentum.\"] # [doc = \"\"] # [doc = \" The default preserves the exponential model configured by\"] # [doc = \" [`GestureTuning::momentum_decay_per_ms`]. Platforms can opt into\"] # [doc = \" [`ScrollPhysics::FrictionSpline`] without changing the tuning struct.\"] fn scroll_physics (& self) -> ScrollPhysics { ScrollPhysics::Exponential { decay_per_ms : self . tuning () . momentum_decay_per_ms, } } # [doc = \" The gesture kinds this platform recognizes natively.\"] fn native_recognizers (& self) -> GestureKinds { GestureKinds::NONE } }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gestures::ScrollPhysics",
+      "name": "ScrollPhysics",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gestures",
+      "path": "gpui::gestures",
+      "source": "crates/gpui/src/gestures.rs",
+      "summary": "How free scrolling decelerates after a fling.",
+      "documentation": "How free scrolling decelerates after a fling.\n\nThis models deceleration only. Boundary behavior — bouncing, edge glow,\nclamping — is the scroll container's policy: the container is the one that\nknows its extents.",
+      "signature": "# [doc = \" How free scrolling decelerates after a fling.\"] # [doc = \"\"] # [doc = \" This models deceleration only. Boundary behavior — bouncing, edge glow,\"] # [doc = \" clamping — is the scroll container's policy: the container is the one that\"] # [doc = \" knows its extents.\"] # [derive (Clone, Copy, Debug, PartialEq)] pub enum ScrollPhysics { # [doc = \" Exponential velocity decay, the `UIScrollView` model:\"] # [doc = \" `velocity(t) = v₀ · decay_per_msᵐˢ`.\"] Exponential { # [doc = \" Per-millisecond velocity decay factor. `UIScrollView`'s normal\"] # [doc = \" deceleration rate is `0.998`.\"] decay_per_ms : f32, }, # [doc = \" The friction spline of Android's `OverScroller`: fling duration and\"] # [doc = \" distance follow a logarithmic deceleration law, and progress along\"] # [doc = \" the fling follows a cubic-Bezier ease-out curve. Transcribed from\"] # [doc = \" AOSP's `SplineOverScroller` (Apache-2.0).\"] FrictionSpline { # [doc = \" The scroll friction coefficient;\"] # [doc = \" `ViewConfiguration.getScrollFriction()` is `0.015` on Android.\"] friction : f32, # [doc = \" Pixels per physical inch of the display, in the coordinate space\"] # [doc = \" the fling runs in. Android folds display density into its\"] # [doc = \" deceleration coefficient, so the same finger speed flings\"] # [doc = \" further in pixels on a denser screen.\"] pixels_per_inch : f32, }, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gestures::ScrollPhysics::android",
+      "name": "android",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gestures",
+      "path": "gpui::gestures",
+      "source": "crates/gpui/src/gestures.rs",
+      "summary": "Android scroll feel: `OverScroller` with stock friction, at Android's nominal density of 160 density-independent pixels per inch — the right pairing when fling distances are in logical pixels. Platforms that fling in physical pixels, or know the display's true density in their logical space, should construct [`ScrollPhysics::FrictionSpline`] directly.",
+      "documentation": "Android scroll feel: `OverScroller` with stock friction, at Android's\nnominal density of 160 density-independent pixels per inch — the\nright pairing when fling distances are in logical pixels. Platforms\nthat fling in physical pixels, or know the display's true density in\ntheir logical space, should construct\n[`ScrollPhysics::FrictionSpline`] directly.",
+      "signature": "pub fn android () -> Self",
+      "cfg": [],
+      "target": "ScrollPhysics"
+    },
+    {
+      "id": "gpui::gestures::ScrollPhysics::ios",
+      "name": "ios",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gestures",
+      "path": "gpui::gestures",
+      "source": "crates/gpui/src/gestures.rs",
+      "summary": "iOS scroll feel: `UIScrollView`'s normal deceleration rate.",
+      "documentation": "iOS scroll feel: `UIScrollView`'s normal deceleration rate.",
+      "signature": "pub fn ios () -> Self",
+      "cfg": [],
+      "target": "ScrollPhysics"
+    },
+    {
+      "id": "gpui::gestures::TouchDragEvent",
+      "name": "TouchDragEvent",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gestures",
+      "path": "gpui::gestures",
+      "source": "crates/gpui/src/gestures.rs",
+      "summary": "A direct touch drag claimed by an element before touch input becomes a tap, long press, or scrolling gesture.",
+      "documentation": "A direct touch drag claimed by an element before touch input becomes a tap,\nlong press, or scrolling gesture.",
+      "signature": "# [doc = \" A direct touch drag claimed by an element before touch input becomes a tap,\"] # [doc = \" long press, or scrolling gesture.\"] # [derive (Clone, Debug)] pub struct TouchDragEvent { # [doc = \" The phase of the touch drag.\"] pub phase : TouchPhase, # [doc = \" The position where the touch started.\"] pub start_position : Point<Pixels>, # [doc = \" The touch's current position.\"] pub position : Point<Pixels>, }",
       "cfg": []
     },
     {
@@ -22636,8 +22694,23 @@
       "source": "crates/gpui/src/interactive.rs",
       "summary": "An enum corresponding to all kinds of platform input events.",
       "documentation": "An enum corresponding to all kinds of platform input events.",
-      "signature": "# [doc = \" An enum corresponding to all kinds of platform input events.\"] # [derive (Clone, Debug)] pub enum PlatformInput { # [doc = \" A key was pressed.\"] KeyDown (KeyDownEvent), # [doc = \" A key was released.\"] KeyUp (KeyUpEvent), # [doc = \" The keyboard modifiers were changed.\"] ModifiersChanged (ModifiersChangedEvent), # [doc = \" The mouse was pressed.\"] MouseDown (MouseDownEvent), # [doc = \" The mouse was released.\"] MouseUp (MouseUpEvent), # [doc = \" Mouse pressure.\"] MousePressure (MousePressureEvent), # [doc = \" The mouse was moved.\"] MouseMove (MouseMoveEvent), # [doc = \" The mouse exited the window.\"] MouseExited (MouseExitEvent), # [doc = \" The scroll wheel was used.\"] ScrollWheel (ScrollWheelEvent), # [doc = \" A pinch gesture was performed.\"] Pinch (PinchEvent), # [doc = \" Files were dragged and dropped onto the window.\"] FileDrop (FileDropEvent), # [doc = \" Non-path native data was dragged and dropped onto the window.\"] ExternalDrop (ExternalDropEvent), # [doc = \" A raw touch event on a touch screen.\"] Touch (TouchEvent), }",
+      "signature": "# [doc = \" An enum corresponding to all kinds of platform input events.\"] # [derive (Clone, Debug)] pub enum PlatformInput { # [doc = \" A key was pressed.\"] KeyDown (KeyDownEvent), # [doc = \" A key was released.\"] KeyUp (KeyUpEvent), # [doc = \" The keyboard modifiers were changed.\"] ModifiersChanged (ModifiersChangedEvent), # [doc = \" The mouse was pressed.\"] MouseDown (MouseDownEvent), # [doc = \" The mouse was released.\"] MouseUp (MouseUpEvent), # [doc = \" Mouse pressure.\"] MousePressure (MousePressureEvent), # [doc = \" The mouse was moved.\"] MouseMove (MouseMoveEvent), # [doc = \" The mouse exited the window.\"] MouseExited (MouseExitEvent), # [doc = \" The scroll wheel was used.\"] ScrollWheel (ScrollWheelEvent), # [doc = \" A pinch gesture was performed.\"] Pinch (PinchEvent), # [doc = \" A long-press gesture recognized from touch input.\"] LongPress (LongPressEvent), # [doc = \" A direct touch drag claimed by an element.\"] TouchDrag (TouchDragEvent), # [doc = \" Files were dragged and dropped onto the window.\"] FileDrop (FileDropEvent), # [doc = \" Non-path native data was dragged and dropped onto the window.\"] ExternalDrop (ExternalDropEvent), # [doc = \" A raw touch event on a touch screen.\"] Touch (TouchEvent), }",
       "cfg": []
+    },
+    {
+      "id": "gpui::interactive::PlatformInput::kind_name",
+      "name": "kind_name",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "interactive",
+      "path": "gpui::interactive",
+      "source": "crates/gpui/src/interactive.rs",
+      "summary": "A short static name for this input's variant, for diagnostics and telemetry.",
+      "documentation": "A short static name for this input's variant, for diagnostics and\ntelemetry.",
+      "signature": "pub fn kind_name (& self) -> & 'static str",
+      "cfg": [],
+      "target": "PlatformInput"
     },
     {
       "id": "gpui::interactive::PlatformInput::touch_event",
@@ -22765,8 +22838,8 @@
       "path": "gpui::interactive",
       "source": "crates/gpui/src/interactive.rs",
       "summary": "A raw touch event from the platform.",
-      "documentation": "A raw touch event from the platform.\n\n\nDispatch contract (core implementation pending): a touch is hit-tested\nonce, at [`TouchPhase::Started`], occlusion-aware; all subsequent events\nfor the same [`TouchId`] are delivered to the elements under the starting\nposition, even after the touch moves outside them.",
-      "signature": "# [doc = \" A raw touch event from the platform.\"] # [doc = \"\"] # [doc = \"\"] # [doc = \" Dispatch contract (core implementation pending): a touch is hit-tested\"] # [doc = \" once, at [`TouchPhase::Started`], occlusion-aware; all subsequent events\"] # [doc = \" for the same [`TouchId`] are delivered to the elements under the starting\"] # [doc = \" position, even after the touch moves outside them.\"] # [derive (Clone, Debug, Default)] pub struct TouchEvent { # [doc = \" Which touch this event belongs to.\"] pub id : TouchId, # [doc = \" The phase of the touch.\"] pub phase : TouchPhase, # [doc = \" The position of the touch in window coordinates.\"] pub position : Point<Pixels>, # [doc = \" Normalized touch force in `0.0..=1.0`, if the hardware reports it.\"] pub force : Option<f32>, }",
+      "documentation": "A raw touch event from the platform.\n\nThe core recognizer classifies one touch stream at a time. Tap and pan\nrouting remain anchored to the starting position; additional concurrent\ntouches are ignored until the active stream resolves.",
+      "signature": "# [doc = \" A raw touch event from the platform.\"] # [doc = \"\"] # [doc = \" The core recognizer classifies one touch stream at a time. Tap and pan\"] # [doc = \" routing remain anchored to the starting position; additional concurrent\"] # [doc = \" touches are ignored until the active stream resolves.\"] # [derive (Clone, Debug, Default)] pub struct TouchEvent { # [doc = \" Which touch this event belongs to.\"] pub id : TouchId, # [doc = \" The phase of the touch.\"] pub phase : TouchPhase, # [doc = \" The position of the touch in window coordinates.\"] pub position : Point<Pixels>, # [doc = \" Where the platform predicts the touch will be roughly one frame from\"] # [doc = \" now, in the same coordinate space as `position`, when the platform\"] # [doc = \" offers a prediction for a [`TouchPhase::Moved`] event.\"] # [doc = \"\"] # [doc = \" Best-effort latency compensation only: it may influence how far a\"] # [doc = \" recognized pan scrolls within a frame, but never hit testing, gesture\"] # [doc = \" classification, or velocity estimation. Later events reconcile any\"] # [doc = \" prediction error.\"] pub predicted_position : Option<Point<Pixels>>, # [doc = \" Normalized touch force in `0.0..=1.0`, if the hardware reports it.\"] pub force : Option<f32>, }",
       "cfg": []
     },
     {
@@ -35983,7 +36056,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Holds the state for a specific window.",
       "documentation": "Holds the state for a specific window.",
-      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
+      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
       "cfg": []
     },
     {
@@ -36148,6 +36221,21 @@
       "summary": "The current state of the keyboard's capslock",
       "documentation": "The current state of the keyboard's capslock",
       "signature": "pub fn capslock (& self) -> Capslock",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::capture_long_press",
+      "name": "capture_long_press",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Captures the current long press for the given entity.",
+      "documentation": "Captures the current long press for the given entity.\n\nThe capture is released when the gesture ends or is cancelled, or when\na replacement touch begins. A listener must also call\n[`Self::prevent_default`] on the started event to claim the gesture.",
+      "signature": "pub fn capture_long_press<T : 'static> (& mut self, entity : & Entity<T>)",
       "cfg": [],
       "target": "Window"
     },
@@ -36736,6 +36824,21 @@
       "cfg": [
         "cfg (any (test, feature = \"test-support\"))"
       ],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::has_long_press_capture",
+      "name": "has_long_press_capture",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Returns whether the given entity has captured the current long press.",
+      "documentation": "Returns whether the given entity has captured the current long press.",
+      "signature": "pub fn has_long_press_capture<T : 'static> (& self, entity : & Entity<T>) -> bool",
+      "cfg": [],
       "target": "Window"
     },
     {
@@ -38390,6 +38493,21 @@
       "target": "Window"
     },
     {
+      "id": "gpui::window::Window::set_touch_prediction_enabled",
+      "name": "set_touch_prediction_enabled",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Sets whether recognized touch pans may use the platform's predicted touch positions. Disabling drops [`TouchEvent::predicted_position`] before gesture recognition, so pans track only raw touch positions.",
+      "documentation": "Sets whether recognized touch pans may use the platform's predicted\ntouch positions. Disabling drops [`TouchEvent::predicted_position`]\nbefore gesture recognition, so pans track only raw touch positions.",
+      "signature": "pub fn set_touch_prediction_enabled (& mut self, enabled : bool)",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
       "id": "gpui::window::Window::set_traffic_light_position",
       "name": "set_traffic_light_position",
       "kind": "method",
@@ -38769,6 +38887,21 @@
       "summary": "Shows or hides the window tab overview. This is macOS specific.",
       "documentation": "Shows or hides the window tab overview.\nThis is macOS specific.",
       "signature": "pub fn toggle_window_tab_overview (& self)",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::touch_prediction_enabled",
+      "name": "touch_prediction_enabled",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Whether recognized touch pans may use the platform's predicted touch positions ([`TouchEvent::predicted_position`]) to compensate for input latency. Defaults to true.",
+      "documentation": "Whether recognized touch pans may use the platform's predicted touch\npositions ([`TouchEvent::predicted_position`]) to compensate for input\nlatency. Defaults to true.",
+      "signature": "pub fn touch_prediction_enabled (& self) -> bool",
       "cfg": [],
       "target": "Window"
     },
@@ -143095,6 +143228,15 @@
     },
     "framework_context_menu": {
       "contract": "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
+    },
+    "framework_gestures": {
+      "limitations": [
+        "no portable pinch recognizer",
+        "no multi-touch arena",
+        "no native iOS or Android touch producer"
+      ],
+      "portable_touch": "One raw touch stream resolves to synthesized tap presses, an axis-locked phased scroll with optional prediction and catchable fling momentum, or an element-claimed phased touch drag or long press. Additional concurrent contacts are ignored.",
+      "scroll_physics": "PlatformGestures selects exponential or Android friction-spline deceleration without replacing the source-compatible GestureTuning::momentum_decay_per_ms field."
     },
     "framework_layout": {
       "measured_reveal": "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."

@@ -1,6 +1,7 @@
 use crate::{
-    Bounds, Capslock, Context, Empty, ImageFormat, IntoElement, Keystroke, Modifiers, Pixels,
-    Point, Render, Result, SharedString, Window, point, seal::Sealed,
+    Bounds, Capslock, Context, Empty, ImageFormat, IntoElement, Keystroke, LongPressEvent,
+    Modifiers, Pixels, Point, Render, Result, SharedString, TouchDragEvent, Window, point,
+    seal::Sealed,
 };
 use futures::{FutureExt as _, future::LocalBoxFuture};
 use smallvec::SmallVec;
@@ -111,11 +112,9 @@ pub struct TouchId(pub u64);
 
 /// A raw touch event from the platform.
 ///
-///
-/// Dispatch contract (core implementation pending): a touch is hit-tested
-/// once, at [`TouchPhase::Started`], occlusion-aware; all subsequent events
-/// for the same [`TouchId`] are delivered to the elements under the starting
-/// position, even after the touch moves outside them.
+/// The core recognizer classifies one touch stream at a time. Tap and pan
+/// routing remain anchored to the starting position; additional concurrent
+/// touches are ignored until the active stream resolves.
 #[derive(Clone, Debug, Default)]
 pub struct TouchEvent {
     /// Which touch this event belongs to.
@@ -124,6 +123,15 @@ pub struct TouchEvent {
     pub phase: TouchPhase,
     /// The position of the touch in window coordinates.
     pub position: Point<Pixels>,
+    /// Where the platform predicts the touch will be roughly one frame from
+    /// now, in the same coordinate space as `position`, when the platform
+    /// offers a prediction for a [`TouchPhase::Moved`] event.
+    ///
+    /// Best-effort latency compensation only: it may influence how far a
+    /// recognized pan scrolls within a frame, but never hit testing, gesture
+    /// classification, or velocity estimation. Later events reconcile any
+    /// prediction error.
+    pub predicted_position: Option<Point<Pixels>>,
     /// Normalized touch force in `0.0..=1.0`, if the hardware reports it.
     pub force: Option<f32>,
 }
@@ -999,6 +1007,10 @@ pub enum PlatformInput {
     ScrollWheel(ScrollWheelEvent),
     /// A pinch gesture was performed.
     Pinch(PinchEvent),
+    /// A long-press gesture recognized from touch input.
+    LongPress(LongPressEvent),
+    /// A direct touch drag claimed by an element.
+    TouchDrag(TouchDragEvent),
     /// Files were dragged and dropped onto the window.
     FileDrop(FileDropEvent),
     /// Non-path native data was dragged and dropped onto the window.
@@ -1020,6 +1032,8 @@ impl PlatformInput {
             PlatformInput::MouseExited(event) => Some(event),
             PlatformInput::ScrollWheel(event) => Some(event),
             PlatformInput::Pinch(event) => Some(event),
+            PlatformInput::LongPress(event) => Some(event),
+            PlatformInput::TouchDrag(event) => Some(event),
             PlatformInput::FileDrop(event) => Some(event),
             PlatformInput::ExternalDrop(event) => Some(event),
             PlatformInput::Touch(_) => None,
@@ -1038,9 +1052,33 @@ impl PlatformInput {
             PlatformInput::MouseExited(_) => None,
             PlatformInput::ScrollWheel(_) => None,
             PlatformInput::Pinch(_) => None,
+            PlatformInput::LongPress(_) => None,
+            PlatformInput::TouchDrag(_) => None,
             PlatformInput::FileDrop(_) => None,
             PlatformInput::ExternalDrop(_) => None,
             PlatformInput::Touch(_) => None,
+        }
+    }
+
+    /// A short static name for this input's variant, for diagnostics and
+    /// telemetry.
+    pub fn kind_name(&self) -> &'static str {
+        match self {
+            PlatformInput::KeyDown(_) => "key_down",
+            PlatformInput::KeyUp(_) => "key_up",
+            PlatformInput::ModifiersChanged(_) => "modifiers_changed",
+            PlatformInput::MouseDown(_) => "mouse_down",
+            PlatformInput::MouseUp(_) => "mouse_up",
+            PlatformInput::MousePressure(_) => "mouse_pressure",
+            PlatformInput::MouseMove(_) => "mouse_move",
+            PlatformInput::MouseExited(_) => "mouse_exited",
+            PlatformInput::ScrollWheel(_) => "scroll_wheel",
+            PlatformInput::Pinch(_) => "pinch",
+            PlatformInput::LongPress(_) => "long_press",
+            PlatformInput::TouchDrag(_) => "touch_drag",
+            PlatformInput::FileDrop(_) => "file_drop",
+            PlatformInput::ExternalDrop(_) => "external_drop",
+            PlatformInput::Touch(_) => "touch",
         }
     }
 

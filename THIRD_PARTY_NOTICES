@@ -353,7 +353,7 @@ root overlay, icon pipeline, source file, or Cargo dependency is included; see
 PROVENANCE.md P17.
 License text: LICENSE-APACHE
 
-gpui-pre 0.3.2 spring primitive (reviewed through Longbridge GPUI Kit 0.6)
+gpui-pre 0.3.2 spring and gesture primitives (Longbridge GPUI Kit 0.6 audit)
 --------------------------------------------------------------------------------
 Package: https://crates.io/crates/gpui-pre/0.3.2
 Package checksum: c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad
@@ -362,7 +362,14 @@ Longbridge release revision: 94a313a72a2513aee2780240cd322d552b2395f0
 License: Apache-2.0
 Copyright 2022–2025 Zed Industries, Inc.
 Scope: adapted closed-form spring solver, interpolation and target projection,
-playback builder, sampled easing, and stateful element animation lifecycle.
+playback builder, sampled easing, stateful element animation lifecycle, and the
+portable single-touch recognizer/window dispatch for tap, pan, fling,
+touch-drag, and long press.
+Nested source: Android Open Source Project `OverScroller.SplineOverScroller`,
+https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/widget/OverScroller.java
+License: Apache-2.0
+Copyright 2006 The Android Open Source Project
+Scope: friction-spline fling math transcribed by the identified package source.
 GPUI Box retains its sole local framework/package authority and includes no
 gpui-pre, Longbridge, Zed Git dependency, or Cargo patch; see PROVENANCE.md P18.
 License text: licenses/ZED-APACHE-2.0.txt
