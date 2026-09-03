@@ -463,45 +463,36 @@ impl RenderOnce for Button {
             }
         }
 
-        let mut button = frame(
-            &theme,
-            self.variant,
-            unified,
-            metrics,
-            self.disabled,
-            self.loading,
-            self.ground,
-            direction,
-        )
-        .group(hover_group)
-        .when(self.icon_only, |element| {
-            element.w(px(metrics.height)).px(px(0.0))
-        })
-        .map(|element| joined(element, self.join, direction))
-        .when(self.selected && !self.disabled, |element| {
-            element.bg(selected_fill_for(&theme, unified))
-        })
-        .id(self.ident.element_id())
-        .when_some(self.focus_handle.clone(), |element, handle| {
-            element.track_focus(&handle)
-        })
-        .role(gpui::Role::Button)
-        .when(self.full_width, |element| element.w_full())
-        .when(actionable, |element| {
-            element
-                .cursor_pointer()
-                .tab_index(0)
-                // Against the page, not against the button's own fill. The
-                // halo is cast outside the button, so the fill is the one
-                // surface it never lands on — and a primary button's fill is
-                // the accent, which is the focus colour, so asking for a pole
-                // readable on it returned near-black on a dark theme and pure
-                // white on a light one. Both were drawn onto a dialog of very
-                // nearly that colour and could not be seen at all.
-                .focus_ring(&theme)
-                .pressable(cx)
-        })
-        .children(content);
+        let mut button = frame(&theme, &self, unified, metrics, direction)
+            .group(hover_group)
+            .when(self.icon_only, |element| {
+                element.w(px(metrics.height)).px(px(0.0))
+            })
+            .map(|element| joined(element, self.join, direction))
+            .when(self.selected && !self.disabled, |element| {
+                element.bg(selected_fill_for(&theme, unified))
+            })
+            .id(self.ident.element_id())
+            .when_some(self.focus_handle.clone(), |element, handle| {
+                element.track_focus(&handle)
+            })
+            .role(gpui::Role::Button)
+            .when(self.full_width, |element| element.w_full())
+            .when(actionable, |element| {
+                element
+                    .cursor_pointer()
+                    .tab_index(0)
+                    // Against the page, not against the button's own fill. The
+                    // halo is cast outside the button, so the fill is the one
+                    // surface it never lands on — and a primary button's fill is
+                    // the accent, which is the focus colour, so asking for a pole
+                    // readable on it returned near-black on a dark theme and pure
+                    // white on a light one. Both were drawn onto a dialog of very
+                    // nearly that colour and could not be seen at all.
+                    .focus_ring(&theme)
+                    .pressable(cx)
+            })
+            .children(content);
 
         if let (true, Some(handler)) = (actionable, self.on_click.clone()) {
             let on_click = Rc::clone(&handler);
@@ -614,12 +605,9 @@ fn token_color(paint: Hsla) -> Color {
 
 fn frame(
     theme: &Theme,
-    variant: ButtonVariant,
+    button: &Button,
     unified: Option<(Variant, VariantColors)>,
     metrics: ControlMetrics,
-    disabled: bool,
-    loading: bool,
-    ground: Surface,
     direction: LayoutDirection,
 ) -> Div {
     // Leading and trailing are named for reading order, not for the screen,
@@ -635,14 +623,16 @@ fn frame(
         .radius(theme, Radius::Control)
         // No variant carries an outline any more, so none of them needs a
         // transparent one to keep the run of heights even.
-        .when(disabled, |element| element.opacity(theme.opacity.disabled));
+        .when(button.disabled, |element| {
+            element.opacity(theme.opacity.disabled)
+        });
 
     // A refused action gives up its variant's fill entirely. Dimming a
     // primary button leaves a pale slab that still out-shouts every action
     // that can actually be taken, and it leaves refused and in-flight — two
     // different answers — drawn as the same chip.
-    if disabled {
-        let neutral = neutral_colors_on(theme, ground).background;
+    if button.disabled {
+        let neutral = neutral_colors_on(theme, button.ground).background;
         if let Some((tier, _)) = unified {
             // Same rule as the weights: a surfaceless tier stays bare, and a
             // tier that had a surface trades it for the neutral one.
@@ -651,14 +641,14 @@ fn frame(
                 _ => base.bg(neutral),
             };
         }
-        return match variant {
+        return match button.variant {
             ButtonVariant::Ghost => base,
             ButtonVariant::Link => base.px(px(0.0)),
             _ => base.bg(neutral),
         };
     }
 
-    let inert = loading;
+    let inert = button.loading;
     if let Some((tier, resolved)) = unified {
         return base
             .bg(resolved.background)
@@ -666,7 +656,7 @@ fn frame(
                 element.hover(move |style| style.bg(resolved.background_hover))
             });
     }
-    match variant {
+    match button.variant {
         ButtonVariant::Primary => base.bg(theme.colors.primary_fill).when(!inert, |element| {
             element.hover(|style| style.opacity(theme.effects.primary_hover_opacity))
         }),
@@ -675,7 +665,7 @@ fn frame(
         // the outline it used to carry made it the most drawn-around thing on
         // the page and put a box beside every primary button.
         ButtonVariant::Secondary => {
-            let neutral = neutral_colors_on(theme, ground);
+            let neutral = neutral_colors_on(theme, button.ground);
             base.bg(neutral.background).when(!inert, |element| {
                 element.hover(move |style| style.bg(neutral.background_hover))
             })
