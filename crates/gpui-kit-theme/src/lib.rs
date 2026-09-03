@@ -1099,6 +1099,17 @@ impl Theme {
         self.color_wash(self.semantic_color(color), strength)
     }
 
+    /// A wash resolved against the surface it is tinting, as one opaque fill.
+    ///
+    /// A wash is translucent by construction, so painting one *as* a surface
+    /// leaves a hole rather than a tint: the page reads through it, and so
+    /// does the drop shadow an elevated surface casts under its own footprint.
+    /// A surface that means to lean towards a colour asks for this, and gets a
+    /// single fill it can still be read against.
+    pub fn washed_surface(&self, surface: Surface, wash: Hsla) -> Hsla {
+        self.surface(surface).blend(wash)
+    }
+
     /// A caller-owned colour used as a background without becoming a solid
     /// fill. The strength remains theme-owned even when the hue is not.
     pub fn color_wash(&self, color: Hsla, strength: SemanticWash) -> Hsla {
@@ -2072,6 +2083,49 @@ mod tests {
                 assert_eq!(shadows.len(), 2, "{level:?}");
                 assert!(shadows[0].blur_radius < shadows[1].blur_radius);
                 assert!(shadows[0].offset.y < shadows[1].offset.y);
+            }
+        }
+    }
+
+    /// A tinted panel is still a panel, in every theme that ships one.
+    ///
+    /// The failure of this invariant is invisible in a dark appearance and
+    /// ruinous in a light one: a panel painted with the wash alone shows its
+    /// own raised shadow through itself, so the light themes are the ones that
+    /// prove the composite happened.
+    #[test]
+    fn a_washed_surface_stays_an_opaque_ground() {
+        for tokens in presets() {
+            let theme = Theme::from_tokens(tokens, Density::default());
+            for color in [
+                SemanticColor::Danger,
+                SemanticColor::Warning,
+                SemanticColor::Success,
+                SemanticColor::Info,
+            ] {
+                for strength in [
+                    SemanticWash::Faint,
+                    SemanticWash::Standard,
+                    SemanticWash::Strong,
+                ] {
+                    let wash = theme.semantic_wash(color, strength);
+                    let washed = theme.washed_surface(Surface::Panel, wash);
+                    assert!(wash.a < 1.0, "{} {color:?} {strength:?}", tokens.meta.id);
+                    assert_eq!(washed.a, 1.0, "{} {color:?} {strength:?}", tokens.meta.id);
+                    assert_ne!(
+                        washed,
+                        theme.surface(Surface::Panel),
+                        "{} {color:?} {strength:?}",
+                        tokens.meta.id
+                    );
+                    // The sentence inside a tinted panel is the reason the
+                    // panel exists, so the tint may not cost it its reading.
+                    assert!(
+                        theme.contrast(theme.colors.text, washed) >= 4.5,
+                        "{} {color:?} {strength:?}",
+                        tokens.meta.id
+                    );
+                }
             }
         }
     }

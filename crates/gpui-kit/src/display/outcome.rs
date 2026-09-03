@@ -131,8 +131,12 @@ impl RenderOnce for OutcomePanel {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
-            .bg(theme.color_wash(color, SemanticWash::Faint))
+            .frame_washed(
+                &theme,
+                Surface::Panel,
+                Elevation::Raised,
+                theme.color_wash(color, SemanticWash::Faint),
+            )
             .child(
                 div()
                     .row()

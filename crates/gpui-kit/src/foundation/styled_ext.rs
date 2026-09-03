@@ -182,6 +182,29 @@ pub trait StyledExt: Styled + Sized {
         self.surface(theme, surface).elevation(theme, level)
     }
 
+    /// The same shell, leaning towards a colour that means something.
+    ///
+    /// A wash is translucent by construction, so laying one over a surface
+    /// replaces that surface rather than tinting it, and what is left is a
+    /// panel with a hole in it. Through the hole reads the page — and the
+    /// element's own drop shadow, which an elevated surface casts under its
+    /// own footprint. On a dark ground the shadow is black over near-black and
+    /// nobody sees the hole; on a light one it fills the card with grey and
+    /// takes the contrast of everything written inside with it.
+    ///
+    /// Compositing the wash onto the surface first keeps one opaque fill,
+    /// which is what a caller asking for a panel that leans danger meant.
+    fn frame_washed(
+        self,
+        theme: &Theme,
+        surface: Surface,
+        level: Elevation,
+        wash: gpui::Hsla,
+    ) -> Self {
+        self.bg(theme.washed_surface(surface, wash))
+            .elevation(theme, level)
+    }
+
     /// The recess an editable value sits in.
     ///
     /// A field is a well rather than an outlined box, so the resting state of

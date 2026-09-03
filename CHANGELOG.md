@@ -29,6 +29,19 @@ including on rotated and scaled sprites, whose ramp is measured through their
 transform rather than assumed to be one pixel. Monochrome sprites, glyphs,
 SVGs, shadows and quads never used that derivative and are untouched.
 
+**A panel that leans towards danger is still a panel.** `FailurePanel` and
+`OutcomePanel` painted their surface and then painted a semantic wash over it,
+and a wash is translucent by construction — so the second fill replaced the
+first instead of tinting it, leaving a card that was 94% transparent. Through
+the hole read the page and the panel's own `Elevation::Raised` shadow, which
+an elevated surface casts under its own footprint. In a dark appearance that
+shadow is black over near-black and nobody noticed; in a light one a failure
+card measured `#CFC5C9`, a muddy grey-mauve, where the intent was a faint
+danger tint, and the muted detail line inside it lost most of its contrast.
+The wash is now composited onto the surface into one opaque fill: the same
+card now measures `#F3E9EC`. Rust API additions: `Theme::washed_surface` and
+`StyledExt::frame_washed`.
+
 ### Added
 
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs

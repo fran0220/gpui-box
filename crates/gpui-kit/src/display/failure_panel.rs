@@ -212,8 +212,12 @@ impl RenderOnce for FailurePanel {
             // subject is the sentence, not the colour.
             .overflow_hidden()
             .relative()
-            .frame(&theme, Surface::Panel, Elevation::Raised)
-            .bg(theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint))
+            .frame_washed(
+                &theme,
+                Surface::Panel,
+                Elevation::Raised,
+                theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint),
+            )
             .child(
                 div()
                     .row()
