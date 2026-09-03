@@ -64,6 +64,11 @@ frame_submission = "FrameTiming retains each draw; FrameSubmissionTiming pairs t
 meaning = "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
 excluded = ["upstream profiler journal", "hang report integration", "debug frame overlay", "compositor presentation callbacks"]
 
+[kit_dock_tree]
+ownership = "DockTopology and its stable ids remain caller-owned; DockTree projects them through SplitTree, Tabs, and the shared drag system and emits selection, collapse, resize, move, and split intents without applying them."
+invariants = ["load/dump/load fixpoint", "empty stacks persist", "malformed records reject", "selection and collapse preserve unrelated ratios", "resize reports only the dragged split", "one completed drop emits one move intent", "ratios are dimensionless across container sizes"]
+excluded = ["upstream retained PaneTree reducer", "panel entity registry", "DockArea reconciliation cache", "product persistence transport"]
+
 [framework_paint]
 sprite_corner_coverage = "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
 edge_fade = "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading."

@@ -593,11 +593,16 @@ hooks, or source files, and adds no dependency.
   `gpui-pre/src/elements/animation.rs`, `gpui-pre/src/gestures.rs`,
   `gpui-pre/src/interactive.rs`, `gpui-pre/src/profiler.rs`, and
   `gpui-pre/src/window.rs`
+- Behavioral-review locations: Longbridge release
+  `crates/base/src/dock/layout`, `crates/base/src/dock/dock_area.rs`,
+  `crates/base/src/dock/drag.rs`, `crates/base/src/dock/tab_group.rs`, and
+  `crates/base/src/dock/state_convert.rs`
 - Destinations: `crates/gpui/src/spring.rs`,
   `crates/gpui/src/elements/animation.rs`, and
   `crates/gpui-kit/src/motion/spring.rs`; `crates/gpui/src/gestures.rs`,
   `crates/gpui/src/interactive.rs`, `crates/gpui/src/profiler.rs`, and
-  `crates/gpui/src/window.rs`
+  `crates/gpui/src/window.rs`; behavioral contracts in
+  `crates/gpui-kit/tests/dock_tree.rs`
 
 The 0.6 release was audited as a capability delta, not installed as a package:
 its crates resolve through `gpui-pre`, which would create a second GPUI type
@@ -637,3 +642,12 @@ record, and guards draw-to-submit pairing across trace enable/disable
 transitions. Local APIs deliberately say “submission”: return from that call is
 not evidence of compositor or display presentation. The package's profiler
 journal, hang reporting, and debug frame overlay were not imported.
+
+The release's retained dock model was compared with GPUI Box's existing
+caller-owned `DockTopology` and `DockTree`. Upstream `PaneTree` mutations,
+normalization, panel entities and registry, and `DockArea` reconciliation cache
+solve a different ownership contract and were not imported. Box instead pins
+its controlled boundary with behavior tests for persistence fixpoints and empty
+stacks, malformed-record refusal, unrelated-ratio stability, split-local resize
+intents, one move intent per completed drop, and dimensionless ratios. No dock
+source from this release was copied or translated by this audit.

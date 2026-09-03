@@ -129,6 +129,16 @@ they were. Every canvas that does not ask stays lit. Rust API addition:
 
 ### Changed
 
+**Dock remains caller-owned after the GPUI Kit 0.6 convergence audit.** The
+upstream retained `PaneTree` reducer, panel entities, registry, and `DockArea`
+reconciliation cache are not layered beside Box's controlled `DockTopology`.
+The existing `DockTree` boundary is now explicitly pinned by behavior tests:
+persistence reaches a fixpoint and retains empty stacks, malformed records are
+refused, unrelated ratios survive selection and collapse, a nested resize names
+only its split, one completed drop emits one move intent, and ratios remain
+dimensionless across container sizes. The host still applies and normalizes
+structural changes.
+
 **Scroll-edge fades no longer erase tall painted primitives.** Solid filled
 paths now receive the same per-pixel band gradient as solid quads, normalized
 to the clipped bounds their shaders consume. Shadows, SVGs, images, and sprite

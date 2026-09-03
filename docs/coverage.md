@@ -106,6 +106,18 @@ is one place where dragging a divider is implemented. Every dock stack header
 is a `Tabs` strip for the same reason: dragging a panel is the drag system, not
 a second one.
 
+The Longbridge GPUI Kit 0.6 dock was reviewed here rather than copied. Its
+`PaneTree`, normalization reducer, panel entities, registry, and reconciliation
+cache solve ownership inside a retained `DockArea`; importing them would create
+a second layout authority and make an action mutate state the Box contract says
+the caller owns. `DockTree` therefore keeps its controlled record-and-intent
+boundary. Its tests pin the corresponding invariants: load/dump/load reaches a
+fixpoint while empty stacks persist, every malformed record shape is refused,
+selection and collapse do not move unrelated ratios, a nested divider names
+only its own split, one completed drop emits one move intent, and ratios remain
+dimensionless when the container changes size. The host still applies and
+normalizes accepted structural changes.
+
 ## Table or DataGrid
 
 Both are covered and neither replaces the other. `Table` takes materialized

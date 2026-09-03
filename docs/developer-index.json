@@ -143376,6 +143376,24 @@
       "frame_submission": "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames.",
       "meaning": "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
     },
+    "kit_dock_tree": {
+      "excluded": [
+        "upstream retained PaneTree reducer",
+        "panel entity registry",
+        "DockArea reconciliation cache",
+        "product persistence transport"
+      ],
+      "invariants": [
+        "load/dump/load fixpoint",
+        "empty stacks persist",
+        "malformed records reject",
+        "selection and collapse preserve unrelated ratios",
+        "resize reports only the dragged split",
+        "one completed drop emits one move intent",
+        "ratios are dimensionless across container sizes"
+      ],
+      "ownership": "DockTopology and its stable ids remain caller-owned; DockTree projects them through SplitTree, Tabs, and the shared drag system and emits selection, collapse, resize, move, and split intents without applying them."
+    },
     "platform": [
       {
         "ci_commands": [
