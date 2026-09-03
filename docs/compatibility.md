@@ -84,6 +84,16 @@ prepainted or published. `Reveal` owns no timer, easing, or component policy.
 Kit's Accordion and Collapsible resolve semantic `Resize` motion and pass only
 the resulting progress into this framework primitive.
 
+Stateful springs also have one framework authority. `SpringConfig` analytically
+advances position and velocity for fixed and steadily moving targets, and
+`AnimationExt::with_spring` keeps that state under a stable element id so a
+retarget does not restart from rest. A first mount starts at the target unless
+the builder supplies `from`; pause retains velocity, stop discards it, complete
+lands at the target, cancel returns to the initial value, and reduced motion
+lands immediately. Finite eased values may exceed 0–1, so an underdamped
+spring's overshoot is preserved. Kit retains the token, semantic-role, visual
+settle, transition, presence, and FLIP policy above this scalar primitive.
+
 Application-provided native context menus use the framework's existing
 `Menu`/`MenuItem` action tree rather than a platform-specific component model.
 macOS maps it to `NSMenu`; Windows maps it to `HMENU` and

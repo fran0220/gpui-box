@@ -126,10 +126,11 @@ impl MotionSpec {
 
     /// Adapts the specification to GPUI's animation driver.
     ///
-    /// GPUI requires an eased delta inside 0..1, so an overshooting curve or
-    /// an underdamped spring is clamped here. Overshoot survives in
-    /// [`Transition`](super::Transition) and [`Presence`](super::Presence),
-    /// which sample [`MotionSpec::progress`] directly.
+    /// GPUI accepts finite values outside 0..1, but the existing Kit helpers
+    /// use this fraction for properties such as opacity, so this compatibility
+    /// adapter remains clamped. Overshoot survives in
+    /// [`Transition`](super::Transition), [`Presence`](super::Presence), and
+    /// GPUI's stateful `with_spring` path.
     pub fn animation(self) -> Animation {
         Animation::new(self.total()).with_easing(move |delta| self.progress(delta).clamp(0.0, 1.0))
     }

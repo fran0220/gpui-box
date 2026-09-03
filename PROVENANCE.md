@@ -580,3 +580,29 @@ focus context, reports native completion to Kit, and reuses Kit's existing
 accessible `ContextMenu` as the fallback. It does not include the upstream
 component-native menu model, root overlay, icon loading/rasterization, theme
 hooks, or source files, and adds no dependency.
+
+## P18: Longbridge GPUI Kit 0.6 convergence reference and framework source port
+
+- Release reviewed: <https://github.com/longbridge/gpui-kit/releases/tag/v0.6.0>
+- Release revision: `94a313a72a2513aee2780240cd322d552b2395f0`
+- Framework package: `gpui-pre` 0.3.2
+- Package checksum: `c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad`
+- Package source revision: `zed@801c087af22dd189dc1aa49e2f370b4f04190b19`
+- License: Apache-2.0
+- Source locations: `gpui-pre/src/spring.rs` and
+  `gpui-pre/src/elements/animation.rs`
+- Destinations: `crates/gpui/src/spring.rs`,
+  `crates/gpui/src/elements/animation.rs`, and
+  `crates/gpui-kit/src/motion/spring.rs`
+
+The 0.6 release was audited as a capability delta, not installed as a package:
+its crates resolve through `gpui-pre`, which would create a second GPUI type
+universe beside `gpui-box`. The Apache-2.0 spring solver, target projection,
+interpolation types, playback builder, sampled easing, and element animation
+lifecycle were therefore adapted into GPUI Box's existing framework authority.
+Local changes retain reduced-motion behavior, use the repository's scheduler,
+and add coverage for every damping regime, retargeted velocity, playback
+states, and finite overshoot. Kit's existing token/perceptual `Spring`, visual
+settling policy, transitions, presence, and FLIP remain its policy layer but
+delegate scalar evolution to the framework solver. No `gpui-pre`, Longbridge,
+Zed Git source, or Cargo patch was added.

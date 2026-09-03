@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use gpui::Animation;
+use gpui::{Animation, SpringConfig, SpringState};
 use gpui_kit_theme::{SpringPreset, SpringTokens, Theme};
 
 /// The fraction of the remaining distance treated as arrived.
@@ -85,14 +85,18 @@ impl Spring {
         Self::from(theme.spring(preset))
     }
 
+    fn config(self) -> SpringConfig {
+        SpringConfig::new(self.stiffness, self.damping, self.mass)
+    }
+
     /// Undamped angular frequency.
     fn omega(self) -> f32 {
-        (self.stiffness / self.mass).sqrt()
+        self.config().canonical().0
     }
 
     /// Damping ratio: below one oscillates, one settles fastest, above one crawls.
     pub fn damping_ratio(self) -> f32 {
-        self.damping / (2.0 * (self.stiffness * self.mass).sqrt())
+        self.config().canonical().1
     }
 
     /// The duration half of [`Spring::perceptual`], for a spring built any
@@ -128,47 +132,15 @@ impl Spring {
     /// value and its own velocity, so a caller that retargets again can hand
     /// the motion on rather than restarting it.
     pub fn value_at(self, elapsed: Duration, velocity: f32) -> (f32, f32) {
-        // Distance still to travel starts at the whole of it, and closing that
-        // distance is what a positive carried velocity does.
-        let (error, error_rate) = self.error(elapsed, 1.0, -velocity);
-        (1.0 - error, -error_rate)
-    }
-
-    /// The remaining distance and its rate of change at `elapsed`, for a
-    /// spring released with error `initial` changing at `initial_rate`.
-    fn error(self, elapsed: Duration, initial: f32, initial_rate: f32) -> (f32, f32) {
-        let t = elapsed.as_secs_f32();
-        if t <= 0.0 {
-            return (initial, initial_rate);
-        }
-        let omega = self.omega();
-        let zeta = self.damping_ratio();
-        if zeta < 1.0 {
-            let damped = omega * (1.0 - zeta * zeta).sqrt();
-            let a = initial;
-            let b = (initial_rate + zeta * omega * initial) / damped;
-            let decay = (-zeta * omega * t).exp();
-            let (sin, cos) = (damped * t).sin_cos();
-            (
-                decay * (a * cos + b * sin),
-                decay
-                    * ((-zeta * omega * a + damped * b) * cos
-                        + (-zeta * omega * b - damped * a) * sin),
-            )
-        } else if (zeta - 1.0).abs() < f32::EPSILON {
-            let slope = initial_rate + omega * initial;
-            let decay = (-omega * t).exp();
-            let error = initial + slope * t;
-            (decay * error, decay * (slope - omega * error))
-        } else {
-            let root = omega * (zeta * zeta - 1.0).sqrt();
-            let first = -zeta * omega + root;
-            let second = -zeta * omega - root;
-            let c1 = (initial_rate - second * initial) / (first - second);
-            let c2 = initial - c1;
-            let (a, b) = (c1 * (first * t).exp(), c2 * (second * t).exp());
-            (a + b, a * first + b * second)
-        }
+        let state = self.config().step(
+            SpringState {
+                position: 0.0,
+                velocity,
+            },
+            1.0,
+            elapsed.as_secs_f32(),
+        );
+        (state.position, state.velocity)
     }
 
     /// How long until the spring stays within one part in a thousand of its target.

@@ -73,6 +73,18 @@ license = "MIT"
 license_text = "vendor/block/LICENSE"
 source_sha256 = "51e54353cee1cc853e567d140d35b4a74e27d5cbdbcbe68e979269f39209906a"
 
+[[derived_source]]
+name = "gpui-pre 0.3.2 spring primitive"
+url = "https://crates.io/crates/gpui-pre/0.3.2"
+revision = "801c087af22dd189dc1aa49e2f370b4f04190b19"
+release_reference = "https://github.com/longbridge/gpui-kit/releases/tag/v0.6.0"
+release_revision = "94a313a72a2513aee2780240cd322d552b2395f0"
+source_location = "src/spring.rs; src/elements/animation.rs"
+relationship = "copied-and-adapted-into-local-framework-authority"
+license = "Apache-2.0"
+license_text = "licenses/ZED-APACHE-2.0.txt"
+package_checksum_sha256 = "c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad"
+
 [[external_dependency]]
 name = "rasterlottie"
 version = "0.2.2"

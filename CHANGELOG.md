@@ -56,6 +56,20 @@ paints, and fades neither end when the list fits.
 
 ### Added
 
+**A spring is now a framework primitive, not a component-local equation.**
+GPUI gains `SpringConfig`, `SpringState`, `SpringTarget`, `AnimationPhase`,
+`Interpolate`, `SpringPlayback`, `SpringAnimation`, `sampled_easing`, and
+`AnimationExt::with_spring`. The closed-form solver handles under-, critical-,
+and over-damping, fixed and steadily moving targets, conservative settling,
+retargeted velocity, explicit initial values, pause/stop/complete/cancel, and
+reduced motion. Easing output must be finite but may exceed 0–1, so physical
+overshoot can drive GPUI's stateful spring path. Kit keeps its existing token
+presets, perceptual duration/bounce mapping, bounded `MotionSpec::animation`
+adapter, visual settle thresholds, transitions, presence, and FLIP, while
+delegating their scalar spring evolution to GPUI's one solver. The source port
+is from Apache-2.0 `gpui-pre` 0.3.2 as identified through the Longbridge GPUI
+Kit 0.6 audit; no second GPUI package or Git dependency enters the graph.
+
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs
 are Studios, branches, or environments was read by name alone, because the one
 language the library had for "which one is this" was the accent, and the accent

@@ -467,6 +467,17 @@ motion is within one part in a thousand of its target, capped at four seconds so
 an over-soft configuration cannot animate forever. `Spring::animation` adapts a
 spring to GPUI's `Animation`, so it can drive `with_animation` like any curve.
 
+The scalar solver is GPUI's `SpringConfig`: it advances a `SpringState` toward
+a fixed target with `step`, toward a steadily moving target with `step_ramp`,
+and can derive a conservative settle time without integrating frame by frame.
+`AnimationExt::with_spring` is the stateful element path. It keeps velocity
+across retargets under a stable element id and supports pause, stop, complete,
+cancel, an explicit initial value, and reduced motion. `SpringTarget` projects
+the scalar coordinate to pixels, rems, phases, booleans, or a caller-defined
+path. Kit's `Spring` remains the policy adapter for theme tokens, perceptual
+duration/bounce, visual thresholds, transitions, presence, and FLIP; its
+scalar values come from the same framework solver rather than a second copy.
+
 `Spring::value_at` is the same solution released with a velocity already
 carried into the motion, and returns the value with its own velocity so a
 caller that retargets can hand the motion on. `Spring::settle_time_at` is the
@@ -663,9 +674,11 @@ drives FLIP, the slider's follow, and anything else that has to feel attached
 to the pointer rather than trailing it. `spring.smooth` is what a dialog and a
 drawer arrive on, through `MotionSpec::sprung`, which takes its duration from
 `Spring::settle_time` so a sprung specification runs anywhere a curved one
-does. GPUI requires an eased delta inside `0..1`, so `MotionSpec::animation`
-clamps; overshoot survives in `Transition` and `Presence`, which sample
-`MotionSpec::progress` directly. `motion.pressOffsetPx` and `motion.hoverLiftPx` are the two
+does. GPUI accepts any finite eased value, and `with_spring`, `Transition`, and
+`Presence` preserve an underdamped spring's overshoot. `MotionSpec::animation`
+remains clamped because the established Kit helpers feed its fraction to
+bounded properties such as opacity. `motion.pressOffsetPx` and
+`motion.hoverLiftPx` are the two
 pointer responses, both validated to stay within a hairline so a response can
 never be mistaken for a layout change.
 

@@ -352,3 +352,17 @@ boundary and reuses its existing Kit menu. No upstream component menu model,
 root overlay, icon pipeline, source file, or Cargo dependency is included; see
 PROVENANCE.md P17.
 License text: LICENSE-APACHE
+
+gpui-pre 0.3.2 spring primitive (reviewed through Longbridge GPUI Kit 0.6)
+--------------------------------------------------------------------------------
+Package: https://crates.io/crates/gpui-pre/0.3.2
+Package checksum: c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad
+Source revision: https://github.com/zed-industries/zed/commit/801c087af22dd189dc1aa49e2f370b4f04190b19
+Longbridge release revision: 94a313a72a2513aee2780240cd322d552b2395f0
+License: Apache-2.0
+Copyright 2022–2025 Zed Industries, Inc.
+Scope: adapted closed-form spring solver, interpolation and target projection,
+playback builder, sampled easing, and stateful element animation lifecycle.
+GPUI Box retains its sole local framework/package authority and includes no
+gpui-pre, Longbridge, Zed Git dependency, or Cargo patch; see PROVENANCE.md P18.
+License text: licenses/ZED-APACHE-2.0.txt

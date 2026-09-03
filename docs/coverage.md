@@ -584,6 +584,12 @@ another, motion that is interrupted, composed or driven by a gesture, and
 springs described as a duration and a bounce. The remaining entries are
 renderer/framework boundaries, not missing catalog components.
 
+The spring itself is no longer one of those boundaries: GPUI owns analytic
+fixed- and moving-target evolution, velocity-preserving element retargeting,
+playback state, projected targets, and finite overshoot. Kit owns the theme and
+component policy above it. This is an invisible framework primitive and does
+not add a scene merely to increase catalog coverage.
+
 | Framework boundary | Why it matters |
 |---|---|
 | Shape in `flip` | `Flip::shape` interpolates radius, border width, border colour and background over the same spring that carries position and size, and `Shaping::shaped` applies the result, so a row becoming a card travels between the two forms. The caller states both forms and applies what comes back, because `Flipped` wraps an element it did not build and cannot reach the style inside it. What is still not interpolated is anything with no numeric path between the two forms — a shadow set, a gradient, or a change of element kind. |
