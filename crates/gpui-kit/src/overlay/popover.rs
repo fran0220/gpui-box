@@ -19,6 +19,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::foundation::{Ident, StyledExt, text};
+use crate::layout::ScrollFade;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::positioner::Positioner;
@@ -170,6 +171,56 @@ pub fn card(theme: &Theme) -> gpui::Div {
 /// edge to edge.
 pub fn card_flush(theme: &Theme) -> gpui::Div {
     card(theme).p_0()
+}
+
+/// How far a menu may sit from an end before it counts as away from it.
+///
+/// Measurement lands on fractions, and a list resting one hundredth of a pixel
+/// from zero must not fade an edge that hides nothing.
+const AT_END: f32 = 1.0;
+
+/// The scrolling body of a menu, faded at whichever edge is still hiding a row.
+///
+/// A menu is as tall as a measure token and holds as many rows as the query
+/// left it, and those two numbers do not divide. The row at the boundary is
+/// therefore sliced horizontally — descenders, cap height and shortcut chips
+/// cut at once — and where the card's rounded corner crosses it as well, the
+/// result reads as a rendering fault rather than as "there is more below".
+///
+/// Quantising the height cannot answer it. A heading and a row are different
+/// heights, density changes both, and which of them lands on the boundary
+/// changes with the query, so a height that divides for one result set slices
+/// the next.
+///
+/// So the boundary states what it is instead. This is the same fade
+/// [`ScrollArea`](crate::layout::ScrollArea) paints, and it is truthful the
+/// same way: an edge fades only while it is hiding something, and a list that
+/// fits fades at neither end. It publishes no node of its own, because the
+/// menu around it is the region a reader can already name.
+pub(crate) fn menu_body(
+    ident: &Ident,
+    scroll: &gpui::ScrollHandle,
+    body: impl IntoElement,
+) -> ScrollFade {
+    // Read as a distance from the start, because which sign means "scrolled
+    // onward" is a detail of the platform's scroll convention.
+    let (above, below) = hidden_ends(
+        f32::from(scroll.offset().y).abs(),
+        f32::from(scroll.max_offset().y).abs(),
+    );
+    ScrollFade::inside(ident.clone())
+        .top(above)
+        .bottom(below)
+        // The body is bounded by its own maximum height, so a fade sized to
+        // the card around it would paint over whatever sits below.
+        .fit_height()
+        .child(body)
+}
+
+/// Whether a menu that has travelled `travelled` of `total` still hides a row
+/// above it and below it.
+fn hidden_ends(travelled: f32, total: f32) -> (bool, bool) {
+    (travelled > AT_END, travelled < total - AT_END)
 }
 
 /// The viewport policy for a select-like popup whose trigger was measured on
@@ -819,6 +870,23 @@ pub fn tracked_upper(label: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A fade is a claim that a row is hidden, so a menu that hides nothing
+    /// makes it at neither end.
+    #[test]
+    fn a_menu_fades_only_the_end_that_is_hiding_a_row() {
+        assert_eq!(hidden_ends(0.0, 0.0), (false, false));
+        assert_eq!(hidden_ends(0.0, 240.0), (false, true));
+        assert_eq!(hidden_ends(120.0, 240.0), (true, true));
+        assert_eq!(hidden_ends(240.0, 240.0), (true, false));
+    }
+
+    /// Measurement lands on fractions, and a list at rest is at rest.
+    #[test]
+    fn a_menu_a_fraction_from_an_end_has_not_left_it() {
+        assert_eq!(hidden_ends(0.25, 240.0), (false, true));
+        assert_eq!(hidden_ends(239.75, 240.0), (true, false));
+    }
 
     #[test]
     fn navigation_wraps_and_handles_empty_lists() {

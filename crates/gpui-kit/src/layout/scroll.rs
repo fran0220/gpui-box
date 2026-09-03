@@ -527,7 +527,13 @@ pub fn scroll_to(ident: impl Into<Ident>, offset: Point<Pixels>, window: &Window
 }
 
 /// The scroll position of the region with this identity.
-fn scroll_handle(ident: &Ident, window: &Window, cx: &mut App) -> ScrollHandle {
+///
+/// The same handle [`scroll_offset`] and [`scroll_to`] address, for a
+/// component that has to hand it to the element it is about to build — a menu
+/// that scrolls, and so has an edge that may be hiding a row — without
+/// carrying a field for a region whose existence depends on what it was given
+/// to show.
+pub(crate) fn scroll_handle(ident: &Ident, window: &Window, cx: &mut App) -> ScrollHandle {
     window_state::with(
         window.window_handle().window_id(),
         cx,

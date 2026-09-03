@@ -556,7 +556,11 @@ impl Combobox {
             .w(px(geometry.width))
             .max_h(px(geometry.max_height))
             .id(menu_ident.element_id())
-            .child(viewport)
+            .child(popover::menu_body(
+                &self.ident.child("menu.fade"),
+                &self.scroll,
+                viewport,
+            ))
             .semantic_in(
                 cx,
                 NodeSpec::new(menu_ident.semantic_id(), Role::Menu)

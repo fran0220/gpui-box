@@ -535,7 +535,11 @@ impl Render for MultiSelect {
                 popover::card_flush(&theme)
                     .w(px(geometry.width))
                     .max_h(px(geometry.max_height))
-                    .child(list)
+                    .child(popover::menu_body(
+                        &self.ident.child("list.fade"),
+                        &self.scroll,
+                        list,
+                    ))
                     .into_any_element(),
             )
         });

@@ -483,7 +483,11 @@ impl Select {
             .w(px(geometry.width))
             .max_h(px(geometry.max_height))
             .id(self.ident.child("menu").element_id())
-            .child(viewport)
+            .child(popover::menu_body(
+                &self.ident.child("menu.fade"),
+                &self.scroll,
+                viewport,
+            ))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.child("menu").semantic_id(), Role::Menu),

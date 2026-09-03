@@ -256,6 +256,34 @@ width a conforming `fwidth` reports. Whoever next captures on macOS and Windows
 should review those six images against this entry rather than accepting them
 unseen.
 
+### An overflowing menu with no active baseline, 2026-09-03
+
+No catalog scene fills a menu past its own height. `command-palette`,
+`choice`, `multi-select`, `cascader`, and `mention-input` each stage a list
+that fits, which is why the boundary treatment every one of those menus lacked
+— a row sliced through its glyphs at the viewport edge, with the card's
+rounded corner cutting across the same row — was never in a reviewed picture.
+
+A temporary llvmpipe exhibit rendered a `CommandPalette` holding fifteen
+commands in three sections at the same 480-pixel width and `menuMaxHeight` the
+scene uses, in both Studio themes, before and after the fade. Before, the
+eighth row was cut horizontally through its cap height with its shortcut chips
+halved; after, that row fades out over the band and the boundary reads as
+"there is more below". The exhibit was then removed, because Linux's baseline
+set is retired and cannot author the active Metal and WARP images.
+
+Behavior coverage keeps the permanent invariant: `overlay::popover`'s edge
+decision fades an end only while it hides a row, fades neither end for a list
+that fits, and does not mistake a sub-pixel resting offset for travel.
+
+Two gaps stay open for whoever next captures on macOS and Windows. The first
+is the exhibit: a palette long enough to overflow belongs in the
+`command-palette` family so the boundary has a picture. The second is that
+`CommandPalette` still does not scroll its keyboard highlight into view the
+way `Select` and `Combobox` do, so arrowing past the fold moves a highlight
+nobody can see; the fade now says the rows are there, and the reveal is the
+separate change that lets the keyboard reach them.
+
 ### Edge-faded crossing surfaces with no active baseline, 2026-09-03
 
 A tall `SettingsSection` whose card crossed the bottom of a `ScrollArea` was

@@ -42,6 +42,18 @@ The wash is now composited onto the surface into one opaque fill: the same
 card now measures `#F3E9EC`. Rust API additions: `Theme::washed_surface` and
 `StyledExt::frame_washed`.
 
+**A menu stops at a row, not through one.** `CommandPalette`, `Select`,
+`Combobox`, `MultiSelect`, `Cascader` and `MentionInput` bounded their
+scrolling body with a height token and let the viewport clip whatever landed
+on the boundary. Because a menu holds as many rows as the query left it, that
+boundary normally fell inside a row: descenders, cap height and shortcut chips
+sliced at once, with the card's rounded corner cutting across the same row, and
+no fade or scrollbar to say why. A host could not tune its way out — heading
+and row heights differ, density changes both, and which one lands on the edge
+changes with the query. Each of those menus now fades the end that is still
+hiding a row, using the same `ScrollFade` an overflowing `ScrollArea` already
+paints, and fades neither end when the list fits.
+
 ### Added
 
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs

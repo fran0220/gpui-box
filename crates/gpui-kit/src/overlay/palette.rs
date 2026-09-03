@@ -19,6 +19,7 @@ use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, Pressable, StyledExt};
+use crate::layout::scroll::scroll_handle;
 use crate::motion;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::{OverlaySurface, surface};
@@ -456,15 +457,22 @@ impl Render for CommandPalette {
                 .into_any_element()
             })
         } else {
-            div()
-                .id(self.ident.child("results").element_id())
-                .flex()
-                .flex_col()
-                .max_h(px(theme.measures.menu_max_height))
-                .overflow_y_scroll()
-                .children(rows)
-                .semantic_in(cx, NodeSpec::new(results_id, Role::Menu))
-                .into_any_element()
+            let results_ident = self.ident.child("results");
+            let scroll = scroll_handle(&results_ident, window, cx);
+            popover::menu_body(
+                &results_ident.child("fade"),
+                &scroll,
+                div()
+                    .id(results_ident.element_id())
+                    .flex()
+                    .flex_col()
+                    .max_h(px(theme.measures.menu_max_height))
+                    .overflow_y_scroll()
+                    .track_scroll(&scroll)
+                    .children(rows)
+                    .semantic_in(cx, NodeSpec::new(results_id, Role::Menu)),
+            )
+            .into_any_element()
         };
 
         surface(&theme, OverlaySurface::MODAL)

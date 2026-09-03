@@ -479,7 +479,9 @@ impl MentionInput {
             .max_h(px(theme.measures.compact_menu_max_height))
             .id(menu_ident.element_id())
             .children(top)
-            .child(
+            .child(popover::menu_body(
+                &menu_ident.child("fade"),
+                &self.scroll,
                 div()
                     .p(px(theme.space(Space::Xs)))
                     .max_h(px(theme.measures.compact_menu_max_height))
@@ -488,7 +490,7 @@ impl MentionInput {
                     .track_scroll(&self.scroll)
                     .children(rows)
                     .children(state),
-            )
+            ))
             .children(bottom)
             .semantic_in(
                 cx,
