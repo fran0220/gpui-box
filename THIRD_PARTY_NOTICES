@@ -36,6 +36,9 @@ GPUI Box renderer work and likewise import no source.
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 for up to eight ordered stops, including their Metal, Direct3D, WGPU, and
 WebGL shaders, are GPUI Box work and import no additional source.
+The primitive-aware scroll-edge fade for filled paths, shadows, SVG masks,
+images, and sprite instances is GPUI Box work over those existing paint and
+shader contracts and imports no additional source, shader, or visual asset.
 The Metal monochrome-sprite contrast and gamma correction uses the same
 Microsoft Terminal / DirectWrite algorithm already present in the imported
 Direct3D and WGPU shaders; it is not a new third-party source drop.

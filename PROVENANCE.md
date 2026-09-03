@@ -80,6 +80,13 @@ shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader
 implementations were authored here; they import no additional framework or
 shader source.
 
+The primitive-aware scroll-edge fade correction is subsequent GPUI Box work.
+Solid filled paths reuse the existing renderer-backed gradient in the clipped
+bounds every path shader already reads; large shadows, SVG masks, images, and
+sprite instances sample uniform alpha at the center of their visible
+fade-region intersection. Small atomic primitives retain nearest-edge
+sampling. This correction imports no source, shader, or visual asset.
+
 The composited sprite-batch scene primitive, explicit atlas source rectangles,
 center-relative transforms, rounded/source-alpha masks, tint modes, and normal,
 additive, and screen pipeline states are subsequent GPUI Box work across Metal,

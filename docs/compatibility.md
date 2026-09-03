@@ -118,6 +118,15 @@ different transcendental approximations for the noise. Color conversion and
 edge rasterization remain renderer-specific, which is why each renderer
 retains its own baseline rather than claiming identical bytes across platforms.
 
+Scroll-edge fading uses those same painted bounds rather than treating every
+primitive as one atomic mark. Solid quads and filled paths crossing one active
+edge carry a per-pixel linear alpha ramp; a path's stops are normalized to the
+clipped bounds consumed by every path shader. Shadows, monochrome SVGs,
+polychrome images, and sprite instances expose uniform alpha, so primitives
+larger than the band sample at the center of the portion inside the fade
+region. Atomic primitives no larger than the band, including glyphs, retain
+nearest-edge fading so they disappear before clipping can slice them.
+
 Read-only `StyledText` selection is a framework primitive rather than a Kit
 gesture. A window-owned coordinator joins separately mounted participants in
 caller-declared reading order, while stable business keys keep a selection on

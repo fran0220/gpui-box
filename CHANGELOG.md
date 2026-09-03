@@ -33,6 +33,13 @@ they were. Every canvas that does not ask stays lit. Rust API addition:
 
 ### Changed
 
+**Scroll-edge fades no longer erase tall painted primitives.** Solid filled
+paths now receive the same per-pixel band gradient as solid quads, normalized
+to the clipped bounds their shaders consume. Shadows, SVGs, images, and sprite
+instances larger than the band sample opacity from their visible intersection
+with the fade region instead of their hidden far edge. Small atomic primitives
+and glyphs keep nearest-edge fading.
+
 **Colour is measured in a space that can see what the reader sees.** The
 contrast report asks whether a paint can be *seen*; nothing asked whether two
 paints can be told from *each other*, and neither the WCAG ratio nor CIE L\*

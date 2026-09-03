@@ -237,6 +237,25 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Edge-faded crossing surfaces with no active baseline, 2026-09-03
+
+A tall `SettingsSection` whose card crossed the bottom of a `ScrollArea` was
+rendered before and after the primitive-aware edge-fade correction in a
+temporary `scroll-fade` exhibit. Both Studio themes were inspected with Linux
+llvmpipe: before the correction the card shadow was absent while its visible
+rows remained; afterwards the shadow retained the card's visible grouping and
+the fill continued to fade over the band. The temporary exhibit was then
+removed because Linux's baseline set is retired and cannot author the active
+Metal and WARP images.
+
+Framework behavior coverage keeps the permanent invariant: a shadow and a
+filled path taller than the band remain non-transparent when they cross the
+region edge, the path carries a transparent-to-opaque shader gradient, and a
+primitive smaller than the band retains nearest-edge alpha. Whoever next
+captures on macOS and Windows should add the crossing `SettingsSection` state
+to the `scroll-fade` family and review both active renderer images rather than
+accepting either unseen.
+
 ### Three opt-in states with no active baseline, 2026-09-03
 
 An `InlineEdit` reading a long multi-line value, a `NodeGraph` that keeps its

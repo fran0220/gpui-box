@@ -4278,15 +4278,75 @@ impl Window {
         opacity * ramp
     }
 
-    /// Per-pixel [`EdgeFade`] for quads: a SOLID background on a quad that
-    /// crosses an active fade ramp is rewritten as a linear gradient whose
-    /// stops sit AT the band boundary in quad space (the shader clamps `t`
-    /// outside the stop range), so the piecewise ramp renders exactly and the
-    /// GPU interpolates per pixel — uniform per-primitive alpha visibly
-    /// popped/clipped on anything wider than the band (tab washes, row
-    /// selections). `None` = no rewrite applies; callers fall back to the
-    /// center-point alpha.
-    fn quad_fade_gradient(
+    /// The opacity for a primitive too large to treat as one atomic mark.
+    ///
+    /// Along an axis where the primitive is no larger than the fade band this
+    /// retains [`Self::element_opacity_for_bounds`]'s nearest-edge sampling.
+    /// Along an axis where it is larger, the ramp is sampled at the center of
+    /// the part inside the fade region. This keeps ordinary controls and
+    /// glyph-sized sprites fading before they are clipped while ensuring a
+    /// tall shadow or image is not erased merely because its far edge is
+    /// outside the region.
+    #[inline]
+    fn element_opacity_for_visible_bounds(&self, bounds: &Bounds<Pixels>) -> f32 {
+        let opacity = self.element_opacity();
+        let Some(fade) = &self.edge_fade else {
+            return opacity;
+        };
+        let visible_bounds = bounds.intersect(&fade.bounds);
+        if visible_bounds.is_empty() {
+            return self.element_opacity_for_bounds(bounds);
+        }
+
+        let band = fade.band.0.max(1.0);
+        let visible_center = visible_bounds.center();
+        let sample_x_at_center = bounds.size.width.0 > band;
+        let sample_y_at_center = bounds.size.height.0 > band;
+        let mut ramp: f32 = 1.0;
+        if fade.top {
+            let y = if sample_y_at_center {
+                visible_center.y.0
+            } else {
+                bounds.top().0
+            };
+            ramp = ramp.min(((y - fade.bounds.top().0) / band).clamp(0.0, 1.0));
+        }
+        if fade.bottom {
+            let y = if sample_y_at_center {
+                visible_center.y.0
+            } else {
+                bounds.bottom().0
+            };
+            ramp = ramp.min(((fade.bounds.bottom().0 - y) / band).clamp(0.0, 1.0));
+        }
+        if fade.left {
+            let x = if sample_x_at_center {
+                visible_center.x.0
+            } else {
+                bounds.left().0
+            };
+            ramp = ramp.min(((x - fade.bounds.left().0) / band).clamp(0.0, 1.0));
+        }
+        if fade.right {
+            let x = if sample_x_at_center {
+                visible_center.x.0
+            } else {
+                bounds.right().0
+            };
+            ramp = ramp.min(((fade.bounds.right().0 - x) / band).clamp(0.0, 1.0));
+        }
+        opacity * ramp
+    }
+
+    /// Per-pixel [`EdgeFade`] for solid backgrounds: a primitive that crosses
+    /// an active fade ramp is rewritten as a linear gradient whose stops sit
+    /// AT the band boundary in the bounds used by that primitive's shader.
+    /// The shader clamps `t` outside the stop range, so the piecewise ramp
+    /// renders exactly and the GPU interpolates per pixel — uniform
+    /// per-primitive alpha visibly popped/clipped on anything wider than the
+    /// band (tab washes, row selections). `None` = no rewrite applies;
+    /// callers fall back to uniform alpha sampling.
+    fn edge_fade_gradient(
         &self,
         bounds: Bounds<Pixels>,
         background: &Background,
@@ -4327,14 +4387,14 @@ impl Window {
         let in_hi_band = fade_hi && hi > edge_hi - band;
         let base = self.element_opacity();
         let color = background.solid;
-        // Anchor both stops INSIDE the band segment, clamped to the quad: the
-        // ramp's zero must sit at the REGION edge (v = edge), not the quad
-        // edge — anchoring at a partially-scrolled-out quad's own edge left
-        // its visible part nonzero at the clip line (user report). The shader
+        // Anchor both stops INSIDE the band segment, clamped to the primitive:
+        // the ramp's zero must sit at the REGION edge (v = edge), not the
+        // primitive edge — anchoring at a partially-scrolled-out primitive's
+        // own edge left its visible part nonzero at the clip line. The shader
         // clamps t outside the stop range, extending both plateaus exactly.
         let (v0, v1, a0, a1) = match (in_lo_band, in_hi_band) {
-            // A quad spanning BOTH bands can't be expressed with two stops;
-            // no variation at all needs no gradient.
+            // A primitive spanning BOTH bands can't be expressed with two
+            // stops; no variation at all needs no gradient.
             (true, true) | (false, false) => return None,
             (true, false) => {
                 let v0 = lo.max(edge_lo);
@@ -4631,7 +4691,6 @@ impl Window {
 
         let scale_factor = self.scale_factor();
         let content_mask = self.snapped_content_mask();
-        let opacity = self.element_opacity_for_bounds(&bounds);
         let element_bounds = self.cover_bounds(bounds);
         let element_corner_radii = corner_radii.scale(scale_factor);
         for shadow in shadows {
@@ -4639,6 +4698,8 @@ impl Window {
                 continue;
             }
             let shadow_bounds = (bounds + shadow.offset).dilate(shadow.spread_radius);
+            let painted_bounds = shadow_bounds.dilate(shadow.blur_radius * 3.0);
+            let opacity = self.element_opacity_for_visible_bounds(&painted_bounds);
             self.next_frame.scene.insert_primitive(Shadow {
                 order: 0,
                 blur_radius: shadow.blur_radius.scale(scale_factor),
@@ -4667,7 +4728,6 @@ impl Window {
 
         let scale_factor = self.scale_factor();
         let content_mask = self.snapped_content_mask();
-        let opacity = self.element_opacity_for_bounds(&bounds);
         let element_bounds = self.cover_bounds(bounds);
         let element_corner_radii = corner_radii.scale(scale_factor);
         for shadow in shadows {
@@ -4675,6 +4735,7 @@ impl Window {
                 continue;
             }
             let hole = (bounds + shadow.offset).dilate(-shadow.spread_radius);
+            let opacity = self.element_opacity_for_visible_bounds(&bounds);
             // Clamp at zero so a large spread can't produce negative radii, which would
             // break the SDF in the shader.
             let zero = Pixels::ZERO;
@@ -4893,7 +4954,7 @@ impl Window {
 
         let opacity = self.element_opacity_at(quad.bounds.center());
         let background = self
-            .quad_fade_gradient(quad.bounds, &quad.background)
+            .edge_fade_gradient(quad.bounds, &quad.background)
             .unwrap_or_else(|| quad.background.opacity(opacity));
         let snapped_bounds = self.snap_bounds(quad.bounds);
         let snapped_border_widths = self.snap_border_widths(quad.border_widths);
@@ -4967,10 +5028,14 @@ impl Window {
 
         let scale_factor = self.scale_factor();
         let content_mask = self.content_mask();
-        let opacity = self.element_opacity_for_bounds(&path.bounds);
+        let shader_bounds = path.bounds.intersect(&content_mask.bounds);
         path.content_mask = content_mask;
         let color: Background = color.into();
-        path.color = color.opacity(opacity);
+        path.color = self
+            .edge_fade_gradient(shader_bounds, &color)
+            .unwrap_or_else(|| {
+                color.opacity(self.element_opacity_for_visible_bounds(&shader_bounds))
+            });
         self.next_frame
             .scene
             .insert_primitive(path.scale(scale_factor));
@@ -5242,7 +5307,7 @@ impl Window {
     ) -> Result<()> {
         self.invalidator.debug_assert_paint();
 
-        let element_opacity = self.element_opacity_for_bounds(&bounds);
+        let element_opacity = self.element_opacity_for_visible_bounds(&bounds);
         let bounds = self.snap_bounds(bounds);
 
         let params = RenderSvgParams {
@@ -5446,8 +5511,8 @@ impl Window {
                     .transform_bounds(bounds)
                     .map(|coordinate| px(coordinate.0 / scale_factor))
             });
-            let opacity =
-                instance.opacity.clamp(0.0, 1.0) * self.element_opacity_for_bounds(&fade_bounds);
+            let opacity = instance.opacity.clamp(0.0, 1.0)
+                * self.element_opacity_for_visible_bounds(&fade_bounds);
             if opacity <= 0.0 {
                 continue;
             }
@@ -7951,14 +8016,15 @@ mod tests {
     };
 
     use crate::{
-        AnyWindowHandle, AppContext as _, Bounds, Context, DragMoveEvent, Empty, Entity,
-        ExternalDragPayload, ExternalDrop, ExternalDropData, ExternalDropEvent, ExternalDropItem,
-        ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, FontId,
-        ImageFormat, InputEvent as _, InteractiveElement as _, IntoElement, MouseButton,
-        MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, Render, RequestFrameOptions,
+        AnyWindowHandle, AppContext as _, BackgroundTag, Bounds, BoxShadow, ContentMask, Context,
+        DragMoveEvent, EdgeFade, Empty, Entity, ExternalDragPayload, ExternalDrop,
+        ExternalDropData, ExternalDropEvent, ExternalDropItem, ExternalImage, ExternalPaths,
+        FileDragPaths, FileDropEvent, FocusHandle, FontId, ImageFormat, InputEvent as _,
+        InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
+        ParentElement, Path, Pixels, Point, Render, RequestFrameOptions,
         StatefulInteractiveElement as _, StyleRefinement, Styled, TestAppContext,
         TextRenderingMode, Window, WindowAppearance, WindowControlArea, WindowOptions, canvas,
-        deferred, div, point, px, size,
+        deferred, div, point, px, size, white,
     };
 
     use super::window_control_at_mouse;
@@ -7969,6 +8035,91 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    #[gpui::test]
+    fn edge_fade_keeps_tall_shadow_and_path_visible(cx: &mut TestAppContext) {
+        let window = cx.add_empty_window();
+        let fade_bounds = Bounds {
+            origin: point(px(0.), px(0.)),
+            size: size(px(100.), px(100.)),
+        };
+        let tall_bounds = Bounds {
+            origin: point(px(10.), px(10.)),
+            size: size(px(80.), px(120.)),
+        };
+        let small_bounds = Bounds {
+            origin: point(px(10.), px(85.)),
+            size: size(px(20.), px(10.)),
+        };
+
+        window.draw(
+            point(px(0.), px(0.)),
+            size(px(100.), px(100.)),
+            move |_, _| {
+                canvas(
+                    |_, _, _| (),
+                    move |_, _, window, _| {
+                        let fade = EdgeFade {
+                            bounds: fade_bounds,
+                            band: px(20.),
+                            top: false,
+                            bottom: true,
+                            left: false,
+                            right: false,
+                        };
+                        window.with_content_mask(
+                            Some(ContentMask {
+                                bounds: fade_bounds,
+                            }),
+                            |window| {
+                                window.with_edge_fade(Some(fade), |window| {
+                                    let shadow = BoxShadow::new(px(0.), px(0.), white());
+                                    window.paint_drop_shadows(
+                                        tall_bounds,
+                                        Default::default(),
+                                        std::slice::from_ref(&shadow),
+                                    );
+                                    window.paint_drop_shadows(
+                                        small_bounds,
+                                        Default::default(),
+                                        std::slice::from_ref(&shadow),
+                                    );
+
+                                    let mut path = Path::new(tall_bounds.origin);
+                                    path.line_to(tall_bounds.top_right());
+                                    path.line_to(tall_bounds.bottom_right());
+                                    path.line_to(tall_bounds.bottom_left());
+                                    path.line_to(tall_bounds.origin);
+                                    window.paint_path(path, white());
+                                });
+                            },
+                        );
+                    },
+                )
+                .size_full()
+                .into_any_element()
+            },
+        );
+
+        window.update(|window, _| {
+            let scene = &window.rendered_frame.scene;
+            assert_eq!(scene.shadows.len(), 2);
+            assert!(
+                scene.shadows[0].color.a > 0.0,
+                "a tall shadow crossing the fade edge must remain visible"
+            );
+            assert!(
+                (scene.shadows[1].color.a - 0.25).abs() < f32::EPSILON,
+                "a primitive smaller than the band keeps nearest-edge fading"
+            );
+
+            let path = scene.paths.last().expect("the tall path should be painted");
+            assert_eq!(path.color.tag, BackgroundTag::LinearGradient);
+            let stops = &path.color.colors[..path.color.color_stop_count as usize];
+            assert!(stops.iter().any(|stop| stop.color.a > 0.0));
+            assert!(stops.iter().any(|stop| stop.color.a == 0.0));
+        });
     }
 
     struct CountRenders(Rc<Cell<usize>>);
