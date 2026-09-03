@@ -59,6 +59,11 @@ portable_touch = "One raw touch stream resolves to synthesized tap presses, an a
 scroll_physics = "PlatformGestures selects exponential or Android friction-spline deceleration without replacing the source-compatible GestureTuning::momentum_decay_per_ms field."
 limitations = ["no portable pinch recognizer", "no multi-touch arena", "no native iOS or Android touch producer"]
 
+[framework_profiling]
+frame_submission = "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames."
+meaning = "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
+excluded = ["upstream profiler journal", "hang report integration", "debug frame overlay", "compositor presentation callbacks"]
+
 [framework_paint]
 sprite_corner_coverage = "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
 edge_fade = "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading."

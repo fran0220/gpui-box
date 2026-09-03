@@ -732,6 +732,53 @@ impl FrameTiming {
     }
 }
 
+/// Timing for one newly drawn frame submitted to the platform.
+///
+/// `submission_end` is sampled when the synchronous platform draw call
+/// returns. It proves that GPUI handed the frame to the platform renderer; it
+/// does not claim that a compositor or display has presented the frame.
+#[derive(Debug, Copy, Clone)]
+pub struct FrameSubmissionTiming {
+    /// The draw whose scene was submitted.
+    pub frame: FrameTiming,
+    /// When platform submission began.
+    pub submission_start: Instant,
+    /// When the platform draw call returned.
+    pub submission_end: Instant,
+    /// The first input that invalidated work included in this submission, if
+    /// one was observed while tracing was active.
+    pub first_input_at: Option<Instant>,
+    /// Number of invalidating top-level input events coalesced into this
+    /// submission.
+    pub input_events: u64,
+}
+
+impl FrameSubmissionTiming {
+    /// Time spent in the platform submission call.
+    pub fn submission_duration(&self) -> Duration {
+        self.submission_end.duration_since(self.submission_start)
+    }
+
+    /// Time from the draw start until platform submission returned.
+    pub fn draw_to_submission_duration(&self) -> Duration {
+        self.submission_end.duration_since(self.frame.draw_start)
+    }
+
+    /// Time from the first observed invalidation until platform submission
+    /// returned.
+    pub fn dirty_to_submission_duration(&self) -> Option<Duration> {
+        self.frame
+            .dirty_at
+            .map(|dirty_at| self.submission_end.duration_since(dirty_at))
+    }
+
+    /// Time from the first coalesced input until platform submission returned.
+    pub fn input_to_submission_duration(&self) -> Option<Duration> {
+        self.first_input_at
+            .map(|input_at| self.submission_end.duration_since(input_at))
+    }
+}
+
 /// Deterministic structural work performed while drawing one window frame.
 ///
 /// Unlike [`FrameTiming`], these counters do not depend on machine speed. They
@@ -763,21 +810,30 @@ pub struct FrameStats {
     pub allocator_delta_bytes: Option<i64>,
 }
 
-// Allow 16MiB of frame timing entries.
-const MAX_FRAME_TIMINGS: usize = (16 * 1024 * 1024) / core::mem::size_of::<FrameTiming>();
+#[derive(Debug, Copy, Clone)]
+enum FrameEvent {
+    Draw(FrameTiming),
+    Submission(FrameSubmissionTiming),
+}
+
+// Allow 16MiB of frame events. Draw and submission records share one ring so
+// enabling submission timing does not double the profiler's memory ceiling.
+const MAX_FRAME_EVENTS: usize = (16 * 1024 * 1024) / core::mem::size_of::<FrameEvent>();
 
 struct FrameTimings {
-    timings: VecDeque<FrameTiming>,
+    events: VecDeque<FrameEvent>,
     total_pushed: u64,
     manual_enabled: bool,
     lease_count: usize,
+    generation: u64,
 }
 
 static FRAME_TIMINGS: spin::Mutex<FrameTimings> = spin::Mutex::new(FrameTimings {
-    timings: VecDeque::new(),
+    events: VecDeque::new(),
     total_pushed: 0,
     manual_enabled: false,
     lease_count: 0,
+    generation: 0,
 });
 
 static FRAME_TRACE_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -788,9 +844,25 @@ impl FrameTimings {
     }
 
     fn clear(&mut self) {
-        self.timings.clear();
-        self.timings.shrink_to_fit();
+        self.events.clear();
+        self.events.shrink_to_fit();
         self.total_pushed = 0;
+    }
+
+    fn push(&mut self, event: FrameEvent) {
+        if self.events.len() >= MAX_FRAME_EVENTS {
+            self.events.pop_front();
+        }
+        self.events.push_back(event);
+        self.total_pushed = self.total_pushed.saturating_add(1);
+    }
+
+    fn update_enabled_generation(&mut self, was_enabled: bool) -> bool {
+        let enabled = self.enabled();
+        if enabled != was_enabled {
+            self.generation = self.generation.wrapping_add(1);
+        }
+        enabled
     }
 }
 
@@ -808,7 +880,7 @@ pub fn set_frame_trace_enabled(enabled: bool) -> bool {
 
     let was_enabled = frames.enabled();
     frames.manual_enabled = enabled;
-    let is_enabled = frames.enabled();
+    let is_enabled = frames.update_enabled_generation(was_enabled);
     if was_enabled && !is_enabled {
         frames.clear();
     }
@@ -819,6 +891,18 @@ pub fn set_frame_trace_enabled(enabled: bool) -> bool {
 /// Returns whether frame timing collection is enabled.
 pub fn frame_trace_enabled() -> bool {
     FRAME_TRACE_ENABLED.load(Ordering::Relaxed)
+}
+
+/// Identifies the current uninterrupted frame-tracing session.
+///
+/// Window integration uses this to prevent a draw captured before tracing was
+/// disabled from becoming a submission sample after tracing is enabled again.
+pub(crate) fn frame_trace_generation() -> Option<u64> {
+    if !frame_trace_enabled() {
+        return None;
+    }
+    let frames = FRAME_TIMINGS.lock();
+    frames.enabled().then_some(frames.generation)
 }
 
 /// A reference-counted owner of frame timing collection.
@@ -835,8 +919,10 @@ impl FrameTraceLease {
     /// Acquires one independent owner of frame timing collection.
     pub fn new() -> Self {
         let mut frames = FRAME_TIMINGS.lock();
+        let was_enabled = frames.enabled();
         frames.lease_count = frames.lease_count.saturating_add(1);
-        FRAME_TRACE_ENABLED.store(true, Ordering::Release);
+        let enabled = frames.update_enabled_generation(was_enabled);
+        FRAME_TRACE_ENABLED.store(enabled, Ordering::Release);
         Self { active: true }
     }
 }
@@ -854,8 +940,9 @@ impl Drop for FrameTraceLease {
         }
 
         let mut frames = FRAME_TIMINGS.lock();
+        let was_enabled = frames.enabled();
         frames.lease_count = frames.lease_count.saturating_sub(1);
-        let enabled = frames.enabled();
+        let enabled = frames.update_enabled_generation(was_enabled);
         if !enabled {
             frames.clear();
         }
@@ -877,11 +964,24 @@ pub fn record_frame_timing(timing: FrameTiming) {
     if !frames.enabled() {
         return;
     }
-    if frames.timings.len() >= MAX_FRAME_TIMINGS {
-        frames.timings.pop_front();
+    frames.push(FrameEvent::Draw(timing));
+}
+
+/// Records a newly drawn frame's platform submission.
+///
+/// The generation must be the one captured when that frame was drawn. This is
+/// crate-private because only the window owns the platform submission call.
+pub(crate) fn record_frame_submission(generation: u64, timing: FrameSubmissionTiming) {
+    if !frame_trace_enabled() {
+        return;
     }
-    frames.timings.push_back(timing);
-    frames.total_pushed += 1;
+    std::hint::cold_path();
+
+    let mut frames = FRAME_TIMINGS.lock();
+    if !frames.enabled() || frames.generation != generation {
+        return;
+    }
+    frames.push(FrameEvent::Submission(timing));
 }
 
 /// Drains frame timings recorded after this collector was created, tracking a
@@ -909,26 +1009,73 @@ impl FrameTimingCollector {
     /// previous poll, the evicted entries are lost.
     pub fn collect_unseen(&mut self) -> Vec<FrameTiming> {
         let frames = FRAME_TIMINGS.lock();
-        let buffer_len = frames.timings.len() as u64;
+        let buffer_len = frames.events.len() as u64;
         let buffer_start = frames.total_pushed.saturating_sub(buffer_len);
         let skip = self.cursor.saturating_sub(buffer_start) as usize;
         let unseen = frames
-            .timings
+            .events
             .iter()
-            .skip(skip.min(frames.timings.len()))
-            .copied()
+            .skip(skip.min(frames.events.len()))
+            .filter_map(|event| match event {
+                FrameEvent::Draw(timing) => Some(*timing),
+                FrameEvent::Submission(_) => None,
+            })
             .collect();
         self.cursor = frames.total_pushed;
         unseen
     }
 }
 
-/// A bounded, per-window summary of observed draw work.
+/// Drains platform-submission timings observed after this collector was
+/// created. Each sample belongs to a newly drawn frame; requests that resubmit
+/// unchanged scene contents are not included.
+pub struct FrameSubmissionTimingCollector {
+    cursor: u64,
+}
+
+impl Default for FrameSubmissionTimingCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FrameSubmissionTimingCollector {
+    /// Creates a collector that only sees submissions recorded from this point
+    /// on. Hold a [`FrameTraceLease`] for the collector's lifetime.
+    pub fn new() -> Self {
+        Self {
+            cursor: FRAME_TIMINGS.lock().total_pushed,
+        }
+    }
+
+    /// Returns newly observed frame submissions. If the shared ring wrapped
+    /// since the previous poll, evicted entries are lost.
+    pub fn collect_unseen(&mut self) -> Vec<FrameSubmissionTiming> {
+        let frames = FRAME_TIMINGS.lock();
+        let buffer_len = frames.events.len() as u64;
+        let buffer_start = frames.total_pushed.saturating_sub(buffer_len);
+        let skip = self.cursor.saturating_sub(buffer_start) as usize;
+        let unseen = frames
+            .events
+            .iter()
+            .skip(skip.min(frames.events.len()))
+            .filter_map(|event| match event {
+                FrameEvent::Draw(_) => None,
+                FrameEvent::Submission(timing) => Some(*timing),
+            })
+            .collect();
+        self.cursor = frames.total_pushed;
+        unseen
+    }
+}
+
+/// A bounded, per-window summary of observed submitted-frame work.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameTimingSummary {
-    /// Number of retained target-window draws represented by this summary.
+    /// Number of retained target-window submissions represented by this
+    /// summary.
     pub sample_count: usize,
-    /// Draw starts per second, computed from the first and last retained draw
+    /// Newly drawn submissions per second, computed from their completion
     /// timestamps rather than from the monitor's polling cadence.
     pub frames_per_second: f64,
     /// Caller-supplied threshold used to classify draw-budget overage.
@@ -945,11 +1092,27 @@ pub struct FrameTimingSummary {
     /// Mean first-dirty-to-draw-end latency for samples whose first
     /// invalidation was observed after tracing began.
     pub mean_dirty_to_draw_duration: Option<Duration>,
+    /// Arithmetic mean of time spent in the synchronous platform submission
+    /// call. This is not compositor or display presentation time.
+    pub mean_submission_duration: Duration,
+    /// Mean first-dirty-to-submission-end latency for samples whose first
+    /// invalidation was observed after tracing began.
+    pub mean_dirty_to_submission_duration: Option<Duration>,
+    /// Mean first-input-to-submission-end latency for submitted frames caused
+    /// by input observed after tracing began.
+    pub mean_input_to_submission_duration: Option<Duration>,
+    /// Arithmetic mean of invalidating top-level input events coalesced into a
+    /// submitted frame.
+    pub mean_input_events: f64,
     /// Draw durations in retained timestamp order, for caller-owned plots.
     pub draw_durations: Vec<Duration>,
+    /// Platform submission-call durations in retained timestamp order, for
+    /// caller-owned plots.
+    pub submission_durations: Vec<Duration>,
 }
 
-/// Observes existing draws for one window and keeps a bounded history.
+/// Observes existing submitted frames for one window and keeps a bounded
+/// history.
 ///
 /// The monitor owns a [`FrameTraceLease`] but never refreshes the window. A
 /// host chooses when to call [`Self::collect`] and whether its workload should
@@ -959,17 +1122,17 @@ pub struct FrameTimingMonitor {
     window_id: WindowId,
     capacity: usize,
     frame_budget: Duration,
-    samples: VecDeque<FrameTiming>,
-    collector: FrameTimingCollector,
+    samples: VecDeque<FrameSubmissionTiming>,
+    collector: FrameSubmissionTimingCollector,
     _lease: FrameTraceLease,
 }
 
 impl FrameTimingMonitor {
     /// Creates a monitor for `window_id`. A zero capacity retains one sample,
-    /// although a summary is unavailable until two draw starts are observed.
+    /// although a summary is unavailable until two submissions are observed.
     pub fn new(window_id: WindowId, capacity: usize, frame_budget: Duration) -> Self {
         let lease = FrameTraceLease::new();
-        let collector = FrameTimingCollector::new();
+        let collector = FrameSubmissionTimingCollector::new();
         Self {
             window_id,
             capacity: capacity.max(1),
@@ -985,16 +1148,17 @@ impl FrameTimingMonitor {
         self.window_id
     }
 
-    /// Number of currently retained target-window draws.
+    /// Number of currently retained target-window submissions.
     pub fn sample_count(&self) -> usize {
         self.samples.len()
     }
 
-    /// Collects newly recorded frames, discarding frames from other windows,
-    /// and returns the current summary once two target-window draws exist.
+    /// Collects newly submitted frames, discarding frames from other windows,
+    /// and returns the current summary once two target-window submissions
+    /// exist.
     pub fn collect(&mut self) -> Option<FrameTimingSummary> {
         for timing in self.collector.collect_unseen() {
-            if timing.window_id != self.window_id {
+            if timing.frame.window_id != self.window_id {
                 continue;
             }
             if self.samples.len() >= self.capacity {
@@ -1012,7 +1176,7 @@ impl FrameTimingMonitor {
 }
 
 fn summarize_frame_timings(
-    samples: &VecDeque<FrameTiming>,
+    samples: &VecDeque<FrameSubmissionTiming>,
     frame_budget: Duration,
 ) -> Option<FrameTimingSummary> {
     if samples.len() < 2 {
@@ -1022,8 +1186,8 @@ fn summarize_frame_timings(
     let sample_count = samples.len();
     let elapsed = samples
         .back()?
-        .draw_start
-        .saturating_duration_since(samples.front()?.draw_start);
+        .submission_end
+        .saturating_duration_since(samples.front()?.submission_end);
     let frames_per_second = if elapsed.is_zero() {
         0.0
     } else {
@@ -1031,7 +1195,11 @@ fn summarize_frame_timings(
     };
     let draw_durations = samples
         .iter()
-        .map(FrameTiming::draw_duration)
+        .map(|sample| sample.frame.draw_duration())
+        .collect::<Vec<_>>();
+    let submission_durations = samples
+        .iter()
+        .map(FrameSubmissionTiming::submission_duration)
         .collect::<Vec<_>>();
     let mean_draw_duration = mean_duration(draw_durations.iter().copied());
     let mut sorted_draws = draw_durations.clone();
@@ -1044,12 +1212,20 @@ fn summarize_frame_timings(
         .count();
     let mean_invalidations = samples
         .iter()
-        .map(|sample| sample.invalidations as f64)
+        .map(|sample| sample.frame.invalidations as f64)
         .sum::<f64>()
         / sample_count as f64;
     let dirty_to_draw = samples
         .iter()
-        .filter_map(FrameTiming::dirty_to_draw_duration)
+        .filter_map(|sample| sample.frame.dirty_to_draw_duration())
+        .collect::<Vec<_>>();
+    let dirty_to_submission = samples
+        .iter()
+        .filter_map(FrameSubmissionTiming::dirty_to_submission_duration)
+        .collect::<Vec<_>>();
+    let input_to_submission = samples
+        .iter()
+        .filter_map(FrameSubmissionTiming::input_to_submission_duration)
         .collect::<Vec<_>>();
 
     Some(FrameTimingSummary {
@@ -1062,7 +1238,18 @@ fn summarize_frame_timings(
         mean_invalidations,
         mean_dirty_to_draw_duration: (!dirty_to_draw.is_empty())
             .then(|| mean_duration(dirty_to_draw.iter().copied())),
+        mean_submission_duration: mean_duration(submission_durations.iter().copied()),
+        mean_dirty_to_submission_duration: (!dirty_to_submission.is_empty())
+            .then(|| mean_duration(dirty_to_submission.iter().copied())),
+        mean_input_to_submission_duration: (!input_to_submission.is_empty())
+            .then(|| mean_duration(input_to_submission.iter().copied())),
+        mean_input_events: samples
+            .iter()
+            .map(|sample| sample.input_events as f64)
+            .sum::<f64>()
+            / sample_count as f64,
         draw_durations,
+        submission_durations,
     })
 }
 
@@ -1080,71 +1267,169 @@ fn mean_duration(durations: impl Iterator<Item = Duration>) -> Duration {
 mod frame_timing_tests {
     use super::*;
 
-    fn timing(
+    struct TimingArgs {
         window_id: u64,
         anchor: Instant,
         start_ms: u64,
         draw_ms: u64,
         dirty_ms: Option<u64>,
         invalidations: u64,
-    ) -> FrameTiming {
-        let draw_start = anchor + Duration::from_millis(start_ms);
-        FrameTiming {
-            window_id: WindowId::from(window_id),
-            dirty_at: dirty_ms.map(|milliseconds| anchor + Duration::from_millis(milliseconds)),
-            invalidations,
-            draw_start,
-            draw_end: draw_start + Duration::from_millis(draw_ms),
+        submission_ms: u64,
+        submission_duration_ms: u64,
+        input_ms: Option<u64>,
+        input_events: u64,
+    }
+
+    fn timing(args: TimingArgs) -> FrameSubmissionTiming {
+        let draw_start = args.anchor + Duration::from_millis(args.start_ms);
+        let submission_start = args.anchor + Duration::from_millis(args.submission_ms);
+        FrameSubmissionTiming {
+            frame: FrameTiming {
+                window_id: WindowId::from(args.window_id),
+                dirty_at: args
+                    .dirty_ms
+                    .map(|milliseconds| args.anchor + Duration::from_millis(milliseconds)),
+                invalidations: args.invalidations,
+                draw_start,
+                draw_end: draw_start + Duration::from_millis(args.draw_ms),
+            },
+            submission_start,
+            submission_end: submission_start + Duration::from_millis(args.submission_duration_ms),
+            first_input_at: args
+                .input_ms
+                .map(|milliseconds| args.anchor + Duration::from_millis(milliseconds)),
+            input_events: args.input_events,
         }
     }
 
     #[test]
-    fn frame_summary_uses_draw_timestamps_and_reports_budget_overage() {
+    fn frame_summary_uses_submissions_and_reports_draw_budget_overage() {
         let anchor = Instant::now();
         let samples = VecDeque::from([
-            timing(1, anchor, 10, 4, Some(6), 1),
-            timing(1, anchor, 30, 8, Some(30), 3),
-            timing(1, anchor, 50, 30, None, 2),
-            timing(1, anchor, 70, 12, Some(74), 2),
+            timing(TimingArgs {
+                window_id: 1,
+                anchor,
+                start_ms: 10,
+                draw_ms: 4,
+                dirty_ms: Some(6),
+                invalidations: 1,
+                submission_ms: 14,
+                submission_duration_ms: 2,
+                input_ms: Some(8),
+                input_events: 1,
+            }),
+            timing(TimingArgs {
+                window_id: 1,
+                anchor,
+                start_ms: 30,
+                draw_ms: 8,
+                dirty_ms: Some(30),
+                invalidations: 3,
+                submission_ms: 38,
+                submission_duration_ms: 4,
+                input_ms: Some(28),
+                input_events: 3,
+            }),
+            timing(TimingArgs {
+                window_id: 1,
+                anchor,
+                start_ms: 50,
+                draw_ms: 30,
+                dirty_ms: None,
+                invalidations: 2,
+                submission_ms: 80,
+                submission_duration_ms: 6,
+                input_ms: None,
+                input_events: 0,
+            }),
+            timing(TimingArgs {
+                window_id: 1,
+                anchor,
+                start_ms: 90,
+                draw_ms: 12,
+                dirty_ms: Some(90),
+                invalidations: 2,
+                submission_ms: 102,
+                submission_duration_ms: 4,
+                input_ms: Some(88),
+                input_events: 2,
+            }),
         ]);
 
         let summary = summarize_frame_timings(&samples, Duration::from_millis(16))
             .expect("four samples produce a summary");
         assert_eq!(summary.sample_count, 4);
-        assert_eq!(summary.frames_per_second, 50.0);
+        assert_eq!(summary.frames_per_second, 3.0 / 0.09);
         assert_eq!(summary.mean_draw_duration, Duration::from_micros(13_500));
         assert_eq!(summary.p95_draw_duration, Duration::from_millis(30));
         assert_eq!(summary.over_budget_fraction, 0.25);
         assert_eq!(summary.mean_invalidations, 2.0);
         assert_eq!(
             summary.mean_dirty_to_draw_duration,
-            Some(Duration::from_millis(8))
+            Some(Duration::from_millis(28) / 3)
         );
+        assert_eq!(summary.mean_submission_duration, Duration::from_millis(4));
+        assert_eq!(
+            summary.mean_dirty_to_submission_duration,
+            Some(Duration::from_millis(38) / 3)
+        );
+        assert_eq!(
+            summary.mean_input_to_submission_duration,
+            Some(Duration::from_millis(40) / 3)
+        );
+        assert_eq!(summary.mean_input_events, 1.5);
         assert_eq!(summary.draw_durations.len(), 4);
+        assert_eq!(summary.submission_durations.len(), 4);
     }
 
     #[test]
-    fn frame_summary_waits_for_two_draw_starts() {
+    fn frame_summary_waits_for_two_submissions() {
         let anchor = Instant::now();
-        let samples = VecDeque::from([timing(1, anchor, 0, 4, Some(0), 1)]);
+        let samples = VecDeque::from([timing(TimingArgs {
+            window_id: 1,
+            anchor,
+            start_ms: 0,
+            draw_ms: 4,
+            dirty_ms: Some(0),
+            invalidations: 1,
+            submission_ms: 4,
+            submission_duration_ms: 1,
+            input_ms: None,
+            input_events: 0,
+        })]);
         assert!(summarize_frame_timings(&samples, Duration::from_millis(16)).is_none());
     }
 
     #[test]
     fn frame_trace_ownership_keeps_collection_enabled_until_every_owner_releases() {
         let mut frames = FrameTimings {
-            timings: VecDeque::new(),
+            events: VecDeque::new(),
             total_pushed: 0,
             manual_enabled: false,
             lease_count: 0,
+            generation: 0,
         };
         assert!(!frames.enabled());
-        frames.lease_count += 2;
+        let was_enabled = frames.enabled();
+        frames.lease_count += 1;
+        assert!(frames.update_enabled_generation(was_enabled));
+        let active_generation = frames.generation;
+        let was_enabled = frames.enabled();
+        frames.lease_count += 1;
+        assert!(frames.update_enabled_generation(was_enabled));
+        assert_eq!(frames.generation, active_generation);
         assert!(frames.enabled());
+        let was_enabled = frames.enabled();
         frames.manual_enabled = true;
+        assert!(frames.update_enabled_generation(was_enabled));
         frames.lease_count -= 2;
+        let was_enabled = frames.enabled();
+        assert!(frames.update_enabled_generation(was_enabled));
         assert!(frames.enabled());
+        let was_enabled = frames.enabled();
         frames.manual_enabled = false;
+        assert!(!frames.update_enabled_generation(was_enabled));
         assert!(!frames.enabled());
+        assert_ne!(frames.generation, active_generation);
     }
 }

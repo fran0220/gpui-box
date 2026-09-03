@@ -364,7 +364,8 @@ Copyright 2022–2025 Zed Industries, Inc.
 Scope: adapted closed-form spring solver, interpolation and target projection,
 playback builder, sampled easing, stateful element animation lifecycle, and the
 portable single-touch recognizer/window dispatch for tap, pan, fling,
-touch-drag, and long press.
+touch-drag, and long press, plus the distinction between frame drawing and
+synchronous platform submission in profiler timing.
 Nested source: Android Open Source Project `OverScroller.SplineOverScroller`,
 https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/widget/OverScroller.java
 License: Apache-2.0

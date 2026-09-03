@@ -756,8 +756,14 @@ that need one: ignored records are refused by the model, a divergent push
 clears redo, and the caller remains responsible for applying every record.
 `PerformanceHud` covers live diagnostics without turning the observer into the
 workload: framework `FrameTimingMonitor` filters and bounds existing per-window
-draws, while the controlled Kit view presents the caller's latest summary and
-never schedules another frame.
+submissions, while the controlled Kit view presents the caller's latest summary
+and never schedules another frame. Framework records preserve every draw for
+benchmarks, then pair the latest newly drawn scene with platform submission and
+its coalesced top-level input. The pairing survives concurrent trace leases and
+cannot cross a disable/re-enable boundary. It intentionally stops when the
+synchronous platform draw call returns: compositor/display presentation,
+upstream journal/hang reporting, and the debug overlay remain outside this
+port.
 
 Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come

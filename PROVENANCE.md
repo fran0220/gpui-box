@@ -591,11 +591,13 @@ hooks, or source files, and adds no dependency.
 - License: Apache-2.0
 - Source locations: `gpui-pre/src/spring.rs`,
   `gpui-pre/src/elements/animation.rs`, `gpui-pre/src/gestures.rs`,
-  `gpui-pre/src/interactive.rs`, and `gpui-pre/src/window.rs`
+  `gpui-pre/src/interactive.rs`, `gpui-pre/src/profiler.rs`, and
+  `gpui-pre/src/window.rs`
 - Destinations: `crates/gpui/src/spring.rs`,
   `crates/gpui/src/elements/animation.rs`, and
   `crates/gpui-kit/src/motion/spring.rs`; `crates/gpui/src/gestures.rs`,
-  `crates/gpui/src/interactive.rs`, and `crates/gpui/src/window.rs`
+  `crates/gpui/src/interactive.rs`, `crates/gpui/src/profiler.rs`, and
+  `crates/gpui/src/window.rs`
 
 The 0.6 release was audited as a capability delta, not installed as a package:
 its crates resolve through `gpui-pre`, which would create a second GPUI type
@@ -624,3 +626,14 @@ This is a portable single-touch input path, not a claim of a complete gesture
 arena: additional contacts are ignored while one touch is active, pinch remains
 a platform event, and no native iOS/Android touch producer is added. No
 `gpui-pre`, Longbridge, Zed Git source, or Cargo patch was added.
+
+The package's split draw/submission profiler model also informed the local
+framework boundary. GPUI Box keeps its existing feature-independent,
+reference-counted frame trace leases, passive per-window monitor, bounded
+history, benchmark draw records, deterministic `FrameStats`, and Kit HUD. It
+adds a paired submission record at the synchronous `PlatformWindow` draw-call
+boundary, carries first-input time and top-level coalesced input count to that
+record, and guards draw-to-submit pairing across trace enable/disable
+transitions. Local APIs deliberately say “submission”: return from that call is
+not evidence of compositor or display presentation. The package's profiler
+journal, hang reporting, and debug frame overlay were not imported.

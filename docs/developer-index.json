@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2498
+      "symbolCount": 2506
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -28881,6 +28881,124 @@
       "cfg": []
     },
     {
+      "id": "gpui::profiler::FrameSubmissionTiming",
+      "name": "FrameSubmissionTiming",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Timing for one newly drawn frame submitted to the platform.",
+      "documentation": "Timing for one newly drawn frame submitted to the platform.\n\n`submission_end` is sampled when the synchronous platform draw call\nreturns. It proves that GPUI handed the frame to the platform renderer; it\ndoes not claim that a compositor or display has presented the frame.",
+      "signature": "# [doc = \" Timing for one newly drawn frame submitted to the platform.\"] # [doc = \"\"] # [doc = \" `submission_end` is sampled when the synchronous platform draw call\"] # [doc = \" returns. It proves that GPUI handed the frame to the platform renderer; it\"] # [doc = \" does not claim that a compositor or display has presented the frame.\"] # [derive (Debug, Copy, Clone)] pub struct FrameSubmissionTiming { # [doc = \" The draw whose scene was submitted.\"] pub frame : FrameTiming, # [doc = \" When platform submission began.\"] pub submission_start : Instant, # [doc = \" When the platform draw call returned.\"] pub submission_end : Instant, # [doc = \" The first input that invalidated work included in this submission, if\"] # [doc = \" one was observed while tracing was active.\"] pub first_input_at : Option<Instant>, # [doc = \" Number of invalidating top-level input events coalesced into this\"] # [doc = \" submission.\"] pub input_events : u64, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTiming::dirty_to_submission_duration",
+      "name": "dirty_to_submission_duration",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Time from the first observed invalidation until platform submission returned.",
+      "documentation": "Time from the first observed invalidation until platform submission\nreturned.",
+      "signature": "pub fn dirty_to_submission_duration (& self) -> Option<Duration>",
+      "cfg": [],
+      "target": "FrameSubmissionTiming"
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTiming::draw_to_submission_duration",
+      "name": "draw_to_submission_duration",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Time from the draw start until platform submission returned.",
+      "documentation": "Time from the draw start until platform submission returned.",
+      "signature": "pub fn draw_to_submission_duration (& self) -> Duration",
+      "cfg": [],
+      "target": "FrameSubmissionTiming"
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTiming::input_to_submission_duration",
+      "name": "input_to_submission_duration",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Time from the first coalesced input until platform submission returned.",
+      "documentation": "Time from the first coalesced input until platform submission returned.",
+      "signature": "pub fn input_to_submission_duration (& self) -> Option<Duration>",
+      "cfg": [],
+      "target": "FrameSubmissionTiming"
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTiming::submission_duration",
+      "name": "submission_duration",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Time spent in the platform submission call.",
+      "documentation": "Time spent in the platform submission call.",
+      "signature": "pub fn submission_duration (& self) -> Duration",
+      "cfg": [],
+      "target": "FrameSubmissionTiming"
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTimingCollector",
+      "name": "FrameSubmissionTimingCollector",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Drains platform-submission timings observed after this collector was created. Each sample belongs to a newly drawn frame; requests that resubmit unchanged scene contents are not included.",
+      "documentation": "Drains platform-submission timings observed after this collector was\ncreated. Each sample belongs to a newly drawn frame; requests that resubmit\nunchanged scene contents are not included.",
+      "signature": "# [doc = \" Drains platform-submission timings observed after this collector was\"] # [doc = \" created. Each sample belongs to a newly drawn frame; requests that resubmit\"] # [doc = \" unchanged scene contents are not included.\"] pub struct FrameSubmissionTimingCollector { cursor : u64, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTimingCollector::collect_unseen",
+      "name": "collect_unseen",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Returns newly observed frame submissions. If the shared ring wrapped since the previous poll, evicted entries are lost.",
+      "documentation": "Returns newly observed frame submissions. If the shared ring wrapped\nsince the previous poll, evicted entries are lost.",
+      "signature": "pub fn collect_unseen (& mut self) -> Vec<FrameSubmissionTiming>",
+      "cfg": [],
+      "target": "FrameSubmissionTimingCollector"
+    },
+    {
+      "id": "gpui::profiler::FrameSubmissionTimingCollector::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "profiler",
+      "path": "gpui::profiler",
+      "source": "crates/gpui/src/profiler.rs",
+      "summary": "Creates a collector that only sees submissions recorded from this point on. Hold a [`FrameTraceLease`] for the collector's lifetime.",
+      "documentation": "Creates a collector that only sees submissions recorded from this point\non. Hold a [`FrameTraceLease`] for the collector's lifetime.",
+      "signature": "pub fn new () -> Self",
+      "cfg": [],
+      "target": "FrameSubmissionTimingCollector"
+    },
+    {
       "id": "gpui::profiler::FrameTiming",
       "name": "FrameTiming",
       "kind": "struct",
@@ -28977,9 +29095,9 @@
       "module": "profiler",
       "path": "gpui::profiler",
       "source": "crates/gpui/src/profiler.rs",
-      "summary": "Observes existing draws for one window and keeps a bounded history.",
-      "documentation": "Observes existing draws for one window and keeps a bounded history.\n\nThe monitor owns a [`FrameTraceLease`] but never refreshes the window. A\nhost chooses when to call [`Self::collect`] and whether its workload should\nproduce another frame, so displaying diagnostics does not silently create\na continuous redraw loop.",
-      "signature": "# [doc = \" Observes existing draws for one window and keeps a bounded history.\"] # [doc = \"\"] # [doc = \" The monitor owns a [`FrameTraceLease`] but never refreshes the window. A\"] # [doc = \" host chooses when to call [`Self::collect`] and whether its workload should\"] # [doc = \" produce another frame, so displaying diagnostics does not silently create\"] # [doc = \" a continuous redraw loop.\"] pub struct FrameTimingMonitor { window_id : WindowId, capacity : usize, frame_budget : Duration, samples : VecDeque<FrameTiming>, collector : FrameTimingCollector, _lease : FrameTraceLease, }",
+      "summary": "Observes existing submitted frames for one window and keeps a bounded history.",
+      "documentation": "Observes existing submitted frames for one window and keeps a bounded\nhistory.\n\nThe monitor owns a [`FrameTraceLease`] but never refreshes the window. A\nhost chooses when to call [`Self::collect`] and whether its workload should\nproduce another frame, so displaying diagnostics does not silently create\na continuous redraw loop.",
+      "signature": "# [doc = \" Observes existing submitted frames for one window and keeps a bounded\"] # [doc = \" history.\"] # [doc = \"\"] # [doc = \" The monitor owns a [`FrameTraceLease`] but never refreshes the window. A\"] # [doc = \" host chooses when to call [`Self::collect`] and whether its workload should\"] # [doc = \" produce another frame, so displaying diagnostics does not silently create\"] # [doc = \" a continuous redraw loop.\"] pub struct FrameTimingMonitor { window_id : WindowId, capacity : usize, frame_budget : Duration, samples : VecDeque<FrameSubmissionTiming>, collector : FrameSubmissionTimingCollector, _lease : FrameTraceLease, }",
       "cfg": []
     },
     {
@@ -28991,8 +29109,8 @@
       "module": "profiler",
       "path": "gpui::profiler",
       "source": "crates/gpui/src/profiler.rs",
-      "summary": "Collects newly recorded frames, discarding frames from other windows, and returns the current summary once two target-window draws exist.",
-      "documentation": "Collects newly recorded frames, discarding frames from other windows,\nand returns the current summary once two target-window draws exist.",
+      "summary": "Collects newly submitted frames, discarding frames from other windows, and returns the current summary once two target-window submissions exist.",
+      "documentation": "Collects newly submitted frames, discarding frames from other windows,\nand returns the current summary once two target-window submissions\nexist.",
       "signature": "pub fn collect (& mut self) -> Option<FrameTimingSummary>",
       "cfg": [],
       "target": "FrameTimingMonitor"
@@ -29006,8 +29124,8 @@
       "module": "profiler",
       "path": "gpui::profiler",
       "source": "crates/gpui/src/profiler.rs",
-      "summary": "Creates a monitor for `window_id`. A zero capacity retains one sample, although a summary is unavailable until two draw starts are observed.",
-      "documentation": "Creates a monitor for `window_id`. A zero capacity retains one sample,\nalthough a summary is unavailable until two draw starts are observed.",
+      "summary": "Creates a monitor for `window_id`. A zero capacity retains one sample, although a summary is unavailable until two submissions are observed.",
+      "documentation": "Creates a monitor for `window_id`. A zero capacity retains one sample,\nalthough a summary is unavailable until two submissions are observed.",
       "signature": "pub fn new (window_id : WindowId, capacity : usize, frame_budget : Duration) -> Self",
       "cfg": [],
       "target": "FrameTimingMonitor"
@@ -29021,8 +29139,8 @@
       "module": "profiler",
       "path": "gpui::profiler",
       "source": "crates/gpui/src/profiler.rs",
-      "summary": "Number of currently retained target-window draws.",
-      "documentation": "Number of currently retained target-window draws.",
+      "summary": "Number of currently retained target-window submissions.",
+      "documentation": "Number of currently retained target-window submissions.",
       "signature": "pub fn sample_count (& self) -> usize",
       "cfg": [],
       "target": "FrameTimingMonitor"
@@ -29066,9 +29184,9 @@
       "module": "profiler",
       "path": "gpui::profiler",
       "source": "crates/gpui/src/profiler.rs",
-      "summary": "A bounded, per-window summary of observed draw work.",
-      "documentation": "A bounded, per-window summary of observed draw work.",
-      "signature": "# [doc = \" A bounded, per-window summary of observed draw work.\"] # [derive (Debug, Clone, PartialEq)] pub struct FrameTimingSummary { # [doc = \" Number of retained target-window draws represented by this summary.\"] pub sample_count : usize, # [doc = \" Draw starts per second, computed from the first and last retained draw\"] # [doc = \" timestamps rather than from the monitor's polling cadence.\"] pub frames_per_second : f64, # [doc = \" Caller-supplied threshold used to classify draw-budget overage.\"] pub frame_budget : Duration, # [doc = \" Arithmetic mean of retained `Window::draw` durations.\"] pub mean_draw_duration : Duration, # [doc = \" Nearest-rank 95th percentile of retained draw durations.\"] pub p95_draw_duration : Duration, # [doc = \" Fraction of retained draws whose own duration exceeded `frame_budget`.\"] # [doc = \" This is draw-budget overage, not a claim about display drops.\"] pub over_budget_fraction : f64, # [doc = \" Arithmetic mean of invalidations coalesced into each retained draw.\"] pub mean_invalidations : f64, # [doc = \" Mean first-dirty-to-draw-end latency for samples whose first\"] # [doc = \" invalidation was observed after tracing began.\"] pub mean_dirty_to_draw_duration : Option<Duration>, # [doc = \" Draw durations in retained timestamp order, for caller-owned plots.\"] pub draw_durations : Vec<Duration>, }",
+      "summary": "A bounded, per-window summary of observed submitted-frame work.",
+      "documentation": "A bounded, per-window summary of observed submitted-frame work.",
+      "signature": "# [doc = \" A bounded, per-window summary of observed submitted-frame work.\"] # [derive (Debug, Clone, PartialEq)] pub struct FrameTimingSummary { # [doc = \" Number of retained target-window submissions represented by this\"] # [doc = \" summary.\"] pub sample_count : usize, # [doc = \" Newly drawn submissions per second, computed from their completion\"] # [doc = \" timestamps rather than from the monitor's polling cadence.\"] pub frames_per_second : f64, # [doc = \" Caller-supplied threshold used to classify draw-budget overage.\"] pub frame_budget : Duration, # [doc = \" Arithmetic mean of retained `Window::draw` durations.\"] pub mean_draw_duration : Duration, # [doc = \" Nearest-rank 95th percentile of retained draw durations.\"] pub p95_draw_duration : Duration, # [doc = \" Fraction of retained draws whose own duration exceeded `frame_budget`.\"] # [doc = \" This is draw-budget overage, not a claim about display drops.\"] pub over_budget_fraction : f64, # [doc = \" Arithmetic mean of invalidations coalesced into each retained draw.\"] pub mean_invalidations : f64, # [doc = \" Mean first-dirty-to-draw-end latency for samples whose first\"] # [doc = \" invalidation was observed after tracing began.\"] pub mean_dirty_to_draw_duration : Option<Duration>, # [doc = \" Arithmetic mean of time spent in the synchronous platform submission\"] # [doc = \" call. This is not compositor or display presentation time.\"] pub mean_submission_duration : Duration, # [doc = \" Mean first-dirty-to-submission-end latency for samples whose first\"] # [doc = \" invalidation was observed after tracing began.\"] pub mean_dirty_to_submission_duration : Option<Duration>, # [doc = \" Mean first-input-to-submission-end latency for submitted frames caused\"] # [doc = \" by input observed after tracing began.\"] pub mean_input_to_submission_duration : Option<Duration>, # [doc = \" Arithmetic mean of invalidating top-level input events coalesced into a\"] # [doc = \" submitted frame.\"] pub mean_input_events : f64, # [doc = \" Draw durations in retained timestamp order, for caller-owned plots.\"] pub draw_durations : Vec<Duration>, # [doc = \" Platform submission-call durations in retained timestamp order, for\"] # [doc = \" caller-owned plots.\"] pub submission_durations : Vec<Duration>, }",
       "cfg": []
     },
     {
@@ -35864,7 +35982,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "A point-in-time snapshot of the input-latency histograms for a window, suitable for external formatting.",
       "documentation": "A point-in-time snapshot of the input-latency histograms for a window,\nsuitable for external formatting.",
-      "signature": "# [doc = \" A point-in-time snapshot of the input-latency histograms for a window,\"] # [doc = \" suitable for external formatting.\"] # [cfg (feature = \"input-latency-histogram\")] # [derive (Clone)] pub struct InputLatencySnapshot { # [doc = \" Histogram of input-to-frame latency samples, in nanoseconds.\"] pub latency_histogram : Histogram<u64>, # [doc = \" Histogram of input events coalesced per rendered frame.\"] pub events_per_frame_histogram : Histogram<u64>, # [doc = \" Count of input events that arrived mid-draw and were excluded from\"] # [doc = \" latency recording.\"] pub mid_draw_events_dropped : u64, }",
+      "signature": "# [doc = \" A point-in-time snapshot of the input-latency histograms for a window,\"] # [doc = \" suitable for external formatting.\"] # [cfg (feature = \"input-latency-histogram\")] # [derive (Clone)] pub struct InputLatencySnapshot { # [doc = \" Histogram of input-to-platform-submission latency samples, in\"] # [doc = \" nanoseconds.\"] pub latency_histogram : Histogram<u64>, # [doc = \" Histogram of input events coalesced per submitted frame.\"] pub events_per_frame_histogram : Histogram<u64>, # [doc = \" Count of input events that arrived mid-draw and were excluded from\"] # [doc = \" latency recording.\"] pub mid_draw_events_dropped : u64, }",
       "cfg": [
         "cfg (feature = \"input-latency-histogram\")"
       ]
@@ -36056,7 +36174,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Holds the state for a specific window.",
       "documentation": "Holds the state for a specific window.",
-      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
+      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
       "cfg": []
     },
     {
@@ -36473,8 +36591,8 @@
       "module": "window",
       "path": "gpui::window",
       "source": "crates/gpui/src/window.rs",
-      "summary": "Dispatch a mouse or keyboard event on the window.",
-      "documentation": "Dispatch a mouse or keyboard event on the window.",
+      "summary": "Dispatch a mouse, keyboard, or touch event on the window.",
+      "documentation": "Dispatch a mouse, keyboard, or touch event on the window.",
       "signature": "pub fn dispatch_event (& mut self, event : PlatformInput, cx : & mut App) -> DispatchEventResult",
       "cfg": [],
       "target": "Window"
@@ -37906,8 +38024,8 @@
       "module": "window",
       "path": "gpui::window",
       "source": "crates/gpui/src/window.rs",
-      "summary": "Presents the most recently drawn frame if it hasn't been presented yet.",
-      "documentation": "Presents the most recently drawn frame if it hasn't been presented yet.\n\nBenchmarks drive drawing synchronously rather than through a platform\nframe-request loop, so they call this after each measured update to\nsubmit the frame like production presentation would.",
+      "summary": "Submits the most recently drawn frame if it hasn't been submitted yet.",
+      "documentation": "Submits the most recently drawn frame if it hasn't been submitted yet.\n\nBenchmarks drive drawing synchronously rather than through a platform\nframe-request loop, so they call this after each measured update to\nsubmit the frame like the production frame loop would.",
       "signature": "pub fn present_if_needed (& mut self)",
       "cfg": [
         "cfg (feature = \"bench\")"
@@ -142972,7 +143090,7 @@
       "uses": [
         "PerformanceHud"
       ],
-      "example": "fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let summary = gpui::FrameTimingSummary {\n        sample_count: 8,\n        frames_per_second: 58.7,\n        frame_budget: Duration::from_micros(16_667),\n        mean_draw_duration: Duration::from_micros(8_425),\n        p95_draw_duration: Duration::from_micros(18_900),\n        over_budget_fraction: 0.125,\n        mean_invalidations: 1.4,\n        mean_dirty_to_draw_duration: Some(Duration::from_micros(10_600)),\n        draw_durations: [7_200, 7_800, 8_100, 7_600, 9_300, 18_900, 8_000, 8_500]\n            .map(Duration::from_micros)\n            .into(),\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"The framework observes existing draws; the controlled HUD only presents the caller's latest summary\",\n        ))\n        .child(\n            PerformanceHud::new(\n                \"scene.performance.ready\",\n                PerformanceHudState::Ready(summary),\n            )\n            .expanded(true)\n            .on_expanded(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row()\n                .items_stretch()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.waiting\",\n                        PerformanceHudState::Waiting,\n                    )),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.unavailable\",\n                        PerformanceHudState::Unavailable(\n                            \"Frame tracing is disabled by this host.\".into(),\n                        ),\n                    )),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let summary = gpui::FrameTimingSummary {\n        sample_count: 8,\n        frames_per_second: 58.7,\n        frame_budget: Duration::from_micros(16_667),\n        mean_draw_duration: Duration::from_micros(8_425),\n        p95_draw_duration: Duration::from_micros(18_900),\n        over_budget_fraction: 0.125,\n        mean_invalidations: 1.4,\n        mean_dirty_to_draw_duration: Some(Duration::from_micros(10_600)),\n        mean_submission_duration: Duration::from_micros(1_200),\n        mean_dirty_to_submission_duration: Some(Duration::from_micros(11_800)),\n        mean_input_to_submission_duration: Some(Duration::from_micros(13_400)),\n        mean_input_events: 1.6,\n        draw_durations: [7_200, 7_800, 8_100, 7_600, 9_300, 18_900, 8_000, 8_500]\n            .map(Duration::from_micros)\n            .into(),\n        submission_durations: [900, 1_100, 1_000, 1_200, 1_300, 1_800, 1_100, 1_200]\n            .map(Duration::from_micros)\n            .into(),\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"The framework observes existing draws; the controlled HUD only presents the caller's latest summary\",\n        ))\n        .child(\n            PerformanceHud::new(\n                \"scene.performance.ready\",\n                PerformanceHudState::Ready(summary),\n            )\n            .expanded(true)\n            .on_expanded(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row()\n                .items_stretch()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.waiting\",\n                        PerformanceHudState::Waiting,\n                    )),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(PerformanceHud::new(\n                        \"scene.performance.unavailable\",\n                        PerformanceHudState::Unavailable(\n                            \"Frame tracing is disabled by this host.\".into(),\n                        ),\n                    )),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "chart",
@@ -143247,6 +143365,16 @@
     "framework_paint": {
       "edge_fade": "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading.",
       "sprite_corner_coverage": "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
+    },
+    "framework_profiling": {
+      "excluded": [
+        "upstream profiler journal",
+        "hang report integration",
+        "debug frame overlay",
+        "compositor presentation callbacks"
+      ],
+      "frame_submission": "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames.",
+      "meaning": "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
     },
     "platform": [
       {

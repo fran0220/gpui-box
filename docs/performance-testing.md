@@ -55,10 +55,14 @@ versa.
 
 For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
 trace lease, filters observations to one `WindowId`, and retains a caller-sized
-history. Its `FrameTimingSummary` derives FPS from actual draw-start timestamps,
-plus mean and P95 draw duration, draw-budget overage, invalidations, and the
-available dirty-to-draw latency. “Over budget” describes time spent in
-`Window::draw`; it does not claim that the display dropped a frame.
+history. It observes only newly drawn frames that reached synchronous platform
+submission. Its `FrameTimingSummary` derives rate from actual submission-end
+timestamps, keeps mean and P95 draw duration, draw-budget overage,
+invalidations, and dirty-to-draw latency, and adds submission-call,
+dirty-to-submit, first-input-to-submit, and coalesced top-level-input
+measurements. “Over budget” still describes time spent in `Window::draw`.
+“Submitted” means the platform draw call returned; neither metric claims that
+the compositor or display presented or dropped a frame.
 
 The monitor never requests a redraw. A host decides when to poll it and whether
 the application workload should produce another frame. Multiple monitors,

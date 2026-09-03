@@ -14,10 +14,20 @@ fn summary() -> FrameTimingSummary {
         over_budget_fraction: 0.25,
         mean_invalidations: 2.0,
         mean_dirty_to_draw_duration: Some(Duration::from_millis(12)),
+        mean_submission_duration: Duration::from_millis(2),
+        mean_dirty_to_submission_duration: Some(Duration::from_millis(14)),
+        mean_input_to_submission_duration: Some(Duration::from_millis(15)),
+        mean_input_events: 1.5,
         draw_durations: vec![
             Duration::from_millis(8),
             Duration::from_millis(10),
             Duration::from_millis(20),
+            Duration::from_millis(2),
+        ],
+        submission_durations: vec![
+            Duration::from_millis(1),
+            Duration::from_millis(2),
+            Duration::from_millis(3),
             Duration::from_millis(2),
         ],
     }

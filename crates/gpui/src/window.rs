@@ -1203,6 +1203,8 @@ pub struct Window {
     /// Tracks recent input event timestamps to determine if input is arriving at a high rate.
     /// Used to selectively enable VRR optimization only when input rate exceeds 60fps.
     pub(crate) input_rate_tracker: Rc<RefCell<InputRateTracker>>,
+    frame_inputs: FrameInputAccumulator,
+    pending_frame_timing: Option<PendingFrameTiming>,
     #[cfg(feature = "input-latency-histogram")]
     input_latency_tracker: InputLatencyTracker,
     last_input_modality: InputModality,
@@ -1291,33 +1293,75 @@ impl InputRateTracker {
     }
 }
 
+#[derive(Clone, Copy)]
+struct PendingFrameTiming {
+    trace_generation: u64,
+    timing: profiler::FrameTiming,
+}
+
+#[derive(Default)]
+struct FrameInputAccumulator {
+    trace_generation: Option<u64>,
+    first_input_at: Option<Instant>,
+    input_events: u64,
+}
+
+impl FrameInputAccumulator {
+    fn record(&mut self, trace_generation: u64, input_at: Instant) {
+        if self.trace_generation != Some(trace_generation) {
+            *self = Self {
+                trace_generation: Some(trace_generation),
+                ..Default::default()
+            };
+        }
+        self.first_input_at.get_or_insert(input_at);
+        self.input_events = self.input_events.saturating_add(1);
+    }
+
+    fn take(&mut self, trace_generation: u64) -> (Option<Instant>, u64) {
+        if self.trace_generation != Some(trace_generation) {
+            *self = Self::default();
+            return (None, 0);
+        }
+        let inputs = (self.first_input_at, self.input_events);
+        *self = Self::default();
+        inputs
+    }
+
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
+
 /// A point-in-time snapshot of the input-latency histograms for a window,
 /// suitable for external formatting.
 #[cfg(feature = "input-latency-histogram")]
 #[derive(Clone)]
 pub struct InputLatencySnapshot {
-    /// Histogram of input-to-frame latency samples, in nanoseconds.
+    /// Histogram of input-to-platform-submission latency samples, in
+    /// nanoseconds.
     pub latency_histogram: Histogram<u64>,
-    /// Histogram of input events coalesced per rendered frame.
+    /// Histogram of input events coalesced per submitted frame.
     pub events_per_frame_histogram: Histogram<u64>,
     /// Count of input events that arrived mid-draw and were excluded from
     /// latency recording.
     pub mid_draw_events_dropped: u64,
 }
 
-/// Records the time between when the first input event in a frame is dispatched
-/// and when the resulting frame is presented, capturing worst-case latency when
-/// multiple events are coalesced into a single frame.
+/// Records the time between the first input dispatch and synchronous platform
+/// submission of the resulting frame, capturing worst-case latency when
+/// multiple events are coalesced. This does not observe compositor or display
+/// presentation completion.
 #[cfg(feature = "input-latency-histogram")]
 struct InputLatencyTracker {
     /// Timestamp of the first unrendered input event in the current frame;
-    /// cleared when a frame is presented.
+    /// cleared when a frame is submitted.
     first_input_at: Option<Instant>,
-    /// Count of input events received since the last frame was presented.
+    /// Count of input events received since the last frame was submitted.
     pending_input_count: u64,
-    /// Histogram of input-to-frame latency samples, in nanoseconds.
+    /// Histogram of input-to-submission latency samples, in nanoseconds.
     latency_histogram: Histogram<u64>,
-    /// Histogram of input events coalesced per rendered frame.
+    /// Histogram of input events coalesced per submitted frame.
     events_per_frame_histogram: Histogram<u64>,
     /// Count of input events that arrived mid-draw and were excluded from
     /// latency recording because their effects won't appear until the next frame.
@@ -1351,8 +1395,9 @@ impl InputLatencyTracker {
         self.mid_draw_events_dropped += 1;
     }
 
-    /// Record that a frame was presented, flushing pending latency and coalescing samples.
-    fn record_frame_presented(&mut self) {
+    /// Record that a frame was submitted, flushing pending latency and
+    /// coalescing samples.
+    fn record_frame_submitted(&mut self) {
         if let Some(first_input_at) = self.first_input_at.take() {
             let latency_nanos = first_input_at.elapsed().as_nanos() as u64;
             self.latency_histogram.record(latency_nanos).ok();
@@ -2045,6 +2090,8 @@ impl Window {
             hovered,
             needs_present,
             input_rate_tracker,
+            frame_inputs: FrameInputAccumulator::default(),
+            pending_frame_timing: None,
             #[cfg(feature = "input-latency-histogram")]
             input_latency_tracker: InputLatencyTracker::new()?,
             last_input_modality: InputModality::Mouse,
@@ -3191,7 +3238,8 @@ impl Window {
         // Drain unconditionally so a stale first-invalidation timestamp can't
         // leak into a later frame across enable/disable of frame tracing.
         let frame_dirty = self.invalidator.take_frame_dirty();
-        let draw_started_at = profiler::frame_trace_enabled().then(Instant::now);
+        let frame_trace_generation = profiler::frame_trace_generation();
+        let draw_started_at = frame_trace_generation.map(|_| Instant::now());
         self.current_frame_stats = profiler::FrameStats {
             frame_index: self.completed_frame_stats.frame_index.saturating_add(1),
             invalidations: frame_dirty.invalidations,
@@ -3321,14 +3369,24 @@ impl Window {
         }
         self.completed_frame_stats = self.current_frame_stats;
 
-        if let Some(draw_start) = draw_started_at {
-            profiler::record_frame_timing(profiler::FrameTiming {
+        if let (Some(trace_generation), Some(draw_start)) =
+            (frame_trace_generation, draw_started_at)
+        {
+            let timing = profiler::FrameTiming {
                 window_id: self.handle.window_id(),
                 dirty_at: frame_dirty.dirty_at,
                 invalidations: frame_dirty.invalidations,
                 draw_start,
                 draw_end: Instant::now(),
+            };
+            profiler::record_frame_timing(timing);
+            self.pending_frame_timing = Some(PendingFrameTiming {
+                trace_generation,
+                timing,
             });
+        } else {
+            self.pending_frame_timing = None;
+            self.frame_inputs.clear();
         }
 
         // Exit the scope to obtain the arena-clear token this draw owes; the
@@ -3398,21 +3456,38 @@ impl Window {
 
     #[profiling::function]
     fn present(&mut self) {
+        let pending_timing = self.pending_frame_timing.take();
+        let submission_start = pending_timing.map(|_| Instant::now());
         self.platform_window.draw_layered(
             &self.rendered_frame.scene,
             self.rendered_frame.overlay_scene_start,
         );
+        if let (Some(pending), Some(submission_start)) = (pending_timing, submission_start) {
+            let (first_input_at, input_events) = self.frame_inputs.take(pending.trace_generation);
+            profiler::record_frame_submission(
+                pending.trace_generation,
+                profiler::FrameSubmissionTiming {
+                    frame: pending.timing,
+                    submission_start,
+                    submission_end: Instant::now(),
+                    first_input_at,
+                    input_events,
+                },
+            );
+        } else if profiler::frame_trace_generation().is_none() {
+            self.frame_inputs.clear();
+        }
         #[cfg(feature = "input-latency-histogram")]
-        self.input_latency_tracker.record_frame_presented();
+        self.input_latency_tracker.record_frame_submitted();
         self.needs_present.set(false);
         profiling::finish_frame!();
     }
 
-    /// Presents the most recently drawn frame if it hasn't been presented yet.
+    /// Submits the most recently drawn frame if it hasn't been submitted yet.
     ///
     /// Benchmarks drive drawing synchronously rather than through a platform
     /// frame-request loop, so they call this after each measured update to
-    /// submit the frame like production presentation would.
+    /// submit the frame like the production frame loop would.
     #[cfg(feature = "bench")]
     pub fn present_if_needed(&mut self) {
         if self.needs_present.get() {
@@ -6118,11 +6193,13 @@ impl Window {
             .unwrap_or_else(|| action.name().to_string())
     }
 
-    /// Dispatch a mouse or keyboard event on the window.
+    /// Dispatch a mouse, keyboard, or touch event on the window.
     #[profiling::function]
     pub fn dispatch_event(&mut self, event: PlatformInput, cx: &mut App) -> DispatchEventResult {
-        #[cfg(feature = "input-latency-histogram")]
-        let dispatch_time = Instant::now();
+        let frame_trace_generation = profiler::frame_trace_generation();
+        let dispatch_time = (frame_trace_generation.is_some()
+            || cfg!(feature = "input-latency-histogram"))
+        .then(Instant::now);
         let update_count_before = self.invalidator.update_count();
         // Track input modality for focus-visible styling and hover suppression.
         // Hover is suppressed during keyboard modality so that keyboard navigation
@@ -6328,10 +6405,18 @@ impl Window {
 
         if self.invalidator.update_count() > update_count_before {
             self.input_rate_tracker.borrow_mut().record_input();
-            #[cfg(feature = "input-latency-histogram")]
             if self.invalidator.not_drawing() {
-                self.input_latency_tracker.record_input(dispatch_time);
+                if let (Some(trace_generation), Some(dispatch_time)) =
+                    (frame_trace_generation, dispatch_time)
+                {
+                    self.frame_inputs.record(trace_generation, dispatch_time);
+                }
+                #[cfg(feature = "input-latency-histogram")]
+                self.input_latency_tracker.record_input(
+                    dispatch_time.expect("latency feature records a dispatch timestamp"),
+                );
             } else {
+                #[cfg(feature = "input-latency-histogram")]
                 self.input_latency_tracker.record_mid_draw_input();
             }
         }
@@ -8217,13 +8302,13 @@ mod tests {
         AnyWindowHandle, AppContext as _, BackgroundTag, Bounds, BoxShadow, ContentMask, Context,
         DragMoveEvent, EdgeFade, Empty, Entity, ExternalDragPayload, ExternalDrop,
         ExternalDropData, ExternalDropEvent, ExternalDropItem, ExternalImage, ExternalPaths,
-        FileDragPaths, FileDropEvent, FocusHandle, FontId, ImageFormat, InputEvent as _,
-        InteractiveElement as _, IntoElement, LongPressEvent, MouseButton, MouseDownEvent,
-        MouseMoveEvent, ParentElement, Path, Pixels, Point, Render, RequestFrameOptions,
-        StatefulInteractiveElement as _, StyleRefinement, Styled, TestAppContext,
-        TextRenderingMode, TouchDragEvent, TouchEvent, TouchId, TouchPhase, Window,
-        WindowAppearance, WindowControlArea, WindowOptions, canvas, deferred, div, point, px, size,
-        white,
+        FileDragPaths, FileDropEvent, FocusHandle, FontId, FrameSubmissionTimingCollector,
+        FrameTraceLease, ImageFormat, InputEvent as _, InteractiveElement as _, IntoElement,
+        LongPressEvent, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Path, Pixels,
+        Point, Render, RequestFrameOptions, StatefulInteractiveElement as _, StyleRefinement,
+        Styled, TestAppContext, TextRenderingMode, TouchDragEvent, TouchEvent, TouchId, TouchPhase,
+        Window, WindowAppearance, WindowControlArea, WindowOptions, canvas, deferred, div, point,
+        px, size, white,
     };
 
     use super::{DispatchPhase, window_control_at_mouse};
@@ -9168,6 +9253,41 @@ mod tests {
                 (TouchPhase::Moved, px(30.)),
                 (TouchPhase::Ended, px(40.)),
             ]
+        );
+    }
+
+    #[gpui::test]
+    fn synthesized_touch_gestures_do_not_duplicate_input_submission_samples(
+        cx: &mut TestAppContext,
+    ) {
+        let window = cx.add_window(|_, _| EmptyView);
+        let _lease = FrameTraceLease::new();
+        let mut collector = FrameSubmissionTimingCollector::new();
+
+        dispatch_touch(window, cx, TouchId(1), TouchPhase::Started, 10.);
+        dispatch_touch(window, cx, TouchId(1), TouchPhase::Ended, 10.);
+        window
+            .update(cx, |_, window, _| {
+                assert!(
+                    window.needs_present.get(),
+                    "tap should have drawn its dirty frame"
+                );
+                window.present();
+            })
+            .expect("window remains available");
+
+        let samples = collector
+            .collect_unseen()
+            .into_iter()
+            .filter(|timing| timing.frame.window_id == window.window_id())
+            .collect::<Vec<_>>();
+        let [sample] = samples.as_slice() else {
+            panic!("expected one submitted touch frame, got {samples:?}");
+        };
+        assert!(sample.first_input_at.is_some());
+        assert_eq!(
+            sample.input_events, 1,
+            "the semantic drag/tap events synthesized inside raw-touch dispatch are not top-level inputs"
         );
     }
 

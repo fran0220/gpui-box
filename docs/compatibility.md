@@ -46,12 +46,15 @@ DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument fixtures and writes
 its renderer-specific timing lane remains separate from the structural gate.
 See [`performance-testing.md`](performance-testing.md).
 
-Live frame timing has the same per-window boundary. `FrameTimingMonitor`
-retains a bounded history of draws already requested by the application and
+Live frame timing has the same per-window boundary. `FrameTiming` retains draw
+work for benchmark consumers; `FrameSubmissionTiming` pairs the latest newly
+drawn frame with the synchronous platform submission call, the first observed
+invalidating input, and the number of coalesced top-level inputs.
+`FrameTimingMonitor` retains a bounded history of those submitted frames and
 does not create a refresh loop. Reference-counted trace leases keep concurrent
-diagnostic and benchmark consumers independent; the derived over-budget metric
-means draw work exceeded a caller-supplied budget, not that a compositor or
-display reported a dropped frame.
+diagnostic and benchmark consumers independent. Submission completion means
+the platform draw call returned, not that a compositor or display reported a
+presented or dropped frame. The budget metric remains draw-only.
 
 Client-drawn desktop titlebars share one framework contract. Nested `Client`
 areas override an enclosing `Drag` strip, caption controls preserve their

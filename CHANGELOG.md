@@ -90,6 +90,22 @@ platform-provided. The source port is from the same Apache-2.0 `gpui-pre` 0.3.2
 package audited through Longbridge GPUI Kit 0.6, with its AOSP-derived spline
 recorded in the provenance and notices.
 
+**Frame diagnostics now distinguish drawing from platform submission.** The
+framework retains every observed `Window::draw` sample for benchmark consumers
+and records a second bounded event only when that newly drawn scene is handed
+to the platform renderer. `FrameSubmissionTiming` reports submission-call,
+draw-to-submit, dirty-to-submit, and input-to-submit durations plus coalesced
+top-level input count. `FrameTimingMonitor` now summarizes submitted frames,
+derives rate from submission completion timestamps, and adds mean submission,
+dirty-to-submit, input-to-submit, and input-event measurements while preserving
+the existing draw statistics and passive, lease-owned history. Generated
+tap/scroll/drag/long-press events stay inside the outer raw-touch dispatch and
+therefore are not counted as additional inputs. “Submitted” means the
+synchronous platform draw call returned; GPUI Box does not claim compositor or
+display presentation completion and does not import the upstream profiler
+journal or debug overlay. Public `FrameTimingSummary` struct literals must add
+the new fields.
+
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs
 are Studios, branches, or environments was read by name alone, because the one
 language the library had for "which one is this" was the accent, and the accent

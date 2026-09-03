@@ -13,7 +13,14 @@ pub(super) fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement 
         over_budget_fraction: 0.125,
         mean_invalidations: 1.4,
         mean_dirty_to_draw_duration: Some(Duration::from_micros(10_600)),
+        mean_submission_duration: Duration::from_micros(1_200),
+        mean_dirty_to_submission_duration: Some(Duration::from_micros(11_800)),
+        mean_input_to_submission_duration: Some(Duration::from_micros(13_400)),
+        mean_input_events: 1.6,
         draw_durations: [7_200, 7_800, 8_100, 7_600, 9_300, 18_900, 8_000, 8_500]
+            .map(Duration::from_micros)
+            .into(),
+        submission_durations: [900, 1_100, 1_000, 1_200, 1_300, 1_800, 1_100, 1_200]
             .map(Duration::from_micros)
             .into(),
     };
