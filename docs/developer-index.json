@@ -142674,6 +142674,9 @@
     "framework_layout": {
       "measured_reveal": "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."
     },
+    "framework_paint": {
+      "edge_fade": "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading."
+    },
     "platform": [
       {
         "ci_commands": [
