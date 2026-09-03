@@ -125,9 +125,17 @@ float4 distance_from_clip_rect(float2 unit_vertex, Bounds bounds, Bounds clip_bo
     return distance_from_clip_rect_impl(position, clip_bounds);
 }
 
+// The screen-space direction a local one carries, with the translation left
+// off. The same multiply `to_device_position_transformed` applies, named
+// separately so a fragment shader can ask what one local unit measures on
+// screen without restating a matrix storage convention.
+float2 transform_direction(float2 direction, TransformationMatrix transformation) {
+    return mul(direction, transformation.rotation_scale);
+}
+
 float4 distance_from_clip_rect_transformed(float2 unit_vertex, Bounds bounds, Bounds clip_bounds, TransformationMatrix transformation) {
     float2 position = unit_vertex * bounds.size + bounds.origin;
-    float2 transformed = mul(position, transformation.rotation_scale) + transformation.translation;
+    float2 transformed = transform_direction(position, transformation) + transformation.translation;
     return distance_from_clip_rect_impl(transformed, clip_bounds);
 }
 
@@ -295,7 +303,7 @@ float pick_corner_radius(float2 center_to_point, Corners corner_radii) {
 float4 to_device_position_transformed(float2 unit_vertex, Bounds bounds,
                                       TransformationMatrix transformation) {
     float2 position = unit_vertex * bounds.size + bounds.origin;
-    float2 transformed = mul(position, transformation.rotation_scale) + transformation.translation;
+    float2 transformed = transform_direction(position, transformation) + transformation.translation;
     float2 device_position = transformed / global_viewport_size * float2(2.0, -2.0) + float2(-1.0, 1.0);
     return float4(device_position, 0.0, 1.0);
 }
@@ -326,6 +334,76 @@ float quad_sdf(float2 pt, Bounds bounds, Corners corner_radii) {
     float2 corner_to_point = abs(center_to_point) - half_size;
     float2 corner_center_to_point = corner_to_point + corner_radius;
     return quad_sdf_impl(corner_center_to_point, corner_radius);
+}
+
+// The gradient of `quad_sdf` at the same point, in the same space.
+//
+// This exists so a primitive can size its antialiasing ramp without asking the
+// rasterizer for a screen-space derivative of the distance. `fwidth` reads the
+// neighbouring lanes of a 2x2 fragment quad, and a lane that belongs to the
+// other triangle of a two-triangle rectangle is a helper invocation whose
+// value some backends do not reconstruct from the same plane: llvmpipe returns
+// derivatives in the hundreds of pixels along the shared edge, which collapses
+// `distance / edge_width` to zero and leaves fully interior pixels at half
+// coverage. The gradient is a property of the field, so deriving it here is
+// both exact and independent of how any backend fills a helper lane.
+//
+// The field is a distance, so this vector has unit length wherever it is
+// defined. It follows the same branches `quad_sdf_impl` takes.
+float2 quad_sdf_gradient(float2 pt, Bounds bounds, Corners corner_radii) {
+    float2 half_size = bounds.size / 2.;
+    float2 center = bounds.origin + half_size;
+    float2 center_to_point = pt - center;
+    float corner_radius = pick_corner_radius(center_to_point, corner_radii);
+    float2 corner_to_point = abs(center_to_point) - half_size;
+    float2 corner_center_to_point = corner_to_point + corner_radius;
+
+    // In the quadrant `abs` folded the point into.
+    float2 mirrored = corner_center_to_point.x > corner_center_to_point.y
+                          ? float2(1.0, 0.0)
+                          : float2(0.0, 1.0);
+    if (corner_radius != 0.0) {
+        float2 outside = max(float2(0.0, 0.0), corner_center_to_point);
+        float outside_distance = length(outside);
+        if (outside_distance > 0.0) {
+            mirrored = outside / outside_distance;
+        }
+    }
+
+    // Unfold it. `sign` is zero on the centre lines, where either direction is
+    // as good as the other, so the fold is undone with an explicit choice.
+    float2 unfold = float2(center_to_point.x >= 0.0 ? 1.0 : -1.0,
+                           center_to_point.y >= 0.0 ? 1.0 : -1.0);
+    return mirrored * unfold;
+}
+
+// How wide, in device pixels, the antialiasing ramp of a transformed quad SDF
+// is at one point.
+//
+// This is what a conforming `fwidth(distance)` reports — the sum of the two
+// absolute screen-space partial derivatives — computed from the field and the
+// primitive's own transform instead of from neighbouring fragments. A
+// primitive whose transform collapses to a line has no ramp to measure, and
+// falls back to one pixel.
+float quad_sdf_edge_width(float2 pt, Bounds bounds, Corners corner_radii,
+                          TransformationMatrix transformation) {
+    float2 gradient = quad_sdf_gradient(pt, bounds, corner_radii);
+    // The two screen-space vectors one local unit along each local axis maps
+    // to, which are the columns of the forward transform. Naming them through
+    // the same multiply the vertex stage does keeps every renderer's matrix
+    // storage convention out of this.
+    float2 along_x = transform_direction(float2(1.0, 0.0), transformation);
+    float2 along_y = transform_direction(float2(0.0, 1.0), transformation);
+    float mapped_area = along_x.x * along_y.y - along_y.x * along_x.y;
+    if (abs(mapped_area) < 1e-6) {
+        return 1.0;
+    }
+    // A gradient is a covector, so it travels through the inverse transpose.
+    float2 screen_gradient =
+        float2(along_y.y * gradient.x - along_x.y * gradient.y,
+               along_x.x * gradient.y - along_y.x * gradient.x) /
+        mapped_area;
+    return max(abs(screen_gradient.x) + abs(screen_gradient.y), 0.0001);
 }
 
 GradientColor prepare_gradient_pair(uint color_space, Hsla color0, Hsla color1) {
@@ -1362,7 +1440,8 @@ float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input): SV_Targe
     PolychromeSprite sprite = poly_sprites[input.sprite_id];
     float4 sample = t_sprite.Sample(s_sprite, input.tile_position);
     float distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
-    float edge_width = max(fwidth(distance), 0.0001);
+    float edge_width = quad_sdf_edge_width(input.local_position, sprite.bounds,
+                                           sprite.corner_radii, sprite.transformation);
     float coverage = saturate(0.5 - distance / edge_width);
 
     float4 color = sample;

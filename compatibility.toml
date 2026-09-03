@@ -52,6 +52,7 @@ resolved_element_focus = "InteractiveElement::on_focus_resolved observes the exa
 measured_reveal = "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."
 
 [framework_paint]
+sprite_corner_coverage = "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
 edge_fade = "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading."
 
 [release_validation]

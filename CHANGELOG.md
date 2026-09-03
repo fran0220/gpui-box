@@ -8,6 +8,27 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Fixed
+
+**An image is opaque where it is opaque.** Every polychrome sprite — an
+`img()`, a `Window::paint_image`, a sprite-batch instance, a colour emoji —
+carried a faint dashed line from one corner to the other, and short ticks
+where its rounded corners begin. The mask that rounds those corners sized its
+antialiasing ramp with `fwidth(distance)`, which asks the rasterizer for the
+neighbouring lanes of a 2x2 fragment quad; a rectangle is two triangles, and
+along their shared edge some backends do not reconstruct a helper lane's value
+from the same plane. Measured under llvmpipe, that derivative reached over 200
+pixels where the true one is 1, which drives `distance / edge_width` to zero
+and leaves pixels deep inside the picture at half coverage. Over a dark page
+nobody could see it; over a light one the page read straight through the
+artwork. The ramp is now derived from the distance field's own gradient and
+the primitive's own transform, in Metal, Direct3D, WGPU and WebGL alike, so
+it no longer depends on how any backend fills a helper lane. It is the same
+width a conforming `fwidth` reports, so corner antialiasing is unchanged —
+including on rotated and scaled sprites, whose ramp is measured through their
+transform rather than assumed to be one pixel. Monochrome sprites, glyphs,
+SVGs, shadows and quads never used that derivative and are untouched.
+
 ### Added
 
 **A tab can wear the colour of the thing it stands for.** A strip whose tabs

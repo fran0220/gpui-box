@@ -118,6 +118,18 @@ different transcendental approximations for the noise. Color conversion and
 edge rasterization remain renderer-specific, which is why each renderer
 retains its own baseline rather than claiming identical bytes across platforms.
 
+A rounded sprite's antialiasing ramp is a property of its own geometry rather
+than of its neighbours. Metal, Direct3D, WGPU, and WebGL all size the polychrome
+sprite's corner mask from the analytic gradient of the same signed distance
+field the mask uses, mapped to device pixels through the sprite's own
+transform. That is the width a conforming `fwidth` reports for the smooth parts
+of the field, and it is defined everywhere the field is — including along the
+shared edge of the two triangles a sprite rectangle is drawn as, where a
+screen-space derivative depends on how a backend reconstructs a helper
+invocation and llvmpipe returns hundreds of pixels. Monochrome sprites, glyphs,
+SVG masks, shadows, and quads never consumed that derivative; their coverage is
+unchanged.
+
 Scroll-edge fading uses those same painted bounds rather than treating every
 primitive as one atomic mark. Solid quads and filled paths crossing one active
 edge carry a per-pixel linear alpha ramp; a path's stops are normalized to the

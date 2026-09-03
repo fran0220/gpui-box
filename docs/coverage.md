@@ -237,6 +237,25 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Sprite corner coverage reviewed on a retired renderer, 2026-09-03
+
+The polychrome sprite corner mask's dependence on `fwidth(distance)` was found
+downstream in a light appearance and reproduced here in direct offscreen
+readback under Linux llvmpipe — no compositor took part, so it is a renderer
+defect rather than a capture artifact. `visual-effects` and `cinematic-effects`
+carried the dashed seam through their own sprite batches and particle recipes,
+and `game-ui` through its item art; the three scenes are the whole of the
+catalog's polychrome sprite coverage, and all six of their images move with the
+correction.
+
+Whether Metal and WARP ever showed the same seam is not recorded, because
+neither renderer can be run here. Both carried the identical `fwidth`-sized
+mask, so both were exposed to the same class of failure; the correction removes
+the derivative rather than compensating for one backend, and reproduces the
+width a conforming `fwidth` reports. Whoever next captures on macOS and Windows
+should review those six images against this entry rather than accepting them
+unseen.
+
 ### Edge-faded crossing surfaces with no active baseline, 2026-09-03
 
 A tall `SettingsSection` whose card crossed the bottom of a `ScrollArea` was

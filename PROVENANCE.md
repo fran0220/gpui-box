@@ -80,6 +80,12 @@ shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader
 implementations were authored here; they import no additional framework or
 shader source.
 
+The derivative-free polychrome sprite corner mask is subsequent GPUI Box work.
+The analytic gradient of the existing quad signed distance field, and the
+device-pixel ramp width derived from it through the sprite's own transform,
+were authored here in the Metal, Direct3D, and WGPU/WebGL shaders that already
+carried the field. The correction imports no source, shader, or visual asset.
+
 The primitive-aware scroll-edge fade correction is subsequent GPUI Box work.
 Solid filled paths reuse the existing renderer-backed gradient in the clipped
 bounds every path shader already reads; large shadows, SVG masks, images, and

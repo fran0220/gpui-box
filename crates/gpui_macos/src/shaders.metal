@@ -28,6 +28,12 @@ float pick_corner_radius(float2 center_to_point, Corners_ScaledPixels corner_rad
 float quad_sdf(float2 point, Bounds_ScaledPixels bounds,
                Corners_ScaledPixels corner_radii);
 float quad_sdf_impl(float2 center_to_point, float corner_radius);
+float2 quad_sdf_gradient(float2 point, Bounds_ScaledPixels bounds,
+                         Corners_ScaledPixels corner_radii);
+float quad_sdf_edge_width(float2 point, Bounds_ScaledPixels bounds,
+                          Corners_ScaledPixels corner_radii,
+                          TransformationMatrix transformation);
+float2 transform_direction(float2 direction, TransformationMatrix transformation);
 float gaussian(float x, float sigma);
 float2 erf(float2 x);
 float blur_along_x(float x, float y, float sigma, float corner,
@@ -783,7 +789,9 @@ fragment float4 polychrome_sprite_fragment(
       atlas_texture.sample(atlas_texture_sampler, input.tile_position);
   float distance =
       quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
-  float edge_width = max(fwidth(distance), 0.0001);
+  float edge_width = quad_sdf_edge_width(input.local_position, sprite.bounds,
+                                         sprite.corner_radii,
+                                         sprite.transformation);
   float coverage = saturate(0.5 - distance / edge_width);
 
   float4 color = sample;
@@ -1088,12 +1096,9 @@ float4 to_device_position_transformed(float2 unit_vertex, Bounds_ScaledPixels bo
       unit_vertex * float2(bounds.size.width, bounds.size.height) +
       float2(bounds.origin.x, bounds.origin.y);
 
-  // Apply the transformation matrix to the position via matrix multiplication.
-  float2 transformed_position = float2(0, 0);
-  transformed_position[0] = position[0] * transformation.rotation_scale[0][0] + position[1] * transformation.rotation_scale[0][1];
-  transformed_position[1] = position[0] * transformation.rotation_scale[1][0] + position[1] * transformation.rotation_scale[1][1];
-
-  // Add in the translation component of the transformation matrix.
+  // Apply the transformation matrix to the position, then add in its
+  // translation component.
+  float2 transformed_position = transform_direction(position, transformation);
   transformed_position[0] += transformation.translation[0];
   transformed_position[1] += transformation.translation[1];
 
@@ -1141,6 +1146,91 @@ float quad_sdf(float2 point, Bounds_ScaledPixels bounds,
     float2 corner_to_point = fabs(center_to_point) - half_size;
     float2 corner_center_to_point = corner_to_point + corner_radius;
     return quad_sdf_impl(corner_center_to_point, corner_radius);
+}
+
+// The screen-space direction a local one carries, with the translation left
+// off. The same multiply `to_device_position_transformed` applies, named
+// separately so a fragment shader can ask what one local unit measures on
+// screen without restating a matrix storage convention.
+float2 transform_direction(float2 direction, TransformationMatrix transformation) {
+    float2 transformed = float2(0., 0.);
+    transformed[0] = direction[0] * transformation.rotation_scale[0][0] +
+                     direction[1] * transformation.rotation_scale[0][1];
+    transformed[1] = direction[0] * transformation.rotation_scale[1][0] +
+                     direction[1] * transformation.rotation_scale[1][1];
+    return transformed;
+}
+
+// The gradient of `quad_sdf` at the same point, in the same space.
+//
+// This exists so a primitive can size its antialiasing ramp without asking the
+// rasterizer for a screen-space derivative of the distance. `fwidth` reads the
+// neighbouring lanes of a 2x2 fragment quad, and a lane that belongs to the
+// other triangle of a two-triangle rectangle is a helper invocation whose
+// value some backends do not reconstruct from the same plane: llvmpipe returns
+// derivatives in the hundreds of pixels along the shared edge, which collapses
+// `distance / edge_width` to zero and leaves fully interior pixels at half
+// coverage. The gradient is a property of the field, so deriving it here is
+// both exact and independent of how any backend fills a helper lane.
+//
+// The field is a distance, so this vector has unit length wherever it is
+// defined. It follows the same branches `quad_sdf_impl` takes.
+float2 quad_sdf_gradient(float2 point, Bounds_ScaledPixels bounds,
+                         Corners_ScaledPixels corner_radii) {
+    float2 half_size = float2(bounds.size.width, bounds.size.height) / 2.;
+    float2 center = float2(bounds.origin.x, bounds.origin.y) + half_size;
+    float2 center_to_point = point - center;
+    float corner_radius = pick_corner_radius(center_to_point, corner_radii);
+    float2 corner_to_point = fabs(center_to_point) - half_size;
+    float2 corner_center_to_point = corner_to_point + corner_radius;
+
+    // In the quadrant `fabs` folded the point into.
+    float2 mirrored = corner_center_to_point.x > corner_center_to_point.y
+                          ? float2(1., 0.)
+                          : float2(0., 1.);
+    if (corner_radius != 0.) {
+        float2 outside = max(float2(0.), corner_center_to_point);
+        float outside_distance = length(outside);
+        if (outside_distance > 0.) {
+            mirrored = outside / outside_distance;
+        }
+    }
+
+    // Unfold it. `sign` is zero on the centre lines, where either direction is
+    // as good as the other, so the fold is undone with an explicit choice.
+    float2 unfold = float2(center_to_point.x >= 0. ? 1. : -1.,
+                           center_to_point.y >= 0. ? 1. : -1.);
+    return mirrored * unfold;
+}
+
+// How wide, in device pixels, the antialiasing ramp of a transformed quad SDF
+// is at one point.
+//
+// This is what a conforming `fwidth(distance)` reports — the sum of the two
+// absolute screen-space partial derivatives — computed from the field and the
+// primitive's own transform instead of from neighbouring fragments. A
+// primitive whose transform collapses to a line has no ramp to measure, and
+// falls back to one pixel.
+float quad_sdf_edge_width(float2 point, Bounds_ScaledPixels bounds,
+                          Corners_ScaledPixels corner_radii,
+                          TransformationMatrix transformation) {
+    float2 gradient = quad_sdf_gradient(point, bounds, corner_radii);
+    // The two screen-space vectors one local unit along each local axis maps
+    // to, which are the columns of the forward transform. Naming them through
+    // the same multiply the vertex stage does keeps every renderer's matrix
+    // storage convention out of this.
+    float2 along_x = transform_direction(float2(1., 0.), transformation);
+    float2 along_y = transform_direction(float2(0., 1.), transformation);
+    float mapped_area = along_x.x * along_y.y - along_y.x * along_x.y;
+    if (fabs(mapped_area) < 1e-6) {
+        return 1.;
+    }
+    // A gradient is a covector, so it travels through the inverse transpose.
+    float2 screen_gradient =
+        float2(along_y.y * gradient.x - along_x.y * gradient.y,
+               along_x.x * gradient.y - along_y.x * gradient.x) /
+        mapped_area;
+    return max(fabs(screen_gradient.x) + fabs(screen_gradient.y), 0.0001);
 }
 
 // Implementation of quad signed distance field
@@ -1201,9 +1291,7 @@ float4 distance_from_clip_rect_transformed(float2 unit_vertex, Bounds_ScaledPixe
   float2 position =
       unit_vertex * float2(bounds.size.width, bounds.size.height) +
       float2(bounds.origin.x, bounds.origin.y);
-  float2 transformed_position = float2(0, 0);
-  transformed_position[0] = position[0] * transformation.rotation_scale[0][0] + position[1] * transformation.rotation_scale[0][1];
-  transformed_position[1] = position[0] * transformation.rotation_scale[1][0] + position[1] * transformation.rotation_scale[1][1];
+  float2 transformed_position = transform_direction(position, transformation);
   transformed_position[0] += transformation.translation[0];
   transformed_position[1] += transformation.translation[1];
 

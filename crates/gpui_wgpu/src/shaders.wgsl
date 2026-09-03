@@ -183,9 +183,17 @@ fn to_device_position(unit_vertex: vec2<f32>, bounds: Bounds) -> vec4<f32> {
 
 fn to_device_position_transformed(unit_vertex: vec2<f32>, bounds: Bounds, transform: TransformationMatrix) -> vec4<f32> {
     let position = unit_vertex * vec2<f32>(bounds.size) + bounds.origin;
-    //Note: Rust side stores it as row-major, so transposing here
-    let transformed = transpose(transform.rotation_scale) * position + transform.translation;
+    let transformed = transform_direction(position, transform) + transform.translation;
     return to_device_position_impl(transformed);
+}
+
+// The screen-space direction a local one carries, with the translation left
+// off. The same multiply `to_device_position_transformed` applies, named
+// separately so a fragment shader can ask what one local unit measures on
+// screen without restating a matrix storage convention.
+fn transform_direction(direction: vec2<f32>, transform: TransformationMatrix) -> vec2<f32> {
+    //Note: Rust side stores it as row-major, so transposing here
+    return transpose(transform.rotation_scale) * direction;
 }
 
 fn to_tile_position(unit_vertex: vec2<f32>, tile: AtlasTile) -> vec2<f32> {
@@ -378,6 +386,83 @@ fn quad_sdf(point: vec2<f32>, bounds: Bounds, corner_radii: Corners) -> f32 {
     let corner_to_point = abs(center_to_point) - half_size;
     let corner_center_to_point = corner_to_point + corner_radius;
     return quad_sdf_impl(corner_center_to_point, corner_radius);
+}
+
+// The gradient of `quad_sdf` at the same point, in the same space.
+//
+// This exists so a primitive can size its antialiasing ramp without asking the
+// rasterizer for a screen-space derivative of the distance. `fwidth` reads the
+// neighbouring lanes of a 2x2 fragment quad, and a lane that belongs to the
+// other triangle of a two-triangle rectangle is a helper invocation whose
+// value some backends do not reconstruct from the same plane: llvmpipe returns
+// derivatives in the hundreds of pixels along the shared edge, which collapses
+// `distance / edge_width` to zero and leaves fully interior pixels at half
+// coverage. The gradient is a property of the field, so deriving it here is
+// both exact and independent of how any backend fills a helper lane.
+//
+// The field is a distance, so this vector has unit length wherever it is
+// defined. It follows the same branches `quad_sdf_impl` takes, because a ramp
+// measured against a different field than the one being masked is not the
+// ramp that field needs.
+fn quad_sdf_gradient(point: vec2<f32>, bounds: Bounds, corner_radii: Corners) -> vec2<f32> {
+    let half_size = bounds.size / 2.0;
+    let center = bounds.origin + half_size;
+    let center_to_point = point - center;
+    let corner_radius = pick_corner_radius(center_to_point, corner_radii);
+    let corner_to_point = abs(center_to_point) - half_size;
+    let corner_center_to_point = corner_to_point + corner_radius;
+
+    // In the quadrant `abs` folded the point into.
+    var mirrored = select(
+        vec2<f32>(0.0, 1.0),
+        vec2<f32>(1.0, 0.0),
+        corner_center_to_point.x > corner_center_to_point.y,
+    );
+    if (corner_radius != 0.0) {
+        let outside = max(vec2<f32>(0.0), corner_center_to_point);
+        let outside_distance = length(outside);
+        if (outside_distance > 0.0) {
+            mirrored = outside / outside_distance;
+        }
+    }
+
+    // Unfold it. `sign` is zero on the centre lines, where either direction is
+    // as good as the other, so the fold is undone with an explicit choice.
+    let unfold = select(vec2<f32>(-1.0), vec2<f32>(1.0), center_to_point >= vec2<f32>(0.0));
+    return mirrored * unfold;
+}
+
+// How wide, in device pixels, the antialiasing ramp of a transformed quad SDF
+// is at one point.
+//
+// This is what a conforming `fwidth(distance)` reports — the sum of the two
+// absolute screen-space partial derivatives — computed from the field and the
+// primitive's own transform instead of from neighbouring fragments. A
+// primitive whose transform collapses to a line has no ramp to measure, and
+// falls back to one pixel.
+fn quad_sdf_edge_width(
+    point: vec2<f32>,
+    bounds: Bounds,
+    corner_radii: Corners,
+    transform: TransformationMatrix,
+) -> f32 {
+    let gradient = quad_sdf_gradient(point, bounds, corner_radii);
+    // The two screen-space vectors one local unit along each local axis maps
+    // to, which are the columns of the forward transform. Naming them through
+    // the same multiply the vertex stage does keeps every renderer's matrix
+    // storage convention out of this.
+    let along_x = transform_direction(vec2<f32>(1.0, 0.0), transform);
+    let along_y = transform_direction(vec2<f32>(0.0, 1.0), transform);
+    let mapped_area = along_x.x * along_y.y - along_y.x * along_x.y;
+    if (abs(mapped_area) < 1e-6) {
+        return 1.0;
+    }
+    // A gradient is a covector, so it travels through the inverse transpose.
+    let screen_gradient = vec2<f32>(
+        along_y.y * gradient.x - along_x.y * gradient.y,
+        along_x.x * gradient.y - along_y.x * gradient.x,
+    ) / mapped_area;
+    return max(abs(screen_gradient.x) + abs(screen_gradient.y), 0.0001);
 }
 
 fn quad_sdf_impl(corner_center_to_point: vec2<f32>, corner_radius: f32) -> f32 {
@@ -1404,12 +1489,17 @@ fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.tile_position);
     let sprite = load_poly_sprite(input.sprite_id);
     let distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
-    let edge_width = max(fwidth(distance), 0.0001);
+    let edge_width = quad_sdf_edge_width(
+        input.local_position,
+        sprite.bounds,
+        sprite.corner_radii,
+        sprite.transformation,
+    );
     let coverage = saturate(0.5 - distance / edge_width);
 
-    // Texture sampling and edge antialiasing both use derivatives. Evaluate
-    // them before the per-fragment clip branch: WebGPU rejects derivatives in
-    // non-uniform control flow even though native backends accept the shader.
+    // Texture sampling uses derivatives. Sample before the per-fragment clip
+    // branch: WebGPU rejects derivatives in non-uniform control flow even
+    // though native backends accept the shader.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return vec4<f32>(0.0);
     }
