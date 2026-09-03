@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, ParentElement, SharedString, TestAppContext};
+use gpui::{InteractiveElement, IntoElement, ParentElement, SharedString, Styled, TestAppContext};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -422,6 +422,77 @@ fn reading_text_reports_the_request_and_opens_nothing(cx: &mut TestAppContext) {
             .value
             .as_deref(),
         Some("reading")
+    );
+}
+
+#[gpui::test]
+fn reading_text_wraps_only_when_the_caller_says_it_is_multiline(cx: &mut TestAppContext) {
+    const VALUE: &str = "A lantern-lit harbour at dusk, tall ships waiting beyond the breakwater";
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        gpui::div()
+            .w(gpui::px(200.0))
+            .flex()
+            .flex_col()
+            .child(
+                InlineEdit::new("prompt.single", VALUE)
+                    .on_edit(|_, _| {})
+                    .into_any_element(),
+            )
+            .child(
+                InlineEdit::new("prompt.multiline", VALUE)
+                    .multiline(true)
+                    .on_edit(|_, _| {})
+                    .into_any_element(),
+            )
+            .into_any_element()
+    });
+
+    let single = harness.node("prompt.single").expect("single-line reading");
+    let multiline = harness
+        .node("prompt.multiline")
+        .expect("multi-line reading");
+    assert!(
+        multiline.bounds.height > single.bounds.height,
+        "multi-line reading {:?} should wrap beyond one row {:?}",
+        multiline.bounds,
+        single.bounds
+    );
+    assert_eq!(multiline.text.as_deref(), Some(VALUE));
+}
+
+#[gpui::test]
+fn a_single_line_value_yields_to_the_pen_inside_a_bounded_parent(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        gpui::div()
+            .w(gpui::px(200.0))
+            .debug_selector(|| "prompt.parent".to_string())
+            .child(
+                InlineEdit::new(
+                    "prompt.single",
+                    "A lantern-lit harbour at dusk, tall ships waiting beyond the breakwater",
+                )
+                .on_edit(|_, _| {}),
+            )
+            .into_any_element()
+    });
+
+    let parent = harness
+        .context()
+        .debug_bounds("prompt.parent")
+        .expect("bounded parent");
+    let value = harness
+        .context()
+        .debug_bounds("prompt.single.reading-value")
+        .expect("reading value");
+    let pen = harness
+        .context()
+        .debug_bounds("prompt.single.pen")
+        .expect("edit affordance");
+
+    assert!(value.right() <= pen.left(), "the value yields to the pen");
+    assert!(
+        pen.right() <= parent.right(),
+        "the pen {pen:?} stays inside its parent {parent:?}"
     );
 }
 

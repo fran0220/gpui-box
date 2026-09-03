@@ -278,6 +278,8 @@ impl RenderOnce for InlineEdit {
         if !editing {
             let actionable = !self.disabled && self.on_edit.is_some();
             let empty = self.value.is_empty();
+            let reading_value_selector = format!("{}.reading-value", self.ident.semantic_id());
+            let pen_selector = format!("{}.pen", self.ident.semantic_id());
             let mut reading = div()
                 .id(self.ident.element_id())
                 .row()
@@ -308,8 +310,14 @@ impl RenderOnce for InlineEdit {
                         theme.colors.text_faint
                     } else {
                         theme.colors.text
-                    }),
+                    })
+                    .flex_1()
+                    .min_w_0()
+                    .when(self.multiline, |element| element.whitespace_normal())
+                    .when(!self.multiline, |element| element.truncate())
+                    .debug_selector(move || reading_value_selector),
                 )
+                .when(self.multiline, |element| element.items_start())
                 // Text that turns into a field has to say so before it is
                 // clicked, or it is text.
                 .when(actionable, |element| {
@@ -317,7 +325,8 @@ impl RenderOnce for InlineEdit {
                         gpui_kit_assets::icon(gpui_kit_assets::Icon::Pen)
                             .size(px(metrics.icon_size))
                             .flex_none()
-                            .text_color(theme.colors.text_faint),
+                            .text_color(theme.colors.text_faint)
+                            .debug_selector(move || pen_selector),
                     )
                 })
                 .when(actionable, |element| {
