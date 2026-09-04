@@ -15,7 +15,6 @@
 //! is transient view state, so it is held in an application global keyed by
 //! semantic identity rather than by the caller.
 
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
@@ -501,8 +500,6 @@ fn bar(
         .into_any_element()
 }
 
-type ScrollHandles = HashMap<SharedString, ScrollHandle>;
-
 /// How far the region with this identity has been scrolled, in pixels down
 /// and across from the start of its content.
 ///
@@ -534,10 +531,11 @@ pub fn scroll_to(ident: impl Into<Ident>, offset: Point<Pixels>, window: &Window
 /// carrying a field for a region whose existence depends on what it was given
 /// to show.
 pub(crate) fn scroll_handle(ident: &Ident, window: &Window, cx: &mut App) -> ScrollHandle {
-    window_state::with(
+    window_state::with_key(
+        &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
-        |handles: &mut ScrollHandles| handles.entry(ident.semantic_id()).or_default().clone(),
+        |handle: &mut ScrollHandle| handle.clone(),
     )
 }
 

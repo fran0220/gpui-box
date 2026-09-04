@@ -6,7 +6,6 @@
 //! keeps the position across rebuilds without making every caller own a GPUI
 //! handle, and it lets a surface built on top of another one move it by name.
 
-use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::foundation::{Ident, window_state};
@@ -24,8 +23,6 @@ const FRAME: Duration = Duration::from_millis(16);
 /// its estimated height and then jumping to its real one.
 const OVERDRAW: f32 = 240.0;
 
-type ScrollHandles = HashMap<SharedString, UniformListScrollHandle>;
-
 /// What one variable-height surface has learned about itself.
 struct Flow {
     state: ListState,
@@ -34,14 +31,6 @@ struct Flow {
     /// a run of anonymous names it can still compare the length of.
     keys: Vec<SharedString>,
 }
-
-/// The rows a variable-height surface has measured, and where it is scrolled.
-///
-/// A uniform list needs no such thing: every row is the same height, so it
-/// knows where row ten thousand starts without laying one out. A list whose
-/// rows are as tall as their content only learns a row's height by laying it
-/// out, so what it has learned has to survive the rebuild.
-type FlowStates = HashMap<SharedString, Flow>;
 
 /// How a surface describes the rows it is about to draw.
 ///
@@ -106,10 +95,11 @@ pub(crate) fn scroll_handle(
     window: &Window,
     cx: &mut App,
 ) -> UniformListScrollHandle {
-    window_state::with(
+    window_state::with_key(
+        &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
-        |handles: &mut ScrollHandles| handles.entry(ident.semantic_id()).or_default().clone(),
+        |handle: &mut UniformListScrollHandle| handle.clone(),
     )
 }
 
@@ -133,11 +123,12 @@ pub(crate) fn list_state(
     cx: &mut App,
 ) -> ListState {
     let count = rows.len();
-    window_state::with(
+    window_state::with_key(
+        &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
-        |states: &mut FlowStates| {
-            let flow = states.entry(ident.semantic_id()).or_insert_with(|| Flow {
+        |flow: &mut Option<Flow>| {
+            let flow = flow.get_or_insert_with(|| Flow {
                 state: ListState::new(count, alignment, px(OVERDRAW))
                     .with_uniform_item_height(estimate),
                 keys: anonymous(count),
@@ -360,11 +351,12 @@ pub fn viewed_rows(ident: &Ident, window: &Window, cx: &App) -> Option<Viewed> {
 }
 
 pub(crate) fn flow_state(ident: &Ident, window_id: WindowId, cx: &App) -> Option<ListState> {
-    window_state::read(window_id, cx, |states: &FlowStates| {
-        states
-            .get(&ident.semantic_id())
-            .map(|flow| flow.state.clone())
-    })
+    window_state::read_key(
+        &ident.semantic_id(),
+        window_id,
+        cx,
+        |flow: &Option<Flow>| flow.as_ref().map(|flow| flow.state.clone()),
+    )
     .flatten()
 }
 

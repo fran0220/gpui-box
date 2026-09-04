@@ -7,7 +7,6 @@
 //! frame that publishes it.
 
 use std::cell::Cell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{App, Bounds, Pixels, SharedString, Window};
@@ -19,14 +18,13 @@ use crate::foundation::window_state;
 /// Sub-pixel drift would otherwise ask for a redraw on every frame forever.
 const EPSILON: f32 = 0.5;
 
-type Measurements = HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>>;
-
 /// The cell holding the bounds last measured for `id`.
 pub(crate) fn cell(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Cell<Bounds<Pixels>>> {
-    window_state::with(
+    window_state::with_key(
+        id,
         window.window_handle().window_id(),
         cx,
-        |cells: &mut Measurements| Rc::clone(cells.entry(id.clone()).or_default()),
+        |cell: &mut Rc<Cell<Bounds<Pixels>>>| Rc::clone(cell),
     )
 }
 

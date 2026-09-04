@@ -14,7 +14,6 @@
 //! save.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
@@ -74,13 +73,12 @@ struct Memory {
     editor: RefCell<Option<Editor>>,
 }
 
-type Memories = HashMap<SharedString, Rc<Memory>>;
-
 fn memory(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Memory> {
-    window_state::with(
+    window_state::with_key(
+        id,
         window.window_handle().window_id(),
         cx,
-        |memories: &mut Memories| Rc::clone(memories.entry(id.clone()).or_default()),
+        |memory: &mut Rc<Memory>| Rc::clone(memory),
     )
 }
 

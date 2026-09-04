@@ -6,7 +6,6 @@
 //! that still holds.
 
 use std::cell::Cell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
@@ -504,18 +503,17 @@ impl RenderOnce for SplitPane {
     }
 }
 
-type Dragging = HashMap<SharedString, Rc<Cell<bool>>>;
-
 /// Whether a drag of this split's divider is in flight.
 ///
 /// A `RenderOnce` builder is rebuilt every frame, so the press that starts a
 /// drag and the moves that continue it are in different builds and need
 /// somewhere outside the frame to agree.
 fn drag_flag(ident: &Ident, window: &Window, cx: &mut App) -> Rc<Cell<bool>> {
-    window_state::with(
+    window_state::with_key(
+        &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
-        |flags: &mut Dragging| Rc::clone(flags.entry(ident.semantic_id()).or_default()),
+        |flag: &mut Rc<Cell<bool>>| Rc::clone(flag),
     )
 }
 

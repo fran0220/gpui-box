@@ -22,10 +22,9 @@
 //! toward it, or a reader nudging up from the bottom would be snapped back
 //! down by their own gesture and the pin would be unbreakable.
 
-use std::collections::HashMap;
 use std::time::Duration;
 
-use gpui::{App, ListState, Pixels, SharedString, Window, WindowId, px};
+use gpui::{App, ListState, Pixels, Window, WindowId, px};
 use web_time::Instant;
 
 use crate::data::viewport::flow_state;
@@ -206,17 +205,13 @@ impl Default for Follower {
     }
 }
 
-type Followers = HashMap<SharedString, Follower>;
-
 fn with_follower<R>(
     ident: &Ident,
     window_id: WindowId,
     cx: &mut App,
     act: impl FnOnce(&mut Follower) -> R,
 ) -> R {
-    window_state::with(window_id, cx, |followers: &mut Followers| {
-        act(followers.entry(ident.semantic_id()).or_default())
-    })
+    window_state::with_key(&ident.semantic_id(), window_id, cx, act)
 }
 
 /// How far above its end this list is sitting.
@@ -383,14 +378,11 @@ pub fn release_end(ident: &Ident, window: &Window, cx: &mut App) {
 
 /// Whether this surface is currently holding its end.
 pub fn follows_end(ident: &Ident, window: &Window, cx: &App) -> bool {
-    window_state::read(
+    window_state::read_key(
+        &ident.semantic_id(),
         window.window_handle().window_id(),
         cx,
-        |followers: &Followers| {
-            followers
-                .get(&ident.semantic_id())
-                .is_some_and(|follower| follower.pinned)
-        },
+        |follower: &Follower| follower.pinned,
     )
     .unwrap_or(false)
 }

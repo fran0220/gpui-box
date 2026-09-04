@@ -69,6 +69,13 @@ changing 400 component call sites into plugin-aware code.
   replay/budgets, and toast routing — is keyed by the same `WindowId` and is
   removed when that window closes. A local component id is never treated as
   application-global identity.
+- Per-identity builder state records the last semantic generation that touched
+  each key and lazily discards keys that miss a full frame. It deliberately
+  does not use GPUI element state: these handles and cells are addressed by
+  semantic id from sibling builders and host commands, while element state is
+  owned by one element's layout lifecycle. Modal order, effect budgets, and
+  toast routing remain window-level because they are event state rather than
+  rendered identities.
 - Add validated segment types for semantic ids. Plugin ids, mount ids, and
   local business keys are qualified by constructors, never scattered string
   concatenation. Prefix checks are segment-aware and plugin parents must stay

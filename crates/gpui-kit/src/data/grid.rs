@@ -935,13 +935,12 @@ struct Memory {
     range_cover: RefCell<Option<RangeCover>>,
 }
 
-type Memories = HashMap<SharedString, Rc<Memory>>;
-
 fn memory(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Memory> {
-    window_state::with(
+    window_state::with_key(
+        id,
         window.window_handle().window_id(),
         cx,
-        |memories: &mut Memories| Rc::clone(memories.entry(id.clone()).or_default()),
+        |memory: &mut Rc<Memory>| Rc::clone(memory),
     )
 }
 

@@ -16,33 +16,14 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gpui::{App, SharedString, WindowId};
-use gpui_kit_semantics::SemanticCoordinator;
-
 use crate::foundation::window_state;
+use gpui::{App, SharedString, WindowId};
 
 /// How many frames an untouched entry survives.
 ///
 /// One frame of slack, so an element that renders on every frame is never
 /// dropped by a frame boundary that falls between two of its own renders.
 const GRACE: u64 = 2;
-
-struct Entry<T> {
-    seen: u64,
-    /// How many frames this entry survives, which the caller that touched it
-    /// last decides: a handoff between two element trees needs longer than an
-    /// element that renders on every frame.
-    grace: u64,
-    value: Rc<RefCell<T>>,
-}
-
-struct Keyed<T>(HashMap<SharedString, Entry<T>>);
-
-impl<T> Default for Keyed<T> {
-    fn default() -> Self {
-        Self(HashMap::new())
-    }
-}
 
 /// The cell holding `id`'s state, creating it on first use.
 ///
@@ -67,35 +48,21 @@ pub(crate) fn slot_retained<T: Default + 'static>(
     window_id: WindowId,
     cx: &mut App,
 ) -> Rc<RefCell<T>> {
-    let frame = frame(window_id, cx);
-    window_state::with(window_id, cx, |keyed: &mut Keyed<T>| {
-        keyed
-            .0
-            .retain(|_, entry| frame.saturating_sub(entry.seen) < entry.grace);
-        let entry = keyed.0.entry(id.clone()).or_insert_with(|| Entry {
-            seen: frame,
-            grace,
-            value: Rc::new(RefCell::new(T::default())),
-        });
-        entry.seen = frame;
-        entry.grace = grace;
-        Rc::clone(&entry.value)
+    window_state::with_key_retained(id, grace, window_id, cx, |value: &mut Rc<RefCell<T>>| {
+        Rc::clone(value)
     })
 }
 
 /// One container's worth of per-entry state.
 struct Scope<T> {
-    /// When the *container* was last seen, which is what this state's life is
-    /// measured against.
-    seen: u64,
     entries: HashMap<SharedString, Rc<RefCell<T>>>,
 }
 
-struct Scoped<T>(HashMap<SharedString, Scope<T>>);
-
-impl<T> Default for Scoped<T> {
+impl<T> Default for Scope<T> {
     fn default() -> Self {
-        Self(HashMap::new())
+        Self {
+            entries: HashMap::new(),
+        }
     }
 }
 
@@ -121,14 +88,7 @@ pub(crate) fn scoped_slot<T: Default + 'static>(
     window_id: WindowId,
     cx: &mut App,
 ) -> Rc<RefCell<T>> {
-    let frame = frame(window_id, cx);
-    window_state::with(window_id, cx, |scoped: &mut Scoped<T>| {
-        prune(&mut scoped.0, frame);
-        let scope = scoped.0.entry(container.clone()).or_insert_with(|| Scope {
-            seen: frame,
-            entries: HashMap::new(),
-        });
-        scope.seen = frame;
+    window_state::with_key(container, window_id, cx, |scope: &mut Scope<T>| {
         Rc::clone(
             scope
                 .entries
@@ -152,25 +112,9 @@ pub(crate) fn retain_scope<T: 'static>(
     window_id: WindowId,
     cx: &mut App,
 ) {
-    let frame = frame(window_id, cx);
-    window_state::with(window_id, cx, |scoped: &mut Scoped<T>| {
-        prune(&mut scoped.0, frame);
-        let scope = scoped.0.entry(container.clone()).or_insert_with(|| Scope {
-            seen: frame,
-            entries: HashMap::new(),
-        });
-        scope.seen = frame;
+    window_state::with_key(container, window_id, cx, |scope: &mut Scope<T>| {
         scope.entries.retain(|id, _| live.contains(id));
     });
-}
-
-/// Drops the scopes whose containers have stopped rendering.
-///
-/// The same grace [`slot`] gives an element, for the same reason: a frame
-/// boundary that falls between two of a container's own renders must not be
-/// read as the container going away.
-fn prune<T>(scopes: &mut HashMap<SharedString, Scope<T>>, frame: u64) {
-    scopes.retain(|_, scope| frame.saturating_sub(scope.seen) < GRACE);
 }
 
 /// One entry's state, without claiming the entry rendered.
@@ -186,8 +130,8 @@ pub(crate) fn scoped_peek<T: 'static>(
     window_id: WindowId,
     cx: &App,
 ) -> Option<Rc<RefCell<T>>> {
-    window_state::read(window_id, cx, |scoped: &Scoped<T>| {
-        scoped.0.get(container)?.entries.get(entry).map(Rc::clone)
+    window_state::read_key(container, window_id, cx, |scope: &Scope<T>| {
+        scope.entries.get(entry).map(Rc::clone)
     })
     .flatten()
 }
@@ -203,10 +147,7 @@ pub(crate) fn scoped_ids<T: 'static>(
     window_id: WindowId,
     cx: &App,
 ) -> Vec<SharedString> {
-    window_state::read(window_id, cx, |scoped: &Scoped<T>| {
-        let Some(scope) = scoped.0.get(container) else {
-            return Vec::new();
-        };
+    window_state::read_key(container, window_id, cx, |scope: &Scope<T>| {
         let mut ids: Vec<SharedString> = scope.entries.keys().cloned().collect();
         ids.sort();
         ids
@@ -216,22 +157,14 @@ pub(crate) fn scoped_ids<T: 'static>(
 
 /// The ids currently retained, for diagnostics and tests.
 pub(crate) fn ids<T: 'static>(window_id: WindowId, cx: &App) -> Vec<SharedString> {
-    window_state::read(window_id, cx, |keyed: &Keyed<T>| {
-        let mut ids: Vec<SharedString> = keyed.0.keys().cloned().collect();
-        ids.sort();
-        ids
-    })
-    .unwrap_or_default()
-}
-
-fn frame(window_id: WindowId, cx: &App) -> u64 {
-    frame_counter(window_id, cx).unwrap_or_default()
+    window_state::keyed_ids::<Rc<RefCell<T>>>(window_id, cx)
 }
 
 /// The current frame, or `None` where the host installed no semantic registry
 /// and there is therefore no frame boundary to count.
 pub(crate) fn frame_counter(window_id: WindowId, cx: &App) -> Option<u64> {
-    SemanticCoordinator::try_global(cx).and_then(|coordinator| coordinator.generation(window_id))
+    gpui_kit_semantics::SemanticCoordinator::try_global(cx)
+        .and_then(|coordinator| coordinator.generation(window_id))
 }
 
 #[cfg(test)]
