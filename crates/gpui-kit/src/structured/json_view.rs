@@ -70,6 +70,7 @@ use crate::foundation::window_state;
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
 };
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
@@ -847,24 +848,22 @@ fn row_element(
                 .text_color(value_color),
         );
 
-    // The mark says the value was kept back; the shape says how much was kept
-    // back. Neither is the value, and neither reaches the semantic tree.
+    // The masked value says it was kept back; the shape says how much was
+    // kept back. Neither is the value, and neither reaches the semantic tree.
+    let withheld_label = line
+        .shape
+        .as_ref()
+        .map(|_| cx.strings().text(StringKey::JsonWithheld));
     if let Some(shape) = line.shape.clone() {
         row = row.child(
             div()
                 .flex_none()
                 .row_reading(direction)
-                .gap(px(theme.space(Space::Xs)))
-                .child(
-                    text(
-                        theme,
-                        TypeScale::Caption,
-                        cx.strings().text(StringKey::JsonWithheld),
-                    )
-                    .text_tone(theme, TextTone::Muted),
-                )
                 .child(text(theme, TypeScale::Code, shape).text_tone(theme, TextTone::Faint)),
         );
+    }
+    if let Some(label) = withheld_label {
+        row = row.tip(ident.clone(), label);
     }
 
     if let (true, Some(handler)) = (selectable, view.on_select.clone()) {

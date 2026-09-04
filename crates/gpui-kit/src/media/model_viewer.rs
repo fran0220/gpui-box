@@ -359,7 +359,7 @@ impl RenderOnce for ModelViewer {
                     theme.colors.text_muted,
                     None,
                     strings.text(StringKey::ModelEmpty),
-                    strings.text(StringKey::ModelEmptyDetail),
+                    SharedString::default(),
                 ));
             }
             ModelState::Rejected(error) => {
@@ -532,6 +532,9 @@ impl RenderOnce for ModelViewer {
             .value(self.state.name());
         if let Some(title) = self.title.clone() {
             spec = spec.text(title);
+        }
+        if matches!(self.state, ModelState::Empty) {
+            spec = spec.description(strings.text(StringKey::ModelEmptyDetail));
         }
 
         div()

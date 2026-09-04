@@ -55,6 +55,7 @@ use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
 use crate::motion::{self, keyed};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
@@ -641,13 +642,10 @@ impl Tree {
             if let Some(replacement) = self.slots.render(slot::FAILED, window, cx) {
                 return replacement;
             }
-            return EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::TreeChildrenUnavailable),
-            )
-            .kind(EmptyKind::Failed)
-            .detail(failure)
-            .into_any_element();
+            return EmptyState::new(self.ident.child("empty"), SharedString::default())
+                .kind(EmptyKind::Failed)
+                .detail(failure)
+                .into_any_element();
         }
         if let Some(replacement) = self.slots.render(slot::EMPTY, window, cx) {
             return replacement;
@@ -671,18 +669,19 @@ impl RenderOnce for Tree {
         let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
         if self.nodes.is_empty() {
             let vacant = self.vacant(window, cx);
+            let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Tree)
+                .value("0")
+                .busy(self.loading);
+            if self.failure.is_some() {
+                spec = spec.description(cx.strings().text(StringKey::TreeChildrenUnavailable));
+            }
             return div()
                 .id(self.ident.element_id())
                 .column()
                 .w_full()
                 .children(extra)
                 .child(vacant)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.semantic_id(), Role::Tree)
-                        .value("0")
-                        .busy(self.loading),
-                )
+                .semantic_in(cx, spec)
                 .into_any_element();
         }
         let reorder = self.reorder(window, cx);
@@ -1085,27 +1084,22 @@ impl Rows {
         cx: &mut App,
     ) -> AnyElement {
         let ident = self.ident.child(node.id.as_ref());
-        let (label, value, busy) = match node.kind {
+        let (label, detail, value, busy) = match node.kind {
             VisibleKind::Loading => (
                 cx.strings().text(StringKey::TreeLoadingChildren),
+                None,
                 "loading",
                 true,
             ),
             VisibleKind::Unavailable => (
-                if node.label.is_empty() {
-                    cx.strings().text(StringKey::TreeChildrenUnavailable)
-                } else {
-                    node.label.clone()
-                },
+                cx.strings().text(StringKey::TreeChildrenUnavailable),
+                (!node.label.is_empty()).then(|| node.label.clone()),
                 "unavailable",
                 false,
             ),
             VisibleKind::Failed => (
-                if node.label.is_empty() {
-                    cx.strings().text(StringKey::TreeChildrenUnavailable)
-                } else {
-                    node.label.clone()
-                },
+                cx.strings().text(StringKey::TreeChildrenUnavailable),
+                (!node.label.is_empty()).then(|| node.label.clone()),
                 "failed",
                 false,
             ),
@@ -1143,10 +1137,7 @@ impl Rows {
             ),
             VisibleKind::Node => unreachable!("status rows are not nodes"),
         };
-        let color = match node.kind {
-            VisibleKind::Loading => theme.colors.text_muted,
-            _ => theme.colors.text_faint,
-        };
+        let semantic_text = detail.clone().unwrap_or_else(|| label.clone());
         motion::surface_in(
             ident.element_id(),
             theme,
@@ -1172,12 +1163,13 @@ impl Rows {
                         .text_color(mark_color)
                         .child(mark),
                 )
-                .child(
-                    text(theme, TypeScale::Caption, label.clone())
+                .children(detail.map(|detail| {
+                    text(theme, TypeScale::Caption, detail)
                         .flex_1()
                         .text_start(direction)
-                        .text_color(color),
-                )
+                        .text_color(theme.colors.text_faint)
+                }))
+                .tip(ident.clone(), label)
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status)
@@ -1188,7 +1180,7 @@ impl Rows {
                                     self.ident.child(parent.as_ref()).semantic_id()
                                 }),
                         )
-                        .text(label)
+                        .text(semantic_text)
                         .value(value)
                         .busy(busy)
                         .level(node.level),

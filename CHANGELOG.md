@@ -26,6 +26,30 @@ graph can be resized from its bottom-right grip, reported as
 
 ### Changed
 
+**Components say a state once, by its mark.** Where an icon or coloured dot
+already names a state, the word beside it is no longer printed; it is hover
+help on the mark and the node's semantic text and value, so a harness or a
+screen reader still reads it and a picture does not. Sibling states that
+shared a dot now take distinct glyphs (queued and starting, pending approval
+and running, unavailable and failed, cancelled and uploaded). Sentences that
+explained a state or a mechanism — why a count is unknown, what the fallback
+clipboard check does, that a field cannot be shown here, what a list is for —
+leave the surface and become the mark's tooltip and the node's
+`description`. Hints became controls: the combobox offers a selectable row for
+a value it does not have, the keybinding recorder shows a keyboard glyph and a
+caret instead of asking to be pressed, and an empty dock target is a drop
+glyph. Caller-supplied reasons, `Because:` lines, validation messages, counts,
+and custom titles stay visible, and every builder that accepted such text
+still does. This changes what a component draws, not what it accepts.
+
+**Sixteen `StringKey`s that no component read were removed.**
+`SchemaFilesDropHint` and `KanbanColumnEmpty` lost their last use above;
+`AgentDeclined`, `AgentElapsedUnknown`, `AgentPending`, `AgentReasoning`,
+`ApprovalPending`, `ChartHideSeries`, `ChartShowSeries`, `CodeLineNumbers`,
+`EmptyUnauthorized`, `GridCopy`, `PromptSlot`, `SchemaUnrenderable`,
+`SchemaUnrenderableRequired`, and `TabSaveFailed` had none. A host that
+overrode one of these keys by name was overriding text nothing drew.
+
 **Node cards say their state once, in colour.** The state is a single mark
 that breathes while busy; the state's word and `GraphNode::status` text are
 tooltip and semantic value, never printed on the card. The kind is a muted

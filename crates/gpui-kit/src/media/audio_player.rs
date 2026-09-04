@@ -290,11 +290,11 @@ impl RenderOnce for AudioPlayer {
             (None, _) => framed(notice(
                 &theme,
                 theme.colors.warning,
-                Some(gpui_kit_assets::Icon::SoundWave),
+                Some(gpui_kit_assets::Icon::Forbidden),
                 self.title
                     .clone()
                     .unwrap_or_else(|| strings.text(StringKey::MediaNoTransport)),
-                strings.text(StringKey::MediaNoTransportDetail),
+                SharedString::default(),
             ))
             .into_any_element(),
         };
@@ -312,6 +312,17 @@ impl RenderOnce for AudioPlayer {
             .value(state);
         if let Some(title) = self.title.clone() {
             spec = spec.text(title);
+        }
+        if let Some(description) = snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.availability.reason())
+            .or_else(|| {
+                snapshot
+                    .is_none()
+                    .then(|| strings.text(StringKey::MediaNoTransportDetail))
+            })
+        {
+            spec = spec.description(description);
         }
 
         div()
@@ -403,7 +414,7 @@ pub(crate) fn command_for(event: &TransportEvent) -> Option<MediaCommand> {
     })
 }
 
-/// The sentence a player draws when there is nothing to move.
+/// The state a player draws when there is nothing to move.
 pub(crate) fn unready(
     theme: &gpui_kit_theme::Theme,
     strings: &crate::strings::Strings,
@@ -412,16 +423,33 @@ pub(crate) fn unready(
     mark: Option<gpui_kit_assets::Icon>,
     place: super::NoticePlace,
 ) -> gpui::AnyElement {
-    let (tint, key) = match availability {
-        MediaAvailability::Loading => (theme.colors.text_muted, StringKey::Loading),
-        MediaAvailability::NoBackend(_) => (theme.colors.warning, StringKey::MediaNoBackend),
-        MediaAvailability::Failed(_) => (theme.colors.danger, StringKey::MediaFailed),
-        _ => (theme.colors.text_muted, StringKey::MediaEmpty),
+    let (tint, key, mark) = match availability {
+        MediaAvailability::Loading => (
+            theme.colors.text_muted,
+            StringKey::Loading,
+            Some(gpui_kit_assets::Icon::Refresh),
+        ),
+        MediaAvailability::NoBackend(_) => (
+            theme.colors.warning,
+            StringKey::MediaNoBackend,
+            Some(gpui_kit_assets::Icon::Forbidden),
+        ),
+        MediaAvailability::Failed(_) => (
+            theme.colors.danger,
+            StringKey::MediaFailed,
+            Some(gpui_kit_assets::Icon::Danger),
+        ),
+        MediaAvailability::Idle => (
+            theme.colors.text_muted,
+            StringKey::MediaEmpty,
+            Some(gpui_kit_assets::Icon::Archive),
+        ),
+        MediaAvailability::Ready => (theme.colors.text_muted, StringKey::MediaEmpty, mark),
     };
     let headline = title.unwrap_or_else(|| strings.text(key));
-    // A backend's own sentence is the detail whenever it gave one, so a
-    // refusal is shown as the refusal it is rather than as an absence.
-    let detail = availability.reason().unwrap_or_else(|| strings.text(key));
+    // A backend's own sentence stays visible whenever it gave one. Without a
+    // reason the distinct state mark still says what happened.
+    let detail = availability.reason().unwrap_or_default();
     super::notice_at(theme, tint, mark, headline, detail, place)
 }
 

@@ -43,6 +43,7 @@ use crate::display::loading::Skeleton;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -335,14 +336,6 @@ fn state_overlay(
                         .widths([0.46, 0.72, 0.28])
                         .label(cx.strings().text(StringKey::TerminalStarting)),
                 )
-                .child(
-                    div()
-                        .row()
-                        .gap_token(&theme, Space::Xs)
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
-                        .child(cx.strings().text(StringKey::TerminalStarting)),
-                )
                 .into_any_element()
         })),
         TerminalState::Unavailable(reason) => {
@@ -373,6 +366,8 @@ fn state_overlay(
         TerminalState::Error(reason) => Some(slots.or_else(slot::FAILED, window, cx, |_, cx| {
             let theme = cx.theme().clone();
             let strings = cx.strings().clone();
+            let label = strings.text(StringKey::TerminalError);
+            let mark_ident = ident.child("error-mark");
             div()
                 .absolute()
                 .bottom_0()
@@ -390,18 +385,15 @@ fn state_overlay(
                         .py_token(&theme, Space::Sm)
                         .surface(&theme, Surface::Panel)
                         .child(
-                            gpui_kit_assets::icon(gpui_kit_assets::Icon::Danger)
-                                .size(px(theme.typography.label.line_height))
+                            div()
+                                .id(mark_ident.element_id())
                                 .flex_none()
-                                .text_color(theme.colors.danger),
-                        )
-                        .child(
-                            crate::foundation::text(
-                                &theme,
-                                TypeScale::Label,
-                                strings.text(StringKey::TerminalError),
-                            )
-                            .flex_none(),
+                                .child(
+                                    gpui_kit_assets::icon(gpui_kit_assets::Icon::Danger)
+                                        .size(px(theme.typography.label.line_height))
+                                        .text_color(theme.colors.danger),
+                                )
+                                .tip(mark_ident, label.clone()),
                         )
                         .child(
                             crate::foundation::text(&theme, TypeScale::Caption, reason.clone())
@@ -414,8 +406,9 @@ fn state_overlay(
                     cx,
                     NodeSpec::new(ident.child("error").semantic_id(), Role::Status)
                         .parent(ident.semantic_id())
-                        .text(strings.text(StringKey::TerminalError))
-                        .value(reason.clone())
+                        .text(label)
+                        .value(state.name())
+                        .description(reason.clone())
                         .invalid(true),
                 )
                 .into_any_element()

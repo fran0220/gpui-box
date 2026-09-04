@@ -249,6 +249,16 @@ impl RenderOnce for VideoPlayer {
             (None, Some(_)) => SurfaceContent::Poster,
             (None, None) => SurfaceContent::Nothing,
         };
+        let surface_description = match (&snapshot, &self.transport, content) {
+            (Some(snapshot), _, SurfaceContent::Poster) if snapshot.availability.is_ready() => {
+                Some(strings.text(StringKey::VideoPosterDetail))
+            }
+            (Some(snapshot), _, SurfaceContent::Nothing) if snapshot.availability.is_ready() => {
+                Some(strings.text(StringKey::VideoNoFramesDetail))
+            }
+            (None, _, _) => Some(strings.text(StringKey::MediaNoTransportDetail)),
+            (Some(snapshot), _, _) => snapshot.availability.reason(),
+        };
 
         let mut picture = div()
             .relative()
@@ -284,7 +294,7 @@ impl RenderOnce for VideoPlayer {
                         theme.colors.text_muted,
                         None,
                         strings.text(StringKey::VideoPoster),
-                        strings.text(StringKey::VideoPosterDetail),
+                        SharedString::default(),
                         place,
                     )
                 }
@@ -293,7 +303,7 @@ impl RenderOnce for VideoPlayer {
                     theme.colors.warning,
                     mark,
                     strings.text(StringKey::VideoNoFrames),
-                    strings.text(StringKey::VideoNoFramesDetail),
+                    SharedString::default(),
                     place,
                 ),
                 (Some(snapshot), _) => unready(
@@ -307,26 +317,25 @@ impl RenderOnce for VideoPlayer {
                 (None, _) => notice_at(
                     &theme,
                     theme.colors.warning,
-                    mark,
+                    Some(gpui_kit_assets::Icon::Forbidden),
                     strings.text(StringKey::MediaNoTransport),
-                    strings.text(StringKey::MediaNoTransportDetail),
+                    SharedString::default(),
                     place,
                 ),
             });
         }
 
+        let mut surface_spec = NodeSpec::new(ident.child("surface").semantic_id(), Role::Image)
+            .parent(ident.semantic_id())
+            .busy(matches!(availability, Some(MediaAvailability::Loading)))
+            .invalid(matches!(availability, Some(MediaAvailability::Failed(_))))
+            .value(content.name());
+        if let Some(description) = surface_description {
+            surface_spec = surface_spec.description(description);
+        }
         let surface = AspectRatio::new(ident.child("aspect"), self.ratio)
             .fit(AspectFit::Width)
-            .child(
-                picture.semantic_in(
-                    cx,
-                    NodeSpec::new(ident.child("surface").semantic_id(), Role::Image)
-                        .parent(ident.semantic_id())
-                        .busy(matches!(availability, Some(MediaAvailability::Loading)))
-                        .invalid(matches!(availability, Some(MediaAvailability::Failed(_))))
-                        .value(content.name()),
-                ),
-            );
+            .child(picture.semantic_in(cx, surface_spec));
 
         let titles = div()
             .row()

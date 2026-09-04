@@ -41543,8 +41543,8 @@
       "module": "agent::cost",
       "path": "gpui_kit::agent::cost",
       "source": "crates/gpui-kit/src/agent/cost.rs",
-      "summary": "An estimate. Every rendering of it says so.",
-      "documentation": "An estimate. Every rendering of it says so.",
+      "summary": "An estimate. Every rendering of it carries the estimate mark.",
+      "documentation": "An estimate. Every rendering of it carries the estimate mark.",
       "signature": "pub fn estimated (amount : f64, text : impl Into<SharedString>) -> Self",
       "cfg": [],
       "target": "Quantity"
@@ -43484,8 +43484,8 @@
       "module": "agent::permission",
       "path": "gpui_kit::agent::permission",
       "source": "crates/gpui-kit/src/agent/permission.rs",
-      "summary": "The wording a reader reads.",
-      "documentation": "The wording a reader reads.",
+      "summary": "The localized state name published for assistive readers and help.",
+      "documentation": "The localized state name published for assistive readers and help.",
       "signature": "pub fn label (self, cx : & App) -> SharedString",
       "cfg": [],
       "target": "PermissionState"
@@ -46266,7 +46266,7 @@
       "path": "gpui_kit::agent::thinking",
       "source": "crates/gpui-kit/src/agent/thinking.rs",
       "summary": "Reports that the reasoning is still being produced.",
-      "documentation": "Reports that the reasoning is still being produced.\n\nNothing else on the block says this. Reasoning that has finished and\nreasoning still being written are the same words in the same place, so\nwithout this a reader watching a stalled run and a reader watching a\nworking one see the same picture.",
+      "documentation": "Reports that the reasoning is still being produced.\n\nIts active mark differs from the settled mark even when motion is\nreduced, so a working thought does not need a state word beside it.",
       "signature": "pub fn thinking (mut self, thinking : bool) -> Self",
       "cfg": [],
       "target": "ThinkingBlock"
@@ -57139,7 +57139,7 @@
       "source": "crates/gpui-kit/src/controls/copy_button.rs",
       "summary": "A button that copies caller-supplied text and confirms what happened.",
       "documentation": "A button that copies caller-supplied text and confirms what happened.",
-      "signature": "# [doc = \" A button that copies caller-supplied text and confirms what happened.\"] pub struct CopyButton { ident : Ident, focus_handle : FocusHandle, text : SharedString, label : Option<SharedString>, # [doc = \" What the button is called when it carries only a glyph.\"] name : Option<SharedString>, glyph_only : bool, variant : ButtonVariant, size : ControlSize, disabled : bool, copier : Option<Copier>, confirmation : Duration, state : CopyState, # [doc = \" How much of the confirmation is left, and when it was last spent.\"] remaining : Option<Duration>, last_tick : Option<Instant>, }",
+      "signature": "# [doc = \" A button that copies caller-supplied text and confirms what happened.\"] pub struct CopyButton { ident : Ident, focus_handle : FocusHandle, text : SharedString, label : Option<SharedString>, # [doc = \" What the button is called when it carries only a glyph.\"] name : Option<SharedString>, glyph_only : bool, variant : ButtonVariant, size : ControlSize, disabled : bool, copier : Option<Copier>, confirmation : Duration, state : CopyState, # [doc = \" Whether the current refusal came from the fallback clipboard check.\"] default_failure : bool, # [doc = \" How much of the confirmation is left, and when it was last spent.\"] remaining : Option<Duration>, last_tick : Option<Instant>, }",
       "cfg": []
     },
     {
@@ -76569,7 +76569,7 @@
       "path": "gpui_kit::display::state_view",
       "source": "crates/gpui-kit/src/display/state_view.rs",
       "summary": "How long the host says this wait has already run.",
-      "documentation": "How long the host says this wait has already run.\n\nThe clock stays with the host. Past eight seconds the surface names\nthat the wait is longer than usual; it does not invent a duration.",
+      "documentation": "How long the host says this wait has already run.\n\nThe clock stays with the host. Past eight seconds the semantic\ndescription reports that the wait is longer than usual; it does not\ninvent a duration.",
       "signature": "pub fn elapsed (mut self, elapsed : Duration) -> Self",
       "cfg": [],
       "target": "StateView"

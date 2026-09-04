@@ -34,8 +34,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    div, prelude::FluentBuilder, px, relative,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -54,6 +54,7 @@ use crate::display::timeline::EntryTime;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::motion::{engage_end, follow_end, follows_end};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
 /// What a host said about a message's journey.
@@ -988,17 +989,18 @@ fn body_element(
 
 fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
     let label = cx.strings().text(StringKey::MessageStreaming);
+    let mark_ident = ident.child("streaming");
     div()
+        .id(mark_ident.element_id())
         .row()
-        .gap(px(theme.space(Space::Xs)))
         .text_color(theme.colors.accent)
         // The mark already published `busy`; a still dot meant a reader
         // watching the screen had to take the word for it.
         .child(StatusDot::new(Tone::Accent).busy(ident.child("streaming.mark")))
-        .child(label.clone())
+        .tip(mark_ident.clone(), label.clone())
         .semantic_in(
             cx,
-            NodeSpec::new(ident.child("streaming").semantic_id(), Role::Status)
+            NodeSpec::new(mark_ident.semantic_id(), Role::Status)
                 .parent(ident.semantic_id())
                 .text(label)
                 .value("streaming")
@@ -1009,11 +1011,9 @@ fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
 
 /// The mark that says where a message got to.
 ///
-/// A message still being written has been handed over exactly as a queued one
-/// has, so the state is the same and the wording is not: two messages in
-/// visibly different situations reading the same word told the reader less
-/// than the host knew. The node keeps the state's own name, so an assertion
-/// reads the delivery rather than the sentence drawn for it.
+/// The state name remains in hover help and the semantic node. A failed
+/// delivery keeps the host's reason visible because it is a fact, not a second
+/// rendering of the mark.
 fn delivery_mark(
     ident: &Ident,
     state: &DeliveryState,
@@ -1026,17 +1026,25 @@ fn delivery_mark(
         _ => state.label(cx.strings()),
     };
     let tone = state.tone();
+    let mark_ident = ident.child("delivery");
     div()
+        .id(mark_ident.element_id())
         .row()
-        .gap(px(theme.space(Space::Xs)))
         .min_w_0()
         .type_scale(theme, TypeScale::Caption)
         .text_color(tone.color(theme))
         .child(StatusDot::new(tone))
-        .child(div().min_w_0().child(label.clone()))
+        .when(state.failed(), |element| {
+            element
+                .gap(px(theme.space(Space::Xs)))
+                .child(div().min_w_0().child(label.clone()))
+        })
+        .when(!state.failed(), |element| {
+            element.tip(mark_ident.clone(), label.clone())
+        })
         .semantic_in(
             cx,
-            NodeSpec::new(ident.child("delivery").semantic_id(), Role::Status)
+            NodeSpec::new(mark_ident.semantic_id(), Role::Status)
                 .parent(ident.semantic_id())
                 .text(label)
                 .value(state.name())

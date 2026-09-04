@@ -42,10 +42,11 @@ use crate::controls::segmented::{Segment, SegmentedControl};
 use crate::controls::slider::Slider;
 use crate::display::badge::Tone;
 use crate::display::signature;
-use crate::display::status::StatusLine;
+use crate::display::status::StatusDot;
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, MotionPolicy, MotionRole, keyed};
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -676,6 +677,19 @@ impl RenderOnce for TransportBar {
                 (strings.text(StringKey::TransportBuffering), Tone::Warning)
             }
         };
+        let status_ident = ident.child("status");
+        let status_mark = div()
+            .id(status_ident.element_id())
+            .child(StatusDot::new(status.1))
+            .tip(status_ident.clone(), status.0.clone())
+            .semantic_in(
+                cx,
+                NodeSpec::new(status_ident.semantic_id(), Role::Status)
+                    .parent(ident.semantic_id())
+                    .text(status.0)
+                    .value(self.state.name())
+                    .busy(matches!(self.state, TransportState::Buffering)),
+            );
 
         let mute = self.volume_control.then(|| {
             let report = Rc::clone(&report);
@@ -801,11 +815,7 @@ impl RenderOnce for TransportBar {
                             .text_color(theme.colors.text)
                             .child(label)
                     }))
-                    .child(
-                        div()
-                            .flex_none()
-                            .child(StatusLine::new(status.0, status.1).id(ident.child("status"))),
-                    ),
+                    .child(div().flex_none().child(status_mark)),
             )
             .child(
                 div()

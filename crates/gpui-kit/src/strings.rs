@@ -289,7 +289,6 @@ string_keys! {
     // Schema file and repeated fields.
     SchemaFilesChoose => "schema.files.choose", "Choose files";
     SchemaFilesDrop => "schema.files.drop", "Drop files here";
-    SchemaFilesDropHint => "schema.files.drop-hint", "or choose them with the file picker";
     SchemaFileMaximumOne => "schema.files.maximum-one", "This field holds at most 1 file.";
     SchemaFilesMaximum => "schema.files.maximum", "This field holds at most {0} files.";
     SchemaFilesRemove => "schema.files.remove", "Remove selected file";
@@ -411,7 +410,6 @@ string_keys! {
     ApprovalAlwaysPath => "approval.always-path", "Always in {0}";
     ApprovalAlwaysHost => "approval.always-host", "Always on {0}";
     ApprovalStanding => "approval.standing", "Standing approvals";
-    ApprovalPending => "approval.pending", "Waiting for your answer";
     ApprovalDeclined => "approval.declined", "Declined";
     ApprovalApproved => "approval.approved", "Approved: {0}";
     ApprovalOnceScope => "approval.once-scope", "this time only";
@@ -494,18 +492,13 @@ string_keys! {
     JsonShapeValue => "json.shape-value", "a value";
 
     // Schema-generated form.
-    SchemaUnrenderable => "schema.unrenderable", "This field cannot be shown here, so it has to be filled in some other way.";
-    SchemaUnrenderableRequired => "schema.unrenderable-required", "This field is required and cannot be shown here, so this form cannot complete the call.";
     SchemaNoChoices => "schema.no-choices", "No choices were offered, so there is nothing to pick.";
     SchemaNeedsAdapter => "schema.needs-adapter", "This field needs a date adapter from the host.";
     SchemaNeedsHost => "schema.needs-host", "This field needs a host policy before it can be filled in.";
     ChartEmpty => "chart.empty", "No series to plot";
     ChartLegend => "chart.legend", "Legend";
-    ChartHideSeries => "chart.hide-series", "Hide {0}";
-    ChartShowSeries => "chart.show-series", "Show {0}";
     TagInputOverflow => "tag-input.overflow", "+{0}";
     GridSummary => "grid.summary", "Summary";
-    GridCopy => "grid.copy", "Copy selection";
     TraceEmpty => "trace.empty", "No spans to show";
     TracePending => "trace.pending", "Waiting";
     TraceRunning => "trace.running", "Running";
@@ -535,7 +528,6 @@ string_keys! {
     // and a reader deciding whether retrying is worth anything was reading the
     // same three words either way.
     PromptFailed => "prompt.failed", "Template could not be loaded";
-    PromptSlot => "prompt.slot", "Slot";
     FeedbackUp => "feedback.up", "Helpful";
     FeedbackDown => "feedback.down", "Not helpful";
     ArtifactEmpty => "artifact.empty", "No artifact";
@@ -543,7 +535,6 @@ string_keys! {
     ArtifactLoading => "artifact.loading", "Preparing artifact";
     KanbanEmpty => "kanban.empty", "No cards";
     KanbanUnavailable => "kanban.unavailable", "Board unavailable";
-    KanbanColumnEmpty => "kanban.column-empty", "Nothing here";
     KanbanAdd => "kanban.add", "Add to {0}";
     KanbanMoveHere => "kanban.move-here", "Move {0} to {1}";
     KanbanOverLimit => "kanban.over-limit", "Over the limit for {0}";
@@ -607,10 +598,7 @@ string_keys! {
     AgentRunning => "agent.running", "Running";
     AgentSucceeded => "agent.succeeded", "Succeeded";
     AgentFailed => "agent.failed", "Failed";
-    AgentDeclined => "agent.declined", "Declined";
-    AgentPending => "agent.pending", "Pending";
     AgentNoOutput => "agent.no-output", "This tool returned nothing";
-    AgentElapsedUnknown => "agent.elapsed-unknown", "Elapsed time unknown";
     AgentTruncated => "agent.truncated", "{0} of {1} lines shown";
     AgentLinesOne => "agent.lines-one", "1 line";
     AgentLinesMany => "agent.lines-many", "{0} lines";
@@ -620,7 +608,6 @@ string_keys! {
     AgentPlanReason => "agent.plan-reason", "{0} — {1}";
     AgentStepsDoneOne => "agent.steps-done-one", "1 step done";
     AgentStepsDoneMany => "agent.steps-done-many", "{0} steps done";
-    AgentReasoning => "agent.reasoning", "Reasoning";
     AgentReasoningWithheld => "agent.reasoning-withheld", "Reasoning withheld";
     AgentReasoningThinking => "agent.reasoning-thinking", "Thinking";
     AgentReasoningAbsent => "agent.reasoning-absent", "No reasoning was returned";
@@ -673,7 +660,6 @@ string_keys! {
     // there is no key here for one: silence is the whole message.
     TabDirty => "tab.dirty", "Unsaved changes";
     TabSaving => "tab.saving", "Saving";
-    TabSaveFailed => "tab.save-failed", "Could not save";
     TabClose => "tab.close", "Close {0}";
     TabMoreTabs => "tab.more-tabs", "More tabs";
 
@@ -723,7 +709,6 @@ string_keys! {
     StateViewUnavailable => "state.unavailable", "Unavailable";
     StateViewStillWorking => "state.still-working", "This is taking longer than usual";
     StateViewRefreshing => "state.refreshing", "Refreshing";
-    EmptyUnauthorized => "empty.unauthorized", "Not authorized";
     ProgressCancel => "progress.cancel", "Cancel";
     ProgressPaused => "progress.paused", "Paused";
     ProgressStalled => "progress.stalled", "Stalled";
@@ -737,7 +722,6 @@ string_keys! {
     StaleUpdated => "stale.updated", "Last verified: {0}";
 
     // Read-only code.
-    CodeLineNumbers => "code.line-numbers", "Line numbers";
     CodeLineAdded => "code.line-added", "Added";
     CodeLineRemoved => "code.line-removed", "Removed";
     CodeLineChanged => "code.line-changed", "Changed";

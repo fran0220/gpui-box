@@ -824,7 +824,7 @@ fn files_without_a_host_policy_stay_visible_and_unrenderable(cx: &mut TestAppCon
         .node("form.attachments.unrenderable")
         .expect("file field keeps its place");
     assert_eq!(
-        refusal.text.as_deref(),
+        refusal.description.as_deref(),
         Some("This field needs a host policy before it can be filled in.")
     );
     harness.update(|_, cx| {

@@ -20,6 +20,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::state_view::StateView;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -394,11 +395,15 @@ impl RenderOnce for KanbanBoard {
                                 )
                             })
                             .collect::<Vec<_>>();
-                        let empty = cards.is_empty();
                         let tally = match column.limit {
                             Some(limit) => cx.numbers().count_of_total(count, limit),
                             None => cx.numbers().count(count),
                         };
+                        let column_ident = self.ident.child("column").child(column.id.as_ref());
+                        let over_limit = over.then(|| {
+                            cx.strings()
+                                .format(StringKey::KanbanOverLimit, &[column.title.as_ref()])
+                        });
                         let adding =
                             self.on_add
                                 .clone()
@@ -487,11 +492,7 @@ impl RenderOnce for KanbanBoard {
                                     )
                             });
                         div()
-                            .id(self
-                                .ident
-                                .child("column")
-                                .child(column.id.as_ref())
-                                .element_id())
+                            .id(column_ident.element_id())
                             .flex_1()
                             .min_w(px(theme.control.md.height * LANE_ROWS))
                             .min_h(px(theme.control.md.height * LANE_ROWS))
@@ -531,39 +532,21 @@ impl RenderOnce for KanbanBoard {
                                     }))
                                     .children(adding),
                             )
-                            .when(over, |lane| {
-                                lane.child(
-                                    div()
-                                        .type_scale(&theme, TypeScale::Caption)
-                                        .text_color(theme.colors.warning)
-                                        .child(cx.strings().format(
-                                            StringKey::KanbanOverLimit,
-                                            &[column.title.as_ref()],
-                                        )),
-                                )
+                            .when_some(over_limit.clone(), |lane, explanation| {
+                                lane.tip(column_ident.clone(), explanation)
                             })
                             .children(cards)
-                            .when(empty && landing.is_none(), |lane| {
-                                lane.child(
-                                    div()
-                                        .type_scale(&theme, TypeScale::Caption)
-                                        .text_color(theme.colors.text_faint)
-                                        .child(cx.strings().text(StringKey::KanbanColumnEmpty)),
-                                )
-                            })
                             .children(landing)
-                            .semantic_in(
-                                cx,
-                                NodeSpec::new(
-                                    self.ident
-                                        .child("column")
-                                        .child(column.id.as_ref())
-                                        .semantic_id(),
-                                    Role::List,
-                                )
-                                .text(column.title.clone())
-                                .value(tally),
-                            )
+                            .semantic_in(cx, {
+                                let mut spec =
+                                    NodeSpec::new(column_ident.semantic_id(), Role::List)
+                                        .text(column.title.clone())
+                                        .value(tally);
+                                if let Some(explanation) = over_limit {
+                                    spec = spec.description(explanation);
+                                }
+                                spec
+                            })
                     })
                     .collect::<Vec<_>>();
                 div()

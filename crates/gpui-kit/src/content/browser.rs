@@ -220,6 +220,8 @@ impl RenderOnce for BrowserPanel {
             self.state.value()
         };
         let busy = self.state == ViewportState::Loading;
+        let viewport_description = matches!(self.state, ViewportState::Empty)
+            .then(|| strings.text(StringKey::BrowserEmptyDetail));
 
         let control = |ident: Ident, glyph: Icon, name: SharedString, action: Option<Action>| {
             let mut button = IconButton::new(ident, glyph, name)
@@ -350,7 +352,6 @@ impl RenderOnce for BrowserPanel {
                     strings.text(StringKey::BrowserEmpty),
                 )
                 .kind(EmptyKind::Empty)
-                .detail(strings.text(StringKey::BrowserEmptyDetail))
                 .into_any_element()
             }),
             ViewportState::Unavailable(reason) => {
@@ -379,6 +380,14 @@ impl RenderOnce for BrowserPanel {
             }),
         };
 
+        let mut viewport_spec = NodeSpec::new(viewport_ident.semantic_id(), Role::Region)
+            .parent(panel_id.clone())
+            .value(state_value)
+            .busy(busy);
+        if let Some(description) = viewport_description {
+            viewport_spec = viewport_spec.description(description);
+        }
+
         div()
             .id(self.ident.element_id())
             .column()
@@ -400,13 +409,7 @@ impl RenderOnce for BrowserPanel {
                         element.flex().items_center().justify_center()
                     })
                     .child(body)
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(viewport_ident.semantic_id(), Role::Region)
-                            .parent(panel_id.clone())
-                            .value(state_value)
-                            .busy(busy),
-                    ),
+                    .semantic_in(cx, viewport_spec),
             )
             .semantic_in(
                 cx,

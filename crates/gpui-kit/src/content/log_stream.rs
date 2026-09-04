@@ -44,6 +44,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::motion::keyed;
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -382,6 +383,7 @@ impl RenderOnce for LogStream {
             } else {
                 StringKey::LogFollowing
             });
+            let mode_ident = self.ident.child("mode");
             div()
                 .row()
                 .w_full()
@@ -390,9 +392,9 @@ impl RenderOnce for LogStream {
                 .gap_token(&theme, Space::Sm)
                 .child(
                     div()
+                        .id(mode_ident.element_id())
                         .row()
                         .items_center()
-                        .gap_token(&theme, Space::Xs)
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(if paused {
                             theme.colors.warning
@@ -404,10 +406,10 @@ impl RenderOnce for LogStream {
                         } else {
                             Tone::Success
                         }))
-                        .child(mode_label.clone())
+                        .tip(mode_ident.clone(), mode_label.clone())
                         .semantic_in(
                             cx,
-                            NodeSpec::new(self.ident.child("mode").semantic_id(), Role::Status)
+                            NodeSpec::new(mode_ident.semantic_id(), Role::Status)
                                 .parent(self.ident.semantic_id())
                                 .text(mode_label)
                                 .value(if paused { "paused" } else { "following" }),
@@ -667,12 +669,6 @@ fn state_body(
                         .row_height(theme.typography.code.line_height)
                         .widths([0.82, 0.64, 0.9, 0.38])
                         .label(cx.strings().text(StringKey::Loading)),
-                )
-                .child(
-                    div()
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
-                        .child(cx.strings().text(StringKey::Loading)),
                 )
                 .into_any_element()
         }),

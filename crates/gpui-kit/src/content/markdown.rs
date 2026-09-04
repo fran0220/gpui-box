@@ -1219,20 +1219,15 @@ impl Painter {
     fn html_block(&mut self, html: SharedString, cx: &mut App) -> AnyElement {
         let theme = self.theme.clone();
         let ident = self.ident_for("html", "block");
+        let explanation = cx.strings().text(StringKey::MarkdownUnrenderedHtml);
         div()
+            .id(ident.element_id())
             .column()
             .w_full()
-            .gap(px(theme.space(Space::Xxs)))
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Small)
             .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Faint))
-            .child(
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.warning)
-                    .child(cx.strings().text(StringKey::MarkdownUnrenderedHtml)),
-            )
             .child(
                 div()
                     .mono(&theme)
@@ -1244,11 +1239,13 @@ impl Painter {
                             .map(|line| div().child(SharedString::from(line.to_string()))),
                     ),
             )
+            .tip(ident.clone(), explanation.clone())
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Text)
                     .parent(self.ident.semantic_id())
                     .text(html.clone())
+                    .description(explanation)
                     .value(UNRENDERED),
             )
             .into_any_element()

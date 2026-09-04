@@ -5,7 +5,11 @@
 
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
+use gpui::{
+    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, px,
+};
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
@@ -18,6 +22,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
+use crate::overlay::Tooltipped;
 use crate::state::Loadable;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -340,12 +345,13 @@ impl RenderOnce for DiagnosticsList {
         let ident = self.ident.clone();
         let state = match self.diagnostics {
             Loadable::Idle => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
+                explanation_mark(
                     ident.child("idle"),
+                    EmptyKind::Unstarted,
+                    Icon::Document,
                     cx.strings().text(StringKey::DiagnosticsUnstarted),
+                    cx,
                 )
-                .kind(EmptyKind::Unstarted)
-                .into_any_element()
             }),
             Loadable::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
                 PulseLoader::new(ident.child("loading"))
@@ -471,13 +477,13 @@ impl RenderOnce for DiagnosticsList {
                         .flex()
                         .flex_col()
                         .child(bar)
-                        .child(
-                            EmptyState::new(
-                                ident.child("no-match"),
-                                cx.strings().text(StringKey::DiagnosticsNoMatch),
-                            )
-                            .kind(EmptyKind::Empty),
-                        )
+                        .child(explanation_mark(
+                            ident.child("no-match"),
+                            EmptyKind::Empty,
+                            Icon::Archive,
+                            cx.strings().text(StringKey::DiagnosticsNoMatch),
+                            cx,
+                        ))
                         .into_any_element()
                 } else {
                     let rows = Rc::new(rows);
@@ -603,4 +609,37 @@ impl RenderOnce for DiagnosticsList {
             .child(state)
             .semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Group))
     }
+}
+
+/// A state whose mark is sufficient on the surface and whose explanation is
+/// still available to hover and semantic readers.
+fn explanation_mark(
+    ident: Ident,
+    kind: EmptyKind,
+    glyph: Icon,
+    explanation: SharedString,
+    cx: &mut App,
+) -> gpui::AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .id(ident.element_id())
+        .flex()
+        .items_center()
+        .justify_center()
+        .w_full()
+        .p_token(&theme, Space::Lg)
+        .child(
+            icon(glyph)
+                .size(px(theme.measures.standalone_icon))
+                .text_color(theme.colors.text_faint),
+        )
+        .tip(ident.clone(), explanation.clone())
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(explanation.clone())
+                .description(explanation)
+                .value(kind.name()),
+        )
+        .into_any_element()
 }
