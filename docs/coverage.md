@@ -270,6 +270,18 @@ orb; its active check remains native CI. This is a pixel-equivalent renderer
 optimization, so no macOS or Windows baseline is recaptured or changed; their
 existing headless checks remain the acceptance authority.
 
+### Downsampled backdrop blur deliberately deferred, 2026-09-04
+
+Metal, Direct3D, and WGPU keep full-resolution backdrop textures and preserve
+the established Gaussian and refraction samples while clipping work to the
+surface's conservative sampling region. Rendering the blur through a smaller
+intermediate texture could reduce bandwidth further, but resampling changes
+the material's pixels and may change the apparent radius, rim detail, and
+paint-order boundaries. It is therefore not hidden behind a renderer-local
+shortcut. A future downsampled path needs one shared quality contract, focused
+renderer tests, and reviewed replacement captures from both active baseline
+renderers (Metal on macOS and WARP on Windows).
+
 ### Metal and WARP baselines outstanding for this wave, 2026-09-03
 
 Three light-appearance fixes landed from a Linux orb, which can run neither
