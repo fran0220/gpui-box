@@ -188,14 +188,14 @@ fn heap_allocation_limit(name: &str) -> u64 {
         // Baseline plus a 10% integer ceiling. These are ratchets, not generic
         // capacity targets: lower the matching value when an optimization
         // removes steady-state frame allocations.
-        "list" => 1_390,
-        "data-grid" => 3_861,
-        "tree-grid" => 4_699,
-        "code-view" => 17_300,
-        "log-stream" => 28_695,
-        "agent-document" => 40_075,
-        "node-graph-material" => 12_603,
-        "theme-semantics" => 7_391,
+        "list" => 1_330,
+        "data-grid" => 3_723,
+        "tree-grid" => 4_452,
+        "code-view" => 17_096,
+        "log-stream" => 28_482,
+        "agent-document" => 39_940,
+        "node-graph-material" => 12_105,
+        "theme-semantics" => 7_251,
         "idle-frame" => 0,
         "unbounded-detector-proof" => u64::MAX,
         _ => panic!("fixture `{name}` has no heap-allocation ratchet"),

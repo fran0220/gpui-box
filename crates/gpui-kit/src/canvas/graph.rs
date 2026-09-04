@@ -178,6 +178,12 @@ struct GestureState {
     animation_started: Option<Instant>,
     /// The visible colour crossover for each caller-owned edge.
     edge_transitions: HashMap<SharedString, EdgeTransition>,
+    /// Ids used to age edge-local paint history. Rebuilt only when the
+    /// caller-owned edge identities change.
+    edge_ids: EdgeIdentityCache,
+    /// Estimated card boxes shared by marquee and context-menu hit testing.
+    /// Event handlers outlive this render, so they retain one immutable set.
+    interaction_nodes: InteractionNodeCache,
     /// The last frame this canvas proposed. Kept beside the gesture because it
     /// is the same kind of fact: what this one canvas has been through, not
     /// what the caller asked for.
@@ -216,6 +222,53 @@ struct GestureState {
     /// Recording what was proposed is how the two are told apart exactly,
     /// rather than by guessing from how far the viewport moved.
     direct: Option<GraphViewport>,
+}
+
+#[derive(Debug, Default)]
+struct EdgeIdentityCache {
+    signature: Option<u64>,
+    ids: HashSet<SharedString>,
+}
+
+impl EdgeIdentityCache {
+    fn update(&mut self, edges: &[GraphEdge]) {
+        let signature = edge_identity_signature(edges);
+        if self.signature != Some(signature) {
+            self.ids = edges.iter().map(GraphEdge::edge_id).collect();
+            self.signature = Some(signature);
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct InteractionNodeCache {
+    signature: Option<u64>,
+    nodes: Rc<Vec<(SharedString, Bounds<f32>)>>,
+}
+
+impl InteractionNodeCache {
+    fn update(
+        &mut self,
+        nodes: &[Placed],
+        theme: &gpui_kit_theme::Theme,
+    ) -> Rc<Vec<(SharedString, Bounds<f32>)>> {
+        let signature = interaction_node_signature(nodes, theme);
+        if self.signature != Some(signature) {
+            self.nodes = Rc::new(
+                nodes
+                    .iter()
+                    .map(|placed| {
+                        (
+                            placed.node.ident().semantic_id(),
+                            placed.bounds(theme, None),
+                        )
+                    })
+                    .collect(),
+            );
+            self.signature = Some(signature);
+        }
+        Rc::clone(&self.nodes)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1017,6 +1070,31 @@ fn route_signature(nodes: &[NodeGeometry], edges: &[GraphEdge]) -> u64 {
         edge.edge_id().hash(&mut hasher);
         edge.from().hash(&mut hasher);
         edge.to().hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn edge_identity_signature(edges: &[GraphEdge]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    edges.len().hash(&mut hasher);
+    for edge in edges {
+        edge.edge_id().hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn interaction_node_signature(nodes: &[Placed], theme: &gpui_kit_theme::Theme) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    nodes.len().hash(&mut hasher);
+    for placed in nodes {
+        placed.node.ident().semantic_id().hash(&mut hasher);
+        let bounds = placed.bounds(theme, None);
+        f32::to_bits(bounds.origin.x).hash(&mut hasher);
+        f32::to_bits(bounds.origin.y).hash(&mut hasher);
+        f32::to_bits(bounds.size.width).hash(&mut hasher);
+        f32::to_bits(bounds.size.height).hash(&mut hasher);
     }
     hasher.finish()
 }
@@ -1868,6 +1946,10 @@ impl RenderOnce for NodeGraph {
             .cloned()
             .filter(|_| matches!(self.state, GraphState::Ready) && !self.nodes.is_empty())
         {
+            let interaction_nodes = gesture
+                .borrow_mut()
+                .interaction_nodes
+                .update(&self.nodes, &theme);
             let down = Rc::clone(&gesture);
             frame =
                 frame.on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, _, cx| {
@@ -1929,16 +2011,7 @@ impl RenderOnce for NodeGraph {
             // Each card's own box, not one shared guess: a marquee that
             // selected by a fixed rectangle would miss a tall card the reader
             // dragged across and catch a short one they went around.
-            let up_nodes = self
-                .nodes
-                .iter()
-                .map(|placed| {
-                    (
-                        placed.node.ident().semantic_id(),
-                        placed.bounds(&theme, None),
-                    )
-                })
-                .collect::<Vec<_>>();
+            let up_nodes = Rc::clone(&interaction_nodes);
             frame = frame.on_mouse_up(MouseButton::Left, move |event, window, cx| {
                 let gesture = up.borrow_mut().gesture.take();
                 match gesture {
@@ -2005,11 +2078,7 @@ impl RenderOnce for NodeGraph {
             // press was on a card or on the canvas behind it.
             let context_report = Rc::clone(&report);
             let context_bounds = Rc::clone(&measured);
-            let context_nodes = self
-                .nodes
-                .iter()
-                .map(|placed| placed.bounds(&theme, None))
-                .collect::<Vec<_>>();
+            let context_nodes = interaction_nodes;
             frame = frame.on_mouse_down(MouseButton::Right, move |event, window, cx| {
                 let frame = context_bounds.get();
                 let at = screen_to_world(
@@ -2019,7 +2088,7 @@ impl RenderOnce for NodeGraph {
                     ),
                     viewport,
                 );
-                if context_nodes.iter().any(|bounds| bounds.contains(&at)) {
+                if context_nodes.iter().any(|(_, bounds)| bounds.contains(&at)) {
                     return;
                 }
                 context_report(
@@ -2335,9 +2404,12 @@ impl RenderOnce for NodeGraph {
         let state_change = MotionPolicy::resolve(MotionRole::StateChange, cx);
         let edge_colors: HashMap<SharedString, EdgeColors> = {
             let now = cx.background_executor().now();
-            let live: HashSet<SharedString> = self.edges.iter().map(GraphEdge::edge_id).collect();
             let mut gesture = gesture.borrow_mut();
-            gesture.edge_transitions.retain(|id, _| live.contains(id));
+            gesture.edge_ids.update(&self.edges);
+            let state = &mut *gesture;
+            state
+                .edge_transitions
+                .retain(|id, _| state.edge_ids.ids.contains(id));
             let mut animating = false;
             let colors = self
                 .edges
@@ -2420,10 +2492,14 @@ impl RenderOnce for NodeGraph {
             // culling: a connection panned off screen and back has already
             // been drawn, and treating it as new would animate it in every
             // time it returned.
-            let live: HashSet<SharedString> = self.edges.iter().map(GraphEdge::edge_id).collect();
-            state.arrived.retain(|id, _| live.contains(id));
+            let state = &mut *state;
+            state
+                .arrived
+                .retain(|id, _| state.edge_ids.ids.contains(id));
             let span = arrival.spec().total().as_secs_f32().max(f32::EPSILON);
-            live.into_iter()
+            self.edges
+                .iter()
+                .map(GraphEdge::edge_id)
                 .map(|id| {
                     let born = *state.arrived.entry(id.clone()).or_insert(now);
                     // A canvas opening onto a graph draws it rather than
@@ -4732,6 +4808,37 @@ mod tests {
         }];
         assert_ne!(first, route_signature(&shifted, &[]));
         assert_eq!(first, route_signature(&geometry, &[]));
+    }
+
+    #[test]
+    fn interaction_bounds_are_reused_until_node_geometry_changes() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let nodes = [Placed::new(GraphNode::new("a", "A"), 0.0, 0.0)];
+        let mut cache = InteractionNodeCache::default();
+        let first = cache.update(&nodes, &theme);
+        let unchanged = cache.update(&nodes, &theme);
+        assert!(Rc::ptr_eq(&first, &unchanged));
+
+        let moved = [Placed::new(GraphNode::new("a", "A"), 40.0, 0.0)];
+        let changed = cache.update(&moved, &theme);
+        assert!(!Rc::ptr_eq(&first, &changed));
+        assert_ne!(first[0].1, changed[0].1);
+    }
+
+    #[test]
+    fn edge_identity_cache_tracks_identity_changes() {
+        let mut cache = EdgeIdentityCache::default();
+        let first = [GraphEdge::new("a", "b")];
+        cache.update(&first);
+        assert_eq!(cache.ids, HashSet::from([first[0].edge_id()]));
+        let signature = cache.signature;
+        cache.update(&first);
+        assert_eq!(cache.signature, signature);
+
+        let changed = [GraphEdge::new("a", "b").lane(1)];
+        cache.update(&changed);
+        assert_eq!(cache.ids, HashSet::from([changed[0].edge_id()]));
+        assert_ne!(cache.signature, signature);
     }
 
     #[test]

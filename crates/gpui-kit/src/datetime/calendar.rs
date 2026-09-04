@@ -6,6 +6,8 @@
 //! calendar owns the month it is
 //! looking at, where the keyboard is, and what the pointer is over.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
@@ -102,6 +104,10 @@ pub struct Calendar {
     /// arrives without motion so a capture of a settled calendar is settled.
     travel: i32,
     navigations: usize,
+    /// Stable day identities for the month currently on screen. The adapter
+    /// rebuilds `MonthGrid` values, but the same day must not rebuild its id
+    /// on every frame.
+    day_idents: RefCell<HashMap<Day, Ident>>,
     slots: Slots,
 }
 
@@ -141,6 +147,7 @@ impl Calendar {
             disabled: false,
             travel: 0,
             navigations: 0,
+            day_idents: RefCell::new(HashMap::new()),
             slots: Slots::default(),
         }
     }
@@ -481,6 +488,7 @@ impl Calendar {
         week_start: bool,
         week_end: bool,
         direction: LayoutDirection,
+        grid_id: &SharedString,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
@@ -491,8 +499,7 @@ impl Calendar {
                 .into_any_element();
         };
 
-        let day_id = format!("day-{}", day.0);
-        let ident = self.ident.child(day_id);
+        let ident = self.day_ident(day);
         let selectability = self.adapter.is_selectable(day);
         let blocked = selectability.reason().cloned();
         let selectable = selectability.is_selectable() && !self.disabled;
@@ -505,7 +512,7 @@ impl Calendar {
         let label = self.adapter.day_label(day);
 
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Option)
-            .parent(self.ident.child("grid").semantic_id())
+            .parent(grid_id.clone())
             .text(label.clone())
             .checked(selected || endpoint)
             .disabled(!selectable)
@@ -674,6 +681,13 @@ impl Calendar {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let grid_ident = self.ident.child("grid");
+        let grid_id = grid_ident.semantic_id();
+        self.day_idents.borrow_mut().retain(|day, _| {
+            grid.weeks
+                .iter()
+                .flatten()
+                .any(|cell| cell.day() == Some(*day))
+        });
         let weeks: Vec<AnyElement> = grid
             .weeks
             .iter()
@@ -685,7 +699,7 @@ impl Calendar {
                         week.iter()
                             .enumerate()
                             .map(|(index, cell)| {
-                                self.cell(*cell, index == 0, index == last, direction, cx)
+                                self.cell(*cell, index == 0, index == last, direction, &grid_id, cx)
                             })
                             .collect::<Vec<_>>(),
                     )
@@ -703,6 +717,14 @@ impl Calendar {
                     .parent(self.ident.semantic_id()),
             )
             .into_any_element()
+    }
+
+    fn day_ident(&self, day: Day) -> Ident {
+        self.day_idents
+            .borrow_mut()
+            .entry(day)
+            .or_insert_with(|| self.ident.child(format!("day-{}", day.0)))
+            .clone()
     }
 }
 

@@ -1061,6 +1061,13 @@
           "features": []
         },
         {
+          "alias": "smallvec",
+          "package": "smallvec",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
           "alias": "unicode-segmentation",
           "package": "unicode-segmentation",
           "kind": "normal",
@@ -46926,7 +46933,7 @@
       "source": "crates/gpui-kit/src/canvas/edge.rs",
       "summary": "A controlled connection between two graph nodes.",
       "documentation": "A controlled connection between two graph nodes.",
-      "signature": "# [doc = \" A controlled connection between two graph nodes.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct GraphEdge { from : SharedString, to : SharedString, kind : EdgeKind, id : Option<SharedString>, from_port : Option<SharedString>, to_port : Option<SharedString>, label : Option<SharedString>, state : EdgeState, marker : EdgeMarker, selected : bool, lane : i16, }",
+      "signature": "# [doc = \" A controlled connection between two graph nodes.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct GraphEdge { from : SharedString, to : SharedString, kind : EdgeKind, id : SharedString, explicit_id : bool, from_port : Option<SharedString>, to_port : Option<SharedString>, label : Option<SharedString>, state : EdgeState, marker : EdgeMarker, selected : bool, lane : i16, }",
       "cfg": []
     },
     {
@@ -46954,7 +46961,7 @@
       "path": "gpui_kit::canvas::edge",
       "source": "crates/gpui-kit/src/canvas/edge.rs",
       "summary": "The stable identity used for interaction and duplicate rejection.",
-      "documentation": "The stable identity used for interaction and duplicate rejection.\n\nAn explicit identity supplied with [`GraphEdge::id`] is returned as-is.\nOtherwise the endpoint, port, kind, and lane identities form an\nunambiguous compatibility identity.",
+      "documentation": "The stable identity used for interaction and duplicate rejection.\n\nAn explicit identity supplied with [`GraphEdge::id`] is returned as-is;\notherwise the builder precomputes an unambiguous compatibility identity\nfrom the endpoints, ports, kind, and lane.",
       "signature": "pub fn edge_id (& self) -> SharedString",
       "cfg": [],
       "target": "GraphEdge"
@@ -69737,7 +69744,7 @@
       "source": "crates/gpui-kit/src/datetime/calendar.rs",
       "summary": "A month of days.",
       "documentation": "A month of days.",
-      "signature": "# [doc = \" A month of days.\"] pub struct Calendar { ident : Ident, focus_handle : FocusHandle, adapter : SharedDateAdapter, selection : Vec<Day>, multi : bool, # [doc = \" The month the caller asked to open on, if any.\"] requested_month : Option<MonthKey>, # [doc = \" The month navigation has moved to. Until something navigates, the\"] # [doc = \" month is resolved from the selection, then from today, and if neither\"] # [doc = \" is known the calendar says so instead of picking one.\"] month : Option<MonthKey>, cursor : Option<Day>, hovered : Option<Day>, range : Option<DayRange>, overlay : Option<Overlay>, disabled : bool, # [doc = \" Which way the last navigation travelled, and how many have happened.\"] # [doc = \" The count keys the arrival animation; zero means the first frame, which\"] # [doc = \" arrives without motion so a capture of a settled calendar is settled.\"] travel : i32, navigations : usize, slots : Slots, }",
+      "signature": "# [doc = \" A month of days.\"] pub struct Calendar { ident : Ident, focus_handle : FocusHandle, adapter : SharedDateAdapter, selection : Vec<Day>, multi : bool, # [doc = \" The month the caller asked to open on, if any.\"] requested_month : Option<MonthKey>, # [doc = \" The month navigation has moved to. Until something navigates, the\"] # [doc = \" month is resolved from the selection, then from today, and if neither\"] # [doc = \" is known the calendar says so instead of picking one.\"] month : Option<MonthKey>, cursor : Option<Day>, hovered : Option<Day>, range : Option<DayRange>, overlay : Option<Overlay>, disabled : bool, # [doc = \" Which way the last navigation travelled, and how many have happened.\"] # [doc = \" The count keys the arrival animation; zero means the first frame, which\"] # [doc = \" arrives without motion so a capture of a settled calendar is settled.\"] travel : i32, navigations : usize, # [doc = \" Stable day identities for the month currently on screen. The adapter\"] # [doc = \" rebuilds `MonthGrid` values, but the same day must not rebuild its id\"] # [doc = \" on every frame.\"] day_idents : RefCell<HashMap<Day, Ident>>, slots : Slots, }",
       "cfg": []
     },
     {
@@ -78950,7 +78957,7 @@
       "source": "crates/gpui-kit/src/foundation/ident.rs",
       "summary": "One identity used for both the GPUI element and the semantic tree.",
       "documentation": "One identity used for both the GPUI element and the semantic tree.\n\nIds come from business identity, never list position, so an assertion that\ntargets `settings.provider.anthropic` keeps working when the row moves.",
-      "signature": "# [doc = \" One identity used for both the GPUI element and the semantic tree.\"] # [doc = \"\"] # [doc = \" Ids come from business identity, never list position, so an assertion that\"] # [doc = \" targets `settings.provider.anthropic` keeps working when the row moves.\"] # [derive (Debug, Clone, PartialEq, Eq, Hash)] pub struct Ident (SharedString);",
+      "signature": "# [doc = \" One identity used for both the GPUI element and the semantic tree.\"] # [doc = \"\"] # [doc = \" Ids come from business identity, never list position, so an assertion that\"] # [doc = \" targets `settings.provider.anthropic` keeps working when the row moves.\"] pub struct Ident { segments : SmallVec<[SharedString; 3]>, resolved : OnceLock<SharedString>, }",
       "cfg": []
     },
     {
@@ -78977,8 +78984,8 @@
       "module": "foundation::ident",
       "path": "gpui_kit::foundation::ident",
       "source": "crates/gpui-kit/src/foundation/ident.rs",
-      "summary": "Derives a child identity, for example the clear button inside a field.",
-      "documentation": "Derives a child identity, for example the clear button inside a field.",
+      "summary": "Derives a lazily joined child identity, for example the clear button inside a field.",
+      "documentation": "Derives a lazily joined child identity, for example the clear button\ninside a field.\n\nSegments stay separate until an element or semantic id needs the full\nstring. Chained builders therefore materialize once rather than once\nper intermediate child, and the inline segment storage dies with the\nvalue instead of retaining an interning table.",
       "signature": "pub fn child (& self, suffix : impl AsRef<str>) -> Self",
       "cfg": [],
       "target": "Ident"

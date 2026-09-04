@@ -2548,6 +2548,7 @@ dependencies = [
  "rasterlottie",
  "serde",
  "serde_json",
+ "smallvec",
  "unicode-segmentation",
  "web-time",
  "windows 0.61.3",

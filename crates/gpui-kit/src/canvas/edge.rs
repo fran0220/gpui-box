@@ -186,7 +186,8 @@ pub struct GraphEdge {
     from: SharedString,
     to: SharedString,
     kind: EdgeKind,
-    id: Option<SharedString>,
+    id: SharedString,
+    explicit_id: bool,
     from_port: Option<SharedString>,
     to_port: Option<SharedString>,
     label: Option<SharedString>,
@@ -198,11 +199,14 @@ pub struct GraphEdge {
 
 impl GraphEdge {
     pub fn new(from: impl Into<SharedString>, to: impl Into<SharedString>) -> Self {
+        let from = from.into();
+        let to = to.into();
         Self {
-            from: from.into(),
-            to: to.into(),
+            id: compatibility_edge_id(&from, &to, None, None, EdgeKind::Flow, 0),
+            explicit_id: false,
+            from,
+            to,
             kind: EdgeKind::Flow,
-            id: None,
             from_port: None,
             to_port: None,
             label: None,
@@ -223,12 +227,14 @@ impl GraphEdge {
         self.kind
     }
     pub fn id(mut self, id: impl Into<SharedString>) -> Self {
-        self.id = Some(id.into());
+        self.id = id.into();
+        self.explicit_id = true;
         self
     }
     pub fn ports(mut self, from: impl Into<SharedString>, to: impl Into<SharedString>) -> Self {
         self.from_port = Some(from.into());
         self.to_port = Some(to.into());
+        self.refresh_compatibility_id();
         self
     }
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
@@ -258,10 +264,12 @@ impl GraphEdge {
     }
     pub fn lane(mut self, lane: i16) -> Self {
         self.lane = lane;
+        self.refresh_compatibility_id();
         self
     }
     pub fn feedback(mut self) -> Self {
         self.kind = EdgeKind::Feedback;
+        self.refresh_compatibility_id();
         self
     }
 
@@ -291,33 +299,54 @@ impl GraphEdge {
     }
     /// The stable identity used for interaction and duplicate rejection.
     ///
-    /// An explicit identity supplied with [`GraphEdge::id`] is returned as-is.
-    /// Otherwise the endpoint, port, kind, and lane identities form an
-    /// unambiguous compatibility identity.
+    /// An explicit identity supplied with [`GraphEdge::id`] is returned as-is;
+    /// otherwise the builder precomputes an unambiguous compatibility identity
+    /// from the endpoints, ports, kind, and lane.
     pub fn edge_id(&self) -> SharedString {
-        if let Some(id) = &self.id {
-            return id.clone();
-        }
-        // Length prefixes make the compatibility identity unambiguous even if ids contain separators.
-        let kind = match self.kind {
-            EdgeKind::Flow => "flow",
-            EdgeKind::Feedback => "feedback",
-        };
-        format!(
-            "{}:{}|{}:{}|{}:{}|{}:{}|{}|{}",
-            self.from.len(),
-            self.from,
-            self.to.len(),
-            self.to,
-            self.from_port.as_ref().map_or(0, |v| v.len()),
-            self.from_port.as_deref().unwrap_or(""),
-            self.to_port.as_ref().map_or(0, |v| v.len()),
-            self.to_port.as_deref().unwrap_or(""),
-            kind,
-            self.lane
-        )
-        .into()
+        self.id.clone()
     }
+
+    fn refresh_compatibility_id(&mut self) {
+        if !self.explicit_id {
+            self.id = compatibility_edge_id(
+                &self.from,
+                &self.to,
+                self.from_port.as_ref(),
+                self.to_port.as_ref(),
+                self.kind,
+                self.lane,
+            );
+        }
+    }
+}
+
+fn compatibility_edge_id(
+    from: &SharedString,
+    to: &SharedString,
+    from_port: Option<&SharedString>,
+    to_port: Option<&SharedString>,
+    kind: EdgeKind,
+    lane: i16,
+) -> SharedString {
+    // Length prefixes make the compatibility identity unambiguous even if ids contain separators.
+    let kind = match kind {
+        EdgeKind::Flow => "flow",
+        EdgeKind::Feedback => "feedback",
+    };
+    format!(
+        "{}:{}|{}:{}|{}:{}|{}:{}|{}|{}",
+        from.len(),
+        from,
+        to.len(),
+        to,
+        from_port.map_or(0, |value| value.len()),
+        from_port.map_or("", SharedString::as_str),
+        to_port.map_or(0, |value| value.len()),
+        to_port.map_or("", SharedString::as_str),
+        kind,
+        lane
+    )
+    .into()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1650,6 +1679,15 @@ mod tests {
         assert_eq!(a.edge_lane(), 3);
         assert_eq!(
             a.clone().id("business").edge_id(),
+            SharedString::from("business")
+        );
+        assert_eq!(
+            GraphEdge::new("one", "two")
+                .id("business")
+                .ports("out", "in")
+                .lane(3)
+                .feedback()
+                .edge_id(),
             SharedString::from("business")
         );
     }

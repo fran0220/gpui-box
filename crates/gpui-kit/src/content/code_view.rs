@@ -312,6 +312,8 @@ impl Sizable for CodeView {
 #[allow(clippy::too_many_arguments)]
 fn line_element(
     ident: &Ident,
+    text_ident: &Ident,
+    parent: &SharedString,
     line: &CodeLine,
     gutter: f32,
     line_numbers: bool,
@@ -323,8 +325,6 @@ fn line_element(
         .mark
         .map_or(gpui::transparent_black(), |mark| mark.wash(theme));
     let struck = line.mark.is_some_and(LineMark::struck);
-
-    let text_ident = ident.child(format!("line-{}-text", line.number));
 
     let row = div()
         .row()
@@ -379,8 +379,8 @@ fn line_element(
         Some(mark) => row
             .semantic_in(
                 cx,
-                NodeSpec::new(line_id(ident, line.number), Role::Row)
-                    .parent(ident.semantic_id())
+                NodeSpec::new(ident.semantic_id(), Role::Row)
+                    .parent(parent.clone())
                     // The mark's wording, not the line's source: what the view
                     // claims about the line is the fact it adds, and the code
                     // itself is content nobody here wrote.
@@ -391,15 +391,6 @@ fn line_element(
             .into_any_element(),
         None => row.into_any_element(),
     }
-}
-
-/// One line's stable id.
-///
-/// The number is prefixed rather than trailing on its own, because an id whose
-/// last segment is a bare number reads as a list position, and the audit that
-/// catches that mistake elsewhere is worth more than the two characters.
-fn line_id(ident: &Ident, number: usize) -> SharedString {
-    ident.child(format!("line-{number}")).semantic_id()
 }
 
 /// One shaped code value with its syntax ranges, whoever classified them.
@@ -506,13 +497,23 @@ impl RenderOnce for CodeView {
         } else if let Some(visible) = self.visible_lines {
             let lines = std::rc::Rc::new(self.lines);
             let list_ident = body_ident.clone();
+            let list_parent = list_ident.semantic_id();
             let theme_for_rows = theme.clone();
             List::new(body_ident.clone(), total, move |index, _window, cx| {
                 let line = &lines[index];
+                // The line id is shared by the list row, semantic row, and
+                // selectable text instead of being formatted independently
+                // for each consumer.
+                let text_suffix = format!("line-{}-text", line.number);
+                let line_suffix = &text_suffix[..text_suffix.len() - "-text".len()];
+                let line_ident = list_ident.child(line_suffix);
+                let text_ident = list_ident.child(&text_suffix);
                 ListItem::new(
-                    line_id(&list_ident, line.number),
+                    line_ident.semantic_id(),
                     line_element(
-                        &list_ident,
+                        &line_ident,
+                        &text_ident,
+                        &list_parent,
                         line,
                         gutter,
                         line_numbers,
@@ -530,6 +531,7 @@ impl RenderOnce for CodeView {
             // scroll area that filled the height it was offered was offered
             // none by a column that states no height, and the body collapsed
             // to an empty strip. Only the horizontal scroll does work here.
+            let body_parent = body_ident.semantic_id();
             ScrollArea::new(body_ident.clone())
                 .axis(ScrollAxis::Both)
                 .fit_height()
@@ -538,8 +540,14 @@ impl RenderOnce for CodeView {
                         self.lines
                             .iter()
                             .map(|line| {
+                                let text_suffix = format!("line-{}-text", line.number);
+                                let line_suffix = &text_suffix[..text_suffix.len() - "-text".len()];
+                                let line_ident = body_ident.child(line_suffix);
+                                let text_ident = body_ident.child(&text_suffix);
                                 line_element(
-                                    &body_ident,
+                                    &line_ident,
+                                    &text_ident,
+                                    &body_parent,
                                     line,
                                     gutter,
                                     line_numbers,

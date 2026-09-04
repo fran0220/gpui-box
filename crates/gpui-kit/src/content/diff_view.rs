@@ -1320,6 +1320,7 @@ fn unified_line(
     cx: &App,
 ) -> AnyElement {
     let color = side.mark.tone().color(theme);
+    let text_id = Ident::new(id.clone()).child("text").semantic_id();
     // A wrapped line grows downwards, so its number and mark belong beside the
     // line's first row rather than beside the middle of everything it became.
     row_frame(theme, fit)
@@ -1346,11 +1347,7 @@ fn unified_line(
         .child(
             code_cell(fit).child(
                 styled_code(theme, side.text.clone(), &side.spans)
-                    .selectable_in_document(
-                        SharedString::from(format!("{id}.text")),
-                        SharedString::from(format!("{id}.text")),
-                        order,
-                    )
+                    .selectable_in_document(text_id.clone(), text_id, order)
                     .virtualized_participant(true),
             ),
         )
@@ -1424,7 +1421,10 @@ fn code_side(
                 .child(side.map_or("", |side| side.mark.prefix())),
         )
         .child(code_cell(fit).children(side.map(|side| {
-            let key = SharedString::from(format!("{id}.{slot}.text"));
+            let key = Ident::new(id.clone())
+                .child(slot)
+                .child("text")
+                .semantic_id();
             styled_code(theme, side.text.clone(), &side.spans)
                 .selectable_in_document(key.clone(), key, order)
                 .virtualized_participant(true)

@@ -46,6 +46,7 @@ rasterlottie = { workspace = true, optional = true }
 # serializes, and nothing here resolves a URI.
 serde = { workspace = true }
 serde_json.workspace = true
+smallvec.workspace = true
 web-time.workspace = true
 zip = { workspace = true, optional = true }
 

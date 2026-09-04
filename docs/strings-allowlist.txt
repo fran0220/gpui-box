@@ -103,6 +103,7 @@ GridItem
 GridRow
 HoverCard
 IconButton
+Ident
 ImageList
 ImageListItem
 ImageViewer
@@ -244,7 +245,9 @@ Yes
 `{id}` appears more than once
 `{id}` names a parent `{parent}` that is absent
 a built source was just matched
+a cloned identity is empty
 a keyframe list is never empty
+a new identity is empty
 a rich text document always has one block
 a rich-text block id cannot be empty
 a rich-text document needs one block
@@ -264,6 +267,7 @@ game fraction must be between 0 and 1
 game fraction must be finite
 glTF
 handled before mutation
+identity segments are valid UTF-8
 layout came from projected document
 layout is present until paint
 markdown stream closed `{end:?}` past its root

@@ -430,6 +430,7 @@ impl EventEmitter<SchemaFormEvent> for SchemaForm {}
 
 struct SelectedFile {
     id: u64,
+    ident: Ident,
     path: PathBuf,
     label: SharedString,
 }
@@ -444,6 +445,7 @@ struct FilesControl {
 
 struct RepeatedItem {
     id: u64,
+    ident: Ident,
     form: Entity<SchemaForm>,
     _subscription: Subscription,
 }
@@ -925,6 +927,11 @@ impl SchemaForm {
         append: bool,
         cx: &mut Context<Self>,
     ) -> Result<bool, SharedString> {
+        let file_root = self
+            .ident
+            .child(path.as_ref())
+            .child("control")
+            .child("file");
         let Some(field) = self.fields.iter().find(|field| field.path == *path) else {
             return Ok(false);
         };
@@ -982,17 +989,25 @@ impl SchemaForm {
         let previous = files
             .selected
             .iter()
-            .map(|file| (file.path.clone(), file.id, file.label.clone()))
+            .map(|file| {
+                (
+                    file.path.clone(),
+                    file.id,
+                    file.label.clone(),
+                    file.ident.clone(),
+                )
+            })
             .collect::<Vec<_>>();
         let mut next_id = files.next_id;
         let selected = candidates
             .into_iter()
             .map(|candidate| {
-                if let Some((_, id, label)) =
-                    previous.iter().find(|(path, _, _)| path == &candidate)
+                if let Some((_, id, label, ident)) =
+                    previous.iter().find(|(path, _, _, _)| path == &candidate)
                 {
                     SelectedFile {
                         id: *id,
+                        ident: ident.clone(),
                         path: candidate,
                         label: label.clone(),
                     }
@@ -1002,6 +1017,7 @@ impl SchemaForm {
                     let label = policy.display_name(&candidate);
                     SelectedFile {
                         id,
+                        ident: file_root.child(id.to_string()),
                         path: candidate,
                         label,
                     }
@@ -1012,7 +1028,7 @@ impl SchemaForm {
             || previous
                 .iter()
                 .zip(&selected)
-                .any(|((path, _, _), selected)| path != &selected.path);
+                .any(|((path, _, _, _), selected)| path != &selected.path);
 
         if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
             && let Control::Files(files) = &mut field.control
@@ -1106,6 +1122,7 @@ impl SchemaForm {
             .child("control")
             .child(format!("item-{id}"));
         let schema = Self::repeated_schema(&item);
+        let retained_ident = item_ident.clone();
         let form = cx.new(|cx| SchemaForm::new(item_ident, schema, window, cx));
         let export_prefix = Self::exported_path(
             self.export_prefix.as_ref(),
@@ -1134,6 +1151,7 @@ impl SchemaForm {
         {
             repeated.items.push(RepeatedItem {
                 id,
+                ident: retained_ident,
                 form,
                 _subscription: subscription,
             });
@@ -2149,10 +2167,7 @@ impl SchemaForm {
                     let path = field.path.clone();
                     let id = selected.id;
                     div()
-                        .id(control_ident
-                            .child("file")
-                            .child(id.to_string())
-                            .element_id())
+                        .id(selected.ident.element_id())
                         .row_reading(direction)
                         .items_center()
                         .justify_between()
@@ -2172,10 +2187,7 @@ impl SchemaForm {
                         )
                         .child(
                             IconButton::new(
-                                control_ident
-                                    .child("file")
-                                    .child(id.to_string())
-                                    .child("remove"),
+                                selected.ident.child("remove"),
                                 Icon::Trash,
                                 cx.strings().text(StringKey::SchemaFilesRemove),
                             )
@@ -2213,7 +2225,7 @@ impl SchemaForm {
             Control::Repeated(repeated) => {
                 let item_count = repeated.items.len();
                 let items = repeated.items.iter().enumerate().map(|(index, item)| {
-                    let item_ident = control_ident.child(format!("item-{}", item.id));
+                    let item_ident = item.ident.clone();
 
                     let form = cx.entity().downgrade();
                     let path = field.path.clone();
