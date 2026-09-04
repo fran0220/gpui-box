@@ -225,7 +225,53 @@ namespace GpuiBox.Accessibility
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Rect
+        {
+            internal int Left;
+            internal int Top;
+            internal int Right;
+            internal int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GuiThreadInfo
+        {
+            internal uint Size;
+            internal uint Flags;
+            internal IntPtr Active;
+            internal IntPtr Focus;
+            internal IntPtr Capture;
+            internal IntPtr MenuOwner;
+            internal IntPtr MoveSize;
+            internal IntPtr Caret;
+            internal Rect CaretRect;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
+
         private const uint GW_OWNER = 4;
+
+        // What Win32 itself says about the target's keyboard state, for a
+        // failure message: which window is foreground, and which windows the
+        // target thread considers active and focused.
+        public static string Describe(int processId)
+        {
+            IntPtr hwnd = TopLevelWindow(processId);
+            uint ignored;
+            uint thread = hwnd == IntPtr.Zero ? 0 : GetWindowThreadProcessId(hwnd, out ignored);
+            GuiThreadInfo info = new GuiThreadInfo();
+            info.Size = (uint)Marshal.SizeOf(typeof(GuiThreadInfo));
+            bool known = thread != 0 && GetGUIThreadInfo(thread, ref info);
+            return String.Format(
+                "target=0x{0:X} foreground=0x{1:X} thread-active=0x{2:X} thread-focus=0x{3:X}",
+                hwnd.ToInt64(),
+                GetForegroundWindow().ToInt64(),
+                known ? info.Active.ToInt64() : -1,
+                known ? info.Focus.ToInt64() : -1
+            );
+        }
 
         public static IntPtr TopLevelWindow(int processId)
         {

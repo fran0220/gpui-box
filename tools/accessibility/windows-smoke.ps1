@@ -223,7 +223,7 @@ switch ($Mode) {
         $menu = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions"
         # Host focus arrives through WM_SETFOCUS and the AccessKit focus event
         # after Activate-Target returns, so read until they agree.
-        Wait-Until -Failure "Copy link was not the singular focused UIA MenuItem" -Predicate {
+        $menuFocusAgrees = {
             $items = @(Find-All -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link")
             if ($items.Count -ne 1 -or -not $items[0].Current.HasKeyboardFocus) {
                 return $false
@@ -231,6 +231,33 @@ switch ($Mode) {
             $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
             return $focused.Current.ProcessId -eq $TargetProcessId -and
                 $focused.Current.Name -eq "Copy link"
+        }
+        $deadline = [DateTime]::UtcNow.AddSeconds(15)
+        while (-not (& $menuFocusAgrees)) {
+            if ([DateTime]::UtcNow -ge $deadline) {
+                $report = @()
+                $report += [GpuiBox.Accessibility.NativeWindow]::Describe($TargetProcessId)
+                $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $report += "focused-element pid=$($focused.Current.ProcessId) type=$($focused.Current.ControlType.ProgrammaticName) name='$($focused.Current.Name)'"
+                $condition = [System.Windows.Automation.AndCondition]::new(
+                    [System.Windows.Automation.PropertyCondition]::new(
+                        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+                        $TargetProcessId
+                    ),
+                    [System.Windows.Automation.PropertyCondition]::new(
+                        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                        [System.Windows.Automation.ControlType]::MenuItem
+                    )
+                )
+                foreach ($item in @([System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+                    [System.Windows.Automation.TreeScope]::Descendants,
+                    $condition
+                ))) {
+                    $report += "menu-item '$($item.Current.Name)' focusable=$($item.Current.IsKeyboardFocusable) focused=$($item.Current.HasKeyboardFocus)"
+                }
+                throw "Copy link was not the singular focused UIA MenuItem; $($report -join '; ')"
+            }
+            Start-Sleep -Milliseconds 100
         }
         $copyLink = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link"
         $invoke = [System.Windows.Automation.InvokePattern](
