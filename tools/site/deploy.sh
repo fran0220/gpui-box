@@ -5,6 +5,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 host="${GPUI_BOX_DEPLOY_HOST:-bwg}"
 key="${GPUI_BOX_DEPLOY_SSH_KEY:-}"
+known_hosts="${GPUI_BOX_DEPLOY_KNOWN_HOSTS:-}"
 out="${GPUI_BOX_RELEASE_OUT:-$root/target/site-release}"
 
 archive="$("$root/tools/site/build-release.sh" "$out" | tail -n 1)"
@@ -18,6 +19,11 @@ ssh_args=(
 )
 if [[ -n "$key" ]]; then
   ssh_args+=(-i "$key" -o IdentitiesOnly=yes)
+fi
+if [[ -n "$known_hosts" ]]; then
+  # Pin the receiver's host key to the committed file instead of whatever the
+  # machine's own known_hosts has accumulated.
+  ssh_args+=(-o "UserKnownHostsFile=$known_hosts" -o StrictHostKeyChecking=yes)
 fi
 
 echo "deploying $(basename "$archive") to $host"

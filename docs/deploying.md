@@ -34,18 +34,37 @@ the `current` symlink atomically. Failure restores the previous release. Five
 releases are retained.
 
 ```bash
-rustup target add x86_64-unknown-linux-musl
-tools/site/deploy.sh
+tools/site/deploy-main.sh
 ```
 
-On macOS the release build uses `cargo-zigbuild`; Linux uses `musl-tools`.
-Normal deployments run in `.github/workflows/deploy-site.yml` on every push to
-`main`, in parallel with the platform CI. The release builder independently
-checks the generated indexes, builds the site, semantic snapshots, and static
-MCP binary, and validates the complete immutable bundle before BWG accepts it.
-This keeps the hosted catalog on the exact `origin/main` revision even when an
-unrelated platform CI job is unavailable or failing. The only repository
-secret is the restricted private key `BWG_GPUI_BOX_DEPLOY_KEY`.
+That is the ordinary deployment, run from the orb right after `git push`.
+It fetches `origin/main`, refuses a `HEAD` that differs from it or a dirty
+tree, resolves the deployment identity (`GPUI_BOX_DEPLOY_SSH_KEY`, or the Amp
+environment secret `ORIGINGAME_SSH_PRIVATE_KEY_B64` written once to
+`~/.ssh/gpui-box-deploy`), addresses the receiver as
+`${ORIGINGAME_BWG_SSH_USER:-root}@$ORIGINGAME_BWG_SSH_HOST` unless
+`GPUI_BOX_DEPLOY_HOST` says otherwise, pins the host key to the committed
+`tools/site/ops/bwg-known-hosts`, runs `tools/site/deploy.sh`, and finishes
+with `tools/site/verify-deployment.sh`. `.agents/setup` installs `musl-tools`
+and the musl target so a fresh orb can do this; on macOS the release build
+uses `cargo-zigbuild` instead.
+
+`tools/site/verify-deployment.sh [revision]` is the proof, and it is the same
+proof whichever lane deployed: both hostnames serve `/build-info.json` naming
+the revision with the package, symbol, component, type, theme, guide, recipe,
+and scene counts of the committed `docs/developer-index.json`; `POST /mcp`
+`tools/list` returns every tool in `tools/mcp/tools.json`; and
+`search_components` with an empty query returns every component. Every
+request pins the BWG address so the answer is about the origin, not DNS.
+
+Nothing deploys on push. `.github/workflows/deploy-site.yml` is a
+dispatch-only fallback for when no machine holds the deployment identity; it
+runs the same two scripts on a hosted runner with the repository secret
+`BWG_GPUI_BOX_DEPLOY_KEY`, whose key is restricted to
+`receive-gpui-box-release`. The release builder independently checks the
+generated indexes, builds the site, semantic snapshots, and static MCP
+binary, and validates the complete immutable bundle before BWG accepts it, so
+either lane keeps the hosted catalog on the exact `origin/main` revision.
 
 ## One-time host bootstrap
 

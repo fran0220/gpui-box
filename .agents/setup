@@ -14,6 +14,7 @@ packages=(
   libx11-xcb-dev
   libxkbcommon-x11-dev
   libvulkan1
+  musl-tools
   xauth
   xvfb
 )
@@ -64,6 +65,9 @@ fi
 toolchain="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml)"
 echo "Installing Rust $toolchain with repository-required components."
 rustup toolchain install "$toolchain" --profile minimal --component clippy --component rustfmt
+# The browser gallery needs wasm32; the hosted MCP release is a static
+# Linux/x86-64 musl executable built by tools/site/deploy-main.sh.
+rustup target add --toolchain "$toolchain" wasm32-unknown-unknown x86_64-unknown-linux-musl
 
 wasm_bindgen_version="0.2.127"
 if ! command -v wasm-bindgen >/dev/null 2>&1 ||
@@ -76,20 +80,17 @@ echo "Fetching locked Cargo dependencies."
 cargo fetch --locked
 
 if ! command -v npx >/dev/null 2>&1; then
-  echo "npx is required to deploy the hosted site and MCP endpoint." >&2
+  echo "npx is required for the browser-gallery smoke." >&2
   exit 1
 fi
 
 echo "Installing locked browser-gallery tools."
 npm --prefix examples/browser-gallery ci
 
-echo "Caching Wrangler for hosted site and MCP deployments."
-npx --yes wrangler@4 --version >/dev/null
-
-if [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" && -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-  echo "Cloudflare deployment credentials are available."
+if [[ -n "${ORIGINGAME_SSH_PRIVATE_KEY_B64:-}" && -n "${ORIGINGAME_BWG_SSH_HOST:-}" ]]; then
+  echo "BWG deployment identity is available; tools/site/deploy-main.sh can deploy after a push."
 else
-  echo "Cloudflare deployment is unavailable: configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Amp project settings." >&2
+  echo "BWG deployment is unavailable here: tools/site/deploy-main.sh needs ORIGINGAME_SSH_PRIVATE_KEY_B64 and ORIGINGAME_BWG_SSH_HOST (or GPUI_BOX_DEPLOY_SSH_KEY and GPUI_BOX_DEPLOY_HOST)." >&2
 fi
 
 echo "Orb setup complete."
