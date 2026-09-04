@@ -581,19 +581,34 @@ accessible `ContextMenu` as the fallback. It does not include the upstream
 component-native menu model, root overlay, icon loading/rasterization, theme
 hooks, or source files, and adds no dependency.
 
-## P18: Longbridge GPUI Kit 0.6 convergence reference and framework source port
+## P18: Zed GPUI spring, gesture, and profiler source ports
 
-- Release reviewed: <https://github.com/longbridge/gpui-kit/releases/tag/v0.6.0>
-- Release revision: `94a313a72a2513aee2780240cd322d552b2395f0`
-- Framework package: `gpui-pre` 0.3.2
-- Package checksum: `c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad`
-- Package source revision: `zed@801c087af22dd189dc1aa49e2f370b4f04190b19`
-- License: Apache-2.0
-- Source locations: `gpui-pre/src/spring.rs`,
-  `gpui-pre/src/elements/animation.rs`, `gpui-pre/src/gestures.rs`,
-  `gpui-pre/src/interactive.rs`, `gpui-pre/src/profiler.rs`, and
-  `gpui-pre/src/window.rs`
-- Behavioral-review locations: Longbridge release
+- Upstream: <https://github.com/zed-industries/zed>
+- Compared range: frozen GPUI Box baseline
+  `a6a23c7b80a5cefa0487b7856335be89ace7e483` through reviewed Zed revision
+  `801c087af22dd189dc1aa49e2f370b4f04190b19`
+- Spring source revision: `8b1497dbd22fb06f5838a7c0b84a1e54fafa71bc`
+- Gesture source revisions: `956a49e4ca8aa4b7c2c293e1414c91f009824ae3`,
+  `76b1096cbd83b5b5138793e5f552218abc8fdcbb`,
+  `0855410ccd2040efbbf14d71409166b6c472e0bd`,
+  `b3326e13c142fc8f313aca67a93dd6855a1e7e32`, and
+  `5e28272c1407ced4bae4a90deaea25352a1fbc96`
+- Profiler source revisions: `a21007b7a948e46afbe719150f5e9968bfcd1078`,
+  `9e236090b9a31338caf233d440f724922b58d7e1`,
+  `1861e58f984c76afc06032e753557994ffc8fe44`, and
+  `55007f518bc1d49e6b3291c5eaa1aabf649b36fd`
+- License: Apache-2.0; Copyright Zed Industries, Inc.
+- Source locations: Zed `crates/gpui/src/spring.rs`,
+  `crates/gpui/src/elements/animation.rs`, `crates/gpui/src/gestures.rs`,
+  `crates/gpui/src/interactive.rs`, `crates/gpui/src/profiler.rs`, and
+  `crates/gpui/src/window.rs`
+- Discovery reference only: Longbridge GPUI Kit release
+  <https://github.com/longbridge/gpui-kit/releases/tag/v0.6.0> at
+  `94a313a72a2513aee2780240cd322d552b2395f0`, whose `Cargo.toml` declared
+  `gpui = { package = "gpui-pre", version = "0.3.1" }`; Cargo's caret
+  requirement resolved `gpui-pre` 0.3.2 in its lock file
+- Reviewed package checksum: `c4680a36f5977d6e0892b0e7f3a2a9248a7b8acedc2b1975c88d4eb5517a21ad`
+- Behavioral-review locations in the discovery reference:
   `crates/base/src/dock/layout`, `crates/base/src/dock/dock_area.rs`,
   `crates/base/src/dock/drag.rs`, `crates/base/src/dock/tab_group.rs`, and
   `crates/base/src/dock/state_convert.rs`
@@ -604,18 +619,20 @@ hooks, or source files, and adds no dependency.
   `crates/gpui/src/window.rs`; behavioral contracts in
   `crates/gpui-kit/tests/dock_tree.rs`
 
-The 0.6 release was audited as a capability delta, not installed as a package:
-its crates resolve through `gpui-pre`, which would create a second GPUI type
-universe beside `gpui-box`. The Apache-2.0 spring solver, target projection,
-interpolation types, playback builder, sampled easing, and element animation
-lifecycle were therefore adapted into GPUI Box's existing framework authority.
+The Longbridge release exposed the capability delta but is not the source of
+the framework code: `gpui-pre` is Zed's published GPUI crate, and the original
+work is identified by the Zed commits above. The release was not installed as a
+package because doing so would create a second GPUI type universe beside
+`gpui-box`. Zed's Apache-2.0 spring solver, target projection, interpolation
+types, playback builder, sampled easing, and element animation lifecycle were
+therefore adapted into GPUI Box's existing framework authority.
 Local changes retain reduced-motion behavior, use the repository's scheduler,
 and add coverage for every damping regime, retargeted velocity, playback
 states, and finite overshoot. Kit's existing token/perceptual `Spring`, visual
 settling policy, transitions, presence, and FLIP remain its policy layer but
 delegate scalar evolution to the framework solver.
 
-The package's portable touch recognizer, least-squares release velocity,
+Zed's portable touch recognizer, least-squares release velocity,
 prediction reconciliation, tap/multi-tap synthesis, axis-locked pan, catchable
 fling momentum, phased touch-drag/long-press claiming, cancellation, and window
 dispatch were adapted at the same framework boundary. GPUI Box retains the
@@ -632,7 +649,7 @@ arena: additional contacts are ignored while one touch is active, pinch remains
 a platform event, and no native iOS/Android touch producer is added. No
 `gpui-pre`, Longbridge, Zed Git source, or Cargo patch was added.
 
-The package's split draw/submission profiler model also informed the local
+Zed's split draw/submission profiler model also informed the local
 framework boundary. GPUI Box keeps its existing feature-independent,
 reference-counted frame trace leases, passive per-window monitor, bounded
 history, benchmark draw records, deterministic `FrameStats`, and Kit HUD. It
