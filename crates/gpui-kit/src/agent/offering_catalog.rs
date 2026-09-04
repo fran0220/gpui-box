@@ -24,6 +24,7 @@ use crate::foundation::{
     CardVariant, Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, Sizable,
     StyledExt, rule, text,
 };
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -350,6 +351,16 @@ impl OfferingCatalog {
             ),
         };
         let label = cx.strings().format(label_key, &[source.name.as_ref()]);
+        let mark_ident = ident.child("mark");
+        let mark = match source.state {
+            // Empty and unavailable are both neutral; the unavailable state
+            // keeps a distinct still shape after its wording moves to help.
+            OfferingSourceState::Unavailable(_) => icon(Icon::CloseCircle)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(tone.color(theme))
+                .into_any_element(),
+            _ => StatusDot::new(tone).into_any_element(),
+        };
         div()
             .row()
             .w_full()
@@ -360,15 +371,17 @@ impl OfferingCatalog {
             .bg(theme.color_wash(tone.color(theme), SemanticWash::Standard))
             .child(
                 div()
+                    .id(mark_ident.element_id())
                     .mt(px(theme.space(Space::Xs)))
-                    .child(StatusDot::new(tone)),
+                    .child(mark)
+                    .tip(mark_ident, label.clone()),
             )
             .child(
                 div()
                     .column()
                     .min_w_0()
                     .child(
-                        text(theme, TypeScale::Caption, label.clone())
+                        text(theme, TypeScale::Caption, source.name.clone())
                             .text_color(tone.color(theme)),
                     )
                     .children(reason.clone().map(|reason| {
@@ -379,9 +392,9 @@ impl OfferingCatalog {
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Status)
                     .parent(self.ident.semantic_id())
-                    .text(label)
+                    .text(source.name.clone())
                     .value(source.state.name())
-                    .description(reason.unwrap_or_default())
+                    .description(reason.unwrap_or(label))
                     .busy(matches!(source.state, OfferingSourceState::Loading))
                     .invalid(matches!(source.state, OfferingSourceState::Error(_))),
             )
@@ -423,19 +436,40 @@ impl OfferingCatalog {
             })
             .collect();
         if filtered.is_empty() {
-            let key = if self
+            let has_offerings = self
                 .sources
                 .iter()
-                .any(|source| !source.state.offerings().is_empty())
-            {
-                StringKey::OfferingCatalogNoMatch
-            } else {
-                StringKey::OfferingCatalogEmpty
-            };
+                .any(|source| !source.state.offerings().is_empty());
             return self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(self.ident.child("empty"), cx.strings().text(key))
+                if has_offerings {
+                    // No match is a result of the reader's query, not a bare
+                    // catalog state, so that fact remains visible.
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::OfferingCatalogNoMatch),
+                    )
                     .kind(EmptyKind::Empty)
                     .into_any_element()
+                } else {
+                    let label = cx.strings().text(StringKey::OfferingCatalogEmpty);
+                    div()
+                        .column()
+                        .items_center()
+                        .justify_center()
+                        .p_token(theme, Space::Lg)
+                        .child(
+                            icon(Icon::Archive)
+                                .size(px(theme.measures.standalone_icon))
+                                .text_color(theme.colors.text_faint),
+                        )
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(self.ident.child("empty").semantic_id(), Role::Status)
+                                .text(label)
+                                .value("empty"),
+                        )
+                        .into_any_element()
+                }
             });
         }
 

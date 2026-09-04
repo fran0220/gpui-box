@@ -7,14 +7,13 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
-use gpui_kit_assets::Icon;
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
-use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, StyledExt};
@@ -174,13 +173,15 @@ impl RenderOnce for PromptBuilder {
             ),
             PromptBuilderState::Empty => (
                 self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    state_surface(
                         self.ident.child("empty"),
                         cx.strings().text(StringKey::PromptEmpty),
+                        Icon::Document,
+                        theme.colors.text_faint,
+                        None,
+                        &theme,
+                        cx,
                     )
-                    .kind(EmptyKind::Empty)
-                    .icon(Icon::Document)
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
@@ -188,30 +189,36 @@ impl RenderOnce for PromptBuilder {
             ),
             PromptBuilderState::Unavailable(reason) => (
                 self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    state_surface(
                         self.ident.child("unavailable"),
                         cx.strings().text(StringKey::PromptUnavailable),
+                        Icon::CloseCircle,
+                        theme.colors.warning,
+                        Some(reason.clone()),
+                        &theme,
+                        cx,
                     )
-                    .kind(EmptyKind::Unavailable)
-                    .detail(reason.clone())
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
+                    .description(reason.clone())
                     .value(self.state.name()),
             ),
             PromptBuilderState::Error(reason) => (
                 self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    state_surface(
                         self.ident.child("error"),
                         cx.strings().text(StringKey::PromptFailed),
+                        Icon::Danger,
+                        theme.colors.danger,
+                        Some(reason.clone()),
+                        &theme,
+                        cx,
                     )
-                    .kind(EmptyKind::Failed)
-                    .detail(reason.clone())
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
+                    .description(reason.clone())
                     .value(self.state.name()),
             ),
             PromptBuilderState::Ready => {
@@ -337,6 +344,40 @@ impl RenderOnce for PromptBuilder {
             )
             .semantic_in(cx, spec)
     }
+}
+
+fn state_surface(
+    ident: Ident,
+    label: SharedString,
+    glyph: Icon,
+    tint: Hsla,
+    detail: Option<SharedString>,
+    theme: &gpui_kit_theme::Theme,
+    cx: &mut App,
+) -> gpui::AnyElement {
+    div()
+        .column()
+        .items_center()
+        .justify_center()
+        .gap_token(theme, Space::Sm)
+        .child(
+            icon(glyph)
+                .size(px(theme.measures.standalone_icon))
+                .text_color(tint),
+        )
+        .children(detail.clone().map(|detail| {
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(detail)
+        }))
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(label)
+                .description(detail.unwrap_or_default()),
+        )
+        .into_any_element()
 }
 
 #[cfg(test)]

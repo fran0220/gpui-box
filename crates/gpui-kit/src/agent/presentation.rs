@@ -342,6 +342,7 @@ impl RenderOnce for AgentActivityLine {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let label = execution_label(&self.execution, cx.strings());
+        let surface_label = execution_surface_label(&self.execution).then(|| label.clone());
         let tone = execution_tone(&self.execution);
         let busy = self.execution.busy();
         let color = tone.mark_color(self.tint, &theme);
@@ -382,7 +383,7 @@ impl RenderOnce for AgentActivityLine {
             .type_scale(&theme, TypeScale::Label)
             .text_color(theme.colors.text_muted)
             .child(mark)
-            .child(div().min_w_0().child(label.clone()))
+            .children(surface_label.map(|label| div().min_w_0().child(label)))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Status)
@@ -1110,9 +1111,12 @@ fn execution_tone(execution: &AgentExecutionState) -> Tone {
 fn execution_glyph(execution: &AgentExecutionState) -> Option<Glyph> {
     match execution {
         AgentExecutionState::Idle => None,
-        AgentExecutionState::Queued
-        | AgentExecutionState::Starting
-        | AgentExecutionState::Active(_) => Some(Glyph::Refresh),
+        // A queued run and one that has begun starting are different facts.
+        // Their marks stay different when motion is reduced and no wording is
+        // available to do that work for them.
+        AgentExecutionState::Queued => Some(Glyph::ClockCountdown),
+        AgentExecutionState::Starting => Some(Glyph::Play),
+        AgentExecutionState::Active(_) => Some(Glyph::Refresh),
         AgentExecutionState::Waiting(_) => Some(Glyph::Info),
         AgentExecutionState::Blocked(_) => Some(Glyph::Danger),
         AgentExecutionState::Cancelling => Some(Glyph::Close),
@@ -1126,6 +1130,32 @@ fn execution_glyph(execution: &AgentExecutionState) -> Option<Glyph> {
             AgentOutcome::Refused(_) => Glyph::Forbidden,
         }),
         AgentExecutionState::Unavailable(_) => Some(Glyph::CloseCircle),
+    }
+}
+
+/// Whether the execution wording carries more than the state already painted
+/// by its mark.
+fn execution_surface_label(execution: &AgentExecutionState) -> bool {
+    match execution {
+        AgentExecutionState::Idle
+        | AgentExecutionState::Cancelling
+        | AgentExecutionState::Completed(AgentOutcome::Succeeded | AgentOutcome::Cancelled) => {
+            false
+        }
+        // Queue position and the transition into a run are facts a mark alone
+        // does not fully report, as are activity, waiting causes, and reasons.
+        AgentExecutionState::Queued
+        | AgentExecutionState::Starting
+        | AgentExecutionState::Active(_)
+        | AgentExecutionState::Waiting(_)
+        | AgentExecutionState::Blocked(_)
+        | AgentExecutionState::Completed(
+            AgentOutcome::Partial(_)
+            | AgentOutcome::Failed(_)
+            | AgentOutcome::Refused(_)
+            | AgentOutcome::TimedOut(_),
+        )
+        | AgentExecutionState::Unavailable(_) => true,
     }
 }
 
@@ -1248,7 +1278,7 @@ mod tests {
     }
 
     #[test]
-    fn every_execution_state_has_visible_wording() {
+    fn every_execution_state_has_semantic_wording() {
         let strings = Strings::default();
         for state in [
             AgentExecutionState::Idle,
@@ -1262,6 +1292,24 @@ mod tests {
         ] {
             assert!(!execution_label(&state, &strings).trim().is_empty());
         }
+    }
+
+    #[test]
+    fn bare_states_leave_their_wording_to_the_semantic_tree() {
+        assert!(!execution_surface_label(&AgentExecutionState::Idle));
+        assert!(!execution_surface_label(&AgentExecutionState::Completed(
+            AgentOutcome::Succeeded
+        )));
+        assert!(execution_surface_label(&AgentExecutionState::Queued));
+        assert!(execution_surface_label(&AgentExecutionState::Starting));
+    }
+
+    #[test]
+    fn queued_and_starting_have_distinct_marks() {
+        assert_ne!(
+            execution_glyph(&AgentExecutionState::Queued),
+            execution_glyph(&AgentExecutionState::Starting)
+        );
     }
 
     #[test]

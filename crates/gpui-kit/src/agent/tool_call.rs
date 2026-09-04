@@ -43,6 +43,7 @@ use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::motion;
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -485,34 +486,67 @@ impl RenderOnce for ToolCall {
         let actionable = has_details && self.on_toggle.is_some();
         let family_color = self.family.color(&theme);
         let retryable = matches!(self.state, ToolCallState::Failed { .. });
-
-        let mut dot = match self.state {
-            ToolCallState::PendingApproval | ToolCallState::Running => {
-                StatusDot::new(Tone::Accent).tint(family_color)
-            }
-            ToolCallState::Succeeded { .. } => StatusDot::new(Tone::Neutral).tint(family_color),
-            ToolCallState::Failed { .. } => StatusDot::new(Tone::Danger),
-            ToolCallState::Refused { .. } => StatusDot::new(Tone::Warning),
-        };
-        if matches!(self.state, ToolCallState::Running) {
-            dot = dot
-                .busy(ident.child("state.mark"))
-                .activity(motion::Activity::Advancing);
-        }
-
-        let status = match &self.state {
+        // The two states still in flight are named by the mark alone. The
+        // word is hover help and a status node under the row, so a reader
+        // who cannot tell the two glyphs apart is still told which it is.
+        let in_flight = match self.state {
             ToolCallState::PendingApproval => Some((
-                ident.child("state"),
                 cx.strings().text(StringKey::AgentPendingApproval),
-                theme.colors.text_faint,
                 "pending-approval",
             )),
-            ToolCallState::Running => Some((
-                ident.child("state"),
-                cx.strings().text(StringKey::AgentRunning),
-                theme.colors.text_faint,
-                "running",
-            )),
+            ToolCallState::Running => Some((cx.strings().text(StringKey::AgentRunning), "running")),
+            _ => None,
+        };
+
+        let dot = match self.state {
+            // Pending and running used to share a dot and rely on the word
+            // beside it. Their marks now remain distinct under reduced motion.
+            ToolCallState::PendingApproval => crate::display::icon::paint(
+                Glyph::ClockCountdown,
+                theme.control.sm.icon_size,
+                family_color,
+                false,
+            )
+            .into_any_element(),
+            ToolCallState::Running => motion::spin(
+                crate::display::icon::paint(
+                    Glyph::Refresh,
+                    theme.control.sm.icon_size,
+                    family_color,
+                    false,
+                ),
+                ident.child("state.mark").element_id(),
+                &theme,
+                cx,
+            ),
+            ToolCallState::Succeeded { .. } => StatusDot::new(Tone::Neutral)
+                .tint(family_color)
+                .into_any_element(),
+            ToolCallState::Failed { .. } => StatusDot::new(Tone::Danger).into_any_element(),
+            ToolCallState::Refused { .. } => StatusDot::new(Tone::Warning).into_any_element(),
+        };
+        let dot = match in_flight {
+            Some((words, value)) => {
+                let state_ident = ident.child("state");
+                div()
+                    .id(state_ident.element_id())
+                    .flex_none()
+                    .child(dot)
+                    .tip(state_ident.clone(), words.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(state_ident.semantic_id(), Role::Status)
+                            .parent(ident.semantic_id())
+                            .text(words)
+                            .value(value),
+                    )
+                    .into_any_element()
+            }
+            None => dot,
+        };
+
+        let status = match &self.state {
+            ToolCallState::PendingApproval | ToolCallState::Running => None,
             ToolCallState::Succeeded {
                 output: ToolOutput::Silent,
             } => Some((

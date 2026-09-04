@@ -40,7 +40,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::badge::Tone;
 use crate::display::description_list::{DescriptionItem, DescriptionList};
-use crate::display::status::StatusLine;
+use crate::display::status::{StatusDot, StatusLine};
 use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -352,23 +352,29 @@ impl ApprovalPrompt {
         }
     }
 
-    fn outcome(&self, cx: &App) -> Option<(SharedString, Tone)> {
+    fn outcome(&self, cx: &App) -> Option<(SharedString, Tone, bool)> {
         let strings = cx.strings();
         match &self.status {
             ApprovalStatus::Pending => None,
-            ApprovalStatus::Declined => {
-                Some((strings.text(StringKey::ApprovalDeclined), Tone::Danger))
-            }
+            ApprovalStatus::Declined => Some((
+                strings.text(StringKey::ApprovalDeclined),
+                Tone::Danger,
+                false,
+            )),
             ApprovalStatus::Approved(decision) => Some((
                 strings.format(StringKey::ApprovalApproved, &[&decision.label(cx)]),
                 Tone::Success,
+                true,
             )),
-            ApprovalStatus::Expired => {
-                Some((strings.text(StringKey::ApprovalExpired), Tone::Warning))
-            }
+            ApprovalStatus::Expired => Some((
+                strings.text(StringKey::ApprovalExpired),
+                Tone::Warning,
+                true,
+            )),
             ApprovalStatus::Superseded { by } => Some((
                 strings.format(StringKey::ApprovalSuperseded, &[by]),
                 Tone::Neutral,
+                true,
             )),
         }
     }
@@ -487,9 +493,28 @@ impl Render for ApprovalPrompt {
                 ),
             )
             .children(details)
-            .when_some(outcome, |element, (text, tone)| {
-                element
-                    .child(div().child(StatusLine::new(text, tone).id(self.ident.child("outcome"))))
+            .when_some(outcome, |element, (message, tone, visible)| {
+                if visible {
+                    element.child(
+                        div().child(StatusLine::new(message, tone).id(self.ident.child("outcome"))),
+                    )
+                } else {
+                    element.child(
+                        div()
+                            .id(self.ident.child("outcome").element_id())
+                            .child(StatusDot::new(tone))
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(
+                                    self.ident.child("outcome").semantic_id(),
+                                    Role::Status,
+                                )
+                                .parent(self.ident.semantic_id())
+                                .text(message)
+                                .value(SharedString::new_static(self.status.name())),
+                            ),
+                    )
+                }
             })
             .when(pending, |element| {
                 element.child(

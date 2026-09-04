@@ -44,12 +44,14 @@ use gpui::{
     IntoElement, KeyDownEvent, ParentElement, Render, SharedString, StatefulInteractiveElement,
     Styled, Window, div, prelude::FluentBuilder,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
-use crate::display::status::StatusLine;
+use crate::display::icon::Icon as IconView;
+use crate::display::status::{StatusDot, StatusLine};
 use crate::foundation::{
     CardVariant, Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedFill, StyledExt, text,
 };
@@ -403,10 +405,10 @@ impl ClarificationPanel {
         }
     }
 
-    /// The sentence a settled panel puts under the question, and the tone it
-    /// is said in. A pending question says nothing here: the controls are the
-    /// message.
-    fn outcome(&self, cx: &App) -> Option<(SharedString, Tone)> {
+    /// The settled fact, its tone, and whether the fact carries information
+    /// beyond the mark. A pending question says nothing here: the controls are
+    /// the message.
+    fn outcome(&self, cx: &App) -> Option<(SharedString, Tone, bool)> {
         let strings = cx.strings();
         match &self.status {
             ClarificationStatus::Pending => None,
@@ -417,17 +419,22 @@ impl ClarificationPanel {
             ClarificationStatus::Answered(_) => Some((
                 strings.text(StringKey::ClarificationAnswered),
                 Tone::Success,
+                false,
             )),
-            ClarificationStatus::Skipped => {
-                Some((strings.text(StringKey::ClarificationSkipped), Tone::Neutral))
-            }
+            ClarificationStatus::Skipped => Some((
+                strings.text(StringKey::ClarificationSkipped),
+                Tone::Neutral,
+                false,
+            )),
             ClarificationStatus::Withdrawn(reason) => Some((
                 strings.format(StringKey::ClarificationWithdrawn, &[reason]),
                 Tone::Neutral,
+                true,
             )),
             ClarificationStatus::Superseded { by } => Some((
                 strings.format(StringKey::ClarificationSuperseded, &[by]),
                 Tone::Neutral,
+                true,
             )),
         }
     }
@@ -569,30 +576,29 @@ impl Render for ClarificationPanel {
             })
             .collect();
 
-        // A question with nothing to pick from is not a question the reader
-        // can answer, and an empty panel would claim the candidates failed to
-        // arrive. It says so instead.
+        // With no candidate there is no control to draw. The archive mark says
+        // the list is empty while the semantic node keeps the exact fact.
         let empty = self.options.is_empty().then(|| {
-            text(
-                &theme,
-                TypeScale::Caption,
-                cx.strings().text(StringKey::ClarificationNoOptions),
-            )
-            .text_color(theme.colors.text_muted)
+            let label = cx.strings().text(StringKey::ClarificationNoOptions);
+            div()
+                .id(self.ident.child("empty").element_id())
+                .child(IconView::new(Glyph::Archive).faint())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("empty").semantic_id(), Role::Status)
+                        .parent(self.ident.semantic_id())
+                        .text(label)
+                        .value("empty"),
+                )
         });
 
-        // How many answers the question takes is a property of the question,
-        // so it is said once, under it, rather than left for the reader to
-        // infer from whether picking one closed the panel. The same sentence
-        // is the list's published value, so a reader who cannot see the
-        // caption is told the arity too.
+        // The selectable rows are the control form of the arity hint. Its
+        // localized wording remains the list's semantic name without becoming
+        // an instruction sentence under the question.
         let arity = cx.strings().text(if self.multiple {
             StringKey::ClarificationPickMany
         } else {
             StringKey::ClarificationPickOne
-        });
-        let arity_caption = (pending && !self.options.is_empty()).then(|| {
-            text(&theme, TypeScale::Caption, arity.clone()).text_color(theme.colors.text_muted)
         });
 
         let panel = cx.entity().downgrade();
@@ -650,18 +656,14 @@ impl Render for ClarificationPanel {
                 element.on_key_down(cx.listener(Self::on_key))
             })
             .child(
-                div()
-                    .column()
-                    .gap_token(&theme, Space::Xxs)
-                    .child(
-                        text(&theme, TypeScale::Body, self.question.clone()).semantic_in(
-                            cx,
-                            NodeSpec::new(self.ident.child("question").semantic_id(), Role::Text)
-                                .text(self.question.clone())
-                                .parent(self.ident.semantic_id()),
-                        ),
-                    )
-                    .children(arity_caption),
+                div().column().gap_token(&theme, Space::Xxs).child(
+                    text(&theme, TypeScale::Body, self.question.clone()).semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.child("question").semantic_id(), Role::Text)
+                            .text(self.question.clone())
+                            .parent(self.ident.semantic_id()),
+                    ),
+                ),
             )
             .children(empty)
             .when(!rows.is_empty(), |element| {
@@ -679,10 +681,28 @@ impl Render for ClarificationPanel {
                         ),
                 )
             })
-            .when_some(outcome, |element, (message, tone)| {
-                element.child(
-                    div().child(StatusLine::new(message, tone).id(self.ident.child("outcome"))),
-                )
+            .when_some(outcome, |element, (message, tone, visible)| {
+                if visible {
+                    element.child(
+                        div().child(StatusLine::new(message, tone).id(self.ident.child("outcome"))),
+                    )
+                } else {
+                    element.child(
+                        div()
+                            .id(self.ident.child("outcome").element_id())
+                            .child(StatusDot::new(tone))
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(
+                                    self.ident.child("outcome").semantic_id(),
+                                    Role::Status,
+                                )
+                                .parent(self.ident.semantic_id())
+                                .text(message)
+                                .value(SharedString::new_static(self.status.name())),
+                            ),
+                    )
+                }
             })
             .children(controls)
             .semantic_in(

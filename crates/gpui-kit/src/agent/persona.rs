@@ -15,8 +15,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    div, prelude::FluentBuilder, px,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
@@ -29,7 +29,7 @@ use crate::agent::presentation::{AgentActivityLine, AgentAvatar};
 use crate::content::{CodeBlock, CodeSpan, ImageRequest, Markdown, MarkdownEvent, MessageBody};
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
-use crate::display::status::StatusLine;
+use crate::display::status::StatusDot;
 use crate::effects::{EffectParticles, EffectPlan};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
@@ -935,12 +935,22 @@ impl RenderOnce for PersonaDialogue {
                                     .child(self.turn.agent.descriptor.name.clone()),
                             )
                             .children(streaming.then(|| {
-                                StatusLine::new(
-                                    cx.strings().text(StringKey::MessageStreaming),
-                                    Tone::Accent,
-                                )
-                                .id(self.ident.child("streaming"))
-                                .busy(self.ident.child("streaming-mark"))
+                                let label = cx.strings().text(StringKey::MessageStreaming);
+                                div()
+                                    .id(self.ident.child("streaming").element_id())
+                                    .child(
+                                        StatusDot::new(Tone::Accent)
+                                            .busy(self.ident.child("streaming-mark")),
+                                    )
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new(
+                                            self.ident.child("streaming").semantic_id(),
+                                            Role::Status,
+                                        )
+                                        .text(label)
+                                        .busy(true),
+                                    )
                             })),
                     )
                     .child(AgentActivityLine::new(

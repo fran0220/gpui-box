@@ -31,12 +31,9 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::agent::AgentDisclosurePresentation;
-use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::display::status::StatusDot;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
-use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -165,10 +162,8 @@ impl ThinkingBlock {
 
     /// Reports that the reasoning is still being produced.
     ///
-    /// Nothing else on the block says this. Reasoning that has finished and
-    /// reasoning still being written are the same words in the same place, so
-    /// without this a reader watching a stalled run and a reader watching a
-    /// working one see the same picture.
+    /// Its active mark differs from the settled mark even when motion is
+    /// reduced, so a working thought does not need a state word beside it.
     pub fn thinking(mut self, thinking: bool) -> Self {
         self.thinking = thinking;
         self
@@ -213,16 +208,21 @@ impl RenderOnce for ThinkingBlock {
             Reasoning::Withheld(_) => cx.strings().text(StringKey::AgentReasoningWithheld),
             Reasoning::Absent => cx.strings().text(StringKey::AgentReasoningAbsent),
         };
-        let mut dot = match self.reasoning {
-            Reasoning::Present(_) if self.thinking => StatusDot::new(Tone::Accent),
-            Reasoning::Present(_) | Reasoning::Absent => StatusDot::new(Tone::Neutral),
-            Reasoning::Withheld(_) => StatusDot::new(Tone::Warning),
+        let surface_label = match (&self.reasoning, self.thinking) {
+            (Reasoning::Present(_), false) => Some(label.clone()),
+            _ => None,
         };
-        if self.thinking {
-            dot = dot
-                .busy(ident.child("mark"))
-                .activity(motion::Activity::Deliberating);
-        }
+        // The states whose words leave the surface keep different still
+        // shapes, so reduced motion does not collapse them into one dot.
+        let mark = match self.reasoning {
+            Reasoning::Present(_) if self.thinking => IconView::new(Glyph::Refresh)
+                .accent()
+                .small()
+                .breathing(ident.child("mark")),
+            Reasoning::Present(_) => IconView::new(Glyph::Check).muted().small(),
+            Reasoning::Withheld(_) => IconView::new(Glyph::Forbidden).warning().small(),
+            Reasoning::Absent => IconView::new(Glyph::Minus).faint().small(),
+        };
 
         let mut header = div()
             .id(ident.element_id())
@@ -232,22 +232,12 @@ impl RenderOnce for ThinkingBlock {
             .items_center()
             .gap_token(&theme, Space::Sm)
             .py(px(theme.space(Space::Xxs)))
-            .child(dot)
-            .child(
-                // Absence is drawn quieter than a thought that happened. A
-                // finished thought with nothing to show and no reasoning at
-                // all were the same neutral mark and the same weight of
-                // text, so only the wording told them apart.
-                text(&theme, TypeScale::Caption, label.clone())
+            .child(mark)
+            .children(surface_label.map(|label| {
+                text(&theme, TypeScale::Caption, label)
                     .flex_none()
-                    .text_tone(
-                        &theme,
-                        match self.reasoning {
-                            Reasoning::Absent => TextTone::Faint,
-                            _ => TextTone::Muted,
-                        },
-                    ),
-            )
+                    .text_tone(&theme, TextTone::Muted)
+            }))
             .children(match &self.reasoning {
                 Reasoning::Withheld(reason) => Some(
                     text(&theme, TypeScale::Caption, reason.clone())

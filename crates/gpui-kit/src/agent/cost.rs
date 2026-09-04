@@ -5,11 +5,9 @@
 //! [`Quantity`] has no constructor that takes a number on its own. Every one
 //! of them names the [`Basis`] in the same call —
 //! [`Quantity::measured`] or [`Quantity::estimated`] — and the wording is
-//! derived from that basis, so a number reaches a screen with the fact that it
-//! was estimated attached or it does not reach a screen at all. The label is
-//! in the drawn text, in the mark beside it, and in the node's published
-//! value, because a reader who saw the number on one surface and not the other
-//! would draw the wrong conclusion on the second one.
+//! derived from that basis, so a number reaches a screen with an estimate mark
+//! or it does not reach a screen at all. Its localized meaning is hover help
+//! and is published in the semantic tree.
 //!
 //! # Unavailable is not zero
 //!
@@ -37,14 +35,16 @@
 //! number into text.
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px, relative,
+    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px, relative,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, Surface, TextTone, TypeScale};
 
-use crate::display::badge::{Badge, Tone};
-use crate::foundation::{CardVariant, Ident, StyledExt, text};
+use crate::display::icon::Icon as IconView;
+use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall a gauge's groove is drawn.
@@ -99,7 +99,7 @@ impl Quantity {
         }
     }
 
-    /// An estimate. Every rendering of it says so.
+    /// An estimate. Every rendering of it carries the estimate mark.
     pub fn estimated(amount: f64, text: impl Into<SharedString>) -> Self {
         Self {
             basis: Basis::Estimated,
@@ -186,6 +186,15 @@ impl Reading {
             Self::Unavailable { reason } => reason
                 .clone()
                 .unwrap_or_else(|| cx.strings().text(StringKey::CostUnavailable)),
+        }
+    }
+
+    /// What is painted beside the state mark. The semantic value retains the
+    /// localized basis wording returned by [`Self::display`].
+    fn surface_display(&self, cx: &App) -> SharedString {
+        match self {
+            Self::Known(quantity) => quantity.text().clone(),
+            Self::Unavailable { .. } => self.display(cx),
         }
     }
 
@@ -326,6 +335,7 @@ impl RenderOnce for CostMeter {
             .map(|line| {
                 let ident = self.ident.child(line.id.as_ref());
                 let display = line.reading.display(cx);
+                let surface_display = line.reading.surface_display(cx);
                 let unavailable = line.reading.quantity().is_none();
 
                 div()
@@ -356,7 +366,7 @@ impl RenderOnce for CostMeter {
                                             .items_center()
                                             .gap_token(&theme, Space::Sm)
                                             .child(
-                                                text(&theme, TypeScale::Label, display.clone())
+                                                text(&theme, TypeScale::Label, surface_display)
                                                     .text_tone(
                                                         &theme,
                                                         if unavailable {
@@ -477,6 +487,13 @@ impl RenderOnce for ContextGauge {
             ),
             None => used_display.clone(),
         };
+        let surface_reading = match self.limit.quantity() {
+            Some(limit) => cx.strings().format(
+                StringKey::CountOfTotal,
+                &[&self.used.surface_display(cx), limit.text()],
+            ),
+            None => self.used.surface_display(cx),
+        };
 
         let spec = match fraction {
             Some(fraction) => NodeSpec::new(self.ident.semantic_id(), Role::Progress)
@@ -523,7 +540,7 @@ impl RenderOnce for ContextGauge {
                         div()
                             .row()
                             .gap_token(&theme, Space::Sm)
-                            .child(text(&theme, TypeScale::Label, reading).text_tone(
+                            .child(text(&theme, TypeScale::Label, surface_reading).text_tone(
                                 &theme,
                                 if unavailable {
                                     TextTone::Faint
@@ -583,10 +600,20 @@ impl RenderOnce for ContextGauge {
 }
 
 /// The mark that says a number was not counted, drawn beside every estimate.
-fn estimate_mark(ident: &Ident, cx: &App) -> Badge {
-    Badge::new(cx.strings().text(StringKey::CostEstimateMark))
-        .tone(Tone::Info)
-        .id(ident.child("estimate"))
+fn estimate_mark(ident: &Ident, cx: &App) -> impl IntoElement {
+    let mark_ident = ident.child("estimate");
+    let label = cx.strings().text(StringKey::CostEstimateMark);
+    div()
+        .id(mark_ident.element_id())
+        .child(IconView::new(Glyph::Info).info().small())
+        .tip(mark_ident.clone(), label.clone())
+        .semantic_in(
+            cx,
+            NodeSpec::new(mark_ident.semantic_id(), Role::Status)
+                .parent(ident.semantic_id())
+                .text(label)
+                .value("estimated"),
+        )
 }
 
 fn stale_line(

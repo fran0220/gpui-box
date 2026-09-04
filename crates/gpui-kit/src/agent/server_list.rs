@@ -28,16 +28,16 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, radians,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    radians,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
-use crate::display::badge::{Badge, Tone};
-use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::badge::Tone;
 use crate::display::icon::flips;
 use crate::display::loading::PulseLoader;
 use crate::display::status::{Callout, StatusDot};
@@ -439,13 +439,20 @@ impl RenderOnce for ServerList {
 
         let body: Vec<AnyElement> = if self.servers.is_empty() {
             vec![self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
+                let title = cx.strings().text(StringKey::ServerEmpty);
+                let detail = cx.strings().text(StringKey::ServerEmptyDetail);
+                state_surface(
                     self.ident.child("empty"),
-                    cx.strings().text(StringKey::ServerEmpty),
+                    title,
+                    "empty",
+                    Icon::Archive,
+                    theme.colors.text_faint,
+                    Some(detail),
+                    None,
+                    None,
+                    &theme,
+                    cx,
                 )
-                .kind(EmptyKind::Empty)
-                .detail(cx.strings().text(StringKey::ServerEmptyDetail))
-                .into_any_element()
             })]
         } else {
             self.servers
@@ -487,6 +494,15 @@ impl ServerList {
         let selected = self.selected.as_ref() == Some(&server.id);
         let selectable = !refused && self.on_select.is_some();
         let toggleable = !refused && self.on_toggle.is_some();
+        let state_mark = match server.state {
+            // Disconnected and disabled share the neutral tone, so the state
+            // the reader chose keeps a distinct shape after its word leaves.
+            ServerState::Disabled { .. } => icon(Icon::Forbidden)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint)
+                .into_any_element(),
+            _ => StatusDot::new(server.state.tone()).into_any_element(),
+        };
         // Known before the header is built, because the header's own corners
         // depend on whether anything is drawn under it.
         let has_body = open
@@ -576,7 +592,7 @@ impl ServerList {
                     .focus_ring(theme)
             })
             .child(chevron)
-            .child(StatusDot::new(server.state.tone()))
+            .child(state_mark)
             .child(
                 div()
                     .flex_1()
@@ -589,11 +605,6 @@ impl ServerList {
                                 .text_tone(theme, TextTone::Muted),
                         )
                     }),
-            )
-            .child(
-                Badge::new(server.state.label(cx))
-                    .tone(server.state.tone())
-                    .id(ident.child("state")),
             );
 
         if let (true, Some(handler)) = (selectable, self.on_select.clone()) {
@@ -615,6 +626,7 @@ impl ServerList {
             NodeSpec::new(ident.semantic_id(), Role::Row)
                 .parent(self.ident.semantic_id())
                 .text(server.name.clone())
+                .description(server.state.label(cx))
                 .value(server.state.name())
                 .selected(selected)
                 .disabled(refused)
@@ -711,10 +723,18 @@ impl ServerList {
         let ident = server_ident.child("offerings");
         match &server.catalog {
             Catalog::Unasked => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(ident, cx.strings().text(StringKey::ServerOfferingsUnasked))
-                    .kind(EmptyKind::Unstarted)
-                    .detail(cx.strings().text(StringKey::ServerOfferingsUnaskedDetail))
-                    .into_any_element()
+                state_surface(
+                    ident,
+                    cx.strings().text(StringKey::ServerOfferingsUnasked),
+                    "unstarted",
+                    Icon::Document,
+                    theme.colors.text_faint,
+                    Some(cx.strings().text(StringKey::ServerOfferingsUnaskedDetail)),
+                    None,
+                    Some(server_ident),
+                    theme,
+                    cx,
+                )
             }),
             Catalog::Asking => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
                 let label = cx.strings().text(StringKey::ServerOfferingsAsking);
@@ -732,23 +752,36 @@ impl ServerList {
                     .into_any_element()
             }),
             Catalog::Unavailable(reason) => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
+                state_surface(
                     ident,
                     cx.strings().text(StringKey::ServerOfferingsUnavailable),
+                    "unavailable",
+                    Icon::CloseCircle,
+                    theme.colors.warning,
+                    Some(reason.clone()),
+                    Some(reason.clone()),
+                    Some(server_ident),
+                    theme,
+                    cx,
                 )
-                .kind(EmptyKind::Unavailable)
-                .detail(reason.clone())
-                .into_any_element()
             }),
             // The answer was empty, which is an answer. It is drawn as one:
             // the reader is told the server offers nothing, not that nobody
             // has looked.
             Catalog::Offers(offerings) if offerings.is_empty() => {
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(ident, cx.strings().text(StringKey::ServerOfferingsNone))
-                        .kind(EmptyKind::Empty)
-                        .detail(cx.strings().text(StringKey::ServerOfferingsNoneDetail))
-                        .into_any_element()
+                    state_surface(
+                        ident,
+                        cx.strings().text(StringKey::ServerOfferingsNone),
+                        "empty",
+                        Icon::Archive,
+                        theme.colors.text_faint,
+                        Some(cx.strings().text(StringKey::ServerOfferingsNoneDetail)),
+                        None,
+                        Some(server_ident),
+                        theme,
+                        cx,
+                    )
                 })
             }
             Catalog::Offers(offerings) => {
@@ -862,6 +895,48 @@ impl ServerList {
             )
             .into_any_element()
     }
+}
+
+/// A catalog or list state whose mark carries the state on the surface.
+/// Explanatory detail stays semantic; caller-owned refusal detail may also be
+/// drawn as the fact it is.
+#[allow(clippy::too_many_arguments)]
+fn state_surface(
+    ident: Ident,
+    title: SharedString,
+    value: &'static str,
+    glyph: Icon,
+    tint: Hsla,
+    description: Option<SharedString>,
+    visible_detail: Option<SharedString>,
+    parent: Option<&Ident>,
+    theme: &Theme,
+    cx: &mut App,
+) -> AnyElement {
+    let mut spec = NodeSpec::new(ident.semantic_id(), Role::Status)
+        .text(title)
+        .value(value)
+        .description(description.unwrap_or_default());
+    if let Some(parent) = parent {
+        spec = spec.parent(parent.semantic_id());
+    }
+
+    div()
+        .column()
+        .items_center()
+        .justify_center()
+        .gap_token(theme, Space::Sm)
+        .p_token(theme, Space::Lg)
+        .child(
+            icon(glyph)
+                .size(px(theme.measures.standalone_icon))
+                .text_color(tint),
+        )
+        .children(visible_detail.map(|detail| {
+            text(theme, TypeScale::Caption, detail).text_tone(theme, TextTone::Muted)
+        }))
+        .semantic_in(cx, spec)
+        .into_any_element()
 }
 
 #[cfg(test)]

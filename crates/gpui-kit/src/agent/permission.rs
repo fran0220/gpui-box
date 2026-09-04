@@ -33,10 +33,13 @@ use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
-use crate::foundation::{CardVariant, FocusRing, Ident, StyledExt, text};
+use crate::display::icon::Icon as IconView;
+use crate::foundation::{CardVariant, FocusRing, Ident, Sizable, StyledExt, text};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(PermissionChange, &mut Window, &mut App)>;
@@ -66,7 +69,7 @@ impl PermissionState {
         }
     }
 
-    /// The wording a reader reads.
+    /// The localized state name published for assistive readers and help.
     pub fn label(self, cx: &App) -> SharedString {
         cx.strings().text(match self {
             Self::Allowed => StringKey::PermissionAllowed,
@@ -395,36 +398,31 @@ fn cell(
     let handler = on_change.zip(next);
 
     let mark = div()
-        .row()
-        .gap_token(theme, Space::Xs)
-        .child(
-            div()
-                .flex_none()
-                .size(px(theme.measures.status_mark))
-                .rounded_full()
-                .bg(state.color(theme)),
-        )
-        .child(text(theme, TypeScale::Label, state.label(cx)));
+        .flex_none()
+        .size(px(theme.measures.status_mark))
+        .rounded_full()
+        .bg(state.color(theme));
 
-    // Provenance is shown on every cell that has a state, so "set here" is a
-    // statement rather than the absence of one.
-    //
-    // Two lines of it are held open wherever there is any, because a matrix
-    // whose rows are as tall as the longest reason in them steps down the
-    // table on whichever cell happened to wrap.
+    // Local provenance needs no surface explanation. Inheritance keeps its
+    // source behind a distinct mark and hover help because the named rule is
+    // still a fact a reader may need.
     let source = (state != PermissionState::NotApplicable).then(|| {
+        let source_ident = ident.child("source");
+        let label = entry.source().label(cx);
+        let inherited = matches!(entry.source(), PermissionSource::Inherited(_));
         div()
-            .min_h(px(2.0 * theme.type_style(TypeScale::Caption).line_height))
-            .child(
-                text(theme, TypeScale::Caption, entry.source().label(cx))
-                    .text_tone(theme, TextTone::Faint)
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(ident.child("source").semantic_id(), Role::Text)
-                            .text(entry.source().label(cx))
-                            .value(SharedString::new_static(entry.source().name()))
-                            .parent(ident.semantic_id()),
-                    ),
+            .id(source_ident.element_id())
+            .when(inherited, |source| {
+                source
+                    .child(IconView::new(Glyph::GitBranch).faint().small())
+                    .tip(source_ident.clone(), label.clone())
+            })
+            .semantic_in(
+                cx,
+                NodeSpec::new(source_ident.semantic_id(), Role::Text)
+                    .text(label)
+                    .value(SharedString::new_static(entry.source().name()))
+                    .parent(ident.semantic_id()),
             )
     });
 
