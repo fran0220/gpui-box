@@ -113,6 +113,19 @@ handles and refreshes palette lookup tables after palette changes.
 
 ### Fixed
 
+**The Windows menu smoke asks for the keyboard before reading it.** The
+native UIA `menu` check had failed on every hosted run since it was added:
+AccessKit reports `HasKeyboardFocus` and answers `FocusedElement` only while
+the gallery's window holds Win32 focus, and a process launched by a build tool
+on a runner starts without it. The `editable` mode never noticed because UIA's
+`SetFocus` focuses the host window before it reaches the provider, and the
+macOS script sets `frontmost` first. `tools/accessibility/windows-smoke.ps1`
+now brings the gallery to the foreground before any mode, attaching its input
+queue to the foreground and target threads so a non-foreground caller is
+allowed to, and the menu mode polls until the `Copy link` item and the global
+focused element agree instead of reading them once. The `Platforms` workflow
+is the only place this runs, so it is proven by a dispatch, not by the gate.
+
 **An image is opaque where it is opaque.** Every polychrome sprite — an
 `img()`, a `Window::paint_image`, a sprite-batch instance, a colour emoji —
 carried a faint dashed line from one corner to the other, and short ticks

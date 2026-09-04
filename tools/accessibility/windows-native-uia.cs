@@ -183,6 +183,119 @@ namespace GpuiBox.Accessibility
         object GetCurrentPropertyValue(int propertyId);
     }
 
+    // Host keyboard focus for the target process. AccessKit reports
+    // HasKeyboardFocus and answers GetFocusedElement only while the window
+    // that owns the tree holds Win32 focus (WM_SETFOCUS). UIA's SetFocus
+    // establishes that for the editable mode as a side effect, and the macOS
+    // script sets `frontmost`; a check that only reads focus must establish
+    // it explicitly. A process that was not started from the foreground may
+    // not call SetForegroundWindow directly, so the caller attaches its input
+    // queue to the current foreground thread and the target thread first.
+    public static class NativeWindow
+    {
+        private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lparam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lparam);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr hwnd, uint command);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetFocus(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool AttachThreadInput(uint attach, uint attachTo, bool attaching);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        private const uint GW_OWNER = 4;
+
+        public static IntPtr TopLevelWindow(int processId)
+        {
+            IntPtr found = IntPtr.Zero;
+            EnumWindows(
+                delegate (IntPtr hwnd, IntPtr lparam)
+                {
+                    uint owner;
+                    GetWindowThreadProcessId(hwnd, out owner);
+                    if (owner != (uint)processId ||
+                        !IsWindowVisible(hwnd) ||
+                        GetWindow(hwnd, GW_OWNER) != IntPtr.Zero)
+                    {
+                        return true;
+                    }
+                    found = hwnd;
+                    return false;
+                },
+                IntPtr.Zero
+            );
+            return found;
+        }
+
+        // Returns whether the target's top-level window holds the foreground
+        // afterwards. Idempotent; safe to retry.
+        public static bool Activate(int processId)
+        {
+            IntPtr hwnd = TopLevelWindow(processId);
+            if (hwnd == IntPtr.Zero)
+            {
+                return false;
+            }
+            if (GetForegroundWindow() == hwnd)
+            {
+                return true;
+            }
+
+            uint current = GetCurrentThreadId();
+            uint ignored;
+            uint target = GetWindowThreadProcessId(hwnd, out ignored);
+            IntPtr foreground = GetForegroundWindow();
+            uint foregroundThread = foreground == IntPtr.Zero
+                ? 0
+                : GetWindowThreadProcessId(foreground, out ignored);
+
+            bool attachedForeground = foregroundThread != 0 &&
+                foregroundThread != current &&
+                AttachThreadInput(current, foregroundThread, true);
+            bool attachedTarget = target != current && AttachThreadInput(current, target, true);
+            try
+            {
+                BringWindowToTop(hwnd);
+                SetForegroundWindow(hwnd);
+                SetFocus(hwnd);
+            }
+            finally
+            {
+                if (attachedTarget)
+                {
+                    AttachThreadInput(current, target, false);
+                }
+                if (attachedForeground)
+                {
+                    AttachThreadInput(current, foregroundThread, false);
+                }
+            }
+            return GetForegroundWindow() == hwnd;
+        }
+    }
+
     public static class NativeUia
     {
         private const int ProcessIdProperty = 30002;

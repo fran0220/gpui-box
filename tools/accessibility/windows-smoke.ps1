@@ -145,6 +145,18 @@ function First-Bounds {
     return $rectangles[0]
 }
 
+# The macOS script sets `frontmost` before reading anything. AccessKit only
+# reports keyboard focus while the gallery's window holds Win32 focus, and a
+# process launched by a build tool starts without it. UIA SetFocus hides this
+# for the editable mode; the menu mode reads focus without requesting it.
+function Activate-Target {
+    Wait-Until -Failure "gallery window for process $TargetProcessId could not take the foreground" -Predicate {
+        return [GpuiBox.Accessibility.NativeWindow]::Activate($TargetProcessId)
+    }
+}
+
+Activate-Target
+
 switch ($Mode) {
     "editable" {
         $email = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Edit) -Name "Email"
@@ -209,13 +221,18 @@ switch ($Mode) {
 
     "menu" {
         $menu = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions"
-        $copyLink = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link"
-        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
-        if (-not $copyLink.Current.HasKeyboardFocus -or
-            $focused.Current.ProcessId -ne $TargetProcessId -or
-            $focused.Current.Name -ne "Copy link") {
-            throw "Copy link was not the singular focused UIA MenuItem"
+        # Host focus arrives through WM_SETFOCUS and the AccessKit focus event
+        # after Activate-Target returns, so read until they agree.
+        Wait-Until -Failure "Copy link was not the singular focused UIA MenuItem" -Predicate {
+            $items = @(Find-All -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link")
+            if ($items.Count -ne 1 -or -not $items[0].Current.HasKeyboardFocus) {
+                return $false
+            }
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            return $focused.Current.ProcessId -eq $TargetProcessId -and
+                $focused.Current.Name -eq "Copy link"
         }
+        $copyLink = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link"
         $invoke = [System.Windows.Automation.InvokePattern](
             Pattern -Element $copyLink -Pattern ([System.Windows.Automation.InvokePattern]::Pattern)
         )
