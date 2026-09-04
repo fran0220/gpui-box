@@ -66,6 +66,13 @@ renderer-calibration lane is reported separately from the structural gate so a
 timing regression cannot be hidden by changing a structural limit, or vice
 versa.
 
+`.github/workflows/performance-timing.yml` runs the existing
+`gpui-box-wgpu` Criterion benchmarks every Monday and on manual dispatch. It
+uploads `target/criterion` as an artifact for trend review. The timing lane is
+deliberately observational: it does not run on pushes or pull requests and is
+not a required check. Deterministic structural and heap-allocation budgets in
+`cargo run -p xtask -- performance check` remain the blocking authority.
+
 For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
 trace lease, filters observations to one `WindowId`, and retains a caller-sized
 history. It observes only newly drawn frames that reached synchronous platform
