@@ -141,11 +141,16 @@ After each move, delete the application copy. Do not retain two primitive sets.
 
 ## 6. Add semantic IDs
 
-Install Kit once. Its `SemanticCoordinator` creates and removes one semantic
-context per GPUI window. At the top of each root render call
-`SemanticCoordinator::global(cx).begin_frame(window)`, then attach `NodeSpec`
-to every action and assertion target with `semantic_in`. Keep application IDs
-in the application; the library does not define product vocabulary.
+Install Kit once. Its `SemanticCoordinator` creates and removes one frame
+context per GPUI window, but records nodes only while a diagnostic consumer is
+armed. A harness, inspector, or automation host retains
+`SemanticCoordinator::global(cx).arm()` for its lifetime; ordinary installation
+deliberately leaves diagnostic recording dormant while native accessibility
+remains active. At the top of
+each root render call `SemanticCoordinator::global(cx).begin_frame(window)`,
+then attach `NodeSpec` to every action and assertion target with `semantic_in`.
+Keep application IDs in the application; the library does not define product
+vocabulary.
 
 ## 7. Preserve the host boundary
 

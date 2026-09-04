@@ -194,7 +194,7 @@ fn settings_search_filters_rows_from_caller_metadata_and_counts_the_answer(
 
     assert_eq!(
         harness.node("settings.results").expect("published").value,
-        Some("1".to_string())
+        Some("1".into())
     );
     let status = harness.node("settings.results.status").expect("published");
     assert_eq!(status.text.as_deref(), Some("1 setting"));
@@ -331,7 +331,7 @@ fn unknown_and_not_applicable_are_two_different_facts(cx: &mut TestAppContext) {
 
     assert_eq!(
         harness.node("run.facts").expect("published").value,
-        Some("4".to_string())
+        Some("4".into())
     );
     assert_eq!(
         harness
@@ -433,7 +433,7 @@ fn every_entry_is_addressable_by_its_own_identity(cx: &mut TestAppContext) {
 
     assert_eq!(
         harness.node("run.activity").expect("published").value,
-        Some("3".to_string())
+        Some("3".into())
     );
     let entry = harness.node("run.activity.queued").expect("published");
     assert_eq!(entry.role, Role::Row);

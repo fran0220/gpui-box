@@ -8,7 +8,9 @@ provides a small, transport-independent semantic tree.
 ```rust
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticCoordinator};
 
-SemanticCoordinator::global(cx).begin_frame(window);
+let coordinator = SemanticCoordinator::global(cx);
+let diagnostics = coordinator.arm(); // retain for the consumer's lifetime
+coordinator.begin_frame(window);
 button.semantic_in(
     cx,
     NodeSpec::new("settings.account.sign-out", Role::Button)
@@ -18,8 +20,13 @@ button.semantic_in(
 ```
 
 The decorated element records its bounds and GPUI-resolved focus handle after
-subtree prepaint; diagnostics add no layout or paint element and consume no
-input. A caller-owned handle declared with `NodeSpec::focus` remains
+subtree prepaint while a diagnostic consumer is armed; diagnostics add no
+layout or paint element and consume no input. Kit installation itself leaves
+diagnostics dormant, so a release application with no harness, inspector, or
+automation session installs no diagnostic callbacks and records no diagnostic
+nodes. Dropping the `DiagnosticArm` guard disarms that consumer. Platform
+accessibility is independent and remains active. A caller-owned handle declared
+with `NodeSpec::focus` remains
 authoritative. Otherwise a focusable element publishes the stable handle GPUI
 created for `tab_index`; a non-focusable element remains unfocused. The same
 call also projects the supported role, name, value, control state, focus,
@@ -32,11 +39,18 @@ the exact platform capability matrix and unsupported boundaries.
 ## Frame lifecycle
 
 Call `SemanticCoordinator::global(cx).begin_frame(window)` once at the top of
-each window root render. The installed coordinator owns a stable
+each window root render, whether or not diagnostics are armed: the same clock
+temporarily supports Kit's older transient state. While armed, the installed
+coordinator owns a stable
 `WindowSemanticContext` for every GPUI `WindowId`; nodes registered during that
 window's frame form its next snapshot. A node not rendered in the next frame
 disappears. Rendering or closing another window cannot clear this tree, advance
 its generation, or collide with its local ids.
+
+Each window alternates between two node buffers. Opening a frame clears the
+next buffer instead of retaining over every node from the previous generation.
+The coordinator and all per-window buffers are UI-thread state behind one
+`RefCell`, so a registration does not traverse nested mutexes.
 
 This prevents closed dialogs, hidden panels, and removed rows from remaining as
 stale automation targets.
@@ -80,7 +94,7 @@ container holds, the name of a state, or the reason a row was refused. The
 cases are spelled out in `docs/components.md`; a component that publishes
 `value` for anything else is a bug in that component, not a new case.
 
-Read a tree with `coordinator.snapshot(window_id)` and wait on
+After retaining an arm guard, read a tree with `coordinator.snapshot(window_id)` and wait on
 `coordinator.generation(window_id)`. The deterministic tree is not itself a
 network server and is not the screen-reader transport. In this repository,
 `headless-visual serve` is the debug-only session host: it serializes the
@@ -91,8 +105,9 @@ Applications may also read the snapshot in-process or in unit tests.
 
 ## Security
 
-Call `snapshot.redacted()` before exporting diagnostic data. It removes common
-API-key, bearer, JWT, password, and secret-assignment shapes.
+`snapshot()` redacts common API-key, bearer, JWT, password, and
+secret-assignment shapes at the export boundary. `snapshot.redacted()` remains
+available and idempotent for host-constructed snapshots.
 
 Release applications should not expose input injection or automation servers
 unless that is an explicit product feature with its own security review.

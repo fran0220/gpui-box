@@ -12,7 +12,7 @@ use gpui::{
     Point, Render, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, VisualTestContext,
     Window, WindowBounds, WindowOptions, div, point, prelude::*, px, size,
 };
-use gpui_kit_semantics::{Node, SemanticCoordinator, Snapshot};
+use gpui_kit_semantics::{DiagnosticArm, Node, SemanticCoordinator, Snapshot};
 
 type Build = Box<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
@@ -33,6 +33,7 @@ pub struct Harness {
     cx: VisualTestContext,
     window: AnyWindowHandle,
     build: Rc<RefCell<Build>>,
+    _diagnostics: DiagnosticArm,
     /// Where the simulated pointer is, so a drag can be driven one step at a
     /// time without a test having to carry the position itself.
     pointer: Point<Pixels>,
@@ -55,6 +56,7 @@ impl Harness {
         build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
     ) -> Self {
         cx.update(install);
+        let diagnostics = cx.update(|cx| SemanticCoordinator::global(cx).arm());
         let build = Rc::new(RefCell::new(Box::new(build) as Build));
         let handle = cx.add_window({
             let build = Rc::clone(&build);
@@ -67,6 +69,7 @@ impl Harness {
             window: handle.into(),
             cx: visual,
             build,
+            _diagnostics: diagnostics,
             pointer: Point::default(),
         }
     }

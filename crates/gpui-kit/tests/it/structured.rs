@@ -95,7 +95,7 @@ fn a_withheld_subtree_reads_as_withheld_and_leaks_nothing(cx: &mut TestAppContex
         .nodes
         .iter()
         .filter(|node| {
-            let carries = |text: &Option<String>| {
+            let carries = |text: &Option<SharedString>| {
                 text.as_deref()
                     .is_some_and(|text| text.contains("51 characters"))
             };

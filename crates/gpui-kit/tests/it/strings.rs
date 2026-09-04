@@ -19,6 +19,7 @@ fn shown(harness: &mut Harness, id: &str) -> String {
         .unwrap_or_else(|| panic!("semantic node `{id}` is missing"))
         .text
         .unwrap_or_else(|| panic!("`{id}` publishes no text"))
+        .to_string()
 }
 
 fn pagination(cx: &mut TestAppContext) -> Harness {

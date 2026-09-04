@@ -64,7 +64,7 @@ fn rows_under(harness: &mut Harness, parent: &str, role: Role) -> Vec<Node> {
 fn ids_under(harness: &mut Harness, parent: &str, role: Role) -> Vec<String> {
     rows_under(harness, parent, role)
         .into_iter()
-        .map(|node| node.id)
+        .map(|node| node.id.to_string())
         .collect()
 }
 
@@ -81,7 +81,7 @@ fn ids_named(harness: &mut Harness, prefix: &str, role: Role) -> Vec<String> {
         .under(prefix)
         .into_iter()
         .filter(|node| node.role == role)
-        .map(|node| node.id.clone())
+        .map(|node| node.id.to_string())
         .collect()
 }
 
@@ -299,7 +299,13 @@ fn a_small_table_publishes_the_same_thing_either_way_it_is_given_its_rows(cx: &m
     let described = |harness: &mut Harness| -> Vec<(String, Option<String>, bool)> {
         rows_under(harness, "v.table", Role::Row)
             .into_iter()
-            .map(|node| (node.id, node.text, node.selected))
+            .map(|node| {
+                (
+                    node.id.to_string(),
+                    node.text.map(|text| text.to_string()),
+                    node.selected,
+                )
+            })
             .collect()
     };
 

@@ -19,7 +19,7 @@ use gpui::{
     TouchPhase, Window, div, point, prelude::*, px, size,
 };
 use gpui_kit::prelude::set_layout_direction;
-use gpui_kit_semantics::SemanticCoordinator;
+use gpui_kit_semantics::{DiagnosticArm, SemanticCoordinator};
 use gpui_kit_testkit::audit_or_error;
 use gpui_kit_theme::{Theme, activate_theme};
 use serde_json::{Value, json};
@@ -87,6 +87,7 @@ struct Server {
     cx: HeadlessAppContext,
     sessions: HashMap<String, Session>,
     next_id: u64,
+    _diagnostics: DiagnosticArm,
 }
 
 impl Server {
@@ -103,10 +104,12 @@ impl Server {
             gpui_kit::install(cx);
             cx.set_reduce_motion(true);
         });
+        let diagnostics = cx.update(|cx| SemanticCoordinator::global(cx).arm());
         Ok(Self {
             cx,
             sessions: HashMap::new(),
             next_id: 1,
+            _diagnostics: diagnostics,
         })
     }
 
@@ -415,11 +418,7 @@ impl Server {
         })
     }
 
-    fn point_in(
-        &mut self,
-        window: AnyWindowHandle,
-        id: &str,
-    ) -> Result<gpui::Point<gpui::Pixels>> {
+    fn point_in(&mut self, window: AnyWindowHandle, id: &str) -> Result<gpui::Point<gpui::Pixels>> {
         let snapshot = self.cx.update(|cx| {
             SemanticCoordinator::global(cx)
                 .snapshot(window.window_id())

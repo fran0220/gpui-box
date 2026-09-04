@@ -103,7 +103,7 @@ pub fn audit(snapshot: &Snapshot) -> Vec<Finding> {
     for node in &snapshot.nodes {
         let mut report = |problem: Problem| {
             findings.push(Finding {
-                id: node.id.clone(),
+                id: node.id.to_string(),
                 problem,
             })
         };

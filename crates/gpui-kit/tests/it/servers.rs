@@ -40,6 +40,7 @@ fn all_five_states_present_differently(cx: &mut TestAppContext) {
             harness
                 .node(&format!("servers.{id}"))
                 .and_then(|node| node.value)
+                .map(|value| value.to_string())
                 .unwrap_or_default()
         })
         .collect();

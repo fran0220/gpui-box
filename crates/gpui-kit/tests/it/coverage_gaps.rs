@@ -247,7 +247,7 @@ fn grid_container_image_list_and_masonry_publish_stable_items(cx: &mut TestAppCo
             .node("layout.images.items.cover")
             .expect("tile")
             .text,
-        Some("Cover".to_string())
+        Some("Cover".into())
     );
     assert!(harness.node("layout.masonry.item.tile").is_some());
 }

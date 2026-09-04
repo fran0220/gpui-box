@@ -74,7 +74,7 @@ pub fn text<'a>(
         Err(SemanticAssertionError::Text {
             id: id.into(),
             expected: expected.into(),
-            actual: node.text.clone(),
+            actual: node.text.as_ref().map(ToString::to_string),
         })
     }
 }

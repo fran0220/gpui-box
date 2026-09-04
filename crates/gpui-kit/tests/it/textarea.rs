@@ -902,7 +902,7 @@ fn a_new_placeholder_does_not_disturb_what_was_typed(cx: &mut TestAppContext) {
         harness
             .node("form.notes")
             .and_then(|node| node.placeholder.clone()),
-        Some("Answer the question".to_string()),
+        Some("Answer the question".into()),
         "and it suggests the new one"
     );
 }

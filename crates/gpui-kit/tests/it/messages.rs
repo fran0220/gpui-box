@@ -74,6 +74,7 @@ fn every_delivery_state_is_drawn_as_itself(cx: &mut TestAppContext) {
             .node(&format!("chat.{id}.delivery"))
             .expect("published")
             .value
+            .map(|value| value.to_string())
     })
     .collect();
 

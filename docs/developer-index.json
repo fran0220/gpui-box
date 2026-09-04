@@ -1165,7 +1165,7 @@
           "features": []
         }
       ],
-      "symbolCount": 64
+      "symbolCount": 67
     },
     {
       "name": "gpui-box-kit-testkit",
@@ -102057,6 +102057,20 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit_semantics::DiagnosticArm",
+      "name": "DiagnosticArm",
+      "kind": "struct",
+      "package": "gpui-box-kit-semantics",
+      "crate": "gpui_kit_semantics",
+      "module": "",
+      "path": "gpui_kit_semantics",
+      "source": "crates/gpui-kit-semantics/src/lib.rs",
+      "summary": "Keeps installed diagnostic snapshots armed for one active consumer.",
+      "documentation": "Keeps installed diagnostic snapshots armed for one active consumer.\n\nDropping the guard disarms that consumer. Native accessibility remains\nindependent and active regardless of diagnostic state.",
+      "signature": "# [doc = \" Keeps installed diagnostic snapshots armed for one active consumer.\"] # [doc = \"\"] # [doc = \" Dropping the guard disarms that consumer. Native accessibility remains\"] # [doc = \" independent and active regardless of diagnostic state.\"] pub struct DiagnosticArm { state : Rc<CoordinatorState>, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit_semantics::LiveRegion",
       "name": "LiveRegion",
       "kind": "enum",
@@ -102081,7 +102095,7 @@
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "A single assertion target published for one frame.",
       "documentation": "A single assertion target published for one frame.\n\nFields added after the initial protocol are omitted from serialized\nsnapshots unless a component sets them, so recorded baselines stay stable\nas new roles gain state.",
-      "signature": "# [doc = \" A single assertion target published for one frame.\"] # [doc = \"\"] # [doc = \" Fields added after the initial protocol are omitted from serialized\"] # [doc = \" snapshots unless a component sets them, so recorded baselines stay stable\"] # [doc = \" as new roles gain state.\"] # [derive (Debug, Clone, Default, PartialEq, Serialize, Deserialize)] # [serde (default)] pub struct Node { pub id : String, pub role : Role, pub parent : Option<String>, # [doc = \" The control this node names, for a label that belongs to a field it is\"] # [doc = \" not the parent of. A test finds the field by reading its label; GPUI\"] # [doc = \" projects the same association to AccessKit when both ids resolve.\"] # [serde (skip_serializing_if = \"Option::is_none\")] pub labels : Option<String>, # [doc = \" The diagnostic identity this node describes. This never changes tree\"] # [doc = \" parentage and becomes an AccessKit described-by relationship when both\"] # [doc = \" ids resolve in the active window.\"] # [serde (skip_serializing_if = \"Option::is_none\")] pub describes : Option<String>, pub text : Option<String>, # [serde (skip_serializing_if = \"Option::is_none\")] pub description : Option<String>, pub bounds : Rect, pub visible : bool, pub focused : bool, pub disabled : bool, # [serde (skip_serializing_if = \"is_false\")] pub read_only : bool, pub selected : bool, pub hovered : bool, pub pressed : bool, # [serde (skip_serializing_if = \"Option::is_none\")] pub checked : Option<bool>, # [serde (skip_serializing_if = \"Option::is_none\")] pub expanded : Option<bool>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value : Option<String>, # [serde (skip_serializing_if = \"Option::is_none\")] pub placeholder : Option<String>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_min : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_max : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_now : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub level : Option<u32>, # [serde (skip_serializing_if = \"is_false\")] pub busy : bool, # [serde (skip_serializing_if = \"is_false\")] pub invalid : bool, # [serde (skip_serializing_if = \"is_false\")] pub required : bool, # [serde (skip_serializing_if = \"Option::is_none\")] pub live : Option<LiveRegion>, # [serde (skip_serializing_if = \"is_false\")] pub live_atomic : bool, # [serde (skip_serializing_if = \"is_false\")] pub modal : bool, }",
+      "signature": "# [doc = \" A single assertion target published for one frame.\"] # [doc = \"\"] # [doc = \" Fields added after the initial protocol are omitted from serialized\"] # [doc = \" snapshots unless a component sets them, so recorded baselines stay stable\"] # [doc = \" as new roles gain state.\"] # [derive (Debug, Clone, Default, PartialEq, Serialize, Deserialize)] # [serde (default)] pub struct Node { pub id : SharedString, pub role : Role, pub parent : Option<SharedString>, # [doc = \" The control this node names, for a label that belongs to a field it is\"] # [doc = \" not the parent of. A test finds the field by reading its label; GPUI\"] # [doc = \" projects the same association to AccessKit when both ids resolve.\"] # [serde (skip_serializing_if = \"Option::is_none\")] pub labels : Option<SharedString>, # [doc = \" The diagnostic identity this node describes. This never changes tree\"] # [doc = \" parentage and becomes an AccessKit described-by relationship when both\"] # [doc = \" ids resolve in the active window.\"] # [serde (skip_serializing_if = \"Option::is_none\")] pub describes : Option<SharedString>, pub text : Option<SharedString>, # [serde (skip_serializing_if = \"Option::is_none\")] pub description : Option<SharedString>, pub bounds : Rect, pub visible : bool, pub focused : bool, pub disabled : bool, # [serde (skip_serializing_if = \"is_false\")] pub read_only : bool, pub selected : bool, pub hovered : bool, pub pressed : bool, # [serde (skip_serializing_if = \"Option::is_none\")] pub checked : Option<bool>, # [serde (skip_serializing_if = \"Option::is_none\")] pub expanded : Option<bool>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value : Option<SharedString>, # [serde (skip_serializing_if = \"Option::is_none\")] pub placeholder : Option<SharedString>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_min : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_max : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub value_now : Option<f32>, # [serde (skip_serializing_if = \"Option::is_none\")] pub level : Option<u32>, # [serde (skip_serializing_if = \"is_false\")] pub busy : bool, # [serde (skip_serializing_if = \"is_false\")] pub invalid : bool, # [serde (skip_serializing_if = \"is_false\")] pub required : bool, # [serde (skip_serializing_if = \"Option::is_none\")] pub live : Option<LiveRegion>, # [serde (skip_serializing_if = \"is_false\")] pub live_atomic : bool, # [serde (skip_serializing_if = \"is_false\")] pub modal : bool, }",
       "cfg": []
     },
     {
@@ -102483,7 +102497,7 @@
       "path": "gpui_kit_semantics",
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "Records the committed value of an editable control.",
-      "documentation": "Records the committed value of an editable control.\n\nValues pass through [`redact_sensitive_text`] before publication so a\nsnapshot never carries a credential typed by a user.",
+      "documentation": "Records the committed value of an editable control.\n\nValues pass through [`redact_sensitive_text`] when a snapshot is read,\nso exported diagnostics never carry a credential typed by a user.",
       "signature": "pub fn value (mut self, value : impl Into<SharedString>) -> Self",
       "cfg": [],
       "target": "NodeSpec"
@@ -102586,8 +102600,23 @@
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "Routes semantic probes to a registry owned by the GPUI window they paint in.",
       "documentation": "Routes semantic probes to a registry owned by the GPUI window they paint in.\n\nComponents continue to publish through [`Semantic::semantic_in`]; only a\nwindow root opens a frame. Rendering one window therefore cannot clear,\ncollide with, or advance the semantic generation of another window.",
-      "signature": "# [doc = \" Routes semantic probes to a registry owned by the GPUI window they paint in.\"] # [doc = \"\"] # [doc = \" Components continue to publish through [`Semantic::semantic_in`]; only a\"] # [doc = \" window root opens a frame. Rendering one window therefore cannot clear,\"] # [doc = \" collide with, or advance the semantic generation of another window.\"] # [derive (Clone, Default)] pub struct SemanticCoordinator { inner : Arc<Mutex<CoordinatorInner>>, }",
+      "signature": "# [doc = \" Routes semantic probes to a registry owned by the GPUI window they paint in.\"] # [doc = \"\"] # [doc = \" Components continue to publish through [`Semantic::semantic_in`]; only a\"] # [doc = \" window root opens a frame. Rendering one window therefore cannot clear,\"] # [doc = \" collide with, or advance the semantic generation of another window.\"] # [derive (Clone, Default)] pub struct SemanticCoordinator { state : Rc<CoordinatorState>, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit_semantics::SemanticCoordinator::arm",
+      "name": "arm",
+      "kind": "method",
+      "package": "gpui-box-kit-semantics",
+      "crate": "gpui_kit_semantics",
+      "module": "",
+      "path": "gpui_kit_semantics",
+      "source": "crates/gpui-kit-semantics/src/lib.rs",
+      "summary": "Arms diagnostic recording until the returned guard is dropped.",
+      "documentation": "Arms diagnostic recording until the returned guard is dropped.\n\nKit installation does not arm diagnostics. Tests, inspectors, and\nautomation hosts opt in explicitly; platform accessibility does not\ndepend on this guard.",
+      "signature": "pub fn arm (& self) -> DiagnosticArm",
+      "cfg": [],
+      "target": "SemanticCoordinator"
     },
     {
       "id": "gpui_kit_semantics::SemanticCoordinator::begin_frame",
@@ -102628,8 +102657,8 @@
       "module": "",
       "path": "gpui_kit_semantics",
       "source": "crates/gpui-kit-semantics/src/lib.rs",
-      "summary": "Returns the stable semantic context for `window`, creating it on the first frame or probe.",
-      "documentation": "Returns the stable semantic context for `window`, creating it on the\nfirst frame or probe.",
+      "summary": "Returns the stable semantic context for `window`; its first frame creates the backing generation buffers.",
+      "documentation": "Returns the stable semantic context for `window`; its first frame\ncreates the backing generation buffers.",
       "signature": "pub fn context (& self, window : & Window) -> WindowSemanticContext",
       "cfg": [],
       "target": "SemanticCoordinator"
@@ -102676,6 +102705,21 @@
       "summary": "The coordinator installed for this application.",
       "documentation": "The coordinator installed for this application.\n\nPanics when [`install`] has not run, because a missing coordinator would\notherwise silently produce empty snapshots that tests read as passes.",
       "signature": "pub fn global (cx : & App) -> Self",
+      "cfg": [],
+      "target": "SemanticCoordinator"
+    },
+    {
+      "id": "gpui_kit_semantics::SemanticCoordinator::is_armed",
+      "name": "is_armed",
+      "kind": "method",
+      "package": "gpui-box-kit-semantics",
+      "crate": "gpui_kit_semantics",
+      "module": "",
+      "path": "gpui_kit_semantics",
+      "source": "crates/gpui-kit-semantics/src/lib.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_armed (& self) -> bool",
       "cfg": [],
       "target": "SemanticCoordinator"
     },
@@ -102735,7 +102779,7 @@
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Clone, Default)] pub struct SemanticRegistry { inner : Arc<Mutex<Inner>>, }",
+      "signature": "# [derive (Clone, Default)] pub struct SemanticRegistry { inner : Rc<RefCell<WindowRegistry>>, }",
       "cfg": []
     },
     {
@@ -102747,8 +102791,8 @@
       "module": "",
       "path": "gpui_kit_semantics",
       "source": "crates/gpui-kit-semantics/src/lib.rs",
-      "summary": "Opens a frame, discarding everything the previous one published.",
-      "documentation": "Opens a frame, discarding everything the previous one published.\n\nWithout the discard, a frame that publishes nothing would still report\nthe previous tree, and a test asserting that an element disappeared\nwould pass against a stale snapshot.",
+      "summary": "Opens a frame, selecting and clearing the alternate recording buffer.",
+      "documentation": "Opens a frame, selecting and clearing the alternate recording buffer.\n\nDouble buffering preserves reusable capacity without scanning the\nprevious tree. A frame that publishes nothing therefore reports an\nempty tree rather than stale nodes.",
       "signature": "pub fn begin_frame (& self)",
       "cfg": [],
       "target": "SemanticRegistry"
@@ -102897,7 +102941,7 @@
       "path": "gpui_kit_semantics",
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "Re-applies redaction.",
-      "documentation": "Re-applies redaction.\n\nThe probe already redacts recorded text and values; this covers nodes a\nhost constructed directly, and is idempotent.",
+      "documentation": "Re-applies redaction.\n\nRegistry snapshots already apply this export-boundary operation; this\nalso covers nodes a host constructed directly, and is idempotent.",
       "signature": "pub fn redacted (mut self) -> Self",
       "cfg": [],
       "target": "Snapshot"
@@ -102928,7 +102972,7 @@
       "source": "crates/gpui-kit-semantics/src/lib.rs",
       "summary": "One window's semantic frame and diagnostic tree.",
       "documentation": "One window's semantic frame and diagnostic tree.\n\nA context is stable for the lifetime of its GPUI window. It can be retained\nby a test or host without exposing the installed coordinator to components.",
-      "signature": "# [doc = \" One window's semantic frame and diagnostic tree.\"] # [doc = \"\"] # [doc = \" A context is stable for the lifetime of its GPUI window. It can be retained\"] # [doc = \" by a test or host without exposing the installed coordinator to components.\"] # [derive (Clone)] pub struct WindowSemanticContext { window_id : WindowId, registry : SemanticRegistry, }",
+      "signature": "# [doc = \" One window's semantic frame and diagnostic tree.\"] # [doc = \"\"] # [doc = \" A context is stable for the lifetime of its GPUI window. It can be retained\"] # [doc = \" by a test or host without exposing the installed coordinator to components.\"] # [derive (Clone)] pub struct WindowSemanticContext { window_id : WindowId, coordinator : SemanticCoordinator, }",
       "cfg": []
     },
     {
@@ -103316,7 +103360,7 @@
       "source": "crates/gpui-kit-testkit/src/harness.rs",
       "summary": "One window under test.",
       "documentation": "One window under test.",
-      "signature": "# [doc = \" One window under test.\"] pub struct Harness { cx : VisualTestContext, window : AnyWindowHandle, build : Rc<RefCell<Build>>, # [doc = \" Where the simulated pointer is, so a drag can be driven one step at a\"] # [doc = \" time without a test having to carry the position itself.\"] pointer : Point<Pixels>, }",
+      "signature": "# [doc = \" One window under test.\"] pub struct Harness { cx : VisualTestContext, window : AnyWindowHandle, build : Rc<RefCell<Build>>, _diagnostics : DiagnosticArm, # [doc = \" Where the simulated pointer is, so a drag can be driven one step at a\"] # [doc = \" time without a test having to carry the position itself.\"] pointer : Point<Pixels>, }",
       "cfg": []
     },
     {

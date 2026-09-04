@@ -10,7 +10,9 @@ use gpui_kit::prelude::{
     Badge, Button, EmptyKind, EmptyState, HitCount, List, ListItem, ScrollArea, SearchField,
     SearchFieldEvent, Selectable, set_layout_direction, text,
 };
-use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticCoordinator, WindowSemanticContext};
+use gpui_kit_semantics::{
+    DiagnosticArm, NodeSpec, Role, Semantic, SemanticCoordinator, WindowSemanticContext,
+};
 use gpui_kit_theme::{Theme, ThemeRegistry, TypeScale, activate_theme};
 use wasm_bindgen::prelude::*;
 
@@ -49,6 +51,7 @@ struct BrowserGallery {
     query: SharedString,
     search: Option<Entity<SearchField>>,
     _subscriptions: Vec<Subscription>,
+    _diagnostics: DiagnosticArm,
 }
 
 impl BrowserGallery {
@@ -66,6 +69,7 @@ impl BrowserGallery {
             query: SharedString::default(),
             search: None,
             _subscriptions: Vec::new(),
+            _diagnostics: SemanticCoordinator::global(cx).arm(),
         };
 
         if mode == BrowserMode::Playground {

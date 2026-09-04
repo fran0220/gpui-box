@@ -103,7 +103,7 @@ fn a_row_keeps_its_id_when_the_data_is_reordered(cx: &mut TestAppContext) {
 
     let before: Vec<String> = rows_of(&mut harness, "data.list")
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     assert_eq!(before.len(), 6);
     assert!(before.contains(&"data.list.record-0000".to_string()));
@@ -115,7 +115,7 @@ fn a_row_keeps_its_id_when_the_data_is_reordered(cx: &mut TestAppContext) {
 
     let after: Vec<String> = rows_of(&mut harness, "data.list")
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     assert_ne!(before, after, "the fixture must actually have reordered");
     let mut sorted_before = before.clone();
@@ -312,7 +312,7 @@ fn a_sortable_header_reports_the_next_direction_and_sorts_nothing(cx: &mut TestA
 
     let before: Vec<String> = rows_of(&mut harness, "data.table")
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     harness.click("data.table.header.duration");
 
@@ -322,7 +322,7 @@ fn a_sortable_header_reports_the_next_direction_and_sorts_nothing(cx: &mut TestA
     );
     let after: Vec<String> = rows_of(&mut harness, "data.table")
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     assert_eq!(before, after, "the table renders the order it was given");
 }

@@ -296,6 +296,7 @@ mod imp {
             // one-shot at its end and holds a repeating one at its start.
             cx.set_reduce_motion(true);
         });
+        let _diagnostics = cx.update(|cx| SemanticCoordinator::global(cx).arm());
         let window: AnyWindowHandle = cx
             .open_window(size(px(920.0), px(1000.0)), |_, cx: &mut App| {
                 cx.new(|_| Host)

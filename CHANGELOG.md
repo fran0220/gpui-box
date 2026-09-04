@@ -10,6 +10,14 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Installed diagnostic semantics are now dormant until a consumer arms them.**
+Harnesses, the browser gallery, and headless/MCP sessions retain a
+`DiagnosticArm`; ordinary `gpui_kit::install` keeps native accessibility but
+does not install diagnostic prepaint callbacks or register nodes. Armed nodes
+retain `SharedString` fields through prepaint, redact only when a snapshot is
+read, record through one UI-thread `RefCell`, and alternate generation buffers
+instead of scanning the previous frame.
+
 **Cloning a theme no longer clones a token document's resolved heap data.**
 `Theme` is now an `Arc` handle over public read-only-through-the-handle
 `ThemeData`; the clone used by component render paths is constant-time rather

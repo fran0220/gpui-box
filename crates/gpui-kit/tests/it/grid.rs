@@ -290,7 +290,7 @@ fn a_sortable_header_reports_the_next_direction_and_sorts_nothing(cx: &mut TestA
 
     let before: Vec<String> = rows_of(&mut harness)
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     harness.click("data.grid.header.duration");
 
@@ -300,7 +300,7 @@ fn a_sortable_header_reports_the_next_direction_and_sorts_nothing(cx: &mut TestA
     );
     let after: Vec<String> = rows_of(&mut harness)
         .into_iter()
-        .map(|row| row.id)
+        .map(|row| row.id.to_string())
         .collect();
     assert_eq!(before, after, "the grid renders the order it was given");
 }
@@ -368,7 +368,7 @@ fn dropping_a_column_reports_where_it_should_go(cx: &mut TestAppContext) {
         .snapshot()
         .under("data.grid.header.")
         .into_iter()
-        .map(|node| node.id.clone())
+        .map(|node| node.id.to_string())
         .collect();
 
     harness.drag("data.grid.header.owner", "data.grid.header.duration");
@@ -378,7 +378,7 @@ fn dropping_a_column_reports_where_it_should_go(cx: &mut TestAppContext) {
         .snapshot()
         .under("data.grid.header.")
         .into_iter()
-        .map(|node| node.id.clone())
+        .map(|node| node.id.to_string())
         .collect();
     assert_eq!(before, after, "the grid renders the order it was given");
 }

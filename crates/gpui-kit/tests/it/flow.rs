@@ -54,7 +54,7 @@ fn a_step_publishes_the_status_the_caller_gave_it(cx: &mut TestAppContext) {
 
     assert_eq!(
         harness.node("release.flow").expect("published").value,
-        Some("4".to_string())
+        Some("4".into())
     );
     let current = harness.node("release.flow.sign").expect("published");
     assert_eq!(current.role, Role::Tab);
@@ -270,7 +270,7 @@ fn every_condition_is_a_chip_that_reports_its_own_removal(cx: &mut TestAppContex
 
     assert_eq!(
         harness.node("runs.filters").expect("published").value,
-        Some("3".to_string())
+        Some("3".into())
     );
     assert_eq!(
         harness
@@ -335,7 +335,7 @@ fn adding_and_clearing_report_and_change_nothing(cx: &mut TestAppContext) {
     assert_eq!(*reports.cleared.borrow(), vec!["clear".to_string()]);
     assert_eq!(
         harness.node("runs.filters").expect("published").value,
-        Some("3".to_string())
+        Some("3".into())
     );
 }
 

@@ -69,7 +69,7 @@ fn a_decorative_icon_is_not_announced_and_a_meaningful_one_is(cx: &mut TestAppCo
     );
     assert_eq!(
         snapshot.find("status.failed").expect("published").text,
-        Some("Run failed".to_string())
+        Some("Run failed".into())
     );
     // The decorative one publishes nothing at all, so there is no node for a
     // reader to stop on. That is the default, and forgetting to decide
