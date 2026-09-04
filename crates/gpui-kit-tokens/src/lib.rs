@@ -244,6 +244,13 @@ impl TokenDocument {
                 self.measure.timeline_rail_width,
             ),
             ("measure.statusMark", self.measure.status_mark),
+            ("measure.nodeEdgeWidth", self.measure.node_edge_width),
+            ("measure.nodeEdgeCorner", self.measure.node_edge_corner),
+            ("measure.nodeEdgeLead", self.measure.node_edge_lead),
+            ("measure.nodeEdgeCorridor", self.measure.node_edge_corridor),
+            ("measure.nodeEdgeLane", self.measure.node_edge_lane),
+            ("measure.nodePort", self.measure.node_port),
+            ("measure.nodeProgress", self.measure.node_progress),
         ] {
             if value <= 0.0 {
                 return invalid(path, "must be positive");
@@ -2311,6 +2318,22 @@ pub struct MeasureTokens {
     /// Width reserved for a chronology rail and its status marks.
     pub timeline_rail_width: f32,
     pub status_mark: f32,
+    /// Stroke width of a node-graph connection.
+    pub node_edge_width: f32,
+    /// Corner radius of an orthogonal node-graph connection's bends.
+    pub node_edge_corner: f32,
+    /// Distance an orthogonal connection travels straight out of a port
+    /// before its first bend.
+    pub node_edge_lead: f32,
+    /// Clearance an orthogonal connection keeps from a node while routing
+    /// around it.
+    pub node_edge_corridor: f32,
+    /// Spacing between parallel orthogonal connections sharing a corridor.
+    pub node_edge_lane: f32,
+    /// Diameter of a node-graph port ring at unit zoom.
+    pub node_port: f32,
+    /// Thickness of a node's top-edge progress bar.
+    pub node_progress: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

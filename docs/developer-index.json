@@ -104258,7 +104258,7 @@
       "source": "crates/gpui-kit-theme/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Measures { pub readable_width : f32, pub dialog_width : f32, pub menu_min_width : f32, pub compact_menu_min_width : f32, pub menu_max_height : f32, pub compact_menu_max_height : f32, pub standalone_icon : f32, pub scrollbar_track : f32, pub scrollbar_thumb : f32, pub scrollbar_min_thumb : f32, pub caret_width : f32, pub text_decoration_width : f32, pub progress_track_height : f32, pub slider_track_height : f32, pub slider_vertical_height : f32, pub container_small : f32, pub container_medium : f32, pub container_large : f32, pub container_extra_large : f32, pub compact_overlay_width : f32, pub media_viewer_height : f32, pub timeline_rail_width : f32, pub status_mark : f32, }",
+      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Measures { pub readable_width : f32, pub dialog_width : f32, pub menu_min_width : f32, pub compact_menu_min_width : f32, pub menu_max_height : f32, pub compact_menu_max_height : f32, pub standalone_icon : f32, pub scrollbar_track : f32, pub scrollbar_thumb : f32, pub scrollbar_min_thumb : f32, pub caret_width : f32, pub text_decoration_width : f32, pub progress_track_height : f32, pub slider_track_height : f32, pub slider_vertical_height : f32, pub container_small : f32, pub container_medium : f32, pub container_large : f32, pub container_extra_large : f32, pub compact_overlay_width : f32, pub media_viewer_height : f32, pub timeline_rail_width : f32, pub status_mark : f32, pub node_edge_width : f32, pub node_edge_corner : f32, pub node_edge_lead : f32, pub node_edge_corridor : f32, pub node_edge_lane : f32, pub node_port : f32, pub node_progress : f32, }",
       "cfg": []
     },
     {
@@ -105740,7 +105740,7 @@
       "source": "crates/gpui-kit-tokens/src/lib.rs",
       "summary": "Reusable physical measures that are neither spacing nor the geometry of a single component.",
       "documentation": "Reusable physical measures that are neither spacing nor the geometry of a\nsingle component.\n\nMeasures stay unscaled unless their consumer explicitly combines them with\ndensity-aware spacing: a readable line and a painter hairline are physical\ncontracts, not whitespace.",
-      "signature": "# [doc = \" Reusable physical measures that are neither spacing nor the geometry of a\"] # [doc = \" single component.\"] # [doc = \"\"] # [doc = \" Measures stay unscaled unless their consumer explicitly combines them with\"] # [doc = \" density-aware spacing: a readable line and a painter hairline are physical\"] # [doc = \" contracts, not whitespace.\"] # [derive (Debug, Clone, Deserialize, Serialize)] # [serde (rename_all = \"camelCase\", deny_unknown_fields)] pub struct MeasureTokens { # [doc = \" Maximum width for explanatory copy in empty, unavailable and error\"] # [doc = \" states.\"] pub readable_width : f32, # [doc = \" Width of the library's compact modal question surface.\"] pub dialog_width : f32, # [doc = \" Minimum widths for normal option surfaces and compact field-anchored\"] # [doc = \" option surfaces.\"] pub menu_min_width : f32, pub compact_menu_min_width : f32, # [doc = \" Height at which a normal option menu starts scrolling.\"] pub menu_max_height : f32, # [doc = \" Height at which a compact, caret-anchored option menu starts scrolling.\"] pub compact_menu_max_height : f32, # [doc = \" An icon standing alone above explanatory copy.\"] pub standalone_icon : f32, pub scrollbar_track : f32, pub scrollbar_thumb : f32, pub scrollbar_min_thumb : f32, # [doc = \" Width used to paint insertion carets.\"] pub caret_width : f32, # [doc = \" Width used to paint underlines and strike-through decoration.\"] pub text_decoration_width : f32, # [doc = \" Shared physical measures for progress grooves and semantic status\"] # [doc = \" marks.\"] pub progress_track_height : f32, # [doc = \" Height of the numeric slider groove. It is deliberately independent\"] # [doc = \" from progress: one reports a reading, while the other must carry a\"] # [doc = \" handle and marks without disappearing underneath them.\"] pub slider_track_height : f32, # [doc = \" Default length of a vertical numeric slider.\"] pub slider_vertical_height : f32, # [doc = \" Widths at which a measured container may adopt the next grid layout.\"] # [doc = \" They are part of the theme document so a host can tune responsive\"] # [doc = \" behavior without changing component code.\"] pub container_small : f32, pub container_medium : f32, pub container_large : f32, pub container_extra_large : f32, # [doc = \" Width shared by compact floating surfaces such as previews,\"] # [doc = \" notifications, and rich suggestion menus.\"] pub compact_overlay_width : f32, # [doc = \" Default height of viewers whose caller did not choose a frame.\"] pub media_viewer_height : f32, # [doc = \" Width reserved for a chronology rail and its status marks.\"] pub timeline_rail_width : f32, pub status_mark : f32, }",
+      "signature": "# [doc = \" Reusable physical measures that are neither spacing nor the geometry of a\"] # [doc = \" single component.\"] # [doc = \"\"] # [doc = \" Measures stay unscaled unless their consumer explicitly combines them with\"] # [doc = \" density-aware spacing: a readable line and a painter hairline are physical\"] # [doc = \" contracts, not whitespace.\"] # [derive (Debug, Clone, Deserialize, Serialize)] # [serde (rename_all = \"camelCase\", deny_unknown_fields)] pub struct MeasureTokens { # [doc = \" Maximum width for explanatory copy in empty, unavailable and error\"] # [doc = \" states.\"] pub readable_width : f32, # [doc = \" Width of the library's compact modal question surface.\"] pub dialog_width : f32, # [doc = \" Minimum widths for normal option surfaces and compact field-anchored\"] # [doc = \" option surfaces.\"] pub menu_min_width : f32, pub compact_menu_min_width : f32, # [doc = \" Height at which a normal option menu starts scrolling.\"] pub menu_max_height : f32, # [doc = \" Height at which a compact, caret-anchored option menu starts scrolling.\"] pub compact_menu_max_height : f32, # [doc = \" An icon standing alone above explanatory copy.\"] pub standalone_icon : f32, pub scrollbar_track : f32, pub scrollbar_thumb : f32, pub scrollbar_min_thumb : f32, # [doc = \" Width used to paint insertion carets.\"] pub caret_width : f32, # [doc = \" Width used to paint underlines and strike-through decoration.\"] pub text_decoration_width : f32, # [doc = \" Shared physical measures for progress grooves and semantic status\"] # [doc = \" marks.\"] pub progress_track_height : f32, # [doc = \" Height of the numeric slider groove. It is deliberately independent\"] # [doc = \" from progress: one reports a reading, while the other must carry a\"] # [doc = \" handle and marks without disappearing underneath them.\"] pub slider_track_height : f32, # [doc = \" Default length of a vertical numeric slider.\"] pub slider_vertical_height : f32, # [doc = \" Widths at which a measured container may adopt the next grid layout.\"] # [doc = \" They are part of the theme document so a host can tune responsive\"] # [doc = \" behavior without changing component code.\"] pub container_small : f32, pub container_medium : f32, pub container_large : f32, pub container_extra_large : f32, # [doc = \" Width shared by compact floating surfaces such as previews,\"] # [doc = \" notifications, and rich suggestion menus.\"] pub compact_overlay_width : f32, # [doc = \" Default height of viewers whose caller did not choose a frame.\"] pub media_viewer_height : f32, # [doc = \" Width reserved for a chronology rail and its status marks.\"] pub timeline_rail_width : f32, pub status_mark : f32, # [doc = \" Stroke width of a node-graph connection.\"] pub node_edge_width : f32, # [doc = \" Corner radius of an orthogonal node-graph connection's bends.\"] pub node_edge_corner : f32, # [doc = \" Distance an orthogonal connection travels straight out of a port\"] # [doc = \" before its first bend.\"] pub node_edge_lead : f32, # [doc = \" Clearance an orthogonal connection keeps from a node while routing\"] # [doc = \" around it.\"] pub node_edge_corridor : f32, # [doc = \" Spacing between parallel orthogonal connections sharing a corridor.\"] pub node_edge_lane : f32, # [doc = \" Diameter of a node-graph port ring at unit zoom.\"] pub node_port : f32, # [doc = \" Thickness of a node's top-edge progress bar.\"] pub node_progress : f32, }",
       "cfg": []
     },
     {
@@ -132928,7 +132928,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -133688,7 +133695,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -134448,7 +134462,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -135208,7 +135229,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -135968,7 +135996,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -136728,7 +136763,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -137488,7 +137530,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -138248,7 +138297,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -139008,7 +139064,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,
@@ -139768,7 +139831,14 @@
           "compactOverlayWidth": 320,
           "mediaViewerHeight": 320,
           "timelineRailWidth": 16,
-          "statusMark": 7
+          "statusMark": 7,
+          "nodeEdgeWidth": 2,
+          "nodeEdgeCorner": 18,
+          "nodeEdgeLead": 36,
+          "nodeEdgeCorridor": 48,
+          "nodeEdgeLane": 16,
+          "nodePort": 14,
+          "nodeProgress": 3
         },
         "radius": {
           "small": 5,

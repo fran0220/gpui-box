@@ -545,6 +545,13 @@ pub struct Measures {
     pub media_viewer_height: f32,
     pub timeline_rail_width: f32,
     pub status_mark: f32,
+    pub node_edge_width: f32,
+    pub node_edge_corner: f32,
+    pub node_edge_lead: f32,
+    pub node_edge_corridor: f32,
+    pub node_edge_lane: f32,
+    pub node_port: f32,
+    pub node_progress: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -970,6 +977,13 @@ impl Theme {
                 media_viewer_height: tokens.measure.media_viewer_height,
                 timeline_rail_width: tokens.measure.timeline_rail_width,
                 status_mark: tokens.measure.status_mark,
+                node_edge_width: tokens.measure.node_edge_width,
+                node_edge_corner: tokens.measure.node_edge_corner,
+                node_edge_lead: tokens.measure.node_edge_lead,
+                node_edge_corridor: tokens.measure.node_edge_corridor,
+                node_edge_lane: tokens.measure.node_edge_lane,
+                node_port: tokens.measure.node_port,
+                node_progress: tokens.measure.node_progress,
             },
             radii: Radii {
                 small: tokens.radius(Radius::Small),

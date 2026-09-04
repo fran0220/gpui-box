@@ -2133,6 +2133,13 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             tokens.measure.timeline_rail_width,
         ),
         ("measure.statusMark", tokens.measure.status_mark),
+        ("measure.nodeEdgeWidth", tokens.measure.node_edge_width),
+        ("measure.nodeEdgeCorner", tokens.measure.node_edge_corner),
+        ("measure.nodeEdgeLead", tokens.measure.node_edge_lead),
+        ("measure.nodeEdgeCorridor", tokens.measure.node_edge_corridor),
+        ("measure.nodeEdgeLane", tokens.measure.node_edge_lane),
+        ("measure.nodePort", tokens.measure.node_port),
+        ("measure.nodeProgress", tokens.measure.node_progress),
     ] {
         writeln!(output, "| `{name}` | {value} |")?;
     }

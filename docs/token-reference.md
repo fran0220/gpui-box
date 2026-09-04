@@ -328,6 +328,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -1105,6 +1112,13 @@ Appearance: `Light`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -1882,6 +1896,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -2659,6 +2680,13 @@ Appearance: `Light`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -3436,6 +3464,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -4213,6 +4248,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -4990,6 +5032,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -5767,6 +5816,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -6544,6 +6600,13 @@ Appearance: `Dark`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 
@@ -7321,6 +7384,13 @@ Appearance: `Light`.
 | `measure.mediaViewerHeight` | 320 |
 | `measure.timelineRailWidth` | 16 |
 | `measure.statusMark` | 7 |
+| `measure.nodeEdgeWidth` | 2 |
+| `measure.nodeEdgeCorner` | 18 |
+| `measure.nodeEdgeLead` | 36 |
+| `measure.nodeEdgeCorridor` | 48 |
+| `measure.nodeEdgeLane` | 16 |
+| `measure.nodePort` | 14 |
+| `measure.nodeProgress` | 3 |
 
 ### Radius
 

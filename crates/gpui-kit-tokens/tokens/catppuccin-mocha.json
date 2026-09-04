@@ -390,7 +390,14 @@
     "compactOverlayWidth": 320,
     "mediaViewerHeight": 320,
     "timelineRailWidth": 16,
-    "statusMark": 7
+    "statusMark": 7,
+    "nodeEdgeWidth": 2,
+    "nodeEdgeCorner": 18,
+    "nodeEdgeLead": 36,
+    "nodeEdgeCorridor": 48,
+    "nodeEdgeLane": 16,
+    "nodePort": 14,
+    "nodeProgress": 3
   },
   "radius": {
     "small": 5,
