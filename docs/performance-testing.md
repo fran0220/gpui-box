@@ -9,12 +9,17 @@ cargo run -p xtask -- performance check
 ```
 
 It writes a machine-readable report to
-`target/performance/report.json`. The report covers 10,000-item fixtures for
+`target/performance/report.json`. Each rendering fixture is warmed for two
+explicit redraws and measured on the third. The report covers 10,000-item fixtures for
 List, DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument. It also draws
 a fully visible 64-node graph split between 32 zero-snapshot resting materials
 and 32 promoted glass requests. That promoted set deliberately exceeds the
 renderer admission limit, proving the bounded backdrop/fill-fallback path under
-the same structural budget. The command additionally renders a deliberately
+the same structural budget. A static theme-and-semantics fixture publishes 128
+Buttons and Badges on palette-backed presentation tiers so render-path theme
+resolution and diagnostic semantics have a heap-allocation ratchet. An idle
+fixture renders twice, then only drains already-scheduled work; it fails if the
+window's frame index advances without an invalidation. The command additionally renders a deliberately
 unbounded 10,000-child fixture and fails if the budget does not reject it.
 
 ## What is counted
@@ -29,6 +34,14 @@ that window:
 - native platform-view placements; and
 - retained element-arena capacity growth when test allocator accounting is
   available.
+
+The performance-check binary alone installs a counting global allocator. It
+counts allocation and reallocation calls strictly around the measured redraw;
+the libraries and shipping applications keep their normal allocator. Every
+fixture carries its own allocation ceiling in the serialized report so later
+work can lower the relevant ratchet when it removes render-path allocation.
+The initial ceilings are the repeatable third-frame value plus 10%, rounded up;
+zero remains a strict zero.
 
 `gpui-box-kit-testkit` adds `PerformanceBudget`, named typed limits, and a
 serializable `PerformanceReport`. Component fixtures also report mounted rows

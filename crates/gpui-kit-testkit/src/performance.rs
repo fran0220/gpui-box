@@ -31,6 +31,8 @@ pub enum PerformanceMetric {
     PlatformViewPlacements,
     /// Retained allocator growth in bytes.
     AllocatorDeltaBytes,
+    /// Heap allocation and reallocation calls made during the measured frame.
+    HeapAllocations,
     /// Dataset items mounted by a virtualized builder.
     MountedItems,
     /// Calls to caller-owned item or block builders.
@@ -48,6 +50,7 @@ impl fmt::Display for PerformanceMetric {
             Self::SemanticNodes => "semantic_nodes",
             Self::PlatformViewPlacements => "platform_view_placements",
             Self::AllocatorDeltaBytes => "allocator_delta_bytes",
+            Self::HeapAllocations => "heap_allocations",
             Self::MountedItems => "mounted_items",
             Self::BuilderCalls => "builder_calls",
         })
@@ -60,6 +63,8 @@ impl fmt::Display for PerformanceMetric {
 pub struct PerformanceSample {
     /// Framework-owned frame counters.
     pub frame: FrameStats,
+    /// Heap allocation and reallocation calls during the measured frame.
+    pub heap_allocations: u64,
     /// Dataset items mounted by the component during the frame.
     pub mounted_items: u64,
     /// Calls to caller-owned row or block builders during the frame.
@@ -71,6 +76,7 @@ impl PerformanceSample {
     pub fn new(frame: FrameStats) -> Self {
         Self {
             frame,
+            heap_allocations: 0,
             mounted_items: 0,
             builder_calls: 0,
         }
@@ -85,6 +91,12 @@ impl PerformanceSample {
     /// Records calls to the caller-owned virtualized builder.
     pub fn builder_calls(mut self, count: u64) -> Self {
         self.builder_calls = count;
+        self
+    }
+
+    /// Records heap allocation and reallocation calls in the frame.
+    pub fn heap_allocations(mut self, count: u64) -> Self {
+        self.heap_allocations = count;
         self
     }
 
@@ -103,6 +115,7 @@ impl PerformanceSample {
                     .allocator_delta_bytes
                     .and_then(|value| u64::try_from(value).ok());
             }
+            PerformanceMetric::HeapAllocations => self.heap_allocations,
             PerformanceMetric::MountedItems => self.mounted_items,
             PerformanceMetric::BuilderCalls => self.builder_calls,
         })
@@ -267,11 +280,13 @@ mod tests {
     fn accepts_values_at_the_inclusive_limit() {
         let budget = PerformanceBudget::new("grid")
             .limit(PerformanceMetric::BuilderCalls, 12)
-            .limit(PerformanceMetric::AllocatorDeltaBytes, 0);
+            .limit(PerformanceMetric::AllocatorDeltaBytes, 0)
+            .limit(PerformanceMetric::HeapAllocations, 42);
         let sample = PerformanceSample::new(FrameStats {
             allocator_delta_bytes: Some(0),
             ..Default::default()
         })
+        .heap_allocations(42)
         .builder_calls(12);
 
         assert!(budget.enforce(sample).expect("budget passes").passed);

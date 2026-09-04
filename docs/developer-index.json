@@ -1241,7 +1241,7 @@
           "features": []
         }
       ],
-      "symbolCount": 66
+      "symbolCount": 67
     },
     {
       "name": "gpui-box-kit-theme",
@@ -103807,7 +103807,7 @@
       "source": "crates/gpui-kit-testkit/src/performance.rs",
       "summary": "One deterministic quantity that a [`PerformanceBudget`] can limit.",
       "documentation": "One deterministic quantity that a [`PerformanceBudget`] can limit.",
-      "signature": "# [doc = \" One deterministic quantity that a [`PerformanceBudget`] can limit.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)] # [serde (rename_all = \"snake_case\")] pub enum PerformanceMetric { # [doc = \" Reactive view entities rendered in the measured frame.\"] EntityRenders, # [doc = \" Element request-layout calls.\"] RequestLayoutCalls, # [doc = \" Element prepaint calls.\"] PrepaintCalls, # [doc = \" Element paint calls.\"] PaintCalls, # [doc = \" Invalidations coalesced into the measured frame.\"] Invalidations, # [doc = \" Product semantic nodes published in the frame.\"] SemanticNodes, # [doc = \" Native platform-view placements in the frame.\"] PlatformViewPlacements, # [doc = \" Retained allocator growth in bytes.\"] AllocatorDeltaBytes, # [doc = \" Dataset items mounted by a virtualized builder.\"] MountedItems, # [doc = \" Calls to caller-owned item or block builders.\"] BuilderCalls, }",
+      "signature": "# [doc = \" One deterministic quantity that a [`PerformanceBudget`] can limit.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)] # [serde (rename_all = \"snake_case\")] pub enum PerformanceMetric { # [doc = \" Reactive view entities rendered in the measured frame.\"] EntityRenders, # [doc = \" Element request-layout calls.\"] RequestLayoutCalls, # [doc = \" Element prepaint calls.\"] PrepaintCalls, # [doc = \" Element paint calls.\"] PaintCalls, # [doc = \" Invalidations coalesced into the measured frame.\"] Invalidations, # [doc = \" Product semantic nodes published in the frame.\"] SemanticNodes, # [doc = \" Native platform-view placements in the frame.\"] PlatformViewPlacements, # [doc = \" Retained allocator growth in bytes.\"] AllocatorDeltaBytes, # [doc = \" Heap allocation and reallocation calls made during the measured frame.\"] HeapAllocations, # [doc = \" Dataset items mounted by a virtualized builder.\"] MountedItems, # [doc = \" Calls to caller-owned item or block builders.\"] BuilderCalls, }",
       "cfg": []
     },
     {
@@ -103835,7 +103835,7 @@
       "source": "crates/gpui-kit-testkit/src/performance.rs",
       "summary": "Structural measurements from one completed frame and its caller-owned virtualized builders.",
       "documentation": "Structural measurements from one completed frame and its caller-owned\nvirtualized builders.",
-      "signature": "# [doc = \" Structural measurements from one completed frame and its caller-owned\"] # [doc = \" virtualized builders.\"] # [derive (Debug, Clone, PartialEq, Eq, Serialize, Deserialize)] pub struct PerformanceSample { # [doc = \" Framework-owned frame counters.\"] pub frame : FrameStats, # [doc = \" Dataset items mounted by the component during the frame.\"] pub mounted_items : u64, # [doc = \" Calls to caller-owned row or block builders during the frame.\"] pub builder_calls : u64, }",
+      "signature": "# [doc = \" Structural measurements from one completed frame and its caller-owned\"] # [doc = \" virtualized builders.\"] # [derive (Debug, Clone, PartialEq, Eq, Serialize, Deserialize)] pub struct PerformanceSample { # [doc = \" Framework-owned frame counters.\"] pub frame : FrameStats, # [doc = \" Heap allocation and reallocation calls during the measured frame.\"] pub heap_allocations : u64, # [doc = \" Dataset items mounted by the component during the frame.\"] pub mounted_items : u64, # [doc = \" Calls to caller-owned row or block builders during the frame.\"] pub builder_calls : u64, }",
       "cfg": []
     },
     {
@@ -103850,6 +103850,21 @@
       "summary": "Records calls to the caller-owned virtualized builder.",
       "documentation": "Records calls to the caller-owned virtualized builder.",
       "signature": "pub fn builder_calls (mut self, count : u64) -> Self",
+      "cfg": [],
+      "target": "PerformanceSample"
+    },
+    {
+      "id": "gpui_kit_testkit::performance::PerformanceSample::heap_allocations",
+      "name": "heap_allocations",
+      "kind": "method",
+      "package": "gpui-box-kit-testkit",
+      "crate": "gpui_kit_testkit",
+      "module": "performance",
+      "path": "gpui_kit_testkit::performance",
+      "source": "crates/gpui-kit-testkit/src/performance.rs",
+      "summary": "Records heap allocation and reallocation calls in the frame.",
+      "documentation": "Records heap allocation and reallocation calls in the frame.",
+      "signature": "pub fn heap_allocations (mut self, count : u64) -> Self",
       "cfg": [],
       "target": "PerformanceSample"
     },
