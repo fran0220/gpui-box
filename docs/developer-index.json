@@ -140264,6 +140264,12 @@
       "title": "Truthful UI",
       "path": "docs/truthful-ui.md",
       "summary": "Truthful UI means the display does not claim more than the owning application layer knows."
+    },
+    {
+      "slug": "upstream-resync-assessment",
+      "title": "Upstream resynchronization assessment",
+      "path": "docs/upstream-resync-assessment.md",
+      "summary": "This is a cost assessment, not an import plan or an update receipt. GPUI Box remains the development authority, no upstream tree was merged, and the frozen vendor refs were not advanced."
     }
   ],
   "recipes": [
@@ -141466,6 +141472,30 @@
       "title": "Attempts and stale results",
       "guide": "truthful-ui",
       "anchor": "attempts-and-stale-results"
+    },
+    {
+      "id": "upstream-resync-assessment-assessed-coordinates",
+      "title": "Assessed coordinates",
+      "guide": "upstream-resync-assessment",
+      "anchor": "assessed-coordinates"
+    },
+    {
+      "id": "upstream-resync-assessment-measured-merge-surface",
+      "title": "Measured merge surface",
+      "guide": "upstream-resync-assessment",
+      "anchor": "measured-merge-surface"
+    },
+    {
+      "id": "upstream-resync-assessment-already-adapted-versus-absent",
+      "title": "Already adapted versus absent",
+      "guide": "upstream-resync-assessment",
+      "anchor": "already-adapted-versus-absent"
+    },
+    {
+      "id": "upstream-resync-assessment-cost-comparison-and-decision",
+      "title": "Cost comparison and decision",
+      "guide": "upstream-resync-assessment",
+      "anchor": "cost-comparison-and-decision"
     }
   ],
   "scenes": [
