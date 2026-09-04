@@ -249,6 +249,27 @@ components. Out of scope above means "will not be built, and here is why";
 these entries record capabilities that need a framework or platform owner
 without pretending that a component-local workaround is complete support.
 
+### Backdrop work regions preserve the established pixels, 2026-09-04
+
+The WGPU `frost` and `glass` scenes were captured with Linux llvmpipe
+immediately before and after bounding their snapshot, blur, and composite
+passes. All four PNGs are byte-identical (`AE = 0`):
+
+| Image | SHA-256 before and after |
+|---|---|
+| `frost-studio-dark.png` | `fd936b094521bc9fe91149f7fc6a0365fddd63554ebf13fe328c07d295ab1ec9` |
+| `frost-studio-light.png` | `11dd9814eddb4097c675f2c793b530017eeb59b8dc08620a52587b84aa743418` |
+| `glass-studio-dark.png` | `37387fe70f5a9a5f0e86908bf968867cea9d0513c18966df36d6cae02d686ad8` |
+| `glass-studio-light.png` | `604cdf8137acedb1fbb2dece495189f5310e7025273e37fa95a183a344a23ff1` |
+
+The shared region calculation retains every Gaussian dependency, the maximum
+refracted and dispersed reach, and requested probe samples while leaving
+texture coordinates and material math unchanged. Direct3D's all-feature crate
+also cross-compiles for `x86_64-pc-windows-gnu`. Metal cannot run in the Linux
+orb; its active check remains native CI. This is a pixel-equivalent renderer
+optimization, so no macOS or Windows baseline is recaptured or changed; their
+existing headless checks remain the acceptance authority.
+
 ### Metal and WARP baselines outstanding for this wave, 2026-09-03
 
 Three light-appearance fixes landed from a Linux orb, which can run neither
@@ -483,7 +504,7 @@ that rubric, not that every possible interaction was exercised.
 | `find-replace` | High: dark explanatory copy disappears, controls are over-wide, and count/arrows are crowded. |
 | `form` | Medium: the Region popup covers field help; dark unselected text is still faint. Errors now clear the field. |
 | `frost` | High: dark frost lacks enough edge/surface evidence; light needs bottom clearance and consistent stripes. The edge evidence a frosted surface is missing is what `glass` carries; `Frost` stays frosted deliberately, being the material every renderer can produce. |
-| `glass` | Medium: Metal, WGPU (native and web), and DirectX implement the same dual-source material. Every surface snapshots the framebuffer at its exact paint order; a positive blur derives a frosted source, while the original sharp snapshot remains available to the refracted rim. `Liquid` and `Lens` therefore default to clear (`blur = 0`) without losing optics or burying them under an ordinary source-over fill, and `Frosted` alone defaults to `effect.glassFrostBlur`. The spherical profile, 45%-of-bevel displacement cap, subtle channel dispersion, transmission gain, additive lift and one-pixel hairline agree across the three shaders; bevel depth resolves from each control's short edge, and a fused group uses its constituent panes rather than the union width. `track_pointer`, `pressable`, `adaptive`, and eight-lobe `GlassGroup` remain supported; adaptive tint is an explicit readability policy rather than part of the clear material. Probes read the actual source used for the interior (sharp for clear, blurred for frost) one frame later. WGPU and DirectX both retain sharp optics and the probe when the per-frame gaussian budget cannot fund the requested blur, removing their previous over-budget divergence. The scene now carries one-pixel rules behind Frosted, Lens and Liquid so sharp-rim versus scattered-interior behavior is reviewable. macOS and Windows baselines are authoritative; the Linux baseline set remains retired. |
+| `glass` | Medium: Metal, WGPU (native and web), and DirectX implement the same dual-source material. Every surface snapshots the framebuffer at its exact paint order; a positive blur derives a frosted source, while the original sharp snapshot remains available to the refracted rim. Full-size texture coordinates are retained, but each renderer limits snapshot, blur, and composite work to the visible surface plus conservative Gaussian and optical sampling reach; WGPU evaluates the unchanged Gaussian expression once per weight in a small GPU texture instead of once per fragment tap. `Liquid` and `Lens` therefore default to clear (`blur = 0`) without losing optics or burying them under an ordinary source-over fill, and `Frosted` alone defaults to `effect.glassFrostBlur`. The spherical profile, 45%-of-bevel displacement cap, subtle channel dispersion, transmission gain, additive lift and one-pixel hairline agree across the three shaders; bevel depth resolves from each control's short edge, and a fused group uses its constituent panes rather than the union width. `track_pointer`, `pressable`, `adaptive`, and eight-lobe `GlassGroup` remain supported; adaptive tint is an explicit readability policy rather than part of the clear material. Probes read the actual source used for the interior (sharp for clear, blurred for frost); WGPU and DirectX expose the next-frame value, while Metal exposes the latest completed value without a GPU wait and may remain another frame behind on a slow completion. WGPU and DirectX both retain sharp optics and the probe when the per-frame gaussian budget cannot fund the requested blur, removing their previous over-budget divergence. Downsampled blur remains deliberately deferred because it would change pixels and requires reviewed Metal and WARP baselines. The scene now carries one-pixel rules behind Frosted, Lens and Liquid so sharp-rim versus scattered-interior behavior is reviewable. macOS and Windows baselines are authoritative; the Linux baseline set remains retired. |
 | `hover-card` | Medium: helper and body copy are too faint, especially in dark. |
 | `ide-shell` | High: dark shell height leaves a large void and Empty/Unavailable claims conflict. |
 | `image-viewer` | High: metadata and disabled controls are too faint; the third viewer breaks the first two viewers' grid/container rhythm. |
