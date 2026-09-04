@@ -72,6 +72,8 @@ excluded = ["upstream retained PaneTree reducer", "panel entity registry", "Dock
 [framework_paint]
 sprite_corner_coverage = "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
 edge_fade = "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading."
+backdrop_glass_region = "Metal, Direct3D, and WGPU snapshot and process only the integral visible backdrop-glass region plus conservative Gaussian and optical sampling reach while retaining full-viewport texture coordinates; WGPU evaluates each Gaussian weight once into a GPU texture and reuses stable bind groups."
+backdrop_luminance = "A Metal luminance query returns the latest reading published by a completed command buffer and never waits for the GPU; a slow completion may therefore leave the previous completed frame's reading visible for another frame."
 
 [release_validation]
 dependency_graph = "cargo run -p xtask -- dependencies check"

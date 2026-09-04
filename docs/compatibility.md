@@ -361,12 +361,22 @@ Metal uses its platform gaussian when scattering is nonzero. Direct3D and WGPU
 split wide gaussians into bounded passes and both degrade an over-budget blur to
 the sharp source without dropping refraction or a requested luminance probe.
 The browser uses the same WGPU path, including clear optics and bounded
-scattering. Independently, the scene admits at most 16 backdrop-glass surfaces
-per frame because even a clear surface requires a full-frame snapshot. Valid
-surfaces past that paint their caller-supplied ordinary-fill fallback and stay
-in cached paint ranges so a later paint-order change can admit them. Rejected
-surfaces never issue luminance probes. Ordinary Liquid and Lens paint no
-source-over fill while admitted; Kit supplies `effect.glassAlpha` as their
+scattering. Every backend retains full-size scratch textures and unchanged
+viewport coordinates, but snapshot, blur, and composite work is clipped to the
+integral visible surface plus three standard deviations of support for each
+Gaussian pass and the maximum refracted and dispersed sampling reach. WGPU
+evaluates each Gaussian weight once into a GPU-resident 65-entry texture and
+reuses bind groups whose texture roles and uniform slot are unchanged; blur
+fragments no longer evaluate an exponential for every tap. Metal publishes
+luminance probes from command-buffer completion handlers, so a query returns
+the most recently completed frame without waiting for the GPU and may remain
+one additional frame behind when completion is late.
+
+Independently, the scene admits at most 16 backdrop-glass surfaces per frame.
+Valid surfaces past that paint their caller-supplied ordinary-fill fallback
+and stay in cached paint ranges so a later paint-order change can admit them.
+Rejected surfaces never issue luminance probes. Ordinary Liquid and Lens paint
+no source-over fill while admitted; Kit supplies `effect.glassAlpha` as their
 over-budget fallback. Frosted and the explicitly adaptive readability policy
 already carry that fill. Adaptive surfaces begin with the safe tint and release
 it after the first non-opposing probe reading, so first paint and renderers

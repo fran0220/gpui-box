@@ -412,8 +412,13 @@ made blur part of the framework material rather than a call-site gate, and
 added bounded-pass fallback and cross-renderer tests. The separate 16-surface
 per-frame admission budget, replay-aware ordinary-fill fallback, and rejection
 of over-budget probe work are subsequent GPUI Box framework work rather than
-adapted source. Bezel's license text is `licenses/BEZEL-MIT.txt`; the
-Apache-2.0 text is `licenses/ZED-APACHE-2.0.txt`.
+adapted source. Limiting snapshot, blur, and composite work to conservative
+device-pixel regions, precomputing WGPU Gaussian weights into a GPU texture,
+reusing WGPU bind groups, and publishing Metal luminance readings from command
+buffer completion handlers are later GPUI Box renderer work over the same
+material contract. They import no additional source. Bezel's license text is
+`licenses/BEZEL-MIT.txt`; the Apache-2.0 text is
+`licenses/ZED-APACHE-2.0.txt`.
 
 ## P11: bundled theme preset palettes
 

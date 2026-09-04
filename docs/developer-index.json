@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2506
+      "symbolCount": 2508
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -30341,6 +30341,21 @@
       "target": "BackdropGlass"
     },
     {
+      "id": "gpui::scene::BackdropGlass::render_region",
+      "name": "render_region",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "The clipped output and conservative scratch region for this surface.",
+      "documentation": "The clipped output and conservative scratch region for this surface.\n\n`gaussian_passes` is the number of same-variance passes the backend\nwill apply. A platform Gaussian is one pass; a clear surface is zero.\nThe Gaussian support is three standard deviations per pass. Refraction\nis capped by the shader at 45% of bevel depth, with dispersion allowed\nto move the furthest color channel one pixel farther for linear\nsampling. Both regions are rounded outwards and clamped to `viewport`.\nWhen the material requests a valid luminance probe, `sampling` also\nretains each probe texel and its blur dependencies even when the\ncontent mask clips that point out of `visible`.",
+      "signature": "pub fn render_region (& self, gaussian_passes : u32, viewport : Size<DevicePixels>,) -> Option<BackdropRenderRegion>",
+      "cfg": [],
+      "target": "BackdropGlass"
+    },
+    {
       "id": "gpui::scene::BackdropGlass::shape",
       "name": "shape",
       "kind": "method",
@@ -30354,6 +30369,20 @@
       "signature": "pub fn shape (& self) -> ([GlassLobe; MAX_GLASS_LOBES], usize)",
       "cfg": [],
       "target": "BackdropGlass"
+    },
+    {
+      "id": "gpui::scene::BackdropRenderRegion",
+      "name": "BackdropRenderRegion",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "Integral device-pixel regions a backdrop renderer must preserve.",
+      "documentation": "Integral device-pixel regions a backdrop renderer must preserve.\n\n`visible` is the surface clipped by its content mask. `sampling` expands\nthat region by every blur pass's finite Gaussian support and the material's\nmaximum refracted displacement, and preserves any requested probe samples.\nA renderer may leave pixels outside `sampling` untouched in scratch\ntextures because neither a fragment in `visible` nor a probe can read them.",
+      "signature": "# [doc = \" Integral device-pixel regions a backdrop renderer must preserve.\"] # [doc = \"\"] # [doc = \" `visible` is the surface clipped by its content mask. `sampling` expands\"] # [doc = \" that region by every blur pass's finite Gaussian support and the material's\"] # [doc = \" maximum refracted displacement, and preserves any requested probe samples.\"] # [doc = \" A renderer may leave pixels outside `sampling` untouched in scratch\"] # [doc = \" textures because neither a fragment in `visible` nor a probe can read them.\"] # [derive (Copy, Clone, Debug, Eq, PartialEq)] pub struct BackdropRenderRegion { # [doc = \" The integral pixels where the surface can produce fragments.\"] pub visible : Bounds<DevicePixels>, # [doc = \" The integral pixels that can contribute to those fragments.\"] pub sampling : Bounds<DevicePixels>, }",
+      "cfg": []
     },
     {
       "id": "gpui::scene::BorderStyle",
@@ -143458,6 +143487,8 @@
       "spring": "SpringConfig analytically advances position and velocity for fixed or steadily moving targets; with_spring retains per-element state across retargeting, supports pause, stop, complete, and cancel, and resolves finite overshoot without clamping. Reduced motion snaps a running spring to its target."
     },
     "framework_paint": {
+      "backdrop_glass_region": "Metal, Direct3D, and WGPU snapshot and process only the integral visible backdrop-glass region plus conservative Gaussian and optical sampling reach while retaining full-viewport texture coordinates; WGPU evaluates each Gaussian weight once into a GPU texture and reuses stable bind groups.",
+      "backdrop_luminance": "A Metal luminance query returns the latest reading published by a completed command buffer and never waits for the GPU; a slow completion may therefore leave the previous completed frame's reading visible for another frame.",
       "edge_fade": "Solid quads and filled paths crossing one active edge fade per pixel in their shader bounds; shadows, SVG masks, images, and sprite instances larger than the band sample alpha at the center of bounds intersected with the fade region, while atomic primitives no larger than the band retain nearest-edge fading.",
       "sprite_corner_coverage": "A polychrome sprite's rounded-corner mask sizes its antialiasing ramp from the analytic gradient of its own signed distance field, mapped to device pixels through the sprite's transform, on every renderer; it consumes no screen-space derivative and so does not depend on how a backend fills a helper invocation across a triangle seam."
     },

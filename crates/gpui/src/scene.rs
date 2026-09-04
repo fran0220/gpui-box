@@ -271,7 +271,7 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BackgroundTag, ColorSpace, LinearColorStop, MAX_GRADIENT_STOPS};
+    use crate::{BackgroundTag, ColorSpace, LinearColorStop, MAX_GRADIENT_STOPS, size};
 
     #[test]
     fn empty_layers_do_not_make_a_scene_drawable() {
@@ -774,6 +774,87 @@ mod tests {
             assert!((0.0..640.0).contains(&x), "column {x} is outside");
             assert!((0.0..480.0).contains(&y), "row {y} is outside");
         }
+    }
+
+    #[test]
+    fn backdrop_render_region_clips_rounds_and_keeps_every_sample_dependency() {
+        let mut glass = probe_glass((10.25, 20.25), (100.5, 50.5));
+        glass.content_mask.bounds = Bounds::from_corners(
+            point(ScaledPixels(20.2), ScaledPixels(0.)),
+            point(ScaledPixels(70.4), ScaledPixels(200.)),
+        );
+        glass.material.blur_radius = ScaledPixels(12.);
+        glass.material.bevel = ScaledPixels(10.);
+        glass.material.refraction = 0.3;
+        glass.material.dispersion = 0.1;
+
+        let region = glass
+            .render_region(4, size(DevicePixels(300), DevicePixels(300)))
+            .expect("the clipped surface is visible");
+
+        assert_eq!(
+            region.visible,
+            Bounds::from_corners(
+                point(DevicePixels(20), DevicePixels(20)),
+                point(DevicePixels(71), DevicePixels(71)),
+            )
+        );
+        // Four radius-18 supports plus six pixels for the capped, dispersed
+        // refraction reach the texture edge on the top and left.
+        assert_eq!(
+            region.sampling,
+            Bounds::from_corners(
+                point(DevicePixels(0), DevicePixels(0)),
+                point(DevicePixels(149), DevicePixels(149)),
+            )
+        );
+    }
+
+    #[test]
+    fn backdrop_render_region_keeps_clipped_probe_samples_current() {
+        let mut glass = probe_glass((100., 200.), (400., 80.));
+        glass.content_mask.bounds = Bounds::from_corners(
+            point(ScaledPixels(290.), ScaledPixels(230.)),
+            point(ScaledPixels(310.), ScaledPixels(250.)),
+        );
+        glass.material.blur_radius = ScaledPixels(0.);
+        glass.material.probe = 0;
+
+        let region = glass
+            .render_region(0, size(DevicePixels(1000), DevicePixels(1000)))
+            .expect("the clipped surface is visible");
+
+        assert_eq!(
+            region.sampling,
+            Bounds::from_corners(
+                point(DevicePixels(200), DevicePixels(220)),
+                point(DevicePixels(401), DevicePixels(261)),
+            )
+        );
+    }
+
+    #[test]
+    fn a_fully_clipped_backdrop_spends_no_renderer_work() {
+        let mut glass = probe_glass((10., 10.), (20., 20.));
+        glass.content_mask.bounds = Bounds::from_corners(
+            point(ScaledPixels(40.), ScaledPixels(40.)),
+            point(ScaledPixels(60.), ScaledPixels(60.)),
+        );
+
+        assert_eq!(
+            glass.render_region(1, size(DevicePixels(100), DevicePixels(100))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_backdrop_outside_the_viewport_spends_no_renderer_work() {
+        let glass = probe_glass((110., 110.), (20., 20.));
+
+        assert_eq!(
+            glass.render_region(1, size(DevicePixels(100), DevicePixels(100))),
+            None
+        );
     }
 
     #[test]
@@ -1753,6 +1834,21 @@ pub struct BackdropGlass {
     pub lobe_count: u32,
 }
 
+/// Integral device-pixel regions a backdrop renderer must preserve.
+///
+/// `visible` is the surface clipped by its content mask. `sampling` expands
+/// that region by every blur pass's finite Gaussian support and the material's
+/// maximum refracted displacement, and preserves any requested probe samples.
+/// A renderer may leave pixels outside `sampling` untouched in scratch
+/// textures because neither a fragment in `visible` nor a probe can read them.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct BackdropRenderRegion {
+    /// The integral pixels where the surface can produce fragments.
+    pub visible: Bounds<DevicePixels>,
+    /// The integral pixels that can contribute to those fragments.
+    pub sampling: Bounds<DevicePixels>,
+}
+
 const _: () = assert!(
     MAX_GLASS_LOBES == 8,
     "the lobe array's literal length and MAX_GLASS_LOBES must agree"
@@ -1838,6 +1934,93 @@ impl BackdropGlass {
             .max(1.) as u32;
         (passes <= MAX_GLASS_GAUSSIAN_PASSES).then_some(passes)
     }
+
+    /// The clipped output and conservative scratch region for this surface.
+    ///
+    /// `gaussian_passes` is the number of same-variance passes the backend
+    /// will apply. A platform Gaussian is one pass; a clear surface is zero.
+    /// The Gaussian support is three standard deviations per pass. Refraction
+    /// is capped by the shader at 45% of bevel depth, with dispersion allowed
+    /// to move the furthest color channel one pixel farther for linear
+    /// sampling. Both regions are rounded outwards and clamped to `viewport`.
+    /// When the material requests a valid luminance probe, `sampling` also
+    /// retains each probe texel and its blur dependencies even when the
+    /// content mask clips that point out of `visible`.
+    pub fn render_region(
+        &self,
+        gaussian_passes: u32,
+        viewport: Size<DevicePixels>,
+    ) -> Option<BackdropRenderRegion> {
+        let clipped = self.bounds.intersect(&self.content_mask.bounds);
+        if clipped.size.width.0 <= 0. || clipped.size.height.0 <= 0. {
+            return None;
+        }
+
+        let sigma = if gaussian_passes > 0 {
+            self.material.blur_radius.0.max(1.) / (gaussian_passes as f32).sqrt()
+        } else {
+            0.
+        };
+        let blur_reach = (sigma * 3.).ceil() * gaussian_passes as f32;
+        let optical_reach = if self.material.bends_light() {
+            (self.material.bevel.0 * 0.45 * (1. + self.material.dispersion)).ceil() + 1.
+        } else {
+            0.
+        };
+        let reach = blur_reach + optical_reach;
+        let mut sampled_output = clipped;
+        if self.material.probe != NO_LUMINANCE_PROBE
+            && (self.material.probe as usize) < MAX_LUMINANCE_PROBES
+        {
+            for [x, y] in
+                self.probe_sample_points(viewport.width.0 as f32, viewport.height.0 as f32)
+            {
+                sampled_output = sampled_output.union(&Bounds {
+                    origin: point(ScaledPixels(x), ScaledPixels(y)),
+                    size: Size {
+                        width: ScaledPixels(1.),
+                        height: ScaledPixels(1.),
+                    },
+                });
+            }
+        }
+        let sampling = Bounds::from_corners(
+            point(
+                ScaledPixels(sampled_output.origin.x.0 - reach),
+                ScaledPixels(sampled_output.origin.y.0 - reach),
+            ),
+            point(
+                ScaledPixels(sampled_output.bottom_right().x.0 + reach),
+                ScaledPixels(sampled_output.bottom_right().y.0 + reach),
+            ),
+        );
+
+        let visible = integral_device_bounds(clipped, viewport);
+        if visible.size.width.0 <= 0 || visible.size.height.0 <= 0 {
+            return None;
+        }
+
+        Some(BackdropRenderRegion {
+            visible,
+            sampling: integral_device_bounds(sampling, viewport),
+        })
+    }
+}
+
+fn integral_device_bounds(
+    bounds: Bounds<ScaledPixels>,
+    viewport: Size<DevicePixels>,
+) -> Bounds<DevicePixels> {
+    let width = viewport.width.0.max(0) as f32;
+    let height = viewport.height.0.max(0) as f32;
+    let left = bounds.origin.x.0.floor().clamp(0., width) as i32;
+    let top = bounds.origin.y.0.floor().clamp(0., height) as i32;
+    let right = bounds.bottom_right().x.0.ceil().clamp(left as f32, width) as i32;
+    let bottom = bounds.bottom_right().y.0.ceil().clamp(top as f32, height) as i32;
+    Bounds::from_corners(
+        point(DevicePixels(left), DevicePixels(top)),
+        point(DevicePixels(right), DevicePixels(bottom)),
+    )
 }
 
 /// The largest standard deviation one separable gaussian pass can carry.

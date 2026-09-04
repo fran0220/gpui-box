@@ -22,7 +22,7 @@ struct Params {
     transmission_gain: f32,
     hairline: f32,
     lobe_count: u32,
-    pad_0: u32,
+    blur_radius: u32,
     optical_lift: vec4<f32>,
     lobes: array<Lobe, MAX_GLASS_LOBES>,
 }
@@ -31,6 +31,7 @@ struct Params {
 @group(0) @binding(1) var sharp_source: texture_2d<f32>;
 @group(0) @binding(2) var source_sampler: sampler;
 @group(0) @binding(3) var<uniform> params: Params;
+@group(0) @binding(4) var blur_weights: texture_2d<f32>;
 
 struct Varying {
     @builtin(position) position: vec4<f32>,
@@ -46,19 +47,21 @@ fn vs_fullscreen(@builtin(vertex_index) vertex: u32) -> Varying {
     );
 }
 
-fn gaussian(x: f32, sigma: f32) -> f32 {
-    return exp(-0.5 * x * x / (sigma * sigma));
+@fragment
+fn fs_blur_weight(input: Varying) -> @location(0) f32 {
+    let offset = f32(u32(input.position.x));
+    let sigma = max(params.sigma, 1.0);
+    return exp(-0.5 * offset * offset / (sigma * sigma));
 }
 
 @fragment
 fn fs_blur(input: Varying) -> @location(0) vec4<f32> {
-    let sigma = max(params.sigma, 1.0);
-    let radius = min(64, i32(ceil(sigma * 3.0)));
-    var color = textureSample(source, source_sampler, input.uv) * gaussian(0.0, sigma);
-    var weight = gaussian(0.0, sigma);
+    let radius = min(64u, params.blur_radius);
+    var color = textureSample(source, source_sampler, input.uv) * textureLoad(blur_weights, vec2(0, 0), 0).x;
+    var weight = textureLoad(blur_weights, vec2(0, 0), 0).x;
     for (var offset = 1; offset <= 64; offset++) {
-        if (offset <= radius) {
-            let sample_weight = gaussian(f32(offset), sigma);
+        if (u32(offset) <= radius) {
+            let sample_weight = textureLoad(blur_weights, vec2(offset, 0), 0).x;
             let delta = params.direction * f32(offset) / params.viewport;
             color += (textureSample(source, source_sampler, input.uv + delta) +
                 textureSample(source, source_sampler, input.uv - delta)) * sample_weight;

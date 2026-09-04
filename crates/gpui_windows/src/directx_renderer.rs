@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use gpui_util::ResultExt;
 use windows::{
     Win32::{
-        Foundation::HWND,
+        Foundation::{HWND, RECT},
         Graphics::{
             Direct3D::*,
             Direct3D11::*,
@@ -30,7 +30,7 @@ const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
 const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
-/// How many full-viewport blur passes all the glass surfaces in one frame may
+/// How many clipped blur passes all the glass surfaces in one frame may
 /// spend between them. How many one radius needs is
 /// [`BackdropGlass::gaussian_pass_count`], which this renderer shares with
 /// WGPU; how many a frame may afford is this renderer's own, because it is a
@@ -103,9 +103,9 @@ struct DirectXResources {
 
     // Backdrop glass scratch. `snapshot` is the copy of the render target the
     // blur reads, and the two scratch textures are ping-ponged through the
-    // separable gaussian's axes. All three are full viewport: a glass surface
-    // samples outside its own bounds, both because the blur's kernel reaches
-    // past the rim and because refraction displaces the sample further.
+    // separable gaussian's axes. All three retain the full viewport so UVs do
+    // not change, but each surface only copies and draws its conservative
+    // sampling region.
     backdrop_snapshot: ID3D11Texture2D,
     backdrop_snapshot_srv: Option<ID3D11ShaderResourceView>,
     backdrop_scratch: [ID3D11Texture2D; 2],
@@ -156,14 +156,15 @@ struct DirectXRenderPipelines {
     poly_sprites: PipelineState<PolychromeSprite>,
     poly_additive_blend: ID3D11BlendState,
     poly_screen_blend: ID3D11BlendState,
-    // The two backdrop passes carry no instance buffer: each draws one full
-    // viewport strip and reads everything it needs from `b2`, so they are a
-    // shader pair and a blend state rather than a `PipelineState`.
+    // The two backdrop passes carry no instance buffer: each submits one
+    // viewport strip clipped by a scissor and reads everything it needs from
+    // `b2`, so they are a shader pair and a blend state rather than a
+    // `PipelineState`.
     backdrop_blur: BackdropPipeline,
     backdrop_glass: BackdropPipeline,
 }
 
-/// A shader pair that draws one full-viewport strip.
+/// A shader pair that submits one viewport strip under the active scissor.
 struct BackdropPipeline {
     vertex: ID3D11VertexShader,
     fragment: ID3D11PixelShader,
@@ -382,6 +383,10 @@ impl DirectXRenderer {
             );
             device_context.OMSetRenderTargets(Some(slice::from_ref(render_target_view)), None);
             device_context.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
+            device_context.RSSetScissorRects(Some(slice::from_ref(&full_scissor(
+                self.width,
+                self.height,
+            ))));
             device_context
                 .VSSetConstantBuffers(0, Some(slice::from_ref(&self.globals.global_params_buffer)));
             device_context
@@ -807,6 +812,15 @@ impl DirectXRenderer {
         } else {
             0
         };
+        let Some(region) = glass.render_region(
+            pass_count,
+            Size {
+                width: DevicePixels(self.width as i32),
+                height: DevicePixels(self.height as i32),
+            },
+        ) else {
+            return Ok(());
+        };
 
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
@@ -824,10 +838,22 @@ impl DirectXRenderer {
             // The previous surface bound its sharp snapshot at t1. Release
             // both source slots before overwriting that texture.
             device_context.PSSetShaderResources(0, Some(&[None, None]));
-            // Take the backdrop out of the render target. Everything painted
-            // below this order is in it, and nothing above it has been drawn.
-            device_context.CopyResource(&resources.backdrop_snapshot, &render_target.texture);
+            // Take only the pixels this surface can transitively sample out
+            // of the render target. Everything painted below this order is
+            // in them, and nothing above it has been drawn.
+            let source = d3d_box(region.sampling);
+            device_context.CopySubresourceRegion(
+                &resources.backdrop_snapshot,
+                0,
+                region.sampling.origin.x.0 as u32,
+                region.sampling.origin.y.0 as u32,
+                0,
+                &render_target.texture,
+                0,
+                Some(&source),
+            );
             device_context.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
+            device_context.RSSetScissorRects(Some(slice::from_ref(&d3d_scissor(region.sampling))));
             device_context.PSSetConstantBuffers(
                 2,
                 Some(slice::from_ref(&self.globals.backdrop_params_buffer)),
@@ -900,6 +926,7 @@ impl DirectXRenderer {
         unsafe {
             device_context.PSSetShaderResources(0, Some(&[None, None]));
             device_context.OMSetRenderTargets(Some(slice::from_ref(&render_target.view)), None);
+            device_context.RSSetScissorRects(Some(slice::from_ref(&d3d_scissor(region.visible))));
         }
         let composite_sources = [read.clone(), resources.backdrop_snapshot_srv.clone()];
         self.pipelines
@@ -908,6 +935,10 @@ impl DirectXRenderer {
 
         unsafe {
             device_context.PSSetShaderResources(0, Some(&[None, None]));
+            device_context.RSSetScissorRects(Some(slice::from_ref(&full_scissor(
+                self.width,
+                self.height,
+            ))));
         }
         if takes_probe {
             self.probe_requests.push(probe_slot);
@@ -2427,7 +2458,7 @@ fn set_rasterizer_state(device: &ID3D11Device, device_context: &ID3D11DeviceCont
         DepthBiasClamp: 0.0,
         SlopeScaledDepthBias: 0.0,
         DepthClipEnable: true.into(),
-        ScissorEnable: false.into(),
+        ScissorEnable: true.into(),
         MultisampleEnable: true.into(),
         AntialiasedLineEnable: false.into(),
     };
@@ -2438,6 +2469,35 @@ fn set_rasterizer_state(device: &ID3D11Device, device_context: &ID3D11DeviceCont
     };
     unsafe { device_context.RSSetState(&rasterizer_state) };
     Ok(())
+}
+
+fn d3d_scissor(bounds: Bounds<DevicePixels>) -> RECT {
+    RECT {
+        left: bounds.origin.x.0,
+        top: bounds.origin.y.0,
+        right: bounds.bottom_right().x.0,
+        bottom: bounds.bottom_right().y.0,
+    }
+}
+
+fn full_scissor(width: u32, height: u32) -> RECT {
+    RECT {
+        left: 0,
+        top: 0,
+        right: width as i32,
+        bottom: height as i32,
+    }
+}
+
+fn d3d_box(bounds: Bounds<DevicePixels>) -> D3D11_BOX {
+    D3D11_BOX {
+        left: bounds.origin.x.0 as u32,
+        top: bounds.origin.y.0 as u32,
+        front: 0,
+        right: bounds.bottom_right().x.0 as u32,
+        bottom: bounds.bottom_right().y.0 as u32,
+        back: 1,
+    }
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ns-d3d11-d3d11_blend_desc
@@ -2920,8 +2980,8 @@ pub(crate) mod shader_resources {
                 ShaderModule::OverlaySubpixelSprite => "overlay_subpixel_sprite",
                 ShaderModule::PolychromeSprite => "polychrome_sprite",
                 ShaderModule::EmojiRasterization => "emoji_rasterization",
-                // Both backdrop passes share one vertex shader, which draws
-                // the same full-viewport strip: only the fragment differs.
+                // Both backdrop passes share one vertex shader, which submits
+                // the same scissor-clipped viewport strip: only the fragment differs.
                 ShaderModule::BackdropBlur => "backdrop_blur",
                 ShaderModule::BackdropGlass => "backdrop_glass",
             }

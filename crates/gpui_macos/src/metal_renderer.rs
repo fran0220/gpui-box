@@ -35,6 +35,35 @@ use std::{cell::Cell, ffi::c_void, mem, mem::MaybeUninit, ops::Range, ptr, slice
 // Exported to metal
 pub(crate) type PointF = gpui::Point<f32>;
 
+/// MetalPerformanceShaders uses signed source coordinates while Metal's
+/// destination region is unsigned. This mirrors `MPSOffset` from
+/// MetalPerformanceShaders.h without adding a wrapper crate for two setters.
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct MpsOffset {
+    x: isize,
+    y: isize,
+    z: isize,
+}
+
+fn metal_region(bounds: Bounds<DevicePixels>) -> metal::MTLRegion {
+    metal::MTLRegion::new_2d(
+        bounds.origin.x.0 as u64,
+        bounds.origin.y.0 as u64,
+        bounds.size.width.0 as u64,
+        bounds.size.height.0 as u64,
+    )
+}
+
+fn metal_scissor(bounds: Bounds<DevicePixels>) -> metal::MTLScissorRect {
+    metal::MTLScissorRect {
+        x: bounds.origin.x.0 as u64,
+        y: bounds.origin.y.0 as u64,
+        width: bounds.size.width.0 as u64,
+        height: bounds.size.height.0 as u64,
+    }
+}
+
 #[cfg(not(feature = "runtime_shaders"))]
 const SHADERS_METALLIB: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shaders.metallib"));
 #[cfg(feature = "runtime_shaders")]
@@ -45,6 +74,7 @@ const PATH_SAMPLE_COUNT: u32 = 4;
 /// Metal requires the offset a buffer is bound at to be 256-byte aligned.
 const INSTANCE_BUFFER_ALIGNMENT: usize = 256;
 const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
+const PROBE_BUFFER_BYTES: u64 = (MAX_LUMINANCE_PROBES * LUMINANCE_PROBE_SAMPLES * 4) as u64;
 
 pub(crate) type Context = Arc<Mutex<InstanceBufferPool>>;
 pub(crate) type Renderer = MetalRenderer;
@@ -118,6 +148,36 @@ impl InstanceBufferPool {
     }
 }
 
+fn new_probe_buffer(device: &metal::DeviceRef) -> metal::Buffer {
+    device.new_buffer(PROBE_BUFFER_BYTES, MTLResourceOptions::StorageModeShared)
+}
+
+fn read_probe_values(
+    buffer: &metal::BufferRef,
+    requests: &[u32],
+    values: &mut [Option<f32>; MAX_LUMINANCE_PROBES],
+) {
+    let data = buffer.contents() as *const u8;
+    for &slot in requests {
+        let mut total = 0.0;
+        for index in 0..LUMINANCE_PROBE_SAMPLES {
+            // The drawable and every scratch texture are BGRA8Unorm.
+            let texel = unsafe {
+                slice::from_raw_parts(
+                    data.add((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4),
+                    4,
+                )
+            };
+            total += probe_sample_luminance(
+                texel[2] as f32 / 255.0,
+                texel[1] as f32 / 255.0,
+                texel[0] as f32 / 255.0,
+            );
+        }
+        values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+    }
+}
+
 pub(crate) struct MetalRenderer {
     device: metal::Device,
     layer: Option<metal::MetalLayer>,
@@ -140,12 +200,15 @@ pub(crate) struct MetalRenderer {
     /// The shared buffer luminance probe texels are blitted into, one row of
     /// [`LUMINANCE_PROBE_SAMPLES`] BGRA texels per slot.
     probe_buffer: metal::Buffer,
+    /// Completed handlers return their readback buffers here. A frame never
+    /// overwrites a buffer that the GPU or its completion handler still owns.
+    #[allow(clippy::arc_with_non_send_sync)]
+    probe_buffer_pool: Arc<Mutex<Vec<metal::Buffer>>>,
     /// The slots the frame currently being encoded blits probes for.
     probe_requests: Vec<u32>,
-    /// The last committed frame that carried probes, held until it completes
-    /// so the readback never stalls the frame that took it.
-    probe_frame: Option<(metal::CommandBuffer, Vec<u32>)>,
-    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
+    /// Latest readings published by completed command buffers. Rendering and
+    /// callers only take this CPU lock; neither ever waits for the GPU.
+    probe_values: Arc<Mutex<[Option<f32>; MAX_LUMINANCE_PROBES]>>,
     quads_pipeline_state: metal::RenderPipelineState,
     underlines_pipeline_state: metal::RenderPipelineState,
     monochrome_sprites_pipeline_state: metal::RenderPipelineState,
@@ -423,10 +486,7 @@ impl MetalRenderer {
             .unwrap_or_else(|| Arc::new(MetalAtlas::new(device.clone(), is_apple_gpu)));
         let core_video_texture_cache = CVMetalTextureCache::new(None, device.clone(), None)
             .expect("required framework invariant must hold");
-        let probe_buffer = device.new_buffer(
-            (MAX_LUMINANCE_PROBES * LUMINANCE_PROBE_SAMPLES * 4) as u64,
-            MTLResourceOptions::StorageModeShared,
-        );
+        let probe_buffer = new_probe_buffer(&device);
 
         Self {
             device,
@@ -444,9 +504,9 @@ impl MetalRenderer {
             backdrop_blurred_snapshot: None,
             backdrop_kernel: None,
             probe_buffer,
+            probe_buffer_pool: Arc::new(Mutex::new(Vec::new())),
             probe_requests: Vec::new(),
-            probe_frame: None,
-            probe_values: [None; MAX_LUMINANCE_PROBES],
+            probe_values: Arc::new(Mutex::new([None; MAX_LUMINANCE_PROBES])),
             quads_pipeline_state,
             underlines_pipeline_state,
             monochrome_sprites_pipeline_state,
@@ -629,11 +689,28 @@ impl MetalRenderer {
             texture,
             viewport_size,
         )?;
-        // A frame that encoded no probe blits leaves the last carrying frame
-        // in place, so a still window keeps its reading instead of losing it.
+        // Publish probe texels from the completion callback. The next frame
+        // gets a different buffer, so neither rendering nor a caller asking
+        // for the latest value can force a GPU-to-CPU wait.
         let probes = mem::take(&mut self.probe_requests);
         if !probes.is_empty() {
-            self.probe_frame = Some((command_buffer.to_owned(), probes));
+            let next_buffer = self
+                .probe_buffer_pool
+                .lock()
+                .pop()
+                .unwrap_or_else(|| new_probe_buffer(&self.device));
+            let completed_buffer =
+                Cell::new(Some(mem::replace(&mut self.probe_buffer, next_buffer)));
+            let probe_buffer_pool = Arc::clone(&self.probe_buffer_pool);
+            let probe_values = Arc::clone(&self.probe_values);
+            let block = ConcreteBlock::new(move |_| {
+                if let Some(buffer) = completed_buffer.take() {
+                    read_probe_values(&buffer, &probes, &mut probe_values.lock());
+                    probe_buffer_pool.lock().push(buffer);
+                }
+            });
+            let block = block.copy();
+            command_buffer.add_completed_handler(&block);
         }
 
         let instance_buffer_pool = self.instance_buffer_pool.clone();
@@ -797,29 +874,38 @@ impl MetalRenderer {
                 let glass = *pending_glass
                     .next()
                     .expect("required framework invariant must hold");
+                let has_blur = glass.material.blur_radius.0 > 0.0;
+                let Some(region) = glass.render_region(u32::from(has_blur), viewport_size) else {
+                    continue;
+                };
                 command_encoder.end_encoding();
                 let (scratch, blurred) = self.ensure_backdrop_scratch(texture);
                 let blit = command_buffer.new_blit_command_encoder();
+                let copy_region = metal_region(region.sampling);
                 blit.copy_from_texture(
                     texture,
                     0,
                     0,
-                    metal::MTLOrigin { x: 0, y: 0, z: 0 },
-                    metal::MTLSize {
-                        width: texture.width(),
-                        height: texture.height(),
-                        depth: 1,
-                    },
+                    copy_region.origin,
+                    copy_region.size,
                     &scratch,
                     0,
                     0,
-                    metal::MTLOrigin { x: 0, y: 0, z: 0 },
+                    copy_region.origin,
                 );
                 blit.end_encoding();
-                let frosted = if glass.material.blur_radius.0 > 0.0 {
+                let frosted = if has_blur {
                     use metal::foreign_types::ForeignType as _;
                     let kernel = self.ensure_gaussian_kernel(glass.material.blur_radius.0);
                     unsafe {
+                        let clip = metal_region(region.sampling);
+                        let offset = MpsOffset {
+                            x: region.sampling.origin.x.0 as isize,
+                            y: region.sampling.origin.y.0 as isize,
+                            z: 0,
+                        };
+                        let _: () = msg_send![kernel, setClipRect: clip];
+                        let _: () = msg_send![kernel, setOffset: offset];
                         let _: () = msg_send![
                             kernel,
                             encodeToCommandBuffer: command_buffer.as_ptr() as *mut objc::runtime::Object
@@ -840,6 +926,7 @@ impl MetalRenderer {
                     viewport_size,
                     &frosted,
                     &scratch,
+                    region.visible,
                     command_encoder,
                 ) {
                     command_encoder.end_encoding();
@@ -921,29 +1008,38 @@ impl MetalRenderer {
         // to trigger on, and still has a backdrop — the same trailing pass
         // the WGPU and DirectX renderers take.
         for glass in pending_glass {
+            let has_blur = glass.material.blur_radius.0 > 0.0;
+            let Some(region) = glass.render_region(u32::from(has_blur), viewport_size) else {
+                continue;
+            };
             command_encoder.end_encoding();
             let (scratch, blurred) = self.ensure_backdrop_scratch(texture);
             let blit = command_buffer.new_blit_command_encoder();
+            let copy_region = metal_region(region.sampling);
             blit.copy_from_texture(
                 texture,
                 0,
                 0,
-                metal::MTLOrigin { x: 0, y: 0, z: 0 },
-                metal::MTLSize {
-                    width: texture.width(),
-                    height: texture.height(),
-                    depth: 1,
-                },
+                copy_region.origin,
+                copy_region.size,
                 &scratch,
                 0,
                 0,
-                metal::MTLOrigin { x: 0, y: 0, z: 0 },
+                copy_region.origin,
             );
             blit.end_encoding();
-            let frosted = if glass.material.blur_radius.0 > 0.0 {
+            let frosted = if has_blur {
                 use metal::foreign_types::ForeignType as _;
                 let kernel = self.ensure_gaussian_kernel(glass.material.blur_radius.0);
                 unsafe {
+                    let clip = metal_region(region.sampling);
+                    let offset = MpsOffset {
+                        x: region.sampling.origin.x.0 as isize,
+                        y: region.sampling.origin.y.0 as isize,
+                        z: 0,
+                    };
+                    let _: () = msg_send![kernel, setClipRect: clip];
+                    let _: () = msg_send![kernel, setOffset: offset];
                     let _: () = msg_send![
                         kernel,
                         encodeToCommandBuffer: command_buffer.as_ptr() as *mut objc::runtime::Object
@@ -964,6 +1060,7 @@ impl MetalRenderer {
                 viewport_size,
                 &frosted,
                 &scratch,
+                region.visible,
                 command_encoder,
             ) {
                 command_encoder.end_encoding();
@@ -1122,45 +1219,9 @@ impl MetalRenderer {
         self.probe_requests.push(slot);
     }
 
-    /// Fold the last committed frame's probe texels into the slot values.
-    ///
-    /// Waits for that frame if the GPU is still on it: the frame is already
-    /// committed, so the wait is bounded by work the renderer had to finish
-    /// anyway, and a reading that silently stayed one more frame behind on a
-    /// slow device would make the flip land at a different frame per machine.
-    fn collect_probes(&mut self) {
-        let Some((frame, requests)) = &self.probe_frame else {
-            return;
-        };
-        if frame.status() != metal::MTLCommandBufferStatus::Completed {
-            frame.wait_until_completed();
-        }
-        let data = self.probe_buffer.contents() as *const u8;
-        for &slot in requests {
-            let mut total = 0.0;
-            for index in 0..LUMINANCE_PROBE_SAMPLES {
-                // The drawable and every scratch texture are BGRA8Unorm.
-                let texel = unsafe {
-                    slice::from_raw_parts(
-                        data.add((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4),
-                        4,
-                    )
-                };
-                total += probe_sample_luminance(
-                    texel[2] as f32 / 255.0,
-                    texel[1] as f32 / 255.0,
-                    texel[0] as f32 / 255.0,
-                );
-            }
-            self.probe_values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
-        }
-        self.probe_frame = None;
-    }
-
     /// The luminance the most recently completed frame read for this slot.
     pub fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
-        self.collect_probes();
-        *self.probe_values.get(slot as usize)?
+        *self.probe_values.lock().get(slot as usize)?
     }
 
     /// The cached `MPSImageGaussianBlur` for `sigma` (device px) — Apple's
@@ -1198,6 +1259,7 @@ impl MetalRenderer {
         viewport_size: Size<DevicePixels>,
         source_texture: &metal::TextureRef,
         sharp_texture: &metal::TextureRef,
+        visible: Bounds<DevicePixels>,
         command_encoder: &metal::RenderCommandEncoderRef,
     ) -> Result<()> {
         if surfaces.is_empty() {
@@ -1240,12 +1302,19 @@ impl MetalRenderer {
             Some(sharp_texture),
         );
 
+        command_encoder.set_scissor_rect(metal_scissor(visible));
         command_encoder.draw_primitives_instanced(
             metal::MTLPrimitiveType::Triangle,
             0,
             6,
             surfaces.len() as u64,
         );
+        command_encoder.set_scissor_rect(metal::MTLScissorRect {
+            x: 0,
+            y: 0,
+            width: viewport_size.width.0 as u64,
+            height: viewport_size.height.0 as u64,
+        });
         Ok(())
     }
 

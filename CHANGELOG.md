@@ -10,6 +10,17 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Backdrop glass now limits GPU work to the pixels the material can reach.**
+Metal, Direct3D, and WGPU retain the existing full-size texture coordinates and
+pixel output while clipping snapshots, blur passes, and composites to the
+visible surface plus conservative Gaussian and optical sampling support. WGPU
+evaluates Gaussian weights once into a small GPU texture and reuses stable bind
+groups instead of evaluating `exp` and creating a bind group per fragment pass.
+Metal luminance probes now publish the latest completed frame asynchronously
+instead of making the CPU wait for the GPU; late completion can leave the
+previous completed reading visible for one additional frame. Downsampled blur
+remains deferred because it would change pixels and active baselines.
+
 **Installed diagnostic semantics are now dormant until a consumer arms them.**
 Harnesses, the browser gallery, and headless/MCP sessions retain a
 `DiagnosticArm`; ordinary `gpui_kit::install` keeps native accessibility but
