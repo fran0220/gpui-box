@@ -8,7 +8,36 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**Node graph ports carry a type.** `PortType` is an id, a colour, and an
+optional glyph; `GraphPort::typed` seats it on a port. A port is drawn as a
+ring in its type's colour with the glyph inside, and a wire leaving an output
+inherits that colour unless `GraphEdge::color` overrides it. Ports on the left
+and right edges are printed as named rows inside the card, and a wire aims at
+the row it belongs to rather than at an even division of the card's height;
+only top and bottom ports keep a floating name chip. `GraphNode::progress`
+draws a fraction, or an indeterminate sweep while busy, along the card's top
+edge, and `GraphNode::child`/`children` seat caller-owned content inside the
+card without the canvas taking its pointer or key events. A node in an editable
+graph can be resized from its bottom-right grip, reported as
+`NodeGraphEvent::NodeResized { id, size }`; `Placed::height` and
+`GraphNode::width` are how a host applies the size it stored.
+
 ### Changed
+
+**Node cards say their state once, in colour.** The state is a single mark
+that breathes while busy; the state's word and `GraphNode::status` text are
+tooltip and semantic value, never printed on the card. The kind is a muted
+word after the title and yields before the title truncates. The action line
+shows only while busy, metric labels move to tooltips so the card prints the
+value alone, and selection is an accent outline instead of a wash. Wires
+between facing ports take a symmetric route at the halfway line, with the two
+leads halved when the ports are closer than both leads so no stub doubles
+back; corner radius, lead, corridor, lane, port ring, and progress thickness
+come from `measure.*` tokens rather than constants. `PortDirection` and
+`GraphPort` no longer implement `Eq`, and `GraphEdge` only `PartialEq`, because
+a colour choice is not `Eq`.
 
 **Backdrop glass now limits GPU work to the pixels the material can reach.**
 Metal, Direct3D, and WGPU retain the existing full-size texture coordinates and

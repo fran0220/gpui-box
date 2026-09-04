@@ -333,7 +333,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -1117,7 +1117,7 @@ Appearance: `Light`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -1901,7 +1901,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -2685,7 +2685,7 @@ Appearance: `Light`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -3469,7 +3469,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -4253,7 +4253,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -5037,7 +5037,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -5821,7 +5821,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -6605,7 +6605,7 @@ Appearance: `Dark`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius
@@ -7389,7 +7389,7 @@ Appearance: `Light`.
 | `measure.nodeEdgeLead` | 36 |
 | `measure.nodeEdgeCorridor` | 48 |
 | `measure.nodeEdgeLane` | 16 |
-| `measure.nodePort` | 14 |
+| `measure.nodePort` | 20 |
 | `measure.nodeProgress` | 3 |
 
 ### Radius

@@ -246,6 +246,7 @@ impl RenderOnce for AgentRunCanvas {
                     }
                 }
                 NodeGraphEvent::NodeDeleted { .. }
+                | NodeGraphEvent::NodeResized { .. }
                 | NodeGraphEvent::ConnectionRequested { .. }
                 | NodeGraphEvent::ConnectionDropped { .. }
                 | NodeGraphEvent::DisconnectRequested { .. }

@@ -396,7 +396,7 @@
     "nodeEdgeLead": 36,
     "nodeEdgeCorridor": 48,
     "nodeEdgeLane": 16,
-    "nodePort": 14,
+    "nodePort": 20,
     "nodeProgress": 3
   },
   "radius": {

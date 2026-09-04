@@ -51,5 +51,20 @@ pub use graph::{
 };
 pub use group::NodeGroup;
 pub use minimap::{Minimap, MinimapEvent, MinimapMark, MinimapView};
-pub use node::{Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection};
+pub use node::{
+    Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection, PortType,
+};
 pub use toolbar::{CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent};
+
+/// A stable id built from a prefix and length-delimited parts, so two
+/// different part lists can never collide by concatenation.
+pub(crate) fn composite_id(prefix: &str, parts: &[&str]) -> gpui::SharedString {
+    let mut id = prefix.to_string();
+    for part in parts {
+        id.push(':');
+        id.push_str(&part.len().to_string());
+        id.push(':');
+        id.push_str(part);
+    }
+    id.into()
+}

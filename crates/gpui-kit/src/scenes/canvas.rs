@@ -14,25 +14,47 @@ pub(super) struct SceneGraph {
     selected: Vec<SharedString>,
     deleted: Vec<SharedString>,
     edges: Vec<GraphEdge>,
+    /// Sizes the reader has dragged cards to, by node id.
+    sizes: std::collections::HashMap<SharedString, gpui::Size<f32>>,
 }
 
 impl Global for SceneGraph {}
 
+/// Places a card at the size the reader dragged it to, or at its own.
+fn sized(
+    sizes: &std::collections::HashMap<SharedString, gpui::Size<f32>>,
+    node: GraphNode,
+    x: f32,
+    y: f32,
+) -> Placed {
+    let id = node.ident().semantic_id();
+    match sizes.get(&id) {
+        Some(size) => Placed::new(node.width(size.width), x, y).height(size.height),
+        None => Placed::new(node, x, y),
+    }
+}
+
 /// A live processing graph with the visual states and editor gestures shown
-/// together: traffic lanes, a running aura, explicit ports, labels,
-/// feedback routing, pan, zoom, node movement, and connection creation.
+/// together: traffic lanes, a running aura, typed ports whose colour the
+/// wires inherit, progress along a card's top edge, a control seated inside
+/// a card, labels, feedback routing, pan, zoom, node movement, resizing, and
+/// connection creation.
 pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let records = PortType::new("records", "teal").glyph(Icon::List);
+    let signal = PortType::new("signal", "orange").glyph(Icon::Graph);
+    let artifact = PortType::new("artifact", "violet").glyph(Icon::ArchiveUp);
     if !cx.has_global::<SceneGraph>() {
         cx.set_global(SceneGraph {
             viewport: GraphViewport::default(),
             fit: 0,
             ingest: gpui::point(24.0, 190.0),
-            validate: gpui::point(244.0, 40.0),
-            persist: gpui::point(492.0, 40.0),
-            observe: gpui::point(452.0, 300.0),
-            publish: gpui::point(648.0, 190.0),
+            validate: gpui::point(284.0, 40.0),
+            persist: gpui::point(556.0, 40.0),
+            observe: gpui::point(516.0, 300.0),
+            publish: gpui::point(748.0, 190.0),
             selected: vec!["scene.graph.validate".into()],
             deleted: Vec::new(),
+            sizes: std::collections::HashMap::new(),
             edges: vec![
                 GraphEdge::new("scene.graph.ingest", "scene.graph.validate")
                     .id("scene.graph.edge.rows")
@@ -87,6 +109,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     let selected = scene.selected.clone();
     let deleted = scene.deleted.clone();
     let edges = scene.edges.clone();
+    let sizes = scene.sizes.clone();
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
@@ -117,40 +140,60 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.ingest"),
                         |graph| {
-                            graph.node(
+                            graph.placed(sized(
+                                &sizes,
                                 GraphNode::new("scene.graph.ingest", "Stream ingest")
                                     .color("teal")
                                     .icon(Icon::SoundWave)
-                                    .width(176.0)
+                                    .kind("source")
+                                    .width(200.0)
                                     .state(NodeState::Succeeded)
                                     .status("Synced")
                                     .thumbnail(scene_picture("Input preview", cx))
                                     .action("orders.v2 · partition 18")
                                     .metric("rate", "3.2k/s")
                                     .port(GraphPort::input("source", "Source").side(PortSide::Top))
-                                    .port(GraphPort::output("rows", "Rows"))
-                                    .port(GraphPort::output("errors", "Errors"))
+                                    .port(GraphPort::output("rows", "Rows").typed(records.clone()))
+                                    .port(
+                                        GraphPort::output("errors", "Errors").typed(signal.clone()),
+                                    )
                                     .selected(selected.iter().any(|id| id == "scene.graph.ingest")),
                                 ingest.x,
                                 ingest.y,
-                            )
+                            ))
                         },
                     )
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.validate"),
                         |graph| {
-                            graph.node(
+                            graph.placed(sized(
+                                &sizes,
                                 GraphNode::new("scene.graph.validate", "Validate & enrich")
                                     .color("indigo")
                                     .icon(Icon::Checklist)
-                                    .width(176.0)
+                                    .kind("transform")
+                                    .width(200.0)
                                     .state(NodeState::Running)
                                     .status("Running")
+                                    .progress(Some(0.62))
                                     .action("schema + fraud signals")
                                     .metric("p95", "18 ms")
-                                    .port(GraphPort::input("records", "Records"))
+                                    .port(
+                                        GraphPort::input("records", "Records")
+                                            .typed(records.clone()),
+                                    )
                                     .port(GraphPort::input("retry", "Retry").side(PortSide::Bottom))
-                                    .port(GraphPort::output("valid", "Valid"))
+                                    .port(
+                                        GraphPort::output("valid", "Valid").typed(records.clone()),
+                                    )
+                                    .child(
+                                        Slider::new("scene.graph.validate.threshold")
+                                            .range(0.0, 1.0)
+                                            .step(0.05)
+                                            .value(0.35)
+                                            .display("0.35")
+                                            .on_change(|_, _, _| {}),
+                                    )
                                     .port(
                                         GraphPort::output("telemetry", "Events")
                                             .side(PortSide::Bottom),
@@ -160,39 +203,49 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     ),
                                 validate.x,
                                 validate.y,
-                            )
+                            ))
                         },
                     )
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.persist"),
                         |graph| {
-                            graph.node(
+                            graph.placed(sized(
+                                &sizes,
                                 GraphNode::new("scene.graph.persist", "Persist batch")
                                     .color("violet")
                                     .icon(Icon::ArchiveUp)
-                                    .width(176.0)
+                                    .kind("sink")
+                                    .width(200.0)
                                     .state(NodeState::Succeeded)
                                     .status("Committed")
                                     .action("warehouse / orders")
                                     .metric("written", "12.3k")
-                                    .port(GraphPort::input("records", "Records"))
-                                    .port(GraphPort::output("commit", "Commit"))
+                                    .port(
+                                        GraphPort::input("records", "Records")
+                                            .typed(records.clone()),
+                                    )
+                                    .port(
+                                        GraphPort::output("commit", "Commit")
+                                            .typed(artifact.clone()),
+                                    )
                                     .selected(
                                         selected.iter().any(|id| id == "scene.graph.persist"),
                                     ),
                                 persist.x,
                                 persist.y,
-                            )
+                            ))
                         },
                     )
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.observe"),
                         |graph| {
-                            graph.node(
+                            graph.placed(sized(
+                                &sizes,
                                 GraphNode::new("scene.graph.observe", "Observe quality")
                                     .color("orange")
                                     .icon(Icon::Danger)
-                                    .width(176.0)
+                                    .kind("monitor")
+                                    .width(200.0)
                                     .state(NodeState::Failed)
                                     .status("Needs review")
                                     .action("drift threshold exceeded")
@@ -204,19 +257,22 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     ),
                                 observe.x,
                                 observe.y,
-                            )
+                            ))
                         },
                     )
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.publish"),
                         |graph| {
-                            graph.node(
+                            graph.placed(sized(
+                                &sizes,
                                 GraphNode::new("scene.graph.publish", "Publish artifact")
                                     .color("lime")
                                     .icon(Icon::Global)
-                                    .width(176.0)
+                                    .kind("release")
+                                    .width(200.0)
                                     .state(NodeState::Pending)
                                     .status("Queued")
+                                    .progress(None)
                                     .action("waiting for commit")
                                     .port(
                                         GraphPort::input("artifact", "Artifact")
@@ -231,7 +287,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     ),
                                 publish.x,
                                 publish.y,
-                            )
+                            ))
                         },
                     )
                     .edges(edges)
@@ -251,6 +307,9 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 "scene.graph.publish" => scene.publish = *position,
                                 _ => {}
                             },
+                            NodeGraphEvent::NodeResized { id, size } => {
+                                scene.sizes.insert(id.clone(), *size);
+                            }
                             NodeGraphEvent::NodeDeleted { id } => {
                                 scene.deleted.push(id.clone());
                                 scene.selected.retain(|selected| selected != id);
@@ -822,6 +881,7 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
                                                 }
                                             }
                                             NodeGraphEvent::NodeDeleted { .. }
+                                            | NodeGraphEvent::NodeResized { .. }
                                             | NodeGraphEvent::SurfacePressed { .. }
                                             | NodeGraphEvent::ConnectionRequested { .. }
                                             | NodeGraphEvent::ConnectionDropped { .. }

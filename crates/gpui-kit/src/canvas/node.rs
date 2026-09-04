@@ -6,14 +6,16 @@
 //! deciding a product question — thousands separators, units, rounding — on
 //! behalf of every host that ever draws one.
 
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use web_time::Instant;
 
 use gpui::{
-    AnyElement, App, BoxShadow, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, linear_color_stop,
-    linear_gradient_stops, point, prelude::FluentBuilder, px,
+    AnyElement, App, Bounds, BoxShadow, FontWeight, Hsla, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Pixels, RenderOnce, SharedString, StatefulInteractiveElement,
+    Styled, Window, div, linear_color_stop, linear_gradient_stops, point, prelude::FluentBuilder,
+    px, size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -22,11 +24,12 @@ use gpui_kit_theme::{
 };
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
-use crate::motion;
+use crate::layout::measure;
 use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, ResolvedMotion, keyed};
-use crate::overlay::{Glass, GlassPreset};
+use crate::overlay::{Glass, GlassPreset, Tooltipped};
 use crate::strings::ActiveNumbers;
 
+use super::composite_id;
 use super::edge::PortSide;
 
 /// The default width of a node, in pixels.
@@ -37,6 +40,12 @@ pub const NODE_WIDTH: f32 = 216.0;
 
 /// The shape of a thumbnail whose caller did not state another one.
 const DEFAULT_THUMBNAIL_RATIO: f32 = 16.0 / 9.0;
+
+/// How much of the top edge an indeterminate sweep occupies at once.
+const INDETERMINATE_SWEEP: f32 = 0.3;
+/// Flex shrink weight of the kind word against the title's 1: large enough
+/// that the word gives up all of its width before the title loses any.
+const KIND_YIELDS_FIRST: f32 = 100.0;
 
 /// Whether a port receives or produces data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -55,16 +64,69 @@ impl PortDirection {
     }
 }
 
+/// What a port carries, in the caller's taxonomy.
+///
+/// A type is a colour and, optionally, a glyph. The colour is the one fact a
+/// reader uses to tell at a glance which sockets can be joined and which wire
+/// carries what: a connection inherits the colour of the port it leaves. The
+/// id is the caller's own vocabulary for the type — `"image"`, `"tensor"`,
+/// `"text"` — and is published on the port, never invented here.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PortType {
+    id: SharedString,
+    glyph: Option<Icon>,
+    color: ColorChoice,
+}
+
+impl PortType {
+    pub fn new(id: impl Into<SharedString>, color: impl Into<ColorChoice>) -> Self {
+        Self {
+            id: id.into(),
+            glyph: None,
+            color: color.into(),
+        }
+    }
+
+    /// Seats a glyph inside the port ring, for a type whose colour alone is
+    /// not enough to tell it from its neighbours.
+    pub fn glyph(mut self, glyph: Icon) -> Self {
+        self.glyph = Some(glyph);
+        self
+    }
+
+    pub fn id(&self) -> &SharedString {
+        &self.id
+    }
+
+    pub fn icon(&self) -> Option<Icon> {
+        self.glyph
+    }
+
+    pub fn color(&self) -> &ColorChoice {
+        &self.color
+    }
+
+    /// The one paint that stands for this type on a ring and along a wire.
+    ///
+    /// It resolves through the shared [`Variant::Light`] tier, so a teal port
+    /// here, a teal wire leaving it, and a teal chip elsewhere are the same
+    /// teal, readable on both appearances.
+    pub(crate) fn tint(&self, theme: &Theme) -> Hsla {
+        theme.variant_colors(Variant::Light, &self.color).text
+    }
+}
+
 /// A typed connection point on a [`GraphNode`].
 ///
 /// Port ids must be unique within their node. They are caller-owned identity,
 /// while labels are the caller-owned words shown for that identity.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GraphPort {
     id: SharedString,
     label: SharedString,
     direction: PortDirection,
     side: PortSide,
+    port_type: Option<PortType>,
 }
 
 impl GraphPort {
@@ -74,6 +136,7 @@ impl GraphPort {
             label: label.into(),
             direction: PortDirection::Input,
             side: PortSide::Left,
+            port_type: None,
         }
     }
 
@@ -83,11 +146,19 @@ impl GraphPort {
             label: label.into(),
             direction: PortDirection::Output,
             side: PortSide::Right,
+            port_type: None,
         }
     }
 
     pub fn side(mut self, side: PortSide) -> Self {
         self.side = side;
+        self
+    }
+
+    /// States what this port carries. The ring takes the type's colour and
+    /// glyph, and a wire leaving an output of this type takes its colour.
+    pub fn typed(mut self, port_type: PortType) -> Self {
+        self.port_type = Some(port_type);
         self
     }
 
@@ -110,6 +181,21 @@ impl GraphPort {
     pub fn port_side(&self) -> PortSide {
         self.side
     }
+
+    pub fn port_type(&self) -> Option<&PortType> {
+        self.port_type.as_ref()
+    }
+
+    /// Whether this port is seated in the card's own rows rather than on the
+    /// card's top or bottom edge, where there is no row to seat it in.
+    pub(crate) fn seated_in_row(&self) -> bool {
+        matches!(self.side, PortSide::Left | PortSide::Right)
+    }
+}
+
+/// The measurement cell id for where one port's row landed inside its card.
+pub(crate) fn port_measure_id(node: &str, port: &str) -> SharedString {
+    composite_id("port-measure", &[node, port])
 }
 
 /// Screen-space values derived from world-space theme values in one place.
@@ -131,7 +217,15 @@ struct NodeMetrics {
     caption_height: f32,
     icon_size: f32,
     badge: f32,
-    status: f32,
+    /// The state dot's diameter.
+    mark: f32,
+    /// The thickness of the progress bar along the top edge.
+    progress: f32,
+    /// The height of one port row, which is what a wire aims at.
+    row_height: f32,
+    /// How far a port row's text stands in from the card edge: past the
+    /// half of the ring that sits inside the card, plus a gap.
+    port_inset: f32,
     radius: f32,
 }
 
@@ -157,7 +251,10 @@ impl NodeMetrics {
             caption_height: scaled(theme.typography.caption.line_height),
             icon_size: scaled(theme.control.sm.icon_size),
             badge: scaled(theme.control.xs.height),
-            status: scaled(theme.control.xs.height),
+            mark: scaled(theme.measures.status_mark),
+            progress: scaled(theme.measures.node_progress),
+            row_height: scaled(theme.typography.caption.line_height),
+            port_inset: scaled(theme.measures.node_port / 2.0 + theme.spacing.xs),
             // A node is a card, so it takes the card role: the same rounding
             // the group box around it and every other card in the library
             // already read. Bubble is the dialog and message step, and a board
@@ -212,22 +309,8 @@ impl NodeState {
         }
     }
 
-    fn glyph(self) -> Option<Icon> {
-        match self {
-            Self::Pending | Self::Idle => None,
-            Self::Queued | Self::Waiting => Some(Icon::Info),
-            Self::Starting | Self::Running | Self::Cancelling => Some(Icon::Refresh),
-            Self::Blocked | Self::Partial | Self::TimedOut => Some(Icon::Danger),
-            Self::Succeeded => Some(Icon::Check),
-            Self::Failed => Some(Icon::Close),
-            Self::Refused => Some(Icon::Danger),
-            Self::Cancelled => Some(Icon::Close),
-            Self::Unavailable => Some(Icon::CloseCircle),
-        }
-    }
-
     /// What the node publishes as its value.
-    fn value(self) -> &'static str {
+    pub(crate) fn value(self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Idle => "idle",
@@ -277,9 +360,20 @@ impl NodeState {
         }
     }
 
-    fn animates_mark(self) -> bool {
+    /// Whether the state dot breathes: the step is doing something now, and
+    /// a still dot would say it had stopped.
+    fn breathes(self) -> bool {
         matches!(self, Self::Starting | Self::Running | Self::Cancelling)
     }
+}
+
+/// How far a step has got, when it says.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Progress {
+    /// Work is underway and the step cannot say how much is left.
+    Indeterminate,
+    /// The fraction done, from 0 to 1.
+    Fraction(f32),
 }
 
 /// One figure a step reports about itself, such as a token count or an elapsed
@@ -377,6 +471,10 @@ pub struct GraphNode {
     ports: Vec<GraphPort>,
     diff: Option<Diff>,
     status: Option<SharedString>,
+    progress: Option<Progress>,
+    /// Caller-owned content seated below the ports: a prompt, a preview, a
+    /// control. The card lays it out and keeps its hands off it.
+    content: Vec<AnyElement>,
     selected: bool,
     active_glass: GlassPreset,
     width: f32,
@@ -397,6 +495,8 @@ impl std::fmt::Debug for GraphNode {
             .field("has_thumbnail", &self.thumbnail.is_some())
             .field("state", &self.state)
             .field("metrics", &self.metrics.len())
+            .field("ports", &self.ports.len())
+            .field("content", &self.content.len())
             .finish_non_exhaustive()
     }
 }
@@ -417,6 +517,8 @@ impl GraphNode {
             ports: Vec::new(),
             diff: None,
             status: None,
+            progress: None,
+            content: Vec::new(),
             selected: false,
             active_glass: GlassPreset::Frosted,
             width: NODE_WIDTH,
@@ -459,6 +561,10 @@ impl GraphNode {
     }
 
     /// What the step is doing right now, in the caller's words.
+    ///
+    /// Shown only while the step is busy: a finished step's last action is a
+    /// record, and a record belongs in the step's detail, not on a card
+    /// whose job is to say where the run is now.
     pub fn action(mut self, action: impl Into<SharedString>) -> Self {
         self.action = Some(action.into());
         self
@@ -487,20 +593,21 @@ impl GraphNode {
         self
     }
 
-    /// The word for what this node is — "image", "review", "deploy" — shown as
-    /// a small chip before the title.
+    /// The word for what this node is — "image", "review", "deploy" — set
+    /// quietly beside the title.
     ///
-    /// This is where [`GraphNode::color`] lands when both are given, and it is
-    /// the reason to give both: a wash behind two or three letters says the
-    /// kind once, where a tinted title bar and a stripe down the card say it
-    /// twice and turn a board of cards into a board of colour. A node with a
-    /// colour and no word keeps the stripe, because then the stripe is the
-    /// only thing saying it.
+    /// It is a word and not a chip: the badge already carries the category's
+    /// colour, and a wash behind the word would say the kind twice on every
+    /// card. A node with a colour and no badge keeps the wash on the card,
+    /// because then the wash is the only thing saying it.
     pub fn kind(mut self, kind: impl Into<SharedString>) -> Self {
         self.kind = Some(kind.into());
         self
     }
 
+    /// One figure the step reports. The value is what the card shows; the
+    /// label names it on hover and in the semantic tree, so a card carrying
+    /// three figures is three numbers wide rather than three sentences.
     pub fn metric(
         mut self,
         label: impl Into<SharedString>,
@@ -533,13 +640,48 @@ impl GraphNode {
         self
     }
 
-    /// Seats the caller's current status words in the card footer.
+    /// The caller's own words for the step's state, published on the state
+    /// dot's help and in the semantic tree.
     ///
-    /// [`GraphNode::state`] still owns the semantic state, colour and motion;
-    /// this text is caller-owned because products use different operational
-    /// vocabulary for the same state.
+    /// [`GraphNode::state`] owns the semantic state, colour and motion, and
+    /// the dot is what the card shows for it; these words are caller-owned
+    /// because products use different operational vocabulary for the same
+    /// state, and they are not painted on the card because the dot has
+    /// already said it.
     pub fn status(mut self, status: impl Into<SharedString>) -> Self {
         self.status = Some(status.into());
+        self
+    }
+
+    /// How far the step has got, as a bar along the card's top edge.
+    ///
+    /// `Some(fraction)` fills that much of the edge. `None` says the step is
+    /// working without knowing how much is left, and the bar sweeps while the
+    /// step is busy. A step that succeeds fills the bar and lets it go; one
+    /// that fails keeps the bar where it stopped, in the failure's colour,
+    /// because how far it got is part of what went wrong.
+    pub fn progress(mut self, fraction: Option<f32>) -> Self {
+        self.progress = Some(match fraction {
+            Some(fraction) if fraction.is_finite() => Progress::Fraction(fraction.clamp(0.0, 1.0)),
+            _ => Progress::Indeterminate,
+        });
+        self
+    }
+
+    /// Seats caller-owned content below the ports.
+    ///
+    /// The card lays the content out at its own width and keeps its hands
+    /// off it: pointer and keyboard that land on the content belong to what
+    /// the caller mounted, not to the card's activation or the canvas's drag.
+    /// A prompt field, a preview, a slider, and a button are all content.
+    pub fn child(mut self, child: impl IntoElement) -> Self {
+        self.content.push(child.into_any_element());
+        self
+    }
+
+    pub fn children(mut self, children: impl IntoIterator<Item = impl IntoElement>) -> Self {
+        self.content
+            .extend(children.into_iter().map(IntoElement::into_any_element));
         self
     }
 
@@ -600,6 +742,24 @@ impl GraphNode {
         &self.ports
     }
 
+    /// The ports seated in the card's rows, in row order, one pair per row:
+    /// the left-side port and the right-side port that share it.
+    fn port_rows(&self) -> Vec<(Option<&GraphPort>, Option<&GraphPort>)> {
+        let left: Vec<&GraphPort> = self
+            .ports
+            .iter()
+            .filter(|port| port.port_side() == PortSide::Left)
+            .collect();
+        let right: Vec<&GraphPort> = self
+            .ports
+            .iter()
+            .filter(|port| port.port_side() == PortSide::Right)
+            .collect();
+        (0..left.len().max(right.len()))
+            .map(|row| (left.get(row).copied(), right.get(row).copied()))
+            .collect()
+    }
+
     pub(crate) fn click_handler(&self) -> Option<ClickHandler> {
         self.on_click.clone()
     }
@@ -654,9 +814,7 @@ impl GraphNode {
         let mut widths: Vec<f32> = self
             .metrics
             .iter()
-            .map(|metric| {
-                text_advance(&metric.label, size) + inner + text_advance(&metric.value, size)
-            })
+            .map(|metric| text_advance(&metric.value, size))
             .collect();
         if let Some(diff) = self.diff.filter(|diff| !diff.is_empty()) {
             let counted =
@@ -688,16 +846,23 @@ impl GraphNode {
         if self.compact {
             return header;
         }
+        // Port rows sit in their own zone under the header, one caption line
+        // each, and a wire aims at the middle of its row. Content the caller
+        // mounted has no estimate at all: only the measurement one frame
+        // later knows how tall a prompt field or a preview came out.
+        let port_rows = self.port_rows().len();
+        let ports = (port_rows > 0).then(|| {
+            theme.typography.caption.line_height * port_rows as f32
+                + theme.spacing.xs * port_rows.saturating_sub(1) as f32
+                + theme.spacing.xs * 2.0
+        });
         let mut rows = Vec::new();
         if self.thumbnail.is_some() {
             let content = self.width - theme.spacing.sm * 2.0;
             rows.push(content.max(0.0) / self.thumbnail_ratio);
         }
-        if self.action.is_some() {
+        if self.action.is_some() && self.state.is_busy() {
             rows.push(theme.typography.caption.line_height);
-        }
-        if self.status.is_some() {
-            rows.push(theme.control.xs.height);
         }
         // The figure strip wraps, so a card carrying three figures on a narrow
         // node is two rows tall. An estimate that always answered one row
@@ -713,11 +878,11 @@ impl GraphNode {
                     + theme.spacing.sm * lines.saturating_sub(1) as f32,
             );
         }
-        if rows.is_empty() {
-            return header;
-        }
-        let gaps = theme.spacing.xs * (rows.len() - 1) as f32;
-        header + theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
+        let body = (!rows.is_empty()).then(|| {
+            let gaps = theme.spacing.xs * (rows.len() - 1) as f32;
+            theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
+        });
+        header + ports.unwrap_or(0.0) + body.unwrap_or(0.0)
     }
 }
 
@@ -859,6 +1024,19 @@ struct NodeMaterialState {
     hovered: bool,
 }
 
+/// What one frame of a card's state looks like: the paint, how far the
+/// success settle has reached, and where the live signal is in its breath.
+#[derive(Debug, Clone, Copy)]
+struct StateShow {
+    paint: NodePaint,
+    /// How much further than at rest the aura reaches, from the settle.
+    aura_expansion: f32,
+    /// The remaining successful-handoff flash, from 1 down to 0.
+    settle: f32,
+    /// The live signal's breath from 0 to 1, while the state breathes.
+    breath: Option<f32>,
+}
+
 impl GraphNode {
     /// The paint and glow strength this card is showing, partway between the
     /// state it had and the state it has.
@@ -867,7 +1045,7 @@ impl GraphNode {
     /// state has not changed, a reader who asked for reduced motion, and a
     /// card whose first frame this is all get the same values the hard cut
     /// gave.
-    fn state_paint(&self, theme: &Theme, window: &mut Window, cx: &mut App) -> (NodePaint, f32) {
+    fn state_paint(&self, theme: &Theme, window: &mut Window, cx: &mut App) -> StateShow {
         let target = NodePaint::for_state(self.state, theme);
         let change = MotionPolicy::resolve(MotionRole::StateChange, cx);
         let feedback = MotionPolicy::resolve(MotionRole::Feedback, cx);
@@ -884,12 +1062,16 @@ impl GraphNode {
             window.request_animation_frame();
         }
 
+        // The live signal is one breath shared by the dot and the aura: the
+        // dot breathes whenever the step is doing something, and the aura
+        // breathes with it while the step runs.
         let clock = keyed::slot::<AuraClock>(
             &self.ident.child("aura").semantic_id(),
             window.window_handle().window_id(),
             cx,
         );
-        if self.state == NodeState::Running {
+        let mut breath = None;
+        if self.state.breathes() {
             let signal = MotionPolicy::resolve(MotionRole::Activity(Activity::Signaling), cx);
             if signal.animates() {
                 let started = *clock.borrow_mut().started.get_or_insert(now);
@@ -901,15 +1083,20 @@ impl GraphNode {
                 } else {
                     (1.0 - phase) * 2.0
                 };
-                let breath = signal.spec().progress(half);
-                paint.aura_alpha = theme.effects.node_aura_pulse_floor_alpha
-                    + (theme.effects.node_aura_pulse_peak_alpha
-                        - theme.effects.node_aura_pulse_floor_alpha)
-                        * breath;
+                let progress = signal.spec().progress(half);
+                breath = Some(progress);
+                if self.state == NodeState::Running {
+                    paint.aura_alpha = theme.effects.node_aura_pulse_floor_alpha
+                        + (theme.effects.node_aura_pulse_peak_alpha
+                            - theme.effects.node_aura_pulse_floor_alpha)
+                            * progress;
+                }
                 window.request_animation_frame();
             } else {
                 clock.borrow_mut().started = None;
-                paint.aura_alpha = theme.effects.node_aura_resting_alpha;
+                if self.state == NodeState::Running {
+                    paint.aura_alpha = theme.effects.node_aura_resting_alpha;
+                }
             }
         } else {
             clock.borrow_mut().started = None;
@@ -923,13 +1110,21 @@ impl GraphNode {
                 .aura_alpha
                 .max(theme.effects.node_aura_settle_peak_alpha * settle);
         }
-        (paint, theme.effects.node_aura_settle_expansion * settle)
+        StateShow {
+            paint,
+            aura_expansion: theme.effects.node_aura_settle_expansion * settle,
+            settle,
+            breath,
+        }
     }
 }
 
 impl RenderOnce for GraphNode {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        // The card's semantic id, built once: every part of the card that
+        // reports itself names this as its parent.
+        let node_id = self.ident.semantic_id();
         let material_state = keyed::slot::<NodeMaterialState>(
             &self.ident.child("material").semantic_id(),
             window.window_handle().window_id(),
@@ -947,22 +1142,13 @@ impl RenderOnce for GraphNode {
         // The crossfade is perceptual, so a run that goes from accent to
         // danger passes through the colours between them rather than through
         // the mud two gamma-encoded paints average to.
-        let (paint, aura_expansion) = self.state_paint(&theme, window, cx);
+        let StateShow {
+            paint,
+            aura_expansion,
+            settle,
+            breath,
+        } = self.state_paint(&theme, window, cx);
         let metrics = NodeMetrics::new(&theme, self.width, self.display_zoom, self.declared_height);
-
-        // The mark is the one part of a node that moves, and it moves because
-        // the step is still running. It turns through the shared vocabulary,
-        // so a running node and a running tool call turn at one rate.
-        let mark = self.state.glyph().map(|glyph| {
-            let element = icon(glyph)
-                .size(px(metrics.icon_size))
-                .text_color(paint.mark);
-            if self.state.animates_mark() {
-                motion::spin(element, self.ident.child("mark").element_id(), &theme, cx)
-            } else {
-                element.into_any_element()
-            }
-        });
 
         // A category resolves through the same tier vocabulary as every other
         // coloured surface, so the wash behind a node's name and the wash
@@ -995,40 +1181,71 @@ impl RenderOnce for GraphNode {
                 )
         });
 
-        // The word for the kind, with the category's wash behind it. A canvas
-        // is read by scanning for one kind among many, and a chip is the
-        // smallest mark that answers that: tinting the whole title bar answers
-        // it at ten times the size, and on a board of a dozen cards the tints
-        // become the picture instead of the work.
+        // The word for the kind, set quietly after the title. A canvas is
+        // read by scanning for one kind among many, and the badge's colour
+        // already answers that; the word is there for the reader who has
+        // found the card and wants it confirmed.
+        // When the header runs out of room the word yields before the
+        // title does: the title is what the card is, the word only what
+        // sort of thing it is, and the badge already says that.
         let kind = self.kind.clone().map(|kind| {
             div()
-                .flex_none()
-                .px(px(metrics.gap))
-                .rounded(px(theme.radius(Radius::Small) * metrics.scale))
+                .min_w_0()
+                .flex_shrink(KIND_YIELDS_FIRST)
+                .truncate()
                 .text_size(px(metrics.caption_size))
                 .line_height(px(metrics.label_height))
-                .font_weight(FontWeight(theme.typography.label.weight))
-                .map(|element| match identity {
-                    Some(identity) => element.bg(identity.background).text_color(identity.text),
-                    None => element
-                        .bg(theme.colors.node.label_wash)
-                        .text_color(theme.colors.text_muted),
-                })
+                .font_weight(FontWeight(theme.typography.caption.weight))
+                .text_color(theme.colors.text_muted)
                 .child(kind)
         });
+
+        // The state is one dot. It takes the state's colour, breathes while
+        // the step is doing something, and carries the caller's words for the
+        // state as help — so a board of a dozen cards is scanned by colour and
+        // motion, and the words are there for whoever reaches for them. The
+        // dot closes the row rather than opening it: what this node *is*
+        // leads, and what it is *doing* answers.
+        // The card's own semantic node carries the state as its value and
+        // the status words as its description, so the dot registers nothing
+        // of its own; it only becomes a stateful element when there are
+        // words for a tooltip to show.
+        let mark = div()
+            .flex_none()
+            .ml_auto()
+            .size(px(metrics.mark))
+            .rounded_full()
+            .bg(paint.mark)
+            .when(self.state.aura_color(&theme).is_some(), |dot| {
+                dot.shadow(theme.glow(paint.mark))
+            })
+            .when_some(breath, |dot, breath| {
+                dot.opacity(
+                    theme.effects.node_aura_pulse_floor_alpha
+                        + (1.0 - theme.effects.node_aura_pulse_floor_alpha) * breath,
+                )
+            })
+            .map(|dot| match self.status.clone() {
+                Some(status) => {
+                    let mark_ident = self.ident.child("mark");
+                    dot.id(mark_ident.element_id())
+                        .tip(mark_ident, status)
+                        .into_any_element()
+                }
+                None => dot.into_any_element(),
+            });
 
         let header = div()
             .row()
             .w_full()
+            .items_center()
             .gap(px(metrics.gap))
             .px(px(metrics.padding))
             .py(px(metrics.header_padding))
             .children(badge)
-            .children(kind)
             .child(
                 div()
                     .min_w_0()
-                    .flex_1()
                     .text_size(px(metrics.label_size))
                     .line_height(px(metrics.label_height))
                     .font_weight(FontWeight(theme.typography.strong.weight))
@@ -1036,41 +1253,222 @@ impl RenderOnce for GraphNode {
                     .truncate()
                     .child(self.title.clone()),
             )
-            // What this node *is* leads the row and what it is *doing* closes
-            // it. Put the running mark first and every card starts with a
-            // status, so a board of a dozen is scanned by state before it is
-            // scanned by kind — which is backwards for the reader arranging
-            // one, and it costs the name a mark's width on every card whether
-            // or not there is anything to report.
-            .children(mark);
+            .children(kind)
+            .child(mark);
 
-        let action = self.action.clone().map(|action| {
-            div()
-                .w_full()
-                .text_size(px(metrics.caption_size))
-                .line_height(px(metrics.caption_height))
-                .font_weight(FontWeight(theme.typography.caption.weight))
-                .text_color(theme.colors.text_muted)
-                .truncate()
-                .child(action)
+        // How far the step has got, along the top edge. A known fraction
+        // fills that much of the edge; unknown progress sweeps while the step
+        // is busy; a success fills the edge and lets it go on the same settle
+        // the aura uses, so the two say "done" together.
+        let progress = self.progress.and_then(|progress| {
+            let (fraction, sweep, alpha) = match (progress, self.state) {
+                (_, NodeState::Succeeded) => (settle > 0.0).then_some((1.0, None, settle))?,
+                (Progress::Fraction(fraction), _) => (fraction, None, 1.0),
+                (Progress::Indeterminate, state) if state.is_busy() => {
+                    let sweep = MotionPolicy::resolve(MotionRole::Activity(Activity::Working), cx);
+                    if sweep.animates() {
+                        let now = cx.background_executor().now();
+                        let clock = keyed::slot::<AuraClock>(
+                            &self.ident.child("progress").semantic_id(),
+                            window.window_handle().window_id(),
+                            cx,
+                        );
+                        let started = *clock.borrow_mut().started.get_or_insert(now);
+                        let phase = (now.duration_since(started).as_secs_f32()
+                            / sweep.spec().total().as_secs_f32().max(f32::EPSILON))
+                        .rem_euclid(1.0);
+                        window.request_animation_frame();
+                        (INDETERMINATE_SWEEP, Some(sweep.spec().progress(phase)), 1.0)
+                    } else {
+                        (INDETERMINATE_SWEEP, Some(0.5), 1.0)
+                    }
+                }
+                (Progress::Indeterminate, _) => return None,
+            };
+            // The bar runs between the card's corners rather than across
+            // them, so its ends are never clipped by the rounding and the
+            // rest of the edge reads as the track it fills.
+            let track = (metrics.width - metrics.radius * 2.0).max(0.0);
+            let width = track * fraction;
+            let left = metrics.radius + sweep.map_or(0.0, |phase| (track - width) * phase);
+            Some(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left(px(left))
+                    .w(px(width))
+                    .h(px(metrics.progress))
+                    .rounded_full()
+                    .bg(paint.mark.opacity(alpha))
+                    .semantic_in(cx, {
+                        let spec = NodeSpec::new(
+                            self.ident.child("progress").semantic_id(),
+                            Role::Progress,
+                        )
+                        .parent(node_id.clone())
+                        .busy(self.state.is_busy());
+                        if sweep.is_none() {
+                            spec.range(0.0, 1.0, fraction)
+                        } else {
+                            spec
+                        }
+                    }),
+            )
         });
 
+        // The ports, one row per pair, each name inside the card beside the
+        // socket it belongs to. A wire aims at the middle of its row, and the
+        // row says where it landed so the graph can aim there rather than at
+        // an even division of the card's height.
+        let seen_rows: Rc<RefCell<Vec<(SharedString, f32, f32)>>> = Rc::default();
+        // Each port row reports where it sat; the outer wrapper records that
+        // as an offset from the card's top, in graph units, so the graph can
+        // read it back with the node's placement and aim a wire at the row.
+        let cells: Vec<(SharedString, Rc<Cell<Bounds<Pixels>>>)> = self
+            .port_rows()
+            .into_iter()
+            .flat_map(|(left, right)| [left, right])
+            .flatten()
+            .map(|port| {
+                (
+                    port.id().clone(),
+                    measure::cell(&port_measure_id(&node_id, port.id()), window, cx),
+                )
+            })
+            .collect();
+        let zoom = self.display_zoom.max(f32::EPSILON);
+        let rows = if self.compact {
+            Vec::new()
+        } else {
+            self.port_rows()
+        };
+        let port_rows: Vec<AnyElement> = rows
+            .into_iter()
+            .map(|(left, right)| {
+                let socket = |port: &GraphPort, trailing: bool| {
+                    // The row carries the name and nothing else: the ring
+                    // on the edge beside it already shows the type's glyph
+                    // in the type's colour, and a second copy in the row
+                    // made every port say its type twice.
+                    let name = div()
+                        .min_w_0()
+                        .truncate()
+                        .text_color(theme.colors.text_muted)
+                        .child(port.label().clone());
+                    div()
+                        .row()
+                        .min_w_0()
+                        .items_center()
+                        .when(trailing, |cell| cell.justify_end())
+                        .child(name)
+                        .semantic_in(cx, {
+                            let spec = NodeSpec::new(
+                                composite_id("port-name", &[node_id.as_ref(), port.id().as_ref()]),
+                                Role::Text,
+                            )
+                            .parent(node_id.clone())
+                            .text(port.label().clone());
+                            match port.port_type() {
+                                Some(port_type) => spec.value(port_type.id().clone()),
+                                None => spec,
+                            }
+                        })
+                };
+                let ids: Vec<SharedString> = [left, right]
+                    .into_iter()
+                    .flatten()
+                    .map(|port| port.id().clone())
+                    .collect();
+                let seen = Rc::clone(&seen_rows);
+                div()
+                    .row()
+                    .w_full()
+                    .h(px(metrics.row_height))
+                    .items_center()
+                    .justify_between()
+                    .gap(px(metrics.gap))
+                    .text_size(px(metrics.caption_size))
+                    .line_height(px(metrics.row_height))
+                    .font_weight(FontWeight(theme.typography.caption.weight))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .children(left.map(|port| socket(port, false))),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .children(right.map(|port| socket(port, true))),
+                    )
+                    .on_children_prepainted(move |bounds, _, _| {
+                        // The row's extent is whichever cell has something
+                        // in it: an empty cell on the other side is flat.
+                        let Some((top, bottom)) = bounds
+                            .iter()
+                            .filter(|cell| cell.size.height > px(0.0))
+                            .map(|cell| (f32::from(cell.top()), f32::from(cell.bottom())))
+                            .reduce(|(top, bottom), (t, b)| (top.min(t), bottom.max(b)))
+                        else {
+                            return;
+                        };
+                        let center = (top + bottom) / 2.0;
+                        let height = bottom - top;
+                        let mut seen = seen.borrow_mut();
+                        for id in &ids {
+                            seen.push((id.clone(), center, height));
+                        }
+                    })
+                    .into_any_element()
+            })
+            .collect();
+        let sockets = (!port_rows.is_empty()).then(|| {
+            div()
+                .w_full()
+                .column()
+                .gap(px(metrics.gap))
+                .px(px(metrics.padding.max(metrics.port_inset)))
+                .py(px(metrics.gap))
+                .children(port_rows)
+        });
+
+        // What the step is doing, while it is doing it.
+        let action = self
+            .action
+            .clone()
+            .filter(|_| self.state.is_busy())
+            .map(|action| {
+                div()
+                    .w_full()
+                    .text_size(px(metrics.caption_size))
+                    .line_height(px(metrics.caption_height))
+                    .font_weight(FontWeight(theme.typography.caption.weight))
+                    .text_color(theme.colors.text_muted)
+                    .truncate()
+                    .child(action)
+            });
+
+        // The figures are values; each one's name is help and semantics. A
+        // card carrying three figures is three numbers wide rather than
+        // three sentences, and the reader who wants to know which is which
+        // reaches for one.
         let mut figures: Vec<AnyElement> = self
             .metrics
             .iter()
             .map(|metric| {
+                let figure_ident = self.ident.child("metric").child(metric.label.clone());
                 div()
-                    .row()
-                    .gap(px(metrics.gap / 2.0))
-                    .child(
-                        div()
-                            .text_color(theme.colors.text_faint)
-                            .child(metric.label.clone()),
-                    )
-                    .child(
-                        div()
-                            .text_color(theme.colors.text_muted)
-                            .child(metric.value.clone()),
+                    .id(figure_ident.element_id())
+                    .text_color(theme.colors.text_muted)
+                    .child(metric.value.clone())
+                    .tip(figure_ident.clone(), metric.label.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(figure_ident.semantic_id(), Role::Text)
+                            .parent(node_id.clone())
+                            .text(metric.value.clone())
+                            .description(metric.label.clone()),
                     )
                     .into_any_element()
             })
@@ -1107,27 +1505,6 @@ impl RenderOnce for GraphNode {
                 .children(figures)
         });
 
-        let status = self.status.clone().map(|status| {
-            div()
-                .self_start()
-                .h(px(metrics.status))
-                .row()
-                .gap(px(metrics.gap))
-                .px(px(metrics.gap))
-                .rounded_full()
-                .bg(theme.color_wash(paint.mark, SemanticWash::Faint))
-                .text_size(px(metrics.caption_size))
-                .font_weight(FontWeight(theme.typography.label.weight))
-                .text_color(paint.mark)
-                .child(
-                    div()
-                        .size(px(theme.measures.status_mark * metrics.scale))
-                        .rounded_full()
-                        .bg(paint.mark),
-                )
-                .child(status)
-        });
-
         let thumbnail = self.thumbnail.map(|thumbnail| {
             div()
                 .w_full()
@@ -1139,8 +1516,27 @@ impl RenderOnce for GraphNode {
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("thumbnail").semantic_id(), Role::Image)
-                        .parent(self.ident.semantic_id())
+                        .parent(node_id.clone())
                         .text(self.title.clone()),
+                )
+        });
+
+        // The caller's content is the caller's. Pointer and keys that land on
+        // it stop here, before the card's activation and the canvas's drag
+        // can read a click on a prompt field as picking the card up, or a
+        // Backspace in it as deleting the step.
+        let content = (!self.compact && !self.content.is_empty()).then(|| {
+            div()
+                .w_full()
+                .column()
+                .gap(px(metrics.gap))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_key_down(|_, _, cx| cx.stop_propagation())
+                .children(self.content)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("content").semantic_id(), Role::Group)
+                        .parent(node_id.clone()),
                 )
         });
 
@@ -1149,7 +1545,7 @@ impl RenderOnce for GraphNode {
         // nothing but a name has no body at all: an empty padded box below the
         // title would claim there is content that failed to arrive.
         let body = (!self.compact
-            && (thumbnail.is_some() || action.is_some() || strip.is_some() || status.is_some()))
+            && (thumbnail.is_some() || action.is_some() || strip.is_some() || content.is_some()))
         .then(|| {
             div()
                 .w_full()
@@ -1159,7 +1555,7 @@ impl RenderOnce for GraphNode {
                 .children(thumbnail)
                 .children(action)
                 .children(strip)
-                .children(status)
+                .children(content)
         });
 
         let stack = div()
@@ -1167,6 +1563,7 @@ impl RenderOnce for GraphNode {
             .min_w_0()
             .column()
             .child(header)
+            .children(sockets)
             .children(body);
 
         // A full-bleed layer inside the card carries the card's own rounding.
@@ -1207,7 +1604,15 @@ impl RenderOnce for GraphNode {
         let category_wash = identity
             .filter(|_| self.icon.is_none() && self.kind.is_none())
             .map(|identity| fill().bg(identity.background));
-        let selection_wash = self.selected.then(|| fill().bg(theme.colors.selected));
+        // Selection is an outline in the accent rather than a wash: the wash
+        // read as a colour of state, and a selected running node then said
+        // two things with one tint. A ring says "this one" and leaves the
+        // material to say what it is doing.
+        let selection = self.selected.then(|| {
+            fill()
+                .border(px(theme.measures.node_edge_width * self.display_zoom))
+                .border_color(theme.colors.accent)
+        });
         let inset = BoxShadow {
             color: theme
                 .colors
@@ -1230,8 +1635,9 @@ impl RenderOnce for GraphNode {
             .shadow(vec![inset])
             .child(material)
             .children(category_wash)
-            .children(selection_wash)
-            .child(stack);
+            .child(stack)
+            .children(progress)
+            .children(selection);
 
         let hover_state = Rc::clone(&material_state);
         card = card.on_hover(move |hovered, window, _| {
@@ -1250,12 +1656,16 @@ impl RenderOnce for GraphNode {
         } else {
             Role::Group
         };
-        let spec = NodeSpec::new(self.ident.semantic_id(), role)
+        let spec = NodeSpec::new(node_id.clone(), role)
             .text(self.title.clone())
             .value(self.state.value())
             .selected(self.selected)
             .busy(self.state.is_busy())
             .invalid(self.state.is_invalid());
+        let spec = match self.status.clone() {
+            Some(status) => spec.description(status),
+            None => spec,
+        };
 
         let card = if self.on_click.is_none() && self.on_delete.is_none() {
             card.semantic_in(cx, spec).into_any_element()
@@ -1327,6 +1737,32 @@ impl RenderOnce for GraphNode {
             .rounded(px(metrics.radius))
             .shadow(shadows)
             .child(material)
+            // A card with no side ports has nothing to report and installs
+            // no callback: a board of plain cards should cost no more per
+            // card than it did before rows existed.
+            .when(!cells.is_empty(), |wrapper| {
+                wrapper.on_children_prepainted(move |bounds, window, _| {
+                    let Some(card) = bounds.first() else {
+                        return;
+                    };
+                    let top = f32::from(card.origin.y);
+                    let seen = seen_rows.borrow();
+                    for (id, cell) in &cells {
+                        let Some((_, center, height)) = seen.iter().find(|(seen, _, _)| seen == id)
+                        else {
+                            continue;
+                        };
+                        measure::record(
+                            cell,
+                            Bounds {
+                                origin: point(px(0.0), px((center - top) / zoom)),
+                                size: size(px(0.0), px(height / zoom)),
+                            },
+                            window,
+                        );
+                    }
+                })
+            })
             .into_any_element()
     }
 }
@@ -1512,31 +1948,23 @@ mod tests {
         );
         assert!(NodeState::Pending.aura_color(&theme).is_none());
         assert!(NodeState::Succeeded.aura_color(&theme).is_none());
-        assert!(NodeState::Running.animates_mark());
-        assert!(!NodeState::Queued.animates_mark());
+        assert!(NodeState::Running.breathes());
+        assert!(NodeState::Starting.breathes());
+        assert!(NodeState::Cancelling.breathes());
+        assert!(!NodeState::Queued.breathes());
     }
 
+    /// The mark is one dot in one colour per state, so the states a board
+    /// tells apart at a glance have to be told apart by colour alone.
     #[test]
-    fn pending_and_idle_carry_no_glyph_and_settled_states_do() {
-        assert!(NodeState::Pending.glyph().is_none());
-        assert!(NodeState::Idle.glyph().is_none());
-        for state in [
-            NodeState::Queued,
-            NodeState::Starting,
-            NodeState::Running,
-            NodeState::Waiting,
-            NodeState::Blocked,
-            NodeState::Succeeded,
-            NodeState::Partial,
-            NodeState::Failed,
-            NodeState::Refused,
-            NodeState::Cancelling,
-            NodeState::Cancelled,
-            NodeState::TimedOut,
-            NodeState::Unavailable,
-        ] {
-            assert!(state.glyph().is_some(), "{state:?}");
-        }
+    fn states_a_reader_must_tell_apart_take_different_mark_colours() {
+        let theme = theme();
+        let mark = |state: NodeState| NodePaint::for_state(state, &theme).mark;
+        assert_ne!(mark(NodeState::Running), mark(NodeState::Succeeded));
+        assert_ne!(mark(NodeState::Running), mark(NodeState::Failed));
+        assert_ne!(mark(NodeState::Succeeded), mark(NodeState::Failed));
+        assert_ne!(mark(NodeState::Pending), mark(NodeState::Running));
+        assert_ne!(mark(NodeState::Failed), mark(NodeState::Refused));
     }
 
     #[test]
@@ -1633,11 +2061,19 @@ mod tests {
         let one = GraphNode::new("one", "One")
             .metric("Model", "A")
             .measured_height(&theme);
-        let many = GraphNode::new("many", "Many")
+        // Figures are values only, so it takes long values to fill a row:
+        // four short ones sit side by side and the card stays one row tall.
+        let few = GraphNode::new("few", "Few")
             .metric("Model", "GPT Image")
             .metric("Ratio", "16:9")
             .metric("Duration", "12s")
             .metric("Seed", "118")
+            .measured_height(&theme);
+        assert_eq!(few, one, "{few} should match {one}");
+        let many = GraphNode::new("many", "Many")
+            .metric("Model", "gpt-image-1-high-fidelity")
+            .metric("Prompt", "a lit interior at dusk, 35mm")
+            .metric("Seed", "118443921")
             .measured_height(&theme);
         assert!(many > one, "{many} should exceed {one}");
     }
@@ -1674,7 +2110,8 @@ mod tests {
         assert_eq!(doubled.caption_size, theme.typography.caption.size * 2.0);
         assert_eq!(doubled.icon_size, theme.control.sm.icon_size * 2.0);
         assert_eq!(doubled.badge, theme.control.xs.height * 2.0);
-        assert_eq!(doubled.status, theme.control.xs.height * 2.0);
+        assert_eq!(doubled.mark, theme.measures.status_mark * 2.0);
+        assert_eq!(doubled.progress, theme.measures.node_progress * 2.0);
         assert_eq!(doubled.radius, theme.radius(Radius::Card) * 2.0);
     }
 

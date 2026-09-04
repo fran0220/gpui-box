@@ -20,6 +20,10 @@ fn port_id(node: &str, port: &str) -> String {
     format!("graph-port:{}:{}:{}:{}", node.len(), node, port.len(), port)
 }
 
+fn port_name_id(node: &str, port: &str) -> String {
+    format!("port-name:{}:{}:{}:{}", node.len(), node, port.len(), port)
+}
+
 fn edge_id(edge: &str) -> String {
     format!("graph-edge:{}:{}", edge.len(), edge)
 }
@@ -698,10 +702,24 @@ fn ports_follow_the_prepainted_height_of_wrapped_node_content(cx: &mut TestAppCo
     let port = harness
         .bounds(&port_id("measured-graph.node", "result"))
         .expect("port bounds");
+    let row = harness
+        .bounds(&port_name_id("measured-graph.node", "result"))
+        .expect("port row bounds");
     assert!(f32::from(node.size.height) > 80.0, "node bounds: {node:?}");
+    // The wrapped metrics push the card tall; the port stays on the row that
+    // names it rather than drifting to the middle of whatever height the
+    // content reached, and that row is inside the measured card.
     assert!(
-        (f32::from(port.center().y - node.center().y)).abs() < 1.0,
-        "port {port:?} follows measured node {node:?}"
+        row.top() >= node.top() && row.bottom() <= node.bottom(),
+        "row {row:?} sits inside measured node {node:?}"
+    );
+    assert!(
+        (f32::from(port.center().y - row.center().y)).abs() < 1.0,
+        "port {port:?} follows its row {row:?}"
+    );
+    assert!(
+        (f32::from(port.center().x - node.right())).abs() < 1.0,
+        "port {port:?} sits on the right edge of {node:?}"
     );
 }
 

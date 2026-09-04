@@ -214,6 +214,7 @@ string_keys! {
     // The node graph editor.
     CanvasDisconnect => "canvas.disconnect", "Disconnect";
     CanvasConnection => "canvas.connection", "Connection";
+    CanvasResize => "canvas.resize", "Resize node";
 
     // Transport bar.
     TransportBuffered => "transport.buffered", "Buffered";

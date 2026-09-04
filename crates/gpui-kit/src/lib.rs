@@ -148,7 +148,7 @@ pub mod prelude {
         EdgeState, GraphBand, GraphEdge, GraphEndpoint, GraphFit, GraphInteraction, GraphNode,
         GraphPort, GraphRouting, GraphState, GraphViewport, Minimap, MinimapEvent, MinimapMark,
         MinimapView, NodeGraph, NodeGraphEvent, NodeGroup, NodeMetric, NodeState, Placed,
-        PortDirection, PortSide, layered_layout,
+        PortDirection, PortSide, PortType, layered_layout,
     };
     pub use crate::content::{
         AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
