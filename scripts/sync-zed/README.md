@@ -3,8 +3,8 @@
 GPUI Box is the sole development authority for its GPUI framework, platform
 implementations, media services, and Kit. The former two-repository development
 and continuous Zed synchronization model is permanently retired. No command in
-this directory fetches a remote, imports source, advances a cursor, creates a
-branch, or changes a Git ref.
+this directory imports source, advances a cursor, creates a branch, or changes
+an existing Git ref.
 
 This directory now preserves and verifies the historical import:
 
@@ -30,6 +30,25 @@ the vendor lanes meet only at the bootstrap tip, and checks mappings, package
 identities, forbidden product paths, license files, and machine provenance. It
 uses only local Git objects and Python's standard library, so CI and releases do
 not depend on either historical source repository being reachable.
+
+To estimate the cost of one deliberately selected upstream revision, run:
+
+```sh
+scripts/sync-zed/sync-zed assess --revision <full-zed-commit-sha>
+```
+
+`assess` is networked but read-only. It fetches that exact revision from the
+official Zed repository into a temporary Git repository, applies the frozen
+path mappings and GPUI Box package-name mappings, and performs a three-way
+merge with the frozen `vendor/zed-gpui` tip as base and the current committed
+`HEAD` as ours. Its JSON report counts conflict files, conflict-marker hunks and
+payload lines, conflict subsystems, and changed lines in automatically merged,
+fully conflict-free files. The temporary repository is deleted afterward; the
+current worktree and every existing ref remain untouched.
+
+This command is an assessment tool, not an update lane. Landing any discrete
+upstream import still requires an explicit policy decision, provenance review,
+and the framework validation required by the root contributor guidance.
 
 The historical source chain was:
 

@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
+import tempfile
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
@@ -34,10 +36,12 @@ class VerificationError(RuntimeError):
     pass
 
 
-def run(args, cwd=ROOT, check=True):
+def run(args, cwd=ROOT, check=True, env=None, input_text=None):
     result = subprocess.run(
         args,
         cwd=cwd,
+        env=env,
+        input=input_text,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -86,6 +90,257 @@ def remap(path, mappings):
     )
     suffix = path[len(mapping["source"]) :].lstrip("/")
     return mapping["destination"] + (("/" + suffix) if suffix else "")
+
+
+def deterministic_env(extra=None):
+    env = os.environ.copy()
+    env.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "LANG": "C",
+            "LC_ALL": "C",
+            "TZ": "UTC",
+        }
+    )
+    if extra:
+        env.update(extra)
+    return env
+
+
+def source_entries(repo, commit, mappings):
+    source_paths = [mapping["source"] for mapping in mappings]
+    output = run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "ls-tree",
+            "-r",
+            "-z",
+            commit,
+            "--",
+            *source_paths,
+        ]
+    ).stdout
+    entries = {}
+    records = output.rstrip("\0").split("\0") if output else []
+    for record in records:
+        metadata, source = record.split("\t", 1)
+        mode, kind, oid = metadata.split()
+        if kind != "blob":
+            raise VerificationError(f"unsupported mapped Git entry {kind} at {source}")
+        destination = remap(source, mappings)
+        if destination is None:
+            continue
+        value = (mode, oid, source)
+        prior = entries.get(destination)
+        if prior is not None and prior != value:
+            raise VerificationError(f"mapping collision at {destination}")
+        entries[destination] = value
+    return entries
+
+
+def rewrite_package_name(manifest, expected):
+    lines = manifest.splitlines(keepends=True)
+    in_package = False
+    found = False
+    original = None
+    for index, line in enumerate(lines):
+        ending = ""
+        if line.endswith("\r\n"):
+            line, ending = line[:-2], "\r\n"
+        elif line.endswith("\n"):
+            line, ending = line[:-1], "\n"
+        stripped = line.strip()
+        if stripped.startswith("["):
+            in_package = stripped == "[package]"
+            continue
+        if not in_package:
+            continue
+        match = re.match(r'^(\s*name\s*=\s*)"([^"]+)"(.*)$', line)
+        if match:
+            if found:
+                raise VerificationError("duplicate [package] name")
+            original = match.group(2)
+            lines[index] = (
+                f'{match.group(1)}"{expected}"{match.group(3)}{ending}'
+            )
+            found = True
+    if not found:
+        raise VerificationError("missing [package] name")
+    return "".join(lines), original
+
+
+def rewrite_filtered_manifests(repo, entries, packages):
+    rewritten = dict(entries)
+    package_names = {}
+    missing = []
+    manifests = {}
+    for destination, expected in packages.items():
+        entry = rewritten.get(destination)
+        if entry is None:
+            missing.append(destination)
+            continue
+        mode, oid, source = entry
+        manifest = run(["git", "-C", str(repo), "cat-file", "blob", oid]).stdout
+        manifest, original = rewrite_package_name(manifest, expected)
+        manifests[destination] = (mode, source, manifest)
+        package_names[original] = expected
+
+    package_pattern = None
+    if package_names:
+        alternatives = "|".join(
+            re.escape(name) for name in sorted(package_names, key=len, reverse=True)
+        )
+        package_pattern = re.compile(
+            rf'(package\s*=\s*")({alternatives})(")'
+        )
+
+    for destination, (mode, oid, source) in list(rewritten.items()):
+        if not destination.endswith("Cargo.toml"):
+            continue
+        if destination in manifests:
+            manifest = manifests[destination][2]
+        else:
+            manifest = run(["git", "-C", str(repo), "cat-file", "blob", oid]).stdout
+        if package_pattern is not None:
+            manifest = package_pattern.sub(
+                lambda match: (
+                    match.group(1) + package_names[match.group(2)] + match.group(3)
+                ),
+                manifest,
+            )
+        new_oid = run(
+            ["git", "-C", str(repo), "hash-object", "-w", "--stdin"],
+            input_text=manifest,
+        ).stdout.strip()
+        rewritten[destination] = (mode, new_oid, source)
+
+    renamed = sum(old != new for old, new in package_names.items())
+    return rewritten, {
+        "configured": len(packages),
+        "present": len(package_names),
+        "renamed": renamed,
+        "missing": sorted(missing),
+    }
+
+
+def write_filtered_tree(repo, entries):
+    index = Path(repo) / "assessment.index"
+    index.unlink(missing_ok=True)
+    env = deterministic_env({"GIT_INDEX_FILE": str(index)})
+    run(["git", "read-tree", "--empty"], cwd=repo, env=env)
+    records = "".join(
+        f"{mode} {oid}\t{destination}\0"
+        for destination, (mode, oid, _) in sorted(entries.items())
+    )
+    run(
+        ["git", "update-index", "-z", "--index-info"],
+        cwd=repo,
+        env=env,
+        input_text=records,
+    )
+    return run(["git", "write-tree"], cwd=repo, env=env).stdout.strip()
+
+
+SUBSYSTEMS = (
+    "window",
+    "scene",
+    "renderer_macos",
+    "renderer_windows",
+    "renderer_wgpu",
+    "renderer_web",
+    "renderer_linux",
+    "renderer_other",
+    "elements",
+    "text",
+    "platform_view",
+    "a11y",
+    "other_kit_unrelated",
+)
+
+
+def classify_subsystem(path):
+    lowered = path.lower()
+    name = PurePosixPath(lowered).name
+    if "platform_view" in lowered or "platform-view" in lowered:
+        return "platform_view"
+    if "/a11y" in lowered or "accessibility" in lowered or "accesskit" in lowered:
+        return "a11y"
+    renderer_path = any(
+        part in name
+        for part in ("renderer", "shader", "atlas", "display_link", "surface")
+    )
+    if lowered.startswith("crates/gpui_wgpu/"):
+        return "renderer_wgpu"
+    if renderer_path and lowered.startswith("crates/gpui_macos/"):
+        return "renderer_macos"
+    if renderer_path and lowered.startswith("crates/gpui_windows/"):
+        return "renderer_windows"
+    if renderer_path and lowered.startswith("crates/gpui_web/"):
+        return "renderer_web"
+    if renderer_path and lowered.startswith("crates/gpui_linux/"):
+        return "renderer_linux"
+    if renderer_path:
+        return "renderer_other"
+    if name == "scene.rs" or "/scene/" in lowered:
+        return "scene"
+    if name == "window.rs" or "/window/" in lowered:
+        return "window"
+    if any(
+        marker in lowered
+        for marker in ("/text", "font", "glyph", "line_layout", "shap")
+    ):
+        return "text"
+    if "/elements/" in lowered:
+        return "elements"
+    return "other_kit_unrelated"
+
+
+def conflict_marker_stats(path):
+    try:
+        lines = Path(path).read_text(errors="surrogateescape").splitlines()
+    except (OSError, UnicodeError):
+        return 1, 0, True
+    hunks = 0
+    payload_lines = 0
+    in_conflict = False
+    for line in lines:
+        if line.startswith("<<<<<<< "):
+            hunks += 1
+            in_conflict = True
+        elif in_conflict and line.startswith(">>>>>>> "):
+            in_conflict = False
+        elif in_conflict and line != "=======":
+            payload_lines += 1
+    if hunks == 0:
+        return 1, 0, True
+    return hunks, payload_lines, False
+
+
+def numstat(repo, args, excluded=frozenset()):
+    output = run(
+        ["git", "-C", str(repo), "diff", "--numstat", "--no-renames", *args]
+    ).stdout
+    files = additions = deletions = binaries = 0
+    for line in output.splitlines():
+        added, deleted, path = line.split("\t", 2)
+        if path in excluded:
+            continue
+        files += 1
+        if added == "-" or deleted == "-":
+            binaries += 1
+            continue
+        additions += int(added)
+        deletions += int(deleted)
+    return {
+        "files": files,
+        "additions": additions,
+        "deletions": deletions,
+        "changed_lines": additions + deletions,
+        "binary_files": binaries,
+    }
 
 
 def validate_config(config):
@@ -600,12 +855,197 @@ def status(_args):
     )
 
 
+def assess(args):
+    config, state = load(CONFIG), load(STATE)
+    validate_config(config)
+    errors = validate_state(config, state)
+    if errors:
+        raise VerificationError("invalid frozen receipt:\n- " + "\n- ".join(errors))
+    revision = args.revision.lower()
+    if not SHA.fullmatch(revision):
+        raise VerificationError("--revision must be a full 40-character SHA")
+
+    with tempfile.TemporaryDirectory(prefix="sync-zed-assess-") as directory:
+        repo = Path(directory) / "merge"
+        run(["git", "init", "--quiet", str(repo)], env=deterministic_env())
+        run(
+            ["git", "config", "user.name", "GPUI Box assessment"], cwd=repo
+        )
+        run(
+            ["git", "config", "user.email", "assessment@invalid"], cwd=repo
+        )
+        run(["git", "config", "merge.conflictStyle", "merge"], cwd=repo)
+        run(["git", "config", "rerere.enabled", "false"], cwd=repo)
+
+        run(
+            [
+                "git",
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                str(ROOT),
+                "+HEAD:refs/assess/ours",
+                f"+{config['vendor_ref']}:refs/assess/base",
+            ],
+            cwd=repo,
+            env=deterministic_env(),
+        )
+        base = run(["git", "rev-parse", "refs/assess/base"], cwd=repo).stdout.strip()
+        ours = run(["git", "rev-parse", "refs/assess/ours"], cwd=repo).stdout.strip()
+        if base != state["vendor_tip"]:
+            raise VerificationError(
+                "local frozen vendor ref differs from the recorded vendor tip"
+            )
+
+        run(
+            [
+                "git",
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--depth=1",
+                config["official_url"],
+                f"+{revision}:refs/assess/source",
+            ],
+            cwd=repo,
+            env=deterministic_env(),
+        )
+        fetched = run(
+            ["git", "rev-parse", "refs/assess/source^{commit}"], cwd=repo
+        ).stdout.strip()
+        if fetched != revision:
+            raise VerificationError(
+                f"fetched revision differs from requested revision: {fetched}"
+            )
+
+        entries = source_entries(repo, "refs/assess/source", config["mappings"])
+        entries, package_stats = rewrite_filtered_manifests(
+            repo, entries, config["packages"]
+        )
+        tree = write_filtered_tree(repo, entries)
+        theirs = run(
+            ["git", "commit-tree", tree, "-p", base],
+            cwd=repo,
+            env=deterministic_env(),
+            input_text=f"Filtered Zed assessment for {revision}\n",
+        ).stdout.strip()
+        merge_base = run(["git", "merge-base", ours, theirs], cwd=repo).stdout.strip()
+        if merge_base != base:
+            raise VerificationError(
+                f"assessment merge base differs from frozen vendor base: {merge_base}"
+            )
+
+        run(["git", "checkout", "--quiet", "--detach", ours], cwd=repo)
+        merge_result = run(
+            ["git", "merge", "--no-commit", "--no-ff", theirs],
+            cwd=repo,
+            check=False,
+            env=deterministic_env(),
+        )
+        if merge_result.returncode not in (0, 1):
+            raise VerificationError(
+                "temporary merge failed:\n" + merge_result.stderr.strip()
+            )
+
+        conflict_output = run(
+            [
+                "git",
+                "diff",
+                "--name-only",
+                "--diff-filter=U",
+                "-z",
+            ],
+            cwd=repo,
+        ).stdout
+        conflict_paths = sorted(
+            path for path in conflict_output.rstrip("\0").split("\0") if path
+        )
+        if merge_result.returncode == 1 and not conflict_paths:
+            raise VerificationError(
+                "temporary merge failed without producing inspectable conflicts:\n"
+                + merge_result.stderr.strip()
+            )
+
+        subsystem_stats = {
+            subsystem: {"files": 0, "hunks": 0, "payload_lines": 0}
+            for subsystem in SUBSYSTEMS
+        }
+        conflict_files = []
+        unmarked = 0
+        total_hunks = total_lines = 0
+        for path in conflict_paths:
+            hunks, payload_lines, has_no_markers = conflict_marker_stats(repo / path)
+            subsystem = classify_subsystem(path)
+            total_hunks += hunks
+            total_lines += payload_lines
+            unmarked += int(has_no_markers)
+            subsystem_stats[subsystem]["files"] += 1
+            subsystem_stats[subsystem]["hunks"] += hunks
+            subsystem_stats[subsystem]["payload_lines"] += payload_lines
+            conflict_files.append(
+                {
+                    "path": path,
+                    "subsystem": subsystem,
+                    "hunks": hunks,
+                    "payload_lines": payload_lines,
+                    "has_text_markers": not has_no_markers,
+                }
+            )
+
+        top_files = sorted(
+            conflict_files,
+            key=lambda item: (-item["payload_lines"], -item["hunks"], item["path"]),
+        )
+        clean_merge = numstat(
+            repo,
+            ["--cached", "HEAD"],
+            excluded=frozenset(conflict_paths),
+        )
+        upstream_change = numstat(repo, [base, theirs])
+        report = {
+            "schema_version": 1,
+            "assessment_only": True,
+            "official_url": config["official_url"],
+            "revision": revision,
+            "base": base,
+            "ours": ours,
+            "merge_base": merge_base,
+            "filter": {
+                "schema_version": config["filter_schema_version"],
+                "digest_sha256": config["filter_digest_sha256"],
+                "files": len(entries),
+                "packages": package_stats,
+            },
+            "filtered_upstream_change": upstream_change,
+            "conflicts": {
+                "files": len(conflict_paths),
+                "hunks": total_hunks,
+                "payload_lines": total_lines,
+                "unmarked_or_binary_files": unmarked,
+                "by_subsystem": subsystem_stats,
+                "top_files": top_files[:10],
+            },
+            "non_conflict_auto_merge": clean_merge,
+            "definitions": {
+                "conflict_payload_lines": (
+                    "Both sides' text between Git conflict markers; marker lines are excluded. "
+                    "An unmarked or binary conflict counts as one hunk and zero payload lines."
+                ),
+                "non_conflict_auto_merge": (
+                    "Additions plus deletions relative to ours in staged, fully conflict-free "
+                    "files; automatically merged portions of conflicted files are excluded."
+                ),
+            },
+        }
+        print(json.dumps(report, indent=2))
+
+
 def parser():
     command_parser = argparse.ArgumentParser(
         prog="sync-zed",
         description=(
-            "Verify GPUI Box's frozen Zed import history. "
-            "Import, sync, and overlay mutation commands were permanently retired."
+            "Verify GPUI Box's frozen Zed import history or assess an upstream "
+            "revision without importing it. Mutation commands are permanently retired."
         ),
     )
     commands = command_parser.add_subparsers(dest="command", required=True)
@@ -613,6 +1053,12 @@ def parser():
     verify_parser.set_defaults(func=verify)
     status_parser = commands.add_parser("status")
     status_parser.set_defaults(func=status)
+    assess_parser = commands.add_parser(
+        "assess",
+        help="measure a temporary three-way merge without changing the repository",
+    )
+    assess_parser.add_argument("--revision", required=True)
+    assess_parser.set_defaults(func=assess)
     return command_parser
 
 
