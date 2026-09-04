@@ -442,9 +442,10 @@ impl Render for CommandPalette {
         let theme = cx.theme().clone();
         let query = self.query.read(cx).value().clone();
         let rows = self.results(cx);
+        let empty = rows.is_empty();
         let results_id = self.ident.child("results").semantic_id();
 
-        let body = if rows.is_empty() {
+        let body = if empty {
             // A query that answered nothing is a fact about the query, not an
             // application without commands, so it says which query it was.
             self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
@@ -453,7 +454,6 @@ impl Render for CommandPalette {
                     cx.strings().format(StringKey::PaletteNoMatch, &[&query]),
                 )
                 .kind(EmptyKind::Empty)
-                .detail(cx.strings().text(StringKey::PaletteEmptyDetail))
                 .into_any_element()
             })
         } else {
@@ -475,6 +475,11 @@ impl Render for CommandPalette {
             .into_any_element()
         };
 
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Group).value(query);
+        if empty {
+            spec = spec.description(cx.strings().text(StringKey::PaletteEmptyDetail));
+        }
+
         surface(&theme, OverlaySurface::MODAL)
             .w(px(PALETTE_WIDTH))
             .p_token(&theme, Space::Xs)
@@ -483,10 +488,7 @@ impl Render for CommandPalette {
             .on_key_down(cx.listener(Self::on_key_down))
             .child(div().p_token(&theme, Space::Xs).child(self.query.clone()))
             .child(body)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Group).value(query),
-            )
+            .semantic_in(cx, spec)
     }
 }
 

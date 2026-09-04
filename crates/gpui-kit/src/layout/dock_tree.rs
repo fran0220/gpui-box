@@ -751,9 +751,11 @@ impl DockTree {
                 .flex()
                 .items_center()
                 .justify_center()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(cx.strings().text(StringKey::DockEmptyStack))
+                .child(
+                    icon(Icon::CornersIn)
+                        .size(px(theme.measures.standalone_icon))
+                        .text_color(theme.colors.text_faint),
+                )
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("empty").semantic_id(), Role::Status)

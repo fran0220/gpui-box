@@ -590,15 +590,15 @@ impl Render for NotificationCenter {
             }
             rows.push(self.row(index, cx));
         }
+        let empty = rows.is_empty();
 
-        let body = if rows.is_empty() {
+        let body = if empty {
             self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                 EmptyState::new(
                     self.ident.child("empty"),
                     cx.strings().text(StringKey::NotificationsEmpty),
                 )
                 .kind(EmptyKind::Empty)
-                .detail(cx.strings().text(StringKey::NotificationsEmptyDetail))
                 .into_any_element()
             })
         } else {
@@ -610,6 +610,15 @@ impl Render for NotificationCenter {
         // header painted as a raised in-page plane put a square-cornered strip
         // of a third vocabulary on top of it; the title band shares the
         // surface now and a rule marks where the records begin.
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::List)
+            // The value is the badge's own claim, so a test reads what
+            // the badge says rather than counting rows.
+            .text(unread_text)
+            .value(unread_wording);
+        if empty {
+            spec = spec.description(cx.strings().text(StringKey::NotificationsEmptyDetail));
+        }
+
         surface(&theme, OverlaySurface::FLOATING)
             .id(self.ident.element_id())
             .w_full()
@@ -632,14 +641,7 @@ impl Render for NotificationCenter {
             )
             .child(rule(&theme))
             .child(body)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List)
-                    // The value is the badge's own claim, so a test reads what
-                    // the badge says rather than counting rows.
-                    .text(unread_text)
-                    .value(unread_wording),
-            )
+            .semantic_in(cx, spec)
     }
 }
 

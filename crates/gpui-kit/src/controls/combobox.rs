@@ -497,20 +497,19 @@ impl Combobox {
 
         let rows = if matches.is_empty() {
             let query = self.filter(cx);
-            vec![self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings()
-                        .format(StringKey::ComboboxNoMatch, &[query.as_ref()]),
-                )
-                .kind(EmptyKind::Empty)
-                .detail(cx.strings().text(if self.allow_custom {
-                    StringKey::ComboboxCreateHint
-                } else {
-                    StringKey::ComboboxClosedHint
-                }))
-                .into_any_element()
-            })]
+            if self.allow_custom && !query.trim().is_empty() {
+                vec![self.custom_row(query, cx)]
+            } else {
+                vec![self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings()
+                            .format(StringKey::ComboboxNoMatch, &[query.as_ref()]),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                })]
+            }
         } else {
             let mut rows = Vec::new();
             let mut last_group: Option<SharedString> = None;
@@ -589,6 +588,43 @@ impl Combobox {
                 NodeSpec::new(ident.semantic_id(), Role::Text)
                     .parent(self.ident.child("menu").semantic_id())
                     .text(label.clone()),
+            )
+            .into_any_element()
+    }
+
+    fn custom_row(&self, query: SharedString, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let ident = self.ident.child("custom");
+        let help = cx.strings().text(StringKey::ComboboxCreateHint);
+        let value = query.clone();
+        let clicked_value = value.clone();
+        popover::menu_row(&theme, false, true)
+            .id(ident.element_id())
+            .when(!self.disabled, |element| {
+                element.cursor_pointer().pressable(cx).on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |combobox, _, _, cx| {
+                        if !combobox.disabled {
+                            cx.emit(ComboboxEvent::Custom(clicked_value.clone()));
+                            combobox.close(cx);
+                        }
+                    }),
+                )
+            })
+            .child(
+                icon(Icon::Plus)
+                    .size(px(theme.control.sm.icon_size))
+                    .text_color(theme.colors.accent),
+            )
+            .child(foundation_text(&theme, TypeScale::Label, query))
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Option)
+                    .parent(self.ident.child("menu").semantic_id())
+                    .hovered(true)
+                    .disabled(self.disabled)
+                    .text(value)
+                    .description(help),
             )
             .into_any_element()
     }
@@ -747,6 +783,9 @@ impl Render for Combobox {
         }
         if let Some(label) = self.selected_label() {
             spec = spec.value(label);
+        }
+        if self.open && !self.allow_custom && self.matches(cx).is_empty() {
+            spec = spec.description(cx.strings().text(StringKey::ComboboxClosedHint));
         }
 
         let shell = field_shell(

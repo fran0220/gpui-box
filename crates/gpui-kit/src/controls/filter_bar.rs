@@ -8,8 +8,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder,
+    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
@@ -19,6 +19,7 @@ use crate::display::badge::Tone;
 use crate::display::loading::Spinner;
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -309,13 +310,14 @@ impl RenderOnce for FilterBar {
         let counting = self.count == ResultCount::Counting;
         let count = self.count.sentence(self.noun.as_ref(), cx).map(|sentence| {
             let wording = sentence.clone();
-            let sentence = foundation_text(&theme, TypeScale::Caption, sentence.clone())
-                .flex_none()
-                .text_color(match self.count {
-                    ResultCount::Unavailable(_) => theme.colors.warning,
-                    ResultCount::Counting => theme.colors.text_faint,
-                    _ => theme.colors.text_muted,
-                });
+            let sentence = (!counting).then(|| {
+                foundation_text(&theme, TypeScale::Caption, sentence)
+                    .flex_none()
+                    .text_color(match self.count {
+                        ResultCount::Unavailable(_) => theme.colors.warning,
+                        _ => theme.colors.text_muted,
+                    })
+            });
             // A count in progress is a loading state, and it wears what every
             // other loading state in the library wears. As bare text it was a
             // value that happened to be worded oddly.
@@ -325,11 +327,17 @@ impl RenderOnce for FilterBar {
                 .items_center()
                 .gap_token(&theme, Space::Xs)
                 .when(counting, |element| {
+                    let spinner_ident = count_ident.child("spinner");
                     element.child(
-                        Spinner::new(count_ident.child("spinner")).control_size(ControlSize::Xs),
+                        div()
+                            .id(spinner_ident.element_id())
+                            .child(
+                                Spinner::new(spinner_ident.clone()).control_size(ControlSize::Xs),
+                            )
+                            .tip(spinner_ident, wording.clone()),
                     )
                 })
-                .child(sentence)
+                .children(sentence)
                 .semantic_in(
                     cx,
                     NodeSpec::new(count_ident.semantic_id(), Role::Status)

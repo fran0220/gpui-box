@@ -44,7 +44,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
-
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -136,15 +136,22 @@ impl UploadState {
         }
     }
 
-    /// The words beside the file's name.
-    fn wording(&self, cx: &App) -> SharedString {
+    /// The state name carried by the mark's hover help.
+    fn label(&self, cx: &App) -> SharedString {
         match self {
-            // The host's own reason outranks the catalogue's word for it.
-            Self::Failed { reason } | Self::Refused { reason } => reason.clone(),
             Self::Queued => cx.strings().text(StringKey::UploadQueued),
             Self::Uploading { .. } => cx.strings().text(StringKey::UploadUploading),
             Self::Done => cx.strings().text(StringKey::UploadDone),
+            Self::Failed { .. } => cx.strings().text(StringKey::UploadFailed),
             Self::Cancelled => cx.strings().text(StringKey::UploadCancelled),
+            Self::Refused { .. } => cx.strings().text(StringKey::UploadRefused),
+        }
+    }
+
+    fn visible_reason(&self) -> Option<SharedString> {
+        match self {
+            Self::Failed { reason } | Self::Refused { reason } => Some(reason.clone()),
+            _ => None,
         }
     }
 
@@ -365,7 +372,8 @@ impl UploadList {
         let ident = self.ident.child(upload.id.as_ref());
         let live = !self.disabled;
         let dismissible = live && (self.on_cancel.is_some() || self.on_remove.is_some());
-        let wording = upload.state.wording(cx);
+        let state_label = upload.state.label(cx);
+        let reason = upload.state.visible_reason();
 
         // A refusal never gets a retry: the same file against the same rule
         // cannot end differently, and a control that could not work is worse
@@ -441,6 +449,22 @@ impl UploadList {
             } => Some(cx.numbers().percent(fraction)),
             _ => None,
         };
+        let detail = (reason.is_some() || retry.is_some()).then(|| {
+            div()
+                .row()
+                .w_full()
+                .gap_token(&theme, Space::Sm)
+                .children(reason.map(|reason| {
+                    foundation_text(&theme, TypeScale::Caption, reason).text_color(
+                        if matches!(upload.state, UploadState::Failed { .. }) {
+                            theme.colors.danger
+                        } else {
+                            theme.colors.warning
+                        },
+                    )
+                }))
+                .children(retry)
+        });
 
         div()
             .row()
@@ -454,13 +478,26 @@ impl UploadList {
                     .flex_none()
                     .mt(px(theme.space(Space::Xs) + theme.space(Space::Xxs) / 2.0))
                     .child({
-                        let dot = StatusDot::new(upload.state.tone());
-                        // Only a file actually on its way moves. A queued one is
-                        // waiting for a turn, which is not the same as working.
-                        match upload.state {
-                            UploadState::Uploading { .. } => dot.busy(ident.child("mark")),
-                            _ => dot,
-                        }
+                        let mark = match upload.state {
+                            // Only a file actually on its way moves. A queued
+                            // one is waiting for a turn, which is not the same
+                            // as working.
+                            UploadState::Uploading { .. } => StatusDot::new(upload.state.tone())
+                                .busy(ident.child("mark"))
+                                .into_any_element(),
+                            // Queued already owns the neutral dot. Cancellation
+                            // needs its own silhouette once no caption sits by it.
+                            UploadState::Cancelled => gpui_kit_assets::icon(Icon::Close)
+                                .size(px(theme.control.get(self.size).icon_size))
+                                .text_color(theme.colors.text_faint)
+                                .into_any_element(),
+                            _ => StatusDot::new(upload.state.tone()).into_any_element(),
+                        };
+                        let mark_ident = ident.child("state-mark");
+                        div()
+                            .id(mark_ident.element_id())
+                            .child(mark)
+                            .tip(mark_ident, state_label)
                     }),
             )
             .child(
@@ -490,25 +527,7 @@ impl UploadList {
                     // carry, placed in the column every row shares, moves
                     // that column's contents by its own width and leaves the
                     // sizes down the right edge in a ragged line.
-                    .child(
-                        div()
-                            .row()
-                            .w_full()
-                            .gap_token(&theme, Space::Sm)
-                            .child(match upload.state {
-                                UploadState::Failed { .. } => {
-                                    foundation_text(&theme, TypeScale::Caption, wording.clone())
-                                        .text_color(theme.colors.danger)
-                                }
-                                UploadState::Refused { .. } => {
-                                    foundation_text(&theme, TypeScale::Caption, wording.clone())
-                                        .text_color(theme.colors.warning)
-                                }
-                                _ => foundation_text(&theme, TypeScale::Caption, wording.clone())
-                                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
-                            })
-                            .children(retry),
-                    )
+                    .children(detail)
                     .children(bar.map(|bar| {
                         div()
                             .row()
@@ -573,8 +592,7 @@ impl RenderOnce for UploadList {
         let overall_ident = self.ident.child("overall");
 
         let progress = (self.show_overall && overall != OverallProgress::Settled).then(|| {
-            let mut bar = ProgressBar::new(overall_ident.clone())
-                .label(cx.strings().text(StringKey::UploadOverall));
+            let mut bar = ProgressBar::new(overall_ident.clone());
             if let OverallProgress::Known(fraction) = overall {
                 bar = bar.fraction(fraction);
             }
@@ -615,7 +633,10 @@ impl RenderOnce for UploadList {
             // measuring the same work from different left edges read as two
             // unrelated measurements.
             .children(progress.map(|progress| {
+                let help_ident = overall_ident.child("help");
+                let wording = cx.strings().text(StringKey::UploadOverall);
                 div()
+                    .id(help_ident.element_id())
                     .w_full()
                     .px_token(&theme, Space::Sm)
                     .ps(
@@ -623,6 +644,13 @@ impl RenderOnce for UploadList {
                         px(theme.space(Space::Sm) * 2.0 + theme.measures.status_mark),
                     )
                     .child(progress)
+                    .tip(help_ident.clone(), wording.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(help_ident.semantic_id(), Role::Status)
+                            .parent(self.ident.semantic_id())
+                            .text(wording),
+                    )
             }))
             .child(body)
             .semantic_in(

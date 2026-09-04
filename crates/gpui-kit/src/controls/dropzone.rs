@@ -23,6 +23,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::interaction::dnd::{self, DragItem, FILE_KIND};
 use crate::layout::measure;
+use crate::overlay::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -203,15 +204,16 @@ impl RenderOnce for Dropzone {
         if self.invalid {
             border = theme.colors.danger;
         }
-        // The zone always says what it is. A refusal is a second line under
-        // that, in the tone of a refusal, so a refusing zone is still
-        // recognisably the same target and not an unlabelled red box.
         let message = self.label.clone();
-        let refusal = (state == DropzoneState::Refusing).then(|| {
-            self.refusal
-                .clone()
-                .unwrap_or_else(|| cx.strings().text(StringKey::DropzoneRefusal))
-        });
+        let (refusal, refusal_help) = if state == DropzoneState::Refusing {
+            match self.refusal.clone() {
+                Some(reason) => (Some(reason), None),
+                None => (None, Some(cx.strings().text(StringKey::DropzoneRefusal))),
+            }
+        } else {
+            (None, None)
+        };
+        let mark_ident = self.ident.child("mark");
 
         let mut zone = div()
             .id(self.ident.element_id())
@@ -248,9 +250,16 @@ impl RenderOnce for Dropzone {
                 element.opacity(theme.opacity.disabled)
             })
             .children(self.icon.map(|glyph| {
-                icon(glyph)
-                    .size(px(theme.control.md.icon_size))
-                    .text_color(text)
+                div()
+                    .id(mark_ident.element_id())
+                    .child(
+                        icon(glyph)
+                            .size(px(theme.control.md.icon_size))
+                            .text_color(text),
+                    )
+                    .when_some(refusal_help.clone(), |mark, help| {
+                        mark.tip(mark_ident.clone(), help)
+                    })
             }))
             .child(foundation_text(&theme, TypeScale::Label, message.clone()).text_color(text))
             .children(refusal.clone().map(|refusal| {
@@ -299,10 +308,12 @@ impl RenderOnce for Dropzone {
             });
         }
 
+        // A refusing zone reads as its refusal, never as idle, whether the
+        // reason is drawn under the label or held behind the mark.
         let zone = zone.semantic_in(
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Region)
-                .text(refusal.unwrap_or(message))
+                .text(refusal.or(refusal_help).unwrap_or(message))
                 .value(state.name())
                 .disabled(self.disabled)
                 .selected(state == DropzoneState::Accepting)

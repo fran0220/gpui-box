@@ -37,8 +37,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
-    App, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement,
-    Render, SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
+    IntoElement, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
+    px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -47,6 +48,7 @@ use web_time::Instant;
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What the button is currently claiming.
@@ -110,6 +112,8 @@ pub struct CopyButton {
     copier: Option<Copier>,
     confirmation: Duration,
     state: CopyState,
+    /// Whether the current refusal came from the fallback clipboard check.
+    default_failure: bool,
     /// How much of the confirmation is left, and when it was last spent.
     remaining: Option<Duration>,
     last_tick: Option<Instant>,
@@ -142,6 +146,7 @@ impl CopyButton {
             copier: None,
             confirmation: Duration::from_millis(cx.theme().motion.confirmation_ms),
             state: CopyState::Idle,
+            default_failure: false,
             remaining: None,
             last_tick: None,
         }
@@ -214,6 +219,7 @@ impl CopyButton {
             return;
         }
         let copier = self.copier.clone();
+        let default_copier = copier.is_none();
         let text = self.text.clone();
         let outcome = match copier {
             Some(copier) => copier(text.as_ref(), cx),
@@ -222,6 +228,7 @@ impl CopyButton {
         match outcome {
             Ok(()) => {
                 self.state = CopyState::Copied;
+                self.default_failure = false;
                 self.remaining = Some(self.confirmation);
                 self.last_tick = None;
                 cx.emit(CopyEvent::Copied);
@@ -229,6 +236,7 @@ impl CopyButton {
             Err(reason) => {
                 // A refusal is not put on a timer: see the module note.
                 self.state = CopyState::Failed(reason.clone());
+                self.default_failure = default_copier;
                 self.remaining = None;
                 self.last_tick = None;
                 cx.emit(CopyEvent::Failed(reason));
@@ -259,14 +267,6 @@ impl CopyButton {
         self.remaining = Some(left);
         self.last_tick = Some(now);
         window.request_animation_frame();
-    }
-
-    fn glyph(&self) -> Icon {
-        match self.state {
-            CopyState::Copied => Icon::Check,
-            CopyState::Failed(_) => Icon::Danger,
-            CopyState::Idle => Icon::Copy,
-        }
     }
 
     /// The words on the control name the action, in every state.
@@ -307,30 +307,20 @@ impl Render for CopyButton {
         self.tick(window, cx);
         let theme = cx.theme().clone();
         let label = self.button_label(cx);
-        let glyph = self.glyph();
         let parent = self.ident.semantic_id();
-
-        // The three answers are three chips, not one chip with three captions:
-        // a refusal takes the danger tint the rest of the library refuses in,
-        // and the confirmation is carried by the mark beside it.
-        let variant = match self.state {
-            CopyState::Failed(_) => ButtonVariant::Danger,
-            _ => self.variant,
-        };
 
         let button = Button::new(self.ident.child("action"))
             .semantic_parent(parent.clone())
-            .variant(variant)
+            .variant(self.variant)
             .control_size(self.size)
             .disabled(self.disabled)
             .track_focus(&self.focus_handle)
             .map(|button| {
                 match (self.glyph_only, self.name.clone()) {
-                    (true, Some(name)) => button.icon_only(glyph, name),
-                    // The words change with the state, so the name a reader
-                    // hears changes with it too; there is no second name that
-                    // would go stale.
-                    _ => button.icon(glyph).label(label.clone()),
+                    (true, Some(name)) => button.icon_only(Icon::Copy, name),
+                    // The action keeps its name while the separate mark
+                    // reports what happened.
+                    _ => button.icon(Icon::Copy).label(label.clone()),
                 }
             })
             .when(!self.disabled, |button| {
@@ -346,34 +336,54 @@ impl Render for CopyButton {
         // match on prose to tell the two apart.
         let status = match &self.state {
             CopyState::Idle => None,
-            CopyState::Copied => Some((cx.strings().text(StringKey::CopyDone), false)),
-            CopyState::Failed(reason) => Some((reason.clone(), true)),
+            CopyState::Copied => Some((cx.strings().text(StringKey::CopyDone), None, false, false)),
+            CopyState::Failed(reason) => Some((
+                cx.strings().text(StringKey::CopyFailed),
+                Some(reason.clone()),
+                true,
+                self.default_failure,
+            )),
         };
         let status_ident = self.ident.child("status");
         let metrics = theme.control.get(self.size);
-        let status = status.map(|(text, failed)| {
+        let status = status.map(|(state_text, reason, failed, default_failure)| {
             let tone = if failed {
                 theme.colors.danger
             } else {
                 theme.colors.success
             };
+            let mark_ident = status_ident.child("mark");
+            let help = if default_failure {
+                reason.clone().unwrap_or_else(|| state_text.clone())
+            } else {
+                state_text.clone()
+            };
+            // The status reads as the reason it was given, verbatim: a
+            // reader of the tree is told why, not merely that.
+            let spec = NodeSpec::new(status_ident.semantic_id(), Role::Status)
+                .parent(parent.clone())
+                .text(reason.clone().unwrap_or(state_text))
+                .invalid(failed);
             div()
                 .row()
                 .flex_none()
                 .gap_token(&theme, Space::Xs)
                 .child(
-                    gpui_kit_assets::icon(if failed { Icon::Danger } else { Icon::Check })
-                        .size(px(metrics.icon_size))
-                        .text_color(tone),
+                    div()
+                        .id(mark_ident.element_id())
+                        .child(
+                            gpui_kit_assets::icon(if failed { Icon::Danger } else { Icon::Check })
+                                .size(px(metrics.icon_size))
+                                .text_color(tone),
+                        )
+                        .tip(mark_ident, help),
                 )
-                .child(foundation_text(&theme, TypeScale::Caption, text.clone()).text_color(tone))
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(status_ident.semantic_id(), Role::Status)
-                        .parent(parent.clone())
-                        .text(text)
-                        .invalid(failed),
-                )
+                // A host refusal is evidence, not a state caption. The
+                // fallback mechanism stays behind the mark as hover help.
+                .children(reason.filter(|_| !default_failure).map(|reason| {
+                    foundation_text(&theme, TypeScale::Caption, reason).text_color(tone)
+                }))
+                .semantic_in(cx, spec)
         });
 
         div()

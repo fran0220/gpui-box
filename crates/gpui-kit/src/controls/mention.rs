@@ -27,7 +27,7 @@ use crate::controls::textarea::{Pasted, TextArea, TextAreaEvent};
 use crate::display::loading::PulseLoader;
 use crate::foundation::{Ident, Pressable, StyledExt, text as foundation_text};
 use crate::motion;
-use crate::overlay::popover;
+use crate::overlay::{Tooltipped, popover};
 use crate::state::{AsyncStatus, AsyncValue, HasPhase};
 use crate::strings::{ActiveSearch, ActiveStrings, SearchMatcher, StringKey};
 
@@ -455,7 +455,8 @@ impl MentionInput {
                 "refreshing",
                 cx.strings().text(StringKey::MentionRefreshing),
                 None,
-                StatusMark::Busy,
+                StatusMark::Refreshing,
+                false,
                 cx,
             )),
             _ => None,
@@ -465,7 +466,8 @@ impl MentionInput {
                 "stale",
                 cx.strings().text(StringKey::MentionStale),
                 Some(reason.clone()),
-                StatusMark::Danger,
+                StatusMark::Stale,
+                true,
                 cx,
             )),
             _ => None,
@@ -507,35 +509,40 @@ impl MentionInput {
                 "idle",
                 cx.strings().text(StringKey::MentionIdle),
                 None,
-                StatusMark::Info,
+                StatusMark::Idle,
+                false,
                 cx,
             ),
             AsyncStatus::Loading => self.status_row(
                 "loading",
                 cx.strings().text(StringKey::MentionLoading),
                 None,
-                StatusMark::Busy,
+                StatusMark::Loading,
+                false,
                 cx,
             ),
             AsyncStatus::Empty => self.status_row(
                 "empty",
                 cx.strings().text(StringKey::MentionEmpty),
                 None,
-                StatusMark::Info,
+                StatusMark::Empty,
+                true,
                 cx,
             ),
             AsyncStatus::Unavailable(reason) => self.status_row(
                 "unavailable",
                 cx.strings().text(StringKey::MentionUnavailable),
                 Some(reason.clone().into()),
-                StatusMark::Info,
+                StatusMark::Unavailable,
+                false,
                 cx,
             ),
             AsyncStatus::Error(reason) if !has_value => self.status_row(
                 "error",
                 cx.strings().text(StringKey::MentionError),
                 Some(reason.clone()),
-                StatusMark::Danger,
+                StatusMark::Error,
+                false,
                 cx,
             ),
             AsyncStatus::Ready | AsyncStatus::Refreshing | AsyncStatus::Error(_) => {
@@ -550,7 +557,12 @@ impl MentionInput {
                         StringKey::MentionNoMatch
                     }),
                     None,
-                    StatusMark::Info,
+                    if empty {
+                        StatusMark::Empty
+                    } else {
+                        StatusMark::NoMatch
+                    },
+                    true,
                     cx,
                 )
             }
@@ -563,11 +575,12 @@ impl MentionInput {
         title: SharedString,
         detail: Option<SharedString>,
         mark: StatusMark,
+        paint_title: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let ident = self.ident.child("status").child(suffix);
-        let text_color = if mark == StatusMark::Danger {
+        let text_color = if mark.invalid() {
             theme.colors.danger
         } else {
             theme.colors.text_muted
@@ -575,36 +588,70 @@ impl MentionInput {
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Status)
             .parent(self.ident.child("menu").semantic_id())
             .text(title.clone())
-            .busy(mark == StatusMark::Busy)
-            .invalid(mark == StatusMark::Danger);
+            .busy(mark.busy())
+            .invalid(mark.invalid());
         if let Some(detail) = detail.clone() {
             spec = spec.description(detail);
         }
+        let mark_ident = ident.child("mark");
+        let mark_element = match mark {
+            StatusMark::Refreshing => motion::spin(
+                crate::display::icon::paint(
+                    Icon::Refresh,
+                    theme.control.sm.icon_size,
+                    theme.colors.text_faint,
+                    false,
+                ),
+                mark_ident.child("motion").element_id(),
+                &theme,
+                cx,
+            ),
+            StatusMark::Loading => PulseLoader::new(mark_ident.child("motion")).into_any_element(),
+            StatusMark::Idle => icon(Icon::Document)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint)
+                .into_any_element(),
+            StatusMark::Empty => icon(Icon::Archive)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint)
+                .into_any_element(),
+            StatusMark::NoMatch => icon(Icon::Magnifier)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint)
+                .into_any_element(),
+            StatusMark::Unavailable => icon(Icon::Forbidden)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint)
+                .into_any_element(),
+            StatusMark::Error => icon(Icon::CloseCircle)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.danger)
+                .into_any_element(),
+            StatusMark::Stale => icon(Icon::Danger)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.danger)
+                .into_any_element(),
+        };
         div()
             .row()
             .items_start()
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Sm)
-            .child(match mark {
-                StatusMark::Busy => PulseLoader::new(ident.child("mark")).into_any_element(),
-                StatusMark::Info => icon(Icon::Info)
-                    .size(px(theme.control.sm.icon_size))
-                    .text_color(theme.colors.text_faint)
-                    .into_any_element(),
-                StatusMark::Danger => icon(Icon::CloseCircle)
-                    .size(px(theme.control.sm.icon_size))
-                    .text_color(theme.colors.danger)
-                    .into_any_element(),
-            })
+            .child(
+                div()
+                    .id(mark_ident.element_id())
+                    .child(mark_element)
+                    .tip(mark_ident, title.clone()),
+            )
             .child(
                 div()
                     .column()
                     .min_w_0()
-                    .gap(px(theme.space(Space::Xxs)))
-                    .child(
-                        foundation_text(&theme, TypeScale::Caption, title).text_color(text_color),
-                    )
+                    .gap_token(&theme, Space::Xxs)
+                    .children(paint_title.then(|| {
+                        foundation_text(&theme, TypeScale::Caption, title).text_color(text_color)
+                    }))
                     .children(detail.map(|detail| {
                         foundation_text(&theme, TypeScale::Caption, detail).text_color(text_color)
                     })),
@@ -755,9 +802,24 @@ impl Render for MentionInput {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StatusMark {
-    Busy,
-    Info,
-    Danger,
+    Refreshing,
+    Loading,
+    Idle,
+    Empty,
+    NoMatch,
+    Unavailable,
+    Error,
+    Stale,
+}
+
+impl StatusMark {
+    fn busy(self) -> bool {
+        matches!(self, Self::Refreshing | Self::Loading)
+    }
+
+    fn invalid(self) -> bool {
+        matches!(self, Self::Error | Self::Stale)
+    }
 }
 
 fn mention_query(text: &str, selection: Range<usize>, cursor: usize) -> Option<MentionQuery> {

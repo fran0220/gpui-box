@@ -25,6 +25,7 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How many hits the host says the query has.
@@ -639,18 +640,21 @@ impl Render for FindReplace {
 
         let uncountable = counted.is_none().then(|| {
             let ident = self.ident.child("replace-all.reason");
-            foundation_text(
-                &theme,
-                TypeScale::Caption,
-                cx.strings().text(StringKey::ReplaceAllUncountable),
-            )
-            .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
-            .semantic_in(
-                cx,
-                NodeSpec::new(ident.semantic_id(), Role::Text)
-                    .parent(self.ident.semantic_id())
-                    .text(cx.strings().text(StringKey::ReplaceAllUncountable)),
-            )
+            let wording = cx.strings().text(StringKey::ReplaceAllUncountable);
+            div()
+                .id(ident.element_id())
+                .child(
+                    icon(Icon::Info)
+                        .size(px(theme.control.get(ControlSize::Xs).icon_size))
+                        .text_color(theme.colors.text_faint),
+                )
+                .tip(ident.clone(), wording.clone())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Text)
+                        .parent(self.ident.semantic_id())
+                        .description(wording),
+                )
         });
 
         div()

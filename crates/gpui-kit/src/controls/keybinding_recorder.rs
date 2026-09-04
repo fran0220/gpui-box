@@ -41,6 +41,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
+use crate::motion;
 use crate::overlay::Kbd;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -271,6 +272,11 @@ impl Render for KeybindingRecorder {
         // Recording has to be unmistakable: a recorder that looks like a text
         // field invites someone to type into it and lose whatever they typed.
         let body = if recording {
+            let caret = div()
+                .flex_none()
+                .w(px(theme.measures.caret_width))
+                .h(px(metrics.font_size))
+                .bg(theme.colors.accent);
             div()
                 .row()
                 .gap_token(&theme, Space::Xs)
@@ -280,15 +286,12 @@ impl Render for KeybindingRecorder {
                         .size(px(metrics.icon_size))
                         .text_color(theme.colors.accent),
                 )
-                .child(
-                    foundation_text(
-                        &theme,
-                        TypeScale::Label,
-                        cx.strings().text(StringKey::KeybindingPrompt),
-                    )
-                    .text_size(px(metrics.font_size))
-                    .text_color(theme.colors.accent),
-                )
+                .child(motion::breathe(
+                    caret,
+                    self.ident.child("recording.caret").element_id(),
+                    &theme,
+                    cx,
+                ))
                 .into_any_element()
         } else {
             match self.binding.clone() {
@@ -398,7 +401,9 @@ impl Render for KeybindingRecorder {
         // A recorder in flight says so where its value would be: the value is
         // what the caller bound, and nothing is bound while it is listening.
         if recording {
-            spec = spec.value("recording");
+            spec = spec
+                .value("recording")
+                .description(cx.strings().text(StringKey::KeybindingPrompt));
         } else if let Some(binding) = self.binding.clone() {
             spec = spec.value(binding);
         }

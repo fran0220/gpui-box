@@ -19,7 +19,7 @@ use crate::foundation::{
 };
 use crate::layout::scroll::scroll_handle;
 use crate::overlay::{
-    Hang, Placement,
+    Hang, Placement, Tooltipped,
     popover::{self, MenuKey},
 };
 use crate::state::Loadable;
@@ -510,8 +510,25 @@ impl Cascader {
                     .into_any_element()
             }),
             Loadable::Idle => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(ident, cx.strings().text(StringKey::CascaderUnstarted))
-                    .kind(EmptyKind::Unstarted)
+                let wording = cx.strings().text(StringKey::CascaderUnstarted);
+                div()
+                    .id(ident.element_id())
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .p_token(&theme, Space::Xl)
+                    .child(
+                        icon(Icon::Document)
+                            .size(px(theme.measures.standalone_icon))
+                            .text_color(theme.colors.text_faint),
+                    )
+                    .tip(ident.clone(), wording.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.semantic_id(), Role::Status)
+                            .text(wording)
+                            .value(EmptyKind::Unstarted.name()),
+                    )
                     .into_any_element()
             }),
             Loadable::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {

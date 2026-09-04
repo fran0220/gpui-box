@@ -11,13 +11,14 @@ use gpui::{
     Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent, DayMark};
 use crate::display::badge::Tone;
-use crate::display::status::StatusLine;
+use crate::display::status::{StatusDot, StatusLine};
 use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
+use crate::overlay::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 /// A range as the caller holds it: a start, and an end once there is one.
@@ -340,22 +341,49 @@ impl Render for RangePicker {
             self.calendar.clone().into_any_element()
         };
 
-        let blocked_line = match &blocked {
-            BlockedReport::Unchecked => Some(
-                foundation_text(
-                    &theme,
-                    TypeScale::Caption,
-                    cx.strings().text(StringKey::RangeUncheckable),
-                )
-                .text_tone(&theme, TextTone::Muted)
+        let summary_ident = self.ident.child("summary");
+        let summary_line = if matches!(state, RangeState::Unset) {
+            div()
+                .id(summary_ident.element_id())
+                .row()
+                .child(StatusDot::new(tone))
+                .tip(summary_ident.clone(), summary.clone())
                 .semantic_in(
                     cx,
-                    NodeSpec::new(self.ident.child("blocked").semantic_id(), Role::Status)
+                    NodeSpec::new(summary_ident.semantic_id(), Role::Status)
                         .parent(self.ident.semantic_id())
-                        .value("unchecked")
-                        .text(cx.strings().text(StringKey::RangeUncheckable)),
-                ),
-            ),
+                        .text(summary.clone())
+                        .value(state.name()),
+                )
+                .into_any_element()
+        } else {
+            StatusLine::new(summary.clone(), tone)
+                .id(summary_ident)
+                .into_any_element()
+        };
+
+        let blocked_line = match &blocked {
+            BlockedReport::Unchecked => {
+                let ident = self.ident.child("blocked");
+                let wording = cx.strings().text(StringKey::RangeUncheckable);
+                Some(
+                    div()
+                        .id(ident.element_id())
+                        .child(
+                            gpui_kit_assets::icon(gpui_kit_assets::Icon::Info)
+                                .size(px(theme.control.sm.icon_size))
+                                .text_color(theme.colors.text_muted),
+                        )
+                        .tip(ident.clone(), wording.clone())
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.semantic_id(), Role::Status)
+                                .parent(self.ident.semantic_id())
+                                .value("unchecked")
+                                .description(wording),
+                        ),
+                )
+            }
             _ => None,
         };
 
@@ -397,8 +425,8 @@ impl Render for RangePicker {
             .child(
                 div()
                     .column()
-                    .gap(px(theme.space(Space::Xs)))
-                    .child(StatusLine::new(summary.clone(), tone).id(self.ident.child("summary")))
+                    .gap_token(&theme, Space::Xs)
+                    .child(summary_line)
                     .children(blocked_line)
                     .children(named),
             )

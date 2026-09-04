@@ -779,7 +779,6 @@ impl Render for Calendar {
                     cx.strings().text(StringKey::CalendarUnknownMonth),
                 )
                 .kind(EmptyKind::Unavailable)
-                .detail(cx.strings().text(StringKey::CalendarUnknownMonthDetail))
                 .into_any_element()
             }),
         };
@@ -805,7 +804,11 @@ impl Render for Calendar {
             .disabled(self.disabled);
         match month {
             Some(month) => spec = spec.text(self.adapter.month_label(month)),
-            None => spec = spec.value("month unknown"),
+            None => {
+                spec = spec
+                    .value("month unknown")
+                    .description(cx.strings().text(StringKey::CalendarUnknownMonthDetail))
+            }
         }
 
         div()
