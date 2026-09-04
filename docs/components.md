@@ -1225,9 +1225,9 @@ of moving its own checkmark.
 
 Every component appears in `gpui_kit::scenes`, which `xtask headless check`
 renders offscreen in every bundled theme and
-`crates/gpui-kit/tests/scenes.rs` audits headlessly. Behaviour is asserted
+`crates/gpui-kit/tests/it/scenes.rs` audits headlessly. Behaviour is asserted
 through simulated key and mouse input against the published semantic tree, in
-`crates/gpui-kit/tests/`.
+`crates/gpui-kit/tests/it/`.
 
 The catalog is in two tiers, and the difference is what "appears in" means.
 Almost every rendering is an **exhibit**: it is about one component, it lives

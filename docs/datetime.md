@@ -151,8 +151,8 @@ The feature exists so that:
 - the scenes `calendar`, `date-range`, and `date-time` photograph the same
   pixels on every run, because their today is pinned rather than read from the
   machine's clock;
-- `crates/gpui-kit/tests/datetime.rs` can assert behaviour against a calendar
-  that never moves;
+- `crates/gpui-kit/tests/it/datetime.rs` can assert behaviour against a
+  calendar that never moves;
 - the gallery can show the components at all.
 
 The gallery, `xtask`, and the crate's own dev-dependencies turn the feature on.

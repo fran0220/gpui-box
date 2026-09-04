@@ -617,7 +617,7 @@ hooks, or source files, and adds no dependency.
   `crates/gpui-kit/src/motion/spring.rs`; `crates/gpui/src/gestures.rs`,
   `crates/gpui/src/interactive.rs`, `crates/gpui/src/profiler.rs`, and
   `crates/gpui/src/window.rs`; behavioral contracts in
-  `crates/gpui-kit/tests/dock_tree.rs`
+  `crates/gpui-kit/tests/it/dock_tree.rs`
 
 The Longbridge release exposed the capability delta but is not the source of
 the framework code: `gpui-pre` is Zed's published GPUI crate, and the original

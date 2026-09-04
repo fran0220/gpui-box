@@ -159,7 +159,7 @@ A failing run writes only its changed or new actual images to
 are compared directly from memory instead of being PNG-encoded and decoded
 again; a difference nobody can look at is still not a review.
 
-The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
+The same catalog is rendered headlessly by `crates/gpui-kit/tests/it/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually
 in one arrangement and tested in another.
 

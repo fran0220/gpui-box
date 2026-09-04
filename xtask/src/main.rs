@@ -1203,10 +1203,11 @@ fn gate_only(scenes: &[String]) -> Result<()> {
         ],
         None,
     )?;
-    // A scene name is also how its tests are named, which is what makes one
-    // argument enough to select both.
+    // Rust test names use identifiers, so scene kebab-case becomes snake_case.
+    // One scene argument still selects both the tests and the rendered scene.
     for scene in scenes {
-        step("cargo", &["test", "-p", "gpui-box-kit", scene], None)?;
+        let test_filter = scene.replace('-', "_");
+        step("cargo", &["test", "-p", "gpui-box-kit", &test_filter], None)?;
     }
     tokens(true)?;
     strings::check(&root())?;

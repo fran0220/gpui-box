@@ -38,3 +38,9 @@ in explicitly with `CARGO_PROFILE_DEV_DEBUG=full` or
 directories; avoid an unconditional `cargo clean`, and clean the root and
 `tools/headless-visual` workspace separately only when their artifacts are no
 longer useful.
+
+Kit integration tests live as modules under `crates/gpui-kit/tests/it/` and
+compile through the single `tests/main.rs` harness. Keep new suites in that
+harness: one binary lets Cargo share the large Kit and testkit link result while
+the module-qualified test names still support ordinary substring filters and
+`xtask gate only <scene>`.

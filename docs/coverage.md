@@ -87,13 +87,13 @@ against every surface that implements it.
 | Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers), `Dock`/`DockTree` (panel headers, groups, split edges) |
 
 Drag and drop is covered: the contract is written down, the scenes `drag-list`,
-`drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/dnd.rs` drives
-a simulated pointer through every surface above. `DataGrid` reorders its column
-headers through the same system, driven in `crates/gpui-kit/tests/grid.rs`, and
-`Dock` moves panels between regions through it, driven in
-`crates/gpui-kit/tests/shell.rs`; `DockTree` additionally reports centre merges
-into preserved empty stacks and four-way recursive split placement, driven in
-`crates/gpui-kit/tests/dock_tree.rs`.
+`drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/it/dnd.rs`
+drives a simulated pointer through every surface above. `DataGrid` reorders its
+column headers through the same system, driven in
+`crates/gpui-kit/tests/it/grid.rs`, and `Dock` moves panels between regions
+through it, driven in `crates/gpui-kit/tests/it/shell.rs`; `DockTree`
+additionally reports centre merges into preserved empty stacks and four-way
+recursive split placement, driven in `crates/gpui-kit/tests/it/dock_tree.rs`.
 
 ## One resize implementation
 
@@ -132,7 +132,7 @@ faked: a double click on a column edge reports the request and lets the host
 answer.
 
 `TreeGrid` reuses that virtualized machinery for a caller-flattened hierarchy.
-Its `tree-grid` scene and `crates/gpui-kit/tests/tree_grid.rs` cover bounded
+Its `tree-grid` scene and `crates/gpui-kit/tests/it/tree_grid.rs` cover bounded
 materialization, TreeGrid/Row/GridCell semantics, row hierarchy metadata, and
 logical disclosure/parent keyboard intents. It deliberately adds no second
 flattening or cross-tree layout system; horizontal scrolling and a frozen

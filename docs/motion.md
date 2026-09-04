@@ -220,8 +220,8 @@ when the policy says `Poster`. A downstream component should therefore resolve
 one role rather than read `cx.reduce_motion()` directly.
 
 Tests set `cx.set_reduce_motion(true)` when they need a deterministic frame.
-`crates/gpui-kit/tests/motion.rs` carries one reduced-motion test per family —
-choice controls, navigation, display, overlay — and each asserts the same
+`crates/gpui-kit/tests/it/motion.rs` carries one reduced-motion test per family
+— choice controls, navigation, display, overlay — and each asserts the same
 thing: what the tree publishes on the frame a change lands on is what it
 publishes for good.
 
@@ -630,7 +630,7 @@ letting the last element rendered win, is the oscillation itself.
 A shared element transition cannot be captured as a scene. A still frame of it
 is either the list or the panel, and the arrangement that would show both — two
 trees rendering one id at once — is exactly the collision case above. Run it,
-or read the tests in `crates/gpui-kit/tests/motion.rs`.
+or read the tests in `crates/gpui-kit/tests/it/motion.rs`.
 
 ## Pointer responses
 

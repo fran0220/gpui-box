@@ -17,7 +17,7 @@ use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
 
 /// The cube the model tests read, with its buffer inside the document.
-const CUBE: &[u8] = include_bytes!("../../../fixtures/models/cube.gltf");
+const CUBE: &[u8] = include_bytes!("../../../../fixtures/models/cube.gltf");
 
 type Sink<T> = Rc<RefCell<Vec<T>>>;
 
