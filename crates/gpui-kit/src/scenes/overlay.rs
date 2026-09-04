@@ -286,10 +286,16 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
         menu.open_submenu("share", window, cx);
     });
 
+    // The catalog reviews the drawn surface. Left on `Native`, `open_at` would
+    // hand this list to the operating system on macOS and Windows: a modal
+    // popup no capture can hold, opened under every scene that shares these
+    // fixtures, and on Windows it takes the keyboard from the `menu` scene's
+    // exhibit while the native UIA check reads it.
     let context = cx.new(|cx| {
         ContextMenu::new("scene.context.run", window, cx)
             .name("Run actions")
             .target("run-a04")
+            .presentation(ContextMenuPresentation::InWindow)
             .menu(menu_items())
             .content(|_, cx| {
                 let theme = cx.theme().clone();

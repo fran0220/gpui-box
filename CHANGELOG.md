@@ -113,18 +113,23 @@ handles and refreshes palette lookup tables after palette changes.
 
 ### Fixed
 
-**The Windows menu smoke asks for the keyboard before reading it.** The
-native UIA `menu` check had failed on every hosted run since it was added:
-AccessKit reports `HasKeyboardFocus` and answers `FocusedElement` only while
-the gallery's window holds Win32 focus, and a process launched by a build tool
-on a runner starts without it. The `editable` mode never noticed because UIA's
-`SetFocus` focuses the host window before it reaches the provider, and the
-macOS script sets `frontmost` first. `tools/accessibility/windows-smoke.ps1`
-now brings the gallery to the foreground before any mode, attaching its input
-queue to the foreground and target threads so a non-foreground caller is
-allowed to, and the menu mode polls until the `Copy link` item and the global
-focused element agree instead of reading them once. The `Platforms` workflow
-is the only place this runs, so it is proven by a dispatch, not by the gate.
+**The menu scene no longer opens an operating-system menu underneath itself.**
+The overlay scenes share one set of fixtures, and building them opened the
+`ContextMenu` fixture with its default `Native` presentation, so on macOS and
+Windows every one of the `menu`, `context-menu`, `popover`, and
+`command-palette` scenes also popped a modal OS menu that no capture could
+hold. On Windows that popup took the keyboard from the `menu` scene's exhibit,
+which is why the native UIA `menu` check had failed on every hosted run since
+it was added: the `Copy link` item reported focus, but the global focused
+element was the OS menu. The fixture is now `InWindow`, which is what every
+baseline already showed. The check itself also asked for nothing before
+reading focus; a process launched by a build tool starts without the
+foreground, and AccessKit reports focus only while its window holds it.
+`tools/accessibility/windows-smoke.ps1` now brings the gallery to the
+foreground before any mode, polls until the item and the global focused
+element agree, and on failure prints the Win32 active/focus windows and every
+MenuItem's focus flags. The `Platforms` workflow is the only place this runs,
+so it is proven by a dispatch, not by the gate.
 
 **An image is opaque where it is opaque.** Every polychrome sprite — an
 `img()`, a `Window::paint_image`, a sprite-batch instance, a colour emoji —
