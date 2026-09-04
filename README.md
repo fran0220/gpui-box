@@ -93,8 +93,8 @@ token keys, and stable semantic ids are all compatibility surfaces.
 ```bash
 cargo run -p gpui-box-gallery
 cargo run -p xtask -- scenes render
-cargo run -p xtask -- gate              # complete non-visual proof
-cargo run -p xtask -- gate full         # gate + rustdoc + native visual catalog
+cargo run -p xtask -- gate              # complete non-visual proof, incl. wasm32 check
+cargo run -p xtask -- gate full         # gate + rustdoc + this renderer's visual catalog
 cargo run -p xtask -- headless check
 cargo run -p xtask -- web check
 cargo run -p xtask -- web build
@@ -114,10 +114,13 @@ builds and prepares Chromium once before checking the gallery, static-site
 embeds, full compose route, and scoped visual proof. `site generate` bundles
 that browser build with the static catalog rather than replacing searchable
 documentation with a canvas.
-Headless baselines and CI gates cover macOS, Linux, and Windows, and the native
-matrix compiles every feature on all three. Browser CI cross-checks WASM and
-drives a real Chromium smoke. Browser validation is single-threaded and does
-not claim screen-reader announcements. Exact support and limitations are in
+Headless baselines cover Linux, macOS, and Windows. `gate full` on Linux is
+the gate every commit runs; it compiles every feature natively and for wasm32
+and compares the llvmpipe catalog. macOS and Windows native tests and
+headless catalogs run on demand through the dispatch-only `Platforms`
+workflow. `web smoke` drives a real Chromium session when the browser gallery
+changes. Browser validation is single-threaded and does not claim
+screen-reader announcements. Exact support and limitations are in
 [`docs/compatibility.md`](docs/compatibility.md).
 
 `cargo run -p xtask -- performance check` enforces deterministic structural

@@ -32,8 +32,11 @@ list, is authoritative.
    the complete frozen official and fork-overlay history receipts, both
    canonical vendor refs, and their ancestry through this commit entirely
    offline; an incomplete receipt cannot be released.
-2. Run the platform validation required by `compatibility.toml`. Record actual
-   CI job URLs/results; do not infer a platform result from another platform.
+2. Run the platform validation required by `compatibility.toml`: `gate full`
+   on the orb for the authority lane, and one dispatched `Platforms` run of
+   the release commit for macOS and Windows (`gh workflow run platforms.yml
+   --ref main`). Record the actual run URLs/results; do not infer a platform
+   result from another platform.
 3. Run the complete local package gate:
 
    ```bash

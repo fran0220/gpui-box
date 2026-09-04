@@ -266,7 +266,7 @@ The shared region calculation retains every Gaussian dependency, the maximum
 refracted and dispersed reach, and requested probe samples while leaving
 texture coordinates and material math unchanged. Direct3D's all-feature crate
 also cross-compiles for `x86_64-pc-windows-gnu`. Metal cannot run in the Linux
-orb; its active check remains native CI. This is a pixel-equivalent renderer
+orb; its check is the dispatched `Platforms` workflow. This is a pixel-equivalent renderer
 optimization, so no macOS or Windows baseline is recaptured or changed; their
 existing headless checks remain the acceptance authority.
 
@@ -898,13 +898,12 @@ tests still do not fail on every class of slowdown.
 The hosted catalog at gpui-box.origingame.dev is the published documentation;
 it is deployed from a checkout and is not itself a crates.io release.
 
-The visual regression gate is `headless check` on macOS (Metal) and Windows
-(WARP). It renders offscreen at a fixed device-pixel size, so it does not
-depend on a composited, frontmost window or the host display. Linux is a
-compile-and-capability surface: CI builds the native graph there, but does
-not compare llvmpipe pixels. Prior images under
-`snapshots/headless/linux` are retired and non-gating.
-`docs/screenshot-testing.md` describes the gate and review workflow.
+The visual regression gate is `headless check`. It renders offscreen at a
+fixed device-pixel size, so it does not depend on a composited, frontmost
+window or the host display. Linux (llvmpipe) is compared at every commit by
+`gate full` on the orb; macOS (Metal) and Windows (WARP) are compared when the
+dispatch-only `Platforms` workflow runs, which is on demand rather than on
+push. `docs/screenshot-testing.md` describes the gate and review workflow.
 
 ## Rules every covered component follows
 

@@ -23,14 +23,18 @@ history. It does not contact either historical source repository.
 
 | Platform | Current repository contract | Validation command/evidence | Limits |
 |---|---|---|---|
-| macOS | Framework, kit, Metal, native action context menus, clipped and paint-ordered native views, native AVFoundation audio/video playback, and deterministic headless catalog | CI runs native media load/control/replacement/teardown tests, the all-feature native check, and `cargo run -p xtask -- headless check`; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility and context-menu presentation need a logged-in host |
-| Windows | Framework/kit, native action context menus, paint-ordered custom caption controls and native drag/resize behavior, re-entrant native frame-request deferral, clipped and paint-ordered native views, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | CI runs framework input tests, native UIA editing/focus/character/caret/form-description/menu-action smoke, native media replacement/teardown/COM/MF-lifetime and truthful no-backend tests on its audio-less hosted runner, the all-feature native check, and `cargo run -p xtask -- headless check`; release acceptance additionally exercises real-window caption controls and borders plus media load/control/end/restart on an equipped Windows host; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; native frame capture is not implemented |
-| Linux | Wayland/X11 framework code and an all-feature native check | CI runs the all-feature native check. Headless pixel comparison is not a Linux gate; `snapshots/headless/linux` is retired | Application context menus use Kit's in-window fallback; native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
-| Browser/WASM | Stable, single-threaded browser gallery, hosted compose surface, and lazy catalog embeds using the same Rust scenes | CI runs `web check` and the real Chromium gallery/site smoke; the visual command remains available for scoped review | Application context menus use Kit's in-window fallback; native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
+| macOS | Framework, kit, Metal, native action context menus, clipped and paint-ordered native views, native AVFoundation audio/video playback, and deterministic headless catalog | On demand: the dispatched `Platforms` workflow runs native media load/control/replacement/teardown tests, the remaining all-feature platform tests and clippy, `performance check`, and `cargo run -p xtask -- headless check` on Metal; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility and context-menu presentation need a logged-in host |
+| Windows | Framework/kit, native action context menus, paint-ordered custom caption controls and native drag/resize behavior, re-entrant native frame-request deferral, clipped and paint-ordered native views, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | On demand: the dispatched `Platforms` workflow runs native UIA editing/focus/character/caret/form-description/menu-action smoke, native media replacement/teardown/COM/MF-lifetime and truthful no-backend tests on its audio-less hosted runner, the all-feature clippy, `performance check`, the Direct3D release-shader compile, and `cargo run -p xtask -- headless check` on WARP; release acceptance additionally exercises real-window caption controls and borders plus media load/control/end/restart on an equipped Windows host; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; native frame capture is not implemented |
+| Linux | Wayland/X11 framework code, the all-feature native check, and the deterministic llvmpipe headless catalog | Every commit: `cargo run -p xtask -- gate full` on the orb runs the all-feature tests and clippy, rustdoc, the structural performance budgets, and `headless check` against `snapshots/headless/linux` | Application context menus use Kit's in-window fallback; native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
+| Browser/WASM | Stable, single-threaded browser gallery, hosted compose surface, and lazy catalog embeds using the same Rust scenes | Every commit: `gate` runs `web check` (wasm32 compile, warnings denied); `web smoke` drives the real Chromium gallery/site session when the browser gallery changes, and the visual command remains available for scoped review | Application context menus use Kit's in-window fallback; native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
 
-All four rows are mandatory CI surfaces. A release may claim only results
-recorded for its commit; the commands do not erase the explicit limitations in
-the final column. Accessibility capability details remain in
+All four rows are mandatory surfaces, in two lanes recorded by
+`compatibility.toml`'s `gate_lane`: `authority` (Linux and browser) runs in
+`xtask gate` at every commit on the orb, `on-demand` (macOS and Windows) is
+the dispatched `Platforms` workflow. No GitHub workflow builds on push. A
+release may claim only results recorded for its commit, which for the
+on-demand lane means a `Platforms` run of that commit; the commands do not
+erase the explicit limitations in the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
 
@@ -42,7 +46,7 @@ unreachable handlers and active action behavior is unchanged.
 Every native row also runs `cargo run -p xtask -- performance check`. The
 command enforces per-window structural budgets over 10,000-item List,
 DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument fixtures and writes
-`target/performance/report.json`. Browser CI compiles the same fixed counters;
+`target/performance/report.json`. The browser build compiles the same fixed counters;
 its renderer-specific timing lane remains separate from the structural gate.
 See [`performance-testing.md`](performance-testing.md).
 

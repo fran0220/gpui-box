@@ -143829,6 +143829,7 @@
       {
         "ci_commands": [
           "cargo test -p gpui-box-media --all-features --locked",
+          "cargo test --workspace --all-features --locked --exclude gpui-box-media",
           "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
           "cargo run -p xtask -- performance check",
           "cargo run -p xtask -- headless check"
@@ -143842,8 +143843,9 @@
           "cargo run -p xtask -- headless check"
         ],
         "contract": "framework-kit-native-metal-context-menu-clipped-platform-view-avfoundation-media",
+        "gate_lane": "on-demand",
         "limitations": [
-          "visual CI requires separately configured evidence",
+          "evidence comes from a dispatched Platforms run, not from every push",
           "native context-menu presentation requires a logged-in host",
           "native playback covers unprotected sources and operating-system codecs only",
           "does not prove other platforms"
@@ -143854,7 +143856,9 @@
         "ci_commands": [
           "cargo test -p gpui-box-media --all-features --locked",
           "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+          "cargo run -p xtask -- accessibility check",
           "cargo run -p xtask -- performance check",
+          "cargo check -p gpui-box-windows --release --locked",
           "cargo run -p xtask -- headless check"
         ],
         "ci_gated": true,
@@ -143864,19 +143868,24 @@
           "cargo run -p xtask -- headless check"
         ],
         "contract": "framework-kit-native-context-menu-clipped-platform-view-media-foundation-headless-warp",
+        "gate_lane": "on-demand",
         "limitations": [
+          "evidence comes from a dispatched Platforms run, not from every push",
           "native frame capture not implemented",
           "native playback covers unprotected sources and operating-system codecs only"
         ],
         "name": "windows"
       },
       {
+        "ci_commands": [
+          "cargo run -p xtask -- gate full"
+        ],
         "ci_gated": true,
         "commands": [
-          "cargo run -p xtask -- performance check",
-          "cargo run -p xtask -- headless check"
+          "cargo run -p xtask -- gate full"
         ],
         "contract": "wayland-x11-code-and-llvmpipe-baseline",
+        "gate_lane": "authority",
         "limitations": [
           "application context menus use the in-window fallback",
           "native media playback is unavailable",
@@ -143886,6 +143895,9 @@
         "name": "linux"
       },
       {
+        "ci_commands": [
+          "cargo run -p xtask -- web check"
+        ],
         "ci_gated": true,
         "commands": [
           "cargo run -p xtask -- web check",
@@ -143894,6 +143906,7 @@
           "cargo run -p xtask -- web visual check button input dialog node-graph"
         ],
         "contract": "single-threaded-browser-gallery",
+        "gate_lane": "authority",
         "limitations": [
           "application context menus use the in-window fallback",
           "native media playback is unavailable",

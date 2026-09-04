@@ -143,15 +143,17 @@ The public catalog at `https://gpui-box.origingame.dev/mcp` must track
 `origin/main`, not crates.io. Do not publish a crates.io MCP bump as part of
 ordinary Kit work.
 
-After every `git push` to `main`, the `Deploy site and MCP` workflow waits for
-the full `CI` workflow and deploys one static Linux/x86-64 bundle through the
-restricted BWG receiver. A manual deployment uses `tools/site/deploy.sh`.
-
-Confirm hosted `/build-info.json` names that commit and has the same package,
-symbol, component, type, and scene counts as `docs/developer-index.json`.
-Confirm `POST /mcp` `tools/list` returns ten remote tools and
-`search_components` with an empty query returns every component. A push that
-changes the catalog and leaves BWG on the previous release is unfinished.
+Nothing deploys on push. After every `git push` to `main`, run
+`tools/site/deploy-main.sh` from the orb. It refuses a dirty tree or a `HEAD`
+that is not `origin/main`, builds one static Linux/x86-64 bundle, streams it
+through the restricted BWG receiver, and then runs
+`tools/site/verify-deployment.sh`, which proves hosted `/build-info.json` names
+that commit with the same package, symbol, component, type, and scene counts
+as `docs/developer-index.json`, that `POST /mcp` `tools/list` returns every
+remote tool, and that `search_components` with an empty query returns every
+component. The dispatch-only `Deploy site and MCP` workflow is the fallback
+when no machine holds the deployment identity. A push that changes the catalog
+and leaves BWG on the previous release is unfinished.
 
 ## Validation
 
@@ -168,6 +170,18 @@ shortcut while iterating, never what a commit runs — it says nothing about the
 other workspace members, the doctests, or a scene the edit reached without
 anybody predicting it.
 
+The gate runs where the commit is made. No GitHub workflow builds on push:
+`gate full` on the Linux orb is the whole daily authority, covering the
+all-feature native graph, the wasm32 compile, rustdoc, and the llvmpipe visual
+catalog. macOS and Windows are on-demand lanes — the dispatch-only
+`Platforms` workflow (`gh workflow run platforms.yml`) runs their native tests
+and the Metal and WARP headless catalogs. Dispatch it before a release, after
+a renderer, shader, token, or font change, or when a macOS or Windows claim
+needs fresh evidence; a failing headless job uploads its changed frames, and
+`tools/headless-visual/accept-run.sh <run-id>` copies them into the committed
+baseline for review. `compatibility.toml` records which lane proves each
+platform.
+
 The visual gate on each supported native platform is
 `cargo run -p xtask -- headless check` (`headless capture` accepts). It renders
 the catalog into offscreen textures at a size it names — Metal on macOS and
@@ -175,8 +189,9 @@ software adapters on Linux and Windows —
 with reduced motion and simulated time, so no window, display, dock, or
 compositor takes part and the same scene produces the same bytes on any
 machine with that renderer. Active baselines live in
-`snapshots/headless/{macos,windows}/scenes`, one set per renderer; the Linux
-set is retired and no CI job compares it.
+`snapshots/headless/{linux,macos,windows}/scenes`, one set per renderer. The
+Linux set is the one every commit checks; the other two move only when a
+`Platforms` run is accepted.
 
 Never hold a baseline from a real window. A window negotiates its size with
 the display it opens on, which is how `snapshots/macos` came to hold two

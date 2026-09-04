@@ -1087,6 +1087,10 @@ fn scenes_render(only: &[String]) -> Result<()> {
 /// The short form is what a work-in-progress change wants: it answers in about
 /// a minute. The full form adds the two slow proofs, rendered documentation
 /// and the visual regression, and is what a commit wants.
+///
+/// This is the authority. No hosted runner repeats it on push: the Linux orb
+/// that made the commit runs it, and the only remote lane left is the
+/// dispatched `Platforms` workflow for the Metal and WARP renderers.
 fn gate(full: bool) -> Result<()> {
     step("cargo", &["fmt", "--all", "--", "--check"], None)?;
     icons::check(&root())?;
@@ -1113,6 +1117,9 @@ fn gate(full: bool) -> Result<()> {
     api::check(&root())?;
     site::check(&root())?;
     performance_check()?;
+    // The browser surface has no other gate: nothing runs on push anywhere
+    // else, so the wasm32 compile with warnings denied belongs here.
+    web_check()?;
     if full {
         step(
             "cargo",

@@ -26,6 +26,24 @@ graph can be resized from its bottom-right grip, reported as
 
 ### Changed
 
+**The gate runs where the commit is made.** No GitHub workflow builds on push
+any more. `cargo run -p xtask -- gate full` on the Linux orb is the whole
+daily authority — it now also compiles the kit for wasm32 with warnings
+denied, and it compares the llvmpipe catalog against a re-rendered, reviewed
+`snapshots/headless/linux` set instead of treating that set as retired. macOS
+and Windows native tests and their Metal and WARP headless catalogs moved to
+a dispatch-only `Platforms` workflow, run before a release or after a
+renderer, token, or font change; a failing headless job uploads its changed
+frames and `tools/headless-visual/accept-run.sh <run-id>` copies them into
+the committed baseline for review. `compatibility.toml` records each
+platform's lane as `gate_lane = "authority"` or `"on-demand"` and
+`dependencies check` refuses a platform without one. The hosted catalog is
+deployed by `tools/site/deploy-main.sh` from the orb right after a push —
+it refuses a dirty tree or a `HEAD` that is not `origin/main` — and proven by
+`tools/site/verify-deployment.sh`, which the dispatch-only fallback
+`Deploy site and MCP` workflow shares. The supply-chain audit keeps its
+weekly schedule; the Criterion timing lane is dispatch-only.
+
 **Components say a state once, by its mark.** Where an icon or coloured dot
 already names a state, the word beside it is no longer printed; it is hover
 help on the mark and the node's semantic text and value, so a harness or a

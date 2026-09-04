@@ -420,6 +420,28 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
             .all(|record| record.get("ci_gated").and_then(Value::as_bool) == Some(true)),
         "every claimed compatibility platform must be CI-gated"
     );
+    // A gated platform is proven in one of two lanes: `authority` runs inside
+    // `xtask gate` on the Linux orb at every commit, `on-demand` is the
+    // dispatched `Platforms` workflow for renderers that cannot run there.
+    // Either way the commands that produce the evidence must be written down.
+    for record in platform {
+        let name = record.get("name").and_then(Value::as_str).unwrap_or("?");
+        let lane = record
+            .get("gate_lane")
+            .and_then(Value::as_str)
+            .with_context(|| format!("compatibility.toml platform {name} needs gate_lane"))?;
+        ensure!(
+            matches!(lane, "authority" | "on-demand"),
+            "compatibility.toml platform {name} has gate_lane {lane:?}; expected authority or on-demand"
+        );
+        ensure!(
+            record
+                .get("ci_commands")
+                .and_then(Value::as_array)
+                .is_some_and(|commands| !commands.is_empty()),
+            "compatibility.toml platform {name} needs non-empty ci_commands"
+        );
+    }
 
     let provenance = read_toml(&root.join("provenance.toml"))?;
     ensure!(

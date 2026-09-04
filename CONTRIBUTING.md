@@ -14,9 +14,14 @@
    instead when they can. `gate full` already includes the regular gate; do not
    run both back to back.
 6. For UI changes inspect every image reported by `headless check`, and use
-   `headless capture` only after review. macOS, Linux, and Windows each carry an
-   active renderer-specific CI baseline.
-7. Add a reader-facing changelog entry. Rust API, token-key, and semantic-id
+   `headless capture` only after review. Linux, macOS, and Windows each carry
+   a renderer-specific baseline. The Linux one is compared by `gate full` at
+   every commit; the other two are refreshed by dispatching the `Platforms`
+   workflow and accepting its frames with
+   `tools/headless-visual/accept-run.sh`.
+7. Nothing builds on push in GitHub. After pushing to `main`, run
+   `tools/site/deploy-main.sh` so the hosted catalog follows the commit.
+8. Add a reader-facing changelog entry. Rust API, token-key, and semantic-id
    compatibility changes must be explicit.
 
 Use public package names in commands (`gpui-box-gallery`, `gpui-box-mcp`,
