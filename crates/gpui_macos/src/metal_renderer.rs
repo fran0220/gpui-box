@@ -924,8 +924,7 @@ impl MetalRenderer {
                     &[glass],
                     writer,
                     viewport_size,
-                    &frosted,
-                    &scratch,
+                    (&frosted, &scratch),
                     region.visible,
                     command_encoder,
                 ) {
@@ -1058,8 +1057,7 @@ impl MetalRenderer {
                 &[*glass],
                 writer,
                 viewport_size,
-                &frosted,
-                &scratch,
+                (&frosted, &scratch),
                 region.visible,
                 command_encoder,
             ) {
@@ -1257,8 +1255,7 @@ impl MetalRenderer {
         surfaces: &[BackdropGlass],
         writer: &mut InstanceBufferWriter,
         viewport_size: Size<DevicePixels>,
-        source_texture: &metal::TextureRef,
-        sharp_texture: &metal::TextureRef,
+        textures: (&metal::TextureRef, &metal::TextureRef),
         visible: Bounds<DevicePixels>,
         command_encoder: &metal::RenderCommandEncoderRef,
     ) -> Result<()> {
@@ -1295,11 +1292,11 @@ impl MetalRenderer {
         );
         command_encoder.set_fragment_texture(
             BackdropGlassInputIndex::SourceTexture as u64,
-            Some(source_texture),
+            Some(textures.0),
         );
         command_encoder.set_fragment_texture(
             BackdropGlassInputIndex::SharpTexture as u64,
-            Some(sharp_texture),
+            Some(textures.1),
         );
 
         command_encoder.set_scissor_rect(metal_scissor(visible));
