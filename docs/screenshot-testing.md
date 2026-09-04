@@ -122,11 +122,20 @@ cargo run -p xtask -- headless capture        # accept
 `tools/headless-visual` renders each scene into an offscreen texture at a size
 it names and reads the pixels straight back. No window, display, menu bar,
 dock, or compositor takes part, so any machine with the same renderer produces
-the same bytes. Baselines live in `snapshots/headless/{macos,windows}/scenes`,
-one set per renderer, because Metal and WARP land antialiased edges
-differently. Both sets are active platform-specific gates and must be
-captured on the renderer they represent. A retired llvmpipe set remains under
-`snapshots/headless/linux` from when CI compared it; no job runs it today.
+the same bytes. Baselines live in
+`snapshots/headless/{linux,macos,windows}/scenes`, one set per renderer,
+because llvmpipe, Metal, and WARP land antialiased edges differently, and each
+must be captured on the renderer it represents.
+
+The Linux set is the daily gate: `gate full` on the orb compares it at every
+commit, and `headless capture` there accepts. The macOS and Windows sets are
+on-demand evidence. The dispatch-only `Platforms` workflow renders them on
+hosted Metal and WARP runners; a failing job uploads only the frames that
+moved, and `tools/headless-visual/accept-run.sh <run-id>` copies those into
+the committed set so they can be looked at and committed. Nothing renders
+those two sets on push, so a change that moves every image — a token retune,
+a font, a shader — is followed by one dispatched run before the next release
+or macOS/Windows claim, not by a red check on every commit in between.
 
 Text is shaped by cosmic-text from the bundled fonts only. Loading the
 machine's own fonts would shape text differently from one machine to the next,
@@ -155,7 +164,8 @@ Naming scenes checks or captures only those, which is what a change to one
 component needs.
 
 A failing run writes only its changed or new actual images to
-`target/headless-scene-check`, which CI uploads as an artifact. Passing frames
+`target/headless-scene-check`, which the `Platforms` workflow uploads as an
+artifact. Passing frames
 are compared directly from memory instead of being PNG-encoded and decoded
 again; a difference nobody can look at is still not a review.
 
@@ -242,19 +252,20 @@ correlation.
 `tools/headless-visual` renders the same catalog with no window system at all:
 GPUI's renderer draws each scene into an offscreen texture and the pixels are
 read straight back. Metal is used on macOS; llvmpipe and WARP provide software
-adapters on Linux and Windows, so those gates run on headless CI machines with
-no discrete GPU. Text is shaped from bundled fonts only, and time is simulated.
-Repeated runs are stable within each renderer and compare against that
-platform's baseline.
+adapters on Linux and Windows, so those gates run on machines with no
+discrete GPU: the orb for llvmpipe, hosted runners for WARP. Text is shaped
+from bundled fonts only, and time is simulated. Repeated runs are stable
+within each renderer and compare against that platform's baseline.
 
 ```bash
 cargo run -p xtask -- headless check     # compare against the baseline
 cargo run -p xtask -- headless capture   # accept what check reported
 ```
 
-The active baselines live in `snapshots/headless/{macos,windows}/scenes`.
-Metal and WARP land antialiased edges differently, so each supported
-renderer verifies its own baseline.
+The active baselines live in `snapshots/headless/{linux,macos,windows}/scenes`.
+llvmpipe, Metal, and WARP land antialiased edges differently, so each
+supported renderer verifies its own baseline: Linux at every commit on the
+orb, the other two when `Platforms` is dispatched.
 
 Read a frosted surface with a pixel probe, not with your eyes. A blurred
 backdrop and a sharp one look alike at review scale when the thing behind is a
@@ -272,7 +283,9 @@ A token change moves every image on every renderer, and each set can only be
 accepted on a machine with that renderer. The surface-separation and
 tone-distinction retune re-rendered all 216 macOS baselines and all 214 that
 WARP can produce; a baseline is never copied between renderers, because one
-from the wrong renderer verifies nothing.
+from the wrong renderer verifies nothing. When the Linux set became the daily
+gate again it was re-rendered in full on the orb and read before it was
+committed, because the retired set predated that retune.
 
 Procedural scene images retain their `RenderImage` identity across redraws.
 Rebuilding an identical image with a fresh identity repeatedly uploads it into
@@ -289,16 +302,16 @@ family as the root workspace with path-plus-version declarations and no Git
 source. Both workspaces apply the one audited crates.io patch for the vendored
 `block` 0.1.6 future-compatibility fix; no GPUI Box package is patched, and no
 other patch is allowed. `xtask dependencies check` fails if either graph,
-authority declaration, patch receipt, or lockfile drifts. CI invokes this
-workspace directly so a cold visual job does not first build the overlapping
-root `xtask` graph. It also disables native window-system and media playback
+authority declaration, patch receipt, or lockfile drifts. The `Platforms`
+workflow invokes this workspace directly so a cold visual job does not first
+build the overlapping root `xtask` graph. It also disables native window-system and media playback
 features: the harness needs the platform's offscreen renderer, while media
 scenes use the deterministic `FixtureTransport`. Normal applications keep both
 native feature sets enabled by default.
 
-Windows CI builds that harness once, uploads the executable, and assigns the
-stable scene catalog round-robin to eight fresh WARP workers with
-`check --shard INDEX/COUNT`. Every scene belongs to exactly one shard, each
+The Windows lane of `Platforms` builds that harness once, uploads the
+executable, and assigns the stable scene catalog round-robin to eight fresh
+WARP workers with `check --shard INDEX/COUNT`. Every scene belongs to exactly one shard, each
 worker still compares against the same committed Windows baseline, and an
 aggregate `headless (windows-2025)` check fails if the build or any shard fails.
 This parallelizes the software renderer rather than compiling the crate graph
