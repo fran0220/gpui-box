@@ -1,5 +1,7 @@
 //! Maps GPUI-independent tokens into the paint and typography types views use.
 
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use gpui::{
@@ -151,6 +153,15 @@ struct PaletteSteps {
     readable_light: [String; 3],
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct ResolvedRamp {
+    filled: Option<Hsla>,
+    hover: Option<Hsla>,
+    active: Option<Hsla>,
+    readable_dark: Option<Hsla>,
+    readable_light: Option<Hsla>,
+}
+
 fn token_color(paint: Hsla) -> Color {
     let paint = Rgba::from(paint);
     Color {
@@ -159,6 +170,48 @@ fn token_color(paint: Hsla) -> Color {
         blue: paint.b,
         alpha: paint.a,
     }
+}
+
+fn resolve_palette(
+    palette: &Palette,
+    steps: &PaletteSteps,
+) -> (
+    HashMap<SharedString, Hsla>,
+    HashMap<SharedString, ResolvedRamp>,
+) {
+    let resolved = palette
+        .iter()
+        .flat_map(|(group, entries)| {
+            entries.iter().filter_map(move |(step, value)| {
+                let path = format!("{group}.{step}");
+                Color::resolve(&path, value, palette)
+                    .ok()
+                    .map(|paint| (SharedString::from(path), color(paint)))
+            })
+        })
+        .collect::<HashMap<_, _>>();
+    let ramp_step = |group: &str, preferred: &[String; 3]| {
+        preferred.iter().find_map(|step| {
+            let path = format!("{group}.{step}");
+            resolved.get(path.as_str()).copied()
+        })
+    };
+    let ramps = palette
+        .keys()
+        .map(|group| {
+            (
+                SharedString::from(group.clone()),
+                ResolvedRamp {
+                    filled: ramp_step(group, &steps.filled),
+                    hover: ramp_step(group, &steps.hover),
+                    active: ramp_step(group, &steps.active),
+                    readable_dark: ramp_step(group, &steps.readable_dark),
+                    readable_light: ramp_step(group, &steps.readable_light),
+                },
+            )
+        })
+        .collect();
+    (resolved, ramps)
 }
 
 /// The weakest contrast `foreground` keeps over every interactive paint.
@@ -177,8 +230,29 @@ fn weakest_contrast(foreground: Hsla, backgrounds: [Hsla; 3], substrate: Hsla) -
         .fold(f32::INFINITY, f32::min)
 }
 
+/// A cheaply cloned handle to one complete resolved token document.
+///
+/// Render paths clone this handle without cloning the palette, shadows,
+/// strings, or sequence scale behind it. Use [`Theme::modify`] to derive an
+/// adjusted theme while keeping the original unchanged.
 #[derive(Debug, Clone)]
-pub struct Theme {
+pub struct Theme(Arc<ThemeData>);
+
+impl Deref for Theme {
+    type Target = ThemeData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// The complete resolved data behind a [`Theme`].
+///
+/// Its fields stay readable so existing component paint code remains direct.
+/// Mutations go through [`Theme::modify`], which uses copy-on-write and keeps
+/// the pre-resolved palette lookup tables coherent.
+#[derive(Debug, Clone)]
+pub struct ThemeData {
     pub id: SharedString,
     pub name: SharedString,
     pub appearance: Appearance,
@@ -199,10 +273,12 @@ pub struct Theme {
     /// vocabulary has no slot for still travels with the theme rather than
     /// being read from a second document the registry does not know about.
     ///
-    /// Read it through [`Theme::palette_color`]. Shared behind an `Arc`
-    /// because a theme is cloned on every render that reads it.
+    /// Read it through [`Theme::palette_color`]. It remains separately shared
+    /// so a rare copy-on-write theme adjustment need not clone the raw map.
     pub palette: Arc<Palette>,
     palette_steps: PaletteSteps,
+    resolved_palette: HashMap<SharedString, Hsla>,
+    resolved_ramps: HashMap<SharedString, ResolvedRamp>,
 }
 
 #[derive(Debug, Clone)]
@@ -705,6 +781,26 @@ impl Theme {
         Self::from_tokens(gpui_kit_tokens::studio_light(), Density::default())
     }
 
+    /// Derives a theme by mutating a copy-on-write view of its resolved data.
+    ///
+    /// Cloning a theme is constant-time. The complete data is cloned only
+    /// when this method adjusts a shared theme; the source handle and every
+    /// other clone keep their original values. If the callback replaces or
+    /// copy-on-write mutates `palette`, its lookup tables are rebuilt before
+    /// the result is returned.
+    pub fn modify(mut self, adjust: impl FnOnce(&mut ThemeData)) -> Self {
+        let previous_palette = Arc::clone(&self.0.palette);
+        let data = Arc::make_mut(&mut self.0);
+        adjust(data);
+        if !Arc::ptr_eq(&previous_palette, &data.palette) {
+            let (resolved_palette, resolved_ramps) =
+                resolve_palette(&data.palette, &data.palette_steps);
+            data.resolved_palette = resolved_palette;
+            data.resolved_ramps = resolved_ramps;
+        }
+        self
+    }
+
     /// Builds a theme from any validated token document at one density.
     ///
     /// Density scales spacing, control geometry and type independently, and
@@ -719,7 +815,16 @@ impl Theme {
                 weight: step.weight,
             }
         };
-        Self {
+        let palette = Arc::new(tokens.color.palette.clone());
+        let palette_steps = PaletteSteps {
+            filled: tokens.color.palette_steps.filled.clone(),
+            hover: tokens.color.palette_steps.hover.clone(),
+            active: tokens.color.palette_steps.active.clone(),
+            readable_dark: tokens.color.palette_steps.readable_dark.clone(),
+            readable_light: tokens.color.palette_steps.readable_light.clone(),
+        };
+        let (resolved_palette, resolved_ramps) = resolve_palette(&palette, &palette_steps);
+        Self(Arc::new(ThemeData {
             id: tokens.meta.id.clone().into(),
             name: tokens.meta.name.clone().into(),
             appearance: tokens.meta.appearance,
@@ -1031,15 +1136,11 @@ impl Theme {
                     .effect
                     .custom_color_active_lightness_delta,
             },
-            palette: Arc::new(tokens.color.palette.clone()),
-            palette_steps: PaletteSteps {
-                filled: tokens.color.palette_steps.filled.clone(),
-                hover: tokens.color.palette_steps.hover.clone(),
-                active: tokens.color.palette_steps.active.clone(),
-                readable_dark: tokens.color.palette_steps.readable_dark.clone(),
-                readable_light: tokens.color.palette_steps.readable_light.clone(),
-            },
-        }
+            palette,
+            palette_steps,
+            resolved_palette,
+            resolved_ramps,
+        }))
     }
 
     /// A palette entry, addressed as `"group.step"`.
@@ -1055,9 +1156,7 @@ impl Theme {
     /// guessed colour: a theme that has not named a scale has not agreed to
     /// paint it.
     pub fn palette_color(&self, path: &str) -> Option<Hsla> {
-        let (group, step) = path.split_once('.')?;
-        let value = self.palette.get(group)?.get(step)?;
-        Color::resolve(path, value, &self.palette).ok().map(color)
+        self.resolved_palette.get(path).copied()
     }
 
     pub fn surface(&self, surface: Surface) -> Hsla {
@@ -1467,7 +1566,8 @@ impl Theme {
             ColorChoice::Semantic(role) => self.semantic_color(*role),
             ColorChoice::Custom(paint) => *paint,
             ColorChoice::Palette(group) => self
-                .ramp_step(group, &self.palette_steps.filled)
+                .ramp_step(group)
+                .and_then(|ramp| ramp.filled)
                 .unwrap_or(self.colors.accent),
         }
     }
@@ -1475,11 +1575,11 @@ impl Theme {
     /// The shade of the colour that reads as text on this theme's surfaces.
     fn readable_shade(&self, color: &ColorChoice, base: Hsla) -> Hsla {
         if let ColorChoice::Palette(group) = color {
-            let steps = match self.appearance {
-                Appearance::Dark => &self.palette_steps.readable_dark,
-                Appearance::Light => &self.palette_steps.readable_light,
+            let shade = match self.appearance {
+                Appearance::Dark => self.ramp_step(group).and_then(|ramp| ramp.readable_dark),
+                Appearance::Light => self.ramp_step(group).and_then(|ramp| ramp.readable_light),
             };
-            if let Some(shade) = self.ramp_step(group, steps) {
+            if let Some(shade) = shade {
                 return shade;
             }
         }
@@ -1498,10 +1598,8 @@ impl Theme {
     /// The hover and pressed shades of a filled colour.
     fn pressed_shades(&self, color: &ColorChoice, base: Hsla) -> (Hsla, Hsla) {
         if let ColorChoice::Palette(group) = color
-            && let (Some(hover), Some(active)) = (
-                self.ramp_step(group, &self.palette_steps.hover),
-                self.ramp_step(group, &self.palette_steps.active),
-            )
+            && let Some(ramp) = self.ramp_step(group)
+            && let (Some(hover), Some(active)) = (ramp.hover, ramp.active)
         {
             return (hover, active);
         }
@@ -1517,17 +1615,9 @@ impl Theme {
         )
     }
 
-    /// The first step of `preferred` the active palette carries for `group`.
-    fn ramp_step(&self, group: &str, preferred: &[String]) -> Option<Hsla> {
-        let steps = self.palette.get(group)?;
-        preferred
-            .iter()
-            .find_map(|step| steps.get(step).map(|value| (step.as_str(), value.as_str())))
-            .and_then(|(step, value)| {
-                Color::resolve(&format!("{group}.{step}"), value, &self.palette)
-                    .ok()
-                    .map(color)
-            })
+    /// The pre-resolved presentation ramp the active palette carries for `group`.
+    fn ramp_step(&self, group: &str) -> Option<&ResolvedRamp> {
+        self.resolved_ramps.get(group)
     }
 
     /// The colour a surface in a named state bleeds into the pixels around it.
@@ -1826,6 +1916,33 @@ mod tests {
             assert_eq!(metrics.padding_x.fract(), 0.0);
         }
         assert_eq!(compact.spacing.md.fract(), 0.0);
+    }
+
+    #[test]
+    fn clones_share_data_until_an_adjustment_writes() {
+        let theme = Theme::studio_dark();
+        let clone = theme.clone();
+        assert!(Arc::ptr_eq(&theme.0, &clone.0));
+
+        let adjusted = clone.modify(|theme| theme.spacing.lg *= 3.0);
+        assert!(!Arc::ptr_eq(&theme.0, &adjusted.0));
+        assert_eq!(adjusted.spacing.lg, theme.spacing.lg * 3.0);
+        assert_eq!(theme.spacing.lg, Theme::studio_dark().spacing.lg);
+    }
+
+    #[test]
+    fn modifying_the_palette_rebuilds_resolved_lookups() {
+        let theme = Theme::studio_dark();
+        let adjusted = theme.clone().modify(|theme| {
+            Arc::make_mut(&mut theme.palette)
+                .get_mut("indigo")
+                .expect("bundled ramp")
+                .insert("400".into(), "#ff00ff".into());
+        });
+        let magenta = color(Color::parse("test", "#ff00ff").expect("literal"));
+
+        assert_eq!(adjusted.palette_color("indigo.400"), Some(magenta));
+        assert_ne!(theme.palette_color("indigo.400"), Some(magenta));
     }
 
     #[test]

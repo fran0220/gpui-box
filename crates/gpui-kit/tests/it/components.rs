@@ -643,9 +643,9 @@ fn a_theme_overlay_covers_its_subtree_and_stops_there(cx: &mut TestAppContext) {
             )
             .child(ThemeOverlay::new(
                 |theme| {
-                    let mut theme = theme.clone();
-                    theme.spacing.lg *= 3.0;
-                    theme
+                    theme.clone().modify(|theme| {
+                        theme.spacing.lg *= 3.0;
+                    })
                 },
                 Card::new()
                     .id("plans.brand")
@@ -675,9 +675,9 @@ fn an_overlay_restores_the_theme_it_found(cx: &mut TestAppContext) {
         div()
             .child(ThemeOverlay::new(
                 |theme| {
-                    let mut theme = theme.clone();
-                    theme.spacing.lg *= 3.0;
-                    theme
+                    theme.clone().modify(|theme| {
+                        theme.spacing.lg *= 3.0;
+                    })
                 },
                 Card::new()
                     .id("plans.brand")

@@ -667,6 +667,9 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
     // number of squares across and down: a board cut through the middle of a
     // square at the plate edge reads as a broken pattern rather than as the
     // ruled backdrop the optics are being measured against.
+    let checker_light = theme.colors.text_faint;
+    let checker_dark = theme.colors.canvas;
+    let checker_rule = theme.colors.divider.opacity(0.55);
     let checkerboard =
         |width: f32, height: f32| {
             let columns = (width / TILE).ceil() as usize;
@@ -687,9 +690,9 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .children((0..columns).map(move |column| {
                             div().flex_none().w(px(TILE)).h(px(TILE)).bg(
                                 if (row + column) % 2 == 0 {
-                                    theme.colors.text_faint
+                                    checker_light
                                 } else {
-                                    theme.colors.canvas
+                                    checker_dark
                                 },
                             )
                         }))
@@ -701,7 +704,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .left(px(column as f32 * 12.0))
                         .w(px(1.0))
                         .h(px(height))
-                        .bg(theme.colors.divider.opacity(0.55))
+                        .bg(checker_rule)
                 }))
                 .children((0..=(height / 12.0) as usize).map(|row| {
                     div()
@@ -710,7 +713,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .left(px(0.0))
                         .w(px(width))
                         .h(px(1.0))
-                        .bg(theme.colors.divider.opacity(0.55))
+                        .bg(checker_rule)
                 }))
         };
 

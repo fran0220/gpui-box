@@ -39,11 +39,7 @@ impl ThemeOverlay {
     ///
     /// ```ignore
     /// ThemeOverlay::new(
-    ///     |theme| {
-    ///         let mut theme = theme.clone();
-    ///         theme.colors.accent = brand;
-    ///         theme
-    ///     },
+    ///     |theme| theme.clone().modify(|theme| theme.colors.accent = brand),
     ///     checkout_panel(),
     /// )
     /// ```

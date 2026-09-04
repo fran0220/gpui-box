@@ -90,6 +90,15 @@ part of the theme document rather than a hard-coded Open Color convention in
 Rust, so a sparse or differently numbered custom palette can retune variants
 without replacing the resolver.
 
+`Theme::from_tokens` resolves every palette entry and each of those selected
+ramp steps once. `palette_color` and palette-backed variant recipes then read
+hash tables; rendering does not rebuild a `"group.step"` path or parse a hex
+value. A `Theme` is an `Arc` handle over `ThemeData`, so the clone components
+take while rendering is constant-time even though a complete theme owns
+strings, shadow vectors, and a categorical sequence. A subtree exception uses
+`theme.clone().modify(|data| ...)`; this copy-on-write boundary preserves the
+source theme and rebuilds palette lookups if the callback changes the palette.
+
 ### Ownership boundary
 
 Configurability depends on where a value is owned, not on whether it has a

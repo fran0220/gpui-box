@@ -98,6 +98,20 @@ let theme = Theme::get(cx);
 theme.colors.panel
 ```
 
+`Theme` is a cheaply cloned handle to immutable `ThemeData`. Existing reads
+stay direct, but code that derived an adjusted theme by writing a cloned field
+must use the copy-on-write boundary:
+
+```rust
+let branded = Theme::get(cx)
+    .clone()
+    .modify(|theme| theme.colors.accent = brand);
+```
+
+This is also the adjustment callback expected by `ThemeOverlay`. Do not mutate
+the raw palette outside `Theme::modify`; that method rebuilds the pre-resolved
+palette and variant-ramp lookups when the palette changes.
+
 ## 4. Install assets and theme
 
 ```rust

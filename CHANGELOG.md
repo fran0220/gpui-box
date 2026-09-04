@@ -8,6 +8,19 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Changed
+
+**Cloning a theme no longer clones a token document's resolved heap data.**
+`Theme` is now an `Arc` handle over public read-only-through-the-handle
+`ThemeData`; the clone used by component render paths is constant-time rather
+than copying palette-step strings, shadow vectors, and the categorical colour
+sequence. Palette entries and presentation ramps are resolved once by
+`Theme::from_tokens`, so `palette_color` and palette-backed variants no longer
+format a path and parse token colour text while rendering. Code that directly
+mutated fields on a cloned `Theme` must move that write into
+`theme.clone().modify(|data| ...)`; the copy-on-write method preserves other
+handles and refreshes palette lookup tables after palette changes.
+
 ### Fixed
 
 **An image is opaque where it is opaque.** Every polychrome sprite — an
