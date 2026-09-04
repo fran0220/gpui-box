@@ -1,7 +1,9 @@
 name: Supply chain
+
+# Weekly advisory, licence, and SBOM audit. It resolves the dependency graph
+# without building it and never runs on push; dispatch it for a fresh answer.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
   schedule:
     - cron: "17 6 * * 1"
 permissions:

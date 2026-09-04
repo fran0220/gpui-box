@@ -1,8 +1,11 @@
 name: Deploy site and MCP
 
+# Fallback deployment lane. The ordinary path is `tools/site/deploy-main.sh`
+# run from the Linux orb immediately after a push to `main`; nothing deploys
+# on push from here. Dispatch this only when no machine with the deployment
+# identity is available.
+
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +23,7 @@ jobs:
       CARGO_PROFILE_RELEASE_DEBUG: "0"
       GPUI_BOX_DEPLOY_HOST: root@67.230.183.147
       GPUI_BOX_DEPLOY_SSH_KEY: /home/runner/.ssh/gpui-box-production
+      GPUI_BOX_DEPLOY_KNOWN_HOSTS: tools/site/ops/bwg-known-hosts
     steps:
       - uses: actions/checkout@v5
         with:
@@ -50,22 +54,7 @@ jobs:
           install -d -m 0700 /home/runner/.ssh
           printf '%s\n' "$DEPLOY_KEY" > "$GPUI_BOX_DEPLOY_SSH_KEY"
           chmod 0600 "$GPUI_BOX_DEPLOY_SSH_KEY"
-          install -m 0600 tools/site/ops/bwg-known-hosts /home/runner/.ssh/known_hosts
       - name: Build and deploy the immutable release
         run: tools/site/deploy.sh
       - name: Verify the BWG origin before relying on public DNS
-        run: |
-          revision="$(git rev-parse HEAD)"
-          for host in gpui-box.origingame.dev gpui-kit.origingame.dev; do
-            curl --fail --silent --show-error \
-              --resolve "$host:443:67.230.183.147" \
-              "https://$host/build-info.json" \
-              | jq -e --arg revision "$revision" '.revision == $revision and .counts.tools == 10'
-          done
-          curl --fail --silent --show-error \
-            --resolve gpui-box.origingame.dev:443:67.230.183.147 \
-            -H 'Content-Type: application/json' \
-            -H 'Accept: application/json' \
-            --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
-            https://gpui-box.origingame.dev/mcp \
-            | jq -e '.result.tools | length == 10'
+        run: tools/site/verify-deployment.sh

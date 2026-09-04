@@ -1,0 +1,154 @@
+name: Platforms
+
+# macOS and Windows evidence, produced only when somebody asks for it.
+#
+# The daily gate is `cargo run -p xtask -- gate full` on the Linux orb, which
+# proves the all-feature native graph, the browser build, and the llvmpipe
+# visual baseline without any hosted runner. This workflow exists for the two
+# renderers that cannot run there: Metal and WARP. Dispatch it before a
+# release, after a renderer or token change, or whenever a macOS or Windows
+# claim in `compatibility.toml` needs fresh evidence. Nothing here runs on push.
+#
+# A failing headless job uploads its changed frames. Accept them into the
+# committed baseline with `tools/headless-visual/accept-run.sh <run-id>` after
+# looking at every image.
+
+on:
+  workflow_dispatch:
+    inputs:
+      macos:
+        description: Run the macOS native tests and Metal headless catalog
+        required: true
+        default: true
+        type: boolean
+      windows:
+        description: Run the Windows native tests and WARP headless catalog
+        required: true
+        default: true
+        type: boolean
+      scenes:
+        description: Space-separated scene names to check (empty means the whole catalog)
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # Hosted runners never attach a debugger. Omitting debug information makes
+  # the large GPUI dependency graph faster to link and small enough to cache.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-macos:
+    if: inputs.macos
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.1, components: "clippy" }
+      - uses: Swatinem/rust-cache@v2
+      - name: Run native media lifecycle tests
+        run: cargo test -p gpui-box-media --all-features --locked
+      - name: Run the remaining macOS platform tests
+        run: cargo test --workspace --all-features --locked --exclude gpui-box-media
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Check deterministic component performance budgets
+        run: cargo run -p xtask --locked -- performance check
+
+  native-windows:
+    if: inputs.windows
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.1, components: "clippy" }
+      - uses: Swatinem/rust-cache@v2
+      - name: Run native media lifecycle tests
+        run: cargo test -p gpui-box-media --all-features --locked
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Run native Windows UI Automation smoke
+        run: cargo run -p xtask --locked -- accessibility check
+      - name: Check deterministic component performance budgets
+        run: cargo run -p xtask --locked -- performance check
+      - name: Compile Direct3D release shaders
+        run: cargo check -p gpui-box-windows --release --locked
+
+  headless-macos:
+    if: inputs.macos
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.1 }
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Enter the visual workspace directly. Building the root xtask first
+          # would compile the same GPUI/Kit graph into a second target.
+          workspaces: tools/headless-visual -> target
+      - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check ${{ inputs.scenes }}
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: headless-diff-macOS
+          path: target/headless-scene-check
+          if-no-files-found: ignore
+
+  headless-windows-build:
+    if: inputs.windows
+    name: headless build (windows-2025)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.1 }
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/headless-visual -> target
+      - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
+      - uses: actions/upload-artifact@v7
+        with:
+          name: headless-windows-executable
+          path: tools/headless-visual/target/debug/gpui-box-headless-visual.exe
+          if-no-files-found: error
+
+  headless-windows-shard:
+    if: inputs.windows
+    name: headless shard ${{ matrix.shard }} (windows-2025)
+    needs: headless-windows-build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: headless-windows-executable
+          path: tools/headless-visual/target/debug
+      - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/8 ${{ inputs.scenes }}
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: headless-diff-Windows-${{ matrix.shard }}
+          path: target/headless-scene-check
+          if-no-files-found: ignore
+
+  headless-windows:
+    # One job that answers for the build and every shard, so a person reading
+    # the run sees a single Windows visual verdict.
+    if: always() && inputs.windows
+    name: headless (windows-2025)
+    needs: [headless-windows-build, headless-windows-shard]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the build and every shard
+        if: needs.headless-windows-build.result != 'success' || needs.headless-windows-shard.result != 'success'
+        run: exit 1

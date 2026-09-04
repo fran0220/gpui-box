@@ -1,8 +1,9 @@
 name: Performance timing
+
+# Observational Criterion lane on a hosted runner, dispatched when a renderer
+# timing trend is wanted. It is not a gate and runs on no push.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "31 5 * * 1"
 
 permissions:
   contents: read

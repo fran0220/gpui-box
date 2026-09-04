@@ -67,10 +67,10 @@ timing regression cannot be hidden by changing a structural limit, or vice
 versa.
 
 `.github/workflows/performance-timing.yml` runs the existing
-`gpui-box-wgpu` Criterion benchmarks every Monday and on manual dispatch. It
-uploads `target/criterion` as an artifact for trend review. The timing lane is
-deliberately observational: it does not run on pushes or pull requests and is
-not a required check. Deterministic structural and heap-allocation budgets in
+`gpui-box-wgpu` Criterion benchmarks on manual dispatch. It uploads
+`target/criterion` as an artifact for trend review. The timing lane is
+deliberately observational: it runs on no push and no schedule and is not a
+gate. Deterministic structural and heap-allocation budgets in
 `cargo run -p xtask -- performance check` remain the blocking authority.
 
 For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
