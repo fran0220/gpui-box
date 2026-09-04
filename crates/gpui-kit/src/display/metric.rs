@@ -4,8 +4,8 @@
 //! is already normalized. A refresh failure keeps the last verified reading.
 
 use gpui::{
-    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    div, px,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, px,
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -23,6 +23,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{CardVariant, Ident, StyledExt};
 use crate::motion;
+use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -258,32 +259,30 @@ impl RenderOnce for MetricCard {
                     .into_any_element()
             }),
             MetricState::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
+                marked_empty(
                     self.ident.child("empty"),
                     cx.strings().text(StringKey::MetricEmpty),
+                    EmptyKind::Empty,
+                    None,
                 )
-                .kind(EmptyKind::Empty)
-                .into_any_element()
             }),
             MetricState::Unavailable(reason) => {
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("unavailable"),
                         cx.strings().text(StringKey::MetricUnavailable),
+                        EmptyKind::Unavailable,
+                        Some(reason.clone()),
                     )
-                    .kind(EmptyKind::Unavailable)
-                    .detail(reason.clone())
-                    .into_any_element()
                 })
             }
             MetricState::Error(reason) => self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
-                EmptyState::new(
+                marked_empty(
                     self.ident.child("error"),
                     cx.strings().text(StringKey::MetricError),
+                    EmptyKind::Failed,
+                    Some(reason.clone()),
                 )
-                .kind(EmptyKind::Failed)
-                .detail(reason.clone())
-                .into_any_element()
             }),
             MetricState::Ready(reading) | MetricState::Stale { reading, .. } => {
                 let stale = match &self.state {
@@ -343,9 +342,31 @@ impl RenderOnce for MetricCard {
 }
 
 fn spec_for(ident: &Ident, label: &SharedString, state: &MetricState) -> NodeSpec {
-    NodeSpec::new(ident.semantic_id(), Role::Status)
+    let mut spec = NodeSpec::new(ident.semantic_id(), Role::Status)
         .text(label.clone())
-        .value(state.name())
+        .value(state.name());
+    if let Some(reason) = state.reason() {
+        spec = spec.description(reason);
+    }
+    spec
+}
+
+fn marked_empty(
+    ident: Ident,
+    label: SharedString,
+    kind: EmptyKind,
+    detail: Option<SharedString>,
+) -> AnyElement {
+    let mut empty = EmptyState::new(ident.clone(), SharedString::default()).kind(kind);
+    if let Some(detail) = detail {
+        empty = empty.detail(detail);
+    }
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(empty)
+        .tip(mark_ident, label)
+        .into_any_element()
 }
 
 /// The reading itself: the value, what it moved by, and the shape it moved in.

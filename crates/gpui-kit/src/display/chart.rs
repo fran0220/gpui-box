@@ -35,6 +35,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, MotionPolicy, MotionRole, Presence, Stagger, Transition, keyed};
+use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -349,11 +350,12 @@ fn line_like_state(
             slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                 non_ready_body(
                     label,
-                    EmptyState::new(
+                    marked_empty(
                         ident.child("empty"),
                         cx.strings().text(StringKey::ChartEmpty),
+                        EmptyKind::Empty,
                     )
-                    .kind(EmptyKind::Empty),
+                    .into_any_element(),
                     &theme,
                 )
             }),
@@ -2453,11 +2455,12 @@ impl RenderOnce for RadarChart {
                     self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                         non_ready_body(
                             &self.label,
-                            EmptyState::new(
+                            marked_empty(
                                 self.ident.child("empty"),
                                 cx.strings().text(StringKey::RadarEmpty),
+                                EmptyKind::Empty,
                             )
-                            .kind(EmptyKind::Empty),
+                            .into_any_element(),
                             &theme,
                         )
                     }),
@@ -2477,6 +2480,14 @@ impl RenderOnce for RadarChart {
         };
         div().w_full().child(body).semantic_in(cx, spec)
     }
+}
+
+fn marked_empty(ident: Ident, label: SharedString, kind: EmptyKind) -> impl IntoElement {
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(EmptyState::new(ident, SharedString::default()).kind(kind))
+        .tip(mark_ident, label)
 }
 
 fn ready_radar(

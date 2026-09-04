@@ -266,6 +266,7 @@ impl Slotted for Heatmap {
 impl RenderOnce for Heatmap {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let description = self.state.reason().map(SharedString::from);
         let (body, value): (gpui::AnyElement, SharedString) = match &self.state {
             HeatmapState::Loading | HeatmapState::Error(_) => (
                 StateView::new(self.ident.child(self.state.name()), &self.state).into_any_element(),
@@ -273,35 +274,34 @@ impl RenderOnce for Heatmap {
             ),
             HeatmapState::Empty => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("empty"),
                         cx.strings().text(StringKey::HeatmapEmpty),
+                        EmptyKind::Empty,
+                        None,
                     )
-                    .kind(EmptyKind::Empty)
-                    .into_any_element()
                 }),
                 SharedString::from(self.state.name()),
             ),
             HeatmapState::Unavailable(reason) => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("unavailable"),
                         cx.strings().text(StringKey::HeatmapUnavailable),
+                        EmptyKind::Unavailable,
+                        Some(reason.clone()),
                     )
-                    .kind(EmptyKind::Unavailable)
-                    .detail(reason.clone())
-                    .into_any_element()
                 }),
                 SharedString::from(self.state.name()),
             ),
             HeatmapState::Ready if self.rows.is_empty() || self.columns.is_empty() => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("empty"),
                         cx.strings().text(StringKey::HeatmapEmpty),
+                        EmptyKind::Empty,
+                        None,
                     )
-                    .kind(EmptyKind::Empty)
-                    .into_any_element()
                 }),
                 SharedString::from(HeatmapState::Empty.name()),
             ),
@@ -321,6 +321,13 @@ impl RenderOnce for Heatmap {
         let legend = matches!(self.state, HeatmapState::Ready)
             .then(|| legend(ramp(&theme, self.tint), &theme, cx));
 
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Table)
+            .text(self.label.clone())
+            .value(value);
+        if let Some(description) = description {
+            spec = spec.description(description);
+        }
+
         div()
             .id(self.ident.element_id())
             .column()
@@ -334,13 +341,26 @@ impl RenderOnce for Heatmap {
             )
             .child(body)
             .children(legend)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Table)
-                    .text(self.label)
-                    .value(value),
-            )
+            .semantic_in(cx, spec)
     }
+}
+
+fn marked_empty(
+    ident: Ident,
+    label: SharedString,
+    kind: EmptyKind,
+    detail: Option<SharedString>,
+) -> gpui::AnyElement {
+    let mut empty = EmptyState::new(ident.clone(), SharedString::default()).kind(kind);
+    if let Some(detail) = detail {
+        empty = empty.detail(detail);
+    }
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(empty)
+        .tip(mark_ident, label)
+        .into_any_element()
 }
 
 /// The colour the density steps are cut from.

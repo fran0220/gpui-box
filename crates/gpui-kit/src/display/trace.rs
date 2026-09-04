@@ -20,6 +20,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::motion;
+use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -425,11 +426,11 @@ fn waterfall(
     let with_duration = spans.iter().any(|span| span.duration.is_some());
     let body = if empty {
         slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-            EmptyState::new(
+            marked_empty(
                 ident.child("empty"),
                 cx.strings().text(StringKey::TraceEmpty),
+                EmptyKind::Empty,
             )
-            .kind(EmptyKind::Empty)
             .into_any_element()
         })
     } else {
@@ -486,6 +487,14 @@ fn waterfall(
                 .value(if empty { "empty" } else { "ready" }),
         )
         .into_any_element()
+}
+
+fn marked_empty(ident: Ident, label: SharedString, kind: EmptyKind) -> impl IntoElement {
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(EmptyState::new(ident, SharedString::default()).kind(kind))
+        .tip(mark_ident, label)
 }
 
 /// The column every row measures its normalized positions inside: the same

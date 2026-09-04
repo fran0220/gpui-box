@@ -3,9 +3,10 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
 
@@ -13,6 +14,7 @@ use crate::controls::button::Button;
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable};
 use crate::motion::{self, MotionPolicy, MotionRole};
+use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -197,16 +199,26 @@ impl RenderOnce for ProgressBar {
         });
 
         let moving = self.value.is_moving();
-        let spec = self
+        let mut spec = self
             .value
             .spec(self.ident.semantic_id(), self.label.clone(), cx);
         let display = self.value.shown(cx);
-        let pace = self.value.pace.name().map(|name| {
-            cx.strings().text(match name {
-                "stalled" => StringKey::ProgressStalled,
-                _ => StringKey::ProgressPaused,
-            })
-        });
+        let pace = match self.value.pace {
+            ProgressPace::Running => None,
+            ProgressPace::Stalled => Some((
+                cx.strings().text(StringKey::ProgressStalled),
+                Icon::Danger,
+                theme.colors.warning,
+            )),
+            ProgressPace::Paused => Some((
+                cx.strings().text(StringKey::ProgressPaused),
+                Icon::Pause,
+                theme.colors.text_muted,
+            )),
+        };
+        if let Some((wording, _, _)) = &pace {
+            spec = spec.description(wording.clone());
+        }
         let cancel = self.on_cancel.map(|handler| {
             // Stopping a run is a control, so it wears a boundary. Ghost
             // chrome put it in the same tone as the count beside it, which
@@ -253,9 +265,20 @@ impl RenderOnce for ProgressBar {
                                     element
                                         .child(div().text_color(theme.colors.text).child(display))
                                 })
-                                .when_some(pace, |element, pace| {
-                                    element
-                                        .child(div().text_color(theme.colors.warning).child(pace))
+                                .when_some(pace, |element, (wording, glyph, color)| {
+                                    let mark_ident = self.ident.child("pace");
+                                    element.child(
+                                        div()
+                                            .id(mark_ident.element_id())
+                                            .flex()
+                                            .items_center()
+                                            .child(
+                                                icon(glyph)
+                                                    .size(px(theme.control.sm.icon_size))
+                                                    .text_color(color),
+                                            )
+                                            .tip(mark_ident, wording),
+                                    )
                                 })
                                 .children(cancel),
                         ),
@@ -270,18 +293,7 @@ impl RenderOnce for ProgressBar {
                     .overflow_hidden()
                     .bg(signature::track(&theme))
                     .when_some(drawn, |element, fraction| {
-                        // The pace is part of the picture, not only of the
-                        // caption: a stalled fill wears the warning colour
-                        // and a paused one dims, so neither can pass for
-                        // healthy running work at a glance.
-                        let fill = match self.value.pace {
-                            ProgressPace::Running => signature::mark(&theme),
-                            ProgressPace::Stalled => theme.colors.warning,
-                            ProgressPace::Paused => {
-                                signature::mark(&theme).opacity(theme.opacity.muted)
-                            }
-                        };
-                        element.child(signature::filled(fill, fraction))
+                        element.child(signature::filled(signature::mark(&theme), fraction))
                     })
                     // An unknown extent sweeps only while the work is moving.
                     // A still sweep would be read as a position, and a stalled

@@ -14,8 +14,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    canvas, div, px, relative,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, canvas, div, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
@@ -25,6 +25,7 @@ use crate::display::progress_circle::arc;
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::{self, Activity, AnimationExt as _, MotionPolicy, MotionRole};
+use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 const PULSE_CELLS: usize = 3;
@@ -572,13 +573,9 @@ impl RenderOnce for LoadMore {
             LoadMoreState::Loading => {
                 let label = cx.strings().text(StringKey::LoadMoreLoading);
                 let spec = busy_spec(&self.ident, Some(label.clone()));
-                row.child(PulseLoader::new(self.ident.child("wait")).control_size(ControlSize::Xs))
-                    .child(
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(label),
-                    )
+                row.id(self.ident.element_id())
+                    .child(PulseLoader::new(self.ident.child("wait")).control_size(ControlSize::Xs))
+                    .tip(self.ident.clone(), label)
                     .semantic_in(cx, spec)
             }
             LoadMoreState::Exhausted => {

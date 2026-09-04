@@ -2,8 +2,8 @@
 //! what happened, including when some of it succeeded.
 
 use gpui::{
-    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -11,6 +11,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, SemanticWash, Space, Surfac
 
 use crate::display::badge::Tone;
 use crate::foundation::{Ident, StyledExt};
+use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 /// Which of the three outcomes the host is reporting.
@@ -118,10 +119,9 @@ impl RenderOnce for OutcomePanel {
         let theme = cx.theme().clone();
         let tone = self.kind.tone();
         let color = tone.color(&theme);
-        let title = self
-            .title
-            .clone()
-            .unwrap_or_else(|| cx.strings().text(self.kind.title_key()));
+        let state_label = cx.strings().text(self.kind.title_key());
+        let semantic_title = self.title.clone().unwrap_or_else(|| state_label.clone());
+        let mark_ident = self.ident.child("mark");
 
         div()
             .relative()
@@ -139,6 +139,7 @@ impl RenderOnce for OutcomePanel {
             )
             .child(
                 div()
+                    .id(mark_ident.element_id())
                     .row()
                     .gap_token(&theme, Space::Sm)
                     .child(
@@ -146,12 +147,15 @@ impl RenderOnce for OutcomePanel {
                             .size(px(theme.control.md.icon_size))
                             .text_color(color),
                     )
-                    .child(
-                        div()
-                            .type_scale(&theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(title.clone()),
-                    ),
+                    .when_some(self.title.clone(), |element, title| {
+                        element.child(
+                            div()
+                                .type_scale(&theme, TypeScale::Label)
+                                .text_color(theme.colors.text)
+                                .child(title),
+                        )
+                    })
+                    .tip(mark_ident, state_label),
             )
             .when_some(self.count.clone(), |element, count| {
                 element.child(
@@ -176,7 +180,7 @@ impl RenderOnce for OutcomePanel {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
-                    .text(title)
+                    .text(semantic_title)
                     .value(self.kind.name()),
             )
     }

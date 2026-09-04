@@ -28,6 +28,7 @@ use crate::display::loading::PulseLoader;
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
+use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -260,12 +261,12 @@ impl RenderOnce for Sparkline {
             ),
             SparklineState::Empty => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("empty"),
                         cx.strings().text(StringKey::SparklineEmpty),
+                        EmptyKind::Empty,
+                        None,
                     )
-                    .kind(EmptyKind::Empty)
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
@@ -274,28 +275,27 @@ impl RenderOnce for Sparkline {
             ),
             SparklineState::Unavailable(reason) => (
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("unavailable"),
                         cx.strings().text(StringKey::SparklineUnavailable),
+                        EmptyKind::Unavailable,
+                        Some(reason.clone()),
                     )
-                    .kind(EmptyKind::Unavailable)
-                    .detail(reason.clone())
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("unavailable")
+                    .description(reason.clone())
                     .read_only(true),
             ),
             SparklineState::Error(reason) => (
                 self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
-                    EmptyState::new(
+                    marked_empty(
                         self.ident.child("error"),
                         cx.strings().text(StringKey::SparklineError),
+                        EmptyKind::Failed,
+                        Some(reason.clone()),
                     )
-                    .kind(EmptyKind::Failed)
-                    .detail(reason.clone())
-                    .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
@@ -316,6 +316,24 @@ impl RenderOnce for Sparkline {
             .semantic_in(cx, spec)
             .into_any_element()
     }
+}
+
+fn marked_empty(
+    ident: Ident,
+    label: SharedString,
+    kind: EmptyKind,
+    detail: Option<SharedString>,
+) -> AnyElement {
+    let mut empty = EmptyState::new(ident.clone(), SharedString::default()).kind(kind);
+    if let Some(detail) = detail {
+        empty = empty.detail(detail);
+    }
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(empty)
+        .tip(mark_ident, label)
+        .into_any_element()
 }
 
 /// The supplied points that are inside the documented normalized square.

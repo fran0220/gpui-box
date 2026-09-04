@@ -1,7 +1,8 @@
 //! Work that moves through named stages the host already owns.
 
 use gpui::{
-    App, Div, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+    App, Div, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    Styled, Window, div, px,
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -10,6 +11,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
 use crate::display::badge::Tone;
 use crate::display::icon::paint;
 use crate::foundation::{Ident, StyledExt};
+use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -45,8 +47,7 @@ impl StageStatus {
         }
     }
 
-    /// The words a reader gets for the state, which is what turns a coloured
-    /// node into a report.
+    /// The words the node publishes as hover help.
     fn wording(self) -> StringKey {
         match self {
             Self::Pending => StringKey::StagePending,
@@ -179,6 +180,7 @@ impl RenderOnce for StageProgress {
                     .then(|| connector(&theme, reached).top(px(NODE / 2.0)).bottom_0());
                 let numeral = cx.numbers().count(index + 1);
                 let wording = cx.strings().text(status.wording());
+                let mark_ident = ident.child("mark");
 
                 div()
                     .row()
@@ -187,12 +189,14 @@ impl RenderOnce for StageProgress {
                     .gap_token(&theme, Space::Sm)
                     .child(
                         div()
+                            .id(mark_ident.element_id())
                             .relative()
                             .flex_none()
                             .w(px(NODE))
                             .children(above)
                             .children(below)
-                            .child(node(&theme, status, color, numeral)),
+                            .child(node(&theme, status, color, numeral))
+                            .tip(mark_ident, wording),
                     )
                     .child(
                         div()
@@ -219,15 +223,6 @@ impl RenderOnce for StageProgress {
                                         },
                                     )
                                     .child(stage.label.clone()),
-                            )
-                            .child(
-                                div()
-                                    .type_scale(&theme, TypeScale::Caption)
-                                    .text_color(match status {
-                                        StageStatus::Pending => theme.colors.text_faint,
-                                        _ => color,
-                                    })
-                                    .child(wording),
                             ),
                     )
                     .semantic_in(

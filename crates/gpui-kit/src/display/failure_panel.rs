@@ -35,8 +35,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -44,6 +44,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface
 
 use crate::controls::button::Button;
 use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -146,23 +147,30 @@ impl FailurePanel {
 impl RenderOnce for FailurePanel {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let title = self
-            .title
-            .clone()
-            .unwrap_or_else(|| cx.strings().text(StringKey::FailureTitle));
+        let state_label = cx.strings().text(StringKey::FailureTitle);
+        let semantic_title = self.title.clone().unwrap_or_else(|| state_label.clone());
+        let retrying = self.retrying;
 
         let retry = self.on_retry.clone().map(|handler| {
             // The one thing a reader can do about a failure is the loudest
             // control on the panel. A secondary chip beside a red message
             // reads as the disabled remains of something that already failed.
-            Button::new(self.ident.child("retry"))
+            let retry_ident = self.ident.child("retry");
+            let control = Button::new(retry_ident.clone())
                 .label(cx.strings().text(StringKey::TryAgain))
                 .control_size(ControlSize::Sm)
                 .semantic_parent(self.ident.semantic_id())
                 // A retry already in flight refuses another one rather than
                 // stacking attempts nobody asked for.
-                .loading(self.retrying)
-                .on_click(move |window, cx| handler(window, cx))
+                .loading(retrying)
+                .on_click(move |window, cx| handler(window, cx));
+            let wrapper_ident = retry_ident.child("state");
+            div()
+                .id(wrapper_ident.element_id())
+                .child(control)
+                .when(retrying, |element| {
+                    element.tip(wrapper_ident, cx.strings().text(StringKey::FailureRetrying))
+                })
         });
 
         let attempts = self.attempts.filter(|count| *count > 1).map(|count| {
@@ -183,22 +191,8 @@ impl RenderOnce for FailurePanel {
                 )
         });
 
-        let status = self.retrying.then(|| {
-            let wording = cx.strings().text(StringKey::FailureRetrying);
-            div()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(wording.clone())
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("retrying").semantic_id(), Role::Status)
-                        .parent(self.ident.semantic_id())
-                        .text(wording)
-                        .busy(true),
-                )
-        });
-
         let reason_ident = self.ident.child("reason");
+        let mark_ident = self.ident.child("mark");
 
         div()
             .column()
@@ -220,6 +214,7 @@ impl RenderOnce for FailurePanel {
             )
             .child(
                 div()
+                    .id(mark_ident.element_id())
                     .row()
                     .w_full()
                     .gap_token(&theme, Space::Sm)
@@ -229,19 +224,22 @@ impl RenderOnce for FailurePanel {
                             .size(px(theme.control.md.icon_size))
                             .text_color(theme.colors.danger),
                     )
-                    .child(
-                        // The name of what is missing outranks the sentence
-                        // explaining it, which is the order they are read in.
-                        // It wraps inside the panel: a headline that runs off
-                        // the edge of a narrow column takes the last word of
-                        // the failure with it.
-                        div()
-                            .min_w_0()
-                            .flex_1()
-                            .type_scale(&theme, TypeScale::Subtitle)
-                            .text_color(theme.colors.text)
-                            .child(title.clone()),
-                    ),
+                    .when_some(self.title.clone(), |element, title| {
+                        element.child(
+                            // The name of what is missing outranks the sentence
+                            // explaining it, which is the order they are read in.
+                            // It wraps inside the panel: a headline that runs off
+                            // the edge of a narrow column takes the last word of
+                            // the failure with it.
+                            div()
+                                .min_w_0()
+                                .flex_1()
+                                .type_scale(&theme, TypeScale::Subtitle)
+                                .text_color(theme.colors.text)
+                                .child(title),
+                        )
+                    })
+                    .tip(mark_ident, state_label),
             )
             // The reason is the host's sentence, shown word for word and given
             // a node of its own so a test can prove it survived.
@@ -270,17 +268,16 @@ impl RenderOnce for FailurePanel {
                 )
             })
             .children(attempts)
-            .children(status)
             .children(retry.map(|control| div().row().child(control)))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
-                    .text(title)
+                    .text(semantic_title)
                     // `failed` and never `empty`: a panel that could not be
                     // produced is not a panel with nothing in it.
                     .value("failed")
                     .invalid(true)
-                    .busy(self.retrying),
+                    .busy(retrying),
             )
     }
 }

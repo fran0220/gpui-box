@@ -23,6 +23,7 @@ use crate::display::loading::PulseLoader;
 use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::motion::keyed;
+use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -507,11 +508,11 @@ fn non_ready_plot<T>(
             false,
         ),
         PlotState::Empty => (
-            EmptyState::new(
+            marked_empty(
                 ident.child("empty"),
                 cx.strings().text(StringKey::ChartEmpty),
+                EmptyKind::Empty,
             )
-            .kind(EmptyKind::Empty)
             .into_any_element(),
             None,
             false,
@@ -563,6 +564,14 @@ fn non_ready_plot<T>(
             .into_any_element(),
         spec,
     )
+}
+
+fn marked_empty(ident: Ident, label: SharedString, kind: EmptyKind) -> impl IntoElement {
+    let mark_ident = ident.child("mark");
+    div()
+        .id(mark_ident.element_id())
+        .child(EmptyState::new(ident, SharedString::default()).kind(kind))
+        .tip(mark_ident, label)
 }
 
 /// One caller-normalized OHLC reading.
