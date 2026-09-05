@@ -271,7 +271,9 @@ impl PlatformViewHost {
             // overlapping siblings paint and receive input through each other.
             // Apply even when only the clip changed, preserving layout size.
             let local = plan::child_region_rect(bounds, clip);
-            if let Err(error) = set_rect_region(hwnd, &[local]) {
+            // A clip-only expansion must invalidate newly exposed pixels even
+            // when no SetWindowPos follows it.
+            if let Err(error) = set_rect_region(hwnd, &[local], true) {
                 unsafe {
                     ShowWindow(hwnd, SW_HIDE);
                 }
@@ -341,7 +343,7 @@ impl PlatformViewHost {
     }
 
     fn clip_host(&self, host: HWND, rects: &[PhysicalRect]) {
-        set_rect_region(host, rects).log_err();
+        set_rect_region(host, rects, false).log_err();
     }
 }
 
@@ -359,10 +361,10 @@ impl Drop for PlatformViewHost {
     }
 }
 
-fn set_rect_region(hwnd: HWND, rects: &[PhysicalRect]) -> Result<()> {
+fn set_rect_region(hwnd: HWND, rects: &[PhysicalRect], redraw: bool) -> Result<()> {
     let region = combined_region(rects).unwrap_or_else(|| unsafe { CreateRectRgn(0, 0, 0, 0) });
     anyhow::ensure!(!region.is_invalid(), "failed to allocate window region");
-    if unsafe { SetWindowRgn(hwnd, Some(region), false) } == 0 {
+    if unsafe { SetWindowRgn(hwnd, Some(region), redraw) } == 0 {
         unsafe { DeleteObject(region.into()).ok().log_err() };
         anyhow::bail!("failed to set window region");
     }
