@@ -453,6 +453,30 @@ fn a_duration_nobody_knows_draws_no_track_fraction(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn cancelled_scrubbing_never_commits_or_continues_previewing(cx: &mut TestAppContext) {
+    let (mut harness, events) = clip(cx, playing);
+    let quarter = harness.point_across("bar.scrubber", 0.25);
+    harness.drag_start("bar.scrubber");
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    events.borrow_mut().clear();
+    harness.drag_to(quarter);
+    harness.drop_here();
+    assert!(events.borrow().is_empty());
+    harness.drag_start("bar.scrubber");
+    harness.drag_to(quarter);
+    harness.drop_here();
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter(|event| matches!(event, TransportEvent::SeekRequested(_)))
+            .count(),
+        1
+    );
+}
+
+#[gpui::test]
 fn a_scrub_previews_continuously_and_commits_once(cx: &mut TestAppContext) {
     let (mut harness, events) = clip(cx, playing);
 

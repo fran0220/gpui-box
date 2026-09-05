@@ -99,6 +99,32 @@ fn drag_divider(harness: &mut Harness, x: f32) {
 }
 
 #[gpui::test]
+fn pointer_cancel_clears_split_resize_and_the_next_press_works(cx: &mut TestAppContext) {
+    let mut case = split(cx, 0.5, false);
+    let start = case.harness.point_in("workspace.split.divider");
+    case.harness
+        .context()
+        .simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    case.harness
+        .context()
+        .simulate_event(gpui::MouseCancelEvent);
+    case.harness
+        .context()
+        .simulate_event(gpui::MouseCancelEvent);
+    case.harness.context().simulate_mouse_move(
+        gpui::point(px(400.0), start.y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    case.harness
+        .context()
+        .simulate_mouse_up(start, MouseButton::Left, Modifiers::none());
+    assert!(case.resizes.borrow().is_empty());
+    drag_divider(&mut case.harness, 400.0);
+    assert!(!case.resizes.borrow().is_empty());
+}
+
+#[gpui::test]
 fn dragging_the_divider_reports_a_ratio_without_moving_the_panes(cx: &mut TestAppContext) {
     let mut case = split(cx, 0.5, false);
 

@@ -845,6 +845,38 @@ RTL-aware placement. A product-specific force layout or manually persisted
 coordinates can still use `NodeGraph` directly without creating a second run
 presentation contract downstream.
 
+### Controlled interaction boundaries
+
+Tree and TreeGrid horizontal navigation only selects enabled direct relatives:
+entering an expanded branch skips disabled direct children but never selects a
+grandchild or a neighboring root; a disabled parent refuses upward selection.
+These rules are exercised in both reading directions. Disabled MultiSelect
+publishes disabled root and chip semantics and mounts no chip remove buttons.
+
+DockTree accepts a drag only when its exact source tab surface exists in the
+caller's topology and the dragged panel belongs to that stack. Dock roots may
+be prefix-related; their fully composed semantic surface ids must still be
+unique within the window, like other semantic identities.
+
+The window modal stack owns Dialog/Drawer focus restoration, including non-LIFO
+close and the return chain after a covered modal closes. Drawer releases modal
+ownership at close; its delayed exit removes paint without restoring focus a
+second time. Callers must close a modal before removing its entity: arbitrary
+unmount cleanup is not yet an implemented lifecycle contract.
+
+NodeGraph reconciles active gestures against current caller-owned nodes and
+interaction mode on redraw. Deleted peers are removed without rebasing surviving
+drag origins; deleting the active target or revoking its interaction cancels the
+gesture. Fit prefers native scale but the configured zoom range prevails over
+that preference, and the same legal zoom determines its offset and event.
+
+Kit's shared paint-only pointer-cancel listener uses GPUI's MouseCancelEvent,
+not a synthetic release. Custom graph, grid range/resize, split, drawer resize,
+text-selection, image/model, transport, scrollbar, and drag-session state is
+abandoned without drop, click, or seek completion. Deterministic regressions
+dispatch cancellation twice and verify subsequent gestures; they do not claim
+physical-device/browser delivery coverage beyond the framework platform lanes.
+
 ### Capabilities that are not components
 
 | Gap | Why it matters |

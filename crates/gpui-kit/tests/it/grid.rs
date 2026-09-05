@@ -306,6 +306,69 @@ fn a_sortable_header_reports_the_next_direction_and_sorts_nothing(cx: &mut TestA
 }
 
 #[gpui::test]
+fn pointer_cancel_clears_column_resize_before_release_or_another_move(cx: &mut TestAppContext) {
+    let (mut harness, reports) = grid(cx, Given::rows(40));
+    harness.drag_start("data.grid.header.duration.resize");
+    let anchor = harness.pointer();
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    reports.widths.borrow_mut().clear();
+    harness.drag_to(anchor - point(px(30.0), px(0.0)));
+    harness.drop_here();
+    assert!(reports.widths.borrow().is_empty());
+    harness.drag_start("data.grid.header.duration.resize");
+    harness.drag_to(anchor - point(px(40.0), px(0.0)));
+    harness.drop_here();
+    assert!(!reports.widths.borrow().is_empty());
+}
+
+#[gpui::test]
+fn range_drag_cancellation_and_release_work_without_column_resizing(cx: &mut TestAppContext) {
+    for cancel in [false, true] {
+        let ranges = Rc::new(RefCell::new(Vec::new()));
+        let sink = ranges.clone();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+            let sink = sink.clone();
+            DataGrid::new("ranges", 4, |index, _, _| row(index))
+                .columns(columns())
+                .on_range_change(move |range, _, _| sink.borrow_mut().push(range.clone()))
+                .into_any_element()
+        });
+        let start = harness.point_in("ranges.job-0000.name");
+        let end = harness.point_in("ranges.job-0001.owner");
+        harness
+            .context()
+            .simulate_mouse_down(start, gpui::MouseButton::Left, Modifiers::none());
+        assert!(!ranges.borrow().is_empty());
+        if cancel {
+            harness.context().simulate_event(gpui::MouseCancelEvent);
+            harness.context().simulate_event(gpui::MouseCancelEvent);
+        } else {
+            harness
+                .context()
+                .simulate_mouse_up(start, gpui::MouseButton::Left, Modifiers::none());
+        }
+        ranges.borrow_mut().clear();
+        harness
+            .context()
+            .simulate_mouse_move(end, gpui::MouseButton::Left, Modifiers::none());
+        assert!(ranges.borrow().is_empty());
+        harness
+            .context()
+            .simulate_mouse_down(start, gpui::MouseButton::Left, Modifiers::none());
+        harness
+            .context()
+            .simulate_mouse_move(end, gpui::MouseButton::Left, Modifiers::none());
+        assert!(
+            ranges
+                .borrow()
+                .iter()
+                .any(|range| range.end_row == "job-0001")
+        );
+    }
+}
+
+#[gpui::test]
 fn dragging_a_column_edge_reports_a_width_and_resizes_nothing(cx: &mut TestAppContext) {
     let (mut harness, reports) = grid(cx, Given::rows(40));
 

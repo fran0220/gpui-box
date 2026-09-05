@@ -80,6 +80,34 @@ fn non_lifo_modal_close_splices_focus_restoration_and_drawer_exit_is_inert(
             upper.update(cx, |view, cx| view.close(window, cx));
             assert_eq!(window.focused(cx), Some(trigger.clone()));
         });
+        if lower_is_drawer {
+            harness.update(|window, cx| {
+                drawer.update(cx, |view, cx| {
+                    view.open(window, cx);
+                    view.settle(cx);
+                })
+            });
+            harness.frame();
+            harness.update(|window, cx| drawer.update(cx, |view, cx| view.close(window, cx)));
+            // Reopening during exit must start a new restoration ownership,
+            // not retain the first opening's already-consumed return target.
+            harness.update(|window, cx| upper.update(cx, |view, cx| view.open(window, cx)));
+            harness.frame();
+            harness.update(|window, cx| drawer.update(cx, |view, cx| view.open(window, cx)));
+            harness.frame();
+            let drawer_focus = harness.update(|window, cx| window.focused(cx));
+            harness.update(|window, cx| {
+                upper.update(cx, |view, cx| view.close(window, cx));
+                assert_eq!(window.focused(cx), drawer_focus);
+                drawer.update(cx, |view, cx| {
+                    view.close(window, cx);
+                    view.settle(cx);
+                });
+                assert_eq!(window.focused(cx), Some(trigger.clone()));
+            });
+            harness.frame();
+            harness.update(|window, cx| assert_eq!(window.focused(cx), Some(trigger.clone())));
+        }
     }
 }
 
