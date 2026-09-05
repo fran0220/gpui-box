@@ -318,7 +318,12 @@ impl Render for BrowserGallery {
         };
 
         div()
-            .on_children_prepainted(move |_, _, _| publish_snapshot(&publish))
+            .on_children_prepainted(move |_, window, cx| {
+                // The root records its own semantics after its children have
+                // prepainted. Publish after this draw, not a partial subtree.
+                let publish = publish.clone();
+                window.defer(cx, move |_, _| publish_snapshot(&publish));
+            })
             .id("browser.gallery.root")
             .size_full()
             .overflow_hidden()

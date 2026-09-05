@@ -7,6 +7,7 @@ async function openScene(page, testInfo, scene) {
   const { backend, renderer } = testInfo.project.metadata;
   await page.goto(`/index.html?scene=${scene}&theme=studio-light&backend=${backend}`);
   await page.waitForFunction(() => window.gpuiKitGalleryReady === true);
+  expect((await snapshot(page)).nodes.some(node => node.id === "browser.gallery.root")).toBe(true);
   await expect(page.locator("canvas")).toHaveCount(1);
   await expect(page.locator("canvas")).toHaveAttribute("data-gpui-renderer", renderer);
 }
