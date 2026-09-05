@@ -39,6 +39,7 @@ async function pointer(page, type, position, buttons) {
     clientY: position.y,
     pointerId: 1,
     pointerType: "mouse",
+    isPrimary: true,
   });
 }
 
@@ -157,6 +158,35 @@ test("overlay action dismisses the catalog dialog", async ({ page }, testInfo) =
   const cancel = dialog.locator('button[aria-label="Cancel"]');
   await expect(cancel).toHaveCount(1);
   await cancel.evaluate(element => element.click());
+  await expect(dialog).toHaveCount(0);
+});
+
+test("pointer cancellation never clicks and chord releases match their button", async ({ page }, testInfo) => {
+  await openScene(page, testInfo, "dialog");
+  const dialog = page.locator('[data-gpui-accessibility] [role="dialog"]');
+  const cancel = dialog.locator('button[aria-label="Cancel"]');
+  await expect(cancel).toHaveCount(1);
+  const bounds = await cancel.boundingBox();
+  const position = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  for (const termination of ["pointercancel", "lostpointercapture", "blur"]) {
+    await pointer(page, "pointerdown", position, 1);
+    await settle(page);
+    if (termination === "blur") {
+      await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    } else {
+      await pointer(page, termination, position, 0);
+      await pointer(page, termination, position, 0);
+    }
+    await pointer(page, "pointerup", position, 0);
+    await settle(page);
+    await expect(dialog).toHaveCount(1);
+  }
+  await pointer(page, "pointerdown", position, 1);
+  await pointer(page, "pointermove", position, 3); // right joins the left press
+  await pointer(page, "pointermove", position, 1); // only right is released
+  await settle(page);
+  await expect(dialog).toHaveCount(1);
+  await pointer(page, "pointerup", position, 0);
   await expect(dialog).toHaveCount(0);
 });
 
