@@ -32,6 +32,23 @@ leak, not permission to destroy caller-owned windows).
 Native regression command: `cargo test -p gpui-box-windows platform_view --lib`.
 These HWND tests require Windows; Linux headless images do not prove them.
 
+Pointer cancellation is a distinct `PlatformInput::MouseCancelled` event, not
+a synthetic mouse-up: it cannot click or drop. Window broadcasts it regardless
+of propagation, resets framework text/press/drag state, and releases capture.
+Custom gesture listeners must discard pending state on `MouseCancelEvent`.
+The legacy `Window::capture_pointer` retains its any-up policy; button-specific
+`capture_pointer_for_button` and `on_mouse_down_with_pointer_capture` release
+only on the matching button or cancellation. Framework text selection uses the
+button-specific API and framework drag/drop remains left-button-owned.
+Web reconciles the complete `buttons` snapshot on intermediate pointer moves,
+and cancels only the active pointer on pointercancel, lostpointercapture, or
+window blur. Normal final up followed by capture loss is idempotent. Primary
+touch/pen pointer compatibility is retained; this is not a multi-touch API.
+Windows retains OS capture until no mouse buttons remain, and delivers capture
+loss separately after normal up dispatch. Shared regressions run with
+`cargo test -p gpui-box --lib pointer_`; real browser cancellation and native
+Windows device chords still require platform execution evidence.
+
 Linux `gate` executes both `cargo test --workspace` and
 `cargo test --workspace --all-features`, not only an all-feature compile.
 Both Windows and macOS Platforms/Release native lanes execute

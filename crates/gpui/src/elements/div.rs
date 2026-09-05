@@ -147,7 +147,7 @@ impl Interactivity {
     }
 
     /// Bind the given callback to the mouse down event for the given mouse button, and capture
-    /// the pointer for this element until the next mouse up event.
+    /// the pointer for this element until that button is released or cancelled.
     ///
     /// While captured, mouse move and mouse up listeners on this element continue to receive
     /// events when the pointer is outside its bounds. The pointer is captured before `listener`
@@ -167,7 +167,7 @@ impl Interactivity {
                     && event.button == button
                     && hitbox.is_hovered(window)
                 {
-                    window.capture_pointer(hitbox.id);
+                    window.capture_pointer_for_button(hitbox.id, button);
                     (listener)(event, window, cx)
                 }
             }));
@@ -922,7 +922,7 @@ pub trait InteractiveElement: Sized {
     }
 
     /// Bind the given callback to the mouse down event for the given mouse button, and capture
-    /// the pointer for this element until the next mouse up event.
+    /// the pointer for this element until that button is released or cancelled.
     ///
     /// While captured, mouse move and mouse up listeners on this element continue to receive
     /// events when the pointer is outside its bounds. The pointer is captured before `listener`
@@ -3002,8 +3002,9 @@ impl Interactivity {
         if !drop_listeners.is_empty() {
             let hitbox = hitbox.clone();
             window.on_mouse_event({
-                move |_: &MouseUpEvent, phase, window, cx| {
+                move |event: &MouseUpEvent, phase, window, cx| {
                     if let Some(drag) = &cx.active_drag
+                        && event.button == MouseButton::Left
                         && phase == DispatchPhase::Bubble
                         && hitbox.is_hovered(window)
                     {
@@ -3060,6 +3061,7 @@ impl Interactivity {
                         if phase == DispatchPhase::Bubble
                             && (event.button == MouseButton::Left || has_aux_click_listeners)
                             && hitbox.is_hovered(window)
+                            && pending_mouse_down.borrow().is_none()
                         {
                             *pending_mouse_down.borrow_mut() = Some(event.clone());
                             window.refresh();
@@ -3187,7 +3189,14 @@ impl Interactivity {
                         // so that it happens even if another event handler stops
                         // propagation.
                         DispatchPhase::Capture => {
+                            captured_mouse_down = None;
                             let mut pending_mouse_down = pending_mouse_down.borrow_mut();
+                            if pending_mouse_down
+                                .as_ref()
+                                .is_some_and(|down| down.button != event.button)
+                            {
+                                return;
+                            }
                             if pending_mouse_down.is_some() && hitbox.is_hovered(window) {
                                 captured_mouse_down = pending_mouse_down.take();
                                 window.refresh();
@@ -3320,8 +3329,25 @@ impl Interactivity {
 
             {
                 let active_state = active_state.clone();
-                window.on_mouse_event(move |_: &MouseUpEvent, phase, window, _cx| {
-                    if phase == DispatchPhase::Capture && active_state.borrow().is_clicked() {
+                let pending = element_state.pending_mouse_down.clone();
+                window.on_mouse_event(move |_: &crate::MouseCancelEvent, phase, window, _cx| {
+                    if phase == DispatchPhase::Capture {
+                        if let Some(pending) = &pending {
+                            pending.borrow_mut().take();
+                        }
+                        *active_state.borrow_mut() = ElementClickedState::default();
+                        window.refresh();
+                    }
+                });
+            }
+
+            {
+                let active_state = active_state.clone();
+                window.on_mouse_event(move |event: &MouseUpEvent, phase, window, _cx| {
+                    if phase == DispatchPhase::Capture
+                        && active_state.borrow().is_clicked()
+                        && active_state.borrow().button == Some(event.button)
+                    {
                         *active_state.borrow_mut() = ElementClickedState::default();
                         window.refresh();
                     }
@@ -3334,8 +3360,11 @@ impl Interactivity {
                     .as_ref()
                     .and_then(|group_active| GroupHitboxes::get(&group_active.group, cx));
                 let hitbox = hitbox.clone();
-                window.on_mouse_event(move |_: &MouseDownEvent, phase, window, _cx| {
-                    if phase == DispatchPhase::Bubble && !window.default_prevented() {
+                window.on_mouse_event(move |event: &MouseDownEvent, phase, window, _cx| {
+                    if phase == DispatchPhase::Bubble
+                        && !window.default_prevented()
+                        && !active_state.borrow().is_clicked()
+                    {
                         let group_hovered = active_group_hitbox
                             .is_some_and(|group_hitbox_id| group_hitbox_id.is_hovered(window));
                         let element_hovered = hitbox.is_hovered(window);
@@ -3343,6 +3372,7 @@ impl Interactivity {
                             *active_state.borrow_mut() = ElementClickedState {
                                 group: group_hovered,
                                 element: element_hovered,
+                                button: Some(event.button),
                             };
                             window.refresh();
                         }
@@ -3731,6 +3761,8 @@ pub struct ElementClickedState {
 
     /// True if this element has been clicked, false otherwise
     pub element: bool,
+    /// The button owning the current pressed appearance, if any.
+    pub button: Option<MouseButton>,
 }
 
 impl ElementClickedState {
@@ -4769,6 +4801,81 @@ mod tests {
             );
         })
         .expect("required framework invariant must hold");
+    }
+
+    #[test]
+    fn pointer_capture_matches_button_and_cancellation_does_not_click() {
+        let mut cx = TestAppContext::single();
+        let clicks = Rc::new(Cell::new(0));
+        struct View(Rc<Cell<usize>>);
+        impl Render for View {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let clicks = self.0.clone();
+                div()
+                    .child(canvas(
+                        |_, _, _| (),
+                        |_, _, window, _| {
+                            window.on_mouse_event(|_: &crate::MouseCancelEvent, _, _, cx| {
+                                cx.stop_propagation()
+                            });
+                        },
+                    ))
+                    .child(
+                        div()
+                            .id("cancel-test")
+                            .size(px(50.))
+                            .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, _| {})
+                            .on_click(move |_, _, _| clicks.set(clicks.get() + 1)),
+                    )
+            }
+        }
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let clicks = clicks.clone();
+                move |_, _| View(clicks)
+            })
+            .into();
+        cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            let down = MouseDownEvent {
+                position: point(px(10.), px(10.)),
+                click_count: 1,
+                ..Default::default()
+            };
+            let up = MouseUpEvent {
+                position: down.position,
+                click_count: 1,
+                ..Default::default()
+            };
+            window.dispatch_event(down.clone().to_platform_input(), cx);
+            let captured = window.captured_hitbox();
+            window.dispatch_event(
+                MouseUpEvent {
+                    button: MouseButton::Right,
+                    ..up.clone()
+                }
+                .to_platform_input(),
+                cx,
+            );
+            assert_eq!(window.captured_hitbox(), captured);
+            assert_eq!(clicks.get(), 0);
+            window.dispatch_event(up.clone().to_platform_input(), cx);
+            assert!(window.captured_hitbox().is_none());
+            assert_eq!(clicks.get(), 1);
+            window.dispatch_event(down.to_platform_input(), cx);
+            // Even an unrelated listener that stops propagation cannot prevent
+            // framework-owned press/capture/selection cleanup.
+            window.dispatch_event(crate::MouseCancelEvent.to_platform_input(), cx);
+            window.dispatch_event(crate::MouseCancelEvent.to_platform_input(), cx);
+            assert!(window.captured_hitbox().is_none());
+            window.dispatch_event(up.to_platform_input(), cx);
+            assert_eq!(
+                clicks.get(),
+                1,
+                "cancelled down must never click on a later up"
+            );
+        })
+        .expect("pointer cancellation events dispatch");
     }
 
     #[test]

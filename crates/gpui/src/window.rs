@@ -1235,6 +1235,7 @@ pub struct Window {
     /// element has an id. This remaps capture to its replacement hitbox after
     /// a redraw.
     captured_pointer_element: Option<GlobalElementId>,
+    captured_pointer_button: Option<MouseButton>,
     #[cfg(any(feature = "inspector", debug_assertions))]
     inspector: Option<Entity<Inspector>>,
     pub(crate) a11y: A11y,
@@ -2123,6 +2124,7 @@ impl Window {
             document_selection: crate::DocumentSelectionState::default(),
             captured_hitbox: None,
             captured_pointer_element: None,
+            captured_pointer_button: None,
             #[cfg(any(feature = "inspector", debug_assertions))]
             inspector: None,
             a11y: A11y::new(
@@ -3161,8 +3163,10 @@ impl Window {
     /// regardless of actual hit testing. This enables drag operations that continue
     /// even when the pointer moves outside the element's bounds.
     ///
-    /// The capture is automatically released on mouse up.
+    /// This legacy unbound capture releases on any mouse up or cancellation.
+    /// Prefer [`Self::capture_pointer_for_button`] for a button-owned gesture.
     pub fn capture_pointer(&mut self, hitbox_id: HitboxId) {
+        self.captured_pointer_button = None;
         self.captured_hitbox = Some(hitbox_id);
         self.captured_pointer_element = self
             .rendered_frame
@@ -3171,10 +3175,18 @@ impl Window {
             .find_map(|(element_id, id)| (*id == hitbox_id).then(|| element_id.clone()));
     }
 
+    /// Captures until the specified button is released, or the stream is
+    /// cancelled. Other buttons' releases do not terminate this gesture.
+    pub fn capture_pointer_for_button(&mut self, hitbox_id: HitboxId, button: MouseButton) {
+        self.capture_pointer(hitbox_id);
+        self.captured_pointer_button = Some(button);
+    }
+
     /// Releases any active pointer capture.
     pub fn release_pointer(&mut self) {
         self.captured_hitbox = None;
         self.captured_pointer_element = None;
+        self.captured_pointer_button = None;
     }
 
     /// Returns the hitbox that has captured the pointer, if any.
@@ -6377,7 +6389,9 @@ impl Window {
                 self.mouse_position = touch_drag.start_position;
                 PlatformInput::TouchDrag(touch_drag)
             }
-            PlatformInput::KeyDown(_) | PlatformInput::KeyUp(_) => event,
+            PlatformInput::KeyDown(_)
+            | PlatformInput::KeyUp(_)
+            | PlatformInput::MouseCancelled(_) => event,
         };
 
         if let Some(any_mouse_event) = event.mouse_event() {
@@ -6593,6 +6607,7 @@ impl Window {
     }
 
     fn dispatch_mouse_event(&mut self, event: &dyn Any, cx: &mut App) {
+        let cancelled = event.is::<crate::MouseCancelEvent>();
         let hit_test = self.rendered_frame.hit_test(self.mouse_position());
         if hit_test != self.mouse_hit_test {
             self.mouse_hit_test = hit_test;
@@ -6600,7 +6615,7 @@ impl Window {
         }
 
         #[cfg(any(feature = "inspector", debug_assertions))]
-        if self.is_inspector_picking(cx) {
+        if !cancelled && self.is_inspector_picking(cx) {
             self.handle_inspector_mouse_event(event, cx);
             // When inspector is picking, all other mouse handling is skipped.
             return;
@@ -6615,19 +6630,19 @@ impl Window {
                 .as_mut()
                 .expect("required framework invariant must hold");
             listener(event, DispatchPhase::Capture, self, cx);
-            if !cx.propagate_event {
+            if !cx.propagate_event && !cancelled {
                 break;
             }
         }
 
         // Bubble phase, where most normal handlers do their work.
-        if cx.propagate_event {
+        if cx.propagate_event || cancelled {
             for listener in mouse_listeners.iter_mut().rev() {
                 let listener = listener
                     .as_mut()
                     .expect("required framework invariant must hold");
                 listener(event, DispatchPhase::Bubble, self, cx);
-                if !cx.propagate_event {
+                if !cx.propagate_event && !cancelled {
                     break;
                 }
             }
@@ -6640,7 +6655,11 @@ impl Window {
                 // If this was a mouse move event, redraw the window so that the
                 // active drag can follow the mouse cursor.
                 self.refresh();
-            } else if event.is::<MouseUpEvent>() {
+            } else if cancelled
+                || event
+                    .downcast_ref::<MouseUpEvent>()
+                    .is_some_and(|up| up.button == MouseButton::Left)
+            {
                 // If this was a mouse up event, cancel the active drag and redraw
                 // the window.
                 cx.active_drag = None;
@@ -6648,10 +6667,17 @@ impl Window {
             }
         }
 
-        // Auto-release pointer capture on mouse up
-        if event.is::<MouseUpEvent>() && self.captured_hitbox.is_some() {
-            self.captured_hitbox = None;
-            self.captured_pointer_element = None;
+        if cancelled {
+            self.document_selection.end_drag();
+            self.refresh();
+        }
+        if cancelled
+            || event.downcast_ref::<MouseUpEvent>().is_some_and(|up| {
+                self.captured_pointer_button
+                    .is_none_or(|button| button == up.button)
+            })
+        {
+            self.release_pointer();
         }
     }
 

@@ -167,6 +167,13 @@ impl WindowsWindowInner {
             WM_XBUTTONUP => {
                 self.handle_xbutton_msg(handle, wparam, lparam, Self::handle_mouse_up_msg)
             }
+            WM_CAPTURECHANGED => {
+                if let Some(mut callback) = self.state.callbacks.input.take() {
+                    callback(PlatformInput::MouseCancelled(gpui::MouseCancelEvent));
+                    self.state.callbacks.input.set(Some(callback));
+                }
+                Some(0)
+            }
             WM_MOUSEWHEEL => self.handle_mouse_wheel_msg(handle, wparam, lparam),
             WM_MOUSEHWHEEL => self.handle_mouse_horizontal_wheel_msg(handle, wparam, lparam),
             WM_SYSKEYUP => self.handle_syskeyup_msg(wparam, lparam),
@@ -575,9 +582,10 @@ impl WindowsWindowInner {
         button: MouseButton,
         lparam: LPARAM,
     ) -> Option<isize> {
-        unsafe { ReleaseCapture().log_err() };
-
         let Some(mut func) = self.state.callbacks.input.take() else {
+            if current_pressed_mouse_button().is_none() {
+                unsafe { ReleaseCapture().log_err() };
+            }
             return Some(1);
         };
         let x = lparam.signed_loword() as f32;
@@ -593,6 +601,14 @@ impl WindowsWindowInner {
         });
         let handled = !func(input).propagate;
         self.state.callbacks.input.set(Some(func));
+
+        // Native capture protects delivery for the entire chord, independently
+        // of GPUI's per-gesture hitbox capture. Release only after dispatch:
+        // WM_CAPTURECHANGED is synchronous and must not cancel the pending click
+        // before its final up has been delivered.
+        if current_pressed_mouse_button().is_none() {
+            unsafe { ReleaseCapture().log_err() };
+        }
 
         if handled { Some(0) } else { Some(1) }
     }

@@ -202,6 +202,22 @@ impl InputEvent for MouseUpEvent {
 
 impl MouseEvent for MouseUpEvent {}
 
+/// The platform ended a mouse/pointer stream without a release (capture loss,
+/// cancellation, or deactivation). This is not a mouse-up and must not click or
+/// drop. Window broadcasts it to mouse listeners even if propagation is stopped,
+/// then releases capture and cancels dragging. Gesture owners should discard
+/// pending presses during the capture phase. Repeated cancellation is harmless.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MouseCancelEvent;
+
+impl Sealed for MouseCancelEvent {}
+impl InputEvent for MouseCancelEvent {
+    fn to_platform_input(self) -> PlatformInput {
+        PlatformInput::MouseCancelled(self)
+    }
+}
+impl MouseEvent for MouseCancelEvent {}
+
 impl MouseUpEvent {
     /// Returns true if this mouse up event should focus the element.
     pub fn is_focusing(&self) -> bool {
@@ -469,6 +485,57 @@ impl MouseButton {
             MouseButton::Navigate(NavigationDirection::Back),
             MouseButton::Navigate(NavigationDirection::Forward),
         ]
+    }
+}
+
+/// Complete button state for platform adapters that receive button snapshots.
+/// Bits 0..4 denote left, right, middle, back and forward, respectively (the
+/// standard pointer `buttons` layout). Unknown bits are ignored. Reconciliation
+/// emits each changed button once, releases before presses, including chord
+/// transitions delivered in a move rather than a down/up platform message.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PointerButtonState(u16);
+
+impl PointerButtonState {
+    /// Reconcile a platform snapshot; the bool is true for a press.
+    pub fn update(&mut self, buttons: u16) -> Vec<(MouseButton, bool)> {
+        let buttons = buttons & 31;
+        let previous = self.0;
+        self.0 = buttons;
+        let mut changes = Vec::new();
+        if previous == buttons {
+            return changes;
+        }
+        for pressed in [false, true] {
+            for (index, button) in MouseButton::all().into_iter().enumerate() {
+                let mask = 1 << index;
+                if (previous ^ buttons) & mask != 0 && (buttons & mask != 0) == pressed {
+                    changes.push((button, pressed));
+                }
+            }
+        }
+        changes
+    }
+
+    /// One held button for the legacy move API, preferring left, right, middle,
+    /// back, then forward. Never returns an already released button.
+    pub fn pressed_button(self) -> Option<MouseButton> {
+        match self.0.trailing_zeros() {
+            0 => Some(MouseButton::Left),
+            1 => Some(MouseButton::Right),
+            2 => Some(MouseButton::Middle),
+            3 => Some(MouseButton::Navigate(NavigationDirection::Back)),
+            4 => Some(MouseButton::Navigate(NavigationDirection::Forward)),
+            _ => None,
+        }
+    }
+
+    /// Forget a cancelled stream without producing synthetic releases/clicks.
+    /// Returns whether any button was held; repeated calls return false.
+    pub fn cancel(&mut self) -> bool {
+        let active = self.0 != 0;
+        self.0 = 0;
+        active
     }
 }
 
@@ -997,6 +1064,8 @@ pub enum PlatformInput {
     MouseDown(MouseDownEvent),
     /// The mouse was released.
     MouseUp(MouseUpEvent),
+    /// A pointer stream ended without a release or click.
+    MouseCancelled(MouseCancelEvent),
     /// Mouse pressure.
     MousePressure(MousePressureEvent),
     /// The mouse was moved.
@@ -1027,6 +1096,7 @@ impl PlatformInput {
             PlatformInput::ModifiersChanged { .. } => None,
             PlatformInput::MouseDown(event) => Some(event),
             PlatformInput::MouseUp(event) => Some(event),
+            PlatformInput::MouseCancelled(event) => Some(event),
             PlatformInput::MouseMove(event) => Some(event),
             PlatformInput::MousePressure(event) => Some(event),
             PlatformInput::MouseExited(event) => Some(event),
@@ -1047,6 +1117,7 @@ impl PlatformInput {
             PlatformInput::ModifiersChanged(event) => Some(event),
             PlatformInput::MouseDown(_) => None,
             PlatformInput::MouseUp(_) => None,
+            PlatformInput::MouseCancelled(_) => None,
             PlatformInput::MouseMove(_) => None,
             PlatformInput::MousePressure(_) => None,
             PlatformInput::MouseExited(_) => None,
@@ -1069,6 +1140,7 @@ impl PlatformInput {
             PlatformInput::ModifiersChanged(_) => "modifiers_changed",
             PlatformInput::MouseDown(_) => "mouse_down",
             PlatformInput::MouseUp(_) => "mouse_up",
+            PlatformInput::MouseCancelled(_) => "mouse_cancelled",
             PlatformInput::MousePressure(_) => "mouse_pressure",
             PlatformInput::MouseMove(_) => "mouse_move",
             PlatformInput::MouseExited(_) => "mouse_exited",
@@ -1093,6 +1165,30 @@ impl PlatformInput {
 
 #[cfg(test)]
 mod test {
+
+    #[test]
+    fn pointer_button_state_chords_and_cancellation_are_idempotent() {
+        use super::{MouseButton::*, PointerButtonState};
+        for remaining in [1, 2] {
+            let mut state = PointerButtonState::default();
+            assert_eq!(state.update(1), vec![(Left, true)]);
+            assert_eq!(state.update(3), vec![(Right, true)]);
+            assert!(state.update(3).is_empty());
+            assert_eq!(state.pressed_button(), Some(Left));
+            let released = if remaining == 1 { Right } else { Left };
+            let held = if remaining == 1 { Left } else { Right };
+            assert_eq!(state.update(remaining), vec![(released, false)]);
+            assert_eq!(state.pressed_button(), Some(held));
+            assert_eq!(state.update(0), vec![(held, false)]);
+            assert!(!state.cancel());
+            state.update(31);
+            assert!(state.cancel());
+            assert!(!state.cancel());
+            assert!(state.update(0).is_empty(), "cancel must not synthesize up");
+            assert_eq!(state.pressed_button(), None);
+            assert!(state.update(32).is_empty(), "unknown buttons are ignored");
+        }
+    }
 
     use crate::{
         self as gpui, AppContext as _, Context, ExternalDropData, ExternalFile, FocusHandle,

@@ -15,6 +15,9 @@
 //!
 //! The host is clipped by a window region to the union of the rectangles GPUI
 //! laid its views out at, so it covers no pixel a hosted view does not own.
+//! Each child also carries its own child-local region: a host union cannot
+//! isolate overlapping children. Regions clip drawing and native hit testing
+//! without changing the child's full layout dimensions.
 //!
 //! Everything in [`plan`] is free of Win32 calls: the sequencing of the
 //! reparent, restyle and region work — and the geometry the host derives from a
@@ -206,10 +209,10 @@ impl PlatformViewHost {
     fn detach(&self, detached: &[PlatformViewId]) {
         let mut hosting = self.hosting.borrow_mut();
         for id in detached {
-            let Some(view) = hosting.attributes(*id).cloned() else {
+            let Some(view) = hosting.attributes(*id) else {
                 continue;
             };
-            let unhosted = unhost_view(&view);
+            let unhosted = unhost_view(view);
             if unhosted.is_ok() {
                 hosting.detach(*id);
             }
@@ -412,6 +415,9 @@ fn host_view(host: HWND, handle: PlatformViewHandle) -> Result<HostedView> {
 
 /// Puts a hosted view back exactly as it was before GPUI took its frame.
 fn unhost_view(view: &HostedView) -> Result<()> {
+    // A failed restoration may already have changed styles or parent. If the
+    // caller paints this view again, replay attachment before placing it.
+    view.attached.set(false);
     let hwnd = view.handle.as_hwnd();
     if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
         return Ok(());
@@ -802,7 +808,7 @@ mod tests {
             },
             1.,
         );
-        let popup = host.host.get().unwrap();
+        let popup = host.host.get().expect("host created");
         assert!(unsafe { IsWindowVisible(popup) }.as_bool());
         host.update(
             &PlatformViewUpdate {
@@ -813,7 +819,7 @@ mod tests {
         );
         assert!(host.view_rects.borrow().is_empty());
         unsafe {
-            SetWindowPos(owner, None, 50, 70, 200, 160, SWP_NOZORDER).unwrap();
+            SetWindowPos(owner, None, 50, 70, 200, 160, SWP_NOZORDER).expect("move owner");
         }
         host.sync_geometry();
         assert!(!unsafe { IsWindowVisible(popup) }.as_bool());
@@ -821,8 +827,8 @@ mod tests {
         assert_eq!(unsafe { GetWindowRgnBox(popup, &mut region) }, NULLREGION);
         host.destroy();
         unsafe {
-            DestroyWindow(parent).unwrap();
-            DestroyWindow(owner).unwrap();
+            DestroyWindow(parent).expect("destroy parent");
+            DestroyWindow(owner).expect("destroy owner");
         }
     }
 
@@ -833,7 +839,7 @@ mod tests {
         let a = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
         let b = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
         unsafe {
-            SetWindowPos(owner, None, 0, 0, 300, 200, SWP_NOZORDER).unwrap();
+            SetWindowPos(owner, None, 0, 0, 300, 200, SWP_NOZORDER).expect("size owner");
         }
         let host = PlatformViewHost::new(owner);
         let full = Bounds::new(point(px(-10.), px(-5.)), size(px(100.), px(80.)));
@@ -857,12 +863,14 @@ mod tests {
                 assert!(!unsafe { PtInRegion(region, left + 41, 11) }.as_bool());
                 let mut rect = RECT::default();
                 unsafe {
-                    GetWindowRect(child, &mut rect).unwrap();
-                    DeleteObject(region.into()).ok().unwrap();
+                    GetWindowRect(child, &mut rect).expect("read child bounds");
+                    DeleteObject(region.into())
+                        .ok()
+                        .expect("release test region");
                 }
                 assert_eq!((rect.right - rect.left, rect.bottom - rect.top), (200, 160));
             }
-            let popup = host.host.get().unwrap();
+            let popup = host.host.get().expect("host created");
             // Real HWND hit testing must skip the overlapping sibling whose
             // full bounds cover this point but whose own region does not.
             assert_eq!(
@@ -884,8 +892,8 @@ mod tests {
         }
         host.destroy();
         unsafe {
-            DestroyWindow(parent).unwrap();
-            DestroyWindow(owner).unwrap();
+            DestroyWindow(parent).expect("destroy parent");
+            DestroyWindow(owner).expect("destroy owner");
         }
     }
 
@@ -907,7 +915,7 @@ mod tests {
             },
             1.,
         );
-        let popup = host.host.get().unwrap();
+        let popup = host.host.get().expect("host created");
         FAIL_PARENT.with(|fail| fail.set(true));
         for _ in 0..3 {
             host.detach(&[handle.id()]);
@@ -919,7 +927,7 @@ mod tests {
         assert_eq!(unsafe { get_window_long(popup, GWLP_HWNDPARENT) }, 0);
         // Even owner destruction must not destroy the quarantined child.
         unsafe {
-            DestroyWindow(owner).unwrap();
+            DestroyWindow(owner).expect("destroy owner");
         }
         host.destroy();
         assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, parent);
@@ -936,7 +944,7 @@ mod tests {
             }
         );
         unsafe {
-            DestroyWindow(parent).unwrap();
+            DestroyWindow(parent).expect("destroy parent");
         }
     }
 
@@ -1076,7 +1084,8 @@ pub(crate) mod plan {
         pub parent: Option<isize>,
         pub style: isize,
         pub ex_style: isize,
-        /// A copy of the window's region, owned until it is handed back.
+        /// Borrowed from HostedView's saved-region owner. Applying this plan
+        /// duplicates it before transferring the duplicate to Windows.
         pub region: Option<isize>,
     }
 
@@ -1211,6 +1220,21 @@ pub(crate) mod plan {
                 width,
                 height,
             }
+        }
+
+        #[test]
+        fn child_clips_intersect_before_mapping_to_local_coordinates() {
+            let bounds = rect(-20, -10, 200, 160);
+            assert_eq!(
+                child_region_rect(bounds, rect(0, 0, 40, 40)),
+                rect(20, 10, 40, 40)
+            );
+            assert_eq!(
+                child_region_rect(bounds, rect(-40, -30, 40, 40)),
+                rect(0, 0, 20, 20)
+            );
+            assert!(child_region_rect(bounds, rect(300, 200, 40, 40)).is_empty());
+            assert_eq!(child_region_rect(bounds, bounds), rect(0, 0, 200, 160));
         }
 
         #[test]

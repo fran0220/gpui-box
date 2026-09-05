@@ -1462,7 +1462,7 @@ fn paint_document_selection_handlers(
                 .begin(scope, endpoint, unit, kind);
         }
         window.focus_from_pointer(&focus_for_down, cx);
-        window.capture_pointer(hitbox_for_down.id);
+        window.capture_pointer_for_button(hitbox_for_down.id, MouseButton::Left);
         window.refresh();
     });
 
@@ -1907,9 +1907,22 @@ impl Element for InteractiveText {
                             selection.dragging = true;
                             drop(selection);
                             window.focus_from_pointer(&focus_for_down, cx);
-                            window.capture_pointer(hitbox_for_down.id);
+                            window
+                                .capture_pointer_for_button(hitbox_for_down.id, MouseButton::Left);
                             window.refresh();
                         });
+
+                        let selection_for_cancel = selection_state.clone();
+                        window.on_mouse_event(
+                            move |_: &crate::MouseCancelEvent, phase, window, _cx| {
+                                if phase == DispatchPhase::Capture {
+                                    let mut selection = selection_for_cancel.borrow_mut();
+                                    selection.dragging = false;
+                                    selection.drag_unit = None;
+                                    window.refresh();
+                                }
+                            },
+                        );
 
                         let hitbox_for_move = hitbox.clone();
                         let layout_for_move = text_layout.clone();
@@ -2093,15 +2106,29 @@ impl Element for InteractiveText {
 
                     let text_layout = text_layout.clone();
                     let mouse_down = interactive_state.mouse_down_index.clone();
+                    let pending_for_cancel = mouse_down.clone();
+                    window.on_mouse_event(
+                        move |_: &crate::MouseCancelEvent, phase, window, _cx| {
+                            if phase == DispatchPhase::Capture
+                                && pending_for_cancel.take().is_some()
+                            {
+                                window.refresh();
+                            }
+                        },
+                    );
                     if let Some(mouse_down_index) = mouse_down.get() {
                         let hitbox = hitbox.clone();
                         let clickable_ranges = mem::take(&mut self.clickable_ranges);
                         let selection = selection_state.clone();
                         window.on_mouse_event(
                             move |event: &MouseUpEvent, phase, window: &mut Window, cx| {
-                                if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
+                                if phase == DispatchPhase::Bubble
+                                    && event.button == MouseButton::Left
+                                    && mouse_down.take().is_some()
+                                {
                                     if let Ok(mouse_up_index) =
                                         text_layout.index_for_position(event.position)
+                                        && hitbox.is_hovered(window)
                                         && (!selectable || selection.borrow().range().is_empty())
                                     {
                                         click_listener(
@@ -2124,6 +2151,7 @@ impl Element for InteractiveText {
                         let hitbox = hitbox.clone();
                         window.on_mouse_event(move |event: &MouseDownEvent, phase, window, _| {
                             if phase == DispatchPhase::Bubble
+                                && event.button == MouseButton::Left
                                 && hitbox.is_hovered(window)
                                 && let Ok(mouse_down_index) =
                                     text_layout.index_for_position(event.position)
@@ -2395,6 +2423,69 @@ mod tests {
         assert_eq!(selection.anchor, 3);
         assert_eq!(selection.focus, 0);
         assert_eq!(selection.range(), 0..3);
+    }
+
+    #[test]
+    fn selectable_text_pointer_cancel_preserves_selection_without_finishing_drag() {
+        let mut cx = TestAppContext::single();
+        let window = selectable_text_window(&mut cx);
+        cx.update_window(window, |_, window, cx| {
+            window.dispatch_event(
+                MouseDownEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    click_count: 2,
+                    ..Default::default()
+                }
+                .to_platform_input(),
+                cx,
+            );
+            assert!(window.captured_hitbox().is_some());
+            window.draw(cx).clear(cx);
+            window.dispatch_event(crate::MouseCancelEvent.to_platform_input(), cx);
+            assert!(window.captured_hitbox().is_none());
+            window.dispatch_event(
+                MouseMoveEvent {
+                    position: point(px(400.), px(80.)),
+                    pressed_button: Some(MouseButton::Left),
+                    ..Default::default()
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.dispatch_event(
+                MouseUpEvent {
+                    position: point(px(400.), px(80.)),
+                    ..Default::default()
+                }
+                .to_platform_input(),
+                cx,
+            );
+            let mut modifiers = Modifiers::none();
+            if cfg!(target_os = "macos") {
+                modifiers.platform = true;
+            } else {
+                modifiers.control = true;
+            }
+            window.dispatch_event(
+                KeyDownEvent {
+                    keystroke: Keystroke {
+                        modifiers,
+                        key: "c".into(),
+                        key_char: None,
+                    },
+                    is_held: false,
+                    prefer_character_input: false,
+                }
+                .to_platform_input(),
+                cx,
+            );
+        })
+        .expect("text cancellation events dispatch");
+        assert_eq!(
+            cx.read_from_clipboard().and_then(|item| item.text()),
+            Some("e\u{301}".into())
+        );
     }
 
     #[test]

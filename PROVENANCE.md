@@ -7,6 +7,9 @@ The machine-readable release record is `provenance.toml`.
 The September 2026 Windows hosting corrections (per-child regions, complete
 empty-frame submission, and retry-safe saved-region ownership) are original
 GPUI Box work. They do not change either frozen import receipt.
+The shared mouse cancellation event, button-bound pointer capture, text/click
+cleanup, browser chord reconciliation, and Windows chord capture lifetime are
+likewise local framework corrections with no imported source.
 
 ## P01: GPUI / Zed filtered framework import
 

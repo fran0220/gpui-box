@@ -3,8 +3,8 @@ use std::rc::Rc;
 use gpui::{
     Capslock, DispatchEventResult, KeyDownEvent, KeyUpEvent, Keystroke, Modifiers,
     ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent,
-    MouseUpEvent, NavigationDirection, Pixels, PlatformInput, Point, ScrollDelta, ScrollWheelEvent,
-    TouchPhase, point, px,
+    MouseUpEvent, Pixels, PlatformInput, Point, ScrollDelta, ScrollWheelEvent, TouchPhase, point,
+    px,
 };
 use wasm_bindgen::prelude::*;
 
@@ -86,6 +86,7 @@ impl Drop for EventListenerHandle {
 pub(crate) struct ClickState {
     last_position: Point<Pixels>,
     last_time: f64,
+    last_button: Option<MouseButton>,
     current_count: usize,
 }
 
@@ -94,18 +95,19 @@ impl Default for ClickState {
         Self {
             last_position: Point::default(),
             last_time: 0.0,
+            last_button: None,
             current_count: 0,
         }
     }
 }
 
 impl ClickState {
-    fn register_click(&mut self, position: Point<Pixels>, time: f64) -> usize {
+    fn register_click(&mut self, position: Point<Pixels>, time: f64, button: MouseButton) -> usize {
         let distance = ((f32::from(position.x) - f32::from(self.last_position.x)).powi(2)
             + (f32::from(position.y) - f32::from(self.last_position.y)).powi(2))
         .sqrt();
 
-        if (time - self.last_time) < 400.0 && distance < 5.0 {
+        if self.last_button == Some(button) && (time - self.last_time) < 400.0 && distance < 5.0 {
             self.current_count += 1;
         } else {
             self.current_count = 1;
@@ -113,6 +115,7 @@ impl ClickState {
 
         self.last_position = position;
         self.last_time = time;
+        self.last_button = Some(button);
         self.current_count
     }
 }
@@ -123,6 +126,8 @@ impl WebWindowInner {
             self.register_pointer_down(),
             self.register_pointer_up(),
             self.register_pointer_move(),
+            self.register_pointer_cancel("pointercancel"),
+            self.register_pointer_cancel("lostpointercapture"),
             self.register_pointer_leave(),
             self.register_wheel(),
             self.register_context_menu(),
@@ -246,36 +251,21 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointerdown", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if !event.is_primary() {
+                return;
+            }
             event.prevent_default();
             this.input_element.focus().ok();
-
-            // Capture the pointer so drags that leave the canvas keep
-            // delivering pointermove/pointerup here; otherwise a release
-            // outside the canvas is never seen and `pressed_button` stays
-            // stuck. The capture is released implicitly on pointerup.
-            this.canvas.set_pointer_capture(event.pointer_id()).ok();
-
-            let button = dom_mouse_button_to_gpui(event.button());
-            let position = pointer_position_in_element(&event);
-            let modifiers = modifiers_from_mouse_event(&event, this.is_mac);
-            let time = js_sys::Date::now();
-
-            this.pressed_button.set(Some(button));
-            let click_count = this.click_state.borrow_mut().register_click(position, time);
-
+            if this
+                .active_pointer
+                .get()
+                .is_some_and(|id| id != event.pointer_id())
             {
-                let mut current_state = this.state.borrow_mut();
-                current_state.mouse_position = position;
-                current_state.modifiers = modifiers;
+                this.cancel_pointer();
             }
-
-            this.dispatch_input(PlatformInput::MouseDown(MouseDownEvent {
-                button,
-                position,
-                modifiers,
-                click_count,
-                first_mouse: false,
-            }));
+            this.active_pointer.set(Some(event.pointer_id()));
+            this.canvas.set_pointer_capture(event.pointer_id()).ok();
+            this.reconcile_pointer_buttons(&event);
         })
     }
 
@@ -283,39 +273,104 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointerup", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
-            event.prevent_default();
-
-            let button = dom_mouse_button_to_gpui(event.button());
-            let position = pointer_position_in_element(&event);
-            let modifiers = modifiers_from_mouse_event(&event, this.is_mac);
-
-            this.pressed_button.set(None);
-            let click_count = this.click_state.borrow().current_count;
-
-            {
-                let mut current_state = this.state.borrow_mut();
-                current_state.mouse_position = position;
-                current_state.modifiers = modifiers;
+            if this.active_pointer.get() != Some(event.pointer_id()) {
+                return;
             }
-
-            this.dispatch_input(PlatformInput::MouseUp(MouseUpEvent {
-                button,
-                position,
-                modifiers,
-                click_count,
-            }));
+            event.prevent_default();
+            this.reconcile_pointer_buttons(&event);
+            // The implicit lostpointercapture following a normal up is not a
+            // cancellation of another gesture started by an up handler.
+            this.active_pointer.set(None);
         })
+    }
+
+    fn reconcile_pointer_buttons(&self, event: &web_sys::PointerEvent) {
+        let position = pointer_position_in_element(event);
+        let modifiers = modifiers_from_mouse_event(event, self.is_mac);
+        {
+            let mut state = self.state.borrow_mut();
+            state.mouse_position = position;
+            state.modifiers = modifiers;
+        }
+        let mut buttons = self.pointer_buttons.get();
+        let changes = buttons.update(event.buttons());
+        self.pointer_buttons.set(buttons);
+        for (button, pressed) in changes {
+            let click_count = if pressed {
+                self.click_state
+                    .borrow_mut()
+                    .register_click(position, js_sys::Date::now(), button)
+            } else {
+                self.click_state.borrow().current_count
+            };
+            let input = if pressed {
+                PlatformInput::MouseDown(MouseDownEvent {
+                    button,
+                    position,
+                    modifiers,
+                    click_count,
+                    first_mouse: false,
+                })
+            } else {
+                PlatformInput::MouseUp(MouseUpEvent {
+                    button,
+                    position,
+                    modifiers,
+                    click_count,
+                })
+            };
+            self.dispatch_input(input);
+        }
+    }
+
+    fn register_pointer_cancel(self: &Rc<Self>, name: &'static str) -> EventListenerHandle {
+        let this = Rc::clone(self);
+        self.listen(name, move |event: JsValue| {
+            let event: web_sys::PointerEvent = event.unchecked_into();
+            if this.active_pointer.get() == Some(event.pointer_id()) {
+                this.cancel_pointer();
+            }
+        })
+    }
+
+    fn cancel_pointer(&self) {
+        let Some(id) = self.active_pointer.take() else {
+            return;
+        };
+        let mut buttons = self.pointer_buttons.get();
+        buttons.cancel();
+        self.pointer_buttons.set(buttons);
+        *self.click_state.borrow_mut() = ClickState::default();
+        // Clear identity before releasing: lostpointercapture can re-enter.
+        self.canvas.release_pointer_capture(id).ok();
+        self.dispatch_input(PlatformInput::MouseCancelled(gpui::MouseCancelEvent));
     }
 
     fn register_pointer_move(self: &Rc<Self>) -> EventListenerHandle {
         let this = Rc::clone(self);
         self.listen("pointermove", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if !event.is_primary() {
+                return;
+            }
+            if this
+                .active_pointer
+                .get()
+                .is_some_and(|id| id != event.pointer_id())
+            {
+                return;
+            }
             event.prevent_default();
+            if this.active_pointer.get().is_some() {
+                // Pointer Events reports intermediate chord presses/releases
+                // as moves; button snapshots are authoritative, not a cache
+                // of the last pointerdown's single button.
+                this.reconcile_pointer_buttons(&event);
+            }
 
             let position = pointer_position_in_element(&event);
             let modifiers = modifiers_from_mouse_event(&event, this.is_mac);
-            let current_pressed = this.pressed_button.get();
+            let current_pressed = this.pointer_buttons.get().pressed_button();
 
             {
                 let mut current_state = this.state.borrow_mut();
@@ -335,10 +390,13 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointerleave", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if !event.is_primary() {
+                return;
+            }
 
             let position = pointer_position_in_element(&event);
             let modifiers = modifiers_from_mouse_event(&event, this.is_mac);
-            let current_pressed = this.pressed_button.get();
+            let current_pressed = this.pointer_buttons.get().pressed_button();
 
             {
                 let mut current_state = this.state.borrow_mut();
@@ -626,6 +684,7 @@ impl WebWindowInner {
             self.browser_window.as_ref(),
             "blur",
             move |_event: JsValue| {
+                this.cancel_pointer();
                 this.schedule_active_status_sync();
             },
         )
@@ -712,17 +771,6 @@ fn dom_key_to_gpui_key(event: &web_sys::KeyboardEvent) -> String {
             }
             other.to_lowercase()
         }
-    }
-}
-
-fn dom_mouse_button_to_gpui(button: i16) -> MouseButton {
-    match button {
-        0 => MouseButton::Left,
-        1 => MouseButton::Middle,
-        2 => MouseButton::Right,
-        3 => MouseButton::Navigate(NavigationDirection::Back),
-        4 => MouseButton::Navigate(NavigationDirection::Forward),
-        _ => MouseButton::Left,
     }
 }
 
