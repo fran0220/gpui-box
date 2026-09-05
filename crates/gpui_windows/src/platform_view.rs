@@ -191,7 +191,7 @@ impl PlatformViewHost {
             // keep the restoration state intact so destroy can be retried.
             if let Some(host) = self.host.get() {
                 unsafe {
-                    ShowWindow(host, SW_HIDE);
+                    let _ = ShowWindow(host, SW_HIDE);
                     set_window_long(host, GWLP_HWNDPARENT, 0);
                 }
             }
@@ -275,7 +275,7 @@ impl PlatformViewHost {
             // when no SetWindowPos follows it.
             if let Err(error) = set_rect_region(hwnd, &[local], true) {
                 unsafe {
-                    ShowWindow(hwnd, SW_HIDE);
+                    let _ = ShowWindow(hwnd, SW_HIDE);
                 }
                 log::error!("failed to clip a hosted platform view: {error:#}");
                 continue;
@@ -800,6 +800,10 @@ mod tests {
         let owner = create_test_window(None, WS_VISIBLE);
         let parent = create_test_window(None, WINDOW_STYLE::default());
         let child = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
+        unsafe {
+            SetWindowPos(owner, None, 0, 0, 200, 160, SWP_NOZORDER)
+                .expect("size owner with a nonempty client area");
+        }
         let host = PlatformViewHost::new(owner);
         let bounds = Bounds::new(point(px(0.), px(0.)), size(px(10.), px(10.)));
         let handle = view_handle(child);
