@@ -439,9 +439,12 @@ impl Render for MultiSelect {
                     self.ident.child("tag").child(id.as_ref()),
                     option.label.clone(),
                 )
-                .on_remove(move |_, app| {
-                    let id = id.clone();
-                    select.update(app, |select, cx| select.remove_id(id, cx));
+                .disabled(self.disabled)
+                .when(!self.disabled, |tag| {
+                    tag.on_remove(move |_, app| {
+                        let id = id.clone();
+                        select.update(app, |select, cx| select.remove_id(id, cx));
+                    })
                 }),
             )
         });
@@ -547,6 +550,7 @@ impl Render for MultiSelect {
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
             .text(self.name.clone())
             .placeholder(placeholder)
+            .disabled(self.disabled)
             .expanded(self.open)
             .value(cx.numbers().count(self.selected.len()));
         if !self.disabled {

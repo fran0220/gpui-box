@@ -421,6 +421,7 @@ pub(super) fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// state survive gallery rebuilds.
 pub(super) struct SceneMultiSelect {
     control: Entity<MultiSelect>,
+    disabled: Entity<MultiSelect>,
 }
 
 impl Global for SceneMultiSelect {}
@@ -443,16 +444,32 @@ pub(super) fn multi_select(window: &mut Window, cx: &mut App) -> AnyElement {
                 .clearable(true)
         });
         control.update(cx, |control, cx| control.open(window, cx));
-        cx.set_global(SceneMultiSelect { control });
+        let disabled = cx.new(|cx| {
+            MultiSelect::new("scene.multi-select-disabled", window, cx)
+                .name("Disabled providers")
+                .selected(["native", "remote"])
+                .options([
+                    SelectOption::new("native", "Native runtime"),
+                    SelectOption::new("remote", "Remote gateway"),
+                ])
+                .disabled(true)
+        });
+        cx.set_global(SceneMultiSelect { control, disabled });
     }
     let theme = cx.theme().clone();
     let control = cx.global::<SceneMultiSelect>().control.clone();
+    let disabled = cx.global::<SceneMultiSelect>().disabled.clone();
     stack(&theme)
         .w(px(520.0))
         .child(caption(
             &theme,
             "Selected ids stay with the host; search, chips, and option focus stay with the view",
         ))
+        .child(caption(
+            &theme,
+            "Disabled: selected values remain visible, without remove actions",
+        ))
+        .child(disabled)
         .child(control)
         .into_any_element()
 }

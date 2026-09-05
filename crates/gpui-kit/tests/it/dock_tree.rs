@@ -58,6 +58,61 @@ fn dock(cx: &mut TestAppContext) -> (Harness, Rc<RefCell<Vec<DockTreeEvent>>>) {
     dock_with(cx, topology())
 }
 
+#[gpui::test]
+fn prefix_related_docks_do_not_share_drag_ownership(cx: &mut TestAppContext) {
+    for target in [
+        "tree.source.tabs.files",
+        "tree.source.body",
+        "tree.source.split-right",
+    ] {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let sink = calls.clone();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+            div()
+                .flex()
+                .w(px(900.0))
+                .h(px(600.0))
+                .children(["tree", "tree.other"].map(|id| {
+                    let sink = sink.clone();
+                    div().w(px(450.0)).h_full().child(
+                        DockTree::new(id, DockTopology::stack("source", ["files", "search"]))
+                            .panels([
+                                DockPanel::new("files", "Files"),
+                                DockPanel::new("search", "Search"),
+                            ])
+                            .on_event(move |event, _, _| sink.borrow_mut().push(event)),
+                    )
+                }))
+                .into_any_element()
+        });
+        let from = harness.point_in("tree.other.source.tabs.files");
+        harness
+            .context()
+            .simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+        harness.context().simulate_mouse_move(
+            from + gpui::point(px(12.0), px(8.0)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        harness.frame();
+        let to = harness.point_in(target);
+        harness
+            .context()
+            .simulate_mouse_move(to, MouseButton::Left, Modifiers::none());
+        harness
+            .context()
+            .simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        assert!(
+            !calls.borrow().iter().any(|event| matches!(
+                event,
+                DockTreeEvent::PanelMoved { .. } | DockTreeEvent::PanelSplit { .. }
+            )),
+            "{target}: {:?}",
+            calls.borrow()
+        );
+    }
+}
+
 #[test]
 fn records_round_trip_nested_splits_and_an_empty_stack() {
     let topology = topology();

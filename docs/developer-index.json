@@ -94104,8 +94104,8 @@
       "module": "overlay::drawer",
       "path": "gpui_kit::overlay::drawer",
       "source": "crates/gpui-kit/src/overlay/drawer.rs",
-      "summary": "Starts the slide out. The drawer stays on screen until it finishes.",
-      "documentation": "Starts the slide out. The drawer stays on screen until it finishes.",
+      "summary": "Starts the slide out and releases modal keyboard ownership. The drawer stays on screen until the exit finishes, without restoring focus again.",
+      "documentation": "Starts the slide out and releases modal keyboard ownership. The drawer\nstays on screen until the exit finishes, without restoring focus again.",
       "signature": "pub fn close (& mut self, window : & mut Window, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Drawer"
@@ -98558,9 +98558,9 @@
       "module": "overlay::stack",
       "path": "gpui_kit::overlay::stack",
       "source": "crates/gpui-kit/src/overlay/stack.rs",
-      "summary": "Forgets a surface that has closed.",
-      "documentation": "Forgets a surface that has closed.",
-      "signature": "pub fn pop (id : & SharedString, window : & Window, cx : & mut App)",
+      "summary": "Forgets a closed surface and splices its restoration chain. Closing a covered modal never steals focus; its successor inherits the return target so closing that successor cannot restore focus into the closed surface.",
+      "documentation": "Forgets a closed surface and splices its restoration chain. Closing a\ncovered modal never steals focus; its successor inherits the return target\nso closing that successor cannot restore focus into the closed surface.",
+      "signature": "pub fn pop (id : & SharedString, window : & mut Window, cx : & mut App)",
       "cfg": []
     },
     {
@@ -142023,7 +142023,7 @@
       "uses": [
         "MultiSelect"
       ],
-      "example": "fn multi_select(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMultiSelect>() {\n        let control = cx.new(|cx| {\n            MultiSelect::new(\"scene.multi-select\", window, cx)\n                .name(\"Enabled providers\")\n                .placeholder(\"Choose providers\")\n                .selected([\"native\", \"remote\"])\n                .options([\n                    SelectOption::new(\"native\", \"Native runtime\")\n                        .description(\"Runs on this machine\"),\n                    SelectOption::new(\"remote\", \"Remote gateway\")\n                        .description(\"Uses the workspace gateway\"),\n                    SelectOption::new(\"preview\", \"Preview models\").disabled(true),\n                    SelectOption::new(\"archive\", \"Archive models\"),\n                ])\n                .clearable(true)\n        });\n        control.update(cx, |control, cx| control.open(window, cx));\n        cx.set_global(SceneMultiSelect { control });\n    }\n    let theme = cx.theme().clone();\n    let control = cx.global::<SceneMultiSelect>().control.clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"Selected ids stay with the host; search, chips, and option focus stay with the view\",\n        ))\n        .child(control)\n        .into_any_element()\n}"
+      "example": "fn multi_select(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMultiSelect>() {\n        let control = cx.new(|cx| {\n            MultiSelect::new(\"scene.multi-select\", window, cx)\n                .name(\"Enabled providers\")\n                .placeholder(\"Choose providers\")\n                .selected([\"native\", \"remote\"])\n                .options([\n                    SelectOption::new(\"native\", \"Native runtime\")\n                        .description(\"Runs on this machine\"),\n                    SelectOption::new(\"remote\", \"Remote gateway\")\n                        .description(\"Uses the workspace gateway\"),\n                    SelectOption::new(\"preview\", \"Preview models\").disabled(true),\n                    SelectOption::new(\"archive\", \"Archive models\"),\n                ])\n                .clearable(true)\n        });\n        control.update(cx, |control, cx| control.open(window, cx));\n        let disabled = cx.new(|cx| {\n            MultiSelect::new(\"scene.multi-select-disabled\", window, cx)\n                .name(\"Disabled providers\")\n                .selected([\"native\", \"remote\"])\n                .options([\n                    SelectOption::new(\"native\", \"Native runtime\"),\n                    SelectOption::new(\"remote\", \"Remote gateway\"),\n                ])\n                .disabled(true)\n        });\n        cx.set_global(SceneMultiSelect { control, disabled });\n    }\n    let theme = cx.theme().clone();\n    let control = cx.global::<SceneMultiSelect>().control.clone();\n    let disabled = cx.global::<SceneMultiSelect>().disabled.clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"Selected ids stay with the host; search, chips, and option focus stay with the view\",\n        ))\n        .child(caption(\n            &theme,\n            \"Disabled: selected values remain visible, without remove actions\",\n        ))\n        .child(disabled)\n        .child(control)\n        .into_any_element()\n}"
     },
     {
       "name": "transfer-list",

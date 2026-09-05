@@ -18,6 +18,34 @@ fn recorder<T: 'static>() -> (Calls<T>, Calls<T>) {
 }
 
 #[gpui::test]
+fn disabled_multi_select_has_no_remove_action_or_tab_stop(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<MultiSelectEvent>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let control = cx.new(|cx| {
+            MultiSelect::new("disabled-select", window, cx)
+                .name("Disabled selection")
+                .selected(["native"])
+                .options([SelectOption::new("native", "Native")])
+                .disabled(true)
+        });
+        let sink = sink.clone();
+        cx.subscribe(&control, move |_, event: &MultiSelectEvent, _| {
+            sink.borrow_mut().push(event.clone())
+        })
+        .detach();
+        control.into_any_element()
+    });
+    assert!(harness.node("disabled-select").unwrap().disabled);
+    assert!(harness.node("disabled-select.tag.native").unwrap().disabled);
+    assert!(harness.node("disabled-select.tag.native.remove").is_none());
+    harness.click("disabled-select.tag.native");
+    harness.keystrokes("tab space enter backspace");
+    assert!(calls.borrow().is_empty());
+    assert!(!harness.node("disabled-select").unwrap().focused);
+    assert!(!harness.node("disabled-select.tag.native").unwrap().focused);
+}
+
+#[gpui::test]
 fn multi_select_keeps_selection_controlled_and_ignores_disabled_options(cx: &mut TestAppContext) {
     let (calls, sink) = recorder::<MultiSelectEvent>();
     let slot: Rc<RefCell<Option<Entity<MultiSelect>>>> = Rc::new(RefCell::new(None));

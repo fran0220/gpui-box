@@ -8,6 +8,28 @@
 
 pub mod dnd;
 
+/// A paint-only listener for abandoning component-owned pointer state. It
+/// adds no hitbox and emits no completion action. Cancellation is window-wide
+/// and is deliberately distinct from release, including outside the target.
+pub(crate) fn on_pointer_cancel(
+    cancel: impl Fn(&mut gpui::Window, &mut gpui::App) + 'static,
+) -> impl gpui::IntoElement {
+    use gpui::Styled;
+    gpui::canvas(
+        |_, _, _| (),
+        move |_, _, window, _| {
+            window.on_mouse_event(move |_: &gpui::MouseCancelEvent, phase, window, cx| {
+                if phase == gpui::DispatchPhase::Capture {
+                    cancel(window, cx);
+                    window.refresh();
+                }
+            });
+        },
+    )
+    .absolute()
+    .size_full()
+}
+
 pub use dnd::{
     ActiveDrag, DRAG_NODE_ID, DragItem, DropAxis, DropIntent, DropPosition, FILE_KIND, ROW_KIND,
     StagedDrag,

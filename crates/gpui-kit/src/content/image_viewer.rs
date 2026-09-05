@@ -677,6 +677,12 @@ impl RenderOnce for ImageViewer {
                     window.refresh();
                 });
 
+                let cancelled = Rc::clone(&state);
+                viewport = viewport.child(crate::interaction::on_pointer_cancel(move |_, _| {
+                    let mut state = cancelled.borrow_mut();
+                    state.panning = false;
+                    state.at = None;
+                }));
                 let up_state = Rc::clone(&state);
                 viewport = viewport.on_mouse_up(MouseButton::Left, move |_, _, _| {
                     let mut state = up_state.borrow_mut();

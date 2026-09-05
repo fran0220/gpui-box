@@ -589,8 +589,15 @@ impl DockTree {
             .semantic_id()
     }
 
-    fn owns_prefix(&self) -> String {
-        format!("{}.", self.ident.as_str())
+    // Semantic surface identities must be unique within a window, including
+    // paths formed from dock and stack ids. Prefix-related roots are valid:
+    // only an exact source surface and a member of that stack are accepted.
+    fn owned_sources(&self) -> Vec<(SharedString, Vec<SharedString>)> {
+        self.topology
+            .stacks()
+            .into_iter()
+            .map(|stack| (self.surface(stack), stack.panels.clone()))
+            .collect()
     }
 
     fn header(&self, stack: &DockStack, window: &mut Window, cx: &mut App) -> AnyElement {
@@ -616,7 +623,7 @@ impl DockTree {
             let selected = handler.clone();
             let stack_id = stack.id.clone();
             let destination = stack.id.clone();
-            let prefix = self.owns_prefix();
+            let sources = self.owned_sources();
             let panels = stack.panels.clone();
             tabs = tabs
                 .on_select(move |panel, window, cx| {
@@ -630,7 +637,11 @@ impl DockTree {
                     );
                 })
                 .reorderable(true)
-                .accepts(move |item: &DragItem, _| item.source.starts_with(&prefix))
+                .accepts(move |item: &DragItem, _| {
+                    sources.iter().any(|(surface, panels)| {
+                        surface == &item.source && panels.contains(&item.id)
+                    })
+                })
                 .on_reorder(move |intent, window, cx| {
                     handler(
                         DockTreeEvent::PanelMoved {
@@ -815,7 +826,7 @@ impl DockTree {
             .map(|(position, accepted)| {
                 dnd::indicator(&position, accepted, DropAxis::Vertical, cx)
             });
-        let prefix = self.owns_prefix();
+        let sources = self.owned_sources();
         let destination = stack.id.clone();
         dnd::drop_target(
             frame.children(indicator),
@@ -825,7 +836,11 @@ impl DockTree {
                 index: 0,
                 allow_into: true,
                 axis: DropAxis::Vertical,
-                accepts: Rc::new(move |item: &DragItem, _| item.source.starts_with(&prefix)),
+                accepts: Rc::new(move |item: &DragItem, _| {
+                    sources.iter().any(|(surface, panels)| {
+                        surface == &item.source && panels.contains(&item.id)
+                    })
+                }),
                 on_drop: Rc::new(move |intent: &DropIntent, window, cx| {
                     handler(
                         DockTreeEvent::PanelMoved {
@@ -902,7 +917,7 @@ impl DockTree {
                 )
                 .text(cx.strings().text(placement.string_key())),
         );
-        let prefix = self.owns_prefix();
+        let sources = self.owned_sources();
         let destination = stack.id.clone();
         dnd::drop_target(
             zone,
@@ -912,7 +927,11 @@ impl DockTree {
                 index: 0,
                 allow_into: true,
                 axis: DropAxis::Vertical,
-                accepts: Rc::new(move |item: &DragItem, _| item.source.starts_with(&prefix)),
+                accepts: Rc::new(move |item: &DragItem, _| {
+                    sources.iter().any(|(surface, panels)| {
+                        surface == &item.source && panels.contains(&item.id)
+                    })
+                }),
                 on_drop: Rc::new(move |intent: &DropIntent, window, cx| {
                     handler(
                         DockTreeEvent::PanelSplit {

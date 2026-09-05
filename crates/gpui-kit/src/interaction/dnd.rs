@@ -774,7 +774,9 @@ impl Render for DragGhost {
 
         let landing = fresh_landing(pointer, cx);
         let card = ghost_element(&self.item, landing.as_ref(), cx);
-        div().child(card.ml(offset.x).mt(offset.y))
+        div()
+            .child(card.ml(offset.x).mt(offset.y))
+            .child(super::on_pointer_cancel(cancel))
     }
 }
 

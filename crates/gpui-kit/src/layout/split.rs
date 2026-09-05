@@ -447,6 +447,14 @@ impl RenderOnce for SplitPane {
             .size_full()
             .overflow_hidden();
 
+        if !actionable {
+            dragging.set(false);
+        }
+        let cancelled = Rc::clone(&dragging);
+        frame = frame.child(crate::interaction::on_pointer_cancel(move |_, _| {
+            cancelled.set(false)
+        }));
+
         if let (true, Some(handler)) = (actionable, self.on_resize.clone()) {
             let bounds = Rc::clone(&measured);
             let held = Rc::clone(&dragging);

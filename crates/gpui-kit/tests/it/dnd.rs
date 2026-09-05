@@ -110,6 +110,25 @@ fn a_drop_reports_the_intent_and_moves_nothing(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn pointer_cancel_abandons_a_drop_idempotently_and_allows_a_new_drag(cx: &mut TestAppContext) {
+    let reports = reports();
+    let mut harness = list_harness(cx, Rc::clone(&reports));
+    harness.drag_start("queue.gamma");
+    let over = harness.point_down("queue.alpha", 0.2);
+    harness.drag_to(over);
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    harness.update(|window, cx| assert!(dnd::active(window, cx).is_none()));
+    harness.drop_here();
+    assert!(reports.borrow().is_empty());
+    assert!(harness.node(DRAG_NODE_ID).is_none());
+    harness.drag_start("queue.gamma");
+    harness.drag_to(over);
+    harness.drop_here();
+    assert_eq!(reports.borrow().len(), 1);
+}
+
+#[gpui::test]
 fn escape_cancels_a_drag_silently(cx: &mut TestAppContext) {
     let reports = reports();
     let mut harness = list_harness(cx, Rc::clone(&reports));

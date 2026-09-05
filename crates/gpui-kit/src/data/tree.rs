@@ -337,7 +337,6 @@ struct Visible {
     open: bool,
     has_children: bool,
     parent: Option<SharedString>,
-    first_child: Option<SharedString>,
     kind: VisibleKind,
 }
 
@@ -400,7 +399,6 @@ fn flatten(
             open: open && has_children,
             has_children,
             parent: parent.cloned(),
-            first_child: node.children.first().map(|child| child.id.clone()),
             kind: VisibleKind::Node,
         });
         if open && has_children {
@@ -415,7 +413,6 @@ fn flatten(
                         open: false,
                         has_children: false,
                         parent: Some(node.id.clone()),
-                        first_child: None,
                         kind: VisibleKind::Loading,
                     });
                 }
@@ -429,7 +426,6 @@ fn flatten(
                         open: false,
                         has_children: false,
                         parent: Some(node.id.clone()),
-                        first_child: None,
                         kind: VisibleKind::Unavailable,
                     });
                 }
@@ -443,7 +439,6 @@ fn flatten(
                         open: false,
                         has_children: false,
                         parent: Some(node.id.clone()),
-                        first_child: None,
                         kind: VisibleKind::Failed,
                     });
                 }
@@ -521,21 +516,33 @@ fn keystroke_move(
         "end" => step(visible, visible.len() as isize - 1, -1).map(Move::Select),
         "toward-children" => {
             let node = visible.get(at?)?;
+            if node.disabled {
+                return None;
+            }
             if node.has_children && !node.open {
                 Some(Move::Toggle(node.id.clone(), true))
             } else {
-                node.first_child
-                    .clone()
-                    .filter(|_| node.open)
-                    .map(Move::Select)
+                visible[at? + 1..]
+                    .iter()
+                    .take_while(|child| child.level > node.level)
+                    .find(|child| {
+                        node.open && !child.disabled && child.parent.as_ref() == Some(&node.id)
+                    })
+                    .map(|child| Move::Select(child.id.clone()))
             }
         }
         "toward-parent" => {
             let node = visible.get(at?)?;
+            if node.disabled {
+                return None;
+            }
             if node.has_children && node.open {
                 Some(Move::Toggle(node.id.clone(), false))
             } else {
-                node.parent.clone().map(Move::Select)
+                visible
+                    .iter()
+                    .find(|parent| !parent.disabled && Some(&parent.id) == node.parent.as_ref())
+                    .map(|parent| Move::Select(parent.id.clone()))
             }
         }
         _ => None,
@@ -1193,6 +1200,40 @@ impl Rows {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hierarchy_moves_only_reach_enabled_direct_relatives() {
+        for (direction, descend, ascend) in [
+            (LayoutDirection::LeftToRight, "right", "left"),
+            (LayoutDirection::RightToLeft, "left", "right"),
+        ] {
+            let nodes = [
+                TreeNode::new("a", "A").children([
+                    TreeNode::new("blocked", "Blocked")
+                        .disabled(true)
+                        .children([TreeNode::new("grandchild", "Grandchild")]),
+                    TreeNode::new("sibling", "Sibling"),
+                ]),
+                TreeNode::new("b", "B"),
+            ];
+            let mut rows = Vec::new();
+            flatten(&nodes, &["a".into(), "blocked".into()], 1, None, &mut rows);
+            let a = SharedString::from("a");
+            assert!(
+                matches!(keystroke_move(descend, direction, &rows, Some(&a)), Some(Move::Select(id)) if id == "sibling")
+            );
+            let blocked = SharedString::from("blocked");
+            assert!(keystroke_move(descend, direction, &rows, Some(&blocked)).is_none());
+            assert!(keystroke_move(ascend, direction, &rows, Some(&blocked)).is_none());
+            let grandchild = SharedString::from("grandchild");
+            assert!(keystroke_move(ascend, direction, &rows, Some(&grandchild)).is_none());
+            rows.iter_mut()
+                .find(|row| row.id == "sibling")
+                .unwrap()
+                .disabled = true;
+            assert!(keystroke_move(descend, direction, &rows, Some(&a)).is_none());
+        }
+    }
 
     fn sample() -> Vec<TreeNode> {
         vec![

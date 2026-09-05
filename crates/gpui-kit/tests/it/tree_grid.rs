@@ -9,6 +9,67 @@ use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
 
+#[gpui::test]
+fn hierarchy_refuses_disabled_relatives_and_unrelated_roots(cx: &mut TestAppContext) {
+    for direction in [LayoutDirection::LeftToRight, LayoutDirection::RightToLeft] {
+        for (parent_disabled, sibling_disabled) in [(false, true), (false, false), (true, false)] {
+            let calls = Rc::new(RefCell::new(Vec::new()));
+            let sink = calls.clone();
+            let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+                let sink = sink.clone();
+                TreeGrid::new("hierarchy", 5, move |index, _, _| {
+                    match index {
+                        0 => TreeGridRow::new("a", 1)
+                            .branch(true)
+                            .disabled(parent_disabled),
+                        1 => TreeGridRow::new("blocked", 2)
+                            .parent("a")
+                            .branch(true)
+                            .disabled(true),
+                        2 => TreeGridRow::new("grandchild", 3).parent("blocked"),
+                        3 => TreeGridRow::new("sibling", 2)
+                            .parent("a")
+                            .disabled(sibling_disabled),
+                        _ => TreeGridRow::new("b", 1),
+                    }
+                    .cell("name", "Row")
+                })
+                .columns([GridColumn::new("name", "Name").flex(1.0)])
+                .on_select(move |id, _, _| sink.borrow_mut().push(id))
+                .into_any_element()
+            });
+            harness.update(move |_, cx| set_layout_direction(direction, cx));
+            let (descend, ascend) = if direction == LayoutDirection::LeftToRight {
+                ("right", "left")
+            } else {
+                ("left", "right")
+            };
+            if !parent_disabled {
+                harness.click("hierarchy.a");
+                calls.borrow_mut().clear();
+                harness.keystrokes(descend);
+                if sibling_disabled {
+                    assert!(calls.borrow().is_empty());
+                } else {
+                    assert_eq!(
+                        calls.borrow().as_slice(),
+                        &[gpui::SharedString::from("sibling")]
+                    );
+                }
+            } else {
+                harness.click("hierarchy.sibling");
+                calls.borrow_mut().clear();
+                harness.keystrokes(ascend);
+                assert!(calls.borrow().is_empty());
+            }
+            harness.click("hierarchy.grandchild");
+            calls.borrow_mut().clear();
+            harness.keystrokes(ascend);
+            assert!(calls.borrow().is_empty());
+        }
+    }
+}
+
 fn row(index: usize) -> TreeGridRow {
     let mut row = TreeGridRow::new(format!("node-{index:04}"), if index == 0 { 1 } else { 2 })
         .text(format!("Node {index}"))

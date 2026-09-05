@@ -222,12 +222,12 @@ impl Drawer {
             .get_or_insert_with(|| Presence::hidden(enter_spec(&theme), exit_spec(&theme)));
         presence.show();
         stack::push(self.ident.semantic_id(), window, cx);
-        self.trap.engage(window, cx);
         cx.emit(DrawerEvent::Opened);
         cx.notify();
     }
 
-    /// Starts the slide out. The drawer stays on screen until it finishes.
+    /// Starts the slide out and releases modal keyboard ownership. The drawer
+    /// stays on screen until the exit finishes, without restoring focus again.
     pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.open {
             return;
@@ -417,6 +417,14 @@ impl Drawer {
             });
         Some(
             handle
+                .child(crate::interaction::on_pointer_cancel(move |_, cx| {
+                    drawer
+                        .update(cx, |drawer, cx| {
+                            drawer.drag = None;
+                            cx.notify();
+                        })
+                        .ok();
+                }))
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Button)
@@ -462,11 +470,10 @@ impl Render for Drawer {
             .as_ref()
             .is_none_or(|presence| presence.phase() == Phase::Gone)
         {
-            // The exit has run its course, so the panel leaves the tree now
-            // and the keyboard goes back to whatever opened it.
+            // The exit only removes paint. Focus ownership was released at
+            // close, so a delayed exit cannot steal it from a newer modal.
             self.presence = None;
             self.progress = 0.0;
-            self.trap.release(window, cx);
             cx.emit(DrawerEvent::Closed);
             return div().into_any_element();
         }

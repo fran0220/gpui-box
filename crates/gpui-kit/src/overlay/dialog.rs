@@ -157,7 +157,6 @@ impl Dialog {
         self.open = true;
         self.pending_focus = true;
         stack::push(self.ident.semantic_id(), window, cx);
-        self.trap.engage(window, cx);
         cx.emit(DialogEvent::Opened);
         cx.notify();
     }
@@ -171,7 +170,7 @@ impl Dialog {
         self.open = false;
         self.pending_focus = false;
         stack::pop(&self.ident.semantic_id(), window, cx);
-        self.trap.release(window, cx);
+        self.trap.begin_frame();
         cx.emit(DialogEvent::Closed);
         cx.notify();
     }

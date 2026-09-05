@@ -1813,6 +1813,14 @@ impl Render for TextArea {
                     .on_mouse_move(cx.listener(Self::on_mouse_move))
                     .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
+                    .child(crate::interaction::on_pointer_cancel({
+                        let entity = cx.weak_entity();
+                        move |_, cx| {
+                            entity
+                                .update(cx, |input, _| input.is_selecting = false)
+                                .ok();
+                        }
+                    }))
                     .cursor(CursorStyle::IBeam)
             })
             .when_some(accessible_rows.clone(), move |element, accessible_rows| {

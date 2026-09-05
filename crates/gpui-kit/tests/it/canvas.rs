@@ -442,6 +442,91 @@ fn node_drag_keeps_reporting_after_the_pointer_leaves_the_canvas(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn cancelled_node_drag_emits_no_release_and_the_next_press_works(cx: &mut TestAppContext) {
+    let (mut harness, calls, clicks) = controlled_editor(cx);
+    let start = harness.point_in("controlled-graph.source");
+    harness
+        .context()
+        .simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    harness.context().simulate_event(gpui::MouseCancelEvent);
+    calls.borrow_mut().clear();
+    harness.context().simulate_mouse_move(
+        start + point(px(20.0), px(10.0)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    harness
+        .context()
+        .simulate_mouse_up(start, MouseButton::Left, Modifiers::none());
+    assert!(calls.borrow().is_empty());
+    assert_eq!(clicks.get(), 0);
+    harness.click("controlled-graph.source");
+    assert_eq!(clicks.get(), 1);
+}
+
+#[gpui::test]
+fn controlled_drag_discards_deleted_peers_and_active_targets(cx: &mut TestAppContext) {
+    let membership = Rc::new(Cell::new(2));
+    let members = membership.clone();
+    let calls = Calls::default();
+    let sink = calls.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let mut graph = NodeGraph::new("live");
+        if members.get() > 0 {
+            graph = graph.node(GraphNode::new("a", "A").selected(true), 60.0, 60.0);
+        }
+        if members.get() > 1 {
+            graph = graph.node(GraphNode::new("b", "B").selected(true), 400.0, 60.0);
+        }
+        let sink = sink.clone();
+        div()
+            .w(px(720.0))
+            .h(px(360.0))
+            .child(graph.on_event(move |event, _, _| sink.borrow_mut().push(event.clone())))
+            .into_any_element()
+    });
+    harness.frame();
+    let start = harness.point_in("a");
+    harness
+        .context()
+        .simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    membership.set(1);
+    harness.update(|window, _| window.refresh());
+    harness.frame();
+    harness.context().simulate_mouse_move(
+        start + point(px(30.0), px(20.0)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::NodeMoved { id, .. } if id == "a"))
+    );
+    assert!(
+        !calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::NodeMoved { id, .. } if id == "b"))
+    );
+    membership.set(0);
+    harness.update(|window, _| window.refresh());
+    harness.frame();
+    calls.borrow_mut().clear();
+    harness.context().simulate_mouse_move(
+        start + point(px(50.0), px(30.0)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    harness
+        .context()
+        .simulate_mouse_up(start, MouseButton::Left, Modifiers::none());
+    assert!(calls.borrow().is_empty());
+}
+
+#[gpui::test]
 fn controlled_node_drag_survives_the_redraw_that_applies_its_first_proposal(
     cx: &mut TestAppContext,
 ) {

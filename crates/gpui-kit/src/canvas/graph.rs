@@ -191,6 +191,7 @@ enum Gesture {
 #[derive(Debug, Default)]
 struct GestureState {
     gesture: Option<Gesture>,
+    interaction: Option<GraphInteraction>,
     pointer: Option<Point<Pixels>>,
     animation_started: Option<Instant>,
     /// The visible colour crossover for each caller-owned edge.
@@ -757,11 +758,9 @@ fn frame_all(
             }
             let zoom = (available_width / (max.x - min.x).max(1.0))
                 .min(available_height / (max.y - min.y).max(1.0))
-                .clamp(zoom_range.0, zoom_range.1)
-                // Never magnify. A graph of three cards blown up to fill a
-                // panel reads as a mistake, and the reader can still zoom in
-                // themselves.
-                .min(1.0);
+                // Prefer native size, but the caller's legal range prevails.
+                .min(1.0)
+                .clamp(zoom_range.0, zoom_range.1);
             let available_center = point(
                 insets.left + (width - insets.left - insets.right) / 2.0,
                 insets.top + (height - insets.top - insets.bottom) / 2.0,
@@ -1889,6 +1888,49 @@ impl RenderOnce for NodeGraph {
             window.window_handle().window_id(),
             cx,
         );
+        // Caller-owned identities and permissions may change between moves.
+        // Keep surviving nodes' original drag origins, not deleted peers.
+        {
+            let mut state = gesture.borrow_mut();
+            if state
+                .interaction
+                .is_some_and(|mode| mode != self.interaction)
+            {
+                state.gesture = None;
+            }
+            state.interaction = Some(self.interaction);
+            let exists = |id: &SharedString| {
+                self.nodes
+                    .iter()
+                    .any(|node| node.node.ident().semantic_id() == *id)
+            };
+            let valid = matches!(self.state, GraphState::Ready)
+                && self.on_event.is_some()
+                && match state.gesture.as_mut() {
+                    Some(Gesture::Node { id, peers, .. }) => {
+                        peers.retain(|(id, _)| exists(id));
+                        exists(id)
+                    }
+                    Some(Gesture::Resize { id, .. }) => {
+                        self.interaction.moves_nodes() && exists(id)
+                    }
+                    Some(Gesture::Connect { from, .. }) => {
+                        self.interaction.edits_topology()
+                            && self.nodes.iter().any(|node| {
+                                node.node.ident().semantic_id() == from.node
+                                    && node
+                                        .node
+                                        .graph_ports()
+                                        .iter()
+                                        .any(|port| port.id() == &from.port)
+                            })
+                    }
+                    _ => true,
+                };
+            if !valid {
+                state.gesture = None;
+            }
+        }
         // Where the canvas is looking. The caller owns where it has been asked
         // to look; what the canvas owns is that it does not arrive there in
         // one frame when the reader did not move it themselves. A frame or a
@@ -1966,6 +2008,13 @@ impl RenderOnce for NodeGraph {
             // on the same plane. Sunken is the existing half-step down in the
             // surface scale; top light below gives it depth without a vignette.
             .surface(&theme, Surface::Sunken);
+
+        let cancelled = Rc::clone(&gesture);
+        frame = frame.child(crate::interaction::on_pointer_cancel(move |_, _| {
+            let mut state = cancelled.borrow_mut();
+            state.gesture = None;
+            state.pointer = None;
+        }));
 
         // Route hover is visual transient state and exists even on an inspect-
         // only graph. The pointer is recorded here and resolved against the
@@ -4405,6 +4454,19 @@ mod tests {
             framed.zoom, 1.0,
             "a small graph is shown at its own size, not blown up"
         );
+
+        let magnified = frame_all(
+            &one,
+            &[],
+            &[],
+            surface(1200.0, 900.0),
+            (1.5, 2.0),
+            Edges::default(),
+            &[],
+        )
+        .expect("a legal magnified frame");
+        assert_eq!(magnified.zoom, 1.5);
+        assert_eq!(magnified.offset, point(570.0, 420.0));
 
         let wide = geometry_at(&[(0.0, 0.0, 100_000.0, 100.0)]);
         let floored = frame_all(

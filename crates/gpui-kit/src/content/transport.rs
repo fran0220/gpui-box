@@ -871,6 +871,10 @@ impl RenderOnce for TransportBar {
                 let release = Rc::clone(&report);
                 let release_bounds = Rc::clone(&measured);
                 let release_held = Rc::clone(&scrubbing);
+                let cancelled = Rc::clone(&scrubbing);
+                root = root.child(crate::interaction::on_pointer_cancel(move |_, _| {
+                    cancelled.borrow_mut().held = false;
+                }));
                 root = root.on_mouse_up(MouseButton::Left, move |event, window, cx| {
                     if !std::mem::take(&mut release_held.borrow_mut().held) {
                         return;

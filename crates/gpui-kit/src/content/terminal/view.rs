@@ -522,6 +522,12 @@ fn wire_pointer(
         );
     });
 
+    let cancelled = Rc::clone(gesture);
+    panel = panel.child(crate::interaction::on_pointer_cancel(move |_, _| {
+        let mut gesture = cancelled.borrow_mut();
+        gesture.pressed_at = None;
+        gesture.dragging = false;
+    }));
     let up_gesture = Rc::clone(gesture);
     panel = panel.on_mouse_up(MouseButton::Left, move |_, _, _| {
         let mut gesture = up_gesture.borrow_mut();

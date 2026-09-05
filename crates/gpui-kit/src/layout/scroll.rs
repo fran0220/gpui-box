@@ -394,6 +394,10 @@ fn bar(
         .children(thumb);
 
     if overflowing {
+        let cancelled = Rc::clone(target);
+        gutter = gutter.child(crate::interaction::on_pointer_cancel(move |_, _| {
+            cancelled.set_scroll_dragging(false);
+        }));
         // A list that measures its rows as they arrive learns it is taller
         // than it thought while the thumb is being dragged, which would move
         // the thumb out from under the pointer holding it.

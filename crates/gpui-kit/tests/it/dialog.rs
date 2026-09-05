@@ -14,6 +14,75 @@ struct Fixture {
     trigger: FocusHandle,
 }
 
+#[gpui::test]
+fn non_lifo_modal_close_splices_focus_restoration_and_drawer_exit_is_inert(
+    cx: &mut TestAppContext,
+) {
+    for lower_is_drawer in [false, true] {
+        let slot = Rc::new(RefCell::new(None));
+        let built = slot.clone();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+            let (lower, upper, drawer, trigger) = built
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    (
+                        cx.new(|cx| Dialog::new("lower", window, cx).title("Lower")),
+                        cx.new(|cx| Dialog::new("upper", window, cx).title("Upper")),
+                        cx.new(|cx| Drawer::new("drawer", window, cx).title("Drawer")),
+                        cx.focus_handle(),
+                    )
+                })
+                .clone();
+            div()
+                .child(
+                    div()
+                        .id("background")
+                        .track_focus(&trigger)
+                        .child("Background"),
+                )
+                .child(lower)
+                .child(upper)
+                .child(drawer)
+                .into_any_element()
+        });
+        harness.frame();
+        let (lower, upper, drawer, trigger) = slot.borrow().as_ref().unwrap().clone();
+        harness.update(|window, cx| {
+            trigger.focus(window, cx);
+            if lower_is_drawer {
+                drawer.update(cx, |view, cx| {
+                    view.open(window, cx);
+                    view.settle(cx);
+                });
+            } else {
+                lower.update(cx, |view, cx| view.open(window, cx));
+            }
+        });
+        harness.frame();
+        harness.update(|window, cx| upper.update(cx, |view, cx| view.open(window, cx)));
+        harness.frame();
+        let focused = harness.update(|window, cx| window.focused(cx));
+        harness.update(|window, cx| {
+            if lower_is_drawer {
+                drawer.update(cx, |view, cx| view.close(window, cx));
+            } else {
+                lower.update(cx, |view, cx| view.close(window, cx));
+            }
+            assert_eq!(window.focused(cx), focused);
+        });
+        harness.frame();
+        if lower_is_drawer {
+            harness.update(|_, cx| drawer.update(cx, |view, cx| view.settle(cx)));
+            harness.frame();
+            harness.update(|window, cx| assert_eq!(window.focused(cx), focused));
+        }
+        harness.update(|window, cx| {
+            upper.update(cx, |view, cx| view.close(window, cx));
+            assert_eq!(window.focused(cx), Some(trigger.clone()));
+        });
+    }
+}
+
 fn scene(
     cx: &mut TestAppContext,
     dismissable: bool,
