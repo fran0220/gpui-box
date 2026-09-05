@@ -8,6 +8,15 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3b7f7f85a7e5f68090000ed7622545829afd484d210358702ae4cb97dd0c320"
 dependencies = [
+ "uuid",
+]
+
+[[package]]
+name = "accesskit"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "438a7081a65b95c668db56591a4fef9bc5dad275f448bd6223fc6949d823db38"
+dependencies = [
  "enumn",
  "uuid",
 ]
@@ -18,7 +27,7 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e8c61bee90b42a772d39d06a740207dc71a4e780004ace1db8d99fb1baaa954"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "accesskit_consumer 0.36.0",
  "atspi-common",
  "phf",
@@ -32,7 +41,7 @@ version = "0.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25e0d7e25d06f4dc21d1774d67146e9e80d6789216cbd4d1e88185b0095dba60"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "hashbrown 0.16.1",
 ]
 
@@ -42,7 +51,7 @@ version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f950720ce064757a1b629caad3a408e8d2c63bb01f29b8a3ff8daa331053ffeb"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "hashbrown 0.16.1",
 ]
 
@@ -52,7 +61,7 @@ version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d10a236f96f87d70732e44520046785431ef01d5bcd6b041317bfadd2f88245"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "hashbrown 0.16.1",
 ]
 
@@ -62,7 +71,7 @@ version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce02dc63b43f0c9296af9ac946312a2dc8814427d7a64d2d600971dac55b6076"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "accesskit_consumer 0.38.0",
  "hashbrown 0.16.1",
  "objc2 0.5.2",
@@ -76,7 +85,7 @@ version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b016ca8db0ea0ea2ceff29a9d6240391492d960716aa471967c00e8cc8cb197c"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "accesskit_atspi_common",
  "async-channel",
  "async-executor",
@@ -94,7 +103,7 @@ version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36e93ac7bf50b964f1cbb75f741629a4e950571baa1ef1274457ab5a80d9bcc2"
 dependencies = [
- "accesskit",
+ "accesskit 0.24.1",
  "accesskit_consumer 0.37.0",
  "hashbrown 0.16.1",
  "static_assertions",
@@ -2380,7 +2389,7 @@ dependencies = [
 name = "gpui-box"
 version = "0.1.2"
 dependencies = [
- "accesskit",
+ "accesskit 0.25.0",
  "anyhow",
  "async-channel",
  "async-task",
@@ -2612,7 +2621,7 @@ dependencies = [
 name = "gpui-box-linux"
 version = "0.1.2"
 dependencies = [
- "accesskit",
+ "accesskit 0.25.0",
  "accesskit_unix",
  "anyhow",
  "as-raw-xcb-connection",
@@ -2663,7 +2672,7 @@ dependencies = [
 name = "gpui-box-macos"
 version = "0.1.2"
 dependencies = [
- "accesskit",
+ "accesskit 0.25.0",
  "accesskit_macos",
  "anyhow",
  "async-task",
@@ -2902,7 +2911,7 @@ dependencies = [
 name = "gpui-box-windows"
 version = "0.1.2"
 dependencies = [
- "accesskit",
+ "accesskit 0.25.0",
  "accesskit_windows",
  "anyhow",
  "dunce",
