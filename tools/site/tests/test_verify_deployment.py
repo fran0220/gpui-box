@@ -9,6 +9,22 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class VerifyDeployment(unittest.TestCase):
+    def test_failed_revision_observation_stops_before_main_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "git-called"
+            for name, body in {
+                "curl": "exit 7",
+                "git": f"touch '{marker}'; exit 99",
+            }.items():
+                command = Path(directory) / name
+                command.write_text("#!/usr/bin/env bash\n" + body + "\n")
+                command.chmod(0o755)
+            env = dict(os.environ, PATH=f"{directory}:{os.environ['PATH']}")
+            result = subprocess.run(["bash", str(ROOT / "tools/site/deploy-main.sh")],
+                                    env=env, capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(marker.exists(), "must not observe a new expectation after validating main")
+
     def test_exact_catalog_and_equal_count_corruption(self):
         with tempfile.TemporaryDirectory() as directory:
             curl = Path(directory) / "curl"

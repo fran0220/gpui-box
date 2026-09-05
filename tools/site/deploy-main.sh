@@ -22,7 +22,11 @@ cd "$root"
 
 # Capture the activation precondition before validating main. A builder that
 # observed the previous deployment cannot overwrite a later successful one.
-export GPUI_BOX_EXPECTED_REVISION="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://gpui-box.origingame.dev/build-info.json | jq -er '.revision')"
+GPUI_BOX_EXPECTED_REVISION="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://gpui-box.origingame.dev/build-info.json | jq -er '.revision')"
+export GPUI_BOX_EXPECTED_REVISION
+[[ "$GPUI_BOX_EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "invalid installed revision observation" >&2; exit 1;
+}
 git fetch --quiet origin main
 head="$(git rev-parse HEAD)"
 main="$(git rev-parse origin/main)"

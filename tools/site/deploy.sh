@@ -10,7 +10,8 @@ out="${GPUI_BOX_RELEASE_OUT:-$root/target/site-release}"
 
 # Observe before building, not immediately before upload: an older slow build
 # must retain its old expectation when another deployment activates meanwhile.
-export GPUI_BOX_EXPECTED_REVISION="${GPUI_BOX_EXPECTED_REVISION:-$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://gpui-box.origingame.dev/build-info.json | jq -er '.revision')}"
+GPUI_BOX_EXPECTED_REVISION="${GPUI_BOX_EXPECTED_REVISION:-$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://gpui-box.origingame.dev/build-info.json | jq -er '.revision')}"
+export GPUI_BOX_EXPECTED_REVISION
 [[ "$GPUI_BOX_EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ || "$GPUI_BOX_EXPECTED_REVISION" == none ]] || {
   echo "invalid expected installed revision" >&2; exit 1;
 }
