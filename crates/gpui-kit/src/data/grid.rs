@@ -1926,7 +1926,8 @@ impl DataGrid {
         }
 
         let held = Rc::clone(state);
-        let frame = frame.on_mouse_move(move |event, window, cx| {
+
+        frame.on_mouse_move(move |event, window, cx| {
             let key = held.resizing.borrow().clone();
             let Some(key) = key else {
                 return;
@@ -1941,9 +1942,7 @@ impl DataGrid {
             let left = f32::from(bounds.get().left());
             let width = (f32::from(event.position.x) - left).max(*min_width);
             handler(key, width, window, cx);
-        });
-
-        frame
+        })
     }
 
     /// Up, down, home and end move the reported selection and scroll the row
