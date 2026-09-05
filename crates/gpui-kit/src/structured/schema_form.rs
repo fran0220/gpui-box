@@ -49,7 +49,7 @@ use gpui::{
     ParentElement, Render, SharedString, Styled, Subscription, Window, div, prelude::FluentBuilder,
     px,
 };
-use gpui_kit_assets::{Icon, icon};
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, TextTone, TypeScale};
 
@@ -70,7 +70,6 @@ use crate::display::badge::Tone;
 use crate::display::status::Callout;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, rule, text};
-use crate::overlay::Tooltipped;
 use crate::state::ValidationState;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -2044,18 +2043,24 @@ impl Render for SchemaForm {
                 element.child(
                     div()
                         .id(ident.element_id())
-                        .flex()
-                        .items_center()
+                        // The same callout the form's own refusal takes. This
+                        // used to be the bare mark with the reason on a tip,
+                        // which is a status nobody is told: the one thing a
+                        // reader needs here is which fields the form cannot
+                        // draw and why, and an unlabelled glyph they have to
+                        // find and hover does not say it. Hover is where a
+                        // detail goes, not where the sentence goes.
                         .child(
-                            icon(Icon::Danger)
-                                .size(px(theme.control.get(ControlSize::Sm).icon_size))
-                                .text_color(if unrenderable_required {
-                                    theme.colors.danger
+                            Callout::new(
+                                summary.clone(),
+                                if unrenderable_required {
+                                    Tone::Danger
                                 } else {
-                                    theme.colors.warning
-                                }),
+                                    Tone::Warning
+                                },
+                            )
+                            .id(ident.child("callout")),
                         )
-                        .tip(ident.clone(), summary.clone())
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.semantic_id(), Role::Status)
@@ -2416,18 +2421,21 @@ impl SchemaForm {
                 let refusal = ident.child("unrenderable");
                 div()
                     .id(refusal.element_id())
-                    .flex()
-                    .items_center()
+                    // A field the form cannot draw stands where its control
+                    // would have, and says why in the place the control would
+                    // have occupied. A mark alone leaves a labelled field with
+                    // an empty body and the explanation behind a hover.
                     .child(
-                        icon(Icon::Danger)
-                            .size(px(theme.control.get(ControlSize::Sm).icon_size))
-                            .text_color(if field.required {
-                                theme.colors.danger
+                        Callout::new(
+                            reason.clone(),
+                            if field.required {
+                                Tone::Danger
                             } else {
-                                theme.colors.warning
-                            }),
+                                Tone::Warning
+                            },
+                        )
+                        .id(refusal.child("callout")),
                     )
-                    .tip(refusal.clone(), reason.clone())
                     .semantic_in(
                         cx,
                         NodeSpec::new(refusal.semantic_id(), Role::Status)
