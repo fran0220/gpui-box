@@ -903,11 +903,14 @@ mod raster {
             let Some(path) = file.enclosed_name() else {
                 return Err(DotLottieError::kind(DotLottieErrorKind::ArchiveInvalid));
             };
-            let name = path.to_string_lossy().into_owned();
+            // enclosed_name validates and normalizes ZIP components but
+            // returns a native PathBuf. Archive keys must still use '/' on
+            // Windows, both for collision checks and for the rebuilt ZIP.
+            let name = path.to_string_lossy().replace('\\', "/");
             let is_symlink = file
                 .unix_mode()
                 .is_some_and(|mode| mode & 0o170_000 == 0o120_000);
-            if file.encrypted() || is_symlink || !names.insert(name.clone()) {
+            if name.is_empty() || file.encrypted() || is_symlink || !names.insert(name.clone()) {
                 return Err(DotLottieError::kind(DotLottieErrorKind::ArchiveInvalid));
             }
             let entry_size = file.size();
@@ -1191,6 +1194,39 @@ mod raster {
             format!(
                 r#"{{"v":"5.7.6","fr":30,"ip":0,"op":60,"w":16,"h":16,"assets":[{{"id":"image","w":1,"h":1,"p":"data:image/png;base64,{encoded}","e":1}}],"layers":[{{"nm":"Image","ind":1,"ty":2,"refId":"image"}}]}}"#
             )
+        }
+
+        #[test]
+        fn validated_archives_use_portable_keys_and_reject_separator_aliases() {
+            let manifest = br#"{"animations":[{"id":"main"}]}"#;
+            let animation = animation(16, 16, 30.0, 60.0);
+            for name in ["animations/main.json", "animations\\main.json"] {
+                let bytes = archive_with_entries(
+                    &[("manifest.json", manifest), (name, animation.as_bytes())],
+                    CompressionMethod::Stored,
+                );
+                let validated = validate_archive(&bytes, DotLottieLimits::strict())
+                    .expect("safe archive normalizes");
+                let mut rebuilt =
+                    ZipArchive::new(Cursor::new(validated.bytes)).expect("rewritten ZIP is valid");
+                assert_eq!(rebuilt.len(), 2);
+                assert!(rebuilt.by_name("animations/main.json").is_ok());
+                RasterDotLottieAdapter
+                    .prepare(DotLottieAsset::new(bytes), DotLottieLimits::strict())
+                    .expect("portable keys prepare on every platform");
+            }
+            let aliases = archive_with_entries(
+                &[
+                    ("manifest.json", manifest),
+                    ("animations/main.json", animation.as_bytes()),
+                    ("animations\\main.json", animation.as_bytes()),
+                ],
+                CompressionMethod::Stored,
+            );
+            assert!(matches!(
+                validate_archive(&aliases, DotLottieLimits::strict()),
+                Err(error) if error.category() == DotLottieErrorKind::ArchiveInvalid
+            ));
         }
 
         #[test]
