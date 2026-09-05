@@ -27,6 +27,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run renderer Criterion benchmarks
         run: cargo bench -p gpui-box-wgpu --bench layout_line --locked
+      - name: State the acceptance gap explicitly
+        run: |
+          echo 'Timing acceptance is NOT implemented: these are observational Criterion artifacts, not a calibrated regression verdict. See docs/performance-testing.md for baseline, calibration, noise-envelope and comparator requirements.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: criterion-report-${{ github.sha }}

@@ -1098,6 +1098,21 @@ fn gate(full: bool) -> Result<()> {
     future_compatibility_check()?;
     step("cargo", &["test", "--workspace"], None)?;
     step("cargo", &["test", "--workspace", "--all-features"], None)?;
+    if cfg!(target_os = "linux") {
+        step(
+            "python3",
+            &[
+                "-B",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "tools/site/tests",
+                "-v",
+            ],
+            None,
+        )?;
+    }
     // GPUI Box owns the complete framework and kit source. A warning anywhere
     // in the workspace is therefore a gate failure rather than upstream debt.
     step(

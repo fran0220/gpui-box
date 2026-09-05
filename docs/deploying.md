@@ -33,6 +33,27 @@ linkage, revision, catalog completeness, and runtime health before switching
 the `current` symlink atomically. Failure restores the previous release. Five
 releases are retained.
 
+The bundle carries `EXPECTED_REVISION`, observed before the main-revision
+check and before building. Under its activation lock the installer compares
+that value with the installed `REVISION`; a late build cannot overwrite a
+release activated since its observation. Redeploying the current revision is
+idempotent. Explicit recovery can build a previous revision with the current
+installed revision as its expectation; first installation uses `none`.
+`build-release.sh` requires `GPUI_BOX_EXPECTED_REVISION`; `deploy.sh` observes
+it automatically unless explicitly supplied for recovery.
+
+Health probes have 1-second connection and 2-second total timeouts, with a
+60-second health deadline. Lock acquisition and service commands are bounded;
+the receiver gives the whole installation 240 seconds plus 40 seconds for
+termination/rollback before its last-resort kill. Local fault/CAS tests run via
+`python3 -m unittest discover -s tools/site/tests -v` without touching BWG.
+
+**Host-command rollout:** the restricted archive receiver does not update its
+own root scripts from an uploaded release. Existing hosts must install the
+updated `ops/install-release.sh` and `ops/receive-release.sh` through the
+authorized host bootstrap procedure before the CAS/deadline protection is
+active. An ordinary catalog deployment alone does not prove this migration.
+
 ```bash
 tools/site/deploy-main.sh
 ```
@@ -53,8 +74,10 @@ uses `cargo-zigbuild` instead.
 proof whichever lane deployed: both hostnames serve `/build-info.json` naming
 the revision with the package, symbol, component, type, theme, guide, recipe,
 and scene counts of the committed `docs/developer-index.json`; `POST /mcp`
-`tools/list` returns every tool in `tools/mcp/tools.json`; and
-`search_components` with an empty query returns every component. Every
+`tools/list` matches every tool name and full schema in `tools/mcp/tools.json`;
+and paginated `search_components` with an empty query matches the structured
+component ID multiset (including duplicate detection). Both hostnames receive
+the same MCP protocol checks, not only build-info requests. Every
 request pins the BWG address so the answer is about the origin, not DNS.
 
 Nothing deploys on push. `.github/workflows/deploy-site.yml` is a

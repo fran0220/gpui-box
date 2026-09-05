@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail, ensure};
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Request, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -831,16 +831,22 @@ async fn http_method_not_allowed() -> impl IntoResponse {
     )
 }
 
-async fn http_mcp(
-    State(catalog): State<Arc<Catalog>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    if let Err(message) = validate_http_headers(&headers) {
+async fn http_mcp(State(catalog): State<Arc<Catalog>>, request: Request) -> Response {
+    if let Err(message) = validate_http_headers(request.headers()) {
         return (StatusCode::FORBIDDEN, Json(json!({ "error": message }))).into_response();
     }
     let Ok(permit) = HTTP_SLOTS.try_acquire() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let body = match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        axum::body::to_bytes(request.into_body(), MAX_HTTP_BODY),
+    )
+    .await
+    {
+        Ok(Ok(body)) => body,
+        Ok(Err(_)) => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+        Err(_) => return StatusCode::REQUEST_TIMEOUT.into_response(),
     };
     let request: Value = match serde_json::from_slice(&body) {
         Ok(request) => request,
@@ -861,9 +867,17 @@ async fn http_mcp(
         Ok(Some(bytes)) => {
             // Keep admission until the body is consumed or disconnected, not
             // merely until this handler has allocated its response.
-            let stream = futures::stream::unfold((Some(bytes), permit), |(bytes, permit)| async {
-                bytes.map(|bytes| (Ok::<_, io::Error>(bytes), (None, permit)))
-            });
+            let stream =
+                futures::stream::unfold((bytes, 0, permit), |(bytes, offset, permit)| async {
+                    if offset == bytes.len() {
+                        return None;
+                    }
+                    let end = (offset + 64 * 1024).min(bytes.len());
+                    // Independent small frames do not retain the entire response
+                    // allocation after Hyper consumes the end-of-stream marker.
+                    let chunk = Bytes::copy_from_slice(&bytes[offset..end]);
+                    Some((Ok::<_, io::Error>(chunk), (bytes, end, permit)))
+                });
             (
                 [(header::CONTENT_TYPE, "application/json")],
                 axum::body::Body::from_stream(stream),
@@ -873,11 +887,7 @@ async fn http_mcp(
         Ok(None) => StatusCode::ACCEPTED.into_response(),
         Err(()) => (
             StatusCode::PAYLOAD_TOO_LARGE,
-            Json(rpc_error(
-                Value::Null,
-                -32000,
-                "request exceeds batch or response budget",
-            )),
+            "request exceeds batch or response budget",
         )
             .into_response(),
     }
@@ -1725,22 +1735,25 @@ mod tests {
             .unwrap();
         runtime.block_on(async {
             let catalog = Arc::new(Catalog::local(root().unwrap()).unwrap());
-            let mut headers = HeaderMap::new();
-            headers.insert(header::HOST, "localhost".parse().unwrap());
-            let request = Bytes::from_static(br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#);
-            let first = http_mcp(State(catalog.clone()), headers.clone(), request.clone()).await;
-            let second = http_mcp(State(catalog.clone()), headers.clone(), request.clone()).await;
+            let request = || {
+                Request::builder()
+                    .header(header::HOST, "localhost")
+                    .body(axum::body::Body::from(
+                        r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
+                    ))
+                    .unwrap()
+            };
+            let first = http_mcp(State(catalog.clone()), request()).await;
+            let second = http_mcp(State(catalog.clone()), request()).await;
             assert_eq!(first.status(), StatusCode::OK);
             assert_eq!(second.status(), StatusCode::OK);
             assert_eq!(
-                http_mcp(State(catalog.clone()), headers.clone(), request.clone())
-                    .await
-                    .status(),
+                http_mcp(State(catalog.clone()), request()).await.status(),
                 StatusCode::SERVICE_UNAVAILABLE
             );
             drop(first);
             assert_eq!(
-                http_mcp(State(catalog), headers, request).await.status(),
+                http_mcp(State(catalog), request()).await.status(),
                 StatusCode::OK
             );
         });

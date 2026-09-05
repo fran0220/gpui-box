@@ -21,6 +21,14 @@ history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
+Linux `gate` executes both `cargo test --workspace` and
+`cargo test --workspace --all-features`, not only an all-feature compile.
+Both Windows and macOS Platforms/Release native lanes execute
+`cargo test --workspace --all-features --locked --exclude gpui-box-media`;
+media lifecycle tests remain a separate invocation with their existing host
+restrictions. These commands are required evidence, not a claim that an
+unrun platform has passed.
+
 | Platform | Current repository contract | Validation command/evidence | Limits |
 |---|---|---|---|
 | macOS | Framework, kit, Metal, native action context menus, clipped and paint-ordered native views, native AVFoundation audio/video playback, and deterministic headless catalog | On demand: the dispatched `Platforms` workflow runs native media load/control/replacement/teardown tests, the remaining all-feature platform tests and clippy, `performance check`, and `cargo run -p xtask -- headless check` on Metal; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility and context-menu presentation need a logged-in host |

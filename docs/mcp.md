@@ -15,6 +15,16 @@ Both surfaces report their exact Git revision through `release_info` and every
 search result. The remote process runs on BWG behind Nginx; a browser GET of
 `/mcp/` serves the human page, while MCP clients POST JSON-RPC to `/mcp`.
 
+HTTP requests are limited to 1 MiB, batches to 32 calls, and serialized
+responses to 16 MiB. The complete library fits as a single resource read;
+larger aggregate requests are refused with HTTP 413. Two response slots bound
+concurrent catalog work and queued response bodies; excess work receives 503
+and can be retried. No batch accumulates independent full-library values:
+responses are serialized sequentially into a byte-budgeted buffer, and the
+immutable library text is serialized once at catalog load. Valid notifications
+produce no JSON-RPC response; empty batches and invalid IDs are rejected.
+Checkout session tools lazily start one persistent host, reused until exit.
+
 ## Connect
 
 Remote clients need no checkout:

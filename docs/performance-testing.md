@@ -10,7 +10,7 @@ cargo run -p xtask -- performance check
 
 It writes a machine-readable report to
 `target/performance/report.json`. Each rendering fixture is warmed for two
-explicit redraws and measured on the third. The report covers 10,000-item fixtures for
+explicit redraws and measured on the third. The report covers 1,000- and 10,000-item fixtures with identical viewport budgets for
 List, DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument. It also draws
 a fully visible 64-node graph split between 32 zero-snapshot resting materials
 and 32 promoted glass requests. That promoted set deliberately exceeds the
@@ -48,6 +48,17 @@ serializable `PerformanceReport`. Component fixtures also report mounted rows
 and caller-visible builder calls. An unavailable requested metric is a failure,
 not a zero.
 
+Schema 3 also reports `caller_input_conversions` and
+`has_row_builder_callback`. CodeView, LogStream and AgentDocument take eager
+owned collections, not lazy row callbacks: their builder count is genuinely
+zero, **not a proxy for mounted rows**. Fixture strings are prepared before
+measurement; each clone/conversion needed to feed those APIs is counted
+separately and remains dataset-sized. Their current APIs cannot make total
+input preparation viewport-bounded. The fixed mount/layout/prepaint/paint and
+semantic ceilings are enforced at both dataset sizes; heap ceilings still
+include collection conversion and component work. This proves bounded visible
+work at the tested sizes, not constant-time ingestion of arbitrary datasets.
+
 The counters are per window. Drawing another window cannot reset or contribute
 to them. Shipping builds pay fixed integer increments only; retained allocator
 growth is compiled only for tests and explicit test-support builds.
@@ -59,7 +70,7 @@ portable across Metal, WARP, Linux software rendering, and browser builds and
 do not become looser because a CI machine is slower.
 
 Text shaping, rasterization, and end-to-end renderer submission still need
-timing measurements. Those use Criterion warmup and medians, a same-process
+timing measurements. Acceptance requires Criterion warmup and medians, a same-process
 calibration workload, and a documented noise margin. A raw millisecond
 threshold from one runner is never accepted as a cross-platform budget. This
 renderer-calibration lane is reported separately from the structural gate so a
@@ -72,6 +83,15 @@ versa.
 deliberately observational: it runs on no push and no schedule and is not a
 gate. Deterministic structural and heap-allocation budgets in
 `cargo run -p xtask -- performance check` remain the blocking authority.
+
+**Timing acceptance is not implemented.** The current Criterion artifacts
+contain no calibrated regression verdict. Before promoting this lane to a
+gate, choose a stable calibration workload per renderer, collect repeated
+same-process normalized median ratios for a reviewed baseline revision and
+candidate, derive a noise envelope from repeated unchanged runs, and make a
+comparator fail only for confidence intervals wholly outside that envelope.
+Check synthetic slowdowns and noisy unchanged runs before recording a baseline.
+No arbitrary machine-millisecond threshold or unmeasured baseline is accepted.
 
 For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
 trace lease, filters observations to one `WindowId`, and retains a caller-sized

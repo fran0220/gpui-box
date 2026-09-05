@@ -93,6 +93,13 @@ actions after unmount are refused and tested.
 
 ## Phase 2: deterministic performance budgets
 
+Status: structural budgets and the deliberately unbounded detector are
+implemented. Calibrated timing acceptance below is **not implemented**; the
+manual Criterion workflow only uploads observations. A reviewed renderer
+baseline, same-process calibration, measured noise envelope and blocking
+comparison with slowdown/noise regression tests remain required work (see
+`performance-testing.md`).
+
 Add low-overhead counters at framework boundaries before optimizing individual
 components.
 
@@ -110,7 +117,7 @@ and retained allocations must remain proportional to the viewport rather than
 the dataset.
 
 Timing remains appropriate only where structure cannot stand in for cost:
-shaping, rasterization, and end-to-end draw. Those checks use Criterion,
+shaping, rasterization, and end-to-end draw. Acceptance requires Criterion,
 same-process calibration, warmup, a median and a noise margin; raw wall-clock
 milliseconds from one CI runner never become a cross-platform constant.
 

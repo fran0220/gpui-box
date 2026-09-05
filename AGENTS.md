@@ -164,10 +164,10 @@ cargo run -p xtask -- gate only keymap-editor   # while iterating on one compone
 ```
 
 `gate only` takes scene names and answers the same questions about those:
-`gpui-box-kit` builds and lints clean, the tests whose names mention them pass, the
+`gpui-box-kit` builds and lints clean, all Kit all-feature tests pass, the
 generated artifacts are current, and those scenes match their baseline. It is a
 shortcut while iterating, never what a commit runs — it says nothing about the
-other workspace members, the doctests, or a scene the edit reached without
+other workspace members or a scene the edit reached without
 anybody predicting it.
 
 The gate runs where the commit is made. No GitHub workflow builds on push:
