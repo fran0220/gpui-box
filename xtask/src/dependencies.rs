@@ -299,7 +299,12 @@ fn check_dependency_table(
         let target = canonical(dependency_dir.join(path));
         if let Some(named) = named {
             ensure!(
-                target == canonical(root.join(&named.manifest).parent().unwrap()),
+                target
+                    == canonical(
+                        root.join(&named.manifest)
+                            .parent()
+                            .context("authority manifest parent")?
+                    ),
                 "{} internal dependency {alias} has the wrong local path",
                 owner.name
             );
@@ -675,11 +680,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn inherited_dependencies_cannot_bypass_layers_or_local_authority() {
+    fn inherited_dependencies_cannot_bypass_layers_or_local_authority() -> Result<()> {
         let root =
             std::env::temp_dir().join(format!("gpui-dependency-fixture-{}", std::process::id()));
-        fs::create_dir_all(root.join("low")).unwrap();
-        fs::create_dir_all(root.join("high")).unwrap();
+        fs::create_dir_all(root.join("low"))?;
+        fs::create_dir_all(root.join("high"))?;
         let low = Package {
             manifest: "low/Cargo.toml".into(),
             name: "low".into(),
@@ -707,44 +712,45 @@ mod tests {
         assert!(check_resolved_layers(&graph, &a).is_err());
         graph["resolve"]["nodes"][0] =
             serde_json::json!({"id":"local-high", "deps":[{"pkg":"local-low"}]});
-        check_resolved_layers(&graph, &a).unwrap();
+        check_resolved_layers(&graph, &a)?;
         fs::write(
             root.join("low/Cargo.toml"),
             "[dependencies]\nrenamed = { workspace = true }\n",
-        )
-        .unwrap();
-        fs::write(root.join("Cargo.toml"), "[workspace.dependencies]\nrenamed = { package = 'high', path = 'high', version = '0.1.0' }\n").unwrap();
+        )?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[workspace.dependencies]\nrenamed = { package = 'high', path = 'high', version = '0.1.0' }\n",
+        )?;
         assert!(
             check_internal_declarations(&root, &low, &a)
-                .unwrap_err()
+                .expect_err("inherited higher-layer dependency must fail")
                 .to_string()
                 .contains("higher layer")
         );
         let owner = Package { layer: 2, ..low };
-        check_internal_declarations(&root, &owner, &a).unwrap();
+        check_internal_declarations(&root, &owner, &a)?;
         fs::write(
             root.join("Cargo.toml"),
             "[workspace.dependencies]\nrenamed = { package = 'high', version = '0.1.0' }\n",
-        )
-        .unwrap();
+        )?;
         assert!(
             check_internal_declarations(&root, &owner, &a)
-                .unwrap_err()
+                .expect_err("inherited registry dependency must fail")
                 .to_string()
                 .contains("registry")
         );
         fs::write(
             root.join("low/Cargo.toml"),
             "[target.'cfg(windows)'.build-dependencies]\nhigh = '0.1.0'\n",
-        )
-        .unwrap();
+        )?;
         assert!(
             check_internal_declarations(&root, &owner, &a)
-                .unwrap_err()
+                .expect_err("target registry dependency must fail")
                 .to_string()
                 .contains("registry")
         );
-        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(root)?;
+        Ok(())
     }
 
     #[test]
