@@ -910,7 +910,7 @@ fn bounded_response(
     }
     if batch.is_some_and(Vec::is_empty) {
         return Ok(Some(
-            serde_json::to_vec(&rpc_error(Value::Null, -32600, "empty batch")).unwrap(),
+            serde_json::to_vec(&rpc_error(Value::Null, -32600, "empty batch")).map_err(|_| ())?,
         ));
     }
     let requests = batch
@@ -1697,9 +1697,15 @@ mod tests {
 
     #[test]
     fn hostile_batches_are_bounded_and_protocol_recovers() {
-        let mut server = Server::new(Catalog::local(root().unwrap()).unwrap());
+        let mut server = Server::new(Catalog::local(root().expect("checkout")).expect("catalog"));
         let read = json!({"jsonrpc":"2.0","id":"library","method":"resources/read","params":{"uri":"gpui-box://library"}});
-        assert!(bounded_response(&mut server, &read).unwrap().unwrap().len() < MAX_HTTP_RESPONSE);
+        assert!(
+            bounded_response(&mut server, &read)
+                .expect("within budget")
+                .expect("response")
+                .len()
+                < MAX_HTTP_RESPONSE
+        );
         assert!(bounded_response(&mut server, &Value::Array(vec![read.clone(); 128])).is_err());
         assert!(bounded_response(&mut server, &Value::Array(vec![read; MAX_HTTP_BATCH])).is_err());
         let request = json!([
@@ -1708,21 +1714,27 @@ mod tests {
             {"jsonrpc":"2.0","id":null,"method":"ping"},
             {"jsonrpc":"2.0","id":false,"method":"ping"}, 7
         ]);
-        let response: Value =
-            serde_json::from_slice(&bounded_response(&mut server, &request).unwrap().unwrap())
-                .unwrap();
-        assert_eq!(response.as_array().unwrap().len(), 4);
+        let response: Value = serde_json::from_slice(
+            &bounded_response(&mut server, &request)
+                .expect("within budget")
+                .expect("response"),
+        )
+        .expect("JSON response");
+        assert_eq!(response.as_array().expect("batch response").len(), 4);
         assert_eq!(response[0]["id"], "string-id");
         assert!(response[1]["result"].is_object());
         assert_eq!(response[2]["error"]["code"], -32600);
         assert_eq!(response[3]["error"]["code"], -32600);
-        let empty: Value =
-            serde_json::from_slice(&bounded_response(&mut server, &json!([])).unwrap().unwrap())
-                .unwrap();
+        let empty: Value = serde_json::from_slice(
+            &bounded_response(&mut server, &json!([]))
+                .expect("within budget")
+                .expect("response"),
+        )
+        .expect("JSON response");
         assert_eq!(empty["error"]["code"], -32600);
         assert!(
             bounded_response(&mut server, &json!([{"jsonrpc":"2.0","method":"ping"}]))
-                .unwrap()
+                .expect("notification batch")
                 .is_none()
         );
     }
@@ -1732,16 +1744,16 @@ mod tests {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .unwrap();
+            .expect("test runtime");
         runtime.block_on(async {
-            let catalog = Arc::new(Catalog::local(root().unwrap()).unwrap());
+            let catalog = Arc::new(Catalog::local(root().expect("checkout")).expect("catalog"));
             let request = || {
                 Request::builder()
                     .header(header::HOST, "localhost")
                     .body(axum::body::Body::from(
                         r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
                     ))
-                    .unwrap()
+                    .expect("ping request")
             };
             let first = http_mcp(State(catalog.clone()), request()).await;
             let second = http_mcp(State(catalog.clone()), request()).await;
@@ -1759,16 +1771,16 @@ mod tests {
             drop(second);
             let read = json!({"jsonrpc":"2.0","id":42,"method":"resources/read","params":{"uri":"gpui-box://library"}});
             for count in [128, MAX_HTTP_BATCH] {
-                let body = serde_json::to_vec(&vec![read.clone(); count]).unwrap();
+                let body = serde_json::to_vec(&vec![read.clone(); count]).expect("batch JSON");
                 let hostile = Request::builder().header(header::HOST, "localhost")
-                    .body(axum::body::Body::from(body)).unwrap();
+                    .body(axum::body::Body::from(body)).expect("hostile request");
                 assert_eq!(http_mcp(State(catalog.clone()), hostile).await.status(), StatusCode::PAYLOAD_TOO_LARGE);
             }
             let response = http_mcp(State(catalog.clone()), request()).await;
-            let encoded = axum::body::to_bytes(response.into_body(), MAX_HTTP_RESPONSE).await.unwrap();
-            assert_eq!(serde_json::from_slice::<Value>(&encoded).unwrap()["id"], 1);
+            let encoded = axum::body::to_bytes(response.into_body(), MAX_HTTP_RESPONSE).await.expect("bounded response");
+            assert_eq!(serde_json::from_slice::<Value>(&encoded).expect("JSON response")["id"], 1);
             let oversized = Request::builder().header(header::HOST, "localhost")
-                .body(axum::body::Body::from(vec![b' '; MAX_HTTP_BODY + 1])).unwrap();
+                .body(axum::body::Body::from(vec![b' '; MAX_HTTP_BODY + 1])).expect("oversized request");
             assert_eq!(http_mcp(State(catalog), oversized).await.status(), StatusCode::PAYLOAD_TOO_LARGE);
         });
     }
@@ -1784,9 +1796,9 @@ mod tests {
         }
         let drops = Cell::new(0);
         let mut slot = None;
-        lazy_host(&mut slot, || Ok(Host(&drops))).unwrap();
+        lazy_host(&mut slot, || Ok(Host(&drops))).expect("first spawn");
         for _ in 0..10 {
-            lazy_host(&mut slot, || bail!("must not try another spawn")).unwrap();
+            lazy_host(&mut slot, || bail!("must not try another spawn")).expect("reuse host");
         }
         assert_eq!(drops.get(), 0);
         drop(slot);
