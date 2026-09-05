@@ -78,20 +78,88 @@ timing regression cannot be hidden by changing a structural limit, or vice
 versa.
 
 `.github/workflows/performance-timing.yml` runs the existing
-`gpui-box-wgpu` Criterion benchmarks on manual dispatch. It uploads
-`target/criterion` as an artifact for trend review. The timing lane is
-deliberately observational: it runs on no push and no schedule and is not a
-gate. Deterministic structural and heap-allocation budgets in
-`cargo run -p xtask -- performance check` remain the blocking authority.
+`gpui-box-wgpu` **CPU shaping** workloads on manual dispatch, with required
+`baseline_ref` input. It now blocks that dispatched job on a confident
+calibrated regression or invalid/missing evidence. It runs on no push or
+schedule. Structural and heap-allocation budgets remain a separate root gate;
+the root gate also tests the timing comparator, but does not run noisy timing.
 
-**Timing acceptance is not implemented.** The current Criterion artifacts
-contain no calibrated regression verdict. Before promoting this lane to a
-gate, choose a stable calibration workload per renderer, collect repeated
-same-process normalized median ratios for a reviewed baseline revision and
-candidate, derive a noise envelope from repeated unchanged runs, and make a
-comparator fail only for confidence intervals wholly outside that envelope.
-Check synthetic slowdowns and noisy unchanged runs before recording a baseline.
-No arbitrary machine-millisecond threshold or unmeasured baseline is accepted.
+### Calibrated shaping acceptance
+
+From a clean, committed, non-shallow checkout with dependencies cached:
+
+```bash
+python3 -B tools/performance-check/timing.py compare \
+  --baseline-ref <reviewed-commit> --output target/timing/review
+python3 -B -m unittest discover -s tools/performance-check/tests -v
+```
+
+The output directory must be new. There is no implicit previous baseline and
+no checked-in machine-speed reference. The operator chooses a reviewed source
+revision; the report resolves it and the candidate (default `HEAD`) to exact
+commits. Both are measured on the same host in this execution. To exercise the
+unchanged control, explicitly pass `--baseline-ref HEAD`.
+
+The runner extracts both revisions with `git archive` into temporary source
+directories, then installs the **candidate's identical benchmark and embedded
+Lilex/IBM Plex font bytes into both archives**. Library code and lockfiles stay
+revision-specific; the workload is the common candidate harness, not the old
+revision's benchmark definition. An incompatible baseline API/build or
+Criterion package is refused, never silently replaced with the candidate.
+Both builds use the current toolchain and the same optimized bench profile.
+Sources are removed even on failure; separate reusable build caches remain in
+`target/timing-build/{baseline,candidate}`. Builds are locked and offline: CI
+explicitly fetches candidate dependencies first; baseline-only dependencies
+must already be cached or the run fails closed. The runner never fetches refs
+or modifies the checkout. Fetch/unshallow and dependency preparation are
+explicit operator actions before measuring.
+
+Each fresh benchmark process runs deterministic black-box integer arithmetic
+independent of GPUI, followed by the three existing CosmicText `layout_line`
+workloads: no fallback, ASCII with fallback, and mixed-direction paragraphs.
+No system fonts are loaded. Each workload and calibration receives 0.5 seconds
+warmup, 1 second target measurement, 30 Criterion samples, and a bootstrapped
+95% median confidence interval (100,000 resamples). Both builds complete before
+sampling. Three unchanged baseline processes run first, then three candidate
+processes; `--repeats N` may increase, but never decrease, that minimum.
+
+For workload median interval `[L, U]`, median `M`, and same-process calibration
+`[cL, cU]`, median `cM`, the normalized interval is `[L/cU, U/cL]` and point is
+`M/cM`. Uniform CPU speed changes normalize away. This is conservative interval
+arithmetic, **not a claim of joint 95% coverage** or calibration of GPU work.
+For each workload, let `d` be the maximum minus minimum normalized baseline
+median across unchanged repeats. Its acceptance envelope is the hull of all
+baseline normalized intervals expanded by `d` on each side (lower bound clamped
+to zero). Thus the margin is measured baseline noise, not an arbitrary percent
+or absolute-millisecond threshold; candidate noise cannot widen the baseline.
+
+- `regression`: every candidate interval is wholly above the envelope; fails.
+- `improvement`: every candidate interval is wholly below the envelope.
+- `within_noise`: all candidate intervals fit inside the envelope.
+- `inconclusive`: all other cases, including overlaps and inconsistent repeats.
+
+The last three do not fail timing acceptance, but **neither within-noise nor
+inconclusive proves equivalence**. Three baseline repeats are a small empirical
+noise estimate, not a bound on future drift; a noisy host can hide real changes.
+Review intervals and repeat on a quiet host when inconclusive. Sequential CPU
+calibration does not cancel workload-specific scheduling, thermal or frequency
+effects. No sensitivity to small regressions is promised. Missing calibration,
+workloads, nonfinite/nonpositive values, inconsistent corpus/session/config,
+malformed intervals, or inadequate samples/repeats fail rather than pass.
+
+`report.json` records source commits, exact benchmark and font SHA-256 hashes,
+runner hash, lockfile hashes, toolchain/profile, host CPU/OS and CPU-only backend,
+raw median confidence intervals, normalized intervals, measured noise margins,
+envelopes and verdicts. Raw Criterion samples and process logs accompany it;
+CI uploads evidence even after failure. Synthetic tests prove uniform-speed
+normalization, true 2x slowdown rejection, noisy overlap handling and invalid
+data rejection; they are not measured baselines.
+
+**Unsupported timing coverage:** rasterization, renderer submission, GPU
+execution, Metal/WARP timing, browser frame latency and compositor/display
+presentation. These need their own workload and calibration designs. This CPU
+shaping lane does not close those renderer-latency gaps or replace native visual
+and structural validation.
 
 For live diagnostics, `FrameTimingMonitor` holds a reference-counted frame
 trace lease, filters observations to one `WindowId`, and retains a caller-sized

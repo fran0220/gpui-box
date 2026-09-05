@@ -2,6 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use gpui::{FontFallbacks, FontRun, PlatformTextSystem, font, px};
 use gpui_wgpu::CosmicTextSystem;
 use std::borrow::Cow;
+use std::hint::black_box;
 
 const LILEX: &[u8] = include_bytes!("../assets/fonts/lilex/Lilex-Regular.ttf");
 const IBM_PLEX: &[u8] = include_bytes!("../assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf");
@@ -103,5 +104,21 @@ fn bench_layout_line(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_layout_line);
+// CPU calibration only: no GPUI algorithms, allocations, fonts or renderer.
+// Run in the same invocation as shaping; this cannot calibrate GPU latency.
+fn bench_calibration(c: &mut Criterion) {
+    let mut group = c.benchmark_group("calibration");
+    group.bench_function("arithmetic", |b| {
+        b.iter(|| {
+            let mut value = black_box(0x1234_5678_9abc_def0_u64);
+            for _ in 0..4096 {
+                value = black_box(value.wrapping_mul(6364136223846793005).rotate_left(17) ^ 1);
+            }
+            black_box(value)
+        })
+    });
+    group.finish();
+}
+
+criterion_group!(benches, bench_calibration, bench_layout_line);
 criterion_main!(benches);

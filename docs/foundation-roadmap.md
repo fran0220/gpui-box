@@ -94,11 +94,14 @@ actions after unmount are refused and tested.
 ## Phase 2: deterministic performance budgets
 
 Status: structural budgets and the deliberately unbounded detector are
-implemented. Calibrated timing acceptance below is **not implemented**; the
-manual Criterion workflow only uploads observations. A reviewed renderer
-baseline, same-process calibration, measured noise envelope and blocking
-comparison with slowdown/noise regression tests remain required work (see
-`performance-testing.md`).
+implemented. Calibrated **CPU shaping** acceptance is implemented for the three
+existing CosmicText workloads: the manual workflow requires a reviewed baseline
+revision, measures repeated baseline/candidate processes with identical harness
+and fonts, and blocks confident normalized interval regressions outside measured
+baseline noise. Comparator slowdown/noise and invalid-evidence tests run in the
+root gate. GPU execution, rasterization, submission/presentation, Metal/WARP and
+browser latency acceptance remain unsupported, not implied by the CPU lane (see
+`performance-testing.md` for the exact policy and limits).
 
 Add low-overhead counters at framework boundaries before optimizing individual
 components.

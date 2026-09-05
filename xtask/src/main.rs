@@ -1112,6 +1112,19 @@ fn gate(full: bool) -> Result<()> {
             ],
             None,
         )?;
+        step(
+            "python3",
+            &[
+                "-B",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "tools/performance-check/tests",
+                "-v",
+            ],
+            None,
+        )?;
     }
     // GPUI Box owns the complete framework and kit source. A warning anywhere
     // in the workspace is therefore a gate failure rather than upstream debt.

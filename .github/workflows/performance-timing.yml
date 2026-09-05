@@ -1,9 +1,14 @@
 name: Performance timing
 
-# Observational Criterion lane on a hosted runner, dispatched when a renderer
-# timing trend is wanted. It is not a gate and runs on no push.
+# Calibrated CPU shaping regression lane. No GPU/presentation timing claim.
+# Manual only; the operator must select a reviewed baseline source revision.
 on:
   workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Reviewed baseline commit or ref (measured on this runner)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,18 +25,31 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Install Linux GPUI libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1 }
       - uses: Swatinem/rust-cache@v2
-      - name: Run renderer Criterion benchmarks
-        run: cargo bench -p gpui-box-wgpu --bench layout_line --locked
-      - name: State the acceptance gap explicitly
+      - name: Cache candidate dependencies for offline measurement builds
+        run: cargo fetch --locked
+      - name: Test timing comparator
+        run: python3 -B -m unittest discover -s tools/performance-check/tests -v
+      - name: Compare calibrated shaping against reviewed baseline
+        env:
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+        run: python3 -B tools/performance-check/timing.py compare --baseline-ref "$BASELINE_REF" --output target/timing/review
+      - name: Publish calibrated verdict
+        if: always()
         run: |
-          echo 'Timing acceptance is NOT implemented: these are observational Criterion artifacts, not a calibrated regression verdict. See docs/performance-testing.md for baseline, calibration, noise-envelope and comparator requirements.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'CPU shaping only; within_noise/inconclusive is not proof of equivalence. See docs/performance-testing.md.' >> "$GITHUB_STEP_SUMMARY"
+          if test -f target/timing/review/report.json; then
+            jq '{verdict, error, baseline: .baseline.revision, candidate: .candidate.revision, results}' target/timing/review/report.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: criterion-report-${{ github.sha }}
-          path: target/criterion
+          name: calibrated-shaping-${{ github.sha }}
+          path: target/timing/review
           if-no-files-found: error
