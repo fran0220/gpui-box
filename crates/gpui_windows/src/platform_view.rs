@@ -23,6 +23,7 @@
 use std::{
     cell::{Cell, RefCell},
     ffi::c_void,
+    rc::Rc,
 };
 
 use anyhow::{Context as _, Result};
@@ -49,6 +50,19 @@ struct HostedView {
     /// update, so that frame cannot own this lifetime on the host's behalf.
     handle: PlatformViewHandle,
     saved: SavedViewState,
+    attached: Cell<bool>,
+    // Plans borrow this handle. Only this shared owner deletes the saved copy;
+    // SetWindowRgn receives a fresh copy, including on restoration retries.
+    _region: Rc<SavedRegion>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SavedRegion(Option<isize>);
+
+impl Drop for SavedRegion {
+    fn drop(&mut self) {
+        release_region(self.0);
+    }
 }
 
 /// The owned popup a GPUI window parks its hosted views in, and the bookkeeping
@@ -78,6 +92,9 @@ impl PlatformViewHost {
     /// Applies one drawn frame's worth of platform-view work.
     pub(crate) fn update(&self, update: &PlatformViewUpdate, scale_factor: f32) {
         self.detach(&update.detached);
+        // Placements are a complete frame, not a delta. In particular, move
+        // and resize callbacks must never resurrect the preceding empty frame.
+        self.view_rects.borrow_mut().clear();
 
         if !update.placements.is_empty() {
             match self.ensure_host() {
@@ -146,7 +163,7 @@ impl PlatformViewHost {
         let mut stranded = Vec::new();
         for (id, view) in hosted {
             let unhosted = unhost_view(&view);
-            if unhosted.is_err() && !view_can_be_forgotten(&view, self.host.get()) {
+            if unhosted.is_err() {
                 stranded.push((id, view));
             }
             unhosted.log_err();
@@ -163,8 +180,20 @@ impl PlatformViewHost {
     /// Tears the host window down. Views still attached are unhosted first, so
     /// destroying the GPUI window never destroys a view its owner still holds.
     pub(crate) fn destroy(&self) {
-        self.detach_all();
+        let detached = self.detach_all();
         self.view_rects.borrow_mut().clear();
+        if !detached {
+            // Destroying either this popup or its owner also destroys caller
+            // children. Quarantine the hidden popup without an owner instead;
+            // keep the restoration state intact so destroy can be retried.
+            if let Some(host) = self.host.get() {
+                unsafe {
+                    ShowWindow(host, SW_HIDE);
+                    set_window_long(host, GWLP_HWNDPARENT, 0);
+                }
+            }
+            return;
+        }
         if let Some(host) = self.host.take() {
             unsafe {
                 DestroyWindow(host)
@@ -181,7 +210,7 @@ impl PlatformViewHost {
                 continue;
             };
             let unhosted = unhost_view(&view);
-            if unhosted.is_ok() || view_can_be_forgotten(&view, self.host.get()) {
+            if unhosted.is_ok() {
                 hosting.detach(*id);
             }
             unhosted.log_err();
@@ -213,16 +242,43 @@ impl PlatformViewHost {
         let mut below: Option<HWND> = None;
         for placement in &update.placements {
             let id = placement.handle.id();
-            let Some(hwnd) = hosting.attributes(id).map(|view| view.handle.as_hwnd()) else {
+            let Some(view) = hosting.attributes(id) else {
                 continue;
             };
-            let moved = hosting.place(id, placement.bounds, scale_factor);
-            rects.push(PhysicalRect::from_bounds(platform_view_physical_bounds(
+            let hwnd = view.handle.as_hwnd();
+            if !view.attached.get() {
+                if apply(hwnd, &plan::attach_ops(view.saved, host.0 as isize))
+                    .log_err()
+                    .is_none()
+                {
+                    continue;
+                }
+                view.attached.set(true);
+            }
+            let bounds = PhysicalRect::from_bounds(platform_view_physical_bounds(
+                placement.bounds,
+                scale_factor,
+            ));
+            let clip = PhysicalRect::from_bounds(platform_view_physical_bounds(
                 placement.clip_bounds(),
                 scale_factor,
-            )));
+            ))
+            .intersect(&bounds);
+            // Each child needs its own region: the host's union alone lets
+            // overlapping siblings paint and receive input through each other.
+            // Apply even when only the clip changed, preserving layout size.
+            let local = plan::child_region_rect(bounds, clip);
+            if let Err(error) = set_rect_region(hwnd, &[local]) {
+                unsafe {
+                    ShowWindow(hwnd, SW_HIDE);
+                }
+                log::error!("failed to clip a hosted platform view: {error:#}");
+                continue;
+            }
+            rects.push(clip);
 
-            if moved.is_some() || restacked {
+            let moved = hosting.place(id, placement.bounds, scale_factor);
+            if moved.is_some() || restacked || !unsafe { IsWindowVisible(hwnd) }.as_bool() {
                 place_view(hwnd, below, moved.map(PhysicalRect::from_bounds))
                     .context("failed to place a hosted platform view")
                     .log_err();
@@ -282,23 +338,32 @@ impl PlatformViewHost {
     }
 
     fn clip_host(&self, host: HWND, rects: &[PhysicalRect]) {
-        let Some(region) = combined_region(rects) else {
-            // An empty clip would leave the host covering nothing at all, which
-            // is what an empty frame wants, but `SetWindowRgn` refuses a null
-            // region for that; hiding the host is handled by the caller.
-            unsafe {
-                SetWindowRgn(host, Some(CreateRectRgn(0, 0, 0, 0)), false);
+        set_rect_region(host, rects).log_err();
+    }
+}
+
+impl Drop for PlatformViewHost {
+    fn drop(&mut self) {
+        self.destroy();
+        if self.host.get().is_some() {
+            // An OS refusal cannot justify destroying a caller's child or
+            // controller. A final failed teardown deliberately retains both.
+            // Normal explicit destroy calls remain retryable and leak nothing.
+            for (_, view) in self.hosting.get_mut().detach_all() {
+                std::mem::forget(view);
             }
-            return;
-        };
-        // `SetWindowRgn` takes ownership of the region on success, so it is not
-        // deleted here.
-        let clipped = unsafe { SetWindowRgn(host, Some(region), false) };
-        if clipped == 0 {
-            unsafe { DeleteObject(region.into()).ok().log_err() };
-            log::error!("failed to clip the platform view host");
         }
     }
+}
+
+fn set_rect_region(hwnd: HWND, rects: &[PhysicalRect]) -> Result<()> {
+    let region = combined_region(rects).unwrap_or_else(|| unsafe { CreateRectRgn(0, 0, 0, 0) });
+    anyhow::ensure!(!region.is_invalid(), "failed to allocate window region");
+    if unsafe { SetWindowRgn(hwnd, Some(region), false) } == 0 {
+        unsafe { DeleteObject(region.into()).ok().log_err() };
+        anyhow::bail!("failed to set window region");
+    }
+    Ok(())
 }
 
 /// Reads what a child window must get back at detach and moves it under the
@@ -316,24 +381,32 @@ fn host_view(host: HWND, handle: PlatformViewHandle) -> Result<HostedView> {
         "platform view HWND must have the WS_CHILD style"
     );
     let parent = unsafe { GetAncestor(hwnd, GA_PARENT) };
+    let region = Rc::new(SavedRegion(capture_region(hwnd)));
     let view = HostedView {
         handle,
+        attached: Cell::new(false),
         saved: SavedViewState {
             parent: (!parent.is_invalid()).then_some(parent.0 as isize),
             style,
             ex_style: unsafe { get_window_long(hwnd, GWL_EXSTYLE) },
-            region: capture_region(hwnd),
+            region: region.0,
         },
+        _region: region,
     };
 
     if let Err(error) = apply(hwnd, &plan::attach_ops(view.saved, host.0 as isize)) {
         // A half-hosted view is worse than an unhosted one: put back everything
         // the failed attach may already have changed.
-        apply(hwnd, &plan::detach_ops(view.saved)).log_err();
-        release_region(view.saved.region);
+        if let Err(restore_error) = unhost_view(&view) {
+            // Retain failed rollback state in the host for the next detach,
+            // rather than dropping the controller of a half-hosted child.
+            log::error!("failed platform view attach: {error:#}; rollback: {restore_error:#}");
+            return Ok(view);
+        }
         return Err(error);
     }
 
+    view.attached.set(true);
     Ok(view)
 }
 
@@ -341,35 +414,18 @@ fn host_view(host: HWND, handle: PlatformViewHandle) -> Result<HostedView> {
 fn unhost_view(view: &HostedView) -> Result<()> {
     let hwnd = view.handle.as_hwnd();
     if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
-        release_region(view.saved.region);
         return Ok(());
     }
 
-    let restored = apply(hwnd, &plan::detach_ops(view.saved));
-    if restored.is_ok() {
-        // The window now owns the region again, so it must not be freed here.
-        return Ok(());
-    }
-    release_region(view.saved.region);
-    restored
-}
-
-/// Whether a view that refused to be unhosted can be dropped from the
-/// bookkeeping anyway: it is gone, or it is no longer ours to put back.
-fn view_can_be_forgotten(view: &HostedView, host: Option<HWND>) -> bool {
-    let hwnd = view.handle.as_hwnd();
-    if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
-        return true;
-    }
-    let parent = unsafe { GetAncestor(hwnd, GA_PARENT) };
-    match host {
-        Some(host) => parent != host,
-        None => true,
-    }
+    apply(hwnd, &plan::detach_ops(view.saved))
 }
 
 fn apply(hwnd: HWND, ops: &[ViewOp]) -> Result<()> {
     for op in ops {
+        #[cfg(test)]
+        if FAIL_PARENT.with(|fail| fail.get()) && matches!(op, ViewOp::SetParent(_)) {
+            anyhow::bail!("injected SetParent failure");
+        }
         match *op {
             ViewOp::Hide => unsafe {
                 let _was_visible = ShowWindow(hwnd, SW_HIDE);
@@ -395,15 +451,38 @@ fn apply(hwnd: HWND, ops: &[ViewOp]) -> Result<()> {
                 SetParent(hwnd, parent).context("failed to reparent the platform view")?;
             },
             ViewOp::SetRegion(region) => unsafe {
-                let region = region.map(|region| HRGN(region as *mut c_void));
-                anyhow::ensure!(
-                    SetWindowRgn(hwnd, region, false) != 0,
-                    "failed to set the platform view's window region"
-                );
+                let copy = region
+                    .map(|region| {
+                        let copy = CreateRectRgn(0, 0, 0, 0);
+                        let source = HRGN(region as *mut c_void);
+                        if !copy.is_invalid()
+                            && CombineRgn(Some(copy), Some(source), None, RGN_COPY) != RGN_ERROR
+                        {
+                            Ok(copy)
+                        } else {
+                            if !copy.is_invalid() {
+                                DeleteObject(copy.into()).ok().log_err();
+                            }
+                            Err(anyhow::anyhow!("failed to copy saved window region"))
+                        }
+                    })
+                    .transpose()?;
+                if SetWindowRgn(hwnd, copy, false) == 0 {
+                    if let Some(copy) = copy {
+                        DeleteObject(copy.into()).ok().log_err();
+                    }
+                    anyhow::bail!("failed to set the platform view's window region");
+                }
             },
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+thread_local! {
+    // Thread-local because HWNDs and their restoration run on their UI thread.
+    static FAIL_PARENT: Cell<bool> = const { Cell::new(false) };
 }
 
 fn place_view(hwnd: HWND, below: Option<HWND>, rect: Option<PhysicalRect>) -> Result<()> {
@@ -430,8 +509,8 @@ fn place_view(hwnd: HWND, below: Option<HWND>, rect: Option<PhysicalRect>) -> Re
 
 /// Takes a copy of a window's region, or `None` when it has none.
 ///
-/// The copy is owned by the caller until it is handed back to the window at
-/// detach, or released.
+/// The copy stays owned by the caller. Restoration gives Windows a duplicate,
+/// never this handle, so a partial failure can safely retry.
 fn capture_region(hwnd: HWND) -> Option<isize> {
     let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
     if region.is_invalid() {
@@ -709,6 +788,159 @@ mod tests {
     }
 
     #[test]
+    fn hosting_empty_frame_stays_hidden_after_geometry_sync() {
+        let owner = create_test_window(None, WS_VISIBLE);
+        let parent = create_test_window(None, WINDOW_STYLE::default());
+        let child = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
+        let host = PlatformViewHost::new(owner);
+        let bounds = Bounds::new(point(px(0.), px(0.)), size(px(10.), px(10.)));
+        let handle = view_handle(child);
+        host.update(
+            &PlatformViewUpdate {
+                placements: vec![PlatformViewPlacement::new(handle.clone(), bounds, bounds)],
+                detached: vec![],
+            },
+            1.,
+        );
+        let popup = host.host.get().unwrap();
+        assert!(unsafe { IsWindowVisible(popup) }.as_bool());
+        host.update(
+            &PlatformViewUpdate {
+                placements: vec![],
+                detached: vec![handle.id()],
+            },
+            1.,
+        );
+        assert!(host.view_rects.borrow().is_empty());
+        unsafe {
+            SetWindowPos(owner, None, 50, 70, 200, 160, SWP_NOZORDER).unwrap();
+        }
+        host.sync_geometry();
+        assert!(!unsafe { IsWindowVisible(popup) }.as_bool());
+        let mut region = RECT::default();
+        assert_eq!(unsafe { GetWindowRgnBox(popup, &mut region) }, NULLREGION);
+        host.destroy();
+        unsafe {
+            DestroyWindow(parent).unwrap();
+            DestroyWindow(owner).unwrap();
+        }
+    }
+
+    #[test]
+    fn hosting_overlapping_children_have_independent_clips_and_clip_only_updates() {
+        let owner = create_test_window(None, WS_VISIBLE);
+        let parent = create_test_window(None, WINDOW_STYLE::default());
+        let a = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
+        let b = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
+        unsafe {
+            SetWindowPos(owner, None, 0, 0, 300, 200, SWP_NOZORDER).unwrap();
+        }
+        let host = PlatformViewHost::new(owner);
+        let full = Bounds::new(point(px(-10.), px(-5.)), size(px(100.), px(80.)));
+        for offset in [0., 10.] {
+            let a_clip = Bounds::new(point(px(offset), px(0.)), size(px(20.), px(20.)));
+            let b_clip = Bounds::new(point(px(40.), px(0.)), size(px(20.), px(20.)));
+            host.update(
+                &PlatformViewUpdate {
+                    placements: vec![
+                        PlatformViewPlacement::new(view_handle(a), full, a_clip),
+                        PlatformViewPlacement::new(view_handle(b), full, b_clip),
+                    ],
+                    detached: vec![],
+                },
+                2.,
+            );
+            for (child, left) in [(a, (20. + offset * 2.) as i32), (b, 100)] {
+                let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
+                assert_ne!(unsafe { GetWindowRgn(child, region) }, RGN_ERROR);
+                assert!(unsafe { PtInRegion(region, left + 1, 11) }.as_bool());
+                assert!(!unsafe { PtInRegion(region, left + 41, 11) }.as_bool());
+                let mut rect = RECT::default();
+                unsafe {
+                    GetWindowRect(child, &mut rect).unwrap();
+                    DeleteObject(region.into()).ok().unwrap();
+                }
+                assert_eq!((rect.right - rect.left, rect.bottom - rect.top), (200, 160));
+            }
+            let popup = host.host.get().unwrap();
+            // Real HWND hit testing must skip the overlapping sibling whose
+            // full bounds cover this point but whose own region does not.
+            assert_eq!(
+                unsafe {
+                    RealChildWindowFromPoint(
+                        popup,
+                        POINT {
+                            x: (offset * 2.) as i32 + 1,
+                            y: 1,
+                        },
+                    )
+                },
+                a
+            );
+            assert_eq!(
+                unsafe { RealChildWindowFromPoint(popup, POINT { x: 81, y: 1 }) },
+                b
+            );
+        }
+        host.destroy();
+        unsafe {
+            DestroyWindow(parent).unwrap();
+            DestroyWindow(owner).unwrap();
+        }
+    }
+
+    #[test]
+    fn hosting_failed_detach_retries_keep_region_and_caller_child_alive() {
+        let owner = create_test_window(None, WS_VISIBLE);
+        let parent = create_test_window(None, WINDOW_STYLE::default());
+        let child = create_test_window(Some(parent), WS_CHILD | WS_VISIBLE);
+        unsafe {
+            SetWindowRgn(child, Some(CreateRectRgn(1, 2, 7, 8)), false);
+        }
+        let host = PlatformViewHost::new(owner);
+        let handle = view_handle(child);
+        let bounds = Bounds::new(point(px(0.), px(0.)), size(px(10.), px(10.)));
+        host.update(
+            &PlatformViewUpdate {
+                placements: vec![PlatformViewPlacement::new(handle.clone(), bounds, bounds)],
+                detached: vec![],
+            },
+            1.,
+        );
+        let popup = host.host.get().unwrap();
+        FAIL_PARENT.with(|fail| fail.set(true));
+        for _ in 0..3 {
+            host.detach(&[handle.id()]);
+        }
+        host.destroy();
+        FAIL_PARENT.with(|fail| fail.set(false));
+        assert!(unsafe { IsWindow(Some(child)) }.as_bool());
+        assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, popup);
+        assert_eq!(unsafe { get_window_long(popup, GWLP_HWNDPARENT) }, 0);
+        // Even owner destruction must not destroy the quarantined child.
+        unsafe {
+            DestroyWindow(owner).unwrap();
+        }
+        host.destroy();
+        assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, parent);
+        assert!(!unsafe { IsWindow(Some(popup)) }.as_bool());
+        let mut restored = RECT::default();
+        assert_ne!(unsafe { GetWindowRgnBox(child, &mut restored) }, RGN_ERROR);
+        assert_eq!(
+            restored,
+            RECT {
+                left: 1,
+                top: 2,
+                right: 7,
+                bottom: 8
+            }
+        );
+        unsafe {
+            DestroyWindow(parent).unwrap();
+        }
+    }
+
+    #[test]
     fn a_destroyed_view_stops_being_hosted() {
         let original_parent = create_test_window(None, WINDOW_STYLE::default());
         let host = create_test_window(None, WINDOW_STYLE::default());
@@ -717,7 +949,6 @@ mod tests {
         let view = host_view(host, view_handle(child)).expect("failed to host child HWND");
         unsafe { DestroyWindow(child) }.expect("failed to destroy child HWND");
 
-        assert!(view_can_be_forgotten(&view, Some(host)));
         unhost_view(&view).expect("unhosting a destroyed view is not an error");
 
         unsafe {
@@ -946,6 +1177,18 @@ pub(crate) mod plan {
             .map(|view| view.intersect(&bounds))
             .filter(|rect| !rect.is_empty())
             .collect()
+    }
+
+    /// Clip in child-window coordinates, after rounding both screen-space
+    /// rectangles at the same scale. Never resize the child's layout frame.
+    pub(crate) fn child_region_rect(bounds: PhysicalRect, clip: PhysicalRect) -> PhysicalRect {
+        let clip = clip.intersect(&bounds);
+        PhysicalRect {
+            x: clip.x.saturating_sub(bounds.x),
+            y: clip.y.saturating_sub(bounds.y),
+            width: clip.width,
+            height: clip.height,
+        }
     }
 
     #[cfg(test)]

@@ -21,6 +21,17 @@ history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
+Windows native-view clips are independent child-local regions as well as a
+host union; clipping never changes full layout dimensions. Empty frames hide
+and empty the host, including subsequent move/resize synchronization. Saved
+caller regions remain owned copies throughout restoration retries. If the OS
+refuses teardown, GPUI hides and disowns the popup rather than destroying a
+caller child. Explicit teardown can retry; final destruction deliberately
+retains stranded controllers and the hidden popup (an exceptional resource
+leak, not permission to destroy caller-owned windows).
+Native regression command: `cargo test -p gpui-box-windows platform_view --lib`.
+These HWND tests require Windows; Linux headless images do not prove them.
+
 Linux `gate` executes both `cargo test --workspace` and
 `cargo test --workspace --all-features`, not only an all-feature compile.
 Both Windows and macOS Platforms/Release native lanes execute

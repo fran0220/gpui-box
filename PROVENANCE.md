@@ -4,6 +4,10 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+The September 2026 Windows hosting corrections (per-child regions, complete
+empty-frame submission, and retry-safe saved-region ownership) are original
+GPUI Box work. They do not change either frozen import receipt.
+
 ## P01: GPUI / Zed filtered framework import
 
 - Official upstream: <https://github.com/zed-industries/zed>
