@@ -21,6 +21,17 @@ history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
+Deferred prepaint (including sticky content) preserves logical AccessKit
+ancestors, source child order, synthetic children, and ancestor-based active
+descendant focus independently of paint priority. Frame-local child
+reservations attach to finalized ancestors without duplicate platform nodes.
+While accessibility is active, visual view caches are rebuilt each frame:
+their prepaint/paint ranges do not contain replayable accessibility trees.
+Linux builder and sticky/nested-deferred integration tests cover these shared
+invariants; browser smoke checks TreeGrid ancestry on WebGL2 and WebGPU. Native
+macOS and Windows adapter validation remains the on-demand Platforms lane;
+the shared change does not alter clipping, transforms, hit testing, or paint.
+
 Windows native-view clips are independent child-local regions as well as a
 host union; clipping never changes full layout dimensions. Empty frames hide
 and empty the host, including subsequent move/resize synchronization. Saved

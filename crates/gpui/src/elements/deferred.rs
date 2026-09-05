@@ -116,25 +116,38 @@ mod tests {
 
     impl Render for PanelView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-            div().key_context("Panel").size_full().child(
-                deferred(
-                    anchored().position(point(px(10.), px(10.))).child(
-                        div().key_context("Popover").w(px(200.)).h(px(200.)).child(
-                            deferred(
-                                anchored().position(point(px(30.), px(30.))).child(
-                                    div()
-                                        .key_context("NestedMenu")
-                                        .debug_selector(|| "NESTED_MENU".into())
-                                        .w(px(50.))
-                                        .h(px(50.)),
+            div()
+                .id("panel")
+                .role(crate::Role::Group)
+                .key_context("Panel")
+                .size_full()
+                .child(
+                    deferred(
+                        anchored().position(point(px(10.), px(10.))).child(
+                            div()
+                                .id("popover")
+                                .role(crate::Role::Group)
+                                .key_context("Popover")
+                                .w(px(200.))
+                                .h(px(200.))
+                                .child(
+                                    deferred(
+                                        anchored().position(point(px(30.), px(30.))).child(
+                                            div()
+                                                .id("nested-menu")
+                                                .role(crate::Role::Menu)
+                                                .key_context("NestedMenu")
+                                                .debug_selector(|| "NESTED_MENU".into())
+                                                .w(px(50.))
+                                                .h(px(50.)),
+                                        ),
+                                    )
+                                    .with_priority(2),
                                 ),
-                            )
-                            .with_priority(2),
                         ),
-                    ),
+                    )
+                    .with_priority(1),
                 )
-                .with_priority(1),
-            )
         }
     }
 
@@ -213,5 +226,37 @@ mod tests {
                 );
             })
             .expect("required framework invariant must hold");
+
+        // Activation must invalidate the visual-only cache, and subsequent
+        // root-only notifications must not reuse stale frame-local a11y
+        // reservations or drop the cached panel's accessibility subtree.
+        cx.activate_accessibility(window.into());
+        for _ in 0..3 {
+            window
+                .update(cx, |_, _, cx| cx.notify())
+                .expect("notify root");
+            cx.run_until_parked();
+            window
+                .update(cx, |_, window, _| {
+                    let tree: serde_json::Value = serde_json::from_str(
+                        &window.debug_a11y_tree_json().expect("active accessibility"),
+                    )
+                    .expect("accessibility tree JSON");
+                    let nodes = tree["nodes"].as_object().expect("nodes");
+                    let key = |id: &str| {
+                        nodes
+                            .iter()
+                            .find(|(_, node)| node["element_id"] == id)
+                            .expect("deferred accessibility node")
+                            .0
+                    };
+                    let panel = key("Name(\"panel\")");
+                    let popover = key("Name(\"popover\")");
+                    let menu = key("Name(\"nested-menu\")");
+                    assert_eq!(nodes[panel]["children"], serde_json::json!([popover]));
+                    assert_eq!(nodes[popover]["children"], serde_json::json!([menu]));
+                })
+                .expect("inspect deferred accessibility");
+        }
     }
 }

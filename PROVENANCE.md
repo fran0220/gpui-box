@@ -10,6 +10,9 @@ GPUI Box work. They do not change either frozen import receipt.
 The shared mouse cancellation event, button-bound pointer capture, text/click
 cleanup, browser chord reconciliation, and Windows chord capture lifetime are
 likewise local framework corrections with no imported source.
+Deferred prepaint accessibility ancestry, source-order child reservations, and
+active-accessibility cache rebuilding are original GPUI Box corrections. They
+change no platform renderer or frozen import receipt.
 
 ## P01: GPUI / Zed filtered framework import
 

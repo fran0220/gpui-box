@@ -924,6 +924,7 @@ pub(crate) struct DeferredDraw {
     current_view: EntityId,
     priority: usize,
     parent_node: DispatchNodeId,
+    a11y_context: Option<a11y::DeferredA11yContext>,
     element_id_stack: SmallVec<[ElementId; 32]>,
     text_style_stack: Vec<TextStyleRefinement>,
     content_mask: Option<ContentMask<Pixels>>,
@@ -3521,6 +3522,9 @@ impl Window {
         self.a11y.sync_active_flag();
         if self.a11y.is_active() {
             self.a11y.begin_frame();
+            // Accessibility nodes and deferred child reservations are rebuilt
+            // each frame, not replayed by the visual prepaint/paint caches.
+            self.refreshing = true;
         }
 
         let _inspector_width: Pixels = rems(30.0).to_pixels(self.rem_size());
@@ -3760,6 +3764,7 @@ impl Window {
                 let (
                     element,
                     parent_node,
+                    a11y_context,
                     current_view,
                     rem_size,
                     absolute_offset,
@@ -3774,6 +3779,7 @@ impl Window {
                     (
                         deferred_draw.element.take(),
                         deferred_draw.parent_node,
+                        deferred_draw.a11y_context.clone(),
                         deferred_draw.current_view,
                         deferred_draw.rem_size,
                         deferred_draw.absolute_offset,
@@ -3782,6 +3788,9 @@ impl Window {
                     )
                 };
                 self.next_frame.dispatch_tree.set_active_node(parent_node);
+                let a11y_state = a11y_context
+                    .filter(|_| self.a11y.is_active())
+                    .map(|context| self.a11y.nodes.begin_deferred(context));
 
                 let prepaint_start = self.prepaint_index();
                 if let Some(mut element) = element {
@@ -3797,6 +3806,9 @@ impl Window {
                     self.next_frame.deferred_draws[deferred_draw_ix].element = Some(element);
                 } else {
                     self.reuse_prepaint(prepaint_range);
+                }
+                if let Some(state) = a11y_state {
+                    self.a11y.nodes.end_deferred(state);
                 }
                 let prepaint_end = self.prepaint_index();
                 self.next_frame.deferred_draws[deferred_draw_ix].prepaint_range =
@@ -3904,6 +3916,7 @@ impl Window {
                 .map(|deferred_draw| DeferredDraw {
                     current_view: deferred_draw.current_view,
                     parent_node: reused_subtree.refresh_node_id(deferred_draw.parent_node),
+                    a11y_context: deferred_draw.a11y_context.clone(),
                     element_id_stack: deferred_draw.element_id_stack.clone(),
                     text_style_stack: deferred_draw.text_style_stack.clone(),
                     content_mask: deferred_draw.content_mask,
@@ -4741,6 +4754,10 @@ impl Window {
     /// When `content_mask` is provided, the deferred element will be clipped to that region during
     /// both prepaint and paint. When `None`, no additional clipping is applied.
     ///
+    /// Accessibility retains the logical ancestor and child position at this
+    /// call, including through nested deferrals. Paint priority does not change
+    /// accessibility ancestry, reading order, or ancestor-based focus.
+    ///
     /// This method should only be called as part of the prepaint phase of element drawing.
     pub fn defer_draw(
         &mut self,
@@ -4755,9 +4772,11 @@ impl Window {
             .dispatch_tree
             .active_node_id()
             .expect("required framework invariant must hold");
+        let a11y_context = self.a11y.is_active().then(|| self.a11y.nodes.defer());
         self.next_frame.deferred_draws.push(DeferredDraw {
             current_view: self.current_view(),
             parent_node,
+            a11y_context,
             element_id_stack: self.element_id_stack.clone(),
             text_style_stack: self.text_style_stack.clone(),
             content_mask,

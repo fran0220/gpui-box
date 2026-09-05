@@ -142,12 +142,15 @@ mod tests {
             div().size_full().pt(px(20.0)).pl(px(100.0)).child(
                 div()
                     .id("sticky-scroll")
+                    .role(crate::Role::TreeGrid)
                     .w(px(100.0))
                     .h(px(40.0))
                     .overflow_x_scroll()
                     .track_scroll(&self.scroll)
                     .child(
                         div()
+                            .id("sticky-row")
+                            .role(crate::Role::Row)
                             .flex()
                             .flex_row()
                             .w(px(200.0))
@@ -158,14 +161,22 @@ mod tests {
                                 div()
                                     .id("sticky-target")
                                     .debug_selector(|| "STICKY_TARGET".into())
-                                    .role(crate::Role::Button)
+                                    .role(crate::Role::Cell)
                                     .w(px(30.0))
                                     .h(px(40.0))
                                     .flex_none()
                                     .on_mouse_down(MouseButton::Left, move |_, _, _| {
                                         pressed.set(pressed.get() + 1)
                                     }),
-                            )),
+                            ))
+                            .child(
+                                div()
+                                    .id("scrolling-cell")
+                                    .role(crate::Role::Cell)
+                                    .w(px(170.0))
+                                    .h_full()
+                                    .flex_none(),
+                            ),
                     ),
             )
         }
@@ -204,6 +215,23 @@ mod tests {
                 .copied()
                 .expect("sticky accessibility bounds");
             assert_eq!(accessible, bounds);
+            let tree: serde_json::Value =
+                serde_json::from_str(&window.debug_a11y_tree_json().expect("active accessibility"))
+                    .expect("accessibility tree JSON");
+            let nodes = tree["nodes"].as_object().expect("nodes");
+            let key = |element_id: &str| {
+                nodes
+                    .iter()
+                    .find(|(_, node)| node["element_id"] == element_id)
+                    .expect("sticky accessibility node")
+                    .0
+            };
+            let grid = key("Name(\"sticky-scroll\")");
+            let row = key("Name(\"sticky-row\")");
+            let held = key("Name(\"sticky-target\")");
+            let scrolling = key("Name(\"scrolling-cell\")");
+            assert_eq!(nodes[grid]["children"], serde_json::json!([row]));
+            assert_eq!(nodes[row]["children"], serde_json::json!([held, scrolling]));
 
             window.dispatch_event(
                 MouseDownEvent {

@@ -400,9 +400,36 @@ impl<'a> A11ySubtreeBuilder<'a> {
     }
 }
 
+/// Logical ancestry and a reserved child-list position, independent of paint
+/// priority. Reservations are frame-local and never become AccessKit nodes.
+#[derive(Clone)]
+pub(crate) struct DeferredA11yContext {
+    ancestors: SmallVec<[NodeId; 16]>,
+    reservation: usize,
+}
+
+enum DeferredA11yParent {
+    Node(NodeId),
+    Reservation(usize),
+}
+
+struct DeferredA11yChildren {
+    parent: DeferredA11yParent,
+    position: usize,
+    children: Vec<NodeId>,
+}
+
+pub(crate) struct DeferredA11yState {
+    ids: SmallVec<[NodeId; 16]>,
+    nodes: SmallVec<[accesskit::Node; 16]>,
+    reservation: Option<usize>,
+}
+
 pub(crate) struct A11yNodeBuilder {
     ids_stack: SmallVec<[NodeId; 16]>,
     nodes_stack: SmallVec<[accesskit::Node; 16]>,
+    deferred_children: Vec<DeferredA11yChildren>,
+    current_reservation: Option<usize>,
     /// This is the exact type required by accesskit, so we can't just make it a
     /// `HashMap<NodeId, Node>` to remove the need for `seen_ids`
     all_nodes: Vec<(NodeId, accesskit::Node)>,
@@ -430,6 +457,8 @@ impl A11yNodeBuilder {
         Self {
             ids_stack: SmallVec::new(),
             nodes_stack: SmallVec::new(),
+            deferred_children: Vec::new(),
+            current_reservation: None,
             all_nodes: Vec::new(),
             seen_ids: FxHashSet::default(),
             relationship_nodes: FxHashMap::default(),
@@ -480,6 +509,62 @@ impl A11yNodeBuilder {
         true
     }
 
+    /// Reserve the current logical child position before prepaint is deferred.
+    /// A role-less deferred subtree can itself defer children; its reservation
+    /// then owns another reservation rather than inventing a platform node.
+    pub(crate) fn defer(&mut self) -> DeferredA11yContext {
+        let (parent, position) = if let Some(node) = self.nodes_stack.last() {
+            (
+                DeferredA11yParent::Node(*self.ids_stack.last().expect("a11y root")),
+                node.children().len(),
+            )
+        } else {
+            let reservation = self.current_reservation.expect("deferred a11y context");
+            (
+                DeferredA11yParent::Reservation(reservation),
+                self.deferred_children[reservation].children.len(),
+            )
+        };
+        let reservation = self.deferred_children.len();
+        self.deferred_children.push(DeferredA11yChildren {
+            parent,
+            position,
+            children: Vec::new(),
+        });
+        DeferredA11yContext {
+            ancestors: self.ids_stack.clone(),
+            reservation,
+        }
+    }
+
+    /// Restore ancestry without pushing duplicate nodes. The ancestor may
+    /// already be finalized; newly encountered children fill its reservation.
+    pub(crate) fn begin_deferred(&mut self, context: DeferredA11yContext) -> DeferredA11yState {
+        DeferredA11yState {
+            ids: std::mem::replace(&mut self.ids_stack, context.ancestors),
+            nodes: std::mem::take(&mut self.nodes_stack),
+            reservation: self.current_reservation.replace(context.reservation),
+        }
+    }
+
+    pub(crate) fn end_deferred(&mut self, state: DeferredA11yState) {
+        debug_assert!(
+            self.nodes_stack.is_empty(),
+            "unbalanced deferred a11y nodes"
+        );
+        self.ids_stack = state.ids;
+        self.nodes_stack = state.nodes;
+        self.current_reservation = state.reservation;
+    }
+
+    fn append_child(&mut self, id: NodeId) {
+        if let Some(parent) = self.nodes_stack.last_mut() {
+            parent.push_child(id);
+        } else if let Some(reservation) = self.current_reservation {
+            self.deferred_children[reservation].children.push(id);
+        }
+    }
+
     /// Push a new node onto the stack. It becomes a child of the current
     /// top-of-stack node.
     ///
@@ -489,9 +574,7 @@ impl A11yNodeBuilder {
             return false;
         }
 
-        if let Some(parent) = self.nodes_stack.last_mut() {
-            parent.push_child(id);
-        }
+        self.append_child(id);
         self.ids_stack.push(id);
         self.nodes_stack.push(node);
         true
@@ -507,9 +590,7 @@ impl A11yNodeBuilder {
             return false;
         }
 
-        if let Some(parent) = self.nodes_stack.last_mut() {
-            parent.push_child(id);
-        }
+        self.append_child(id);
         self.all_nodes.push((id, node));
         true
     }
@@ -533,6 +614,8 @@ impl A11yNodeBuilder {
         self.all_nodes.clear();
         self.ids_stack.clear();
         self.nodes_stack.clear();
+        self.deferred_children.clear();
+        self.current_reservation = None;
         self.seen_ids.clear();
         self.relationship_nodes.clear();
         self.relationships.clear();
@@ -620,6 +703,7 @@ impl A11yNodeBuilder {
                 self.all_nodes.push((id, node));
             }
         }
+        self.resolve_deferred_children();
         self.resolve_relationships();
 
         let focus = match self.active_descendant {
@@ -645,6 +729,40 @@ impl A11yNodeBuilder {
         };
 
         Self::repair_tree_update(update)
+    }
+
+    fn resolve_deferred_children(&mut self) {
+        if self.deferred_children.is_empty() {
+            return;
+        }
+        let indices: FxHashMap<_, _> = self
+            .all_nodes
+            .iter()
+            .enumerate()
+            .map(|(index, (id, _))| (*id, index))
+            .collect();
+        // Reverse reservation order both expands nested reservations first
+        // and preserves source order when siblings reserved the same position.
+        // No ordering here depends on the priority of the deferred draw.
+        while let Some(reservation) = self.deferred_children.pop() {
+            match reservation.parent {
+                DeferredA11yParent::Node(id) => {
+                    let node = &mut self.all_nodes[indices[&id]].1;
+                    let mut children = node.children().to_vec();
+                    children.splice(
+                        reservation.position..reservation.position,
+                        reservation.children,
+                    );
+                    node.set_children(children);
+                }
+                DeferredA11yParent::Reservation(index) => {
+                    self.deferred_children[index].children.splice(
+                        reservation.position..reservation.position,
+                        reservation.children,
+                    );
+                }
+            }
+        }
     }
 
     fn resolve_relationships(&mut self) {
@@ -862,6 +980,90 @@ mod tests {
         let mut a11y = A11y::new(Arc::new(AtomicBool::new(true)), false, None);
         a11y.begin_frame();
         a11y
+    }
+
+    #[test]
+    fn deferred_children_keep_ancestry_source_order_synthetic_nodes_and_focus() {
+        for reverse_priority in [false, true] {
+            let mut nodes = new_builder();
+            assert!(nodes.push(NodeId(1), accesskit::Node::new(Role::TreeGrid)));
+            assert!(nodes.push(NodeId(2), accesskit::Node::new(Role::Row)));
+            nodes.set_focus(NodeId(2));
+            assert!(nodes.push_leaf(NodeId(3), test_node()));
+            let first = nodes.defer();
+            let empty = nodes.defer();
+            let second = nodes.defer();
+            assert!(nodes.push_leaf(NodeId(9), test_node()));
+            nodes.pop();
+            nodes.pop();
+            assert!(nodes.push(NodeId(10), test_node()));
+            assert!(!nodes.focus_is_ancestor_of_current());
+            nodes.pop();
+
+            let order = if reverse_priority {
+                vec![(second, false), (first, true)]
+            } else {
+                vec![(first, true), (second, false)]
+            };
+            let mut nested = Vec::new();
+            for (context, first) in order {
+                let state = nodes.begin_deferred(context);
+                if first {
+                    assert!(nodes.push(NodeId(4), accesskit::Node::new(Role::Cell)));
+                    assert!(nodes.focus_is_ancestor_of_current());
+                    {
+                        let mut subtree = A11ySubtreeBuilder::new(NodeId(4), &mut nodes);
+                        subtree.parent_node().set_label("held cell");
+                        assert!(subtree.push_child(NodeId(5), test_node()));
+                    }
+                    nested.push((nodes.defer(), NodeId(6)));
+                    nodes.pop();
+                    // Nested deferral without a role-bearing wrapper must
+                    // occupy the first reservation, not append to the row.
+                    nested.push((nodes.defer(), NodeId(7)));
+                } else {
+                    assert!(nodes.push_leaf(NodeId(8), test_node()));
+                }
+                nodes.end_deferred(state);
+            }
+            let state = nodes.begin_deferred(empty);
+            nodes.end_deferred(state);
+            for (context, id) in nested.into_iter().rev() {
+                let state = nodes.begin_deferred(context);
+                assert!(nodes.push(id, test_node()));
+                assert!(nodes.focus_is_ancestor_of_current());
+                if id == NodeId(6) {
+                    nodes.set_active_descendant(id);
+                }
+                nodes.pop();
+                nodes.end_deferred(state);
+            }
+            let update = nodes.finalize();
+            assert_eq!(update.focus, NodeId(6));
+            assert_eq!(update.nodes.len(), 11, "no duplicate or placeholder nodes");
+            let node = |id| {
+                &update
+                    .nodes
+                    .iter()
+                    .find(|(key, _)| *key == NodeId(id))
+                    .expect("logical accessibility node")
+                    .1
+            };
+            assert_eq!(node(0).children(), &[NodeId(1), NodeId(10)]);
+            assert_eq!(node(1).children(), &[NodeId(2)]);
+            assert_eq!(
+                node(2).children(),
+                &[NodeId(3), NodeId(4), NodeId(7), NodeId(8), NodeId(9)]
+            );
+            assert_eq!(node(4).children(), &[NodeId(5), NodeId(6)]);
+            assert_eq!(node(4).label(), Some("held cell"));
+            nodes.begin_frame(None);
+            assert_eq!(
+                nodes.finalize().nodes.len(),
+                1,
+                "reservations are frame-local"
+            );
+        }
     }
 
     #[test]
