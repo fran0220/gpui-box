@@ -1723,9 +1723,7 @@ impl Render for RichTextEditor {
                             .glow(&theme, theme.colors.danger)
                     })
                     .when(focused && !self.invalid, |element| {
-                        element.shadow(
-                            theme.focus_ring_on(theme.surface(gpui_kit_theme::Surface::Sunken)),
-                        )
+                        element.shadow(theme.focus_ring())
                     })
             })
             .font_fallbacks(gpui_kit_assets::text_fallbacks())

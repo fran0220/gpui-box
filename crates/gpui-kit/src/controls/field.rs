@@ -78,7 +78,7 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
                 .shadow(theme.glow(theme.colors.danger))
         })
         .when(state.focused && !state.invalid, |field| {
-            field.shadow(theme.focus_ring_on(theme.surface(Surface::Sunken)))
+            field.shadow(theme.focus_ring())
         })
         .text_size(px(metrics.font_size))
         .font_fallbacks(gpui_kit_assets::text_fallbacks())

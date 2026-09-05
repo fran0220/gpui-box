@@ -790,6 +790,15 @@ struct RelationshipLabelPlacement {
     /// at the edge, in which case the label slides just inside the surface
     /// rather than clipping its words.
     shown: Bounds<f32>,
+    /// The point on the route the label was seated against.
+    ///
+    /// The search is free to slide a label along its route and to stack it
+    /// outward, which is what keeps annotations off cards and off each other.
+    /// What it cannot do is keep every answer next to the line it describes,
+    /// so where the label ends up is not on its own enough to say whose it is.
+    /// Keeping the point it was seated against is what lets the canvas draw
+    /// that ownership instead of leaving a reader to infer it from proximity.
+    anchor: Point<f32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -859,6 +868,49 @@ fn clamp_relationship_label(bounds: Bounds<f32>, surface: Bounds<f32>) -> Bounds
         ),
         bounds.size,
     )
+}
+
+/// How thick the run joining a displaced label to its route is drawn, in world
+/// units. A hairline: it is there to be followed, not to be read as a wire.
+const RELATIONSHIP_LEADER_WIDTH: f32 = 1.0;
+
+/// The axis-aligned runs joining a seated label to its point on its route.
+///
+/// Empty while the label is against its route, which is the seat the search
+/// tries first: a leader under a label already touching its own line is a mark
+/// that says nothing, drawn in the busiest part of the canvas. Past that one
+/// gap the label has been moved — slid along the route, stacked outward, or
+/// pushed inside the surface — and how far it went is not something a reader
+/// can recover by looking. So the rule is the gap itself: touching needs no
+/// tie, and everything else gets one.
+///
+/// The path is an L rather than a diagonal so it reads as drawing chrome
+/// instead of as one more wire on a board made of wires, and so it can be
+/// painted as two rectangles at any zoom without a path.
+fn relationship_leader(anchor: Point<f32>, label: Bounds<f32>) -> Vec<Bounds<f32>> {
+    let near = point(
+        anchor.x.clamp(label.left(), label.right()),
+        anchor.y.clamp(label.top(), label.bottom()),
+    );
+    let (dx, dy) = (near.x - anchor.x, near.y - anchor.y);
+    if dx.hypot(dy) <= RELATIONSHIP_LABEL_GAP {
+        return Vec::new();
+    }
+    let half = RELATIONSHIP_LEADER_WIDTH * 0.5;
+    let mut runs = Vec::new();
+    if dx.abs() > f32::EPSILON {
+        runs.push(Bounds::new(
+            point(anchor.x.min(near.x), anchor.y - half),
+            size(dx.abs(), RELATIONSHIP_LEADER_WIDTH),
+        ));
+    }
+    if dy.abs() > f32::EPSILON {
+        runs.push(Bounds::new(
+            point(near.x - half, anchor.y.min(near.y)),
+            size(RELATIONSHIP_LEADER_WIDTH, dy.abs()),
+        ));
+    }
+    runs
 }
 
 fn relationship_label_candidate(
@@ -960,7 +1012,14 @@ fn place_relationship_labels(
                         side_rank,
                     };
                     if best.is_none_or(|(_, current)| score.better_than(current)) {
-                        best = Some((RelationshipLabelPlacement { desired, shown }, score));
+                        best = Some((
+                            RelationshipLabelPlacement {
+                                desired,
+                                shown,
+                                anchor: at,
+                            },
+                            score,
+                        ));
                     }
                 }
             }
@@ -2756,6 +2815,34 @@ impl RenderOnce for NodeGraph {
             .absolute()
             .inset_0();
 
+        // Drawn before the labels so a run ends under the wash it points at
+        // rather than across the words.
+        let edge_leaders: Vec<AnyElement> = routes
+            .iter()
+            .filter(|routed| routed.edge.edge_label().is_some())
+            .flat_map(|routed| {
+                let ink = theme.colors.node.edge;
+                relationship_placements
+                    .get(&routed.edge.edge_id())
+                    .into_iter()
+                    .flat_map(move |placement| {
+                        relationship_leader(placement.anchor, placement.shown)
+                            .into_iter()
+                            .map(move |run| {
+                                let at = world_to_screen(run.origin, viewport);
+                                div()
+                                    .absolute()
+                                    .left(px(at.x))
+                                    .top(px(at.y))
+                                    .w(px((run.size.width * viewport.zoom).max(1.0)))
+                                    .h(px((run.size.height * viewport.zoom).max(1.0)))
+                                    .bg(ink)
+                                    .into_any_element()
+                            })
+                    })
+            })
+            .collect();
+
         let edge_labels: Vec<AnyElement> = routes
             .iter()
             .filter_map(|routed| {
@@ -3104,12 +3191,19 @@ impl RenderOnce for NodeGraph {
                     (PortSide::Right, PortDirection::Output) => label
                         .left(px(diameter + label_gap))
                         .bottom(px(diameter + label_gap)),
-                    (PortSide::Top, _) => label
-                        .left(px(diameter + label_gap))
-                        .bottom(px(diameter / 2.0)),
-                    (PortSide::Bottom, _) => {
-                        label.left(px(diameter + label_gap)).top(px(diameter / 2.0))
-                    }
+                    // A port on the top or bottom edge has its wire leaving
+                    // straight out of the card, so the name clears it by
+                    // standing beside the port and by nothing else: the whole
+                    // offset is across the route, and the chip stays centred
+                    // on the port the way a seated name is centred on its row.
+                    //
+                    // Both of the offsets this used to carry were along the
+                    // route rather than across it. Outward put the chip
+                    // exactly where the wire runs, which is the one place a
+                    // reader cannot tell a name from its own line; inward put
+                    // it over whatever the card is showing. Centred, it
+                    // straddles the card's edge and covers neither.
+                    (PortSide::Top | PortSide::Bottom, _) => label.left(px(diameter + label_gap)),
                 };
                 let mut view = div()
                     .id(semantic_id)
@@ -3717,6 +3811,11 @@ impl RenderOnce for NodeGraph {
             .child(ground)
             .children(if compact { Vec::new() } else { bands })
             .child(beneath)
+            .children(if compact && pending_frame.is_none() {
+                Vec::new()
+            } else {
+                edge_leaders
+            })
             .children(if compact && pending_frame.is_none() {
                 Vec::new()
             } else {

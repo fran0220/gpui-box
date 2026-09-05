@@ -1460,6 +1460,14 @@ impl Theme {
     /// is the one surface it never touches; choosing a colour legible against
     /// the fill picks for a surface the ring is never drawn on.
     ///
+    /// A field is the case that reads as the exception and is not one. A field
+    /// paints a well, so `theme.surface(Surface::Sunken)` is the obvious thing
+    /// to hand this — and it is exactly the mistake above, because the well is
+    /// the fill and the ring is drawn outside it, on the form. Every field in
+    /// this library therefore takes [`Self::focus_ring`] and the page ground.
+    /// Reach for this one only when the ring will genuinely be cast onto
+    /// something other than the page.
+    ///
     /// That distinction used to be academic, because the halo was a drop
     /// shadow painted under the element as well as around it. It stopped being
     /// academic the moment the element was cut out of it: a primary button

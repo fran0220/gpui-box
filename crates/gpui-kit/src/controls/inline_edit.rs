@@ -442,9 +442,7 @@ impl RenderOnce for InlineEdit {
                             ),
                         ))
                         .glow(&theme, theme.colors.danger),
-                    false => element.shadow(
-                        theme.focus_ring_on(theme.surface(gpui_kit_theme::Surface::Sunken)),
-                    ),
+                    false => element.shadow(theme.focus_ring()),
                 })
                 .text_size(px(metrics.font_size))
                 .child(field),

@@ -2851,7 +2851,7 @@ fn editor_cell(
         .px(px(theme.space(Space::Xs)))
         .radius(theme, Radius::Control)
         .well(theme)
-        .shadow(theme.focus_ring_on(theme.surface(Surface::Sunken)))
+        .shadow(theme.focus_ring())
         .child(field);
     let frame = column_frame(div(), column, theme)
         .items_center()

@@ -1673,7 +1673,7 @@ impl RenderOnce for GraphNode {
             let mut card = card
                 .cursor_pointer()
                 .tab_index(0)
-                .focus_ring_on(&theme, theme.colors.raised)
+                .focus_ring(&theme)
                 .pressable(cx);
             if self.pointer_click
                 && let Some(handler) = self.on_click.as_ref()

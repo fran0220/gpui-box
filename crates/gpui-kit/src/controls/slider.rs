@@ -351,7 +351,12 @@ impl RenderOnce for Slider {
                 .right_0()
                 .justify_center();
         } else {
-            travel = travel.left(knob / 2.0).right(knob / 2.0).items_center();
+            travel = travel
+                .left(knob / 2.0)
+                .right(knob / 2.0)
+                .top_0()
+                .bottom_0()
+                .items_center();
         }
         travel = travel
             // Ticks are drawn over both halves of the track, and over the
