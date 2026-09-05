@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2514
+      "symbolCount": 2516
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -13747,8 +13747,23 @@
       "source": "crates/gpui/src/elements/deferred.rs",
       "summary": "An element which delays the painting of its child until after all of its ancestors, while keeping its layout as part of the current element tree.",
       "documentation": "An element which delays the painting of its child until after all of\nits ancestors, while keeping its layout as part of the current element tree.",
-      "signature": "# [doc = \" An element which delays the painting of its child until after all of\"] # [doc = \" its ancestors, while keeping its layout as part of the current element tree.\"] pub struct Deferred { child : Option<AnyElement>, priority : usize, }",
+      "signature": "# [doc = \" An element which delays the painting of its child until after all of\"] # [doc = \" its ancestors, while keeping its layout as part of the current element tree.\"] pub struct Deferred { child : Option<AnyElement>, priority : usize, preserve_accessibility : bool, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::elements::deferred::Deferred::preserve_accessibility",
+      "name": "preserve_accessibility",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::deferred",
+      "path": "gpui::elements::deferred",
+      "source": "crates/gpui/src/elements/deferred.rs",
+      "summary": "Retains logical accessibility ancestry and reading order for inline content. By default, deferred overlay surfaces attach to the window root.",
+      "documentation": "Retains logical accessibility ancestry and reading order for inline\ncontent. By default, deferred overlay surfaces attach to the window root.",
+      "signature": "pub fn preserve_accessibility (mut self) -> Self",
+      "cfg": [],
+      "target": "Deferred"
     },
     {
       "id": "gpui::elements::deferred::Deferred::priority",
@@ -36680,8 +36695,23 @@
       "path": "gpui::window",
       "source": "crates/gpui/src/window.rs",
       "summary": "Defers the drawing of the given element, scheduling it to be painted on top of the currently-drawn tree at a later time. The `priority` parameter determines the drawing order relative to other deferred elements, with higher values being drawn on top.",
-      "documentation": "Defers the drawing of the given element, scheduling it to be painted on top of the currently-drawn tree\nat a later time. The `priority` parameter determines the drawing order relative to other deferred elements,\nwith higher values being drawn on top.\n\nWhen `content_mask` is provided, the deferred element will be clipped to that region during\nboth prepaint and paint. When `None`, no additional clipping is applied.\n\nAccessibility retains the logical ancestor and child position at this\ncall, including through nested deferrals. Paint priority does not change\naccessibility ancestry, reading order, or ancestor-based focus.\n\nThis method should only be called as part of the prepaint phase of element drawing.",
+      "documentation": "Defers the drawing of the given element, scheduling it to be painted on top of the currently-drawn tree\nat a later time. The `priority` parameter determines the drawing order relative to other deferred elements,\nwith higher values being drawn on top.\n\nWhen `content_mask` is provided, the deferred element will be clipped to that region during\nboth prepaint and paint. When `None`, no additional clipping is applied.\n\nAccessibility surfaces attach to the window root, independently of their\ntrigger. Inline subtrees should use [`Self::defer_draw_with_accessibility`].\n\nThis method should only be called as part of the prepaint phase of element drawing.",
       "signature": "pub fn defer_draw (& mut self, element : AnyElement, absolute_offset : Point<Pixels>, priority : usize, content_mask : Option<ContentMask<Pixels>>,)",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::defer_draw_with_accessibility",
+      "name": "defer_draw_with_accessibility",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Defers an inline subtree while retaining its logical accessibility ancestors and source-order child position, including nested deferrals. Clipping and paint priority behave exactly as in [`Self::defer_draw`]. Call only during prepaint.",
+      "documentation": "Defers an inline subtree while retaining its logical accessibility\nancestors and source-order child position, including nested deferrals.\nClipping and paint priority behave exactly as in [`Self::defer_draw`].\nCall only during prepaint.",
+      "signature": "pub fn defer_draw_with_accessibility (& mut self, element : AnyElement, absolute_offset : Point<Pixels>, priority : usize, content_mask : Option<ContentMask<Pixels>>,)",
       "cfg": [],
       "target": "Window"
     },

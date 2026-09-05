@@ -21,10 +21,14 @@ history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
-Deferred prepaint (including sticky content) preserves logical AccessKit
+Inline deferred prepaint (including sticky content) preserves logical AccessKit
 ancestors, source child order, synthetic children, and ancestor-based active
 descendant focus independently of paint priority. Frame-local child
 reservations attach to finalized ancestors without duplicate platform nodes.
+Generic deferred overlays retain window-root accessibility parentage; inline
+callers opt in with `Deferred::preserve_accessibility` or
+`Window::defer_draw_with_accessibility`. Popover and hover-card surfaces remain
+window siblings of their triggers.
 While accessibility is active, visual view caches are rebuilt each frame:
 their prepaint/paint ranges do not contain replayable accessibility trees.
 Linux builder and sticky/nested-deferred integration tests cover these shared

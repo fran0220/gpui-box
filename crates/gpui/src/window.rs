@@ -4754,9 +4754,8 @@ impl Window {
     /// When `content_mask` is provided, the deferred element will be clipped to that region during
     /// both prepaint and paint. When `None`, no additional clipping is applied.
     ///
-    /// Accessibility retains the logical ancestor and child position at this
-    /// call, including through nested deferrals. Paint priority does not change
-    /// accessibility ancestry, reading order, or ancestor-based focus.
+    /// Accessibility surfaces attach to the window root, independently of their
+    /// trigger. Inline subtrees should use [`Self::defer_draw_with_accessibility`].
     ///
     /// This method should only be called as part of the prepaint phase of element drawing.
     pub fn defer_draw(
@@ -4766,13 +4765,38 @@ impl Window {
         priority: usize,
         content_mask: Option<ContentMask<Pixels>>,
     ) {
+        self.defer_draw_inner(element, absolute_offset, priority, content_mask, None);
+    }
+
+    /// Defers an inline subtree while retaining its logical accessibility
+    /// ancestors and source-order child position, including nested deferrals.
+    /// Clipping and paint priority behave exactly as in [`Self::defer_draw`].
+    /// Call only during prepaint.
+    pub fn defer_draw_with_accessibility(
+        &mut self,
+        element: AnyElement,
+        absolute_offset: Point<Pixels>,
+        priority: usize,
+        content_mask: Option<ContentMask<Pixels>>,
+    ) {
+        let context = self.a11y.is_active().then(|| self.a11y.nodes.defer());
+        self.defer_draw_inner(element, absolute_offset, priority, content_mask, context);
+    }
+
+    fn defer_draw_inner(
+        &mut self,
+        element: AnyElement,
+        absolute_offset: Point<Pixels>,
+        priority: usize,
+        content_mask: Option<ContentMask<Pixels>>,
+        a11y_context: Option<a11y::DeferredA11yContext>,
+    ) {
         self.invalidator.debug_assert_prepaint();
         let parent_node = self
             .next_frame
             .dispatch_tree
             .active_node_id()
             .expect("required framework invariant must hold");
-        let a11y_context = self.a11y.is_active().then(|| self.a11y.nodes.defer());
         self.next_frame.deferred_draws.push(DeferredDraw {
             current_view: self.current_view(),
             parent_node,

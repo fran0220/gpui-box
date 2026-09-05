@@ -84,7 +84,7 @@ impl Element for Sticky {
             .child
             .take()
             .expect("required framework invariant must hold");
-        window.defer_draw(
+        window.defer_draw_with_accessibility(
             child,
             absolute_offset,
             1,

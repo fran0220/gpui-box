@@ -11,7 +11,7 @@ imported and the historical receipts remain frozen.
 Shared mouse cancellation, button-bound capture and text/click cleanup,
 browser chord reconciliation, and Windows chord capture lifetime are also
 original GPUI Box work without additional imports.
-Deferred prepaint accessibility ancestry, ordered child reservations, and
+Opt-in inline deferred accessibility ancestry, ordered child reservations, and
 active-accessibility cache rebuilding are original GPUI Box work; no new
 third-party source or licenses are involved.
 

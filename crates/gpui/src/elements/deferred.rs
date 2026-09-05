@@ -8,6 +8,7 @@ pub fn deferred(child: impl IntoElement) -> Deferred {
     Deferred {
         child: Some(child.into_any_element()),
         priority: 0,
+        preserve_accessibility: false,
     }
 }
 
@@ -16,9 +17,17 @@ pub fn deferred(child: impl IntoElement) -> Deferred {
 pub struct Deferred {
     child: Option<AnyElement>,
     priority: usize,
+    preserve_accessibility: bool,
 }
 
 impl Deferred {
+    /// Retains logical accessibility ancestry and reading order for inline
+    /// content. By default, deferred overlay surfaces attach to the window root.
+    pub fn preserve_accessibility(mut self) -> Self {
+        self.preserve_accessibility = true;
+        self
+    }
+
     /// Sets the `priority` value of the `deferred` element, which
     /// determines the drawing order relative to other deferred elements,
     /// with higher values being drawn on top.
@@ -69,7 +78,11 @@ impl Element for Deferred {
             .take()
             .expect("required framework invariant must hold");
         let element_offset = window.element_offset();
-        window.defer_draw(child, element_offset, self.priority, None)
+        if self.preserve_accessibility {
+            window.defer_draw_with_accessibility(child, element_offset, self.priority, None)
+        } else {
+            window.defer_draw(child, element_offset, self.priority, None)
+        }
     }
 
     fn paint(
@@ -142,10 +155,12 @@ mod tests {
                                                 .h(px(50.)),
                                         ),
                                     )
+                                    .preserve_accessibility()
                                     .with_priority(2),
                                 ),
                         ),
                     )
+                    .preserve_accessibility()
                     .with_priority(1),
                 )
         }
