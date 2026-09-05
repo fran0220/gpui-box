@@ -1511,6 +1511,13 @@
           ]
         },
         {
+          "alias": "futures",
+          "package": "futures",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
           "alias": "serde_json",
           "package": "serde_json",
           "kind": "normal",
@@ -1525,7 +1532,9 @@
           "features": [
             "net",
             "rt-multi-thread",
-            "signal"
+            "signal",
+            "sync",
+            "time"
           ]
         }
       ],
