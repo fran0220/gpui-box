@@ -9357,7 +9357,8 @@ mod tests {
             .collect_unseen()
             .into_iter()
             .filter(|timing| {
-                timing.frame.window_id == window.window_id() && timing.frame.draw_start == draw_start
+                timing.frame.window_id == window.window_id()
+                    && timing.frame.draw_start == draw_start
             })
             .collect::<Vec<_>>();
         let [sample] = samples.as_slice() else {
