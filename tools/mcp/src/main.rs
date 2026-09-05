@@ -868,7 +868,7 @@ async fn http_mcp(State(catalog): State<Arc<Catalog>>, request: Request) -> Resp
             // Keep admission until the body is consumed or disconnected, not
             // merely until this handler has allocated its response.
             let stream =
-                futures::stream::unfold((bytes, 0, permit), |(bytes, offset, permit)| async {
+                futures::stream::unfold((bytes, 0, permit), |(bytes, offset, permit)| async move {
                     if offset == bytes.len() {
                         return None;
                     }
@@ -1753,9 +1753,23 @@ mod tests {
             );
             drop(first);
             assert_eq!(
-                http_mcp(State(catalog), request()).await.status(),
+                http_mcp(State(catalog.clone()), request()).await.status(),
                 StatusCode::OK
             );
+            drop(second);
+            let read = json!({"jsonrpc":"2.0","id":42,"method":"resources/read","params":{"uri":"gpui-box://library"}});
+            for count in [128, MAX_HTTP_BATCH] {
+                let body = serde_json::to_vec(&vec![read.clone(); count]).unwrap();
+                let hostile = Request::builder().header(header::HOST, "localhost")
+                    .body(axum::body::Body::from(body)).unwrap();
+                assert_eq!(http_mcp(State(catalog.clone()), hostile).await.status(), StatusCode::PAYLOAD_TOO_LARGE);
+            }
+            let response = http_mcp(State(catalog.clone()), request()).await;
+            let encoded = axum::body::to_bytes(response.into_body(), MAX_HTTP_RESPONSE).await.unwrap();
+            assert_eq!(serde_json::from_slice::<Value>(&encoded).unwrap()["id"], 1);
+            let oversized = Request::builder().header(header::HOST, "localhost")
+                .body(axum::body::Body::from(vec![b' '; MAX_HTTP_BODY + 1])).unwrap();
+            assert_eq!(http_mcp(State(catalog), oversized).await.status(), StatusCode::PAYLOAD_TOO_LARGE);
         });
     }
 

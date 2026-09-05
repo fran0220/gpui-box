@@ -98,7 +98,34 @@ fn main() -> Result<()> {
             ("log-stream", log_stream_fixture),
             ("agent-document", agent_document_fixture),
         ] {
-            reports.push(run(name, fixture, items)?);
+            let report = run(name, fixture, items)?;
+            if items == DATASET_ITEMS {
+                let small = reports
+                    .iter()
+                    .find(|small: &&serde_json::Value| small["name"] == name)
+                    .expect("smaller fixture ran first");
+                for path in [
+                    "/sample/mounted_items",
+                    "/sample/builder_calls",
+                    "/sample/frame/request_layout_calls",
+                    "/sample/frame/prepaint_calls",
+                    "/sample/frame/paint_calls",
+                    "/sample/frame/semantic_nodes",
+                ] {
+                    let large_count = report
+                        .pointer(path)
+                        .and_then(serde_json::Value::as_u64)
+                        .context("large fixture metric unavailable")?;
+                    let small_count = small
+                        .pointer(path)
+                        .and_then(serde_json::Value::as_u64)
+                        .context("small fixture metric unavailable")?;
+                    if large_count > small_count {
+                        bail!("{name} viewport work {path} grew with dataset size");
+                    }
+                }
+            }
+            reports.push(report);
         }
     }
     reports.push(run(
@@ -183,7 +210,7 @@ fn run(name: &str, fixture: Fixture, items: usize) -> Result<serde_json::Value> 
     let mut report = serde_json::to_value(report)?;
     report["dataset_items"] = items.into();
     report["caller_input_conversions"] = if eager { calls.get() } else { 0 }.into();
-    report["has_row_builder_callback"] = (!eager).into();
+    report["has_row_builder_callback"] = matches!(name, "list" | "data-grid" | "tree-grid").into();
     Ok(report)
 }
 
@@ -213,9 +240,9 @@ fn heap_allocation_limit(name: &str) -> u64 {
         "list" => 1_330,
         "data-grid" => 3_723,
         "tree-grid" => 4_452,
-        "code-view" => 17_096,
-        "log-stream" => 28_482,
-        "agent-document" => 39_940,
+        "code-view" => 6_096,
+        "log-stream" => 6_485,
+        "agent-document" => 6_940,
         "node-graph-material" => 12_105,
         "theme-semantics" => 7_251,
         "idle-frame" => 0,

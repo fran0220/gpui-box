@@ -89,6 +89,8 @@ pub fn check(root: &Path, args: &[String]) -> Result<()> {
     let head_packages = head_meta["packages"]
         .as_array()
         .context("headless Cargo metadata has no packages array")?;
+    check_resolved_layers(&root_meta, &a)?;
+    check_resolved_layers(&head_meta, &a)?;
     let mut actual = HashMap::new();
     for p in root_packages.iter().chain(head_packages) {
         if p["source"].as_str().is_some_and(|s| s.starts_with("git+")) {
@@ -338,6 +340,38 @@ fn check_dependency_table(
             owner.name,
             package.name
         );
+    }
+    Ok(())
+}
+
+fn check_resolved_layers(metadata: &Json, a: &Authority) -> Result<()> {
+    let packages = metadata["packages"]
+        .as_array()
+        .context("metadata packages missing")?;
+    let owned = |id: &Json| {
+        let package = packages.iter().find(|package| package["id"] == *id)?;
+        a.package.iter().find(|owned| package["name"] == owned.name)
+    };
+    for node in metadata["resolve"]["nodes"]
+        .as_array()
+        .context("resolved dependency edges missing")?
+    {
+        let Some(owner) = owned(&node["id"]) else {
+            continue;
+        };
+        for edge in node["deps"]
+            .as_array()
+            .context("resolved node deps missing")?
+        {
+            if let Some(dependency) = owned(&edge["pkg"]) {
+                ensure!(
+                    owner.layer >= dependency.layer,
+                    "resolved edge {} -> {} crosses into a higher layer",
+                    owner.name,
+                    dependency.name
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -666,6 +700,14 @@ mod tests {
             schema: 1,
             package: vec![low.clone(), high],
         };
+        let mut graph = serde_json::json!({
+            "packages": [{"id":"local-low", "name":"low"}, {"id":"local-high", "name":"high"}],
+            "resolve": {"nodes": [{"id":"local-low", "deps":[{"name":"renamed", "pkg":"local-high"}]}]}
+        });
+        assert!(check_resolved_layers(&graph, &a).is_err());
+        graph["resolve"]["nodes"][0] =
+            serde_json::json!({"id":"local-high", "deps":[{"pkg":"local-low"}]});
+        check_resolved_layers(&graph, &a).unwrap();
         fs::write(
             root.join("low/Cargo.toml"),
             "[dependencies]\nrenamed = { workspace = true }\n",

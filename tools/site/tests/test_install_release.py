@@ -4,7 +4,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import socketserver
 import tempfile
+import threading
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -33,7 +37,17 @@ class InstallRelease(unittest.TestCase):
             "sleep": "exit 0",
             "curl": '''
 case " $* " in *" --connect-timeout 1 --max-time 2 "*) ;; *) exit 99;; esac
-if [[ "${FAULT:-}" == timeout ]]; then exit 28; fi
+if [[ "${FAULT:-}" == timeout ]]; then
+  if [[ ! -f "$GPUI_BOX_INSTALL_BASE/probed" ]]; then
+    touch "$GPUI_BOX_INSTALL_BASE/probed"
+    # The real curl connects to a silent local TCP peer on the first attempt.
+    # Subsequent retries model the same timeout without adding a minute.
+    args=("$@")
+    unset 'args[${#args[@]}-1]'
+    exec "$REAL_CURL" "${args[@]}" "$HANG_URL"
+  fi
+  exit 28
+fi
 revision=$(cat "$GPUI_BOX_INSTALL_BASE/current/REVISION")
 printf '{"status":"ok","revision":"%s","toolCount":10}' "$revision"
 ''',
@@ -84,9 +98,26 @@ printf '{"status":"ok","revision":"%s","toolCount":10}' "$revision"
         self.assertEqual((self.base / "current/REVISION").read_text(), a)
 
     def test_health_timeout_rolls_back_and_releases_lock(self):
+        stopped = threading.Event()
+
+        class SilentPeer(socketserver.BaseRequestHandler):
+            def handle(self):
+                stopped.wait(10)
+
+        server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), SilentPeer)
+        server.daemon_threads = True
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.addCleanup(stopped.set)
+        self.env["REAL_CURL"] = shutil.which("curl")
+        self.env["HANG_URL"] = f"http://127.0.0.1:{server.server_address[1]}/healthz"
         a, b = "a" * 40, "b" * 40
         self.install(a, "none")
+        started = time.monotonic()
         failed = self.install(b, a, fault="timeout", success=False)
+        self.assertGreaterEqual(time.monotonic() - started, 2)
         self.assertIn("rolling back", failed.stderr)
         self.assertEqual((self.base / "current/REVISION").read_text(), a)
         self.install(b, a)
