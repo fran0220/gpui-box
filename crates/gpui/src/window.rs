@@ -9335,20 +9335,30 @@ mod tests {
 
         dispatch_touch(window, cx, TouchId(1), TouchPhase::Started, 10.);
         dispatch_touch(window, cx, TouchId(1), TouchPhase::Ended, 10.);
-        window
+        let draw_start = window
             .update(cx, |_, window, _| {
                 assert!(
                     window.needs_present.get(),
                     "tap should have drawn its dirty frame"
                 );
+                let draw_start = window
+                    .pending_frame_timing
+                    .expect("touch frame is traced")
+                    .timing
+                    .draw_start;
                 window.present();
+                draw_start
             })
             .expect("window remains available");
 
+        // The collector is process-global; concurrent TestApps can allocate
+        // the same WindowId. Identify this submitted frame, not another app's.
         let samples = collector
             .collect_unseen()
             .into_iter()
-            .filter(|timing| timing.frame.window_id == window.window_id())
+            .filter(|timing| {
+                timing.frame.window_id == window.window_id() && timing.frame.draw_start == draw_start
+            })
             .collect::<Vec<_>>();
         let [sample] = samples.as_slice() else {
             panic!("expected one submitted touch frame, got {samples:?}");
