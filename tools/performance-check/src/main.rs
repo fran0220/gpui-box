@@ -88,21 +88,35 @@ type ViewBuilder = Box<dyn Fn(&mut gpui::Window, &mut gpui::App) -> AnyElement>;
 
 fn main() -> Result<()> {
     let output = output_path()?;
-    let reports = vec![
-        run("list", list_fixture)?,
-        run("data-grid", data_grid_fixture)?,
-        run("tree-grid", tree_grid_fixture)?,
-        run("code-view", code_view_fixture)?,
-        run("log-stream", log_stream_fixture)?,
-        run("agent-document", agent_document_fixture)?,
-        run("node-graph-material", node_graph_material_fixture)?,
-        run("theme-semantics", theme_semantics_fixture)?,
-        run_idle_frame()?,
-    ];
+    let mut reports = Vec::new();
+    for items in [1_000, DATASET_ITEMS] {
+        for (name, fixture) in [
+            ("list", list_fixture as Fixture),
+            ("data-grid", data_grid_fixture),
+            ("tree-grid", tree_grid_fixture),
+            ("code-view", code_view_fixture),
+            ("log-stream", log_stream_fixture),
+            ("agent-document", agent_document_fixture),
+        ] {
+            reports.push(run(name, fixture, items)?);
+        }
+    }
+    reports.push(run(
+        "node-graph-material",
+        node_graph_material_fixture,
+        MATERIAL_NODES,
+    )?);
+    reports.push(run(
+        "theme-semantics",
+        theme_semantics_fixture,
+        THEME_SEMANTIC_NODES,
+    )?);
+    reports.push(serde_json::to_value(run_idle_frame()?)?);
     prove_unbounded_fixture_fails()?;
 
     let document = serde_json::json!({
-        "schema_version": 2,
+        "schema_version": 3,
+        "dataset_sizes": [1_000, DATASET_ITEMS],
         "dataset_items": DATASET_ITEMS,
         "viewport_rows": VISIBLE_ROWS,
         "node_graph_nodes": MATERIAL_NODES,
@@ -133,11 +147,11 @@ fn output_path() -> Result<PathBuf> {
     }
 }
 
-type Fixture = fn(Rc<Cell<u64>>) -> ViewBuilder;
+type Fixture = fn(Rc<Cell<u64>>, usize) -> ViewBuilder;
 
-fn run(name: &str, fixture: Fixture) -> Result<PerformanceReport> {
+fn run(name: &str, fixture: Fixture, items: usize) -> Result<serde_json::Value> {
     let calls = Rc::new(Cell::new(0));
-    let build = fixture(Rc::clone(&calls));
+    let build = fixture(Rc::clone(&calls), items);
     let mut cx = TestAppContext::single();
     let mut harness = Harness::new(&mut cx, gpui_kit::install, build);
 
@@ -154,15 +168,23 @@ fn run(name: &str, fixture: Fixture) -> Result<PerformanceReport> {
         .iter()
         .filter(|node| matches!(node.role, Role::Row | Role::TreeItem))
         .count() as u64;
-    let builder_calls = calls.get().max(mounted_rows);
+    // Eager collection APIs have no caller row-builder callback. Their input
+    // conversions are real dataset-sized work, not mounted rows in disguise.
+    let eager = matches!(name, "code-view" | "log-stream" | "agent-document");
+    let builder_calls = if eager { 0 } else { calls.get() };
     let sample = PerformanceSample::new(stats)
         .heap_allocations(heap_allocations)
         .mounted_items(mounted_rows)
         .builder_calls(builder_calls);
 
-    budget(name)
+    let report = budget(name)
         .enforce(sample)
-        .map_err(|error| anyhow::anyhow!(error))
+        .map_err(|error| anyhow::anyhow!(error))?;
+    let mut report = serde_json::to_value(report)?;
+    report["dataset_items"] = items.into();
+    report["caller_input_conversions"] = if eager { calls.get() } else { 0 }.into();
+    report["has_row_builder_callback"] = (!eager).into();
+    Ok(report)
 }
 
 fn budget(name: &str) -> PerformanceBudget {
@@ -244,10 +266,10 @@ fn run_idle_frame() -> Result<PerformanceReport> {
         .map_err(|error| anyhow::anyhow!(error))
 }
 
-fn list_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn list_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
     Box::new(move |_, _| {
         let calls = Rc::clone(&calls);
-        List::new("perf.list", DATASET_ITEMS, move |index, _, _| {
+        List::new("perf.list", items, move |index, _, _| {
             calls.set(calls.get().saturating_add(1));
             ListItem::new(
                 format!("row-{index}"),
@@ -259,10 +281,10 @@ fn list_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
     })
 }
 
-fn data_grid_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn data_grid_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
     Box::new(move |_, _| {
         let calls = Rc::clone(&calls);
-        DataGrid::new("perf.data-grid", DATASET_ITEMS, move |index, _, _| {
+        DataGrid::new("perf.data-grid", items, move |index, _, _| {
             calls.set(calls.get().saturating_add(1));
             GridRow::new(format!("row-{index}"))
                 .text(format!("Data row {index}"))
@@ -280,10 +302,10 @@ fn data_grid_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
     })
 }
 
-fn tree_grid_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn tree_grid_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
     Box::new(move |_, _| {
         let calls = Rc::clone(&calls);
-        TreeGrid::new("perf.tree-grid", DATASET_ITEMS, move |index, _, _| {
+        TreeGrid::new("perf.tree-grid", items, move |index, _, _| {
             calls.set(calls.get().saturating_add(1));
             TreeGridRow::new(format!("node-{index}"), 1)
                 .text(format!("Tree row {index}"))
@@ -299,12 +321,17 @@ fn tree_grid_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
     })
 }
 
-fn code_view_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn code_view_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
+    let lines = (0..items)
+        .map(|index| CodeLine::new(index + 1, format!("let row_{index} = {index};")))
+        .collect::<Vec<_>>();
     Box::new(move |_, _| {
         CodeView::new(
             "perf.code-view",
-            (0..DATASET_ITEMS)
-                .map(|index| CodeLine::new(index + 1, format!("let row_{index} = {index};"))),
+            lines.iter().map(|line| {
+                calls.set(calls.get() + 1);
+                line.clone()
+            }),
         )
         .visible_lines(VISIBLE_ROWS)
         .copyable(false)
@@ -312,33 +339,44 @@ fn code_view_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
     })
 }
 
-fn log_stream_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn log_stream_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
+    let entries = (0..items)
+        .map(|index| LogEntry::new(format!("entry-{index}"), format!("message {index}")))
+        .collect::<Vec<_>>();
     Box::new(move |_, _| {
         LogStream::new(
             "perf.log-stream",
-            (0..DATASET_ITEMS)
-                .map(|index| LogEntry::new(format!("entry-{index}"), format!("message {index}"))),
+            entries.iter().map(|entry| {
+                calls.set(calls.get() + 1);
+                entry.clone()
+            }),
         )
         .visible_rows(VISIBLE_ROWS)
         .into_any_element()
     })
 }
 
-fn agent_document_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn agent_document_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
+    let data = (0..items)
+        .map(|index| {
+            (
+                gpui::SharedString::from(format!("block-{index}")),
+                gpui::SharedString::from(format!("Agent transcript paragraph {index}")),
+            )
+        })
+        .collect::<Vec<_>>();
     Box::new(move |_, _| {
         AgentDocument::new("perf.agent-document")
-            .blocks((0..DATASET_ITEMS).map(|index| {
-                AgentDocumentBlock::text(
-                    format!("block-{index}"),
-                    format!("Agent transcript paragraph {index}"),
-                )
+            .blocks(data.iter().map(|(id, text)| {
+                calls.set(calls.get() + 1);
+                AgentDocumentBlock::text(id.clone(), text.clone())
             }))
             .virtualized(VISIBLE_ROWS)
             .into_any_element()
     })
 }
 
-fn node_graph_material_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn node_graph_material_fixture(calls: Rc<Cell<u64>>, _items: usize) -> ViewBuilder {
     // Deliberately cross the renderer's admission ceiling. The admitted panes
     // carry real Frosted snapshots; requests beyond it keep their material
     // fill through the framework fallback. This is the high-state-density
@@ -363,7 +401,7 @@ fn node_graph_material_fixture(calls: Rc<Cell<u64>>) -> ViewBuilder {
     })
 }
 
-fn theme_semantics_fixture(_calls: Rc<Cell<u64>>) -> ViewBuilder {
+fn theme_semantics_fixture(_calls: Rc<Cell<u64>>, _items: usize) -> ViewBuilder {
     Box::new(move |_, _| {
         div()
             .flex()
