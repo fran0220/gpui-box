@@ -1229,7 +1229,7 @@ mod tests {
             assert!(keystroke_move(ascend, direction, &rows, Some(&grandchild)).is_none());
             rows.iter_mut()
                 .find(|row| row.id == "sibling")
-                .unwrap()
+                .expect("enabled direct sibling")
                 .disabled = true;
             assert!(keystroke_move(descend, direction, &rows, Some(&a)).is_none());
         }

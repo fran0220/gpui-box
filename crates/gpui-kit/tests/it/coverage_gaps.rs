@@ -35,14 +35,24 @@ fn disabled_multi_select_has_no_remove_action_or_tab_stop(cx: &mut TestAppContex
         .detach();
         control.into_any_element()
     });
-    assert!(harness.node("disabled-select").unwrap().disabled);
-    assert!(harness.node("disabled-select.tag.native").unwrap().disabled);
+    assert!(harness.node("disabled-select").expect("combobox").disabled);
+    assert!(
+        harness
+            .node("disabled-select.tag.native")
+            .expect("selected chip")
+            .disabled
+    );
     assert!(harness.node("disabled-select.tag.native.remove").is_none());
     harness.click("disabled-select.tag.native");
     harness.keystrokes("tab space enter backspace");
     assert!(calls.borrow().is_empty());
-    assert!(!harness.node("disabled-select").unwrap().focused);
-    assert!(!harness.node("disabled-select.tag.native").unwrap().focused);
+    assert!(!harness.node("disabled-select").expect("combobox").focused);
+    assert!(
+        !harness
+            .node("disabled-select.tag.native")
+            .expect("selected chip")
+            .focused
+    );
 }
 
 #[gpui::test]

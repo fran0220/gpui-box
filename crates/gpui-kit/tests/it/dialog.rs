@@ -46,7 +46,11 @@ fn non_lifo_modal_close_splices_focus_restoration_and_drawer_exit_is_inert(
                 .into_any_element()
         });
         harness.frame();
-        let (lower, upper, drawer, trigger) = slot.borrow().as_ref().unwrap().clone();
+        let (lower, upper, drawer, trigger) = slot
+            .borrow()
+            .as_ref()
+            .expect("mounted modal fixture")
+            .clone();
         harness.update(|window, cx| {
             trigger.focus(window, cx);
             if lower_is_drawer {
