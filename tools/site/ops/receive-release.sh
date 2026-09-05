@@ -67,4 +67,7 @@ print(name)
 PY
 )"
 
-/usr/local/sbin/install-gpui-box-release "$work/unpacked/$bundle_name"
+# Bound validation, lock acquisition, activation and rollback as a whole.
+# TERM lets the installer's EXIT trap restore the previous release; KILL is
+# only a last resort for an unresponsive external command.
+timeout --kill-after=40 240 /usr/local/sbin/install-gpui-box-release "$work/unpacked/$bundle_name"

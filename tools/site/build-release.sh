@@ -83,6 +83,7 @@ fi
 cp "target/$target/release/gpui-box-mcp" "$bundle/bin/gpui-box-mcp"
 chmod 0755 "$bundle/bin/gpui-box-mcp"
 printf '%s\n' "$revision" > "$bundle/REVISION"
+printf '%s\n' "${GPUI_BOX_EXPECTED_REVISION:?deployment needs the expected installed revision (or none for bootstrap)}" > "$bundle/EXPECTED_REVISION"
 
 # Validate the exact catalog with a native binary. The Linux installer repeats
 # this check using the bundled static executable before switching `current`.

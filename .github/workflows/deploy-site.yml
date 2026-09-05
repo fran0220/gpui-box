@@ -55,6 +55,6 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > "$GPUI_BOX_DEPLOY_SSH_KEY"
           chmod 0600 "$GPUI_BOX_DEPLOY_SSH_KEY"
       - name: Build and deploy the immutable release
-        run: tools/site/deploy.sh
+        run: tools/site/deploy-main.sh
       - name: Verify the BWG origin before relying on public DNS
         run: tools/site/verify-deployment.sh

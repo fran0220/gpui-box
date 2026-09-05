@@ -24,6 +24,11 @@ use serde_json::{Value, json};
 
 const PROTOCOL: &str = "2025-06-18";
 const MAX_HTTP_BODY: usize = 1024 * 1024;
+// Two in-flight responses, including bodies waiting for slow readers. One
+// complete current library fits comfortably; batches cannot multiply it by 128.
+const MAX_HTTP_BATCH: usize = 32;
+const MAX_HTTP_RESPONSE: usize = 16 * 1024 * 1024;
+static HTTP_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 const REMOTE_TOOLS: &str = include_str!("../tools.json");
 const LOCAL_TOOLS: &str = include_str!("../local-tools.json");
 
@@ -160,6 +165,7 @@ struct Catalog {
     root: PathBuf,
     hosted: bool,
     developer: Arc<Value>,
+    library_text: Arc<String>,
     tools: Arc<Vec<Value>>,
     local_tools: Arc<Vec<Value>>,
     revision: Arc<String>,
@@ -174,6 +180,7 @@ impl Catalog {
         Ok(Self {
             root,
             hosted: false,
+            library_text: Arc::new(serde_json::to_string_pretty(&developer)?),
             developer: Arc::new(developer),
             tools: Arc::new(parse_tool_list(REMOTE_TOOLS)?),
             local_tools: Arc::new(parse_tool_list(LOCAL_TOOLS)?),
@@ -233,6 +240,7 @@ impl Catalog {
         Ok(Self {
             root,
             hosted: true,
+            library_text: Arc::new(serde_json::to_string_pretty(&developer)?),
             developer: Arc::new(developer),
             tools: Arc::new(tools),
             local_tools: Arc::new(Vec::new()),
@@ -390,13 +398,23 @@ impl Server {
     }
 
     fn response(&mut self, request: &Value) -> Option<Value> {
-        let id = request.get("id").cloned()?;
+        let id = request.get("id").cloned().unwrap_or(Value::Null);
+        if !id.is_null() && !id.is_string() && !id.is_number() {
+            return Some(rpc_error(Value::Null, -32600, "invalid request id"));
+        }
         if request.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Some(rpc_error(id, -32600, "request must use JSON-RPC 2.0"));
+            return Some(rpc_error(
+                Value::Null,
+                -32600,
+                "request must use JSON-RPC 2.0",
+            ));
         }
         let Some(method) = request.get("method").and_then(Value::as_str) else {
-            return Some(rpc_error(id, -32600, "request has no method"));
+            return Some(rpc_error(Value::Null, -32600, "request has no method"));
         };
+        // This stateless protocol has no work to perform for notifications.
+        // In particular, never build a large resource only to discard it.
+        request.get("id")?;
         let params = request.get("params").cloned().unwrap_or_else(|| json!({}));
         match self.dispatch(method, &params) {
             Ok(result) => Some(json!({ "jsonrpc": "2.0", "id": id, "result": result })),
@@ -657,7 +675,7 @@ impl Server {
             )?
         } else {
             let root = self.catalog.root.clone();
-            let host = self.sessions.get_or_insert(SessionHost::start(&root)?);
+            let host = lazy_host(&mut self.sessions, || SessionHost::start(&root))?;
             snapshot_once(host, name, theme)?
         };
         let structured = json!({
@@ -685,7 +703,7 @@ impl Server {
     fn session_result(&mut self, method: &str, arguments: &Value) -> Result<Value> {
         ensure!(!self.catalog.hosted, "session tools are checkout-only");
         let root = self.catalog.root.clone();
-        let host = self.sessions.get_or_insert(SessionHost::start(&root)?);
+        let host = lazy_host(&mut self.sessions, || SessionHost::start(&root))?;
         let mut result = host.request(method, arguments)?;
         if method == "screenshot" {
             let data = result
@@ -821,6 +839,9 @@ async fn http_mcp(
     if let Err(message) = validate_http_headers(&headers) {
         return (StatusCode::FORBIDDEN, Json(json!({ "error": message }))).into_response();
     }
+    let Ok(permit) = HTTP_SLOTS.try_acquire() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
     let request: Value = match serde_json::from_slice(&body) {
         Ok(request) => request,
         Err(error) => {
@@ -836,18 +857,86 @@ async fn http_mcp(
         }
     };
     let mut server = Server::new((*catalog).clone());
-    let response = if let Some(batch) = request.as_array() {
-        let responses = batch
-            .iter()
-            .filter_map(|request| server.response(request))
-            .collect::<Vec<_>>();
-        (!responses.is_empty()).then_some(Value::Array(responses))
-    } else {
-        server.response(&request)
-    };
-    match response {
-        Some(response) => (StatusCode::OK, Json(response)).into_response(),
-        None => StatusCode::ACCEPTED.into_response(),
+    match bounded_response(&mut server, &request) {
+        Ok(Some(bytes)) => {
+            // Keep admission until the body is consumed or disconnected, not
+            // merely until this handler has allocated its response.
+            let stream = futures::stream::unfold((Some(bytes), permit), |(bytes, permit)| async {
+                bytes.map(|bytes| (Ok::<_, io::Error>(bytes), (None, permit)))
+            });
+            (
+                [(header::CONTENT_TYPE, "application/json")],
+                axum::body::Body::from_stream(stream),
+            )
+                .into_response()
+        }
+        Ok(None) => StatusCode::ACCEPTED.into_response(),
+        Err(()) => (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(rpc_error(
+                Value::Null,
+                -32000,
+                "request exceeds batch or response budget",
+            )),
+        )
+            .into_response(),
+    }
+}
+
+fn lazy_host<T>(slot: &mut Option<T>, start: impl FnOnce() -> Result<T>) -> Result<&mut T> {
+    if slot.is_none() {
+        *slot = Some(start()?);
+    }
+    Ok(slot.as_mut().expect("host initialized"))
+}
+
+fn bounded_response(
+    server: &mut Server,
+    request: &Value,
+) -> std::result::Result<Option<Vec<u8>>, ()> {
+    let batch = request.as_array();
+    if batch.is_some_and(|batch| batch.len() > MAX_HTTP_BATCH) {
+        return Err(());
+    }
+    if batch.is_some_and(Vec::is_empty) {
+        return Ok(Some(
+            serde_json::to_vec(&rpc_error(Value::Null, -32600, "empty batch")).unwrap(),
+        ));
+    }
+    let requests = batch
+        .map(Vec::as_slice)
+        .unwrap_or(std::slice::from_ref(request));
+    let mut output = LimitedOutput(Vec::new());
+    if batch.is_some() {
+        output.write_all(b"[").map_err(|_| ())?;
+    }
+    let mut count = 0;
+    for request in requests {
+        if let Some(response) = server.response(request) {
+            if count > 0 {
+                output.write_all(b",").map_err(|_| ())?;
+            }
+            serde_json::to_writer(&mut output, &response).map_err(|_| ())?;
+            count += 1;
+        }
+    }
+    if batch.is_some() {
+        output.write_all(b"]").map_err(|_| ())?;
+    }
+    Ok((count > 0).then_some(output.0))
+}
+
+struct LimitedOutput(Vec<u8>);
+impl Write for LimitedOutput {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if bytes.len() > MAX_HTTP_RESPONSE - self.0.len() {
+            return Err(io::Error::other("response budget exceeded"));
+        }
+        self.0.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -1313,7 +1402,7 @@ fn resource_templates() -> Value {
 fn resource(catalog: &Catalog, uri: &str) -> Result<(&'static str, String)> {
     let json_text = |value: &Value| Ok(("application/json", serde_json::to_string_pretty(value)?));
     match uri {
-        "gpui-box://library" => return json_text(&catalog.developer),
+        "gpui-box://library" => return Ok(("application/json", (*catalog.library_text).clone())),
         "gpui-box://packages" => return json_text(&catalog.developer["packages"]),
         "gpui-box://components" => return json_text(&catalog.developer["components"]),
         "gpui-box://tokens" => return json_text(&catalog.developer["themes"]),
@@ -1595,6 +1684,87 @@ fn find_root(start: &Path) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hostile_batches_are_bounded_and_protocol_recovers() {
+        let mut server = Server::new(Catalog::local(root().unwrap()).unwrap());
+        let read = json!({"jsonrpc":"2.0","id":"library","method":"resources/read","params":{"uri":"gpui-box://library"}});
+        assert!(bounded_response(&mut server, &read).unwrap().unwrap().len() < MAX_HTTP_RESPONSE);
+        assert!(bounded_response(&mut server, &Value::Array(vec![read.clone(); 128])).is_err());
+        assert!(bounded_response(&mut server, &Value::Array(vec![read; MAX_HTTP_BATCH])).is_err());
+        let request = json!([
+            {"jsonrpc":"2.0","method":"ping"},
+            {"jsonrpc":"2.0","id":"string-id","method":"ping"},
+            {"jsonrpc":"2.0","id":null,"method":"ping"},
+            {"jsonrpc":"2.0","id":false,"method":"ping"}, 7
+        ]);
+        let response: Value =
+            serde_json::from_slice(&bounded_response(&mut server, &request).unwrap().unwrap())
+                .unwrap();
+        assert_eq!(response.as_array().unwrap().len(), 4);
+        assert_eq!(response[0]["id"], "string-id");
+        assert!(response[1]["result"].is_object());
+        assert_eq!(response[2]["error"]["code"], -32600);
+        assert_eq!(response[3]["error"]["code"], -32600);
+        let empty: Value =
+            serde_json::from_slice(&bounded_response(&mut server, &json!([])).unwrap().unwrap())
+                .unwrap();
+        assert_eq!(empty["error"]["code"], -32600);
+        assert!(
+            bounded_response(&mut server, &json!([{"jsonrpc":"2.0","method":"ping"}]))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn http_admission_is_held_until_body_is_dropped() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let catalog = Arc::new(Catalog::local(root().unwrap()).unwrap());
+            let mut headers = HeaderMap::new();
+            headers.insert(header::HOST, "localhost".parse().unwrap());
+            let request = Bytes::from_static(br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#);
+            let first = http_mcp(State(catalog.clone()), headers.clone(), request.clone()).await;
+            let second = http_mcp(State(catalog.clone()), headers.clone(), request.clone()).await;
+            assert_eq!(first.status(), StatusCode::OK);
+            assert_eq!(second.status(), StatusCode::OK);
+            assert_eq!(
+                http_mcp(State(catalog.clone()), headers.clone(), request.clone())
+                    .await
+                    .status(),
+                StatusCode::SERVICE_UNAVAILABLE
+            );
+            drop(first);
+            assert_eq!(
+                http_mcp(State(catalog), headers, request).await.status(),
+                StatusCode::OK
+            );
+        });
+    }
+
+    #[test]
+    fn session_factory_is_lazy_and_has_one_lifecycle() {
+        use std::cell::Cell;
+        struct Host<'a>(&'a Cell<usize>);
+        impl Drop for Host<'_> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+        let drops = Cell::new(0);
+        let mut slot = None;
+        lazy_host(&mut slot, || Ok(Host(&drops))).unwrap();
+        for _ in 0..10 {
+            lazy_host(&mut slot, || bail!("must not try another spawn")).unwrap();
+        }
+        assert_eq!(drops.get(), 0);
+        drop(slot);
+        assert_eq!(drops.get(), 1);
+    }
 
     #[test]
     fn base64_matches_rfc_4648() {

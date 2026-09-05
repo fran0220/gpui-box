@@ -4,13 +4,14 @@ set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || { echo "installer must run as root" >&2; exit 1; }
 source_dir="${1:?installer needs an extracted bundle directory}"
-base=/opt/gpui-box
+base="${GPUI_BOX_INSTALL_BASE:-/opt/gpui-box}"
 releases="$base/releases"
 current="$base/current"
 previous="$base/previous"
 
-exec 9>/run/lock/gpui-box-release.lock
-flock 9
+exec 9>"${GPUI_BOX_INSTALL_LOCK:-/run/lock/gpui-box-release.lock}"
+flock -w 30 9
+trap 'exit 124' TERM INT
 
 bundle_name="$(basename "$source_dir")"
 [[ "$bundle_name" =~ ^gpui-box-linux-x64-([0-9a-f]{12})$ ]] || {
@@ -26,6 +27,7 @@ revision="$(tr -d '\r\n' < "$source_dir/REVISION")"
 
 required=(
   REVISION
+  EXPECTED_REVISION
   SHA256SUMS
   bin/gpui-box-mcp
   public/index.html
@@ -42,6 +44,10 @@ done
   cd "$source_dir"
   sha256sum --strict --check SHA256SUMS
 )
+expected="$(tr -d '\r\n' < "$source_dir/EXPECTED_REVISION")"
+[[ "$expected" =~ ^[0-9a-f]{40}$ || "$expected" == none ]] || {
+  echo "invalid expected revision" >&2; exit 1;
+}
 jq -e --arg revision "$revision" '
   .schema == 1 and
   .revision == $revision and
@@ -83,6 +89,14 @@ old_target=""
 if [[ -L "$current" ]]; then
   old_target="$(readlink -f "$current")"
 fi
+installed=none
+if [[ -n "$old_target" && -f "$old_target/REVISION" ]]; then
+  installed="$(tr -d '\r\n' < "$old_target/REVISION")"
+fi
+if [[ "$installed" != "$expected" && "$installed" != "$revision" ]]; then
+  echo "stale activation: expected $expected, installed $installed" >&2
+  exit 1
+fi
 already_current=false
 if [[ "$old_target" == "$final" ]]; then
   already_current=true
@@ -104,20 +118,22 @@ rollback() {
     if [[ -n "$old_target" && -d "$old_target" ]]; then
       ln -s "$old_target" "$base/.rollback-$$"
       mv -Tf "$base/.rollback-$$" "$current"
-      systemctl restart gpui-box-mcp || true
+      timeout 30 systemctl restart gpui-box-mcp || true
     else
       rm -f "$current"
-      systemctl stop gpui-box-mcp || true
+      timeout 30 systemctl stop gpui-box-mcp || true
     fi
   fi
   exit "$status"
 }
 trap rollback EXIT
 
-systemctl restart gpui-box-mcp
+timeout 30 systemctl restart gpui-box-mcp
 health=""
+deadline=$((SECONDS + 60))
 for _ in $(seq 1 30); do
-  if health="$(curl -fsS -H 'Host: gpui-box.origingame.dev' http://127.0.0.1:9350/healthz 2>/dev/null)" \
+  (( SECONDS < deadline )) || break
+  if health="$(curl --connect-timeout 1 --max-time 2 -fsS -H 'Host: gpui-box.origingame.dev' http://127.0.0.1:9350/healthz 2>/dev/null)" \
     && jq -e --arg revision "$revision" \
       '.status == "ok" and .revision == $revision and .toolCount == 10' \
       <<<"$health" >/dev/null; then
@@ -127,8 +143,8 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 [[ -n "$health" ]] || { echo "MCP health check did not reach $revision" >&2; exit 1; }
-nginx -t
-systemctl reload nginx
+timeout 15 nginx -t
+timeout 30 systemctl reload nginx
 
 current_target="$(readlink -f "$current")"
 previous_target="$(readlink -f "$previous" 2>/dev/null || true)"

@@ -8,6 +8,12 @@ key="${GPUI_BOX_DEPLOY_SSH_KEY:-}"
 known_hosts="${GPUI_BOX_DEPLOY_KNOWN_HOSTS:-}"
 out="${GPUI_BOX_RELEASE_OUT:-$root/target/site-release}"
 
+# Observe before building, not immediately before upload: an older slow build
+# must retain its old expectation when another deployment activates meanwhile.
+export GPUI_BOX_EXPECTED_REVISION="${GPUI_BOX_EXPECTED_REVISION:-$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://gpui-box.origingame.dev/build-info.json | jq -er '.revision')}"
+[[ "$GPUI_BOX_EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ || "$GPUI_BOX_EXPECTED_REVISION" == none ]] || {
+  echo "invalid expected installed revision" >&2; exit 1;
+}
 archive="$("$root/tools/site/build-release.sh" "$out" | tail -n 1)"
 [[ -f "$archive" ]] || { echo "release archive was not built: $archive" >&2; exit 1; }
 

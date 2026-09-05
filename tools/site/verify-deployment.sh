@@ -48,7 +48,7 @@ expected_counts="$(jq -c -S . <<<"$expected_counts")"
 fetch() {
   local host="$1"
   shift
-  curl --fail --silent --show-error --resolve "$host:443:$origin" "$@"
+  curl --fail --silent --show-error --connect-timeout 5 --max-time 30 --resolve "$host:443:$origin" "$@"
 }
 
 for host in "${hosts[@]}"; do
@@ -67,26 +67,36 @@ for host in "${hosts[@]}"; do
 done
 
 mcp() {
-  fetch gpui-box.origingame.dev \
+  fetch "$host" \
     -H 'Content-Type: application/json' \
     -H 'Accept: application/json' \
     --data "$1" \
-    https://gpui-box.origingame.dev/mcp
+    "https://$host/mcp"
 }
 
-expected_tools="$(jq -r '.tools' <<<"$expected_counts")"
-actual_tools="$(mcp '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq '.result.tools | length')"
-if [[ "$actual_tools" != "$expected_tools" ]]; then
-  echo "tools/list returned $actual_tools tools, expected $expected_tools" >&2
-  exit 1
-fi
-echo "tools/list returns $actual_tools tools"
-
-expected_components="$(jq -r '.components' <<<"$expected_counts")"
-search="$(mcp '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_components","arguments":{"query":""}}}')"
-actual_components="$(jq -r '.result.content[0].text' <<<"$search" | sed -n '1s/^\([0-9]*\) match(es).*/\1/p')"
-if [[ "$actual_components" != "$expected_components" ]]; then
-  echo "search_components returned '$actual_components' matches, expected $expected_components" >&2
-  exit 1
-fi
-echo "search_components with an empty query returns all $actual_components components"
+expected_tools="$(jq -cS 'sort_by(.name)' "$root/tools/mcp/tools.json")"
+expected_components="$(jq -cS '[.components[].name | "component:" + .] | sort' "$root/docs/developer-index.json")"
+for host in "${hosts[@]}"; do
+  actual_tools="$(mcp '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq -ecS '.result.tools | sort_by(.name)')"
+  [[ "$actual_tools" == "$expected_tools" ]] || {
+    echo "$host tools/list differs in names or complete schemas" >&2; exit 1;
+  }
+  cursor=0
+  ids='[]'
+  while :; do
+    request="$(jq -nc --arg cursor "$cursor" '{jsonrpc:"2.0",id:2,method:"tools/call",params:{name:"search_components",arguments:{query:"",cursor:$cursor,limit:500}}}')"
+    search="$(mcp "$request" | jq -ec '.result.structuredContent')"
+    page="$(jq -ec '[.matches[].id]' <<<"$search")"
+    ids="$(jq -nc --argjson ids "$ids" --argjson page "$page" '$ids + $page')"
+    next="$(jq -r '.nextCursor // empty' <<<"$search")"
+    [[ -n "$next" ]] || break
+    [[ "$next" =~ ^[0-9]+$ && "$next" -gt "$cursor" && "$next" -le "$(jq length <<<"$expected_components")" ]] || {
+      echo "$host invalid component pagination" >&2; exit 1;
+    }
+    cursor="$next"
+  done
+  [[ "$(jq -cS sort <<<"$ids")" == "$expected_components" ]] || {
+    echo "$host structured component identities differ (including duplicates)" >&2; exit 1;
+  }
+  echo "$host tools match full schemas; structured component identities match the catalog"
+done
