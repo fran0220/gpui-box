@@ -99,6 +99,13 @@ pub fn check(root: &Path, args: &[String]) -> Result<()> {
                 .as_str()
                 .context("Cargo metadata package has no manifest_path")?,
         );
+        if let Some(owned) = a.package.iter().find(|owned| p["name"] == owned.name) {
+            ensure!(
+                p["source"].is_null() && path == canonical(root.join(&owned.manifest)),
+                "resolved internal package {} is not its local authority",
+                owned.name
+            );
+        }
         actual.insert(path, p);
         ensure!(
             !matches!(
@@ -246,13 +253,55 @@ fn check_dependency_table(
     dependencies: &toml::map::Map<String, Value>,
 ) -> Result<()> {
     for (alias, dependency) in dependencies {
+        let inherited;
+        let mut dependency_dir = owner_dir.to_path_buf();
+        let dependency = if dependency.get("workspace").and_then(Value::as_bool) == Some(true) {
+            let (directory, workspace) = owner_dir
+                .ancestors()
+                .find_map(|directory| {
+                    let manifest = read_toml(&directory.join("Cargo.toml")).ok()?;
+                    manifest
+                        .get("workspace")
+                        .cloned()
+                        .map(|workspace| (directory, workspace))
+                })
+                .context("inherited dependency has no workspace")?;
+            inherited = workspace
+                .get("dependencies")
+                .and_then(|deps| deps.get(alias))
+                .with_context(|| format!("workspace has no dependency {alias}"))?
+                .clone();
+            dependency_dir = directory.to_path_buf();
+            &inherited
+        } else {
+            dependency
+        };
+        let name = dependency
+            .get("package")
+            .and_then(Value::as_str)
+            .unwrap_or(alias);
+        let named = a.package.iter().find(|package| package.name == name);
+        if named.is_some() {
+            ensure!(
+                dependency.get("path").and_then(Value::as_str).is_some(),
+                "{} internal dependency {alias} must use local authority, not a registry",
+                owner.name
+            );
+        }
         let Some(dependency) = dependency.as_table() else {
             continue;
         };
         let Some(path) = dependency.get("path").and_then(Value::as_str) else {
             continue;
         };
-        let target = canonical(owner_dir.join(path));
+        let target = canonical(dependency_dir.join(path));
+        if let Some(named) = named {
+            ensure!(
+                target == canonical(root.join(&named.manifest).parent().unwrap()),
+                "{} internal dependency {alias} has the wrong local path",
+                owner.name
+            );
+        }
         let Some(package) = a.package.iter().find(|package| {
             root.join(&package.manifest)
                 .parent()
@@ -590,6 +639,72 @@ fn canonical(path: impl AsRef<Path>) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inherited_dependencies_cannot_bypass_layers_or_local_authority() {
+        let root =
+            std::env::temp_dir().join(format!("gpui-dependency-fixture-{}", std::process::id()));
+        fs::create_dir_all(root.join("low")).unwrap();
+        fs::create_dir_all(root.join("high")).unwrap();
+        let low = Package {
+            manifest: "low/Cargo.toml".into(),
+            name: "low".into(),
+            lib: None,
+            cohort: "framework".into(),
+            version: "0.1.0".into(),
+            license: "MIT".into(),
+            publish: false,
+            layer: 0,
+        };
+        let high = Package {
+            manifest: "high/Cargo.toml".into(),
+            name: "high".into(),
+            layer: 1,
+            ..low.clone()
+        };
+        let a = Authority {
+            schema: 1,
+            package: vec![low.clone(), high],
+        };
+        fs::write(
+            root.join("low/Cargo.toml"),
+            "[dependencies]\nrenamed = { workspace = true }\n",
+        )
+        .unwrap();
+        fs::write(root.join("Cargo.toml"), "[workspace.dependencies]\nrenamed = { package = 'high', path = 'high', version = '0.1.0' }\n").unwrap();
+        assert!(
+            check_internal_declarations(&root, &low, &a)
+                .unwrap_err()
+                .to_string()
+                .contains("higher layer")
+        );
+        let owner = Package { layer: 2, ..low };
+        check_internal_declarations(&root, &owner, &a).unwrap();
+        fs::write(
+            root.join("Cargo.toml"),
+            "[workspace.dependencies]\nrenamed = { package = 'high', version = '0.1.0' }\n",
+        )
+        .unwrap();
+        assert!(
+            check_internal_declarations(&root, &owner, &a)
+                .unwrap_err()
+                .to_string()
+                .contains("registry")
+        );
+        fs::write(
+            root.join("low/Cargo.toml"),
+            "[target.'cfg(windows)'.build-dependencies]\nhigh = '0.1.0'\n",
+        )
+        .unwrap();
+        assert!(
+            check_internal_declarations(&root, &owner, &a)
+                .unwrap_err()
+                .to_string()
+                .contains("registry")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn authority_rejects_layers() {
         let a = Authority {

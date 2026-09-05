@@ -72,6 +72,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run native media lifecycle tests
         run: cargo test -p gpui-box-media --all-features --locked
+      - name: Run the remaining Windows platform tests
+        run: cargo test --workspace --all-features --locked --exclude gpui-box-media
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Run native Windows UI Automation smoke
         run: cargo run -p xtask --locked -- accessibility check

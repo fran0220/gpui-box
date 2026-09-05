@@ -1097,6 +1097,7 @@ fn gate(full: bool) -> Result<()> {
     dependencies::check(&root(), &[])?;
     future_compatibility_check()?;
     step("cargo", &["test", "--workspace"], None)?;
+    step("cargo", &["test", "--workspace", "--all-features"], None)?;
     // GPUI Box owns the complete framework and kit source. A warning anywhere
     // in the workspace is therefore a gate failure rather than upstream debt.
     step(
@@ -1179,12 +1180,12 @@ fn future_compatibility_check() -> Result<()> {
 /// The full gate compiles and tests every workspace member and renders the
 /// whole catalog, which is minutes of waiting for an edit to one file. This
 /// answers the same questions about the named scenes: the library still builds
-/// and lints clean, the tests whose names mention them still pass, the
+/// and lints clean, all Kit tests still pass, the
 /// generated artifacts are still current, and those scenes still look the way
 /// the baseline says.
 ///
 /// It is a shortcut while iterating, not a substitute for `gate` before a
-/// commit. It says nothing about the other members, the doctests, or a scene
+/// commit. It says nothing about the other members or a scene
 /// the edit reached without anybody predicting it.
 fn gate_only(scenes: &[String]) -> Result<()> {
     if scenes.is_empty() {
@@ -1210,12 +1211,14 @@ fn gate_only(scenes: &[String]) -> Result<()> {
         ],
         None,
     )?;
-    // Rust test names use identifiers, so scene kebab-case becomes snake_case.
-    // One scene argument still selects both the tests and the rendered scene.
-    for scene in scenes {
-        let test_filter = scene.replace('-', "_");
-        step("cargo", &["test", "-p", "gpui-box-kit", &test_filter], None)?;
-    }
+    // Scene names describe exhibits, not behavior ownership. Shared interactions
+    // (for example the keymap recorder) need not mention any scene in their
+    // test name. Conservatively run the entire Kit suite; only images are scoped.
+    step(
+        "cargo",
+        &["test", "-p", "gpui-box-kit", "--all-features"],
+        None,
+    )?;
     tokens(true)?;
     strings::check(&root())?;
     api::check(&root())?;
