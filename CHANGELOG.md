@@ -8,6 +8,17 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Changed
+
+**Settings groups sit on the page plane.** `SettingsSection` no longer wraps
+its rows in a raised card. The heading and the rows' own padding carry the
+group; only the actual controls keep a bounded surface.
+
+**macOS hosted backdrop helpers compile under edition-2024
+`unsafe_op_in_unsafe_fn`.** The `NSGlassEffectView` / blur insert path wraps
+AppKit calls in inner `unsafe` blocks so gallery and deny-warnings builds
+compile.
+
 ### Added
 
 **System glass is a window material.** `WindowBackgroundAppearance::SystemGlass`

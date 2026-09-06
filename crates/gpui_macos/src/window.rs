@@ -3879,32 +3879,38 @@ fn display_id_for_screen(screen: id) -> Option<CGDirectDisplayID> {
 }
 
 unsafe fn remove_hosted_backdrop(view: &mut Option<id>) {
-    if let Some(hosted) = view.take() {
-        NSView::removeFromSuperview(hosted);
+    unsafe {
+        if let Some(hosted) = view.take() {
+            NSView::removeFromSuperview(hosted);
+        }
     }
 }
 
 unsafe fn insert_below_content(native_window: id, view: id) -> id {
-    let content_view = NSWindow::contentView(native_window);
-    let _: () = msg_send![
-        content_view,
-        addSubview: view
-        positioned: NSWindowOrderingMode::NSWindowBelow
-        relativeTo: nil
-    ];
-    view.autorelease()
+    unsafe {
+        let content_view = NSWindow::contentView(native_window);
+        let _: () = msg_send![
+            content_view,
+            addSubview: view
+            positioned: NSWindowOrderingMode::NSWindowBelow
+            relativeTo: nil
+        ];
+        view.autorelease()
+    }
 }
 
 unsafe fn insert_blurred_view(native_window: id) -> Option<id> {
-    let content_view = NSWindow::contentView(native_window);
-    let frame = NSView::bounds(content_view);
-    let mut blur_view: id = msg_send![BLURRED_VIEW_CLASS, alloc];
-    blur_view = NSView::initWithFrame_(blur_view, frame);
-    if blur_view.is_null() {
-        return None;
+    unsafe {
+        let content_view = NSWindow::contentView(native_window);
+        let frame = NSView::bounds(content_view);
+        let mut blur_view: id = msg_send![BLURRED_VIEW_CLASS, alloc];
+        blur_view = NSView::initWithFrame_(blur_view, frame);
+        if blur_view.is_null() {
+            return None;
+        }
+        blur_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
+        Some(insert_below_content(native_window, blur_view))
     }
-    blur_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
-    Some(insert_below_content(native_window, blur_view))
 }
 
 /// Embed a native `NSGlassEffectView` when the class exists (macOS 26+).
@@ -3913,24 +3919,26 @@ unsafe fn insert_blurred_view(native_window: id) -> Option<id> {
 /// not the GPUI scene. Runtime class lookup keeps the binary free of a
 /// macOS 26 SDK requirement.
 unsafe fn insert_system_glass(native_window: id) -> Option<id> {
-    let class_name = CString::new("NSGlassEffectView").ok()?;
-    let cls: *const Class = objc::runtime::objc_getClass(class_name.as_ptr());
-    if cls.is_null() {
-        return None;
+    unsafe {
+        let class_name = CString::new("NSGlassEffectView").ok()?;
+        let cls: *const Class = objc::runtime::objc_getClass(class_name.as_ptr());
+        if cls.is_null() {
+            return None;
+        }
+        let content_view = NSWindow::contentView(native_window);
+        let frame = NSView::bounds(content_view);
+        let mut glass: id = msg_send![cls, alloc];
+        glass = NSView::initWithFrame_(glass, frame);
+        if glass.is_null() {
+            return None;
+        }
+        glass.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
+        // `NSGlassEffectViewStyleRegular = 0`. Clear is a separate style for
+        // controls that should not pick up the surrounding chrome.
+        let _: () = msg_send![glass, setStyle: 0i64];
+        let _: () = msg_send![glass, setCornerRadius: 0.0f64];
+        Some(insert_below_content(native_window, glass))
     }
-    let content_view = NSWindow::contentView(native_window);
-    let frame = NSView::bounds(content_view);
-    let mut glass: id = msg_send![cls, alloc];
-    glass = NSView::initWithFrame_(glass, frame);
-    if glass.is_null() {
-        return None;
-    }
-    glass.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
-    // `NSGlassEffectViewStyleRegular = 0`. Clear is a separate style for
-    // controls that should not pick up the surrounding chrome.
-    let _: () = msg_send![glass, setStyle: 0i64];
-    let _: () = msg_send![glass, setCornerRadius: 0.0f64];
-    Some(insert_below_content(native_window, glass))
 }
 
 extern "C" fn blurred_view_init_with_frame(this: &Object, _: Sel, frame: NSRect) -> id {

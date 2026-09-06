@@ -20,7 +20,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -438,9 +438,9 @@ impl RenderOnce for SettingsSection {
                 )
         });
 
-        // The shared panel, stable row padding and each row's own label/control
-        // alignment carry the grouping. Permanent rules between every setting
-        // would turn a calm preferences surface into a table.
+        // Heading, spacing and each row's own padding carry the group.
+        // Permanent rules between every setting would turn a calm
+        // preferences surface into a table.
         let rows = self.rows.into_iter().map(|row| {
             let row = match dimmed.clone() {
                 Some(reason) => row.inapplicable(reason),
@@ -459,9 +459,6 @@ impl RenderOnce for SettingsSection {
                 div()
                     .column()
                     .w_full()
-                    .radius(&theme, Radius::Card)
-                    .frame(&theme, Surface::Panel, Elevation::Raised)
-                    .overflow_hidden()
                     .when(dimmed.is_some(), |element| {
                         element.opacity(theme.opacity.disabled)
                     })
