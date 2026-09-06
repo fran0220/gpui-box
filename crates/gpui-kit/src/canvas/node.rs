@@ -23,7 +23,7 @@ use gpui_kit_theme::{
     ActiveTheme, ColorChoice, Elevation, Radius, SemanticWash, Surface, Theme, Variant,
 };
 
-use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt, ThemeOverlay};
 use crate::layout::measure;
 use crate::motion::{Activity, MotionPolicy, MotionRole, MotionSpec, ResolvedMotion, keyed};
 use crate::overlay::{Glass, GlassPreset, Tooltipped};
@@ -1532,18 +1532,29 @@ impl RenderOnce for GraphNode {
         // can read a click on a prompt field as picking the card up, or a
         // Backspace in it as deleting the step.
         let content = (!self.compact && !self.content.is_empty()).then(|| {
-            div()
-                .w_full()
-                .column()
-                .gap(px(metrics.gap))
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_key_down(|_, _, cx| cx.stop_propagation())
-                .children(self.content)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("content").semantic_id(), Role::Group)
-                        .parent(node_id.clone()),
-                )
+            // Laid out at the card's width and drawn at the card's scale. The
+            // card already scales its own type, padding and ports by the
+            // canvas zoom; content built from the theme in force would come
+            // out at full size beside them, so a slider seated in a card at
+            // three-quarter zoom read a third larger than any control the card
+            // draws itself. The scale goes into the tokens the subtree reads
+            // because GPUI Box has no transform for an element subtree.
+            let scale = metrics.scale;
+            ThemeOverlay::new(
+                move |theme| theme.clone().scaled(scale),
+                div()
+                    .w_full()
+                    .column()
+                    .gap(px(metrics.gap))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_key_down(|_, _, cx| cx.stop_propagation())
+                    .children(self.content)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.child("content").semantic_id(), Role::Group)
+                            .parent(node_id.clone()),
+                    ),
+            )
         });
 
         // The body is a zone of its own rather than more rows under the title,

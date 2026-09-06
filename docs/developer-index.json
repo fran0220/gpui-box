@@ -1285,7 +1285,7 @@
           "features": []
         }
       ],
-      "symbolCount": 88
+      "symbolCount": 89
     },
     {
       "name": "gpui-box-kit-tokens",
@@ -105094,6 +105094,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn resting_track (& self) -> Hsla",
+      "cfg": [],
+      "target": "Theme"
+    },
+    {
+      "id": "gpui_kit_theme::Theme::scaled",
+      "name": "scaled",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "The same theme with every drawn measurement taken at `factor` of its size.",
+      "documentation": "The same theme with every drawn measurement taken at `factor` of its\nsize.\n\nThis exists for one situation, and it is worth stating because the\nobvious reading — a density knob a product can turn — is the wrong one.\nDensity is that, it is an axis of the document, and it is discrete.\nThis is for a container that draws its own chrome at a scale of its own\nand then mounts content it did not build: a card on a zoomed canvas is\nthe case in this library. The card scales its type, its padding and its\nports; anything the caller seats in it is built from the theme in force\nand comes out at full size, so at three-quarter zoom a mounted slider\nis a third larger than the card's own controls. Handing the subtree a\nscaled theme through [`crate`-level `ThemeOverlay`] is how the two are\nmade to agree, because GPUI Box has no transform for an element subtree\n— `TransformationMatrix` reaches sprites alone — so the size has to be\nin the tokens the subtree reads rather than in a matrix over its\npixels.\n\nColour, opacity, motion, elevation and the effect alphas are untouched:\na control drawn smaller is the same control, and an animation does not\nrun at a different speed because the thing it moves shrank.\n\nThe measures that size overlays and page regions are untouched too. A\nmenu, dialog or popover opened from inside the subtree is drawn against\nthe window rather than against the card, so scaling it would answer the\nwrong question and produce a menu nobody can read.",
+      "signature": "pub fn scaled (self, factor : f32) -> Self",
       "cfg": [],
       "target": "Theme"
     },

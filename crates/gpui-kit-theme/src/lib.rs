@@ -808,6 +808,161 @@ impl Theme {
         self
     }
 
+    /// The same theme with every drawn measurement taken at `factor` of its
+    /// size.
+    ///
+    /// This exists for one situation, and it is worth stating because the
+    /// obvious reading — a density knob a product can turn — is the wrong one.
+    /// Density is that, it is an axis of the document, and it is discrete.
+    /// This is for a container that draws its own chrome at a scale of its own
+    /// and then mounts content it did not build: a card on a zoomed canvas is
+    /// the case in this library. The card scales its type, its padding and its
+    /// ports; anything the caller seats in it is built from the theme in force
+    /// and comes out at full size, so at three-quarter zoom a mounted slider
+    /// is a third larger than the card's own controls. Handing the subtree a
+    /// scaled theme through [`crate`-level `ThemeOverlay`] is how the two are
+    /// made to agree, because GPUI Box has no transform for an element subtree
+    /// — `TransformationMatrix` reaches sprites alone — so the size has to be
+    /// in the tokens the subtree reads rather than in a matrix over its
+    /// pixels.
+    ///
+    /// Colour, opacity, motion, elevation and the effect alphas are untouched:
+    /// a control drawn smaller is the same control, and an animation does not
+    /// run at a different speed because the thing it moves shrank.
+    ///
+    /// The measures that size overlays and page regions are untouched too. A
+    /// menu, dialog or popover opened from inside the subtree is drawn against
+    /// the window rather than against the card, so scaling it would answer the
+    /// wrong question and produce a menu nobody can read.
+    pub fn scaled(self, factor: f32) -> Self {
+        if !factor.is_finite() || factor <= 0.0 || (factor - 1.0).abs() < f32::EPSILON {
+            return self;
+        }
+        self.modify(|data| {
+            let Spacing {
+                xxs,
+                xs,
+                sm,
+                md,
+                lg,
+                xl,
+                xxl,
+            } = &mut data.spacing;
+            for value in [xxs, xs, sm, md, lg, xl, xxl] {
+                *value *= factor;
+            }
+
+            let Radii {
+                small,
+                control,
+                card,
+                dialog,
+                bubble,
+                pill,
+            } = &mut data.radii;
+            for value in [small, control, card, dialog, bubble, pill] {
+                *value *= factor;
+            }
+
+            let Borders { hairline, thick } = &mut data.borders;
+            for value in [hairline, thick] {
+                *value *= factor;
+            }
+
+            let Control { xs, sm, md, lg } = &mut data.control;
+            for metrics in [xs, sm, md, lg] {
+                let ControlMetrics {
+                    height,
+                    padding_x,
+                    gap,
+                    font_size,
+                    icon_size,
+                } = metrics;
+                for value in [height, padding_x, gap, font_size, icon_size] {
+                    *value *= factor;
+                }
+            }
+
+            let Typography {
+                sans: _,
+                sans_fallback: _,
+                mono: _,
+                mono_fallback: _,
+                // A ratio, not a length.
+                readout_scale: _,
+                caption,
+                label,
+                body,
+                strong,
+                subtitle,
+                title,
+                code,
+            } = &mut data.typography;
+            for style in [caption, label, body, strong, subtitle, title, code] {
+                style.size *= factor;
+                style.line_height *= factor;
+            }
+
+            let Measures {
+                // Overlay and page geometry. These answer to the window, not
+                // to whatever the subtree is seated in.
+                readable_width: _,
+                dialog_width: _,
+                menu_min_width: _,
+                compact_menu_min_width: _,
+                menu_max_height: _,
+                compact_menu_max_height: _,
+                compact_overlay_width: _,
+                container_small: _,
+                container_medium: _,
+                container_large: _,
+                container_extra_large: _,
+                media_viewer_height: _,
+                // Component geometry: the size of a thing the subtree draws.
+                standalone_icon,
+                scrollbar_track,
+                scrollbar_thumb,
+                scrollbar_min_thumb,
+                caret_width,
+                text_decoration_width,
+                progress_track_height,
+                slider_track_height,
+                slider_vertical_height,
+                timeline_rail_width,
+                status_mark,
+                node_edge_width,
+                node_edge_corner,
+                node_edge_lead,
+                node_edge_corridor,
+                node_edge_lane,
+                node_port,
+                node_progress,
+            } = &mut data.measures;
+            for value in [
+                standalone_icon,
+                scrollbar_track,
+                scrollbar_thumb,
+                scrollbar_min_thumb,
+                caret_width,
+                text_decoration_width,
+                progress_track_height,
+                slider_track_height,
+                slider_vertical_height,
+                timeline_rail_width,
+                status_mark,
+                node_edge_width,
+                node_edge_corner,
+                node_edge_lead,
+                node_edge_corridor,
+                node_edge_lane,
+                node_port,
+                node_progress,
+            ] {
+                *value *= factor;
+            }
+        })
+    }
+
     /// Builds a theme from any validated token document at one density.
     ///
     /// Density scales spacing, control geometry and type independently, and
@@ -1927,6 +2082,51 @@ mod tests {
         assert!(compact.typography.body.size < comfortable.typography.body.size);
         assert_eq!(compact.colors.accent, comfortable.colors.accent);
         assert_eq!(compact.radii.card, comfortable.radii.card);
+    }
+
+    #[test]
+    fn scaling_shrinks_what_a_subtree_draws_and_leaves_the_window_alone() {
+        let full = Theme::studio_dark();
+        let half = full.clone().scaled(0.5);
+
+        // What a control seated in the scaled subtree is built from.
+        assert_eq!(
+            half.control.get(ControlSize::Md).icon_size,
+            full.control.get(ControlSize::Md).icon_size * 0.5
+        );
+        assert_eq!(
+            half.measures.slider_track_height,
+            full.measures.slider_track_height * 0.5
+        );
+        assert_eq!(half.measures.node_port, full.measures.node_port * 0.5);
+        assert_eq!(half.spacing.md, full.spacing.md * 0.5);
+        assert_eq!(
+            half.typography.caption.size,
+            full.typography.caption.size * 0.5
+        );
+        assert_eq!(half.radii.card, full.radii.card * 0.5);
+
+        // A menu or dialog opened from inside it is drawn against the window.
+        assert_eq!(half.measures.menu_min_width, full.measures.menu_min_width);
+        assert_eq!(half.measures.dialog_width, full.measures.dialog_width);
+        assert_eq!(half.measures.readable_width, full.measures.readable_width);
+
+        // Scaling is a size, not a restyle.
+        assert_eq!(half.colors.accent, full.colors.accent);
+        assert_eq!(half.effects.focus_ring_alpha, full.effects.focus_ring_alpha);
+    }
+
+    #[test]
+    fn scaling_by_one_or_by_nonsense_returns_the_same_theme() {
+        let theme = Theme::studio_dark();
+        for factor in [1.0, 0.0, -2.0, f32::NAN, f32::INFINITY] {
+            let same = theme.clone().scaled(factor);
+            assert_eq!(
+                same.control.get(ControlSize::Md).height,
+                theme.control.get(ControlSize::Md).height,
+                "factor {factor} must not change geometry"
+            );
+        }
     }
 
     #[test]
