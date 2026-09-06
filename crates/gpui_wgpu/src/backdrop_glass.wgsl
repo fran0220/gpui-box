@@ -24,6 +24,9 @@ struct Params {
     lobe_count: u32,
     blur_radius: u32,
     optical_lift: vec4<f32>,
+    edge_mask_edge: f32,
+    edge_mask_band: f32,
+    _mask_pad: vec2<f32>,
     lobes: array<Lobe, MAX_GLASS_LOBES>,
 }
 
@@ -100,6 +103,32 @@ fn smooth_min(a: f32, b: f32, smoothing: f32) -> f32 {
 // Distance to the surface's shape. Mirrors `glass_sdf` in the Metal shaders
 // and the `union` helper inside `glass_field` in scene.rs: no lobes means the
 // surface is the single rounded rect it already named.
+// Linear fade from a named edge. Mirrors `glass_edge_mask` in scene.rs.
+fn glass_edge_mask(point: vec2<f32>) -> f32 {
+    if (params.edge_mask_edge <= 0.0 || params.edge_mask_band <= 0.0) {
+        return 1.0;
+    }
+    if (params.edge_mask_edge < 1.5) {
+        return 1.0 - clamp((point.y - params.bounds.y) / params.edge_mask_band, 0.0, 1.0);
+    }
+    if (params.edge_mask_edge < 2.5) {
+        return 1.0 - clamp((params.bounds.y + params.bounds.w - point.y) / params.edge_mask_band, 0.0, 1.0);
+    }
+    if (params.edge_mask_edge < 3.5) {
+        return 1.0 - clamp((point.x - params.bounds.x) / params.edge_mask_band, 0.0, 1.0);
+    }
+    return 1.0 - clamp((params.bounds.x + params.bounds.z - point.x) / params.edge_mask_band, 0.0, 1.0);
+}
+
+fn apply_edge_mask(color: vec4<f32>, point: vec2<f32>) -> vec4<f32> {
+    let mask = glass_edge_mask(point);
+    if (mask >= 1.0) {
+        return color;
+    }
+    let original = textureLoad(sharp_source, vec2<i32>(point), 0);
+    return mix(original, color, mask);
+}
+
 fn glass_distance(point: vec2<f32>) -> f32 {
     if (params.lobe_count == 0u) {
         return rounded_distance(point);
@@ -133,7 +162,7 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
     if ((params.bevel <= 0.0 || params.refraction == 0.0) && params.specular <= 0.0 &&
         params.transmission_gain == 1.0 && params.optical_lift.a <= 0.0 &&
         params.hairline <= 0.0) {
-        return textureLoad(source, vec2<i32>(point), 0);
+        return apply_edge_mask(textureLoad(source, vec2<i32>(point), 0), point);
     }
 
     // The gradient by central differences, on the same half-pixel stencil as
@@ -210,7 +239,10 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         color = vec4<f32>(color.rgb + hair * (1.0 - 0.18 * facing_up) * 0.18, color.a);
     }
 
-    return vec4<f32>(clamp(color.rgb, vec3<f32>(0.0), vec3<f32>(1.0)), color.a);
+    return apply_edge_mask(
+        vec4<f32>(clamp(color.rgb, vec3<f32>(0.0), vec3<f32>(1.0)), color.a),
+        point,
+    );
 }
 
 @fragment

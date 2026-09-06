@@ -10,6 +10,22 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Added
 
+**System glass is a window material.** `WindowBackgroundAppearance::SystemGlass`
+embeds a native `NSGlassEffectView` (regular style) behind the Metal content
+view on macOS 26+, looked up at runtime so the binary does not require that
+SDK. Windows maps the same variant to the current main-window Mica backdrop.
+Linux treats it as opaque. `Blurred` and `NSVisualEffectView` stay for callers
+that asked for the older frost.
+
+**Glass can tint, flip appearance, and fade at an edge.** `Glass::tint` /
+`GlassGroup::tint` overlay a caller colour. `Glass::adaptive_appearance`
+installs the registered counterpart theme on the subtree when the backdrop
+luminance opposes the window, using the existing probe and hysteresis.
+`GlassMaterial` carries a linear edge mask that Metal, WGPU, and DirectX
+apply identically; `ScrollEdgeEffect` is the kit ramp (`Soft` scatters,
+`Hard` is opaque). Tokens `effect.scrollEdgeBand` and `effect.scrollEdgeBlur`
+name the default measures.
+
 **Node graph ports carry a type.** `PortType` is an id, a colour, and an
 optional glyph; `GraphPort::typed` seats it on a port. A port is drawn as a
 ring in its type's colour with the glyph inside, and a wire leaving an output

@@ -18,6 +18,7 @@ pub mod grid;
 pub(crate) mod measure;
 pub mod responsive;
 pub mod scroll;
+pub mod scroll_edge;
 pub mod scroll_fade;
 pub mod split;
 pub mod status_bar;
@@ -34,6 +35,7 @@ pub use dock_tree::{
 pub use grid::{Breakpoint, Container, ContainerWidth, Grid, GridColumns, GridItem};
 pub use responsive::{ContainerSize, Responsive};
 pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
+pub use scroll_edge::{ScrollEdgeEffect, ScrollEdgeKind};
 pub use scroll_fade::{FadeEdges, ScrollFade};
 pub use split::{SplitAxis, SplitPane, SplitSide};
 pub use status_bar::{StatusBar, StatusGroup, StatusItem};

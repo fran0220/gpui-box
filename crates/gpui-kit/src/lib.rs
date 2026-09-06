@@ -306,9 +306,9 @@ pub mod prelude {
         DesktopTitlebar, DesktopTitlebarEvent, Dock, DockEvent, DockPanel, DockPlacement,
         DockRecord, DockRecordError, DockRecordKind, DockRegion, DockStack, DockTopology, DockTree,
         DockTreeEvent, FadeEdges, Grid, GridColumns, GridItem, Responsive, ScrollArea, ScrollAxis,
-        ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec,
-        SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem,
-        Toolbar, ToolbarItem, scroll_offset,
+        ScrollEdgeEffect, ScrollEdgeKind, ScrollFade, SplitAxis, SplitChange, SplitKind,
+        SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree,
+        StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
         AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,
@@ -332,10 +332,10 @@ pub mod prelude {
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent,
         ContextMenuPresentation, Dialog, DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost,
-        Glass, GlassGroup, GlassPreset, Hang, HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent,
-        MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification, NotificationCenter,
-        NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent, Toast, ToastCorner,
-        ToastLayer, Tooltip, Tooltipped, UnreadCount,
+        Glass, GlassAppearance, GlassGroup, GlassPreset, Hang, HoverCard, HoverCardEvent, Kbd,
+        Menu, MenuEvent, MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification,
+        NotificationCenter, NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent,
+        Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::reactive::{Binding, Form, FormValues, History, Rule, Signal, validators};
     pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase, ValidationState};

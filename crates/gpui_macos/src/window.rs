@@ -621,6 +621,8 @@ struct MacWindowState {
     /// GPUI owns their full frames and visible clips while they are here.
     hosted_platform_views: PlatformViewHosting<HostedPlatformView>,
     blurred_view: Option<id>,
+    /// Native `NSGlassEffectView` used by [`WindowBackgroundAppearance::SystemGlass`].
+    glass_view: Option<id>,
     background_appearance: WindowBackgroundAppearance,
     cursor_style: CursorStyle,
     cursor_visible: Arc<AtomicBool>,
@@ -1042,6 +1044,7 @@ impl MacWindow {
                 overlay_input_active: Arc::new(AtomicBool::new(false)),
                 hosted_platform_views: PlatformViewHosting::default(),
                 blurred_view: None,
+                glass_view: None,
                 background_appearance: WindowBackgroundAppearance::Opaque,
                 cursor_style: CursorStyle::Arrow,
                 cursor_visible,
@@ -1804,25 +1807,24 @@ impl PlatformWindow for MacWindow {
             };
             this.native_window.setBackgroundColor_(background_color);
 
-            if background_appearance != WindowBackgroundAppearance::Blurred {
-                if let Some(blur_view) = this.blurred_view {
-                    NSView::removeFromSuperview(blur_view);
-                    this.blurred_view = None;
+            match background_appearance {
+                WindowBackgroundAppearance::SystemGlass => {
+                    remove_hosted_backdrop(&mut this.blurred_view);
+                    if this.glass_view.is_none() {
+                        this.glass_view = insert_system_glass(this.native_window)
+                            .or_else(|| insert_blurred_view(this.native_window));
+                    }
                 }
-            } else if this.blurred_view.is_none() {
-                let content_view = this.native_window.contentView();
-                let frame = NSView::bounds(content_view);
-                let mut blur_view: id = msg_send![BLURRED_VIEW_CLASS, alloc];
-                blur_view = NSView::initWithFrame_(blur_view, frame);
-                blur_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
-
-                let _: () = msg_send![
-                    content_view,
-                    addSubview: blur_view
-                    positioned: NSWindowOrderingMode::NSWindowBelow
-                    relativeTo: nil
-                ];
-                this.blurred_view = Some(blur_view.autorelease());
+                WindowBackgroundAppearance::Blurred => {
+                    remove_hosted_backdrop(&mut this.glass_view);
+                    if this.blurred_view.is_none() {
+                        this.blurred_view = insert_blurred_view(this.native_window);
+                    }
+                }
+                _ => {
+                    remove_hosted_backdrop(&mut this.blurred_view);
+                    remove_hosted_backdrop(&mut this.glass_view);
+                }
             }
         }
     }
@@ -3874,6 +3876,61 @@ fn display_id_for_screen(screen: id) -> Option<CGDirectDisplayID> {
         let screen_number: NSUInteger = msg_send![screen_number, unsignedIntegerValue];
         Some(screen_number as CGDirectDisplayID)
     }
+}
+
+unsafe fn remove_hosted_backdrop(view: &mut Option<id>) {
+    if let Some(hosted) = view.take() {
+        NSView::removeFromSuperview(hosted);
+    }
+}
+
+unsafe fn insert_below_content(native_window: id, view: id) -> id {
+    let content_view = NSWindow::contentView(native_window);
+    let _: () = msg_send![
+        content_view,
+        addSubview: view
+        positioned: NSWindowOrderingMode::NSWindowBelow
+        relativeTo: nil
+    ];
+    view.autorelease()
+}
+
+unsafe fn insert_blurred_view(native_window: id) -> Option<id> {
+    let content_view = NSWindow::contentView(native_window);
+    let frame = NSView::bounds(content_view);
+    let mut blur_view: id = msg_send![BLURRED_VIEW_CLASS, alloc];
+    blur_view = NSView::initWithFrame_(blur_view, frame);
+    if blur_view.is_null() {
+        return None;
+    }
+    blur_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
+    Some(insert_below_content(native_window, blur_view))
+}
+
+/// Embed a native `NSGlassEffectView` when the class exists (macOS 26+).
+///
+/// The glass sits behind the Metal content view so it samples the desktop,
+/// not the GPUI scene. Runtime class lookup keeps the binary free of a
+/// macOS 26 SDK requirement.
+unsafe fn insert_system_glass(native_window: id) -> Option<id> {
+    let class_name = CString::new("NSGlassEffectView").ok()?;
+    let cls: *const Class = objc::runtime::objc_getClass(class_name.as_ptr());
+    if cls.is_null() {
+        return None;
+    }
+    let content_view = NSWindow::contentView(native_window);
+    let frame = NSView::bounds(content_view);
+    let mut glass: id = msg_send![cls, alloc];
+    glass = NSView::initWithFrame_(glass, frame);
+    if glass.is_null() {
+        return None;
+    }
+    glass.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
+    // `NSGlassEffectViewStyleRegular = 0`. Clear is a separate style for
+    // controls that should not pick up the surrounding chrome.
+    let _: () = msg_send![glass, setStyle: 0i64];
+    let _: () = msg_send![glass, setCornerRadius: 0.0f64];
+    Some(insert_below_content(native_window, glass))
 }
 
 extern "C" fn blurred_view_init_with_frame(this: &Object, _: Sel, frame: NSRect) -> id {

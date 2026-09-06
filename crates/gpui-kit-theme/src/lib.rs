@@ -728,6 +728,8 @@ pub struct Effects {
     pub glass_contrast_flip_low: f32,
     pub glass_contrast_flip_high: f32,
     pub glass_press_depth: f32,
+    pub scroll_edge_band: f32,
+    pub scroll_edge_blur: f32,
     /// How strongly a raised surface catches light along its top edge. The
     /// gradient itself is composed by the component, the way [`Theme::glow`]
     /// composes a bloom from a colour and an alpha.
@@ -1257,6 +1259,8 @@ impl Theme {
                 glass_contrast_flip_low: tokens.effect.glass_contrast_flip_low,
                 glass_contrast_flip_high: tokens.effect.glass_contrast_flip_high,
                 glass_press_depth: tokens.effect.glass_press_depth,
+                scroll_edge_band: tokens.effect.scroll_edge_band,
+                scroll_edge_blur: tokens.effect.scroll_edge_blur,
                 sheen_alpha: tokens.effect.sheen_alpha,
                 area_wash_alpha: tokens.effect.area_wash_alpha,
                 header_tint_alpha: tokens.effect.header_tint_alpha,
@@ -1920,6 +1924,36 @@ impl ThemeRegistry {
     /// Returns false when the id is not registered, leaving the active theme
     /// untouched rather than falling back to a default the caller did not ask
     /// for.
+    /// The registered theme of the opposite appearance, if one exists.
+    ///
+    /// Prefers an id that is this theme's id with `-dark` / `-light` swapped,
+    /// then any other document of the opposite appearance. A product that
+    /// registered only one appearance has no counterpart, which a glass
+    /// surface treats as "do not flip".
+    pub fn counterpart(&self) -> Option<Theme> {
+        self.counterpart_for(&self.theme)
+    }
+
+    /// The opposite appearance of `theme`, resolved from this registry.
+    pub fn counterpart_for(&self, theme: &Theme) -> Option<Theme> {
+        let want = match theme.appearance {
+            Appearance::Dark => Appearance::Light,
+            Appearance::Light => Appearance::Dark,
+        };
+        let current_id = theme.id.as_ref();
+        let paired = counterpart_id(current_id);
+        let preferred = self
+            .tokens
+            .iter()
+            .find(|document| document.meta.id == paired && document.meta.appearance == want);
+        let found = preferred.or_else(|| {
+            self.tokens
+                .iter()
+                .find(|document| document.meta.appearance == want && document.meta.id != current_id)
+        })?;
+        Some(Theme::from_tokens(found, self.density))
+    }
+
     pub fn activate(&mut self, id: &str) -> bool {
         let Some(index) = self.tokens.iter().position(|tokens| tokens.meta.id == id) else {
             return false;
@@ -1942,6 +1976,16 @@ impl ThemeRegistry {
 impl Default for ThemeRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn counterpart_id(id: &str) -> String {
+    if let Some(stem) = id.strip_suffix("-dark") {
+        format!("{stem}-light")
+    } else if let Some(stem) = id.strip_suffix("-light") {
+        format!("{stem}-dark")
+    } else {
+        id.to_string()
     }
 }
 
@@ -2292,6 +2336,18 @@ mod tests {
         assert_eq!(registry.active().appearance, Appearance::Light);
         assert!(!registry.activate("studio-solarized"));
         assert_eq!(registry.active().id, "studio-light");
+    }
+
+    #[test]
+    fn the_registry_names_the_opposite_appearance() {
+        let mut registry = ThemeRegistry::new();
+        let light = registry.counterpart().expect("studio-light is bundled");
+        assert_eq!(light.id, "studio-light");
+        assert_eq!(light.appearance, Appearance::Light);
+        assert!(registry.activate("studio-light"));
+        let dark = registry.counterpart().expect("studio-dark is bundled");
+        assert_eq!(dark.id, "studio-dark");
+        assert_eq!(dark.appearance, Appearance::Dark);
     }
 
     #[test]

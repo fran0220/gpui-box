@@ -277,6 +277,9 @@ struct BackdropParams {
     lobe_count: u32,
     blur_radius: u32,
     optical_lift: [f32; 4],
+    edge_mask_edge: f32,
+    edge_mask_band: f32,
+    _mask_pad: [f32; 2],
     lobes: [BackdropLobe; MAX_GLASS_LOBES],
 }
 
@@ -2678,6 +2681,9 @@ impl WgpuRenderer {
                 material.optical_lift.b,
                 material.optical_lift.a,
             ],
+            edge_mask_edge: material.edge_mask_edge,
+            edge_mask_band: material.edge_mask_band.0,
+            _mask_pad: [0.0; 2],
             lobes,
         };
 

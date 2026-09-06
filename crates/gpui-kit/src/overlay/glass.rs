@@ -32,17 +32,33 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use gpui::{
-    AnyElement, App, Bounds, Corners, Element, GlassLobe, GlassMaterial, GlobalElementId,
-    InspectorElementId, InteractiveElement as _, IntoElement, LayoutId, MAX_GLASS_LOBES,
-    MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
+    AnyElement, App, Bounds, Corners, Element, GlassEdge, GlassLobe, GlassMaterial,
+    GlobalElementId, Hsla, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
+    MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme};
+use gpui_kit_theme::{ActiveTheme, Appearance, Radius, Space, Surface, Theme, ThemeRegistry};
 
-use crate::foundation::Ident;
+use crate::foundation::{Ident, ThemeOverlay};
 use crate::layout::measure;
 use crate::motion::{self, MotionPolicy, MotionRole, keyed};
+
+/// Which appearance a glass surface is currently painting.
+///
+/// `Inherited` is the window theme. `Light` and `Dark` are the counterpart
+/// the surface resolved from its backdrop luminance when
+/// [`Glass::adaptive_appearance`] is on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GlassAppearance {
+    /// The window theme is in force.
+    #[default]
+    Inherited,
+    /// The surface installed the light counterpart.
+    Light,
+    /// The surface installed the dark counterpart.
+    Dark,
+}
 
 /// How a glass surface responds to light.
 ///
@@ -203,6 +219,7 @@ impl Drop for ProbeLease {
 struct GlassState {
     pressed: bool,
     deepened: bool,
+    appearance_flipped: bool,
     lease: ProbeLease,
 }
 
@@ -215,6 +232,7 @@ impl Default for GlassState {
             // exposing content over an unknown opposing backdrop. A renderer
             // without probes keeps this legible fallback.
             deepened: true,
+            appearance_flipped: false,
             lease: ProbeLease::default(),
         }
     }
@@ -237,6 +255,9 @@ pub struct Glass {
     track_pointer: bool,
     pressable: bool,
     adaptive: bool,
+    adaptive_appearance: bool,
+    tint: Option<Hsla>,
+    edge_mask: Option<(GlassEdge, f32)>,
     child: Option<AnyElement>,
 }
 
@@ -257,6 +278,9 @@ impl std::fmt::Debug for Glass {
             .field("track_pointer", &self.track_pointer)
             .field("pressable", &self.pressable)
             .field("adaptive", &self.adaptive)
+            .field("adaptive_appearance", &self.adaptive_appearance)
+            .field("tint", &self.tint)
+            .field("edge_mask", &self.edge_mask)
             .field("has_child", &self.child.is_some())
             .finish()
     }
@@ -278,6 +302,9 @@ impl Glass {
             track_pointer: false,
             pressable: false,
             adaptive: false,
+            adaptive_appearance: false,
+            tint: None,
+            edge_mask: None,
             child: None,
         }
     }
@@ -382,6 +409,30 @@ impl Glass {
         self
     }
 
+    /// Flip this surface, and the subtree it holds, to the counterpart
+    /// appearance when the backdrop luminance opposes the current theme.
+    ///
+    /// Uses the same probe and hysteresis as [`Self::adaptive`]. A product
+    /// that registered only one appearance never flips.
+    pub fn adaptive_appearance(mut self, adaptive: bool) -> Self {
+        self.adaptive_appearance = adaptive;
+        self
+    }
+
+    /// Overlay this colour instead of the surface role. The tint is what
+    /// `NSGlassEffectView.tintColor` and a prominent toolbar item are.
+    pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
+        self.tint = Some(tint.into());
+        self
+    }
+
+    /// Fade the optics from `edge` over `band` pixels, for a scroll-edge
+    /// ramp. The inner side of the band is the content itself.
+    pub fn edge_mask(mut self, edge: GlassEdge, band: f32) -> Self {
+        self.edge_mask = Some((edge, band.max(0.0)));
+        self
+    }
+
     pub fn child(mut self, child: impl IntoElement) -> Self {
         self.child = Some(child.into_any_element());
         self
@@ -413,20 +464,25 @@ impl Glass {
         if let Some(light_angle) = self.light_angle {
             material.light_angle = light_angle;
         }
+        if let Some((edge, band)) = self.edge_mask {
+            material.edge_mask_edge = edge.as_f32();
+            material.edge_mask_band = px(band);
+        }
         material
     }
 }
 
 impl RenderOnce for Glass {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme().clone();
+        let mut theme = cx.theme().clone();
         let radius = self.radius_px.unwrap_or_else(|| theme.radius(self.radius));
         let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let mut material = self.material(&theme);
         let bevel = self.preset.bevel(&theme);
 
         let id = self.ident.semantic_id();
-        let interactive = self.track_pointer || self.pressable || self.adaptive;
+        let interactive =
+            self.track_pointer || self.pressable || self.adaptive || self.adaptive_appearance;
         let state = interactive
             .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
         let measured = measure::cell(&id, window, cx);
@@ -463,33 +519,54 @@ impl RenderOnce for Glass {
             material.refraction *= depth;
         }
 
-        if self.adaptive
+        if (self.adaptive || self.adaptive_appearance)
             && let Some(state) = &state
         {
             let mut state = state.borrow_mut();
             if let Some(slot) = state.lease.slot() {
                 material.probe = slot;
                 if let Some(luminance) = window.backdrop_luminance(slot) {
-                    state.deepened = deepen_tint(
-                        state.deepened,
-                        luminance,
-                        theme.surface(self.surface).l < 0.5,
-                        theme.effects.glass_contrast_flip_low,
-                        theme.effects.glass_contrast_flip_high,
-                    );
+                    if self.adaptive {
+                        state.deepened = deepen_tint(
+                            state.deepened,
+                            luminance,
+                            theme.surface(self.surface).l < 0.5,
+                            theme.effects.glass_contrast_flip_low,
+                            theme.effects.glass_contrast_flip_high,
+                        );
+                    }
+                    if self.adaptive_appearance {
+                        state.appearance_flipped = deepen_tint(
+                            state.appearance_flipped,
+                            luminance,
+                            theme.appearance == Appearance::Dark,
+                            theme.effects.glass_contrast_flip_low,
+                            theme.effects.glass_contrast_flip_high,
+                        );
+                    }
                 }
             }
-            if state.deepened {
+            if self.adaptive && state.deepened {
                 alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
             }
         }
 
-        let fill = theme.surface(self.surface).opacity(alpha);
-        let fallback = (alpha == 0.0).then(|| {
-            theme
-                .surface(self.surface)
-                .opacity(theme.effects.glass_alpha)
-        });
+        let mut overlay_theme = None;
+        if self.adaptive_appearance
+            && state
+                .as_ref()
+                .is_some_and(|state| state.borrow().appearance_flipped)
+            && let Some(counterpart) = cx
+                .try_global::<ThemeRegistry>()
+                .and_then(ThemeRegistry::counterpart)
+        {
+            theme = counterpart;
+            overlay_theme = Some(theme.clone());
+        }
+
+        let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
+        let fill = tone.opacity(alpha);
+        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
         let translucent = alpha < 1.0;
 
         let surface = div()
@@ -530,7 +607,24 @@ impl RenderOnce for Glass {
                 }
                 window.refresh();
             });
-            return BackdropLayer {
+            return finish_glass(
+                overlay_theme,
+                BackdropLayer {
+                    radius: px(radius),
+                    material,
+                    bevel,
+                    lobes: LobeSource::Surface,
+                    translucent,
+                    fallback,
+                    measured: Some(measured),
+                    child: stateful.into_any_element(),
+                },
+            );
+        }
+
+        finish_glass(
+            overlay_theme,
+            BackdropLayer {
                 radius: px(radius),
                 material,
                 bevel,
@@ -538,20 +632,16 @@ impl RenderOnce for Glass {
                 translucent,
                 fallback,
                 measured: Some(measured),
-                child: stateful.into_any_element(),
-            };
-        }
+                child: surface.into_any_element(),
+            },
+        )
+    }
+}
 
-        BackdropLayer {
-            radius: px(radius),
-            material,
-            bevel,
-            lobes: LobeSource::Surface,
-            translucent,
-            fallback,
-            measured: Some(measured),
-            child: surface.into_any_element(),
-        }
+fn finish_glass(overlay_theme: Option<Theme>, layer: BackdropLayer) -> AnyElement {
+    match overlay_theme {
+        Some(theme) => ThemeOverlay::theme(theme, layer).into_any_element(),
+        None => layer.into_any_element(),
     }
 }
 
@@ -578,6 +668,7 @@ pub struct GlassGroup {
     preset: GlassPreset,
     merge: Option<f32>,
     gap: Option<f32>,
+    tint: Option<Hsla>,
     panes: Vec<(Ident, AnyElement)>,
 }
 
@@ -592,6 +683,7 @@ impl std::fmt::Debug for GlassGroup {
             .field("preset", &self.preset)
             .field("merge", &self.merge)
             .field("gap", &self.gap)
+            .field("tint", &self.tint)
             .field("panes", &self.panes.len())
             .finish()
     }
@@ -607,6 +699,7 @@ impl GlassGroup {
             preset: GlassPreset::default(),
             merge: None,
             gap: None,
+            tint: None,
             panes: Vec::new(),
         }
     }
@@ -652,6 +745,12 @@ impl GlassGroup {
         self
     }
 
+    /// Overlay this colour on every pane instead of the surface role.
+    pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
+        self.tint = Some(tint.into());
+        self
+    }
+
     /// One pane of the body: a lobe of the shape, a fill, and the caller's
     /// content.
     pub fn pane(mut self, ident: impl Into<Ident>, child: impl IntoElement) -> Self {
@@ -669,12 +768,9 @@ impl RenderOnce for GlassGroup {
         let theme = cx.theme().clone();
         let radius = theme.radius(self.radius);
         let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
-        let fill = theme.surface(self.surface).opacity(alpha);
-        let fallback = (alpha == 0.0).then(|| {
-            theme
-                .surface(self.surface)
-                .opacity(theme.effects.glass_alpha)
-        });
+        let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
+        let fill = tone.opacity(alpha);
+        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
         let mut material = self.preset.material(&theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
@@ -1028,6 +1124,25 @@ mod tests {
         assert_eq!(material.hairline, px(theme.effects.glass_hairline));
         assert_eq!(material.light_angle, theme.effects.glass_light_angle);
         assert!(!material.is_flat());
+    }
+
+    #[test]
+    fn a_tint_and_edge_mask_are_caller_owned() {
+        let theme = Theme::studio_dark();
+        let tint = gpui::hsla(0.6, 0.4, 0.5, 1.0);
+        let glass = Glass::new("surface")
+            .preset(GlassPreset::Frosted)
+            .tint(tint)
+            .edge_mask(GlassEdge::Top, 28.0);
+        let material = glass.material(&theme);
+
+        assert_eq!(material.edge_mask_edge, GlassEdge::Top.as_f32());
+        assert_eq!(material.edge_mask_band, px(28.0));
+        assert_eq!(
+            GlassPreset::Frosted.tint_alpha(&theme),
+            theme.effects.glass_alpha
+        );
+        let _ = tint;
     }
 
     #[test]

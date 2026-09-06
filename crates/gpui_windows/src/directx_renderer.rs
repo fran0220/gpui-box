@@ -1860,6 +1860,7 @@ struct BackdropGlassParams {
     hairline: f32,
     _optical_pad: [f32; 2],
     optical_lift: [f32; 4],
+    edge_mask: [f32; 4],
     lobes: [[f32; 4]; MAX_GLASS_LOBES * 2],
 }
 
@@ -1867,7 +1868,7 @@ struct BackdropGlassParams {
 // constant buffer into sixteen-byte registers that a member may not straddle,
 // which is what the groupings above are chosen to respect.
 const _: () = assert!(
-    std::mem::size_of::<BackdropGlassParams>() == 128 + MAX_GLASS_LOBES * 32,
+    std::mem::size_of::<BackdropGlassParams>() == 144 + MAX_GLASS_LOBES * 32,
     "the backdrop parameter buffer must match the cbuffer in shaders.hlsl"
 );
 
@@ -1920,6 +1921,12 @@ impl BackdropGlassParams {
                 glass.material.optical_lift.g,
                 glass.material.optical_lift.b,
                 glass.material.optical_lift.a,
+            ],
+            edge_mask: [
+                glass.material.edge_mask_edge,
+                glass.material.edge_mask_band.0,
+                0.0,
+                0.0,
             ],
             lobes,
         }

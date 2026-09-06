@@ -2281,6 +2281,12 @@ pub enum WindowBackgroundAppearance {
     MicaBackdrop,
     /// The Mica Alt backdrop material, supported on Windows 11.
     MicaAltBackdrop,
+    /// The current platform's system glass material.
+    ///
+    /// On macOS 26+ this is `NSGlassEffectView` at the regular style, composited
+    /// behind the window's content. On Windows 11 it is the main-window Mica
+    /// backdrop. Other platforms treat it as [`Self::Opaque`].
+    SystemGlass,
 }
 
 /// The text rendering mode to use for drawing glyphs.

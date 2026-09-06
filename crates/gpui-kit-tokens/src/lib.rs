@@ -332,6 +332,8 @@ impl TokenDocument {
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
             ("effect.glassFrostBlur", self.effect.glass_frost_blur),
+            ("effect.scrollEdgeBand", self.effect.scroll_edge_band),
+            ("effect.scrollEdgeBlur", self.effect.scroll_edge_blur),
             ("effect.glassBevelMin", self.effect.glass_bevel_min),
             ("effect.glassBevelMax", self.effect.glass_bevel_max),
             ("effect.glassRefraction", self.effect.glass_refraction),
@@ -2607,6 +2609,12 @@ pub struct EffectTokens {
     /// How much thicker a pressable glass surface reads while pressed, as a
     /// factor on its refraction. 1 is a surface that does not deform.
     pub glass_press_depth: f32,
+    /// How far a scroll-edge effect reaches from a floating surface into the
+    /// scrolling content, in pixels.
+    pub scroll_edge_band: f32,
+    /// How far the soft scroll-edge effect scatters the content under that
+    /// band, in pixels.
+    pub scroll_edge_blur: f32,
     /// How strongly a raised surface catches light along its top edge.
     ///
     /// The scalar of a gradient rather than a gradient: this library composes

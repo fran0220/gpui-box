@@ -645,7 +645,10 @@ impl WaylandWindowState {
 
     pub fn is_transparent(&self) -> bool {
         self.decorations == WindowDecorations::Client
-            || self.background_appearance != WindowBackgroundAppearance::Opaque
+            || !matches!(
+                self.background_appearance,
+                WindowBackgroundAppearance::Opaque | WindowBackgroundAppearance::SystemGlass
+            )
     }
 
     fn update_subpixel_layout(&mut self) {
@@ -2026,8 +2029,10 @@ fn update_window(mut state: RefMut<WaylandWindowState>) {
 
     // Note that rounded corners make this rectangle API hard to work with.
     // As this is common when using CSD, let's just disable this API.
-    if state.background_appearance == WindowBackgroundAppearance::Opaque
-        && state.decorations == WindowDecorations::Server
+    if matches!(
+        state.background_appearance,
+        WindowBackgroundAppearance::Opaque | WindowBackgroundAppearance::SystemGlass
+    ) && state.decorations == WindowDecorations::Server
     {
         // Promise the compositor that this region of the window surface
         // contains no transparent pixels. This allows the compositor to skip

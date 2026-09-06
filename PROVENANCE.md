@@ -683,3 +683,23 @@ its controlled boundary with behavior tests for persistence fixpoints and empty
 stacks, malformed-record refusal, unrelated-ratio stability, split-local resize
 intents, one move intent per completed drop, and dimensionless ratios. No dock
 source from this release was copied or translated by this audit.
+
+## P19: system glass and scroll-edge design intent
+
+- Design source: Apple WWDC25 session 310, "Build an AppKit app with the new
+  design"
+- Scope: design intent only — floating chrome on glass, content edge-to-edge,
+  scroll-edge separation, adaptive appearance, and `NSGlassEffectView` as the
+  current macOS window material
+- Destinations: `crates/gpui/src/platform.rs` (`WindowBackgroundAppearance::SystemGlass`),
+  `crates/gpui_macos/src/window.rs` (runtime `NSGlassEffectView` embed),
+  `crates/gpui/src/scene.rs` (`GlassMaterial` edge mask),
+  `crates/gpui-kit/src/overlay/glass.rs` (`tint`, `adaptive_appearance`),
+  `crates/gpui-kit/src/layout/scroll_edge.rs`
+
+No Apple source was copied. The macOS path looks up `NSGlassEffectView` at
+runtime and does not link a macOS 26 SDK. The within-window optics remain the
+P12 dual-source material; the system view only samples the desktop behind the
+window. Windows maps `SystemGlass` to the current DWM Mica backdrop. The
+scroll-edge ramp and counterpart-appearance flip are original GPUI Box work
+that implement the documented design intent on every renderer.

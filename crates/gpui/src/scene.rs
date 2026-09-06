@@ -651,6 +651,8 @@ mod tests {
             specular_sharpness: 0.,
             smoothing: ScaledPixels(-8.),
             probe: NO_LUMINANCE_PROBE,
+            edge_mask_edge: f32::NAN,
+            edge_mask_band: ScaledPixels(-4.),
         }
         .sanitized();
 
@@ -710,6 +712,8 @@ mod tests {
             specular_sharpness: 12.,
             smoothing: Pixels(28.),
             probe: NO_LUMINANCE_PROBE,
+            edge_mask_edge: GlassEdge::Top.as_f32(),
+            edge_mask_band: Pixels(32.),
         };
 
         let device = logical.scale(2.);
@@ -718,6 +722,8 @@ mod tests {
         assert_eq!(device.bevel, ScaledPixels(28.));
         assert_eq!(device.smoothing, ScaledPixels(56.));
         assert_eq!(device.hairline, ScaledPixels(2.));
+        assert_eq!(device.edge_mask_band, ScaledPixels(64.));
+        assert_eq!(device.edge_mask_edge, logical.edge_mask_edge);
         assert_eq!(device.refraction, logical.refraction, "a ratio is a ratio");
         assert_eq!(device.dispersion, logical.dispersion);
         assert_eq!(device.specular, logical.specular);
@@ -963,7 +969,7 @@ mod tests {
                 + size_of::<u32>()
         );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
-        assert_eq!(size_of::<GlassMaterial>(), 15 * size_of::<f32>());
+        assert_eq!(size_of::<GlassMaterial>(), 17 * size_of::<f32>());
         assert_eq!(
             size_of::<PolychromeSprite>(),
             size_of::<DrawOrder>()
@@ -1698,6 +1704,38 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// That source is sharp for clear glass and blurred for frosted glass. See
     /// that method for what the delay means for a caller.
     pub probe: u32,
+    /// Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,
+    /// 3 left, 4 right. Stored as a float so the GPU struct stays one packed
+    /// run of 32-bit words.
+    pub edge_mask_edge: f32,
+    /// How far that fade reaches from the named edge, in the surface's unit.
+    /// Zero disables the mask even when [`Self::edge_mask_edge`] is set.
+    pub edge_mask_band: P,
+}
+
+/// Which edge a glass surface fades from, for a scroll-edge or similar ramp.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[repr(u32)]
+pub enum GlassEdge {
+    /// No fade; the surface applies its optics uniformly.
+    #[default]
+    None = 0,
+    /// Full optics at the top edge, fading toward the bottom of the band.
+    Top = 1,
+    /// Full optics at the bottom edge, fading toward the top of the band.
+    Bottom = 2,
+    /// Full optics at the left edge, fading toward the right of the band.
+    Left = 3,
+    /// Full optics at the right edge, fading toward the left of the band.
+    Right = 4,
+}
+
+impl GlassEdge {
+    /// The GPU-facing discriminant, as a float so the material struct stays
+    /// one packed run of 32-bit words.
+    pub fn as_f32(self) -> f32 {
+        self as u32 as f32
+    }
 }
 
 impl<P: GlassLength> GlassMaterial<P> {
@@ -1719,6 +1757,8 @@ impl<P: GlassLength> GlassMaterial<P> {
             specular_sharpness: 1.,
             smoothing: P::from_raw(0.),
             probe: NO_LUMINANCE_PROBE,
+            edge_mask_edge: 0.,
+            edge_mask_band: P::from_raw(0.),
         }
     }
 
@@ -1775,6 +1815,17 @@ impl<P: GlassLength> GlassMaterial<P> {
         self.light_angle = finite(self.light_angle, 0.);
         self.specular_sharpness = finite(self.specular_sharpness, 1.).max(1.);
         self.smoothing = P::from_raw(finite(self.smoothing.raw(), 0.).max(0.));
+        self.edge_mask_edge = finite(self.edge_mask_edge, 0.).clamp(0., 4.);
+        self.edge_mask_band = P::from_raw(finite(self.edge_mask_band.raw(), 0.).max(0.));
+        self
+    }
+
+    /// Fade this surface from `edge` over `band`, mixing the optical result
+    /// back into the undisplaced sharp snapshot so the inner side of the
+    /// ramp is the content itself.
+    pub fn with_edge_mask(mut self, edge: GlassEdge, band: P) -> Self {
+        self.edge_mask_edge = edge.as_f32();
+        self.edge_mask_band = band;
         self
     }
 }
@@ -1797,6 +1848,8 @@ impl GlassMaterial<Pixels> {
             specular_sharpness: self.specular_sharpness,
             smoothing: self.smoothing.scale(factor),
             probe: self.probe,
+            edge_mask_edge: self.edge_mask_edge,
+            edge_mask_band: self.edge_mask_band.scale(factor),
         }
     }
 }
@@ -2043,6 +2096,25 @@ pub struct GlassField {
     /// The direction the distance increases in, normalized. Zero-length where
     /// the field is flat, which happens at the exact centre of a lobe.
     pub gradient: Point<f32>,
+}
+
+/// How strongly a surface's optics apply at `point`, given a linear edge mask.
+///
+/// 1 keeps the optical result; 0 restores the undisplaced sharp snapshot.
+/// The three shaders implement this same ramp.
+pub fn glass_edge_mask(point: Point<f32>, bounds: Bounds<f32>, edge: f32, band: f32) -> f32 {
+    if edge <= 0. || band <= 0. {
+        return 1.;
+    }
+    if edge < 1.5 {
+        1. - ((point.y - bounds.origin.y) / band).clamp(0., 1.)
+    } else if edge < 2.5 {
+        1. - ((bounds.origin.y + bounds.size.height - point.y) / band).clamp(0., 1.)
+    } else if edge < 3.5 {
+        1. - ((point.x - bounds.origin.x) / band).clamp(0., 1.)
+    } else {
+        1. - ((bounds.origin.x + bounds.size.width - point.x) / band).clamp(0., 1.)
+    }
 }
 
 /// Signed distance from `point` to one lobe, negative inside.

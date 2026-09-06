@@ -1522,6 +1522,24 @@ float glass_lobe_sdf(float2 point, GlassLobe_ScaledPixels lobe) {
 }
 
 // The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
+// Linear fade from a named edge. Mirrors `glass_edge_mask` in scene.rs:
+// 1 keeps the optical result; 0 restores the undisplaced sharp snapshot.
+float glass_edge_mask(float2 point, float4 bounds, float edge, float band) {
+  if (edge <= 0. || band <= 0.) {
+    return 1.;
+  }
+  if (edge < 1.5) {
+    return 1. - saturate((point.y - bounds.y) / band);
+  }
+  if (edge < 2.5) {
+    return 1. - saturate((bounds.y + bounds.w - point.y) / band);
+  }
+  if (edge < 3.5) {
+    return 1. - saturate((point.x - bounds.x) / band);
+  }
+  return 1. - saturate((bounds.x + bounds.z - point.x) / band);
+}
+
 float glass_smooth_min(float a, float b, float smoothing) {
   if (smoothing <= 0.) {
     return min(a, b);
@@ -1614,10 +1632,21 @@ fragment float4 backdrop_glass_fragment(
                                glass.material.optical_lift.g,
                                glass.material.optical_lift.b,
                                glass.material.optical_lift.a);
+  float edge_mask = glass_edge_mask(
+      point,
+      float4(glass.bounds.origin.x, glass.bounds.origin.y, glass.bounds.size.width,
+             glass.bounds.size.height),
+      glass.material.edge_mask_edge, glass.material.edge_mask_band);
+
   if ((bevel <= 0. || refraction == 0.) && specular <= 0. &&
       glass.material.transmission_gain == 1. && optical_lift.a <= 0. &&
       glass.material.hairline <= 0.) {
-    return source_texture.sample(source_sampler, uv);
+    float4 frosted = source_texture.sample(source_sampler, uv);
+    if (edge_mask >= 1.) {
+      return frosted;
+    }
+    float4 original = sharp_texture.sample(source_sampler, uv);
+    return mix(original, frosted, edge_mask);
   }
 
   // The gradient by central differences, on the same half-pixel stencil as
@@ -1688,6 +1717,11 @@ fragment float4 backdrop_glass_fragment(
     float hair = 1. - smoothstep(0., glass.material.hairline * 1.5, -distance);
     float facing_up = saturate(-gradient.y);
     color.rgb += hair * (1. - 0.18 * facing_up) * 0.18;
+  }
+
+  if (edge_mask < 1.) {
+    float4 original = sharp_texture.sample(source_sampler, uv);
+    color = mix(original, color, edge_mask);
   }
 
   return float4(saturate(color.rgb), color.a);

@@ -1489,6 +1489,8 @@ cbuffer BackdropGlassParams: register(b2) {
     float backdrop_hairline;
     float2 backdrop_optical_pad;
     float4 backdrop_optical_lift;
+    // x = edge (0 none, 1 top, 2 bottom, 3 left, 4 right), y = band in pixels.
+    float4 backdrop_edge_mask;
     // Eight lobes, each a bounds and a radii. Written as an array of vectors
     // rather than of structs so that the sixteen-byte constant buffer packing
     // is the one the Rust side lays out.
@@ -1581,6 +1583,34 @@ float backdrop_glass_distance(float2 pt) {
     return distance;
 }
 
+// Linear fade from a named edge. Mirrors `glass_edge_mask` in scene.rs.
+float backdrop_edge_mask_factor(float2 pt) {
+    float edge = backdrop_edge_mask.x;
+    float band = backdrop_edge_mask.y;
+    if (edge <= 0.0 || band <= 0.0) {
+        return 1.0;
+    }
+    if (edge < 1.5) {
+        return 1.0 - saturate((pt.y - backdrop_bounds.y) / band);
+    }
+    if (edge < 2.5) {
+        return 1.0 - saturate((backdrop_bounds.y + backdrop_bounds.w - pt.y) / band);
+    }
+    if (edge < 3.5) {
+        return 1.0 - saturate((pt.x - backdrop_bounds.x) / band);
+    }
+    return 1.0 - saturate((backdrop_bounds.x + backdrop_bounds.z - pt.x) / band);
+}
+
+float4 apply_backdrop_edge_mask(float4 color, float2 pt) {
+    float mask = backdrop_edge_mask_factor(pt);
+    if (mask >= 1.0) {
+        return color;
+    }
+    float4 original = t_backdrop_sharp.Load(int3(int2(pt), 0));
+    return lerp(original, color, mask);
+}
+
 // The optical source and retained sharp snapshot painted back through the
 // surface's shape and material.
 // Mirrors `fs_composite` in backdrop_glass.wgsl and
@@ -1599,7 +1629,7 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) &&
         backdrop_specular <= 0.0 && backdrop_transmission_gain == 1.0 &&
         backdrop_optical_lift.a <= 0.0 && backdrop_hairline <= 0.0) {
-        return t_sprite.Load(int3(int2(pt), 0));
+        return apply_backdrop_edge_mask(t_sprite.Load(int3(int2(pt), 0)), pt);
     }
 
     // The gradient by central differences, on the same half-pixel stencil as
@@ -1672,5 +1702,5 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         color.rgb += hair * (1.0 - 0.18 * facing_up) * 0.18;
     }
 
-    return float4(saturate(color.rgb), color.a);
+    return apply_backdrop_edge_mask(float4(saturate(color.rgb), color.a), pt);
 }

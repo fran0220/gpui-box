@@ -777,6 +777,26 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             "Liquid",
             "Subtle dispersion without turning the backdrop into a smear",
         ))
+        .child(caption(
+            &theme,
+            "Scroll edge: the soft ramp scatters content under floating glass",
+        ))
+        .child(
+            div()
+                .relative()
+                .h(px(PLATE_HEIGHT))
+                .w(px(PLATE_WIDTH))
+                .surface(&theme, Surface::Panel)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(checkerboard(PLATE_WIDTH, PLATE_HEIGHT))
+                .child(
+                    crate::layout::ScrollEdgeEffect::new("scene.glass.scroll-edge")
+                        .top(true)
+                        .soft()
+                        .band(36.0),
+                ),
+        )
         // The last two demonstrations sit side by side so the whole scene
         // stays inside the window a real display can give the gallery, which
         // is where the DirectX renderer gets looked at.
@@ -859,6 +879,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                                 .preset(GlassPreset::Liquid)
                                                 .radius(Radius::Dialog)
                                                 .adaptive(true)
+                                                .adaptive_appearance(true)
                                                 .child(label(
                                                     "Bright",
                                                     "The reading lands next frame",

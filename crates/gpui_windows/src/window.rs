@@ -1024,8 +1024,9 @@ impl PlatformWindow for WindowsWindow {
             WindowBackgroundAppearance::Blurred => {
                 set_window_composition_attribute(hwnd, Some((0, 0, 0, 0)), 4);
             }
-            WindowBackgroundAppearance::MicaBackdrop => {
-                // DWMSBT_MAINWINDOW => MicaBase
+            WindowBackgroundAppearance::MicaBackdrop | WindowBackgroundAppearance::SystemGlass => {
+                // DWMSBT_MAINWINDOW => MicaBase. System glass is the same
+                // current Windows material; there is no older-DWM fallback.
                 dwm_set_window_composition_attribute(hwnd, 2);
             }
             WindowBackgroundAppearance::MicaAltBackdrop => {
