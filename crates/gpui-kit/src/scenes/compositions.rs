@@ -44,6 +44,14 @@ pub(super) fn reading_direction(_window: &mut Window, cx: &mut App) -> AnyElemen
         .child(
             Card::new()
                 .id("scene.rtl.mixed")
+                // A card holding prose rather than rows has to ask for its
+                // interior padding; without it the lines sit on the card's own
+                // edge. Reading right to left is what made that visible here —
+                // the run ends where the card ends, so the last letter of
+                // "الإصدار" stood outside the rounded corner — but the card was
+                // unpadded in both directions and a left-to-right line would
+                // have been against the other edge just as hard.
+                .padded(true)
                 .child(
                     crate::foundation::text(
                         &theme,
