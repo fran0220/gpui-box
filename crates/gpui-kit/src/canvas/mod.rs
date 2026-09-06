@@ -56,6 +56,20 @@ pub use node::{
 };
 pub use toolbar::{CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent};
 
+/// How much of a port's pointer target the drawn socket fills.
+///
+/// The socket a reader aims at and the socket they see are two different
+/// requirements, and `measure.nodePort` can only be one number. It is the
+/// target — the resize grip borrows it for the same reason — so the mark is
+/// taken as a fraction of it and the rest of the box stays invisible.
+///
+/// Drawn at the full target the socket was the loudest thing on a card:
+/// larger than the icon saying what the step is, close to three times the dot
+/// saying what it is doing, and ten times the wire it caps. A connection point
+/// is a place to aim, not a fact about the run, so it now sits under the marks
+/// that carry meaning while the target it answers to does not move.
+pub(crate) const PORT_MARK_SCALE: f32 = 0.65;
+
 /// A stable id built from a prefix and length-delimited parts, so two
 /// different part lists can never collide by concatenation.
 pub(crate) fn composite_id(prefix: &str, parts: &[&str]) -> gpui::SharedString {

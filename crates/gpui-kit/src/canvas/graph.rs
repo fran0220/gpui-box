@@ -36,7 +36,6 @@ use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 use super::band::GraphBand;
-use super::composite_id;
 use super::edge::{
     Anchor, Axis, EdgeColors, EdgePaint, EdgeState, GraphEdge, GraphEndpoint, GraphRouting,
     OrthogonalRoute, PortSide, RouteMetrics, RouteTransform, paint_route, paint_route_stroke,
@@ -45,6 +44,7 @@ use super::edge::{
 use super::minimap::{MinimapView, bounded_view};
 use super::node::{GraphNode, GraphPort, PortDirection, PortType, port_measure_id};
 use super::toolbar::CanvasToolbar;
+use super::{PORT_MARK_SCALE, composite_id};
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
@@ -3066,7 +3066,12 @@ impl RenderOnce for NodeGraph {
                 )
                 .text(port.label().clone())
                 .value(port.direction().name());
-                let diameter = theme.measures.node_port * viewport.zoom;
+                // `reach` is the box that takes the pointer and paints
+                // nothing; `diameter` is the socket that is drawn inside it.
+                // Names, clearance and the settle wash key off whichever of
+                // the two they are actually about.
+                let reach = theme.measures.node_port * viewport.zoom;
+                let diameter = reach * PORT_MARK_SCALE;
                 let label_gap = theme.spacing.xxs * viewport.zoom;
                 let target = preview
                     .as_ref()
@@ -3127,11 +3132,14 @@ impl RenderOnce for NodeGraph {
                 let inner_diameter = diameter * if emphatic { 0.48 } else { 0.34 };
                 let settle = (contraction > 0.0).then(|| {
                     let size = diameter * (1.0 + contraction * 0.9);
-                    let offset = (size - diameter) * 0.5;
+                    // Centred in the target rather than grown from the mark's
+                    // own corner, because the mark no longer fills the box it
+                    // is drawn in.
+                    let offset = (reach - size) * 0.5;
                     div()
                         .absolute()
-                        .left(px(-offset))
-                        .top(px(-offset))
+                        .left(px(offset))
+                        .top(px(offset))
                         .size(px(size))
                         .rounded_full()
                         .bg(color.opacity(theme.effects.semantic_wash_faint_alpha * contraction))
@@ -3180,17 +3188,17 @@ impl RenderOnce for NodeGraph {
                     .child(port.label().clone());
                 let label = match (port.port_side(), port.direction()) {
                     (PortSide::Left, PortDirection::Input) => label
-                        .right(px(diameter + label_gap))
-                        .top(px(diameter + label_gap)),
+                        .right(px(reach + label_gap))
+                        .top(px(reach + label_gap)),
                     (PortSide::Left, PortDirection::Output) => label
-                        .right(px(diameter + label_gap))
-                        .bottom(px(diameter + label_gap)),
-                    (PortSide::Right, PortDirection::Input) => label
-                        .left(px(diameter + label_gap))
-                        .top(px(diameter + label_gap)),
+                        .right(px(reach + label_gap))
+                        .bottom(px(reach + label_gap)),
+                    (PortSide::Right, PortDirection::Input) => {
+                        label.left(px(reach + label_gap)).top(px(reach + label_gap))
+                    }
                     (PortSide::Right, PortDirection::Output) => label
-                        .left(px(diameter + label_gap))
-                        .bottom(px(diameter + label_gap)),
+                        .left(px(reach + label_gap))
+                        .bottom(px(reach + label_gap)),
                     // A port on the top or bottom edge has its wire leaving
                     // straight out of the card, so the name clears it by
                     // standing beside the port and by nothing else: the whole
@@ -3203,16 +3211,13 @@ impl RenderOnce for NodeGraph {
                     // reader cannot tell a name from its own line; inward put
                     // it over whatever the card is showing. Centred, it
                     // straddles the card's edge and covers neither.
-                    (PortSide::Top | PortSide::Bottom, _) => label.left(px(diameter + label_gap)),
+                    (PortSide::Top | PortSide::Bottom, _) => label.left(px(reach + label_gap)),
                 };
-                let mut view = div()
-                    .id(semantic_id)
-                    .group(port_group)
-                    .absolute()
-                    .left(px(at.x - diameter / 2.0))
-                    .top(px(at.y - diameter / 2.0))
-                    .w(px(diameter))
-                    .h(px(diameter))
+                // The socket itself. It answers to the pointer through the
+                // group rather than to its own bounds, so reaching anywhere in
+                // the target lights the mark that target belongs to.
+                let mark = div()
+                    .size(px(diameter))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -3221,18 +3226,14 @@ impl RenderOnce for NodeGraph {
                     .border(px(ring))
                     .border_color(ring_color)
                     .when(emphatic, |element| element.shadow(theme.glow(color)))
-                    .when(candidate == Some(false) && target.is_none(), |element| {
-                        element.opacity(theme.opacity.disabled)
-                    })
                     // Hover strengthens the same material hierarchy rather
                     // than drawing a third outline language around it.
-                    .hover(|style| {
+                    .group_hover(port_group.clone(), |style| {
                         style
                             .bg(theme
                                 .color_wash(theme.colors.node.port_hover, SemanticWash::Strong))
                             .shadow(theme.glow(theme.colors.node.port_hover))
                     })
-                    .children(settle)
                     .map(|element| match port_geometry.glyph {
                         Some(glyph) => element.child(
                             icon(glyph)
@@ -3242,7 +3243,23 @@ impl RenderOnce for NodeGraph {
                         None => {
                             element.child(div().size(px(inner_diameter)).rounded_full().bg(color))
                         }
+                    });
+                let mut view = div()
+                    .id(semantic_id)
+                    .group(port_group)
+                    .absolute()
+                    .left(px(at.x - reach / 2.0))
+                    .top(px(at.y - reach / 2.0))
+                    .w(px(reach))
+                    .h(px(reach))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .when(candidate == Some(false) && target.is_none(), |element| {
+                        element.opacity(theme.opacity.disabled)
                     })
+                    .children(settle)
+                    .child(mark)
                     .children(floating.then_some(label));
                 if editable {
                     view = view.cursor_pointer();

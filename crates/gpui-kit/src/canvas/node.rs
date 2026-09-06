@@ -254,7 +254,13 @@ impl NodeMetrics {
             mark: scaled(theme.measures.status_mark),
             progress: scaled(theme.measures.node_progress),
             row_height: scaled(theme.typography.caption.line_height),
-            port_inset: scaled(theme.measures.node_port / 2.0 + theme.spacing.xs),
+            // Clearance is owed to the socket that is drawn, not to the
+            // pointer target around it: a row's text stops where the reader
+            // can see something, and holding it off the whole target spent
+            // label width on a box nobody can see.
+            port_inset: scaled(
+                theme.measures.node_port * super::PORT_MARK_SCALE / 2.0 + theme.spacing.xs,
+            ),
             // A node is a card, so it takes the card role: the same rounding
             // the group box around it and every other card in the library
             // already read. Bubble is the dialog and message step, and a board
