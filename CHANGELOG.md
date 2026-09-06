@@ -21,6 +21,10 @@ that asked for the older frost.
 `GlassGroup::tint` overlay a caller colour. `Glass::adaptive_appearance`
 installs the registered counterpart theme on the subtree when the backdrop
 luminance opposes the window, using the existing probe and hysteresis.
+`GlassGroup` carries the same `pressable`, `adaptive`, and
+`adaptive_appearance` on the fused body rather than on each pane. A `Flow`
+can pad its scroll content through `content_inset` so rows travel under a
+floating chrome band instead of shrinking the viewport.
 `GlassMaterial` carries a linear edge mask that Metal, WGPU, and DirectX
 apply identically; `ScrollEdgeEffect` is the kit ramp (`Soft` scatters,
 `Hard` is opaque). Tokens `effect.scrollEdgeBand` and `effect.scrollEdgeBlur`

@@ -668,6 +668,9 @@ pub struct GlassGroup {
     preset: GlassPreset,
     merge: Option<f32>,
     gap: Option<f32>,
+    pressable: bool,
+    adaptive: bool,
+    adaptive_appearance: bool,
     tint: Option<Hsla>,
     panes: Vec<(Ident, AnyElement)>,
 }
@@ -683,6 +686,9 @@ impl std::fmt::Debug for GlassGroup {
             .field("preset", &self.preset)
             .field("merge", &self.merge)
             .field("gap", &self.gap)
+            .field("pressable", &self.pressable)
+            .field("adaptive", &self.adaptive)
+            .field("adaptive_appearance", &self.adaptive_appearance)
             .field("tint", &self.tint)
             .field("panes", &self.panes.len())
             .finish()
@@ -699,6 +705,9 @@ impl GlassGroup {
             preset: GlassPreset::default(),
             merge: None,
             gap: None,
+            pressable: false,
+            adaptive: false,
+            adaptive_appearance: false,
             tint: None,
             panes: Vec::new(),
         }
@@ -745,6 +754,28 @@ impl GlassGroup {
         self
     }
 
+    /// Deepen the fused refraction while any pane is pressed, by
+    /// `effect.glassPressDepth`. The response is optical only: the group
+    /// publishes no action of its own.
+    pub fn pressable(mut self, pressable: bool) -> Self {
+        self.pressable = pressable;
+        self
+    }
+
+    /// Add a tint at `effect.glassAlpha` while the optical source opposes the
+    /// surface colour, using the same probe and hysteresis as [`Glass::adaptive`].
+    pub fn adaptive(mut self, adaptive: bool) -> Self {
+        self.adaptive = adaptive;
+        self
+    }
+
+    /// Flip this fused body, and the subtree it holds, to the counterpart
+    /// appearance when the backdrop luminance opposes the current theme.
+    pub fn adaptive_appearance(mut self, adaptive: bool) -> Self {
+        self.adaptive_appearance = adaptive;
+        self
+    }
+
     /// Overlay this colour on every pane instead of the surface role.
     pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
         self.tint = Some(tint.into());
@@ -760,24 +791,94 @@ impl GlassGroup {
 }
 
 impl RenderOnce for GlassGroup {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         debug_assert!(
             self.panes.len() <= MAX_GLASS_LOBES,
             "a glass group holds at most {MAX_GLASS_LOBES} panes"
         );
-        let theme = cx.theme().clone();
+        let mut theme = cx.theme().clone();
         let radius = theme.radius(self.radius);
-        let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
-        let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
-        let fill = tone.opacity(alpha);
-        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
+        let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let mut material = self.preset.material(&theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
         }
         material.smoothing = px(self.merge.unwrap_or(theme.effects.glass_merge_distance));
-        let translucent = alpha < 1.0;
         let bevel = self.preset.bevel(&theme);
+
+        let id = self.ident.semantic_id();
+        let interactive = self.pressable || self.adaptive || self.adaptive_appearance;
+        let state = interactive
+            .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
+
+        // A press deepens the fused outline, not each pane: the group is one
+        // body, so the finger answers against the joined refraction.
+        if self.pressable {
+            let pressed = state.as_ref().is_some_and(|state| state.borrow().pressed);
+            let target = if pressed {
+                theme.effects.glass_press_depth
+            } else {
+                1.0
+            };
+            let depth = motion::tracked(
+                &id,
+                target,
+                MotionPolicy::spec(MotionRole::StateChange, &theme),
+                window,
+                cx,
+            );
+            material.refraction *= depth;
+        }
+
+        if (self.adaptive || self.adaptive_appearance)
+            && let Some(state) = &state
+        {
+            let mut state = state.borrow_mut();
+            if let Some(slot) = state.lease.slot() {
+                material.probe = slot;
+                if let Some(luminance) = window.backdrop_luminance(slot) {
+                    if self.adaptive {
+                        state.deepened = deepen_tint(
+                            state.deepened,
+                            luminance,
+                            theme.surface(self.surface).l < 0.5,
+                            theme.effects.glass_contrast_flip_low,
+                            theme.effects.glass_contrast_flip_high,
+                        );
+                    }
+                    if self.adaptive_appearance {
+                        state.appearance_flipped = deepen_tint(
+                            state.appearance_flipped,
+                            luminance,
+                            theme.appearance == Appearance::Dark,
+                            theme.effects.glass_contrast_flip_low,
+                            theme.effects.glass_contrast_flip_high,
+                        );
+                    }
+                }
+            }
+            if self.adaptive && state.deepened {
+                alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
+            }
+        }
+
+        let mut overlay_theme = None;
+        if self.adaptive_appearance
+            && state
+                .as_ref()
+                .is_some_and(|state| state.borrow().appearance_flipped)
+            && let Some(counterpart) = cx
+                .try_global::<ThemeRegistry>()
+                .and_then(ThemeRegistry::counterpart)
+        {
+            theme = counterpart;
+            overlay_theme = Some(theme.clone());
+        }
+
+        let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
+        let fill = tone.opacity(alpha);
+        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
+        let translucent = alpha < 1.0;
         let collected: Rc<RefCell<Vec<GlassLobe<Pixels>>>> = Rc::default();
 
         let row = div()
@@ -798,16 +899,47 @@ impl RenderOnce for GlassGroup {
             }))
             .semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Group));
 
-        BackdropLayer {
-            radius: px(radius),
-            material,
-            bevel,
-            lobes: LobeSource::Collected(collected),
-            translucent,
-            fallback,
-            measured: None,
-            child: row.into_any_element(),
-        }
+        let child = if interactive {
+            let mut stateful = row;
+            if self.pressable
+                && let Some(state) = &state
+            {
+                let press = Rc::clone(state);
+                stateful = stateful.on_mouse_down(MouseButton::Left, move |_, window, _| {
+                    press.borrow_mut().pressed = true;
+                    window.refresh();
+                });
+                let release = Rc::clone(state);
+                stateful = stateful.on_mouse_up(MouseButton::Left, move |_, window, _| {
+                    release.borrow_mut().pressed = false;
+                    window.refresh();
+                });
+            }
+            let leave = state.clone();
+            stateful = stateful.on_hover(move |hovered, window, _| {
+                if !*hovered && let Some(state) = &leave {
+                    state.borrow_mut().pressed = false;
+                }
+                window.refresh();
+            });
+            stateful.into_any_element()
+        } else {
+            row.into_any_element()
+        };
+
+        finish_glass(
+            overlay_theme,
+            BackdropLayer {
+                radius: px(radius),
+                material,
+                bevel,
+                lobes: LobeSource::Collected(collected),
+                translucent,
+                fallback,
+                measured: None,
+                child,
+            },
+        )
     }
 }
 

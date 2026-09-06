@@ -77,6 +77,7 @@ pub struct Flow {
     estimate: Option<f32>,
     alignment: ListAlignment,
     extent: Extent,
+    inset: Option<(f32, f32)>,
 }
 
 impl std::fmt::Debug for Flow {
@@ -87,6 +88,7 @@ impl std::fmt::Debug for Flow {
             .field("count", &self.count)
             .field("named", &self.keys.is_some())
             .field("extent", &self.extent)
+            .field("inset", &self.inset)
             .finish()
     }
 }
@@ -111,6 +113,7 @@ impl Flow {
             estimate: None,
             alignment: ListAlignment::Top,
             extent: Extent::Content,
+            inset: None,
         }
     }
 
@@ -157,6 +160,15 @@ impl Flow {
         self.extent = Extent::Fill;
         self
     }
+
+    /// Pad the scroll content, not the viewport. Rows start below `top` and
+    /// can travel through that band as the surface scrolls, which is how a
+    /// conversation keeps its first turn readable under a floating titlebar
+    /// without shrinking the list itself.
+    pub fn content_inset(mut self, top: f32, bottom: f32) -> Self {
+        self.inset = Some((top.max(0.0), bottom.max(0.0)));
+        self
+    }
 }
 
 impl RenderOnce for Flow {
@@ -182,6 +194,7 @@ impl RenderOnce for Flow {
         );
         let render_row = Rc::clone(&self.render_row);
         let extent = self.extent;
+        let inset = self.inset;
 
         list(state, move |index, window, cx| {
             render_row(index, window, cx)
@@ -201,5 +214,8 @@ impl RenderOnce for Flow {
             },
             |element, rows| element.h(px(estimate * rows as f32)),
         )
+        .when_some(inset, |element, (top, bottom)| {
+            element.pt(px(top)).pb(px(bottom))
+        })
     }
 }
