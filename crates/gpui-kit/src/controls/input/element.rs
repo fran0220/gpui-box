@@ -109,6 +109,7 @@ impl Element for TextElement {
             color: text_color,
             background_color: None,
             background_radius: None,
+            background_padding: None,
             underline: None,
             strikethrough: None,
         };

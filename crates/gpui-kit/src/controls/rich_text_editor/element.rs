@@ -8,7 +8,7 @@ use gpui::{
     StrikethroughStyle, Style, TextAlign, TextRun, UnderlineStyle, Window, fill, font, point, px,
     relative, size,
 };
-use gpui_kit_theme::{ActiveTheme, Radius};
+use gpui_kit_theme::{ActiveTheme, Radius, Space};
 
 use crate::content::{
     RichTextAlignment, RichTextBlock, RichTextFormat, RichTextListKind, RichTextSelection,
@@ -182,6 +182,7 @@ impl Element for RichTextEditorElement {
                     color: theme.colors.text_placeholder,
                     background_color: None,
                     background_radius: None,
+                    background_padding: None,
                     underline: None,
                     strikethrough: None,
                 }]
@@ -212,6 +213,7 @@ impl Element for RichTextEditorElement {
                     },
                     background_color: None,
                     background_radius: None,
+                    background_padding: None,
                     underline: None,
                     strikethrough: None,
                 };
@@ -502,6 +504,7 @@ fn runs_for_block(
             color: base.color,
             background_color: None,
             background_radius: None,
+            background_padding: None,
             underline: None,
             strikethrough: None,
         }];
@@ -576,6 +579,13 @@ fn runs_for_block(
                 background_radius: style
                     .format(RichTextFormat::Code)
                     .then_some(px(theme.radius(Radius::Small))),
+                // Code inside a sentence is a chip, and a chip whose fill stops
+                // on the letterforms reads as a rendering fault rather than as
+                // code. The room is paint, so the words on either side of it do
+                // not move when a span becomes code.
+                background_padding: style
+                    .format(RichTextFormat::Code)
+                    .then_some(px(theme.space(Space::Xxs))),
                 underline: diagnostic_color
                     .map(|color| UnderlineStyle {
                         color: Some(color),

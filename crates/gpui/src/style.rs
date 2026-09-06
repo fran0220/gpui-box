@@ -613,6 +613,7 @@ impl TextStyle {
             color: self.color,
             background_color: self.background_color,
             background_radius: None,
+            background_padding: None,
             underline: self.underline,
             strikethrough: self.strikethrough,
         }
@@ -638,6 +639,22 @@ pub struct HighlightStyle {
     /// A uniform corner radius for each painted fragment of the background.
     pub background_radius: Option<Pixels>,
 
+    /// How far each painted fragment of the background reaches past the run's
+    /// glyphs, horizontally, on each side.
+    ///
+    /// Decoration, so it grows the quad and moves nothing: the run keeps the
+    /// advance width it was shaped to, the glyphs stay where they were laid
+    /// out, and the text around them does not reflow. That is the whole reason
+    /// this is here rather than in the layout — a marked word inside a
+    /// sentence cannot pay for its own breathing room by pushing the sentence
+    /// apart.
+    ///
+    /// Without it a background is painted exactly on the glyph advances, so a
+    /// highlighted word is jammed against its own fill on both sides, and
+    /// [`Self::background_radius`] makes it worse rather than better by
+    /// rounding a corner into the first and last letter.
+    pub background_padding: Option<Pixels>,
+
     /// The underline style of the text
     pub underline: Option<UnderlineStyle>,
 
@@ -657,6 +674,7 @@ impl Hash for HighlightStyle {
         self.font_style.hash(state);
         self.background_color.hash(state);
         self.background_radius.hash(state);
+        self.background_padding.hash(state);
         self.underline.hash(state);
         self.strikethrough.hash(state);
         state.write_u32(u32::from_be_bytes(
@@ -955,6 +973,7 @@ impl From<&TextStyle> for HighlightStyle {
             font_style: Some(other.font_style),
             background_color: other.background_color,
             background_radius: None,
+            background_padding: None,
             underline: other.underline,
             strikethrough: other.strikethrough,
             fade_out: None,
@@ -989,6 +1008,7 @@ impl HighlightStyle {
             font_style: other.font_style.or(self.font_style),
             background_color: other.background_color.or(self.background_color),
             background_radius: other.background_radius.or(self.background_radius),
+            background_padding: None,
             underline: other.underline.or(self.underline),
             strikethrough: other.strikethrough.or(self.strikethrough),
             fade_out: other
@@ -1447,6 +1467,7 @@ mod tests {
             font_weight: Some(FontWeight(300.)),
             background_color: Some(yellow()),
             background_radius: Some(px(2.)),
+            background_padding: None,
             underline: Some(UnderlineStyle {
                 thickness: px(2.),
                 color: Some(red()),
@@ -1480,6 +1501,7 @@ mod tests {
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
             background_radius: Some(px(4.)),
+            background_padding: None,
             underline: Some(UnderlineStyle {
                 thickness: px(4.),
                 color: None,
@@ -1499,6 +1521,7 @@ mod tests {
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
             background_radius: Some(px(4.)),
+            background_padding: None,
             underline: Some(UnderlineStyle {
                 thickness: px(4.),
                 color: None,

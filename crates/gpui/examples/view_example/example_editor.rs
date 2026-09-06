@@ -418,6 +418,7 @@ impl Element for EditorText {
                 background_radius: None,
                 underline: None,
                 strikethrough: None,
+                background_padding: None,
             };
             vec![
                 window
@@ -437,6 +438,7 @@ impl Element for EditorText {
                         background_radius: None,
                         underline: None,
                         strikethrough: None,
+                        background_padding: None,
                     };
                     window
                         .text_system()

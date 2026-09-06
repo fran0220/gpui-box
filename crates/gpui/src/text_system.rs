@@ -414,6 +414,7 @@ impl WindowTextSystem {
                 && last_run.strikethrough == run.strikethrough
                 && last_run.background_color == run.background_color
                 && last_run.background_radius == run.background_radius
+                && last_run.background_padding == run.background_padding
             {
                 last_run.len += run.len as u32;
                 continue;
@@ -423,6 +424,7 @@ impl WindowTextSystem {
                 color: run.color,
                 background_color: run.background_color,
                 background_radius: run.background_radius,
+                background_padding: run.background_padding,
                 underline: run.underline,
                 strikethrough: run.strikethrough,
             });
@@ -464,6 +466,7 @@ impl WindowTextSystem {
                 && last_run.strikethrough == run.strikethrough
                 && last_run.background_color == run.background_color
                 && last_run.background_radius == run.background_radius
+                && last_run.background_padding == run.background_padding
             {
                 last_run.len += run.len as u32;
                 continue;
@@ -473,6 +476,7 @@ impl WindowTextSystem {
                 color: run.color,
                 background_color: run.background_color,
                 background_radius: run.background_radius,
+                background_padding: run.background_padding,
                 underline: run.underline,
                 strikethrough: run.strikethrough,
             });
@@ -544,6 +548,7 @@ impl WindowTextSystem {
                     && last_run.strikethrough == run.strikethrough
                     && last_run.background_color == run.background_color
                     && last_run.background_radius == run.background_radius
+                    && last_run.background_padding == run.background_padding
                 {
                     last_run.len += run_len_within_line as u32;
                     false
@@ -553,6 +558,7 @@ impl WindowTextSystem {
                         color: run.color,
                         background_color: run.background_color,
                         background_radius: run.background_radius,
+                        background_padding: run.background_padding,
                         underline: run.underline,
                         strikethrough: run.strikethrough,
                     });
@@ -1008,6 +1014,9 @@ pub struct TextRun {
     pub background_color: Option<Hsla>,
     /// A uniform corner radius for each background fragment.
     pub background_radius: Option<Pixels>,
+    /// How far each background fragment reaches past this run's glyphs,
+    /// horizontally, on each side. Paint only; the run keeps its advances.
+    pub background_padding: Option<Pixels>,
     /// The underline style (if any)
     pub underline: Option<UnderlineStyle>,
     /// The strikethrough style (if any)

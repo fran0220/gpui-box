@@ -500,7 +500,11 @@ impl StyledText {
                 .clone()
                 .highlight(highlight)
                 .to_run(range.len());
+            // Both of these are properties of the painted background rather
+            // than of the text style, so `to_run` does not carry them and they
+            // are copied across here.
             run.background_radius = highlight.background_radius;
+            run.background_padding = highlight.background_padding;
             runs.push(run);
             ix = range.end;
         }

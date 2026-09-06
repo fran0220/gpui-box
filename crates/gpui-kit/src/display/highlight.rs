@@ -33,7 +33,7 @@ use gpui::{
     Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius};
+use gpui_kit_theme::{ActiveTheme, Radius, Space};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::ActiveNumbers;
@@ -198,6 +198,15 @@ impl RenderOnce for HighlightedText {
                                     .opacity(theme.effects.semantic_wash_alpha)
                             }),
                             background_radius: Some(px(theme.radius(Radius::Small))),
+                            // A mark is a chip, and a chip whose fill stops on
+                            // the letterforms reads as a defect rather than as
+                            // emphasis — the rounding makes it worse by cutting
+                            // a corner out of the first and last letter. The
+                            // room is paint, not layout: a marked word inside a
+                            // sentence cannot push the sentence apart to make
+                            // space for itself, so the fill grows and the words
+                            // stay where the reader last saw them.
+                            background_padding: Some(px(theme.space(Space::Xxs))),
                             ..Default::default()
                         },
                     )

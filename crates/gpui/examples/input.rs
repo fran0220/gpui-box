@@ -470,6 +470,7 @@ impl Element for TextElement {
             background_radius: None,
             underline: None,
             strikethrough: None,
+            background_padding: None,
         };
         let runs = if let Some(marked_range) = input.marked_range.as_ref() {
             vec![

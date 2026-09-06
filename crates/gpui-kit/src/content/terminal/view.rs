@@ -900,6 +900,7 @@ fn shape_row(
                 color,
                 background_color: None,
                 background_radius: None,
+                background_padding: None,
                 underline,
                 strikethrough: None,
             }),

@@ -35,6 +35,11 @@ pub struct DecorationRun {
     /// A uniform corner radius for each background fragment.
     pub background_radius: Option<Pixels>,
 
+    /// How far each background fragment reaches past this run's glyphs,
+    /// horizontally, on each side. Paint only: the run keeps its advance
+    /// width, so growing the fill reflows nothing around it.
+    pub background_padding: Option<Pixels>,
+
     /// The underline style for this run
     pub underline: Option<UnderlineStyle>,
 
@@ -197,6 +202,7 @@ impl ShapedLine {
                     color: decoration.color,
                     background_color: decoration.background_color,
                     background_radius: decoration.background_radius,
+                    background_padding: decoration.background_padding,
                     underline: decoration.underline,
                     strikethrough: decoration.strikethrough,
                 });
@@ -205,6 +211,7 @@ impl ShapedLine {
                     color: decoration.color,
                     background_color: decoration.background_color,
                     background_radius: decoration.background_radius,
+                    background_padding: decoration.background_padding,
                     underline: decoration.underline,
                     strikethrough: decoration.strikethrough,
                 });
@@ -598,10 +605,21 @@ fn paint_line_background(
     window: &mut Window,
     cx: &mut App,
 ) -> Result<()> {
+    // A padded background reaches past the run it belongs to, and a run at
+    // either end of the line reaches past the line. The layer is grown by the
+    // widest padding any run asked for, so the first and last marked word keep
+    // the breathing room every word between them gets; clipping them instead
+    // would produce exactly the jammed edge the padding exists to prevent, and
+    // only ever at the ends.
+    let widest_padding = decoration_runs
+        .iter()
+        .filter(|run| run.background_color.is_some())
+        .filter_map(|run| run.background_padding)
+        .fold(px(0.), Pixels::max);
     let line_bounds = Bounds::new(
-        origin,
+        point(origin.x - widest_padding, origin.y),
         size(
-            layout.width,
+            layout.width + widest_padding * 2.,
             line_height * (wrap_boundaries.len() as f32 + 1.),
         ),
     );
@@ -609,7 +627,8 @@ fn paint_line_background(
         let mut decoration_runs = decoration_runs.iter();
         let mut wraps = wrap_boundaries.iter().peekable();
         let mut run_end = 0;
-        let mut current_background: Option<(Point<Pixels>, Hsla, Option<Pixels>)> = None;
+        let mut current_background: Option<(Point<Pixels>, Hsla, Option<Pixels>, Option<Pixels>)> =
+            None;
         let text_system = cx.text_system().clone();
         let mut glyph_origin = point(
             aligned_origin_x(
@@ -632,19 +651,23 @@ fn paint_line_background(
 
                 if wraps.peek() == Some(&&WrapBoundary { run_ix, glyph_ix }) {
                     wraps.next();
-                    if let Some((background_origin, background_color, background_radius)) =
-                        current_background.as_mut()
+                    if let Some((
+                        background_origin,
+                        background_color,
+                        background_radius,
+                        background_padding,
+                    )) = current_background.as_mut()
                     {
                         if glyph_origin.x == background_origin.x {
                             background_origin.x -= max_glyph_size.width.half()
                         }
                         window.paint_quad(text_background(
-                            Bounds {
-                                origin: *background_origin,
-                                size: size(glyph_origin.x - background_origin.x, line_height),
-                            },
+                            *background_origin,
+                            glyph_origin.x - background_origin.x,
+                            line_height,
                             *background_color,
                             *background_radius,
+                            *background_padding,
                         ));
                         if glyph.index < run_end {
                             background_origin.x = origin.x;
@@ -666,7 +689,12 @@ fn paint_line_background(
                 }
                 prev_glyph_position = glyph.position;
 
-                let mut finished_background: Option<(Point<Pixels>, Hsla, Option<Pixels>)> = None;
+                let mut finished_background: Option<(
+                    Point<Pixels>,
+                    Hsla,
+                    Option<Pixels>,
+                    Option<Pixels>,
+                )> = None;
                 if glyph.index >= run_end {
                     let mut style_run = decoration_runs.next();
 
@@ -680,10 +708,11 @@ fn paint_line_background(
                     }
 
                     if let Some(style_run) = style_run {
-                        if let Some((_, background_color, background_radius)) =
+                        if let Some((_, background_color, background_radius, background_padding)) =
                             &mut current_background
                             && (style_run.background_color.as_ref() != Some(background_color)
-                                || style_run.background_radius != *background_radius)
+                                || style_run.background_radius != *background_radius
+                                || style_run.background_padding != *background_padding)
                         {
                             finished_background = current_background.take();
                         }
@@ -692,6 +721,7 @@ fn paint_line_background(
                                 point(glyph_origin.x, glyph_origin.y),
                                 run_background,
                                 style_run.background_radius,
+                                style_run.background_padding,
                             ));
                         }
                         run_end += style_run.len as usize;
@@ -701,8 +731,12 @@ fn paint_line_background(
                     }
                 }
 
-                if let Some((mut background_origin, background_color, background_radius)) =
-                    finished_background
+                if let Some((
+                    mut background_origin,
+                    background_color,
+                    background_radius,
+                    background_padding,
+                )) = finished_background
                 {
                     let mut width = glyph_origin.x - background_origin.x;
                     if background_origin.x == glyph_origin.x {
@@ -710,12 +744,12 @@ fn paint_line_background(
                         width = glyph_origin.x - background_origin.x;
                     };
                     window.paint_quad(text_background(
-                        Bounds {
-                            origin: background_origin,
-                            size: size(width, line_height),
-                        },
+                        background_origin,
+                        width,
+                        line_height,
                         background_color,
                         background_radius,
+                        background_padding,
                     ));
                 }
             }
@@ -728,19 +762,23 @@ fn paint_line_background(
             last_line_end_x -= glyph.position.x;
         }
 
-        if let Some((mut background_origin, background_color, background_radius)) =
-            current_background.take()
+        if let Some((
+            mut background_origin,
+            background_color,
+            background_radius,
+            background_padding,
+        )) = current_background.take()
         {
             if last_line_end_x == background_origin.x {
                 background_origin.x -= max_glyph_size.width.half()
             };
             window.paint_quad(text_background(
-                Bounds {
-                    origin: background_origin,
-                    size: size(last_line_end_x - background_origin.x, line_height),
-                },
+                background_origin,
+                last_line_end_x - background_origin.x,
+                line_height,
                 background_color,
                 background_radius,
+                background_padding,
             ));
         }
 
@@ -748,11 +786,25 @@ fn paint_line_background(
     })
 }
 
+/// The quad behind one run of text.
+///
+/// `padding` reaches past the run's advances on both sides. It is applied here
+/// rather than by the caller so that every one of the four places a background
+/// is finished — mid-run, at a wrap, at the end of a run, and at the end of the
+/// line — grows it the same way.
 fn text_background(
-    bounds: Bounds<Pixels>,
+    origin: Point<Pixels>,
+    width: Pixels,
+    height: Pixels,
     color: Hsla,
     radius: Option<Pixels>,
+    padding: Option<Pixels>,
 ) -> crate::PaintQuad {
+    let padding = padding.unwrap_or(px(0.));
+    let bounds = Bounds {
+        origin: point(origin.x - padding, origin.y),
+        size: size(width + padding * 2., height),
+    };
     match radius {
         Some(radius) => quad(
             bounds,
@@ -1017,6 +1069,7 @@ mod tests {
                     color: red,
                     background_color: None,
                     background_radius: None,
+                    background_padding: None,
                     underline: None,
                     strikethrough: None,
                 },
@@ -1025,6 +1078,7 @@ mod tests {
                     color: green,
                     background_color: None,
                     background_radius: None,
+                    background_padding: None,
                     underline: None,
                     strikethrough: None,
                 },
@@ -1033,6 +1087,7 @@ mod tests {
                     color: blue,
                     background_color: None,
                     background_radius: None,
+                    background_padding: None,
                     underline: None,
                     strikethrough: None,
                 },
@@ -1054,5 +1109,77 @@ mod tests {
         assert_eq!(right.decoration_runs[0].color, green);
         assert_eq!(right.decoration_runs[1].len, 1);
         assert_eq!(right.decoration_runs[1].color, blue);
+    }
+
+    #[test]
+    fn background_padding_grows_the_quad_and_moves_no_glyph() {
+        // The whole contract of a padded run background: the fill reaches past
+        // the run on both sides, and the text the reader is looking at stays
+        // exactly where it was. A padding that moved a glyph would be layout
+        // wearing a decoration's name, and a marked word inside a sentence
+        // would push the sentence apart every time a search matched it.
+        let padding = px(3.);
+        let bare = text_background(point(px(10.), px(4.)), px(40.), px(16.), red(), None, None);
+        let padded = text_background(
+            point(px(10.), px(4.)),
+            px(40.),
+            px(16.),
+            red(),
+            None,
+            Some(padding),
+        );
+
+        assert_eq!(padded.bounds.origin.x, bare.bounds.origin.x - padding);
+        assert_eq!(
+            padded.bounds.size.width,
+            bare.bounds.size.width + padding * 2.
+        );
+        // Vertically a run background already fills the line box, so padding
+        // has nothing to add there and must not invent any.
+        assert_eq!(padded.bounds.origin.y, bare.bounds.origin.y);
+        assert_eq!(padded.bounds.size.height, bare.bounds.size.height);
+    }
+
+    #[test]
+    fn background_padding_survives_a_run_being_split() {
+        // A split happens where a wrap or a selection cuts the line, which is
+        // exactly where a marked word is most likely to be. Both halves have to
+        // keep asking for the same room or the mark grows a straight edge on
+        // one side of the cut and a padded one on the other.
+        let padding = Some(px(2.));
+        let line = make_shaped_line(
+            "abcdef",
+            &[
+                (0, 0.0),
+                (1, 10.0),
+                (2, 20.0),
+                (3, 30.0),
+                (4, 40.0),
+                (5, 50.0),
+            ],
+            60.0,
+            &[DecorationRun {
+                len: 6,
+                color: red(),
+                background_color: Some(red()),
+                background_radius: Some(px(4.)),
+                background_padding: padding,
+                underline: None,
+                strikethrough: None,
+            }],
+        );
+
+        let (left, right) = line.split_at(3);
+        assert_eq!(left.decoration_runs[0].background_padding, padding);
+        assert_eq!(right.decoration_runs[0].background_padding, padding);
+    }
+
+    fn red() -> Hsla {
+        Hsla {
+            h: 0.0,
+            s: 1.0,
+            l: 0.5,
+            a: 1.0,
+        }
     }
 }
