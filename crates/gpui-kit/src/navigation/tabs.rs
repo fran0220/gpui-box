@@ -668,12 +668,11 @@ impl Tabs {
             .when(!self.capsules, |element| {
                 element.selected_fill(theme, selected)
             })
-            // Surface roles (panel / raised / overlay) sit too close to the
-            // page to read as a 24px pill. The selected token is the control
-            // fill; unselected capsules wear it, and the current one replaces
-            // it with its tint on the glass.
+            // The selected token is a wash: it reads on empty canvas and
+            // lets page type show through. Overlay is the opaque step above
+            // the page, which is what a capsule sitting on a transcript needs.
             .when(self.capsules && !selected, |element| {
-                element.bg(theme.colors.selected)
+                element.bg(theme.colors.overlay)
             })
             // The current tab's fill becomes the tint at the strength the
             // theme washes a caller's colour at, in place of the neutral
