@@ -350,11 +350,12 @@ impl Tabs {
     /// Draw each tab as its own grounded Liquid pill.
     ///
     /// A document strip stays a row of selected fills. A strip of named
-    /// places — projects, spaces — is a row of capsules: every item has a
-    /// glass face so page type cannot show through the label, and the current
-    /// item's [`TabItem::tint`] wash replaces that face rather than sitting
-    /// on top of it. Overflow, scrolling, reorder and the keyboard stay what
-    /// they were.
+    /// places — projects, spaces — is a row of capsules: every item has an
+    /// opaque Overlay face so page type cannot show through the label, and
+    /// the current item's [`TabItem::tint`] is blended onto that face
+    /// ([`Theme::washed_surface`]) rather than painted as a wash, which
+    /// would be a hole. Overflow, scrolling, reorder and the keyboard stay
+    /// what they were.
     pub fn capsules(mut self) -> Self {
         self.capsules = true;
         self
@@ -668,11 +669,17 @@ impl Tabs {
             .when(!self.capsules, |element| {
                 element.selected_fill(theme, selected)
             })
-            // The selected token is a wash: it reads on empty canvas and
-            // lets page type show through. Overlay is the opaque step above
-            // the page, which is what a capsule sitting on a transcript needs.
+            // Overlay is the opaque step above the page. A selected tint is
+            // blended onto that face so the current capsule stays a face,
+            // not a wash the page type can show through.
             .when(self.capsules && !selected, |element| {
                 element.bg(theme.colors.overlay)
+            })
+            .when(self.capsules && selected, |element| {
+                let wash = tint
+                    .map(|color| theme.color_wash(color, SemanticWash::Standard))
+                    .unwrap_or(theme.colors.selected);
+                element.bg(theme.washed_surface(Surface::Overlay, wash))
             })
             // The current tab's fill becomes the tint at the strength the
             // theme washes a caller's colour at, in place of the neutral
@@ -807,9 +814,9 @@ impl Tabs {
             return element;
         }
 
-        // Each capsule is its own grounded Liquid face. Adaptive probes stay
+        // Each capsule is its own grounded Liquid mount. Adaptive probes stay
         // off the items so a long strip cannot exhaust the window's slots;
-        // the wash is the readability policy.
+        // the opaque Overlay (or washed Overlay) inside is the face.
         let mut glass = Glass::new(ident.child("face"))
             .preset(GlassPreset::Liquid)
             .surface(Surface::Raised)

@@ -57,8 +57,8 @@ pub(super) fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(caption(
             &theme,
-            "places, not documents: each item is a grounded Liquid capsule, \
-             and the current one wears its tint as the face",
+            "places, not documents: each item is a grounded Liquid capsule \
+             on an Overlay face, and the current one wears its tint on that face",
         ))
         .child(
             Tabs::new("scene.tabs.capsules")

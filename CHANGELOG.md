@@ -14,9 +14,11 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 give Liquid and Lens the theme's `glassAlpha` wash while keeping refraction,
 lift, and the hairline. Large plates stay clear by default so a fill cannot
 mute the optics. `Tabs::capsules` draws each item as its own grounded Liquid
-pill; the current item's `tint` wash replaces that face rather than sitting
-on top of it. Overflow, scrolling, reorder and the keyboard stay what they
-were.
+pill on an opaque Overlay face; the current item's `tint` is blended onto
+that face (`Theme::washed_surface`) rather than painted as a wash the page
+can show through. A graph toolbar sits inside `fit_clearance` so caller
+overlays — a titlebar, a side lens — do not share pixels with Fit. Overflow,
+scrolling, reorder and the keyboard stay what they were.
 
 ### Changed
 

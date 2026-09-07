@@ -3818,8 +3818,8 @@ impl RenderOnce for NodeGraph {
                     }
                 })
                 .absolute()
-                .top(px(overlay_offset))
-                .left(px(overlay_offset))
+                .top(px(overlay_offset + self.fit_clearance.top))
+                .left(px(overlay_offset + self.fit_clearance.left))
                 .child(toolbar)
                 .into_any_element()
         });
