@@ -65,6 +65,31 @@ fn clicking_a_tab_reports_it_without_moving_the_selection(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+fn clicking_a_capsule_still_reports_the_tab(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<String>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        Tabs::new("workspace.capsules")
+            .capsules()
+            .tabs(workspace_tabs())
+            .selected("runs")
+            .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+
+    harness.click("workspace.capsules.overview");
+
+    assert_eq!(*calls.borrow(), vec!["overview".to_string()]);
+    assert_eq!(
+        harness
+            .node("workspace.capsules.runs")
+            .expect("published")
+            .checked,
+        Some(true)
+    );
+}
+
+#[gpui::test]
 fn clicking_a_tab_publishes_focus_on_only_that_tab(cx: &mut TestAppContext) {
     let (mut harness, _calls) = tabs(cx, "runs");
 

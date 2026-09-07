@@ -779,6 +779,45 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(caption(
             &theme,
+            "Grounded: chrome keeps the wash so type on the page cannot show through",
+        ))
+        .child(
+            div()
+                .relative()
+                .h(px(TILE * 2.0))
+                .w(px(PLATE_WIDTH))
+                .surface(&theme, Surface::Panel)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(checkerboard(PLATE_WIDTH, TILE * 2.0))
+                .child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .gap(px(theme.space(Space::Sm)))
+                        .child(
+                            Glass::new("scene.glass.grounded.one")
+                                .preset(GlassPreset::Liquid)
+                                .surface(Surface::Raised)
+                                .radius(Radius::Pill)
+                                .grounded(true)
+                                .child(label("Portal", "Unselected face")),
+                        )
+                        .child(
+                            Glass::new("scene.glass.grounded.two")
+                                .preset(GlassPreset::Liquid)
+                                .radius(Radius::Pill)
+                                .grounded(true)
+                                .tint(theme.colors.accent)
+                                .child(label("Harbour", "Current wash")),
+                        ),
+                ),
+        )
+        .child(caption(
+            &theme,
             "Scroll edge: the soft ramp scatters content under floating glass",
         ))
         .child(

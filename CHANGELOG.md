@@ -8,6 +8,16 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**Compact glass keeps a face.** `Glass::grounded` and `GlassGroup::grounded`
+give Liquid and Lens the theme's `glassAlpha` wash while keeping refraction,
+lift, and the hairline. Large plates stay clear by default so a fill cannot
+mute the optics. `Tabs::capsules` draws each item as its own grounded Liquid
+pill; the current item's `tint` wash replaces that face rather than sitting
+on top of it. Overflow, scrolling, reorder and the keyboard stay what they
+were.
+
 ### Changed
 
 **Settings groups sit on the page plane.** `SettingsSection` no longer wraps

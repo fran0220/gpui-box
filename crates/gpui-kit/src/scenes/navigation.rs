@@ -55,6 +55,29 @@ pub(super) fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .selected("runs")
                 .on_select(|_, _, _| {}),
         )
+        .child(caption(
+            &theme,
+            "places, not documents: each item is a grounded Liquid capsule, \
+             and the current one wears its tint as the face",
+        ))
+        .child(
+            Tabs::new("scene.tabs.capsules")
+                .capsules()
+                .control_size(ControlSize::Sm)
+                .tabs([
+                    TabItem::new("code", "Portal")
+                        .icon(Icon::Terminal)
+                        .tint(theme.colors.accent),
+                    TabItem::new("game", "Harbour")
+                        .icon(Icon::Play)
+                        .tint(theme.colors.warning),
+                    TabItem::new("design", "notes")
+                        .icon(Icon::Pen)
+                        .tint(theme.colors.info),
+                ])
+                .selected("code")
+                .on_select(|_, _, _| {}),
+        )
         // The body belongs to the caller: tabs render the strip only.
         .child(crate::foundation::text(
             &theme,

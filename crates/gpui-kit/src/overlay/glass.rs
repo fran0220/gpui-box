@@ -20,10 +20,15 @@
 //!
 //! Liquid and Lens paint no ordinary source-over fill by default: doing that
 //! on top of the additive lift would mute the very refraction that names the
-//! material. Frosted still needs its theme-owned fill, and `adaptive(true)` is
-//! an explicit readability policy that may add one when the backdrop opposes
-//! the content. A theme that sets `effect.glassAlpha` to 1 makes either of
-//! those fills opaque, so there is deliberately no backdrop work beneath it.
+//! material, which is what a large plate over a ruled backdrop is for.
+//! Compact chrome — a capsule, a fused control cluster, a chip — is the other
+//! reading: [`Glass::grounded`] keeps the same optics and adds the theme's
+//! `effect.glassAlpha` wash so the surface is a face, not a hole. Frosted
+//! still needs its theme-owned fill. `adaptive(true)` is a readability policy
+//! that may deepen an already-present wash, or add one on a clear plate, when
+//! the backdrop opposes the content. A theme that sets `effect.glassAlpha` to
+//! 1 makes either of those fills opaque, so there is deliberately no backdrop
+//! work beneath it.
 //!
 //! `docs/coverage.md` records which renderer does which of these today.
 
@@ -84,7 +89,8 @@ impl GlassPreset {
     ///
     /// A frosted surface uses `effect.glassAlpha` to separate its scattered
     /// backdrop from surrounding content. Liquid and Lens use shader-owned
-    /// optics instead; their default fill is transparent.
+    /// optics instead; their default fill is transparent. [`Glass::grounded`]
+    /// is how chrome asks for the wash without changing that default.
     pub fn tint_alpha(self, theme: &Theme) -> f32 {
         match self {
             GlassPreset::Frosted => theme.effects.glass_alpha,
@@ -256,6 +262,7 @@ pub struct Glass {
     pressable: bool,
     adaptive: bool,
     adaptive_appearance: bool,
+    grounded: bool,
     tint: Option<Hsla>,
     edge_mask: Option<(GlassEdge, f32)>,
     child: Option<AnyElement>,
@@ -279,6 +286,7 @@ impl std::fmt::Debug for Glass {
             .field("pressable", &self.pressable)
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
+            .field("grounded", &self.grounded)
             .field("tint", &self.tint)
             .field("edge_mask", &self.edge_mask)
             .field("has_child", &self.child.is_some())
@@ -303,14 +311,15 @@ impl Glass {
             pressable: false,
             adaptive: false,
             adaptive_appearance: false,
+            grounded: false,
             tint: None,
             edge_mask: None,
             child: None,
         }
     }
 
-    /// Which surface colour Frosted or adaptive Liquid lays over the backdrop.
-    /// Clear Liquid and Lens paint no ordinary fill by default.
+    /// Which surface colour Frosted, grounded, or adaptive Liquid lays over
+    /// the backdrop. Clear Liquid and Lens paint no ordinary fill by default.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
         self
@@ -419,6 +428,20 @@ impl Glass {
         self
     }
 
+    /// Give Liquid and Lens the theme's glass wash as a standing face.
+    ///
+    /// Compact chrome that sits on the page — a capsule, a chip, a fused
+    /// cluster — has to be a material the type underneath cannot show
+    /// through. Name a surface a step above the page (`Raised` or `Panel`);
+    /// Overlay over canvas is the same ink at `glassAlpha` and disappears.
+    /// Large plates that exist to demonstrate refraction leave this off: a
+    /// fill on top of the additive lift would mute the optics. Adaptive
+    /// deepening still applies when the backdrop opposes the face.
+    pub fn grounded(mut self, grounded: bool) -> Self {
+        self.grounded = grounded;
+        self
+    }
+
     /// Overlay this colour instead of the surface role. The tint is what
     /// `NSGlassEffectView.tintColor` and a prominent toolbar item are.
     pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
@@ -443,6 +466,18 @@ impl Glass {
     #[cfg(test)]
     pub(crate) fn material_for_test(&self, theme: &Theme) -> GlassMaterial<Pixels> {
         self.material(theme)
+    }
+
+    #[cfg(test)]
+    fn fill_alpha_for_test(&self, theme: &Theme, deepened: bool) -> f32 {
+        let mut alpha = self.preset.tint_alpha(theme).clamp(0.0, 1.0);
+        if deepened {
+            alpha = alpha.max(theme.effects.glass_alpha);
+        }
+        if self.grounded {
+            alpha = alpha.max(theme.effects.glass_alpha);
+        }
+        alpha.clamp(0.0, 1.0)
     }
 
     /// The material this surface asks the renderer for: the preset's
@@ -550,6 +585,9 @@ impl RenderOnce for Glass {
                 alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
             }
         }
+        if self.grounded {
+            alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
+        }
 
         let mut overlay_theme = None;
         if self.adaptive_appearance
@@ -655,7 +693,7 @@ fn finish_glass(overlay_theme: Option<Theme>, layer: BackdropLayer) -> AnyElemen
 ///
 /// A Frosted fill does not fuse: each pane lays its own tint, and the neck
 /// between two panes shows the bare optical source. Liquid and Lens panes are
-/// clear. A group holds at most
+/// clear unless the group is [`GlassGroup::grounded`]. A group holds at most
 /// [`MAX_GLASS_LOBES`] panes; panes past that keep their fill and their
 /// content but fall outside the fused shape, so the bound is asserted in
 /// debug rather than silently absorbed.
@@ -671,6 +709,7 @@ pub struct GlassGroup {
     pressable: bool,
     adaptive: bool,
     adaptive_appearance: bool,
+    grounded: bool,
     tint: Option<Hsla>,
     panes: Vec<(Ident, AnyElement)>,
 }
@@ -689,6 +728,7 @@ impl std::fmt::Debug for GlassGroup {
             .field("pressable", &self.pressable)
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
+            .field("grounded", &self.grounded)
             .field("tint", &self.tint)
             .field("panes", &self.panes.len())
             .finish()
@@ -708,13 +748,14 @@ impl GlassGroup {
             pressable: false,
             adaptive: false,
             adaptive_appearance: false,
+            grounded: false,
             tint: None,
             panes: Vec::new(),
         }
     }
 
-    /// Which surface colour each Frosted pane lays over the backdrop. Liquid
-    /// and Lens panes are clear.
+    /// Which surface colour each Frosted or grounded pane lays over the
+    /// backdrop. Clear Liquid and Lens panes stay clear.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
         self
@@ -773,6 +814,14 @@ impl GlassGroup {
     /// appearance when the backdrop luminance opposes the current theme.
     pub fn adaptive_appearance(mut self, adaptive: bool) -> Self {
         self.adaptive_appearance = adaptive;
+        self
+    }
+
+    /// Give each Liquid or Lens pane the theme's glass wash as a standing
+    /// face. The fused outline keeps its optics; the wash is what stops
+    /// page type from showing through a compact cluster.
+    pub fn grounded(mut self, grounded: bool) -> Self {
+        self.grounded = grounded;
         self
     }
 
@@ -860,6 +909,9 @@ impl RenderOnce for GlassGroup {
             if self.adaptive && state.deepened {
                 alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
             }
+        }
+        if self.grounded {
+            alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
         }
 
         let mut overlay_theme = None;
@@ -1390,6 +1442,26 @@ mod tests {
     #[test]
     fn adaptive_glass_starts_with_its_safe_tint() {
         assert!(GlassState::default().deepened);
+    }
+
+    #[test]
+    fn grounded_liquid_keeps_the_theme_wash() {
+        let theme = Theme::studio_dark();
+        let clear = Glass::new("surface").preset(GlassPreset::Liquid);
+        let chrome = Glass::new("chrome")
+            .preset(GlassPreset::Liquid)
+            .grounded(true);
+
+        assert_eq!(clear.fill_alpha_for_test(&theme, false), 0.0);
+        assert_eq!(
+            chrome.fill_alpha_for_test(&theme, false),
+            theme.effects.glass_alpha
+        );
+        assert_eq!(
+            chrome.fill_alpha_for_test(&theme, true),
+            theme.effects.glass_alpha,
+            "grounded chrome is already the wash; deepening does not add a second fill"
+        );
     }
 
     #[test]

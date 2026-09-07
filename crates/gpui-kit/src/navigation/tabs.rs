@@ -32,7 +32,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlMetrics, ControlSize, Radius, SemanticWash, Space, Theme, TypeScale,
+    ActiveTheme, ControlMetrics, ControlSize, Radius, SemanticWash, Space, Surface, Theme,
+    TypeScale,
 };
 
 use crate::display::badge::Badge;
@@ -47,7 +48,7 @@ use crate::interaction::dnd::{
 };
 use crate::layout::ScrollFade;
 use crate::motion::keyed;
-use crate::overlay::{Menu, MenuItem};
+use crate::overlay::{Glass, GlassPreset, Menu, MenuItem};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -308,6 +309,7 @@ pub struct Tabs {
     on_reorder: Option<ReorderHandler>,
     overflow: Overflow,
     overflow_menu: Option<Entity<Menu>>,
+    capsules: bool,
 }
 
 impl std::fmt::Debug for Tabs {
@@ -321,6 +323,7 @@ impl std::fmt::Debug for Tabs {
             .field("has_handler", &self.on_select.is_some())
             .field("closable", &self.on_close.is_some())
             .field("overflow", &self.overflow)
+            .field("capsules", &self.capsules)
             .finish()
     }
 }
@@ -340,7 +343,21 @@ impl Tabs {
             on_reorder: None,
             overflow: Overflow::default(),
             overflow_menu: None,
+            capsules: false,
         }
+    }
+
+    /// Draw each tab as its own grounded Liquid pill.
+    ///
+    /// A document strip stays a row of selected fills. A strip of named
+    /// places — projects, spaces — is a row of capsules: every item has a
+    /// glass face so page type cannot show through the label, and the current
+    /// item's [`TabItem::tint`] wash replaces that face rather than sitting
+    /// on top of it. Overflow, scrolling, reorder and the keyboard stay what
+    /// they were.
+    pub fn capsules(mut self) -> Self {
+        self.capsules = true;
+        self
     }
 
     pub fn tab(mut self, tab: TabItem) -> Self {
@@ -638,14 +655,33 @@ impl Tabs {
             .group(hover_group.clone())
             .flex_none()
             .column()
-            .radius(theme, Radius::Control)
-            .selected_fill(theme, selected)
+            .radius(
+                theme,
+                if self.capsules {
+                    Radius::Pill
+                } else {
+                    Radius::Control
+                },
+            )
+            // Capsules wear their face on the glass mount, so a selected fill
+            // here would be a second layer on top of the wash.
+            .when(!self.capsules, |element| {
+                element.selected_fill(theme, selected)
+            })
+            // Surface roles (panel / raised / overlay) sit too close to the
+            // page to read as a 24px pill. The selected token is the control
+            // fill; unselected capsules wear it, and the current one replaces
+            // it with its tint on the glass.
+            .when(self.capsules && !selected, |element| {
+                element.bg(theme.colors.selected)
+            })
             // The current tab's fill becomes the tint at the strength the
             // theme washes a caller's colour at, in place of the neutral
             // selected fill rather than over it.
-            .when_some(tint.filter(|_| selected), |element, tint| {
-                element.bg(theme.color_wash(tint, SemanticWash::Standard))
-            })
+            .when_some(
+                tint.filter(|_| selected && !self.capsules),
+                |element, tint| element.bg(theme.color_wash(tint, SemanticWash::Standard)),
+            )
             .child(
                 div()
                     .row()
@@ -755,7 +791,7 @@ impl Tabs {
                 .invalid(matches!(tab.save_state, SaveState::Failed { .. })),
         );
 
-        match draggable {
+        let element = match draggable {
             Some(reorder) => {
                 let shift = reorder
                     .drag
@@ -767,7 +803,24 @@ impl Tabs {
                     .into_any_element()
             }
             None => element.into_any_element(),
+        };
+        if !self.capsules {
+            return element;
         }
+
+        // Each capsule is its own grounded Liquid face. Adaptive probes stay
+        // off the items so a long strip cannot exhaust the window's slots;
+        // the wash is the readability policy.
+        let mut glass = Glass::new(ident.child("face"))
+            .preset(GlassPreset::Liquid)
+            .surface(Surface::Raised)
+            .radius(Radius::Pill)
+            .grounded(true)
+            .child(element);
+        if selected {
+            glass = glass.tint(tint.unwrap_or(theme.colors.selected));
+        }
+        glass.into_any_element()
     }
 }
 
@@ -856,7 +909,8 @@ impl RenderOnce for Tabs {
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)
-            .items_end()
+            .when(self.capsules, |element| element.items_center())
+            .when(!self.capsules, |element| element.items_end())
             .gap(px(theme.space(Space::Xs)))
             // Wrapping and scrolling are contradictory answers to the same
             // question: a strip that wraps never has a second screenful to
