@@ -1227,7 +1227,7 @@ pub(crate) struct BackdropLayer {
     pub(crate) translucent: bool,
     /// Ordinary surface fill used only when the framework's per-frame glass
     /// admission budget is exhausted. A caller already painting a tint needs
-    /// no second fallback; clear Liquid and Lens do.
+    /// no second fallback; material-only Liquid, Clear and Lens do.
     pub(crate) fallback: Option<gpui::Hsla>,
     /// Where to record the bounds this layer was painted at, for a caller
     /// whose pointer math needs them next frame.
