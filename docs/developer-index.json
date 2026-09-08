@@ -141782,6 +141782,12 @@
       "anchor": "rules-every-covered-component-follows"
     },
     {
+      "id": "coverage-headless-capture-order-dependence-glass-probes",
+      "title": "Headless capture order dependence — glass probes",
+      "guide": "coverage",
+      "anchor": "headless-capture-order-dependence-glass-probes"
+    },
+    {
       "id": "datetime-why-the-seam-is-here",
       "title": "Why the seam is here",
       "guide": "datetime",

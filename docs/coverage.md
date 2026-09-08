@@ -978,3 +978,37 @@ push. `docs/screenshot-testing.md` describes the gate and review workflow.
    without forking the component; `cargo run -p xtask -- strings check` fails
    the build if a component grows a literal a reader could read.
 6. A component that can carry a credential publishes its shape, never its text.
+
+## Headless capture order dependence — glass probes
+
+Metal review on 2026-09-08 found a reproducible difference between the complete
+catalog and the selected sequence `actions cascader context-menu dialog drawer
+form glass mention-input menu menubar multi-select notification-center overlay
+toast` (executed in catalog order). In the `glass` budget capsules/shadows,
+dark has 80 pixels differing by more than one channel step (maximum 2), and
+light has 1,623 (maximum 4). Repeated complete runs agree byte-for-byte;
+`headless check glass` alone also agrees with the complete run. Full-catalog
+captures remain authoritative; the one-step comparison tolerance is unchanged.
+
+Temporary input traces ruled out surface/lobe admission drift: all 16 admitted
+surfaces have identical bounds, lobe counts and ordering in both runs, and only
+budget capsules A–G are admitted. H/I are opaque fallbacks in both. The difference
+is their probe ownership: complete/standalone runs assign H/I slots 14/15 with
+`None`, while the selected sequence reuses slots 3/4 and reads the previous
+scene's `Some(0.92572516)` in both themes. That value changes `glass_shadows`.
+
+`ProbeLease::slot`/`Drop` in `overlay/glass.rs` allocates/releases slot numbers
+without invalidating renderer samples. Keyed state has a two-frame retention
+grace. Metal `read_probe_values` overwrites only requested slots, so an
+unadmitted replacement surface never refreshes its inherited value. The shared
+headless window/renderer and two-identical-frame settling test cannot detect a
+stable stale sample. This is a located product probe-lifetime defect, not merely
+atlas rounding: opening and closing overlays can give a replacement fallback
+surface another surface's shadow strength.
+
+The following product-fix commit will invalidate samples when a lease changes
+owner, with generation-aware completion publication so an old GPU callback cannot restore
+it. The boundary is lease acquisition and the renderer's probe cache; it must
+be consistent on Metal, Direct3D and WGPU. A fresh renderer per scene would
+isolate the harness but would not fix stale product shadows. This review records
+the gap rather than introducing a headless-only reset or weakening the gate.
