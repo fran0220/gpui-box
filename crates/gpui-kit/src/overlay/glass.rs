@@ -104,9 +104,22 @@ impl GlassPreset {
     /// not carry numbers of its own.
     pub fn material(self, theme: &Theme) -> GlassMaterial<Pixels> {
         let effects = &theme.effects;
+        let wash_channel = if theme.appearance == Appearance::Dark {
+            0.0
+        } else {
+            1.0
+        };
         match self {
             GlassPreset::Frosted => GlassMaterial::frosted(px(effects.glass_frost_blur)),
             GlassPreset::Liquid => GlassMaterial {
+                blur_radius: px(effects.glass_frost_blur),
+                saturation: effects.glass_saturation,
+                wash: Rgba {
+                    r: wash_channel,
+                    g: wash_channel,
+                    b: wash_channel,
+                    a: effects.glass_wash,
+                },
                 refraction: effects.glass_refraction,
                 dispersion: effects.glass_dispersion,
                 specular: effects.glass_specular,
@@ -1296,7 +1309,27 @@ mod tests {
             px(100.0 * theme.effects.glass_bevel_ratio),
             "the profile follows the control's short edge"
         );
-        assert_eq!(material.blur_radius, px(0.0));
+        assert_eq!(material.blur_radius, px(theme.effects.glass_frost_blur));
+        assert_eq!(material.saturation, theme.effects.glass_saturation);
+        assert_eq!(
+            material.wash,
+            Rgba {
+                r: 0.,
+                g: 0.,
+                b: 0.,
+                a: theme.effects.glass_wash
+            }
+        );
+        let light = Theme::studio_light();
+        assert_eq!(
+            GlassPreset::Liquid.material(&light).wash,
+            Rgba {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: light.effects.glass_wash
+            }
+        );
         assert_eq!(material.refraction, theme.effects.glass_refraction);
         assert_eq!(material.dispersion, theme.effects.glass_dispersion);
         assert_eq!(material.specular, theme.effects.glass_specular);
