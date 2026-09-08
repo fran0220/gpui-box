@@ -482,6 +482,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -1266,6 +1268,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.55 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -2050,6 +2054,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -2834,6 +2840,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.55 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -3618,6 +3626,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -4402,6 +4412,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -5186,6 +5198,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -5970,6 +5984,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -6754,6 +6770,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.45 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |
@@ -7538,6 +7556,8 @@ Row stagger maximum items: `8`.
 | `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassFrostBlur` | 24 |
+| `effect.glassSaturation` | 1.5 |
+| `effect.glassWash` | 0.55 |
 | `effect.glassBevelRatio` | 0.225 |
 | `effect.glassBevelMin` | 8 |
 | `effect.glassBevelMax` | 36 |

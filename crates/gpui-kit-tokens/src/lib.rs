@@ -332,6 +332,7 @@ impl TokenDocument {
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
             ("effect.glassFrostBlur", self.effect.glass_frost_blur),
+            ("effect.glassSaturation", self.effect.glass_saturation),
             ("effect.scrollEdgeBand", self.effect.scroll_edge_band),
             ("effect.scrollEdgeBlur", self.effect.scroll_edge_blur),
             ("effect.glassBevelMin", self.effect.glass_bevel_min),
@@ -481,6 +482,7 @@ impl TokenDocument {
                 self.effect.custom_color_active_lightness_delta,
             ),
             ("effect.glassAlpha", self.effect.glass_alpha),
+            ("effect.glassWash", self.effect.glass_wash),
             ("effect.glassBevelRatio", self.effect.glass_bevel_ratio),
             ("effect.glassDispersion", self.effect.glass_dispersion),
             ("effect.glassSpecular", self.effect.glass_specular),
@@ -2570,9 +2572,14 @@ pub struct EffectTokens {
     /// that sets this to 1 declares itself opaque, and a frosted surface then
     /// paints no blur at all rather than blurring pixels nobody can see.
     pub glass_alpha: f32,
-    /// How far the Frosted preset scatters what is behind it, in pixels.
-    /// Liquid and Lens are clear by default and do not borrow this value.
+    /// How far Frosted and Regular Liquid scatter what is behind them, in pixels.
     pub glass_frost_blur: f32,
+    /// Backdrop saturation multiplier before transmission gain. One is unchanged.
+    pub glass_saturation: f32,
+    /// Achromatic material wash intensity. Theme appearance chooses white for
+    /// light and black for dark, avoiding two independently tunable directions
+    /// that could disagree with the theme. This is not an element fill alpha.
+    pub glass_wash: f32,
     /// Fraction of the control's short edge occupied by its optical profile.
     pub glass_bevel_ratio: f32,
     /// Lower and upper bounds for the responsive optical profile, in pixels.

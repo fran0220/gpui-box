@@ -713,6 +713,9 @@ pub struct Effects {
     pub glow_spread: f32,
     pub glass_alpha: f32,
     pub glass_frost_blur: f32,
+    pub glass_saturation: f32,
+    /// Achromatic wash intensity; the theme appearance selects black or white.
+    pub glass_wash: f32,
     pub glass_bevel_ratio: f32,
     pub glass_bevel_min: f32,
     pub glass_bevel_max: f32,
@@ -1244,6 +1247,8 @@ impl Theme {
                 glow_spread: tokens.effect.glow_spread,
                 glass_alpha: tokens.effect.glass_alpha,
                 glass_frost_blur: tokens.effect.glass_frost_blur,
+                glass_saturation: tokens.effect.glass_saturation,
+                glass_wash: tokens.effect.glass_wash,
                 glass_bevel_ratio: tokens.effect.glass_bevel_ratio,
                 glass_bevel_min: tokens.effect.glass_bevel_min,
                 glass_bevel_max: tokens.effect.glass_bevel_max,

@@ -683,6 +683,8 @@
     "glowSpread": -5,
     "glassAlpha": 0.78,
     "glassFrostBlur": 24,
+    "glassSaturation": 1.5,
+    "glassWash": 0.55,
     "glassBevelRatio": 0.225,
     "glassBevelMin": 8,
     "glassBevelMax": 36,
