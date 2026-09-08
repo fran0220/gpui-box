@@ -612,6 +612,9 @@ impl RenderOnce for Glass {
             overlay_theme = Some(theme.clone());
         }
 
+        if self.preset.resolved(&theme) == GlassPreset::Liquid {
+            protect_text_contrast(&mut material, &theme);
+        }
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
         let fallback = Some(tone.opacity(1.0));
@@ -942,6 +945,9 @@ impl RenderOnce for GlassGroup {
             overlay_theme = Some(theme.clone());
         }
 
+        if self.preset.resolved(&theme) == GlassPreset::Liquid {
+            protect_text_contrast(&mut material, &theme);
+        }
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
         let fallback = Some(tone.opacity(1.0));
@@ -1103,6 +1109,52 @@ fn can_flip(bounds: Bounds<Pixels>, max_extent: f32) -> bool {
     let width = f32::from(bounds.size.width);
     let height = f32::from(bounds.size.height);
     width > 0.0 && height > 0.0 && width * height <= max_extent * max_extent
+}
+
+/// Keep body text readable even before the probe arrives, or where its mean
+/// conceals a locally opposed patch. Adjust the shader's achromatic wash, not
+/// a second source-over face. The worst neutral backdrop includes the shader's
+/// transmission gain and optical lift; 4.5 is the WCAG normal-text ratio.
+fn protect_text_contrast(material: &mut GlassMaterial<Pixels>, theme: &Theme) {
+    let text: Rgba = theme.colors.text.into();
+    let foreground = gpui_kit_tokens::Color {
+        red: text.r,
+        green: text.g,
+        blue: text.b,
+        alpha: text.a,
+    };
+    let backdrop = if theme.appearance == Appearance::Dark {
+        1.0
+    } else {
+        0.0
+    };
+    let contrast = |alpha: f32| {
+        let channel = (backdrop * material.transmission_gain * (1.0 - alpha)
+            + material.wash.r * alpha
+            + material.optical_lift.r * material.optical_lift.a)
+            .clamp(0.0, 1.0);
+        gpui_kit_tokens::contrast_ratio(
+            foreground,
+            gpui_kit_tokens::Color {
+                red: channel,
+                green: channel,
+                blue: channel,
+                alpha: 1.0,
+            },
+        )
+    };
+    if contrast(material.wash.a) < 4.5 {
+        let (mut low, mut high) = (material.wash.a, 1.0);
+        for _ in 0..16 {
+            let mid = (low + high) / 2.0;
+            if contrast(mid) < 4.5 {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        material.wash.a = high;
+    }
 }
 
 fn glass_shadows(
@@ -1518,6 +1570,37 @@ mod tests {
     #[test]
     fn adaptive_glass_starts_with_the_window_appearance() {
         assert!(!GlassState::default().appearance_flipped);
+    }
+
+    #[test]
+    fn regular_body_text_survives_opposed_backdrops_without_flipping() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let mut material = GlassPreset::Liquid.material(&theme);
+            let direction = material.wash.r;
+            protect_text_contrast(&mut material, &theme);
+            assert_eq!(material.wash.r, direction);
+            assert!(material.wash.a < 1.0);
+            let text: Rgba = theme.colors.text.into();
+            let foreground = gpui_kit_tokens::Color {
+                red: text.r,
+                green: text.g,
+                blue: text.b,
+                alpha: text.a,
+            };
+            for backdrop in [0.0, 1.0] {
+                let channel = (backdrop * material.transmission_gain * (1.0 - material.wash.a)
+                    + direction * material.wash.a
+                    + material.optical_lift.r * material.optical_lift.a)
+                    .clamp(0.0, 1.0);
+                let background = gpui_kit_tokens::Color {
+                    red: channel,
+                    green: channel,
+                    blue: channel,
+                    alpha: 1.0,
+                };
+                assert!(gpui_kit_tokens::contrast_ratio(foreground, background) >= 4.5);
+            }
+        }
     }
 
     #[test]
