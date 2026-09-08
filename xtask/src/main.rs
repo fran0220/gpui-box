@@ -1878,6 +1878,18 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     let color = &tokens.color;
     let sources: Vec<(String, &str)> = vec![
         (
+            "color.onMediaForeground".into(),
+            color.on_media_foreground.as_str(),
+        ),
+        (
+            "color.onMediaBackground".into(),
+            color.on_media_background.as_str(),
+        ),
+        (
+            "color.onMediaHairline".into(),
+            color.on_media_hairline.as_str(),
+        ),
+        (
             "color.surface.backdrop".into(),
             color.surface.backdrop.as_str(),
         ),

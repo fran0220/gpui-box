@@ -199,6 +199,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#050505` |
 | `color.surface.canvas` | `{neutral.50}` | `#131313` |
 | `color.surface.sunken` | `{neutral.25}` | `#0a0a0a` |
@@ -989,6 +992,9 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#dcdce2` |
 | `color.surface.canvas` | `{neutral.50}` | `#ebebef` |
 | `color.surface.sunken` | `{neutral.25}` | `#e0e0e5` |
@@ -1779,6 +1785,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#11111b` |
 | `color.surface.canvas` | `{neutral.50}` | `#1e1e2e` |
 | `color.surface.sunken` | `{neutral.25}` | `#181825` |
@@ -2569,6 +2578,9 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#dce0e8` |
 | `color.surface.canvas` | `{neutral.50}` | `#eff1f5` |
 | `color.surface.sunken` | `{neutral.25}` | `#e6e9ef` |
@@ -3359,6 +3371,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#1c2027` |
 | `color.surface.canvas` | `{neutral.50}` | `#272c35` |
 | `color.surface.sunken` | `{neutral.25}` | `#22262e` |
@@ -4149,6 +4164,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#0f0f14` |
 | `color.surface.canvas` | `{neutral.50}` | `#1a1b26` |
 | `color.surface.sunken` | `{neutral.25}` | `#16161e` |
@@ -4939,6 +4957,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#1b1d1e` |
 | `color.surface.canvas` | `{neutral.50}` | `#282828` |
 | `color.surface.sunken` | `{neutral.25}` | `#1f2223` |
@@ -5729,6 +5750,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#141520` |
 | `color.surface.canvas` | `{neutral.50}` | `#21222c` |
 | `color.surface.sunken` | `{neutral.25}` | `#1c1d26` |
@@ -6519,6 +6543,9 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#000d11` |
 | `color.surface.canvas` | `{neutral.50}` | `#002028` |
 | `color.surface.sunken` | `{neutral.25}` | `#00171d` |
@@ -7309,6 +7336,9 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.onMediaForeground` | `#ffffff` | `#ffffff` |
+| `color.onMediaBackground` | `#171717` | `#171717` |
+| `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
 | `color.surface.backdrop` | `{neutral.10}` | `#e5dec7` |
 | `color.surface.canvas` | `{neutral.50}` | `#f6efdb` |
 | `color.surface.sunken` | `{neutral.25}` | `#eee7d1` |

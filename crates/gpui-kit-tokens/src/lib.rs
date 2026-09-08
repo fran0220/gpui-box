@@ -1877,6 +1877,9 @@ pub struct SpringPresetTokens {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ColorTokens {
+    pub on_media_foreground: String,
+    pub on_media_background: String,
+    pub on_media_hairline: String,
     pub palette: color::Palette,
     pub palette_steps: PaletteStepTokens,
     pub surface: SurfaceColors,
@@ -1922,7 +1925,10 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 70] = [
+        let fixed: [(&'static str, &str); 73] = [
+            ("color.onMediaForeground", &self.on_media_foreground),
+            ("color.onMediaBackground", &self.on_media_background),
+            ("color.onMediaHairline", &self.on_media_hairline),
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),

@@ -683,16 +683,8 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             .column()
             .gap(px(theme.space(Space::Xs)))
             .p(px(theme.space(Space::Md)))
-            .child(crate::foundation::text(
-                &theme,
-                TypeScale::Label,
-                SharedString::from(title),
-            ))
-            .child(crate::foundation::text(
-                &theme,
-                TypeScale::Caption,
-                SharedString::from(body),
-            ))
+            .child(div().type_scale(&theme, TypeScale::Label).child(title))
+            .child(div().type_scale(&theme, TypeScale::Caption).child(body))
     };
 
     // A ruled checkerboard bends far more legibly than a flat fill: its
@@ -800,7 +792,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(900.0))
         .child(caption(
             &theme,
-            "Frosted / reduced transparency                       Clear + 35% dimming / media only",
+            "Clear: dark Frosted / reduced transparency           Clear + 35% dimming / media only",
         ))
         .child(
             row(&theme)
@@ -808,9 +800,9 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                     theme.clone().with_reduce_transparency(true),
                     plate(
                         "scene.glass.frosted",
-                        GlassPreset::Liquid,
-                        "Reduce transparency",
-                        "Host preference resolves Regular to Frosted",
+                        GlassPreset::Clear,
+                        "Clear: reduced transparency",
+                        "Dark Frosted and light content in every theme",
                     ),
                 ))
                 .child(plate(

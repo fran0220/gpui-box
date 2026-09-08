@@ -6,6 +6,9 @@
     "appearance": "light"
   },
   "color": {
+    "onMediaForeground": "#ffffff",
+    "onMediaBackground": "#171717",
+    "onMediaHairline": "#ffffff33",
     "palette": {
       "neutral": {
         "0": "#000000",

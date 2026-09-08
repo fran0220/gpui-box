@@ -300,6 +300,21 @@ are unchanged. Square corners retain their intentional incident-face crease.
 CPU and native pixel regressions include the menu radius and sample both before
 and after the arc centre, while requiring a real rim highlight to remain.
 
+### Clear media reading
+
+Clear is an appearance-independent on-media material: its subtree inherits
+`color.onMediaForeground` and `color.onMediaHairline`, never an adaptive flip.
+Reduced transparency keeps that light content on dark Frosted
+`color.onMediaBackground`, including in light themes. `dimmed(true)` applies
+the `effect.glassDimming` 35% backing only to Clear, and retains it when reduced;
+all other presets ignore dimming. This policy is inside Glass/GlassGroup, not a
+caller-installed theme override. Deliberately coloured child elements still
+own their explicit colours, as on other surfaces.
+
+The current glass integration has Linux offscreen and native Metal evidence.
+Windows/WARP is unverified for this revision: no Windows runner was available;
+the existing Windows baseline is not claimed as acceptance of these changes.
+
 ### Downsampled backdrop blur deliberately deferred, 2026-09-04
 
 Metal, Direct3D, and WGPU keep full-resolution backdrop textures and preserve

@@ -285,6 +285,10 @@ pub struct ThemeData {
 
 #[derive(Debug, Clone)]
 pub struct Colors {
+    /// Appearance-independent reading roles for Clear glass above media.
+    pub on_media_foreground: Hsla,
+    pub on_media_background: Hsla,
+    pub on_media_hairline: Hsla,
     pub backdrop: Hsla,
     pub canvas: Hsla,
     pub sunken: Hsla,
@@ -987,6 +991,12 @@ impl Theme {
     /// rounds to whole pixels so compact layouts stay on the pixel grid.
     pub fn from_tokens(tokens: &TokenDocument, density: Density) -> Self {
         let scale = tokens.density(density);
+        let media_color = |path, value: &str| {
+            color(
+                Color::resolve(path, value, &tokens.color.palette)
+                    .expect("the token document is validated before theme resolution"),
+            )
+        };
         let style = |step| {
             let step = tokens.type_step(step);
             TypeStyle {
@@ -1011,6 +1021,18 @@ impl Theme {
             density,
             reduce_transparency: false,
             colors: Colors {
+                on_media_foreground: media_color(
+                    "color.onMediaForeground",
+                    &tokens.color.on_media_foreground,
+                ),
+                on_media_background: media_color(
+                    "color.onMediaBackground",
+                    &tokens.color.on_media_background,
+                ),
+                on_media_hairline: media_color(
+                    "color.onMediaHairline",
+                    &tokens.color.on_media_hairline,
+                ),
                 backdrop: color(tokens.surface(Surface::Backdrop)),
                 canvas: color(tokens.surface(Surface::Canvas)),
                 sunken: color(tokens.surface(Surface::Sunken)),

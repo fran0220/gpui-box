@@ -70,7 +70,8 @@ pub enum GlassPreset {
     /// achromatic wash, edge lensing and a highlighted rim.
     #[default]
     Liquid,
-    /// Apple Clear variant, only for use above media. Pair with `dimmed(true)`.
+    /// Apple Clear variant, only above media, always with light content.
+    /// Pair with `dimmed(true)`. Reduced transparency uses a dark Frosted body.
     Clear,
     /// The bend without the colour split or the highlight, for a surface that
     /// sits over text that the dispersion would otherwise fringe.
@@ -78,6 +79,30 @@ pub enum GlassPreset {
 }
 
 impl GlassPreset {
+    /// Clear carries its on-media reading policy independently of the host
+    /// appearance. The same scoped roles reach text and icons in its subtree.
+    fn content_theme(self, theme: &Theme) -> Theme {
+        if self != Self::Clear {
+            return theme.clone();
+        }
+        theme.clone().modify(|theme| {
+            theme.appearance = Appearance::Dark;
+            let colors = &mut theme.colors;
+            colors.text = colors.on_media_foreground;
+            colors.text_muted = colors.on_media_foreground;
+            colors.text_faint = colors.on_media_foreground;
+            colors.text_placeholder = colors.on_media_foreground;
+            colors.hairline = colors.on_media_hairline;
+            colors.hairline_strong = colors.on_media_hairline;
+            colors.backdrop = colors.on_media_background;
+            colors.canvas = colors.on_media_background;
+            colors.sunken = colors.on_media_background;
+            colors.panel = colors.on_media_background;
+            colors.raised = colors.on_media_background;
+            colors.overlay = colors.on_media_background;
+        })
+    }
+
     fn resolved(self, theme: &Theme) -> Self {
         if theme.reduce_transparency {
             Self::Frosted
@@ -467,7 +492,7 @@ impl Glass {
 
 impl RenderOnce for Glass {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let mut theme = cx.theme().clone();
+        let mut theme = self.preset.content_theme(cx.theme());
         let radius = self.radius_px.unwrap_or_else(|| theme.radius(self.radius));
         let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let mut material = self.material(&theme);
@@ -484,6 +509,7 @@ impl RenderOnce for Glass {
         let measured = measure::cell(&id, window, cx);
         let bounds = measured.get();
         let adaptive = (self.adaptive || self.adaptive_appearance)
+            && self.preset != GlassPreset::Clear
             && !theme.reduce_transparency
             && can_flip(bounds, theme.effects.glass_flip_max_extent);
 
@@ -540,7 +566,7 @@ impl RenderOnce for Glass {
             }
         }
 
-        let mut overlay_theme = None;
+        let mut overlay_theme = (self.preset == GlassPreset::Clear).then(|| theme.clone());
         if adaptive
             && state
                 .as_ref()
@@ -788,6 +814,7 @@ impl GlassGroup {
     }
 
     /// Dim the media behind Clear glass by `effect.glassDimming`.
+    /// Other presets ignore this setting; Clear retains it under reduced transparency.
     pub fn dimmed(mut self, dimmed: bool) -> Self {
         self.dimmed = dimmed;
         self
@@ -810,7 +837,7 @@ impl GlassGroup {
 impl RenderOnce for GlassGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let over_budget = self.panes.len() > MAX_GLASS_LOBES;
-        let mut theme = cx.theme().clone();
+        let mut theme = self.preset.content_theme(cx.theme());
         let radius = theme.radius(self.radius);
         let alpha = if over_budget {
             1.0
@@ -832,6 +859,7 @@ impl RenderOnce for GlassGroup {
             .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
         let measured = measure::cell(&id, window, cx);
         let adaptive = (self.adaptive || self.adaptive_appearance)
+            && self.preset != GlassPreset::Clear
             && !theme.reduce_transparency
             && can_flip(measured.get(), theme.effects.glass_flip_max_extent);
 
@@ -872,7 +900,7 @@ impl RenderOnce for GlassGroup {
             }
         }
 
-        let mut overlay_theme = None;
+        let mut overlay_theme = (self.preset == GlassPreset::Clear).then(|| theme.clone());
         if adaptive
             && state
                 .as_ref()
@@ -907,6 +935,7 @@ impl RenderOnce for GlassGroup {
         let row = div()
             .flex()
             .flex_row()
+            .text_color(theme.colors.text)
             .gap(px(self.gap.unwrap_or(theme.space(Space::Sm))))
             .children(self.panes.into_iter().map(|(ident, child)| {
                 let pane = div()
@@ -1520,6 +1549,36 @@ mod tests {
     #[test]
     fn adaptive_glass_starts_with_the_window_appearance() {
         assert!(!GlassState::default().appearance_flipped);
+    }
+
+    #[test]
+    fn clear_keeps_light_content_and_a_dark_reduced_body_in_both_appearances() {
+        for host in [Theme::studio_dark(), Theme::studio_light()] {
+            for reduce in [false, true] {
+                let theme = GlassPreset::Clear
+                    .content_theme(&host.clone().with_reduce_transparency(reduce));
+                assert_eq!(theme.appearance, Appearance::Dark);
+                assert_eq!(theme.colors.text, host.colors.on_media_foreground);
+                assert_eq!(theme.colors.hairline, host.colors.on_media_hairline);
+                assert_eq!(
+                    theme.surface(Surface::Raised),
+                    host.colors.on_media_background
+                );
+                assert_eq!(theme.reduce_transparency, reduce);
+                assert_eq!(
+                    GlassPreset::Clear.resolved(&theme),
+                    if reduce {
+                        GlassPreset::Frosted
+                    } else {
+                        GlassPreset::Clear
+                    }
+                );
+            }
+            assert_eq!(
+                GlassPreset::Liquid.content_theme(&host).appearance,
+                host.appearance
+            );
+        }
     }
 
     #[test]

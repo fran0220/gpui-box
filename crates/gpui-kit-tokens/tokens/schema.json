@@ -37,6 +37,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "onMediaForeground",
+        "onMediaBackground",
+        "onMediaHairline",
         "palette",
         "paletteSteps",
         "surface",
@@ -51,6 +54,9 @@
         "terminal"
       ],
       "properties": {
+        "onMediaForeground": { "$ref": "#/$defs/color" },
+        "onMediaBackground": { "$ref": "#/$defs/color" },
+        "onMediaHairline": { "$ref": "#/$defs/color" },
         "palette": { "$ref": "#/$defs/palette" },
         "paletteSteps": { "$ref": "#/$defs/paletteSteps" },
         "surface": { "$ref": "#/$defs/surfaceColors" },
