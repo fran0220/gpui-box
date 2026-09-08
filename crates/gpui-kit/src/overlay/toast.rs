@@ -517,7 +517,7 @@ impl ToastLayer {
         let hovered = entry.hovered;
         let hover_id = id.clone();
 
-        let card = surface(theme, OverlaySurface::FLOATING)
+        let card = surface(toast.ident.clone(), theme, OverlaySurface::FLOATING)
             .id(toast.ident.element_id())
             .row()
             .items_start()

@@ -399,7 +399,7 @@ impl Render for HoverCard {
                 self.pending_focus = false;
             }
             let body = self.content.clone().map(|build| build(window, cx));
-            let card = surface(&theme, OverlaySurface::FLOATING)
+            let card = surface(card_ident.clone(), &theme, OverlaySurface::FLOATING)
                 .id(card_ident.element_id())
                 .max_w(px(theme.measures.compact_overlay_width))
                 .p_token(&theme, Space::Sm)

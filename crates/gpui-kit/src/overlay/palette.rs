@@ -480,7 +480,7 @@ impl Render for CommandPalette {
             spec = spec.description(cx.strings().text(StringKey::PaletteEmptyDetail));
         }
 
-        surface(&theme, OverlaySurface::MODAL)
+        surface(self.ident.clone(), &theme, OverlaySurface::MODAL)
             .w(px(PALETTE_WIDTH))
             .p_token(&theme, Space::Xs)
             .gap_token(&theme, Space::Xs)

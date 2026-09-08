@@ -512,7 +512,7 @@ impl Render for Drawer {
 
         let shown = self.shown_size();
         let handle = self.resize_handle(&theme, cx);
-        let mut card = surface(&theme, OverlaySurface::EDGE)
+        let mut card = surface(self.ident.clone(), &theme, OverlaySurface::EDGE)
             .relative()
             .when(horizontal, |element| element.w(px(shown)).h_full())
             .when(!horizontal, |element| element.h(px(shown)).w_full())

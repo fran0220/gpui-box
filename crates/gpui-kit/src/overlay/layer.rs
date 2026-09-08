@@ -10,7 +10,7 @@ use gpui::{
     Anchor, AnyElement, App, ClickEvent, Div, ElementId, IntoElement, Pixels, Point, RenderOnce,
     Stateful, Window, div, prelude::*, px,
 };
-use gpui_kit_theme::{Elevation, Layer, Radius, Surface, Theme};
+use gpui_kit_theme::{Elevation, Layer, Radius, Theme};
 
 use crate::foundation::{ActiveTheme, Ident, StyledExt};
 
@@ -374,17 +374,143 @@ impl RenderOnce for Overlay {
     }
 }
 
-/// An overlay entity built from one complete overlay recipe.
-pub fn surface(theme: &Theme, recipe: impl Into<OverlaySurface>) -> Div {
+/// An overlay entity built from one complete Regular Liquid recipe.
+/// All style and interaction builders target the content div; material is
+/// installed exactly once after those builders finish.
+pub fn surface(
+    ident: impl Into<Ident>,
+    theme: &Theme,
+    recipe: impl Into<OverlaySurface>,
+) -> GlassSurface {
     let recipe = recipe.into();
-    div()
-        .column()
-        .when_some(recipe.radius, |element, radius| {
-            element.radius(theme, radius)
-        })
-        .frame(theme, Surface::Overlay, recipe.elevation)
-        .overflow_hidden()
-        .text_color(theme.colors.text)
+    let ident = ident.into();
+    GlassSurface {
+        ident: ident.clone(),
+        recipe,
+        inner: div()
+            .id(ident.element_id())
+            .column()
+            .when_some(recipe.radius, |element, radius| {
+                element.radius(theme, radius)
+            })
+            .overflow_hidden(),
+    }
+}
+
+/// A styleable overlay body whose sole material authority is [`surface`].
+pub struct GlassSurface {
+    ident: Ident,
+    recipe: OverlaySurface,
+    inner: Stateful<Div>,
+}
+
+impl GlassSurface {
+    /// Preserve the material wrapper while assigning the content identity.
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.inner.interactivity().element_id = Some(id.into());
+        self
+    }
+}
+
+impl gpui::StatefulInteractiveElement for GlassSurface {}
+
+impl gpui_kit_semantics::Semantic for GlassSurface {
+    type Output = Self;
+    fn semantic(
+        mut self,
+        registry: &gpui_kit_semantics::SemanticRegistry,
+        spec: gpui_kit_semantics::NodeSpec,
+    ) -> Self {
+        self.inner = self.inner.semantic(registry, spec);
+        self
+    }
+    fn semantic_in(mut self, cx: &App, spec: gpui_kit_semantics::NodeSpec) -> Self {
+        self.inner = self.inner.semantic_in(cx, spec);
+        self
+    }
+}
+
+impl gpui::Styled for GlassSurface {
+    fn style(&mut self) -> &mut gpui::StyleRefinement {
+        self.inner.style()
+    }
+}
+
+impl gpui::ParentElement for GlassSurface {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.inner.extend(elements);
+    }
+}
+
+impl gpui::InteractiveElement for GlassSurface {
+    fn interactivity(&mut self) -> &mut gpui::Interactivity {
+        self.inner.interactivity()
+    }
+}
+
+impl gpui::IntoElement for GlassSurface {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl gpui::Element for GlassSurface {
+    type RequestLayoutState = AnyElement;
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+    fn request_layout(
+        &mut self,
+        _: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (gpui::LayoutId, AnyElement) {
+        let glass = super::Glass::new(self.ident.child("material"))
+            .radius_px(
+                self.recipe
+                    .radius
+                    .map_or(0.0, |radius| cx.theme().radius(radius)),
+            )
+            .elevation(self.recipe.elevation)
+            .adaptive(true)
+            .frame(std::mem::replace(
+                &mut self.inner,
+                div().id(self.ident.element_id()),
+            ));
+        let mut element = glass.into_any_element();
+        let layout = element.request_layout(window, cx);
+        (layout, element)
+    }
+    fn prepaint(
+        &mut self,
+        _: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: gpui::Bounds<Pixels>,
+        element: &mut AnyElement,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        element.prepaint(window, cx);
+    }
+    fn paint(
+        &mut self,
+        _: Option<&gpui::GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: gpui::Bounds<Pixels>,
+        element: &mut AnyElement,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        element.paint(window, cx);
+    }
 }
 
 /// Maps a token layer onto GPUI's deferred paint priority.

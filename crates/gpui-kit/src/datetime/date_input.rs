@@ -350,7 +350,7 @@ impl Render for DateInput {
         });
 
         let surface = self.open.then(|| {
-            let card = popover::card(&theme)
+            let card = popover::card(self.ident.child("calendar"), &theme)
                 .child(self.calendar.clone())
                 .into_any_element();
             popover::anchored_below(

@@ -658,7 +658,7 @@ impl Cascader {
                 .child(column)
                 .into_any_element()
         });
-        let card = popover::card_flush(&theme)
+        let card = popover::card_flush(self.ident.child("menu"), &theme)
             .flex()
             .row_reading(direction)
             .items_stretch()

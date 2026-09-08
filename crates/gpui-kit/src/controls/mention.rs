@@ -476,7 +476,7 @@ impl MentionInput {
             .is_empty()
             .then(|| self.empty_menu_state(has_value, cx));
 
-        popover::card_flush(&theme)
+        popover::card_flush(menu_ident.clone(), &theme)
             .w(px(theme.measures.compact_overlay_width))
             .max_h(px(theme.measures.compact_menu_max_height))
             .id(menu_ident.element_id())

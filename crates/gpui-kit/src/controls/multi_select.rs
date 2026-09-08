@@ -535,7 +535,7 @@ impl Render for MultiSelect {
                 &theme,
                 geometry.placement,
                 geometry.hang,
-                popover::card_flush(&theme)
+                popover::card_flush(self.ident.child("menu"), &theme)
                     .w(px(geometry.width))
                     .max_h(px(geometry.max_height))
                     .child(popover::menu_body(

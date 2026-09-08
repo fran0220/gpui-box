@@ -458,7 +458,7 @@ fn panel<V: 'static>(
         })
         .collect::<Vec<_>>();
 
-    surface(theme, OverlaySurface::FLOATING)
+    surface(ident.clone(), theme, OverlaySurface::FLOATING)
         .min_w(px(theme.measures.menu_min_width))
         .p_token(theme, Space::Xs)
         .children(rows)

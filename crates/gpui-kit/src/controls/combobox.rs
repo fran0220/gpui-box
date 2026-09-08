@@ -550,7 +550,7 @@ impl Combobox {
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .children(rows);
-        let list = popover::card_flush(&theme)
+        let list = popover::card_flush(menu_ident.clone(), &theme)
             .py(px(inset))
             .w(px(geometry.width))
             .max_h(px(geometry.max_height))

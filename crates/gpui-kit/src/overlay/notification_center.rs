@@ -21,8 +21,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, ParentElement, Render, SharedString, Styled, Window, div, px,
+    AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement,
+    Render, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
@@ -619,7 +619,7 @@ impl Render for NotificationCenter {
             spec = spec.description(cx.strings().text(StringKey::NotificationsEmptyDetail));
         }
 
-        surface(&theme, OverlaySurface::FLOATING)
+        surface(self.ident.clone(), &theme, OverlaySurface::FLOATING)
             .id(self.ident.element_id())
             .w_full()
             .child(

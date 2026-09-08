@@ -79,7 +79,7 @@ impl RenderOnce for Tooltip {
                 // The one floating recipe, same as a menu or a toast: a
                 // tooltip that kept its own radius was a second vocabulary
                 // for the same detached plane.
-                surface(&theme, OverlaySurface::FLOATING)
+                surface(self.ident.clone(), &theme, OverlaySurface::FLOATING)
                     .max_w(px(260.0))
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)

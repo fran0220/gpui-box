@@ -347,7 +347,7 @@ impl Render for Dialog {
         let description =
             description.map(|description| panel::description(&self.ident, &theme, description, cx));
 
-        let mut card = surface(&theme, OverlaySurface::MODAL)
+        let mut card = surface(self.ident.clone(), &theme, OverlaySurface::MODAL)
             .w(px(theme.measures.dialog_width))
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));

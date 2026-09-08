@@ -163,14 +163,14 @@ pub fn filter_indices_for<S: AsRef<str>>(cx: &App, query: &str, labels: &[S]) ->
 }
 
 /// The elevated surface every anchored overlay draws.
-pub fn card(theme: &Theme) -> gpui::Div {
-    surface(theme, OverlaySurface::FLOATING).p(px(theme.spacing.xs))
+pub fn card(ident: impl Into<Ident>, theme: &Theme) -> super::layer::GlassSurface {
+    surface(ident, theme, OverlaySurface::FLOATING).p(px(theme.spacing.xs))
 }
 
 /// [`card`] without the inner padding, for a surface that draws its own rows
 /// edge to edge.
-pub fn card_flush(theme: &Theme) -> gpui::Div {
-    card(theme).p_0()
+pub fn card_flush(ident: impl Into<Ident>, theme: &Theme) -> super::layer::GlassSurface {
+    card(ident, theme).p_0()
 }
 
 /// How far a menu may sit from an end before it counts as away from it.
@@ -524,8 +524,8 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
 }
 
 /// The surface a modal draws itself on.
-pub fn dialog_card(theme: &Theme) -> gpui::Div {
-    surface(theme, OverlaySurface::MODAL)
+pub fn dialog_card(ident: impl Into<Ident>, theme: &Theme) -> super::layer::GlassSurface {
+    surface(ident, theme, OverlaySurface::MODAL)
         .w(px(theme.measures.dialog_width))
         .p(px(theme.spacing.xl - theme.spacing.xs))
 }
@@ -815,9 +815,13 @@ impl Render for Popover {
                     self.focus_handle.focus(window, cx);
                 }
                 let body = self.content.clone().map(|content| content(window, cx));
-                let mut card = surface(&theme, OverlaySurface::FLOATING)
-                    .p_token(&theme, Space::Sm)
-                    .track_focus(&self.focus_handle);
+                let mut card = surface(
+                    self.ident.child("surface"),
+                    &theme,
+                    OverlaySurface::FLOATING,
+                )
+                .p_token(&theme, Space::Sm)
+                .track_focus(&self.focus_handle);
                 if self.dismissable {
                     card = card
                         .on_key_down(cx.listener(Self::on_dismiss_key))

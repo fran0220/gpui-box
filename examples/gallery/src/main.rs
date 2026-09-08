@@ -1056,8 +1056,8 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
         )
 }
 
-fn menu_sample(theme: &Theme, width: f32) -> gpui::Div {
-    popover::card(theme)
+fn menu_sample(theme: &Theme, width: f32) -> gpui_kit::overlay::GlassSurface {
+    popover::card("gallery.menu-sample", theme)
         .w(px(width))
         .child(popover::heading(theme, "Recent"))
         .child(
@@ -1563,7 +1563,7 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                         .gap(px(theme.spacing.lg))
                         .child(menu_sample(theme, 360.0))
                         .child(
-                            popover::dialog_card(theme)
+                            popover::dialog_card("gallery.dialog-sample", theme)
                                 .child(popover::dialog_title(theme, "Replace existing theme?"))
                                 .child(popover::dialog_body(
                                     theme,
