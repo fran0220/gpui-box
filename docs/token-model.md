@@ -373,22 +373,28 @@ not bypassed by a default constructor. Micro bounce, wobble, and pop timings
 also live in `durationMs`; their keyframe shapes remain local component
 topology.
 
-Overlay surfaces are opaque by default. Glass separates scattering from optics:
-`Frosted` uses `effect.glassFrostBlur`, while `Liquid` and `Lens` default to a
-sharp snapshot (`blur = 0`) and still refract it. A caller can add blur to either
-clear preset, in which case the renderer keeps both snapshots: blurred for the
-interior and sharp for the refracted rim. `effect.glassAlpha` is Frosted's
-source-over fill and the fill an explicitly adaptive Liquid surface may add
-for readability. Ordinary Liquid and Lens paint no source-over fill: their
-light response is shader-owned, where `glassTransmissionGain` multiplies the
-transmitted backdrop and `glassOpticalLift` adds white light rather than
-tinting over it.
+Overlay surfaces use Regular Liquid by default: `effect.glassFrostBlur`,
+`glassSaturation` and shader-owned achromatic `glassWash` separate reading
+content from its backdrop. Rim refraction samples the scattered (blurred)
+source, so the edge bends colour bands and luminance without recognizable
+background details. `Clear` and `Lens` naturally remain sharp at their default
+`blur = 0`; adding blur scatters their rim source too. `effect.glassAlpha` is
+Frosted's source-over fill, never an adaptive Regular fill. Adaptive appearance
+only flips small controls; large reading surfaces retain the host appearance.
+`glassTransmissionGain` multiplies transmitted backdrop light and
+`glassOpticalLift` adds light in the material.
+
+Clear belongs above media and always carries light `color.onMediaForeground`
+content. Only Clear honors `dimmed(true)`, using `effect.glassDimming` (35%).
+The host-owned Reduce transparency preference resolves Regular/Lens to
+Frosted and Clear to dark `color.onMediaBackground` Frosted with light content;
+it is not a token or a platform setting read by Kit.
 
 The optical profile scales from `glassBevelRatio` times each control's short
 edge and is bounded by `glassBevelMin`/`glassBevelMax`. Refraction and dispersion
 are independent ratios; `glassHairline` remains one logical pixel rather than
-growing with the control. A theme that sets `glassAlpha` to 1 declares the
-surface opaque and no backdrop work is painted. GPUI Box Kit does not fake
+growing with the control. A Frosted surface at `glassAlpha` 1 is opaque and
+does not paint backdrop work. GPUI Box Kit does not fake
 optics with a gradient, because the colour behind a translucent window is not
 a colour anything can paint.
 

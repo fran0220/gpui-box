@@ -687,10 +687,10 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             .child(div().type_scale(&theme, TypeScale::Caption).child(body))
     };
 
-    // A ruled checkerboard bends far more legibly than a flat fill: its
-    // one-pixel lines reveal whether the refracted rim retained the sharp
-    // snapshot while Frosted scattered the interior. It is drawn in neutrals,
-    // and every plate that carries one is an exact
+    // A ruled checkerboard makes the material contract visible: Regular's
+    // rim refracts the scattered source, bending colour and luminance bands
+    // without restoring recognizable fine lines. Clear stays sharp because
+    // its blur is zero. The board is neutral, and every plate is an exact
     // number of squares across and down: a board cut through the middle of a
     // square at the plate edge reads as a broken pattern rather than as the
     // ruled backdrop the optics are being measured against.

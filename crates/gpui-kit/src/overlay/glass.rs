@@ -1,9 +1,10 @@
 //! A surface that shows what is behind it, out of focus and bent.
 //!
 //! [`Glass`] is the material a popover, a dialog or a rail is placed on when
-//! the window itself is translucent. Regular Liquid scatters its interior
-//! while retaining a sharp refracted rim. Clear and Lens preserve sharp
-//! interiors; Frosted scatters without bending the backdrop.
+//! the window itself is translucent. Regular Liquid refracts the scattered
+//! (blurred) source at its rim: colour bands and luminance bend there, not
+//! recognizable background details. Clear and Lens stay sharp because their
+//! default blur is zero; Frosted scatters without bending the backdrop.
 //!
 //! # One layer, in one order
 //!
