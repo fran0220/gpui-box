@@ -95231,8 +95231,8 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Dim the media behind Clear glass by `effect.glassDimming`. Other presets ignore this setting.",
-      "documentation": "Dim the media behind Clear glass by `effect.glassDimming`.\nOther presets ignore this setting.",
+      "summary": "Dim the media behind Clear glass by `effect.glassDimming`. Attenuates transmission before optical lift and highlights, independent of foreground primitive batching. Other presets ignore this setting.",
+      "documentation": "Dim the media behind Clear glass by `effect.glassDimming`.\nAttenuates transmission before optical lift and highlights, independent\nof foreground primitive batching.\nOther presets ignore this setting.",
       "signature": "pub fn dimmed (mut self, dimmed : bool) -> Self",
       "cfg": [],
       "target": "Glass"
@@ -141953,6 +141953,12 @@
       "title": "Image-atlas placement precision — separate from probe ownership",
       "guide": "coverage",
       "anchor": "image-atlas-placement-precision-separate-from-probe-ownership"
+    },
+    {
+      "id": "coverage-clear-pill-geometry-and-dimming-order",
+      "title": "Clear Pill geometry and dimming order",
+      "guide": "coverage",
+      "anchor": "clear-pill-geometry-and-dimming-order"
     },
     {
       "id": "datetime-why-the-seam-is-here",

@@ -423,6 +423,8 @@ impl Glass {
     }
 
     /// Dim the media behind Clear glass by `effect.glassDimming`.
+    /// Attenuates transmission before optical lift and highlights, independent
+    /// of foreground primitive batching.
     /// Other presets ignore this setting.
     pub fn dimmed(mut self, dimmed: bool) -> Self {
         self.dimmed = dimmed;
@@ -1044,7 +1046,7 @@ impl Element for Lobe {
     ) {
         self.collected.borrow_mut().push(GlassLobe {
             bounds,
-            corner_radii: Corners::all(self.radius),
+            corner_radii: Corners::all(self.radius).clamp_radii_for_quad_size(bounds.size),
         });
         self.child.prepaint(window, cx);
     }
@@ -1278,35 +1280,31 @@ impl Element for BackdropLayer {
         if let Some(bevel) = self.bevel {
             material.bevel = bevel.resolve(bounds, lobes);
         }
+        if let Some(alpha) = self.dimming {
+            // Black source-over on the transmitted source is multiplication.
+            // Keep it inside the material, before lift/rim, rather than relying
+            // on a same-layer quad to enter the renderer's backdrop snapshot.
+            material.transmission_gain *= 1.0 - alpha.clamp(0.0, 1.0);
+        }
         if !material.needs_backdrop() {
             self.child.paint(window, cx);
             return;
         }
+        // Match the styled child's fitted radii. Theme Pill is deliberately
+        // oversized; raw paint APIs preserve such radii rather than fitting
+        // them, so passing it through would discard both dimming and optics.
+        let corner_radii = Corners::all(self.radius).clamp_radii_for_quad_size(bounds.size);
         window.paint_layer(bounds, |window| {
-            if let Some(alpha) = self.dimming {
-                let black = gpui::hsla(0.0, 0.0, 0.0, alpha);
-                if lobes.is_empty() {
-                    window.paint_quad(
-                        gpui::fill(bounds, black).corner_radii(Corners::all(self.radius)),
-                    );
-                } else {
-                    for lobe in lobes {
-                        window.paint_quad(
-                            gpui::fill(lobe.bounds, black).corner_radii(lobe.corner_radii),
-                        );
-                    }
-                }
-            }
             if let Some(fallback) = self.fallback {
                 window.paint_backdrop_glass_with_fallback(
                     bounds,
-                    Corners::all(self.radius),
+                    corner_radii,
                     material,
                     lobes,
                     fallback,
                 );
             } else {
-                window.paint_backdrop_glass(bounds, Corners::all(self.radius), material, lobes);
+                window.paint_backdrop_glass(bounds, corner_radii, material, lobes);
             }
             self.child.paint(window, cx);
         });

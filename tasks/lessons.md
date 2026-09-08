@@ -80,3 +80,7 @@
   activation through asynchronous readback; unsubmitted surfaces have no value.
   Diagnose remaining image differences with probe inputs and atlas coordinates
   before treating them as the same defect or claiming byte-for-byte equality.
+- Readable overlay text does not prove its material rendered. Exercise Pill
+  token radii against actual small bounds and compare interior pixels to the
+  aligned backdrop. Keep material attenuation inside the material rather than
+  depending on same-layer primitive batching to define its optical order.

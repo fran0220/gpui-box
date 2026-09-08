@@ -481,6 +481,100 @@ mod imp {
         use image::{Rgba, RgbaImage};
 
         #[test]
+        fn clear_pill_dims_media_inside_a_clipped_card() -> Result<()> {
+            use gpui::{DevicePixels, ObjectFit, RenderImage, img};
+            use gpui_kit::foundation::Sizable;
+            use gpui_kit::prelude::{Button, ControlSize, Glass, GlassPreset};
+            use gpui_kit_theme::{Elevation, Radius};
+
+            struct PillHost;
+            impl Render for PillHost {
+                fn render(
+                    &mut self,
+                    window: &mut Window,
+                    cx: &mut Context<Self>,
+                ) -> impl IntoElement {
+                    SemanticCoordinator::global(cx).begin_frame(window);
+                    let media = Arc::new(
+                        RenderImage::from_rgba(
+                            size(DevicePixels(4), DevicePixels(4)),
+                            [100, 80, 60, 255].repeat(16),
+                        )
+                        .expect("fixture image dimensions"),
+                    );
+                    div().size_full().overflow_hidden().child(
+                        div()
+                            .relative()
+                            .w(px(280.))
+                            .h(px(130.))
+                            .rounded(px(16.))
+                            .overflow_hidden()
+                            .child(img(media).size_full().object_fit(ObjectFit::Cover))
+                            .child(
+                                div().absolute().right(px(20.)).bottom(px(20.)).child(
+                                    Glass::new("test.clear-pill")
+                                        .preset(GlassPreset::Clear)
+                                        .dimmed(true)
+                                        .radius(Radius::Pill)
+                                        .elevation(Elevation::Flat)
+                                        .child(
+                                            div().w(px(200.)).h(px(41.)).child(
+                                                Button::new("test.clear-pill.action")
+                                                    .ghost()
+                                                    .control_size(ControlSize::Xs)
+                                                    .label("Generate image"),
+                                            ),
+                                        ),
+                                ),
+                            ),
+                    )
+                }
+            }
+
+            let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                "Geist",
+            ));
+            let mut cx = HeadlessAppContext::with_platform(
+                text_system,
+                Arc::new(gpui_kit::assets::Assets),
+                gpui_platform::current_headless_renderer,
+            );
+            cx.update(|cx| {
+                gpui_kit::install(cx);
+                cx.set_reduce_motion(true);
+                activate_theme("studio-light", cx);
+            });
+            let window: AnyWindowHandle = cx
+                .open_window(size(px(300.), px(150.)), |_, cx| cx.new(|_| PillHost))?
+                .into();
+            let frame = settled_image(&mut cx, window)?;
+            let output = repo_root().join("target/headless-clear-pill.png");
+            frame.save(&output)?;
+            let scale = frame.width() as f32 / 300.;
+            let sample = |x: f32, y: f32| frame.get_pixel((x * scale) as u32, (y * scale) as u32);
+            let raw = sample(150., 40.);
+            let inside = sample(150., 100.);
+            // Uniform media excludes lens displacement. At the flat interior,
+            // Clear applies 35% black, gain 1.042, then white lift 0.075.
+            // Flat elevation isolates the material from shadow compositing.
+            // This checks actual paint ordering as well as Pill radius fitting.
+            for channel in 0..3 {
+                let expected = (raw[channel] as f32 * 0.65 * 1.042 + 255. * 0.075).round() as i16;
+                assert!(
+                    (i16::from(inside[channel]) - expected).abs() <= 2,
+                    "channel {channel}: raw={raw:?}, inside={inside:?}, expected={expected}; {}",
+                    output.display()
+                );
+            }
+            assert!(
+                sample(150., 69.5)[0] > inside[0] + 10,
+                "Pill retains its rim"
+            );
+            assert_eq!(sample(61., 70.), raw, "outside the fitted arc stays media");
+            Ok(())
+        }
+
+        #[test]
         fn comparison_allows_one_channel_step() {
             let expected = RgbaImage::from_pixel(1, 1, Rgba([10, 20, 30, 255]));
             let actual = RgbaImage::from_pixel(1, 1, Rgba([11, 19, 30, 254]));

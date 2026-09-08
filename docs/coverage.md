@@ -1096,3 +1096,29 @@ with source rectangles, transformed sprites, edge filtering and all three
 shader backends verified. It potentially changes every image/textured-sprite
 baseline on Metal, Linux WGPU and Windows; it is not hidden in probe lifetime
 or addressed by a headless-only atlas reset.
+
+## Clear Pill geometry and dimming order
+
+A 200×41 Clear Pill above an image reproduced the downstream failure on Metal:
+raw and interior pixels were both `[100,80,60]`. Kit passed the Pill token's
+999 radius directly to raw quad/backdrop paint, while the styled child fitted
+it to half the shortest side (20.5). The oversized SDF discarded both dimming
+and optics. BackdropLayer and collected GlassPane lobes now use the framework's
+existing `clamp_radii_for_quad_size`, matching their styled surfaces without
+changing raw framework paint semantics.
+
+Fitting the radius exposed a separate ordering dependency: the same-layer
+black quad attenuated the completed optics, producing `[80,66,53]`. Clear
+dimming now multiplies transmission gain by `1 - effect.glassDimming` inside
+the material, before wash/lift/highlights. No extra quad, shader ABI change or
+product workaround is needed. The pixel regression renders a clipped rounded
+card, Cover image, absolute Pill and ghost Xs button with the platform's native
+headless renderer. It checks the independent equation
+`raw × 0.65 × 1.042 + 255 × 0.075`, yielding `[87,73,60]`, the retained rim,
+and untouched pixels outside the rounded arc. Flat elevation isolates material
+math from shadows. Run it on Metal or Linux/WGPU with:
+
+```bash
+cargo test --manifest-path tools/headless-visual/Cargo.toml \
+  clear_pill_dims_media_inside_a_clipped_card -- --nocapture
+```
