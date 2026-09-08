@@ -279,6 +279,14 @@ luminance cannot guarantee contrast at every text position. It does not add an
 opaque or source-over face, change large-panel appearance, or affect Clear.
 Caller-supplied text colours and optical overrides still require caller review.
 
+Application-wide Reduce transparency belongs in `ThemeRegistry`, alongside
+density: call `set_reduce_transparency(reduce, cx)` to update it and repaint all
+windows. `ThemeRegistry::set_reduce_transparency` and `reduce_transparency`
+provide the direct setter/getter. Activation, density changes, registration and
+counterpart resolution preserve this preference; an unchanged value does not
+rebuild the resolved theme. Scoped `Theme::with_reduce_transparency` remains
+available for individual exhibits; no root `ThemeOverlay` workaround is needed.
+
 ### Downsampled backdrop blur deliberately deferred, 2026-09-04
 
 Metal, Direct3D, and WGPU keep full-resolution backdrop textures and preserve

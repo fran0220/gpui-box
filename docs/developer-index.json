@@ -1285,7 +1285,7 @@
           "features": []
         }
       ],
-      "symbolCount": 92
+      "symbolCount": 95
     },
     {
       "name": "gpui-box-kit-tokens",
@@ -105879,7 +105879,7 @@
       "source": "crates/gpui-kit-theme/src/lib.rs",
       "summary": "The set of themes an application can switch between at runtime.",
       "documentation": "The set of themes an application can switch between at runtime.",
-      "signature": "# [doc = \" The set of themes an application can switch between at runtime.\"] # [derive (Debug)] pub struct ThemeRegistry { tokens : Vec<Arc<TokenDocument>>, active : usize, density : Density, theme : Theme, }",
+      "signature": "# [doc = \" The set of themes an application can switch between at runtime.\"] # [derive (Debug)] pub struct ThemeRegistry { tokens : Vec<Arc<TokenDocument>>, active : usize, density : Density, reduce_transparency : bool, theme : Theme, }",
       "cfg": []
     },
     {
@@ -106003,6 +106003,21 @@
       "target": "ThemeRegistry"
     },
     {
+      "id": "gpui_kit_theme::ThemeRegistry::reduce_transparency",
+      "name": "reduce_transparency",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "The host-projected reader preference, preserved across theme changes.",
+      "documentation": "The host-projected reader preference, preserved across theme changes.",
+      "signature": "pub fn reduce_transparency (& self) -> bool",
+      "cfg": [],
+      "target": "ThemeRegistry"
+    },
+    {
       "id": "gpui_kit_theme::ThemeRegistry::register",
       "name": "register",
       "kind": "method",
@@ -106044,6 +106059,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_density (& mut self, density : Density)",
+      "cfg": [],
+      "target": "ThemeRegistry"
+    },
+    {
+      "id": "gpui_kit_theme::ThemeRegistry::set_reduce_transparency",
+      "name": "set_reduce_transparency",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "Projects the host's preference into active and counterpart themes. Repeating the same value leaves the resolved theme unchanged.",
+      "documentation": "Projects the host's preference into active and counterpart themes.\nRepeating the same value leaves the resolved theme unchanged.",
+      "signature": "pub fn set_reduce_transparency (& mut self, reduce : bool)",
       "cfg": [],
       "target": "ThemeRegistry"
     },
@@ -106215,6 +106245,20 @@
       "summary": "Changes the density axis and repaints every window.",
       "documentation": "Changes the density axis and repaints every window.",
       "signature": "pub fn set_density (density : Density, cx : & mut App)",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit_theme::set_reduce_transparency",
+      "name": "set_reduce_transparency",
+      "kind": "function",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "Projects the host's Reduce transparency setting and repaints every window. Kit does not read platform preferences; this persists across theme/density changes without requiring a scoped theme override around the application.",
+      "documentation": "Projects the host's Reduce transparency setting and repaints every window.\nKit does not read platform preferences; this persists across theme/density\nchanges without requiring a scoped theme override around the application.",
+      "signature": "pub fn set_reduce_transparency (reduce : bool, cx : & mut App)",
       "cfg": []
     },
     {

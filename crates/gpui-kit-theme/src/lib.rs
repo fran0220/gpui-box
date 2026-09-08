@@ -1888,6 +1888,7 @@ pub struct ThemeRegistry {
     tokens: Vec<Arc<TokenDocument>>,
     active: usize,
     density: Density,
+    reduce_transparency: bool,
     theme: Theme,
 }
 
@@ -1904,11 +1905,14 @@ impl ThemeRegistry {
             .chain(presets())
             .map(|document| Arc::new(document.clone()))
             .collect();
-        let theme = Theme::from_tokens(&tokens[0], Density::default());
+        let reduce_transparency = false;
+        let theme = Theme::from_tokens(&tokens[0], Density::default())
+            .with_reduce_transparency(reduce_transparency);
         Self {
             tokens,
             active: 0,
             density: Density::default(),
+            reduce_transparency,
             theme,
         }
     }
@@ -1944,6 +1948,11 @@ impl ThemeRegistry {
         self.density
     }
 
+    /// The host-projected reader preference, preserved across theme changes.
+    pub fn reduce_transparency(&self) -> bool {
+        self.reduce_transparency
+    }
+
     /// Returns false when the id is not registered, leaving the active theme
     /// untouched rather than falling back to a default the caller did not ask
     /// for.
@@ -1974,7 +1983,10 @@ impl ThemeRegistry {
                 .iter()
                 .find(|document| document.meta.appearance == want && document.meta.id != current_id)
         })?;
-        Some(Theme::from_tokens(found, self.density))
+        Some(
+            Theme::from_tokens(found, self.density)
+                .with_reduce_transparency(self.reduce_transparency),
+        )
     }
 
     pub fn activate(&mut self, id: &str) -> bool {
@@ -1991,8 +2003,18 @@ impl ThemeRegistry {
         self.rebuild();
     }
 
+    /// Projects the host's preference into active and counterpart themes.
+    /// Repeating the same value leaves the resolved theme unchanged.
+    pub fn set_reduce_transparency(&mut self, reduce: bool) {
+        if self.reduce_transparency != reduce {
+            self.reduce_transparency = reduce;
+            self.rebuild();
+        }
+    }
+
     fn rebuild(&mut self) {
-        self.theme = Theme::from_tokens(&self.tokens[self.active], self.density);
+        self.theme = Theme::from_tokens(&self.tokens[self.active], self.density)
+            .with_reduce_transparency(self.reduce_transparency);
     }
 }
 
@@ -2024,6 +2046,14 @@ pub fn activate_theme(id: &str, cx: &mut App) -> bool {
 /// Changes the density axis and repaints every window.
 pub fn set_density(density: Density, cx: &mut App) {
     cx.update_global::<ThemeRegistry, ()>(|registry, _| registry.set_density(density));
+    cx.refresh_windows();
+}
+
+/// Projects the host's Reduce transparency setting and repaints every window.
+/// Kit does not read platform preferences; this persists across theme/density
+/// changes without requiring a scoped theme override around the application.
+pub fn set_reduce_transparency(reduce: bool, cx: &mut App) {
+    cx.update_global::<ThemeRegistry, ()>(|registry, _| registry.set_reduce_transparency(reduce));
     cx.refresh_windows();
 }
 
@@ -2451,6 +2481,37 @@ mod tests {
         registry.set_density(Density::Compact);
         registry.activate("studio-light");
         assert_eq!(registry.active().density, Density::Compact);
+    }
+
+    #[test]
+    fn reader_preference_survives_registry_rebuilds_and_counterparts() {
+        let mut registry = ThemeRegistry::new();
+        assert!(!registry.reduce_transparency());
+        assert!(!registry.active().reduce_transparency);
+        registry.set_reduce_transparency(true);
+        assert!(registry.reduce_transparency());
+        assert!(registry.active().reduce_transparency);
+        let unchanged = registry.active().clone();
+        registry.set_reduce_transparency(true);
+        assert!(Arc::ptr_eq(&unchanged.0, &registry.active().0));
+        assert!(registry.activate("studio-light"));
+        assert!(registry.active().reduce_transparency);
+        registry.set_density(Density::Compact);
+        assert!(registry.active().reduce_transparency);
+        let counterpart = registry.counterpart().expect("dark counterpart");
+        assert!(counterpart.reduce_transparency);
+        assert_eq!(counterpart.density, Density::Compact);
+        registry.register(bundled()[0].clone());
+        assert!(registry.active().reduce_transparency);
+        registry.set_reduce_transparency(false);
+        assert!(!registry.reduce_transparency());
+        assert!(!registry.active().reduce_transparency);
+        assert!(
+            !registry
+                .counterpart()
+                .expect("counterpart")
+                .reduce_transparency
+        );
     }
 
     #[test]
