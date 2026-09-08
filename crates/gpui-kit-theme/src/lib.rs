@@ -257,6 +257,8 @@ pub struct ThemeData {
     pub name: SharedString,
     pub appearance: Appearance,
     pub density: Density,
+    /// Reader preference projected by the host; never inferred from tokens.
+    pub reduce_transparency: bool,
     pub colors: Colors,
     pub typography: Typography,
     pub spacing: Spacing,
@@ -797,6 +799,13 @@ impl Theme {
         Self::from_tokens(gpui_kit_tokens::studio_light(), Density::default())
     }
 
+    /// Projects the host's Reduce transparency preference into this theme.
+    /// Kit does not read platform settings. Glass and built-in overlays
+    /// resolve to Frosted while this preference is enabled.
+    pub fn with_reduce_transparency(self, reduce: bool) -> Self {
+        self.modify(|theme| theme.reduce_transparency = reduce)
+    }
+
     /// Derives a theme by mutating a copy-on-write view of its resolved data.
     ///
     /// Cloning a theme is constant-time. The complete data is cloned only
@@ -1000,6 +1009,7 @@ impl Theme {
             name: tokens.meta.name.clone().into(),
             appearance: tokens.meta.appearance,
             density,
+            reduce_transparency: false,
             colors: Colors {
                 backdrop: color(tokens.surface(Surface::Backdrop)),
                 canvas: color(tokens.surface(Surface::Canvas)),
@@ -2207,6 +2217,16 @@ mod tests {
         assert!(!Arc::ptr_eq(&theme.0, &adjusted.0));
         assert_eq!(adjusted.spacing.lg, theme.spacing.lg * 3.0);
         assert_eq!(theme.spacing.lg, Theme::studio_dark().spacing.lg);
+    }
+
+    #[test]
+    fn reader_transparency_preference_is_copy_on_write_and_not_a_token() {
+        let theme = Theme::studio_dark();
+        let reduced = theme.clone().with_reduce_transparency(true);
+        assert!(!theme.reduce_transparency);
+        assert!(reduced.reduce_transparency);
+        assert_eq!(theme.effects, reduced.effects);
+        assert!(!reduced.with_reduce_transparency(false).reduce_transparency);
     }
 
     #[test]

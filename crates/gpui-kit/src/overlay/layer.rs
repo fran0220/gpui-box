@@ -387,6 +387,7 @@ pub fn surface(
     GlassSurface {
         ident: ident.clone(),
         recipe,
+        theme: theme.clone(),
         inner: div()
             .id(ident.element_id())
             .column()
@@ -401,6 +402,7 @@ pub fn surface(
 pub struct GlassSurface {
     ident: Ident,
     recipe: OverlaySurface,
+    theme: Theme,
     inner: Stateful<Div>,
 }
 
@@ -476,7 +478,7 @@ impl gpui::Element for GlassSurface {
             .radius_px(
                 self.recipe
                     .radius
-                    .map_or(0.0, |radius| cx.theme().radius(radius)),
+                    .map_or(0.0, |radius| self.theme.radius(radius)),
             )
             .elevation(self.recipe.elevation)
             .adaptive(true)
@@ -484,7 +486,8 @@ impl gpui::Element for GlassSurface {
                 &mut self.inner,
                 div().id(self.ident.element_id()),
             ));
-        let mut element = glass.into_any_element();
+        let mut element =
+            crate::foundation::ThemeOverlay::theme(self.theme.clone(), glass).into_any_element();
         let layout = element.request_layout(window, cx);
         (layout, element)
     }

@@ -79,13 +79,21 @@ pub enum GlassPreset {
 }
 
 impl GlassPreset {
+    fn resolved(self, theme: &Theme) -> Self {
+        if theme.reduce_transparency {
+            Self::Frosted
+        } else {
+            self
+        }
+    }
+
     /// How much ordinary source-over fill the surface paints, at this theme.
     ///
     /// A frosted surface uses `effect.glassAlpha` to separate its scattered
     /// backdrop from surrounding content. Liquid and Lens use shader-owned
     /// optics instead; their wash belongs to the material, not this fill.
     pub fn tint_alpha(self, theme: &Theme) -> f32 {
-        match self {
+        match self.resolved(theme) {
             GlassPreset::Frosted => theme.effects.glass_alpha,
             GlassPreset::Liquid | GlassPreset::Lens | GlassPreset::Clear => 0.0,
         }
@@ -102,7 +110,7 @@ impl GlassPreset {
         } else {
             1.0
         };
-        match self {
+        match self.resolved(theme) {
             GlassPreset::Frosted => GlassMaterial::frosted(px(effects.glass_frost_blur)),
             GlassPreset::Liquid => GlassMaterial {
                 blur_radius: px(effects.glass_frost_blur),
@@ -155,7 +163,7 @@ impl GlassPreset {
     /// known. Frosted is flat; optical presets scale with their own
     /// control rather than borrowing one fixed pixel bevel.
     fn bevel(self, theme: &Theme) -> Option<ResponsiveBevel> {
-        (self != GlassPreset::Frosted).then_some(ResponsiveBevel {
+        (self.resolved(theme) != GlassPreset::Frosted).then_some(ResponsiveBevel {
             ratio: theme.effects.glass_bevel_ratio,
             min: px(theme.effects.glass_bevel_min),
             max: px(theme.effects.glass_bevel_max),
@@ -480,6 +488,9 @@ impl Glass {
     /// The material this surface asks the renderer for: the preset's
     /// combination with the caller's overrides laid over it.
     fn material(&self, theme: &Theme) -> GlassMaterial<Pixels> {
+        if theme.reduce_transparency {
+            return GlassPreset::Frosted.material(theme);
+        }
         let mut material = self.preset.material(theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
@@ -523,6 +534,7 @@ impl RenderOnce for Glass {
         let measured = measure::cell(&id, window, cx);
         let bounds = measured.get();
         let adaptive = (self.adaptive || self.adaptive_appearance)
+            && !theme.reduce_transparency
             && can_flip(bounds, theme.effects.glass_flip_max_extent);
 
         // The pointer carries the light: the angle from the surface's centre
@@ -585,7 +597,7 @@ impl RenderOnce for Glass {
                 .is_some_and(|state| state.borrow().appearance_flipped)
             && let Some(counterpart) = cx
                 .try_global::<ThemeRegistry>()
-                .and_then(ThemeRegistry::counterpart)
+                .and_then(|registry| registry.counterpart_for(&theme))
         {
             theme = counterpart;
             let probe = material.probe;
@@ -853,7 +865,9 @@ impl RenderOnce for GlassGroup {
             self.preset.tint_alpha(&theme).clamp(0.0, 1.0)
         };
         let mut material = self.preset.material(&theme);
-        if let Some(blur) = self.blur {
+        if !theme.reduce_transparency
+            && let Some(blur) = self.blur
+        {
             material.blur_radius = px(blur);
         }
         material.smoothing = px(self.merge.unwrap_or(theme.effects.glass_merge_distance));
@@ -865,6 +879,7 @@ impl RenderOnce for GlassGroup {
             .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
         let measured = measure::cell(&id, window, cx);
         let adaptive = (self.adaptive || self.adaptive_appearance)
+            && !theme.reduce_transparency
             && can_flip(measured.get(), theme.effects.glass_flip_max_extent);
 
         // A press deepens the fused outline, not each pane: the group is one
@@ -911,7 +926,7 @@ impl RenderOnce for GlassGroup {
                 .is_some_and(|state| state.borrow().appearance_flipped)
             && let Some(counterpart) = cx
                 .try_global::<ThemeRegistry>()
-                .and_then(ThemeRegistry::counterpart)
+                .and_then(|registry| registry.counterpart_for(&theme))
         {
             theme = counterpart;
             let counterpart_material = self.preset.material(&theme);
@@ -1515,6 +1530,30 @@ mod tests {
             assert_eq!(bright.style, gpui::ShadowStyle::Ring);
             assert!(dark.color.a > bright.color.a);
             assert_eq!(dark.blur_radius, bright.blur_radius);
+        }
+    }
+
+    #[test]
+    fn reader_preference_resolves_every_preset_to_frosted() {
+        let theme = Theme::studio_dark().with_reduce_transparency(true);
+        let frosted = GlassMaterial::frosted(px(theme.effects.glass_frost_blur));
+        for preset in [
+            GlassPreset::Liquid,
+            GlassPreset::Clear,
+            GlassPreset::Lens,
+            GlassPreset::Frosted,
+        ] {
+            assert_eq!(preset.material(&theme), frosted);
+            assert_eq!(preset.tint_alpha(&theme), theme.effects.glass_alpha);
+            assert!(preset.bevel(&theme).is_none());
+            assert_eq!(
+                Glass::new("reduced")
+                    .preset(preset)
+                    .refraction(2.0)
+                    .blur(0.0)
+                    .material(&theme),
+                frosted
+            );
         }
     }
 
