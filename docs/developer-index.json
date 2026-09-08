@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2516
+      "symbolCount": 2520
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -1089,7 +1089,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4199
+      "symbolCount": 4229
     },
     {
       "name": "gpui-box-kit-assets",
@@ -1285,7 +1285,7 @@
           "features": []
         }
       ],
-      "symbolCount": 89
+      "symbolCount": 92
     },
     {
       "name": "gpui-box-kit-tokens",
@@ -26429,7 +26429,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "The appearance of the background of the window itself, when there is no content or the content is transparent.",
       "documentation": "The appearance of the background of the window itself, when there is\nno content or the content is transparent.",
-      "signature": "# [doc = \" The appearance of the background of the window itself, when there is\"] # [doc = \" no content or the content is transparent.\"] # [derive (Copy, Clone, Debug, Default, PartialEq)] pub enum WindowBackgroundAppearance { # [doc = \" Opaque.\"] # [doc = \"\"] # [doc = \" This lets the window manager know that content behind this\"] # [doc = \" window does not need to be drawn.\"] # [doc = \"\"] # [doc = \" Actual color depends on the system and themes should define a fully\"] # [doc = \" opaque background color instead.\"] # [default] Opaque, # [doc = \" Plain alpha transparency.\"] Transparent, # [doc = \" Transparency, but the contents behind the window are blurred.\"] # [doc = \"\"] # [doc = \" Not always supported.\"] Blurred, # [doc = \" The Mica backdrop material, supported on Windows 11.\"] MicaBackdrop, # [doc = \" The Mica Alt backdrop material, supported on Windows 11.\"] MicaAltBackdrop, }",
+      "signature": "# [doc = \" The appearance of the background of the window itself, when there is\"] # [doc = \" no content or the content is transparent.\"] # [derive (Copy, Clone, Debug, Default, PartialEq)] pub enum WindowBackgroundAppearance { # [doc = \" Opaque.\"] # [doc = \"\"] # [doc = \" This lets the window manager know that content behind this\"] # [doc = \" window does not need to be drawn.\"] # [doc = \"\"] # [doc = \" Actual color depends on the system and themes should define a fully\"] # [doc = \" opaque background color instead.\"] # [default] Opaque, # [doc = \" Plain alpha transparency.\"] Transparent, # [doc = \" Transparency, but the contents behind the window are blurred.\"] # [doc = \"\"] # [doc = \" Not always supported.\"] Blurred, # [doc = \" The Mica backdrop material, supported on Windows 11.\"] MicaBackdrop, # [doc = \" The Mica Alt backdrop material, supported on Windows 11.\"] MicaAltBackdrop, # [doc = \" The current platform's system glass material.\"] # [doc = \"\"] # [doc = \" On macOS 26+ this is `NSGlassEffectView` at the regular style, composited\"] # [doc = \" behind the window's content. On Windows 11 it is the main-window Mica\"] # [doc = \" backdrop. Other platforms treat it as [`Self::Opaque`].\"] SystemGlass, }",
       "cfg": []
     },
     {
@@ -30510,6 +30510,35 @@
       "cfg": []
     },
     {
+      "id": "gpui::scene::GlassEdge",
+      "name": "GlassEdge",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "Which edge a glass surface fades from, for a scroll-edge or similar ramp.",
+      "documentation": "Which edge a glass surface fades from, for a scroll-edge or similar ramp.",
+      "signature": "# [doc = \" Which edge a glass surface fades from, for a scroll-edge or similar ramp.\"] # [derive (Debug, Copy, Clone, Default, PartialEq, Eq)] # [repr (u32)] pub enum GlassEdge { # [doc = \" No fade; the surface applies its optics uniformly.\"] # [default] None = 0, # [doc = \" Full optics at the top edge, fading toward the bottom of the band.\"] Top = 1, # [doc = \" Full optics at the bottom edge, fading toward the top of the band.\"] Bottom = 2, # [doc = \" Full optics at the left edge, fading toward the right of the band.\"] Left = 3, # [doc = \" Full optics at the right edge, fading toward the left of the band.\"] Right = 4, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::scene::GlassEdge::as_f32",
+      "name": "as_f32",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "The GPU-facing discriminant, as a float so the material struct stays one packed run of 32-bit words.",
+      "documentation": "The GPU-facing discriminant, as a float so the material struct stays\none packed run of 32-bit words.",
+      "signature": "pub fn as_f32 (self) -> f32",
+      "cfg": [],
+      "target": "GlassEdge"
+    },
+    {
       "id": "gpui::scene::GlassField",
       "name": "GlassField",
       "kind": "struct",
@@ -30577,7 +30606,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "The complete optical response of a glass surface.",
       "documentation": "The complete optical response of a glass surface.\n\nBlur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\nsnapshots the sharp backdrop and leaves it unchanged; callers independently\nadd refraction, dispersion, transmission, an optical lift, or edge light.\n[`GlassMaterial::frosted`] adds only scattering. A renderer therefore keeps\na sharp snapshot even when it also derives a blurred one: the interior may\nbe frosted while the refracted rim remains sharp.",
-      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. A renderer therefore keeps\"] # [doc = \" a sharp snapshot even when it also derives a blurred one: the interior may\"] # [doc = \" be frosted while the refracted rim remains sharp.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] pub bevel : P, # [doc = \" How far the bevel displaces the sample, as a fraction of `bevel`. This\"] # [doc = \" is a thickness in disguise: 0 is a flat pane and larger values read as\"] # [doc = \" a deeper body of glass.\"] pub refraction : f32, # [doc = \" How far apart the red and blue samples land, as a fraction of the\"] # [doc = \" refraction offset. Zero samples all three channels together.\"] pub dispersion : f32, # [doc = \" Peak brightness of the rim highlight, 0 for none.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Which luminance probe slot this surface fills, or [`NO_LUMINANCE_PROBE`].\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, }",
+      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. A renderer therefore keeps\"] # [doc = \" a sharp snapshot even when it also derives a blurred one: the interior may\"] # [doc = \" be frosted while the refracted rim remains sharp.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] pub bevel : P, # [doc = \" How far the bevel displaces the sample, as a fraction of `bevel`. This\"] # [doc = \" is a thickness in disguise: 0 is a flat pane and larger values read as\"] # [doc = \" a deeper body of glass.\"] pub refraction : f32, # [doc = \" How far apart the red and blue samples land, as a fraction of the\"] # [doc = \" refraction offset. Zero samples all three channels together.\"] pub dispersion : f32, # [doc = \" Peak brightness of the rim highlight, 0 for none.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" Saturation of the sampled backdrop, including the refracted rim, before\"] # [doc = \" transmission gain. One preserves colour, zero uses Rec. 709 luminance.\"] # [doc = \" Values above one intensify colour; negative results are clamped to zero.\"] pub saturation : f32, # [doc = \" Achromatic source-over material wash after saturation and transmission\"] # [doc = \" gain, before optical lift and edge light. RGB must be all zero (dark) or\"] # [doc = \" all one (light); alpha is strength. Sanitization selects black or white\"] # [doc = \" from red at 0.5. This covers the refracted rim, unlike an element fill.\"] pub wash : Rgba, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Which luminance probe slot this surface fills, or [`NO_LUMINANCE_PROBE`].\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, # [doc = \" Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,\"] # [doc = \" 3 left, 4 right. Stored as a float so the GPU struct stays one packed\"] # [doc = \" run of 32-bit words.\"] pub edge_mask_edge : f32, # [doc = \" How far that fade reaches from the named edge, in the surface's unit.\"] # [doc = \" Zero disables the mask even when [`Self::edge_mask_edge`] is set.\"] pub edge_mask_band : P, }",
       "cfg": []
     },
     {
@@ -30684,6 +30713,21 @@
       "signature": "pub fn scale (self, factor : f32) -> GlassMaterial<ScaledPixels>",
       "cfg": [],
       "target": "GlassMaterial<Pixels>"
+    },
+    {
+      "id": "gpui::scene::GlassMaterial::with_edge_mask",
+      "name": "with_edge_mask",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "Fade this surface from `edge` over `band`, mixing the optical result back into the undisplaced sharp snapshot so the inner side of the ramp is the content itself.",
+      "documentation": "Fade this surface from `edge` over `band`, mixing the optical result\nback into the undisplaced sharp snapshot so the inner side of the\nramp is the content itself.",
+      "signature": "pub fn with_edge_mask (mut self, edge : GlassEdge, band : P) -> Self",
+      "cfg": [],
+      "target": "GlassMaterial<P>"
     },
     {
       "id": "gpui::scene::LUMINANCE_PROBE_SAMPLES",
@@ -31631,6 +31675,20 @@
       "summary": "",
       "documentation": "",
       "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Underline { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub thickness : ScaledPixels, pub wavy : PaddedBool32, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::scene::glass_edge_mask",
+      "name": "glass_edge_mask",
+      "kind": "function",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "How strongly a surface's optics apply at `point`, given a linear edge mask.",
+      "documentation": "How strongly a surface's optics apply at `point`, given a linear edge mask.\n\n1 keeps the optical result; 0 restores the undisplaced sharp snapshot.\nThe three shaders implement this same ramp.",
+      "signature": "pub fn glass_edge_mask (point : Point<f32>, bounds : Bounds<f32>, edge : f32, band : f32) -> f32",
       "cfg": []
     },
     {
@@ -66185,7 +66243,7 @@
       "source": "crates/gpui-kit/src/data/flow.rs",
       "summary": "Rows drawn by their caller, laid out only where the viewport reaches.",
       "documentation": "Rows drawn by their caller, laid out only where the viewport reaches.",
-      "signature": "# [doc = \" Rows drawn by their caller, laid out only where the viewport reaches.\"] # [derive (IntoElement)] pub struct Flow { ident : Ident, count : usize, render_row : RenderRow, keys : Option<Vec<SharedString>>, estimate : Option<f32>, alignment : ListAlignment, extent : Extent, }",
+      "signature": "# [doc = \" Rows drawn by their caller, laid out only where the viewport reaches.\"] # [derive (IntoElement)] pub struct Flow { ident : Ident, count : usize, render_row : RenderRow, keys : Option<Vec<SharedString>>, estimate : Option<f32>, alignment : ListAlignment, extent : Extent, inset : Option<(f32, f32)>, }",
       "cfg": []
     },
     {
@@ -66200,6 +66258,21 @@
       "summary": "Rests the rows against the end rather than the start, for a conversation or a log whose newest row is the one worth seeing.",
       "documentation": "Rests the rows against the end rather than the start, for a\nconversation or a log whose newest row is the one worth seeing.",
       "signature": "pub fn anchored_to_end (mut self) -> Self",
+      "cfg": [],
+      "target": "Flow"
+    },
+    {
+      "id": "gpui_kit::data::flow::Flow::content_inset",
+      "name": "content_inset",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::flow",
+      "path": "gpui_kit::data::flow",
+      "source": "crates/gpui-kit/src/data/flow.rs",
+      "summary": "Pad the scroll content, not the viewport. Rows start below `top` and can travel through that band as the surface scrolls, which is how a conversation keeps its first turn readable under a floating titlebar without shrinking the list itself.",
+      "documentation": "Pad the scroll content, not the viewport. Rows start below `top` and\ncan travel through that band as the surface scrolls, which is how a\nconversation keeps its first turn readable under a floating titlebar\nwithout shrinking the list itself.",
+      "signature": "pub fn content_inset (mut self, top : f32, bottom : f32) -> Self",
       "cfg": [],
       "target": "Flow"
     },
@@ -82893,6 +82966,20 @@
     },
     {
       "id": "gpui_kit::layout::reexport-10",
+      "name": "status_bar :: { StatusBar , StatusGroup , StatusItem }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout",
+      "path": "gpui_kit::layout",
+      "source": "crates/gpui-kit/src/layout/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use status_bar::{ StatusBar, StatusGroup, StatusItem };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::reexport-11",
       "name": "titlebar :: { DesktopTitlebar , DesktopTitlebarEvent }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -82906,7 +82993,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::layout::reexport-11",
+      "id": "gpui_kit::layout::reexport-12",
       "name": "toolbar :: { Toolbar , ToolbarItem }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -82920,7 +83007,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::layout::reexport-12",
+      "id": "gpui_kit::layout::reexport-13",
       "name": "tree :: { SplitChange , SplitKind , SplitLayout , SplitPaneSpec , SplitRecord , SplitRecordError , SplitTree , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -83005,6 +83092,20 @@
     },
     {
       "id": "gpui_kit::layout::reexport-7",
+      "name": "scroll_edge :: { ScrollEdgeEffect , ScrollEdgeKind }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout",
+      "path": "gpui_kit::layout",
+      "source": "crates/gpui-kit/src/layout/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use scroll_edge::{ ScrollEdgeEffect, ScrollEdgeKind };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::reexport-8",
       "name": "scroll_fade :: { FadeEdges , ScrollFade }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -83018,7 +83119,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::layout::reexport-8",
+      "id": "gpui_kit::layout::reexport-9",
       "name": "split :: { SplitAxis , SplitPane , SplitSide }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -83029,20 +83130,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use split::{ SplitAxis, SplitPane, SplitSide };",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::layout::reexport-9",
-      "name": "status_bar :: { StatusBar , StatusGroup , StatusItem }",
-      "kind": "reexport",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "layout",
-      "path": "gpui_kit::layout",
-      "source": "crates/gpui-kit/src/layout/mod.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use status_bar::{ StatusBar, StatusGroup, StatusItem };",
       "cfg": []
     },
     {
@@ -83412,6 +83499,214 @@
       "summary": "Puts the region with this identity at `offset`, measured the same way [`scroll_offset`] reports it.",
       "documentation": "Puts the region with this identity at `offset`, measured the same way\n[`scroll_offset`] reports it.\n\nThe counterpart to reading, for a host restoring where the user was: a\nreopened document belongs where they left it, not at the top. It takes\neffect on the next frame, and a region that has never rendered remembers\nthe position until it does.",
       "signature": "pub fn scroll_to (ident : impl Into<Ident>, offset : Point<Pixels>, window : & Window, cx : & mut App)",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect",
+      "name": "ScrollEdgeEffect",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "A visual ramp at the edges where floating glass overlaps scrolling content.",
+      "documentation": "A visual ramp at the edges where floating glass overlaps scrolling content.",
+      "signature": "# [doc = \" A visual ramp at the edges where floating glass overlaps scrolling content.\"] # [derive (IntoElement)] pub struct ScrollEdgeEffect { ident : Ident, edges : FadeEdges, kind : ScrollEdgeKind, band : Option<f32>, blur : Option<f32>, child : Option<AnyElement>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::band",
+      "name": "band",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "How far the ramp reaches, overriding `effect.scrollEdgeBand`.",
+      "documentation": "How far the ramp reaches, overriding `effect.scrollEdgeBand`.",
+      "signature": "pub fn band (mut self, band : f32) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::blur",
+      "name": "blur",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "How far the soft ramp scatters, overriding `effect.scrollEdgeBlur`.",
+      "documentation": "How far the soft ramp scatters, overriding `effect.scrollEdgeBlur`.",
+      "signature": "pub fn blur (mut self, blur : f32) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::bottom",
+      "name": "bottom",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Whether the bottom edge ramps.",
+      "documentation": "Whether the bottom edge ramps.",
+      "signature": "pub fn bottom (mut self, fade : bool) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::child",
+      "name": "child",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Content the ramp is painted over.",
+      "documentation": "Content the ramp is painted over.",
+      "signature": "pub fn child (mut self, child : impl IntoElement) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::edges",
+      "name": "edges",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Which edges hide content under floating chrome.",
+      "documentation": "Which edges hide content under floating chrome.",
+      "signature": "pub fn edges (mut self, edges : FadeEdges) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::hard",
+      "name": "hard",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Opaque backing, for reduced transparency.",
+      "documentation": "Opaque backing, for reduced transparency.",
+      "signature": "pub fn hard (self) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::kind",
+      "name": "kind",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Soft scatters; Hard is an opaque backing.",
+      "documentation": "Soft scatters; Hard is an opaque backing.",
+      "signature": "pub fn kind (mut self, kind : ScrollEdgeKind) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::left",
+      "name": "left",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Whether the left edge ramps.",
+      "documentation": "Whether the left edge ramps.",
+      "signature": "pub fn left (mut self, fade : bool) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "A ramp that paints no edge until the caller names one.",
+      "documentation": "A ramp that paints no edge until the caller names one.",
+      "signature": "pub fn new (ident : impl Into<Ident>) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::right",
+      "name": "right",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Whether the right edge ramps.",
+      "documentation": "Whether the right edge ramps.",
+      "signature": "pub fn right (mut self, fade : bool) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::soft",
+      "name": "soft",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Progressive blur and fade.",
+      "documentation": "Progressive blur and fade.",
+      "signature": "pub fn soft (self) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeEffect::top",
+      "name": "top",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "Whether the top edge ramps.",
+      "documentation": "Whether the top edge ramps.",
+      "signature": "pub fn top (mut self, fade : bool) -> Self",
+      "cfg": [],
+      "target": "ScrollEdgeEffect"
+    },
+    {
+      "id": "gpui_kit::layout::scroll_edge::ScrollEdgeKind",
+      "name": "ScrollEdgeKind",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::scroll_edge",
+      "path": "gpui_kit::layout::scroll_edge",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "How a scroll-edge ramp separates floating chrome from the content under it.",
+      "documentation": "How a scroll-edge ramp separates floating chrome from the content under it.",
+      "signature": "# [doc = \" How a scroll-edge ramp separates floating chrome from the content under it.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum ScrollEdgeKind { # [doc = \" Progressive blur and fade into the content.\"] # [default] Soft, # [doc = \" An opaque backing, used when transparency is reduced.\"] Hard, }",
       "cfg": []
     },
     {
@@ -92977,7 +93272,7 @@
       "source": "crates/gpui-kit/src/navigation/tabs.rs",
       "summary": "A row of tabs. The strip publishes one [`Role::Tab`] node per tab.",
       "documentation": "A row of tabs. The strip publishes one [`Role::Tab`] node per tab.",
-      "signature": "# [doc = \" A row of tabs. The strip publishes one [`Role::Tab`] node per tab.\"] # [derive (IntoElement)] pub struct Tabs { ident : Ident, tabs : Vec<TabItem>, selected : Option<SharedString>, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, on_close : Option<CloseHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, overflow : Overflow, overflow_menu : Option<Entity<Menu>>, }",
+      "signature": "# [doc = \" A row of tabs. The strip publishes one [`Role::Tab`] node per tab.\"] # [derive (IntoElement)] pub struct Tabs { ident : Ident, tabs : Vec<TabItem>, selected : Option<SharedString>, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, on_close : Option<CloseHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, overflow : Overflow, overflow_menu : Option<Entity<Menu>>, capsules : bool, }",
       "cfg": []
     },
     {
@@ -92992,6 +93287,21 @@
       "summary": "Whether this strip takes a payload, and where. Without one, it takes its own tabs and nothing else.",
       "documentation": "Whether this strip takes a payload, and where. Without one, it takes\nits own tabs and nothing else.",
       "signature": "pub fn accepts (mut self, predicate : impl Fn (& DragItem, & DropPosition) -> bool + 'static,) -> Self",
+      "cfg": [],
+      "target": "Tabs"
+    },
+    {
+      "id": "gpui_kit::navigation::tabs::Tabs::capsules",
+      "name": "capsules",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::tabs",
+      "path": "gpui_kit::navigation::tabs",
+      "source": "crates/gpui-kit/src/navigation/tabs.rs",
+      "summary": "Draw each tab as its own Regular Liquid pill.",
+      "documentation": "Draw each tab as its own Regular Liquid pill.\n\nA document strip stays a row of selected fills. A strip of named\nplaces — projects, spaces — is a row of capsules: every item has an\nmaterial-owned blurred face. The current item's [`TabItem::tint`]\nis a translucent selected fill, not a second opaque surface.\nOverflow, scrolling, reorder and the keyboard stay what they were.",
+      "signature": "pub fn capsules (mut self) -> Self",
       "cfg": [],
       "target": "Tabs"
     },
@@ -94718,7 +95028,7 @@
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "A glass surface: optionally scattered and bent backdrop, optional fill, and caller-owned content.",
       "documentation": "A glass surface: optionally scattered and bent backdrop, optional fill,\nand caller-owned content.",
-      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, radius : Radius, radius_px : Option<f32>, blur : Option<f32>, preset : GlassPreset, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, child : Option<AnyElement>, }",
+      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, elevation : Elevation, radius : Radius, radius_px : Option<f32>, blur : Option<f32>, preset : GlassPreset, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, tint : Option<Hsla>, edge_mask : Option<(GlassEdge, f32)>, child : Option<AnyElement>, frame : Option<gpui::Stateful<gpui::Div>>, }",
       "cfg": []
     },
     {
@@ -94730,9 +95040,24 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Add a tint at `effect.glassAlpha` while the optical source opposes the surface colour — a dark panel over a bright backdrop, or a light one over a dark backdrop — where clear glass would wash out its content.",
-      "documentation": "Add a tint at `effect.glassAlpha` while the optical source opposes the\nsurface colour — a dark panel over a bright backdrop, or a light one\nover a dark backdrop — where clear glass would wash out its content.\n\nThe reading comes from [`Window::backdrop_luminance`] one frame after\nthe backdrop moved, so the flip lands on the next frame the window\ndraws. Before that first reading, and on a renderer that takes no\nprobes, the surface keeps the theme tint as a safe readability\nfallback.",
+      "summary": "Let small controls flip their material and content appearance from backdrop probes. Large surfaces never flip. Before a probe resolves, the window theme supplies the direction; no extra fill is painted.",
+      "documentation": "Let small controls flip their material and content appearance from\nbackdrop probes. Large surfaces never flip. Before a probe resolves,\nthe window theme supplies the direction; no extra fill is painted.",
       "signature": "pub fn adaptive (mut self, adaptive : bool) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::Glass::adaptive_appearance",
+      "name": "adaptive_appearance",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Flip this surface, and the subtree it holds, to the counterpart appearance when the backdrop luminance opposes the current theme.",
+      "documentation": "Flip this surface, and the subtree it holds, to the counterpart\nappearance when the backdrop luminance opposes the current theme.\n\nUses the same probe and hysteresis as [`Self::adaptive`]. A product\nthat registered only one appearance never flips.",
+      "signature": "pub fn adaptive_appearance (mut self, adaptive : bool) -> Self",
       "cfg": [],
       "target": "Glass"
     },
@@ -94745,8 +95070,8 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "How far the backdrop is blurred, in pixels, overriding the preset. The Liquid and Lens defaults are zero; adding blur composes frost with their optics instead of enabling those optics.",
-      "documentation": "How far the backdrop is blurred, in pixels, overriding the preset. The\nLiquid and Lens defaults are zero; adding blur composes frost with their\noptics instead of enabling those optics.",
+      "summary": "How far the backdrop is blurred, in pixels, overriding the preset. Clear and Lens default to zero; Regular Liquid includes scattering.",
+      "documentation": "How far the backdrop is blurred, in pixels, overriding the preset.\nClear and Lens default to zero; Regular Liquid includes scattering.",
       "signature": "pub fn blur (mut self, blur : f32) -> Self",
       "cfg": [],
       "target": "Glass"
@@ -94767,6 +95092,21 @@
       "target": "Glass"
     },
     {
+      "id": "gpui_kit::overlay::glass::Glass::dimmed",
+      "name": "dimmed",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Dim the media behind Clear glass by `effect.glassDimming`. Other presets ignore this setting.",
+      "documentation": "Dim the media behind Clear glass by `effect.glassDimming`.\nOther presets ignore this setting.",
+      "signature": "pub fn dimmed (mut self, dimmed : bool) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
       "id": "gpui_kit::overlay::glass::Glass::dispersion",
       "name": "dispersion",
       "kind": "method",
@@ -94778,6 +95118,36 @@
       "summary": "How far the edge splits the backdrop into colour, overriding `effect.glassDispersion`.",
       "documentation": "How far the edge splits the backdrop into colour, overriding\n`effect.glassDispersion`.",
       "signature": "pub fn dispersion (mut self, dispersion : f32) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::Glass::edge_mask",
+      "name": "edge_mask",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Fade the optics from `edge` over `band` pixels, for a scroll-edge ramp. The inner side of the band is the content itself.",
+      "documentation": "Fade the optics from `edge` over `band` pixels, for a scroll-edge\nramp. The inner side of the band is the content itself.",
+      "signature": "pub fn edge_mask (mut self, edge : GlassEdge, band : f32) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::Glass::elevation",
+      "name": "elevation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Token shadow appropriate to this surface's elevation. The shadow is clipped outside the glass, never captured as a dark interior fill.",
+      "documentation": "Token shadow appropriate to this surface's elevation. The shadow is\nclipped outside the glass, never captured as a dark interior fill.",
+      "signature": "pub fn elevation (mut self, elevation : Elevation) -> Self",
       "cfg": [],
       "target": "Glass"
     },
@@ -94910,9 +95280,24 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Which surface colour Frosted or adaptive Liquid lays over the backdrop. Clear Liquid and Lens paint no ordinary fill by default.",
-      "documentation": "Which surface colour Frosted or adaptive Liquid lays over the backdrop.\nClear Liquid and Lens paint no ordinary fill by default.",
+      "summary": "Which surface colour Frosted lays over the backdrop.",
+      "documentation": "Which surface colour Frosted lays over the backdrop.",
       "signature": "pub fn surface (mut self, surface : Surface) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::Glass::tint",
+      "name": "tint",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Overlay this colour instead of the surface role. The tint is what `NSGlassEffectView.tintColor` and a prominent toolbar item are.",
+      "documentation": "Overlay this colour instead of the surface role. The tint is what\n`NSGlassEffectView.tintColor` and a prominent toolbar item are.",
+      "signature": "pub fn tint (mut self, tint : impl Into<Hsla>) -> Self",
       "cfg": [],
       "target": "Glass"
     },
@@ -94932,6 +95317,20 @@
       "target": "Glass"
     },
     {
+      "id": "gpui_kit::overlay::glass::GlassAppearance",
+      "name": "GlassAppearance",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Which appearance a glass surface is currently painting.",
+      "documentation": "Which appearance a glass surface is currently painting.\n\n`Inherited` is the window theme. `Light` and `Dark` are the counterpart\nthe surface resolved from its backdrop luminance when\n[`Glass::adaptive_appearance`] is on.",
+      "signature": "# [doc = \" Which appearance a glass surface is currently painting.\"] # [doc = \"\"] # [doc = \" `Inherited` is the window theme. `Light` and `Dark` are the counterpart\"] # [doc = \" the surface resolved from its backdrop luminance when\"] # [doc = \" [`Glass::adaptive_appearance`] is on.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum GlassAppearance { # [doc = \" The window theme is in force.\"] # [default] Inherited, # [doc = \" The surface installed the light counterpart.\"] Light, # [doc = \" The surface installed the dark counterpart.\"] Dark, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::overlay::glass::GlassGroup",
       "name": "GlassGroup",
       "kind": "struct",
@@ -94941,9 +95340,39 @@
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "Several glass panes fused into one body.",
-      "documentation": "Several glass panes fused into one body.\n\nEach pane is a rounded rect lobe of a single glass surface; where two\npanes come within `effect.glassMergeDistance` of each other, the shape's\nsmooth minimum joins them into one outline, the way two drops of water\nmeet. The optics — bevel, refraction, dispersion, the highlight — follow\nthe fused outline rather than each pane's own.\n\nA Frosted fill does not fuse: each pane lays its own tint, and the neck\nbetween two panes shows the bare optical source. Liquid and Lens panes are\nclear. A group holds at most\n[`MAX_GLASS_LOBES`] panes; panes past that keep their fill and their\ncontent but fall outside the fused shape, so the bound is asserted in\ndebug rather than silently absorbed.",
-      "signature": "# [doc = \" Several glass panes fused into one body.\"] # [doc = \"\"] # [doc = \" Each pane is a rounded rect lobe of a single glass surface; where two\"] # [doc = \" panes come within `effect.glassMergeDistance` of each other, the shape's\"] # [doc = \" smooth minimum joins them into one outline, the way two drops of water\"] # [doc = \" meet. The optics — bevel, refraction, dispersion, the highlight — follow\"] # [doc = \" the fused outline rather than each pane's own.\"] # [doc = \"\"] # [doc = \" A Frosted fill does not fuse: each pane lays its own tint, and the neck\"] # [doc = \" between two panes shows the bare optical source. Liquid and Lens panes are\"] # [doc = \" clear. A group holds at most\"] # [doc = \" [`MAX_GLASS_LOBES`] panes; panes past that keep their fill and their\"] # [doc = \" content but fall outside the fused shape, so the bound is asserted in\"] # [doc = \" debug rather than silently absorbed.\"] # [derive (IntoElement)] pub struct GlassGroup { ident : Ident, surface : Surface, radius : Radius, blur : Option<f32>, preset : GlassPreset, merge : Option<f32>, gap : Option<f32>, panes : Vec<(Ident, AnyElement)>, }",
+      "documentation": "Several glass panes fused into one body.\n\nEach pane is a rounded rect lobe of a single glass surface; where two\npanes come within `effect.glassMergeDistance` of each other, the shape's\nsmooth minimum joins them into one outline, the way two drops of water\nmeet. The optics — bevel, refraction, dispersion, the highlight — follow\nthe fused outline rather than each pane's own.\n\nAt most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque\noverlay panes instead, preserving every pane's content without holes.",
+      "signature": "# [doc = \" Several glass panes fused into one body.\"] # [doc = \"\"] # [doc = \" Each pane is a rounded rect lobe of a single glass surface; where two\"] # [doc = \" panes come within `effect.glassMergeDistance` of each other, the shape's\"] # [doc = \" smooth minimum joins them into one outline, the way two drops of water\"] # [doc = \" meet. The optics — bevel, refraction, dispersion, the highlight — follow\"] # [doc = \" the fused outline rather than each pane's own.\"] # [doc = \"\"] # [doc = \" At most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque\"] # [doc = \" overlay panes instead, preserving every pane's content without holes.\"] # [derive (IntoElement)] pub struct GlassGroup { ident : Ident, surface : Surface, radius : Radius, blur : Option<f32>, preset : GlassPreset, merge : Option<f32>, gap : Option<f32>, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, tint : Option<Hsla>, panes : Vec<(Ident, AnyElement)>, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::overlay::glass::GlassGroup::adaptive",
+      "name": "adaptive",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Let a small fused body flip appearance using [`Glass::adaptive`]'s probe, area limit, and hysteresis. Never adds a source-over wash.",
+      "documentation": "Let a small fused body flip appearance using [`Glass::adaptive`]'s\nprobe, area limit, and hysteresis. Never adds a source-over wash.",
+      "signature": "pub fn adaptive (mut self, adaptive : bool) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::GlassGroup::adaptive_appearance",
+      "name": "adaptive_appearance",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Flip this fused body, and the subtree it holds, to the counterpart appearance when the backdrop luminance opposes the current theme.",
+      "documentation": "Flip this fused body, and the subtree it holds, to the counterpart\nappearance when the backdrop luminance opposes the current theme.",
+      "signature": "pub fn adaptive_appearance (mut self, adaptive : bool) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
     },
     {
       "id": "gpui_kit::overlay::glass::GlassGroup::blur",
@@ -94954,9 +95383,24 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "How far the backdrop is blurred, overriding the preset. Liquid groups are clear by default; this opt-in composes scattering with refraction.",
-      "documentation": "How far the backdrop is blurred, overriding the preset. Liquid groups\nare clear by default; this opt-in composes scattering with refraction.",
+      "summary": "How far the backdrop is blurred, overriding the preset.",
+      "documentation": "How far the backdrop is blurred, overriding the preset.",
       "signature": "pub fn blur (mut self, blur : f32) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::GlassGroup::dimmed",
+      "name": "dimmed",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Dim the media behind Clear glass by `effect.glassDimming`.",
+      "documentation": "Dim the media behind Clear glass by `effect.glassDimming`.",
+      "signature": "pub fn dimmed (mut self, dimmed : bool) -> Self",
       "cfg": [],
       "target": "GlassGroup"
     },
@@ -95036,6 +95480,21 @@
       "target": "GlassGroup"
     },
     {
+      "id": "gpui_kit::overlay::glass::GlassGroup::pressable",
+      "name": "pressable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Deepen the fused refraction while any pane is pressed, by `effect.glassPressDepth`. The response is optical only: the group publishes no action of its own.",
+      "documentation": "Deepen the fused refraction while any pane is pressed, by\n`effect.glassPressDepth`. The response is optical only: the group\npublishes no action of its own.",
+      "signature": "pub fn pressable (mut self, pressable : bool) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
+    },
+    {
       "id": "gpui_kit::overlay::glass::GlassGroup::radius",
       "name": "radius",
       "kind": "method",
@@ -95059,9 +95518,24 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Which surface colour each Frosted pane lays over the backdrop. Liquid and Lens panes are clear.",
-      "documentation": "Which surface colour each Frosted pane lays over the backdrop. Liquid\nand Lens panes are clear.",
+      "summary": "Which surface colour each Frosted pane lays over the backdrop.",
+      "documentation": "Which surface colour each Frosted pane lays over the backdrop.",
       "signature": "pub fn surface (mut self, surface : Surface) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
+    },
+    {
+      "id": "gpui_kit::overlay::glass::GlassGroup::tint",
+      "name": "tint",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Overlay this colour on every pane instead of the surface role.",
+      "documentation": "Overlay this colour on every pane instead of the surface role.",
+      "signature": "pub fn tint (mut self, tint : impl Into<Hsla>) -> Self",
       "cfg": [],
       "target": "GlassGroup"
     },
@@ -95076,7 +95550,7 @@
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "How a glass surface responds to light.",
       "documentation": "How a glass surface responds to light.\n\nThe presets are named for what they are made of rather than for where they\nare used, because the same material carries a popover on one screen and a\nrail on another.",
-      "signature": "# [doc = \" How a glass surface responds to light.\"] # [doc = \"\"] # [doc = \" The presets are named for what they are made of rather than for where they\"] # [doc = \" are used, because the same material carries a popover on one screen and a\"] # [doc = \" rail on another.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum GlassPreset { # [doc = \" Blurred and tinted, and nothing else. This is what [`super::Frost`]\"] # [doc = \" paints, and what every renderer that can blur at all can produce.\"] Frosted, # [doc = \" The theme's full optics: the edge bends the backdrop, splits it into\"] # [doc = \" colour, and carries a highlight.\"] # [default] Liquid, # [doc = \" The bend without the colour split or the highlight, for a surface that\"] # [doc = \" sits over text that the dispersion would otherwise fringe.\"] Lens, }",
+      "signature": "# [doc = \" How a glass surface responds to light.\"] # [doc = \"\"] # [doc = \" The presets are named for what they are made of rather than for where they\"] # [doc = \" are used, because the same material carries a popover on one screen and a\"] # [doc = \" rail on another.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum GlassPreset { # [doc = \" Blurred and tinted, and nothing else. This is what [`super::Frost`]\"] # [doc = \" paints, and what every renderer that can blur at all can produce.\"] Frosted, # [doc = \" Regular Liquid Glass: blurred, saturation-adjusted backdrop with an\"] # [doc = \" achromatic wash, edge lensing and a highlighted rim.\"] # [default] Liquid, # [doc = \" Apple Clear variant, only for use above media. Pair with `dimmed(true)`.\"] Clear, # [doc = \" The bend without the colour split or the highlight, for a surface that\"] # [doc = \" sits over text that the dispersion would otherwise fringe.\"] Lens, }",
       "cfg": []
     },
     {
@@ -95104,7 +95578,7 @@
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "How much ordinary source-over fill the surface paints, at this theme.",
-      "documentation": "How much ordinary source-over fill the surface paints, at this theme.\n\nA frosted surface uses `effect.glassAlpha` to separate its scattered\nbackdrop from surrounding content. Liquid and Lens use shader-owned\noptics instead; their default fill is transparent.",
+      "documentation": "How much ordinary source-over fill the surface paints, at this theme.\n\nA frosted surface uses `effect.glassAlpha` to separate its scattered\nbackdrop from surrounding content. Liquid and Lens use shader-owned\noptics instead; their wash belongs to the material, not this fill.",
       "signature": "pub fn tint_alpha (self, theme : & Theme) -> f32",
       "cfg": [],
       "target": "GlassPreset"
@@ -95465,6 +95939,35 @@
       "target": "Edge"
     },
     {
+      "id": "gpui_kit::overlay::layer::GlassSurface",
+      "name": "GlassSurface",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::layer",
+      "path": "gpui_kit::overlay::layer",
+      "source": "crates/gpui-kit/src/overlay/layer.rs",
+      "summary": "A styleable overlay body whose sole material authority is [`surface`].",
+      "documentation": "A styleable overlay body whose sole material authority is [`surface`].",
+      "signature": "# [doc = \" A styleable overlay body whose sole material authority is [`surface`].\"] pub struct GlassSurface { ident : Ident, recipe : OverlaySurface, theme : Theme, inner : Stateful<Div>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::overlay::layer::GlassSurface::id",
+      "name": "id",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::layer",
+      "path": "gpui_kit::overlay::layer",
+      "source": "crates/gpui-kit/src/overlay/layer.rs",
+      "summary": "Preserve the material wrapper while assigning the content identity.",
+      "documentation": "Preserve the material wrapper while assigning the content identity.",
+      "signature": "pub fn id (mut self, id : impl Into<ElementId>) -> Self",
+      "cfg": [],
+      "target": "GlassSurface"
+    },
+    {
       "id": "gpui_kit::overlay::layer::Hang",
       "name": "Hang",
       "kind": "enum",
@@ -95723,9 +96226,9 @@
       "module": "overlay::layer",
       "path": "gpui_kit::overlay::layer",
       "source": "crates/gpui-kit/src/overlay/layer.rs",
-      "summary": "An overlay entity built from one complete overlay recipe.",
-      "documentation": "An overlay entity built from one complete overlay recipe.",
-      "signature": "pub fn surface (theme : & Theme, recipe : impl Into<OverlaySurface>) -> Div",
+      "summary": "An overlay entity built from one complete Regular Liquid recipe. All style and interaction builders target the content div; material is installed exactly once after those builders finish.",
+      "documentation": "An overlay entity built from one complete Regular Liquid recipe.\nAll style and interaction builders target the content div; material is\ninstalled exactly once after those builders finish.",
+      "signature": "pub fn surface (ident : impl Into<Ident>, theme : & Theme, recipe : impl Into<OverlaySurface>,) -> GlassSurface",
       "cfg": []
     },
     {
@@ -97811,7 +98314,7 @@
       "source": "crates/gpui-kit/src/overlay/popover.rs",
       "summary": "The elevated surface every anchored overlay draws.",
       "documentation": "The elevated surface every anchored overlay draws.",
-      "signature": "pub fn card (theme : & Theme) -> gpui::Div",
+      "signature": "pub fn card (ident : impl Into<Ident>, theme : & Theme) -> super::layer::GlassSurface",
       "cfg": []
     },
     {
@@ -97825,7 +98328,7 @@
       "source": "crates/gpui-kit/src/overlay/popover.rs",
       "summary": "[`card`] without the inner padding, for a surface that draws its own rows edge to edge.",
       "documentation": "[`card`] without the inner padding, for a surface that draws its own rows\nedge to edge.",
-      "signature": "pub fn card_flush (theme : & Theme) -> gpui::Div",
+      "signature": "pub fn card_flush (ident : impl Into<Ident>, theme : & Theme) -> super::layer::GlassSurface",
       "cfg": []
     },
     {
@@ -97867,7 +98370,7 @@
       "source": "crates/gpui-kit/src/overlay/popover.rs",
       "summary": "The surface a modal draws itself on.",
       "documentation": "The surface a modal draws itself on.",
-      "signature": "pub fn dialog_card (theme : & Theme) -> gpui::Div",
+      "signature": "pub fn dialog_card (ident : impl Into<Ident>, theme : & Theme) -> super::layer::GlassSurface",
       "cfg": []
     },
     {
@@ -98483,7 +98986,7 @@
     },
     {
       "id": "gpui_kit::overlay::reexport-5",
-      "name": "glass :: { Glass , GlassGroup , GlassPreset }",
+      "name": "glass :: { Glass , GlassAppearance , GlassGroup , GlassPreset }",
       "kind": "reexport",
       "package": "gpui-box-kit",
       "crate": "gpui_kit",
@@ -98492,7 +98995,7 @@
       "source": "crates/gpui-kit/src/overlay/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use glass::{ Glass, GlassGroup, GlassPreset };",
+      "signature": "pub use glass::{ Glass, GlassAppearance, GlassGroup, GlassPreset };",
       "cfg": []
     },
     {
@@ -98525,7 +99028,7 @@
     },
     {
       "id": "gpui_kit::overlay::reexport-8",
-      "name": "layer :: { Edge , Hang , Overlay , OverlaySurface , Placement , priority , surface }",
+      "name": "layer :: { Edge , GlassSurface , Hang , Overlay , OverlaySurface , Placement , priority , surface }",
       "kind": "reexport",
       "package": "gpui-box-kit",
       "crate": "gpui_kit",
@@ -98534,7 +99037,7 @@
       "source": "crates/gpui-kit/src/overlay/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use layer::{ Edge, Hang, Overlay, OverlaySurface, Placement, priority, surface };",
+      "signature": "pub use layer::{ Edge, GlassSurface, Hang, Overlay, OverlaySurface, Placement, priority, surface };",
       "cfg": []
     },
     {
@@ -104521,7 +105024,7 @@
       "source": "crates/gpui-kit-theme/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Effects { pub edge_fade_band : f32, pub focus_ring_width : f32, pub focus_ring_alpha : f32, pub glow_alpha : f32, pub glow_blur : f32, # [doc = \" The bloom budget, negative: how far a state glow is pulled in before\"] # [doc = \" it is blurred, so it stays out of its neighbours' pixels.\"] pub glow_spread : f32, pub glass_alpha : f32, pub glass_frost_blur : f32, pub glass_bevel_ratio : f32, pub glass_bevel_min : f32, pub glass_bevel_max : f32, pub glass_refraction : f32, pub glass_dispersion : f32, pub glass_specular : f32, pub glass_transmission_gain : f32, pub glass_optical_lift : f32, pub glass_hairline : f32, pub glass_specular_sharpness : f32, pub glass_light_angle : f32, pub glass_merge_distance : f32, pub glass_contrast_flip_low : f32, pub glass_contrast_flip_high : f32, pub glass_press_depth : f32, # [doc = \" How strongly a raised surface catches light along its top edge. The\"] # [doc = \" gradient itself is composed by the component, the way [`Theme::glow`]\"] # [doc = \" composes a bloom from a colour and an alpha.\"] pub sheen_alpha : f32, # [doc = \" The alpha an area fill starts at under a chart line, fading to nothing\"] # [doc = \" at the baseline.\"] pub area_wash_alpha : f32, # [doc = \" How strongly a node header band takes its category colour.\"] pub header_tint_alpha : f32, pub node_active_wash_alpha : f32, pub node_active_stroke_alpha : f32, pub node_traffic_alpha : f32, pub node_preview_alpha : f32, pub node_minimap_alpha : f32, pub node_overview_veil_alpha : f32, pub node_aura_resting_alpha : f32, pub node_aura_pulse_floor_alpha : f32, pub node_aura_pulse_peak_alpha : f32, pub node_aura_settle_peak_alpha : f32, pub node_aura_settle_expansion : f32, pub node_edge_hover_width_scale : f32, pub node_edge_selected_width_scale : f32, pub node_edge_glow_width_scale : f32, # [doc = \" How wide an identity rail is, in pixels: a node's category stripe or a\"] # [doc = \" callout's edge.\"] pub rail_width : f32, pub semantic_wash_faint_alpha : f32, pub semantic_wash_alpha : f32, pub semantic_wash_strong_alpha : f32, pub semantic_border_alpha : f32, pub accent_border_alpha : f32, pub accent_border_strong_alpha : f32, pub subtle_hover_alpha : f32, pub soft_contrast_alpha : f32, pub contrast_tint_alpha : f32, pub track_resting_alpha : f32, pub content_veil_alpha : f32, pub critical_fill_alpha : f32, pub critical_inactive_alpha : f32, pub variant_light_alpha : f32, pub variant_light_hover_alpha : f32, pub variant_light_active_alpha : f32, pub variant_subtle_hover_alpha : f32, pub variant_subtle_active_alpha : f32, pub primary_hover_opacity : f32, pub custom_color_readable_dark_floor : f32, pub custom_color_readable_light_ceiling : f32, pub custom_color_hover_lightness_delta : f32, pub custom_color_active_lightness_delta : f32, }",
+      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Effects { pub edge_fade_band : f32, pub focus_ring_width : f32, pub focus_ring_alpha : f32, pub glow_alpha : f32, pub glow_blur : f32, # [doc = \" The bloom budget, negative: how far a state glow is pulled in before\"] # [doc = \" it is blurred, so it stays out of its neighbours' pixels.\"] pub glow_spread : f32, pub glass_alpha : f32, pub glass_frost_blur : f32, pub glass_saturation : f32, # [doc = \" Achromatic wash intensity; the theme appearance selects black or white.\"] pub glass_wash : f32, pub glass_bevel_ratio : f32, pub glass_bevel_min : f32, pub glass_bevel_max : f32, pub glass_dimming : f32, pub glass_flip_max_extent : f32, pub glass_shadow_min : f32, pub glass_shadow_max : f32, pub glass_refraction : f32, pub glass_dispersion : f32, pub glass_specular : f32, pub glass_transmission_gain : f32, pub glass_optical_lift : f32, pub glass_hairline : f32, pub glass_specular_sharpness : f32, pub glass_light_angle : f32, pub glass_merge_distance : f32, pub glass_contrast_flip_low : f32, pub glass_contrast_flip_high : f32, pub glass_press_depth : f32, pub scroll_edge_band : f32, pub scroll_edge_blur : f32, # [doc = \" How strongly a raised surface catches light along its top edge. The\"] # [doc = \" gradient itself is composed by the component, the way [`Theme::glow`]\"] # [doc = \" composes a bloom from a colour and an alpha.\"] pub sheen_alpha : f32, # [doc = \" The alpha an area fill starts at under a chart line, fading to nothing\"] # [doc = \" at the baseline.\"] pub area_wash_alpha : f32, # [doc = \" How strongly a node header band takes its category colour.\"] pub header_tint_alpha : f32, pub node_active_wash_alpha : f32, pub node_active_stroke_alpha : f32, pub node_traffic_alpha : f32, pub node_preview_alpha : f32, pub node_minimap_alpha : f32, pub node_overview_veil_alpha : f32, pub node_aura_resting_alpha : f32, pub node_aura_pulse_floor_alpha : f32, pub node_aura_pulse_peak_alpha : f32, pub node_aura_settle_peak_alpha : f32, pub node_aura_settle_expansion : f32, pub node_edge_hover_width_scale : f32, pub node_edge_selected_width_scale : f32, pub node_edge_glow_width_scale : f32, # [doc = \" How wide an identity rail is, in pixels: a node's category stripe or a\"] # [doc = \" callout's edge.\"] pub rail_width : f32, pub semantic_wash_faint_alpha : f32, pub semantic_wash_alpha : f32, pub semantic_wash_strong_alpha : f32, pub semantic_border_alpha : f32, pub accent_border_alpha : f32, pub accent_border_strong_alpha : f32, pub subtle_hover_alpha : f32, pub soft_contrast_alpha : f32, pub contrast_tint_alpha : f32, pub track_resting_alpha : f32, pub content_veil_alpha : f32, pub critical_fill_alpha : f32, pub critical_inactive_alpha : f32, pub variant_light_alpha : f32, pub variant_light_hover_alpha : f32, pub variant_light_active_alpha : f32, pub variant_subtle_hover_alpha : f32, pub variant_subtle_active_alpha : f32, pub primary_hover_opacity : f32, pub custom_color_readable_dark_floor : f32, pub custom_color_readable_light_ceiling : f32, pub custom_color_hover_lightness_delta : f32, pub custom_color_active_lightness_delta : f32, }",
       "cfg": []
     },
     {
@@ -105323,6 +105826,21 @@
       "target": "Theme"
     },
     {
+      "id": "gpui_kit_theme::Theme::with_reduce_transparency",
+      "name": "with_reduce_transparency",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "Projects the host's Reduce transparency preference into this theme. Kit does not read platform settings. Glass and built-in overlays resolve to Frosted while this preference is enabled.",
+      "documentation": "Projects the host's Reduce transparency preference into this theme.\nKit does not read platform settings. Glass and built-in overlays\nresolve to Frosted while this preference is enabled.",
+      "signature": "pub fn with_reduce_transparency (self, reduce : bool) -> Self",
+      "cfg": [],
+      "target": "Theme"
+    },
+    {
       "id": "gpui_kit_theme::ThemeData",
       "name": "ThemeData",
       "kind": "struct",
@@ -105333,7 +105851,7 @@
       "source": "crates/gpui-kit-theme/src/lib.rs",
       "summary": "The complete resolved data behind a [`Theme`].",
       "documentation": "The complete resolved data behind a [`Theme`].\n\nIts fields stay readable so existing component paint code remains direct.\nMutations go through [`Theme::modify`], which uses copy-on-write and keeps\nthe pre-resolved palette lookup tables coherent.",
-      "signature": "# [doc = \" The complete resolved data behind a [`Theme`].\"] # [doc = \"\"] # [doc = \" Its fields stay readable so existing component paint code remains direct.\"] # [doc = \" Mutations go through [`Theme::modify`], which uses copy-on-write and keeps\"] # [doc = \" the pre-resolved palette lookup tables coherent.\"] # [derive (Debug, Clone)] pub struct ThemeData { pub id : SharedString, pub name : SharedString, pub appearance : Appearance, pub density : Density, pub colors : Colors, pub typography : Typography, pub spacing : Spacing, pub measures : Measures, pub radii : Radii, pub control : Control, pub borders : Borders, pub opacity : Opacity, pub motion : Motion, pub elevation : Elevations, pub z_index : ZIndices, pub effects : Effects, # [doc = \" The active document's palette, carried so that paint the shared role\"] # [doc = \" vocabulary has no slot for still travels with the theme rather than\"] # [doc = \" being read from a second document the registry does not know about.\"] # [doc = \"\"] # [doc = \" Read it through [`Theme::palette_color`]. It remains separately shared\"] # [doc = \" so a rare copy-on-write theme adjustment need not clone the raw map.\"] pub palette : Arc<Palette>, palette_steps : PaletteSteps, resolved_palette : HashMap<SharedString, Hsla>, resolved_ramps : HashMap<SharedString, ResolvedRamp>, }",
+      "signature": "# [doc = \" The complete resolved data behind a [`Theme`].\"] # [doc = \"\"] # [doc = \" Its fields stay readable so existing component paint code remains direct.\"] # [doc = \" Mutations go through [`Theme::modify`], which uses copy-on-write and keeps\"] # [doc = \" the pre-resolved palette lookup tables coherent.\"] # [derive (Debug, Clone)] pub struct ThemeData { pub id : SharedString, pub name : SharedString, pub appearance : Appearance, pub density : Density, # [doc = \" Reader preference projected by the host; never inferred from tokens.\"] pub reduce_transparency : bool, pub colors : Colors, pub typography : Typography, pub spacing : Spacing, pub measures : Measures, pub radii : Radii, pub control : Control, pub borders : Borders, pub opacity : Opacity, pub motion : Motion, pub elevation : Elevations, pub z_index : ZIndices, pub effects : Effects, # [doc = \" The active document's palette, carried so that paint the shared role\"] # [doc = \" vocabulary has no slot for still travels with the theme rather than\"] # [doc = \" being read from a second document the registry does not know about.\"] # [doc = \"\"] # [doc = \" Read it through [`Theme::palette_color`]. It remains separately shared\"] # [doc = \" so a rare copy-on-write theme adjustment need not clone the raw map.\"] pub palette : Arc<Palette>, palette_steps : PaletteSteps, resolved_palette : HashMap<SharedString, Hsla>, resolved_ramps : HashMap<SharedString, ResolvedRamp>, }",
       "cfg": []
     },
     {
@@ -105373,8 +105891,8 @@
       "module": "",
       "path": "gpui_kit_theme",
       "source": "crates/gpui-kit-theme/src/lib.rs",
-      "summary": "Returns false when the id is not registered, leaving the active theme untouched rather than falling back to a default the caller did not ask for.",
-      "documentation": "Returns false when the id is not registered, leaving the active theme\nuntouched rather than falling back to a default the caller did not ask\nfor.",
+      "summary": "",
+      "documentation": "",
       "signature": "pub fn activate (& mut self, id : & str) -> bool",
       "cfg": [],
       "target": "ThemeRegistry"
@@ -105391,6 +105909,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn active (& self) -> & Theme",
+      "cfg": [],
+      "target": "ThemeRegistry"
+    },
+    {
+      "id": "gpui_kit_theme::ThemeRegistry::counterpart",
+      "name": "counterpart",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "Returns false when the id is not registered, leaving the active theme untouched rather than falling back to a default the caller did not ask for. The registered theme of the opposite appearance, if one exists.",
+      "documentation": "Returns false when the id is not registered, leaving the active theme\nuntouched rather than falling back to a default the caller did not ask\nfor.\nThe registered theme of the opposite appearance, if one exists.\n\nPrefers an id that is this theme's id with `-dark` / `-light` swapped,\nthen any other document of the opposite appearance. A product that\nregistered only one appearance has no counterpart, which a glass\nsurface treats as \"do not flip\".",
+      "signature": "pub fn counterpart (& self) -> Option<Theme>",
+      "cfg": [],
+      "target": "ThemeRegistry"
+    },
+    {
+      "id": "gpui_kit_theme::ThemeRegistry::counterpart_for",
+      "name": "counterpart_for",
+      "kind": "method",
+      "package": "gpui-box-kit-theme",
+      "crate": "gpui_kit_theme",
+      "module": "",
+      "path": "gpui_kit_theme",
+      "source": "crates/gpui-kit-theme/src/lib.rs",
+      "summary": "The opposite appearance of `theme`, resolved from this registry.",
+      "documentation": "The opposite appearance of `theme`, resolved from this registry.",
+      "signature": "pub fn counterpart_for (& self, theme : & Theme) -> Option<Theme>",
       "cfg": [],
       "target": "ThemeRegistry"
     },
@@ -105891,7 +106439,7 @@
       "source": "crates/gpui-kit-tokens/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Clone, Deserialize, Serialize)] # [serde (rename_all = \"camelCase\", deny_unknown_fields)] pub struct EffectTokens { pub edge_fade_band : f32, # [doc = \" How wide the ring around the focused control is drawn, in pixels.\"] pub focus_ring_width : f32, pub focus_ring_alpha : f32, # [doc = \" How strongly a surface that carries a state colour bleeds it into the\"] # [doc = \" pixels around its edge.\"] pub glow_alpha : f32, # [doc = \" How far that bleed reaches, in pixels.\"] pub glow_blur : f32, # [doc = \" The bloom budget: how far the glow is pulled in before it is blurred,\"] # [doc = \" in pixels. Negative by design.\"] # [doc = \"\"] # [doc = \" A blurred shadow at spread zero puts its full alpha at the surface's\"] # [doc = \" own edge and reaches `glowBlur` past it in every direction, which is\"] # [doc = \" how a failed card came to tint the card beside it and a running node\"] # [doc = \" came to be cut flat at the edge of its canvas. Pulling the shape in\"] # [doc = \" first keeps the state readable at the edge it belongs to and keeps it\"] # [doc = \" out of its neighbours' pixels. The validator holds `|glowSpread|`\"] # [doc = \" below `glowBlur`, because a bloom pulled in further than it is blurred\"] # [doc = \" is a glow nobody sees.\"] pub glow_spread : f32, # [doc = \" How opaque a frosted surface's own fill is over what it blurs. A theme\"] # [doc = \" that sets this to 1 declares itself opaque, and a frosted surface then\"] # [doc = \" paints no blur at all rather than blurring pixels nobody can see.\"] pub glass_alpha : f32, # [doc = \" How far the Frosted preset scatters what is behind it, in pixels.\"] # [doc = \" Liquid and Lens are clear by default and do not borrow this value.\"] pub glass_frost_blur : f32, # [doc = \" Fraction of the control's short edge occupied by its optical profile.\"] pub glass_bevel_ratio : f32, # [doc = \" Lower and upper bounds for the responsive optical profile, in pixels.\"] pub glass_bevel_min : f32, pub glass_bevel_max : f32, # [doc = \" How far the bevel displaces what is behind it, as a fraction of the\"] # [doc = \" bevel. Read as the thickness of the glass body.\"] pub glass_refraction : f32, # [doc = \" How far apart the red and blue samples land at the bevel, as a fraction\"] # [doc = \" of the refraction offset. Zero is a colourless bend.\"] pub glass_dispersion : f32, # [doc = \" Peak brightness of the rim highlight.\"] pub glass_specular : f32, # [doc = \" Multiplicative light transmission through Liquid glass.\"] pub glass_transmission_gain : f32, # [doc = \" White additive lift applied inside the Liquid shader.\"] pub glass_optical_lift : f32, # [doc = \" Width of Liquid's measured lit edge, in pixels.\"] pub glass_hairline : f32, # [doc = \" How tight that highlight is. Larger is smaller and harder.\"] pub glass_specular_sharpness : f32, # [doc = \" Where the light that makes the highlight is, in radians clockwise from\"] # [doc = \" straight up. A surface that tracks the pointer starts here.\"] pub glass_light_angle : f32, # [doc = \" How close two glass surfaces in a group must be to join into one body,\"] # [doc = \" in pixels.\"] pub glass_merge_distance : f32, # [doc = \" Backdrop luminance below which a glass surface carries light content,\"] # [doc = \" and above which it carries dark. The two are apart rather than equal on\"] # [doc = \" purpose: a single threshold makes a surface over a backdrop sitting on\"] # [doc = \" it flip back and forth, and the gap is what stops that.\"] pub glass_contrast_flip_low : f32, pub glass_contrast_flip_high : f32, # [doc = \" How much thicker a pressable glass surface reads while pressed, as a\"] # [doc = \" factor on its refraction. 1 is a surface that does not deform.\"] pub glass_press_depth : f32, # [doc = \" How strongly a raised surface catches light along its top edge.\"] # [doc = \"\"] # [doc = \" The scalar of a gradient rather than a gradient: this library composes\"] # [doc = \" one from a colour and an alpha ladder the way [`Self::glow_alpha`] is\"] # [doc = \" composed, so a theme sets how much light there is and the component\"] # [doc = \" decides which edge it falls on. Light themes carry less of it, because\"] # [doc = \" a white highlight on a near-white surface has nowhere to go and reads\"] # [doc = \" as a smudge rather than as a lit edge.\"] pub sheen_alpha : f32, # [doc = \" The alpha an area fill starts at under a chart line, fading to nothing\"] # [doc = \" at the baseline.\"] pub area_wash_alpha : f32, # [doc = \" How strongly a node's header band takes the node's category colour.\"] pub header_tint_alpha : f32, # [doc = \" Paint ladder for active routes, traffic marks, connection previews and\"] # [doc = \" minimap identities on a node canvas.\"] pub node_active_wash_alpha : f32, pub node_active_stroke_alpha : f32, pub node_traffic_alpha : f32, pub node_preview_alpha : f32, pub node_minimap_alpha : f32, # [doc = \" How far an overview pushes back the canvas the reader is not looking\"] # [doc = \" at.\"] # [doc = \"\"] # [doc = \" Strong enough that the two regions are plainly different and weak\"] # [doc = \" enough that the marks outside the view still read, because saying\"] # [doc = \" where the rest of the graph is, is the whole reason an overview exists.\"] pub node_overview_veil_alpha : f32, # [doc = \" The static and animated intensity ladder for state auras. Values scale\"] # [doc = \" the shared glow alpha; they never replace the semantic state colour.\"] pub node_aura_resting_alpha : f32, pub node_aura_pulse_floor_alpha : f32, pub node_aura_pulse_peak_alpha : f32, pub node_aura_settle_peak_alpha : f32, # [doc = \" How much wider a successful outcome begins before it contracts into\"] # [doc = \" the card and disappears, as a factor of the shared glow blur.\"] pub node_aura_settle_expansion : f32, # [doc = \" Width multipliers for route emphasis. Hover and selection stay\"] # [doc = \" distinct from traffic: they change geometry and bloom, not edge state.\"] pub node_edge_hover_width_scale : f32, pub node_edge_selected_width_scale : f32, pub node_edge_glow_width_scale : f32, # [doc = \" How wide an information-bearing identity mark is, in pixels.\"] pub rail_width : f32, # [doc = \" The weakest semantic-colour wash, used behind supporting prose.\"] pub semantic_wash_faint_alpha : f32, # [doc = \" The normal semantic-colour wash.\"] pub semantic_wash_alpha : f32, # [doc = \" The semantic-colour wash for a compact state that must remain visible.\"] pub semantic_wash_strong_alpha : f32, # [doc = \" A semantic report's outline over its wash.\"] pub semantic_border_alpha : f32, # [doc = \" Accent outlines for selected and actively targeted canvas entities.\"] pub accent_border_alpha : f32, pub accent_border_strong_alpha : f32, # [doc = \" A quiet hover when the base interactive hover role is intentionally\"] # [doc = \" reduced inside a dense collection.\"] pub subtle_hover_alpha : f32, # [doc = \" Text mixed into decorative colour so it survives both appearances.\"] pub soft_contrast_alpha : f32, pub contrast_tint_alpha : f32, # [doc = \" Resting strength of a scrollbar thumb before its region is hovered.\"] pub track_resting_alpha : f32, # [doc = \" Opaque-enough backing for copy laid over caller-owned media.\"] pub content_veil_alpha : f32, # [doc = \" Active and inactive strengths of the destructive window affordance.\"] pub critical_fill_alpha : f32, pub critical_inactive_alpha : f32, # [doc = \" Alpha ladder for the shared colour variant recipes.\"] pub variant_light_alpha : f32, pub variant_light_hover_alpha : f32, pub variant_light_active_alpha : f32, pub variant_subtle_hover_alpha : f32, pub variant_subtle_active_alpha : f32, pub primary_hover_opacity : f32, # [doc = \" Fallback recipes for caller-provided colours that do not have a named\"] # [doc = \" palette ramp. Palette-backed colours use their authored steps instead.\"] pub custom_color_readable_dark_floor : f32, pub custom_color_readable_light_ceiling : f32, pub custom_color_hover_lightness_delta : f32, pub custom_color_active_lightness_delta : f32, }",
+      "signature": "# [derive (Debug, Clone, Deserialize, Serialize)] # [serde (rename_all = \"camelCase\", deny_unknown_fields)] pub struct EffectTokens { pub edge_fade_band : f32, # [doc = \" How wide the ring around the focused control is drawn, in pixels.\"] pub focus_ring_width : f32, pub focus_ring_alpha : f32, # [doc = \" How strongly a surface that carries a state colour bleeds it into the\"] # [doc = \" pixels around its edge.\"] pub glow_alpha : f32, # [doc = \" How far that bleed reaches, in pixels.\"] pub glow_blur : f32, # [doc = \" The bloom budget: how far the glow is pulled in before it is blurred,\"] # [doc = \" in pixels. Negative by design.\"] # [doc = \"\"] # [doc = \" A blurred shadow at spread zero puts its full alpha at the surface's\"] # [doc = \" own edge and reaches `glowBlur` past it in every direction, which is\"] # [doc = \" how a failed card came to tint the card beside it and a running node\"] # [doc = \" came to be cut flat at the edge of its canvas. Pulling the shape in\"] # [doc = \" first keeps the state readable at the edge it belongs to and keeps it\"] # [doc = \" out of its neighbours' pixels. The validator holds `|glowSpread|`\"] # [doc = \" below `glowBlur`, because a bloom pulled in further than it is blurred\"] # [doc = \" is a glow nobody sees.\"] pub glow_spread : f32, # [doc = \" How opaque a frosted surface's own fill is over what it blurs. A theme\"] # [doc = \" that sets this to 1 declares itself opaque, and a frosted surface then\"] # [doc = \" paints no blur at all rather than blurring pixels nobody can see.\"] pub glass_alpha : f32, # [doc = \" How far Frosted and Regular Liquid scatter what is behind them, in pixels.\"] pub glass_frost_blur : f32, # [doc = \" Backdrop saturation multiplier before transmission gain. One is unchanged.\"] pub glass_saturation : f32, # [doc = \" Achromatic material wash intensity. Theme appearance chooses white for\"] # [doc = \" light and black for dark, avoiding two independently tunable directions\"] # [doc = \" that could disagree with the theme. This is not an element fill alpha.\"] pub glass_wash : f32, # [doc = \" Fraction of the control's short edge occupied by its optical profile.\"] pub glass_bevel_ratio : f32, # [doc = \" Lower and upper bounds for the responsive optical profile, in pixels.\"] pub glass_bevel_min : f32, pub glass_bevel_max : f32, # [doc = \" Media dimming opacity behind Clear glass.\"] pub glass_dimming : f32, # [doc = \" Square root of the largest control area permitted to flip appearance.\"] pub glass_flip_max_extent : f32, # [doc = \" Shadow alpha multipliers on bright and dark backdrops respectively.\"] pub glass_shadow_min : f32, pub glass_shadow_max : f32, # [doc = \" How far the bevel displaces what is behind it, as a fraction of the\"] # [doc = \" bevel. Read as the thickness of the glass body.\"] pub glass_refraction : f32, # [doc = \" How far apart the red and blue samples land at the bevel, as a fraction\"] # [doc = \" of the refraction offset. Zero is a colourless bend.\"] pub glass_dispersion : f32, # [doc = \" Peak brightness of the rim highlight.\"] pub glass_specular : f32, # [doc = \" Multiplicative light transmission through Liquid glass.\"] pub glass_transmission_gain : f32, # [doc = \" White additive lift applied inside the Liquid shader.\"] pub glass_optical_lift : f32, # [doc = \" Width of Liquid's measured lit edge, in pixels.\"] pub glass_hairline : f32, # [doc = \" How tight that highlight is. Larger is smaller and harder.\"] pub glass_specular_sharpness : f32, # [doc = \" Where the light that makes the highlight is, in radians clockwise from\"] # [doc = \" straight up. A surface that tracks the pointer starts here.\"] pub glass_light_angle : f32, # [doc = \" How close two glass surfaces in a group must be to join into one body,\"] # [doc = \" in pixels.\"] pub glass_merge_distance : f32, # [doc = \" Backdrop luminance below which a glass surface carries light content,\"] # [doc = \" and above which it carries dark. The two are apart rather than equal on\"] # [doc = \" purpose: a single threshold makes a surface over a backdrop sitting on\"] # [doc = \" it flip back and forth, and the gap is what stops that.\"] pub glass_contrast_flip_low : f32, pub glass_contrast_flip_high : f32, # [doc = \" How much thicker a pressable glass surface reads while pressed, as a\"] # [doc = \" factor on its refraction. 1 is a surface that does not deform.\"] pub glass_press_depth : f32, # [doc = \" How far a scroll-edge effect reaches from a floating surface into the\"] # [doc = \" scrolling content, in pixels.\"] pub scroll_edge_band : f32, # [doc = \" How far the soft scroll-edge effect scatters the content under that\"] # [doc = \" band, in pixels.\"] pub scroll_edge_blur : f32, # [doc = \" How strongly a raised surface catches light along its top edge.\"] # [doc = \"\"] # [doc = \" The scalar of a gradient rather than a gradient: this library composes\"] # [doc = \" one from a colour and an alpha ladder the way [`Self::glow_alpha`] is\"] # [doc = \" composed, so a theme sets how much light there is and the component\"] # [doc = \" decides which edge it falls on. Light themes carry less of it, because\"] # [doc = \" a white highlight on a near-white surface has nowhere to go and reads\"] # [doc = \" as a smudge rather than as a lit edge.\"] pub sheen_alpha : f32, # [doc = \" The alpha an area fill starts at under a chart line, fading to nothing\"] # [doc = \" at the baseline.\"] pub area_wash_alpha : f32, # [doc = \" How strongly a node's header band takes the node's category colour.\"] pub header_tint_alpha : f32, # [doc = \" Paint ladder for active routes, traffic marks, connection previews and\"] # [doc = \" minimap identities on a node canvas.\"] pub node_active_wash_alpha : f32, pub node_active_stroke_alpha : f32, pub node_traffic_alpha : f32, pub node_preview_alpha : f32, pub node_minimap_alpha : f32, # [doc = \" How far an overview pushes back the canvas the reader is not looking\"] # [doc = \" at.\"] # [doc = \"\"] # [doc = \" Strong enough that the two regions are plainly different and weak\"] # [doc = \" enough that the marks outside the view still read, because saying\"] # [doc = \" where the rest of the graph is, is the whole reason an overview exists.\"] pub node_overview_veil_alpha : f32, # [doc = \" The static and animated intensity ladder for state auras. Values scale\"] # [doc = \" the shared glow alpha; they never replace the semantic state colour.\"] pub node_aura_resting_alpha : f32, pub node_aura_pulse_floor_alpha : f32, pub node_aura_pulse_peak_alpha : f32, pub node_aura_settle_peak_alpha : f32, # [doc = \" How much wider a successful outcome begins before it contracts into\"] # [doc = \" the card and disappears, as a factor of the shared glow blur.\"] pub node_aura_settle_expansion : f32, # [doc = \" Width multipliers for route emphasis. Hover and selection stay\"] # [doc = \" distinct from traffic: they change geometry and bloom, not edge state.\"] pub node_edge_hover_width_scale : f32, pub node_edge_selected_width_scale : f32, pub node_edge_glow_width_scale : f32, # [doc = \" How wide an information-bearing identity mark is, in pixels.\"] pub rail_width : f32, # [doc = \" The weakest semantic-colour wash, used behind supporting prose.\"] pub semantic_wash_faint_alpha : f32, # [doc = \" The normal semantic-colour wash.\"] pub semantic_wash_alpha : f32, # [doc = \" The semantic-colour wash for a compact state that must remain visible.\"] pub semantic_wash_strong_alpha : f32, # [doc = \" A semantic report's outline over its wash.\"] pub semantic_border_alpha : f32, # [doc = \" Accent outlines for selected and actively targeted canvas entities.\"] pub accent_border_alpha : f32, pub accent_border_strong_alpha : f32, # [doc = \" A quiet hover when the base interactive hover role is intentionally\"] # [doc = \" reduced inside a dense collection.\"] pub subtle_hover_alpha : f32, # [doc = \" Text mixed into decorative colour so it survives both appearances.\"] pub soft_contrast_alpha : f32, pub contrast_tint_alpha : f32, # [doc = \" Resting strength of a scrollbar thumb before its region is hovered.\"] pub track_resting_alpha : f32, # [doc = \" Opaque-enough backing for copy laid over caller-owned media.\"] pub content_veil_alpha : f32, # [doc = \" Active and inactive strengths of the destructive window affordance.\"] pub critical_fill_alpha : f32, pub critical_inactive_alpha : f32, # [doc = \" Alpha ladder for the shared colour variant recipes.\"] pub variant_light_alpha : f32, pub variant_light_hover_alpha : f32, pub variant_light_active_alpha : f32, pub variant_subtle_hover_alpha : f32, pub variant_subtle_active_alpha : f32, pub primary_hover_opacity : f32, # [doc = \" Fallback recipes for caller-provided colours that do not have a named\"] # [doc = \" palette ramp. Palette-backed colours use their authored steps instead.\"] pub custom_color_readable_dark_floor : f32, pub custom_color_readable_light_ceiling : f32, pub custom_color_hover_lightness_delta : f32, pub custom_color_active_lightness_delta : f32, }",
       "cfg": []
     },
     {
@@ -120127,7 +120675,8 @@
         "estimate(height: f32) -> Self",
         "anchored_to_end() -> Self",
         "visible_rows(rows: usize) -> Self",
-        "fills() -> Self"
+        "fills() -> Self",
+        "content_inset(top: f32, bottom: f32) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -120221,6 +120770,7 @@
       ],
       "options": [
         "surface(surface: Surface) -> Self",
+        "elevation(elevation: Elevation) -> Self",
         "radius(radius: Radius) -> Self",
         "radius_px(radius: f32) -> Self",
         "blur(blur: f32) -> Self",
@@ -120232,6 +120782,10 @@
         "track_pointer(track_pointer: bool) -> Self",
         "pressable(pressable: bool) -> Self",
         "adaptive(adaptive: bool) -> Self",
+        "adaptive_appearance(adaptive: bool) -> Self",
+        "dimmed(dimmed: bool) -> Self",
+        "tint(tint: impl Into<Hsla>) -> Self",
+        "edge_mask(edge: GlassEdge, band: f32) -> Self",
         "child(child: impl IntoElement) -> Self"
       ],
       "commands": [],
@@ -122199,6 +122753,36 @@
       ]
     },
     {
+      "name": "ScrollEdgeEffect",
+      "kind": "builder",
+      "path": "gpui_kit::layout::ScrollEdgeEffect",
+      "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
+      "summary": "A visual ramp at the edges where floating glass overlaps scrolling content.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "edges(edges: FadeEdges) -> Self",
+        "top(fade: bool) -> Self",
+        "bottom(fade: bool) -> Self",
+        "left(fade: bool) -> Self",
+        "right(fade: bool) -> Self",
+        "kind(kind: ScrollEdgeKind) -> Self",
+        "soft() -> Self",
+        "hard() -> Self",
+        "band(band: f32) -> Self",
+        "blur(blur: f32) -> Self",
+        "child(child: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "scroll-edge-effect"
+      ]
+    },
+    {
       "name": "ScrollFade",
       "kind": "builder",
       "path": "gpui_kit::layout::ScrollFade",
@@ -122935,6 +123519,7 @@
         "new(ident: impl Into<Ident>) -> Self"
       ],
       "options": [
+        "capsules() -> Self",
         "tab(tab: TabItem) -> Self",
         "tabs(tabs: impl IntoIterator<Item = TabItem>) -> Self",
         "selected(id: impl Into<SharedString>) -> Self",
@@ -127300,18 +127885,45 @@
       "queries": []
     },
     {
+      "name": "GlassAppearance",
+      "path": "gpui_kit::overlay::GlassAppearance",
+      "summary": "Which appearance a glass surface is currently painting.",
+      "variants": [
+        "Inherited",
+        "Light",
+        "Dark"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "GlassPreset",
       "path": "gpui_kit::overlay::GlassPreset",
       "summary": "How a glass surface responds to light.",
       "variants": [
         "Frosted",
         "Liquid",
+        "Clear",
         "Lens"
       ],
       "construct": [],
       "options": [
         "tint_alpha(theme: &Theme) -> f32",
         "material(theme: &Theme) -> GlassMaterial<Pixels>"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GlassSurface",
+      "path": "gpui_kit::overlay::GlassSurface",
+      "summary": "A styleable overlay body whose sole material authority is surface.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "id(id: impl Into<ElementId>) -> Self"
       ],
       "commands": [],
       "queries": []
@@ -131060,6 +131672,19 @@
       "queries": []
     },
     {
+      "name": "ScrollEdgeKind",
+      "path": "gpui_kit::layout::ScrollEdgeKind",
+      "summary": "How a scroll-edge ramp separates floating chrome from the content under it.",
+      "variants": [
+        "Soft",
+        "Hard"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ScrollLink",
       "path": "gpui_kit::motion::ScrollLink",
       "summary": "Scroll offsets mapped onto progress from 0 to 1.",
@@ -133568,9 +134193,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.78,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.55,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -133583,6 +134214,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.05,
           "areaWashAlpha": 0.16,
           "headerTintAlpha": 0.14,
@@ -134335,9 +134968,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -134350,6 +134989,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -135102,9 +135743,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -135117,6 +135764,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -135869,9 +136518,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -135884,6 +136539,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -136636,9 +137293,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -136651,6 +137314,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -137403,9 +138068,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -137418,6 +138089,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -138170,9 +138843,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.78,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.55,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -138185,6 +138864,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.05,
           "areaWashAlpha": 0.16,
           "headerTintAlpha": 0.14,
@@ -138937,9 +139618,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -138952,6 +139639,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -139704,9 +140393,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.78,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.55,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -139719,6 +140414,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.05,
           "areaWashAlpha": 0.16,
           "headerTintAlpha": 0.14,
@@ -140471,9 +141168,15 @@
           "glowSpread": -5,
           "glassAlpha": 0.72,
           "glassFrostBlur": 24,
+          "glassSaturation": 1.5,
+          "glassWash": 0.45,
           "glassBevelRatio": 0.225,
           "glassBevelMin": 8,
           "glassBevelMax": 36,
+          "glassDimming": 0.35,
+          "glassFlipMaxExtent": 72,
+          "glassShadowMin": 0.8,
+          "glassShadowMax": 1.5,
           "glassRefraction": 0.34,
           "glassDispersion": 0.005,
           "glassSpecular": 0.06,
@@ -140486,6 +141189,8 @@
           "glassContrastFlipLow": 0.42,
           "glassContrastFlipHigh": 0.58,
           "glassPressDepth": 1.5,
+          "scrollEdgeBand": 28,
+          "scrollEdgeBlur": 16,
           "sheenAlpha": 0.08,
           "areaWashAlpha": 0.22,
           "headerTintAlpha": 0.18,
@@ -142338,7 +143043,7 @@
       "uses": [
         "Overlay"
       ],
-      "example": "fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        .child(page_behind(&theme, \"Workspace settings\"))\n        .child(\n            Overlay::modal(\"scene.overlay.dialog\")\n                .placement(Placement::Center)\n                .child(\n                    crate::overlay::surface(&theme, crate::overlay::OverlaySurface::MODAL)\n                        .w(px(320.0))\n                        .p(px(theme.spacing.lg))\n                        .gap(px(theme.spacing.sm))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Subtitle,\n                            \"Delete this workspace?\",\n                        ))\n                        .child(\n                            crate::foundation::text(\n                                &theme,\n                                TypeScale::Body,\n                                \"Its runs, filters and saved views are removed for everyone. This \\\n                                 cannot be undone.\",\n                            )\n                            .text_tone(&theme, TextTone::Muted),\n                        )\n                        .child(\n                            div()\n                                .row()\n                                .justify_end()\n                                .gap(px(theme.spacing.sm))\n                                .child(\n                                    Button::new(\"scene.overlay.cancel\")\n                                        .label(\"Cancel\")\n                                        .secondary()\n                                        .on_click(|_, _| {}),\n                                )\n                                .child(\n                                    Button::new(\"scene.overlay.confirm\")\n                                        .label(\"Delete\")\n                                        .danger()\n                                        .on_click(|_, _| {}),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        .child(page_behind(&theme, \"Workspace settings\"))\n        .child(\n            Overlay::modal(\"scene.overlay.dialog\")\n                .placement(Placement::Center)\n                .child(\n                    crate::overlay::surface(\n                        \"scene.overlay.surface\",\n                        &theme,\n                        crate::overlay::OverlaySurface::MODAL,\n                    )\n                    .w(px(320.0))\n                    .p(px(theme.spacing.lg))\n                    .gap(px(theme.spacing.sm))\n                    .child(crate::foundation::text(\n                        &theme,\n                        TypeScale::Subtitle,\n                        \"Delete this workspace?\",\n                    ))\n                    .child(\n                        crate::foundation::text(\n                            &theme,\n                            TypeScale::Body,\n                            \"Its runs, filters and saved views are removed for everyone. This \\\n                                 cannot be undone.\",\n                        )\n                        .text_tone(&theme, TextTone::Muted),\n                    )\n                    .child(\n                        div()\n                            .row()\n                            .justify_end()\n                            .gap(px(theme.spacing.sm))\n                            .child(\n                                Button::new(\"scene.overlay.cancel\")\n                                    .label(\"Cancel\")\n                                    .secondary()\n                                    .on_click(|_, _| {}),\n                            )\n                            .child(\n                                Button::new(\"scene.overlay.confirm\")\n                                    .label(\"Delete\")\n                                    .danger()\n                                    .on_click(|_, _| {}),\n                            ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "dialog",
@@ -142434,7 +143139,7 @@
       "uses": [
         "Tabs"
       ],
-      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"places, not documents: Regular Liquid capsules, \\\n             with a translucent selected fill on the material\",\n        ))\n        .child(\n            Tabs::new(\"scene.tabs.capsules\")\n                .capsules()\n                .control_size(ControlSize::Sm)\n                .tabs([\n                    TabItem::new(\"code\", \"Portal\")\n                        .icon(Icon::Terminal)\n                        .tint(theme.colors.accent),\n                    TabItem::new(\"game\", \"Harbour\")\n                        .icon(Icon::Play)\n                        .tint(theme.colors.warning),\n                    TabItem::new(\"design\", \"notes\")\n                        .icon(Icon::Pen)\n                        .tint(theme.colors.info),\n                ])\n                .selected(\"code\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "carousel",
@@ -142655,6 +143360,18 @@
       "example": "fn scroll_fade(window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    crate::layout::scroll_to(\n        \"scene.fade.output\",\n        gpui::point(px(0.0), px(120.0)),\n        window,\n        cx,\n    );\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"Scrolled: content runs past both ends\"))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.scrolled\")\n                        .edges(FadeEdges::vertical())\n                        .fit_height()\n                        .child(\n                            ScrollArea::new(\"scene.fade.output\")\n                                .label(\"Run output\")\n                                .vertical()\n                                .height(200.0)\n                                .child(filler(&theme, \"Output\", 20)),\n                        ),\n                ),\n        )\n        // Nothing is hidden here, so no edge fades and the caller says so.\n        .child(caption(&theme, \"Nothing hidden: no edge fades\"))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.settled\").fit_height().child(\n                        ScrollArea::new(\"scene.fade.summary\")\n                            .label(\"Summary\")\n                            .vertical()\n                            .height(200.0)\n                            .child(filler(&theme, \"Summary\", 7)),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "scroll-edge-effect",
+      "capture": "cargo run -p xtask -- headless capture scroll-edge-effect",
+      "kind": "exhibit",
+      "subjects": [
+        "ScrollEdgeEffect"
+      ],
+      "uses": [
+        "ScrollEdgeEffect"
+      ],
+      "example": "fn scroll_edge_effect(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"Fixture transcript: content scrolls beneath a Regular glass toolbar\",\n        ))\n        .child(\n            div()\n                .relative()\n                .h(px(240.0))\n                .overflow_hidden()\n                .child(\n                    crate::layout::ScrollEdgeEffect::new(\"scene.scroll-edge.soft\")\n                        .top(true)\n                        .soft()\n                        .band(64.0)\n                        .child(filler(&theme, \"Earlier messages beneath the toolbar\", 10)),\n                )\n                .child(\n                    div().absolute().top(px(8.0)).left(px(16.0)).child(\n                        Glass::new(\"scene.scroll-edge.toolbar\")\n                            .radius(Radius::Pill)\n                            .child(\n                                div()\n                                    .px(px(20.0))\n                                    .py(px(10.0))\n                                    .child(\"Transcript · fixture\"),\n                            ),\n                    ),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Reduced transparency: opaque scroll-edge backing\",\n        ))\n        .child(\n            div().h(px(160.0)).overflow_hidden().child(\n                crate::layout::ScrollEdgeEffect::new(\"scene.scroll-edge.hard\")\n                    .top(true)\n                    .hard()\n                    .band(64.0)\n                    .child(filler(&theme, \"The same transcript\", 7)),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "frost",
       "capture": "cargo run -p xtask -- headless capture frost",
       "kind": "exhibit",
@@ -142676,7 +143393,7 @@
       "uses": [
         "Glass"
       ],
-      "example": "fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let label = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Label,\n                SharedString::from(title),\n            ))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(body),\n            ))\n    };\n\n    // A ruled checkerboard bends far more legibly than a flat fill: its\n    // one-pixel lines reveal whether the refracted rim retained the sharp\n    // snapshot while Frosted scattered the interior. It is drawn in neutrals,\n    // and every plate that carries one is an exact\n    // number of squares across and down: a board cut through the middle of a\n    // square at the plate edge reads as a broken pattern rather than as the\n    // ruled backdrop the optics are being measured against.\n    let checker_light = theme.colors.text_faint;\n    let checker_dark = theme.colors.canvas;\n    let checker_rule = theme.colors.divider.opacity(0.55);\n    let checkerboard =\n        |width: f32, height: f32| {\n            let columns = (width / TILE).ceil() as usize;\n            let rows = (height / TILE).ceil() as usize;\n            div()\n                .absolute()\n                .top(px(0.0))\n                .left(px(0.0))\n                .w(px(width))\n                .h(px(height))\n                .column()\n                .overflow_hidden()\n                .children((0..rows).map(|row| {\n                    div()\n                        .flex()\n                        .flex_none()\n                        .h(px(TILE))\n                        .children((0..columns).map(move |column| {\n                            div().flex_none().w(px(TILE)).h(px(TILE)).bg(\n                                if (row + column) % 2 == 0 {\n                                    checker_light\n                                } else {\n                                    checker_dark\n                                },\n                            )\n                        }))\n                }))\n                .children((0..=(width / 12.0) as usize).map(|column| {\n                    div()\n                        .absolute()\n                        .top(px(0.0))\n                        .left(px(column as f32 * 12.0))\n                        .w(px(1.0))\n                        .h(px(height))\n                        .bg(checker_rule)\n                }))\n                .children((0..=(height / 12.0) as usize).map(|row| {\n                    div()\n                        .absolute()\n                        .top(px(row as f32 * 12.0))\n                        .left(px(0.0))\n                        .w(px(width))\n                        .h(px(1.0))\n                        .bg(checker_rule)\n                }))\n        };\n\n    let plate =\n        |ident: &'static str, preset: GlassPreset, title: &'static str, body: &'static str| {\n            div()\n                .relative()\n                .h(px(PLATE_HEIGHT))\n                .w(px(PLATE_WIDTH))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(checkerboard(PLATE_WIDTH, PLATE_HEIGHT))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(28.0))\n                        .left(px(90.0))\n                        .w(px(280.0))\n                        .child(\n                            Glass::new(ident)\n                                .preset(preset)\n                                .radius(Radius::Dialog)\n                                .child(label(title, body)),\n                        ),\n                )\n        };\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(&theme, \"Frosted: blurred, and nothing bent\"))\n        .child(plate(\n            \"scene.glass.frosted\",\n            GlassPreset::Frosted,\n            \"Frosted\",\n            \"The control the others are read against\",\n        ))\n        .child(caption(\n            &theme,\n            \"Lens: clear inside, the edge bends the sharp backdrop\",\n        ))\n        .child(plate(\n            \"scene.glass.lens\",\n            GlassPreset::Lens,\n            \"Lens\",\n            \"The one-pixel rules bend at the rim and stay sharp\",\n        ))\n        .child(caption(\n            &theme,\n            \"Liquid: clear refraction, additive lift, and a lit hairline\",\n        ))\n        .child(plate(\n            \"scene.glass.liquid\",\n            GlassPreset::Liquid,\n            \"Liquid\",\n            \"Subtle dispersion without turning the backdrop into a smear\",\n        ))\n        // The last two demonstrations sit side by side so the whole scene\n        // stays inside the window a real display can give the gallery, which\n        // is where the DirectX renderer gets looked at.\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .gap(px(theme.space(Space::Md)))\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Fused: two panes joined into one body\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(PLATE_HEIGHT))\n                                .w(px(JOIN_WIDTH))\n                                .surface(&theme, Surface::Panel)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(checkerboard(JOIN_WIDTH, PLATE_HEIGHT))\n                                .child(\n                                    div().absolute().top(px(40.0)).left(px(40.0)).child(\n                                        GlassGroup::new(\"scene.glass.fused\")\n                                            .preset(GlassPreset::Liquid)\n                                            .radius(Radius::Dialog)\n                                            .gap(12.0)\n                                            .pane(\n                                                \"scene.glass.fused.left\",\n                                                label(\"Left\", \"One lobe of the body\"),\n                                            )\n                                            .pane(\n                                                \"scene.glass.fused.right\",\n                                                label(\"Right\", \"Joined across the gap\"),\n                                            ),\n                                    ),\n                                ),\n                        ),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Adaptive: the tint deepens when opposed\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(PLATE_HEIGHT))\n                                .w(px(JOIN_WIDTH))\n                                .surface(&theme, Surface::Panel)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(0.0))\n                                        .w(px(JOIN_WIDTH / 2.0))\n                                        .h(px(PLATE_HEIGHT))\n                                        .bg(gpui::white()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(JOIN_WIDTH / 2.0))\n                                        .w(px(JOIN_WIDTH / 2.0))\n                                        .h(px(PLATE_HEIGHT))\n                                        .bg(gpui::black()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(15.0))\n                                        .w(px(190.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.bright\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .child(label(\n                                                    \"Bright\",\n                                                    \"The reading lands next frame\",\n                                                )),\n                                        ),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(JOIN_WIDTH / 2.0 + 15.0))\n                                        .w(px(190.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.dark\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .child(label(\"Dark\", \"The same glass, other side\")),\n                                        ),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let label = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Label,\n                SharedString::from(title),\n            ))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(body),\n            ))\n    };\n\n    // A ruled checkerboard bends far more legibly than a flat fill: its\n    // one-pixel lines reveal whether the refracted rim retained the sharp\n    // snapshot while Frosted scattered the interior. It is drawn in neutrals,\n    // and every plate that carries one is an exact\n    // number of squares across and down: a board cut through the middle of a\n    // square at the plate edge reads as a broken pattern rather than as the\n    // ruled backdrop the optics are being measured against.\n    let checker_light = theme.colors.text_faint;\n    let checker_dark = theme.colors.canvas;\n    let checker_rule = theme.colors.divider.opacity(0.55);\n    let checkerboard =\n        |width: f32, height: f32| {\n            let columns = (width / TILE).ceil() as usize;\n            let rows = (height / TILE).ceil() as usize;\n            div()\n                .absolute()\n                .top(px(0.0))\n                .left(px(0.0))\n                .w(px(width))\n                .h(px(height))\n                .column()\n                .overflow_hidden()\n                .children((0..rows).map(|row| {\n                    div()\n                        .flex()\n                        .flex_none()\n                        .h(px(TILE))\n                        .children((0..columns).map(move |column| {\n                            div().flex_none().w(px(TILE)).h(px(TILE)).bg(\n                                if (row + column) % 2 == 0 {\n                                    checker_light\n                                } else {\n                                    checker_dark\n                                },\n                            )\n                        }))\n                }))\n                .children((0..=(width / 12.0) as usize).map(|column| {\n                    div()\n                        .absolute()\n                        .top(px(0.0))\n                        .left(px(column as f32 * 12.0))\n                        .w(px(1.0))\n                        .h(px(height))\n                        .bg(checker_rule)\n                }))\n                .children((0..=(height / 12.0) as usize).map(|row| {\n                    div()\n                        .absolute()\n                        .top(px(row as f32 * 12.0))\n                        .left(px(0.0))\n                        .w(px(width))\n                        .h(px(1.0))\n                        .bg(checker_rule)\n                }))\n        };\n\n    let plate =\n        |ident: &'static str, preset: GlassPreset, title: &'static str, body: &'static str| {\n            div()\n                .relative()\n                .h(px(PLATE_HEIGHT))\n                .w(px(PLATE_WIDTH))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    if preset == GlassPreset::Clear || ident == \"scene.glass.media\" {\n                        gpui::img(glass_media())\n                            .object_fit(gpui::ObjectFit::Cover)\n                            .w(px(PLATE_WIDTH))\n                            .h(px(PLATE_HEIGHT))\n                            .into_any_element()\n                    } else {\n                        checkerboard(PLATE_WIDTH, PLATE_HEIGHT).into_any_element()\n                    },\n                )\n                .when(ident == \"scene.glass.liquid\", |element| {\n                    element.child(div().absolute().inset_0().child(filler(\n                        &theme,\n                        \"Document text behind Regular glass\",\n                        6,\n                    )))\n                })\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(28.0))\n                        .left(px(52.0))\n                        .w(px(280.0))\n                        .child(\n                            Glass::new(ident)\n                                .preset(preset)\n                                .dimmed(preset == GlassPreset::Clear)\n                                .adaptive(true)\n                                .radius(Radius::Dialog)\n                                .child(label(title, body)),\n                        ),\n                )\n        };\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(\n            &theme,\n            \"Frosted / reduced transparency                       Clear + 35% dimming / media only\",\n        ))\n        .child(\n            row(&theme)\n                .child(crate::foundation::ThemeOverlay::theme(\n                    theme.clone().with_reduce_transparency(true),\n                    plate(\n                        \"scene.glass.frosted\",\n                        GlassPreset::Liquid,\n                        \"Reduce transparency\",\n                        \"Host preference resolves Regular to Frosted\",\n                    ),\n                ))\n                .child(plate(\n                    \"scene.glass.clear\",\n                    GlassPreset::Clear,\n                    \"Clear + dimmed\",\n                    \"A sharp media fixture, never default chrome\",\n                )),\n        )\n        .child(caption(\n            &theme,\n            \"Regular over text and media: blur, achromatic wash, lensing and hairline\",\n        ))\n        .child(\n            row(&theme)\n                .child(plate(\n                    \"scene.glass.liquid\",\n                    GlassPreset::Liquid,\n                    \"Regular Liquid\",\n                    \"Large reading surfaces keep the window appearance\",\n                ))\n                .child(plate(\n                    \"scene.glass.media\",\n                    GlassPreset::Liquid,\n                    \"Regular on media\",\n                    \"The same material, not the Clear variant\",\n                )),\n        )\n        .child(caption(\n            &theme,\n            \"Compact Regular controls: appearance may flip; no opaque face\",\n        ))\n        .child(\n            div()\n                .relative()\n                .h(px(TILE * 2.0))\n                .w(px(PLATE_WIDTH))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(div().absolute().inset_0().bg(gpui::white()))\n                .child(\n                    div()\n                        .absolute()\n                        .right_0()\n                        .top_0()\n                        .w(px(PLATE_WIDTH / 2.0))\n                        .h_full()\n                        .bg(gpui::black()),\n                )\n                .child(\n                    div()\n                        .absolute()\n                        .inset_0()\n                        .flex()\n                        .items_center()\n                        .justify_center()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(\n                            Glass::new(\"scene.glass.regular.one\")\n                                .preset(GlassPreset::Liquid)\n                                .surface(Surface::Raised)\n                                .radius(Radius::Pill)\n                                .adaptive(true)\n                                .child(\n                                    div()\n                                        .w(px(110.0))\n                                        .h(px(32.0))\n                                        .flex()\n                                        .items_center()\n                                        .justify_center()\n                                        .child(\"Portal\"),\n                                ),\n                        )\n                        .child(\n                            Glass::new(\"scene.glass.regular.two\")\n                                .preset(GlassPreset::Liquid)\n                                .radius(Radius::Pill)\n                                .adaptive(true)\n                                .child(\n                                    div()\n                                        .w(px(110.0))\n                                        .h(px(32.0))\n                                        .rounded(px(theme.radius(Radius::Pill)))\n                                        .bg(theme.colors.selected)\n                                        .flex()\n                                        .items_center()\n                                        .justify_center()\n                                        .child(\"Harbour\"),\n                                ),\n                        ),\n                ),\n        )\n        // The last two demonstrations sit side by side so the whole scene\n        // stays inside the window a real display can give the gallery, which\n        // is where the DirectX renderer gets looked at.\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .gap(px(theme.space(Space::Md)))\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Fused: two panes joined into one body\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(PLATE_HEIGHT))\n                                .w(px(JOIN_WIDTH))\n                                .surface(&theme, Surface::Panel)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(checkerboard(JOIN_WIDTH, PLATE_HEIGHT))\n                                .child(\n                                    div().absolute().top(px(40.0)).left(px(40.0)).child(\n                                        GlassGroup::new(\"scene.glass.fused\")\n                                            .preset(GlassPreset::Liquid)\n                                            .radius(Radius::Dialog)\n                                            .gap(12.0)\n                                            .pane(\n                                                \"scene.glass.fused.left\",\n                                                label(\"Left\", \"One lobe of the body\"),\n                                            )\n                                            .pane(\n                                                \"scene.glass.fused.right\",\n                                                label(\"Right\", \"Joined across the gap\"),\n                                            ),\n                                    ),\n                                ),\n                        ),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Large adaptive surfaces never flip\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(PLATE_HEIGHT))\n                                .w(px(JOIN_WIDTH))\n                                .surface(&theme, Surface::Panel)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(0.0))\n                                        .w(px(JOIN_WIDTH / 2.0))\n                                        .h(px(PLATE_HEIGHT))\n                                        .bg(gpui::white()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(JOIN_WIDTH / 2.0))\n                                        .w(px(JOIN_WIDTH / 2.0))\n                                        .h(px(PLATE_HEIGHT))\n                                        .bg(gpui::black()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(15.0))\n                                        .w(px(160.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.bright\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .adaptive_appearance(true)\n                                                .child(label(\n                                                    \"Bright\",\n                                                    \"The reading lands next frame\",\n                                                )),\n                                        ),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(JOIN_WIDTH / 2.0 + 15.0))\n                                        .w(px(160.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.dark\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .child(label(\"Dark\", \"The same glass, other side\")),\n                                        ),\n                                ),\n                        ),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Budget fallback: admitted optics become opaque cards, never holes\",\n        ))\n        .child(div().flex().gap(px(4.0)).children(('A'..='R').map(|name| {\n            Glass::new(format!(\"scene.glass.budget.{name}\")).child(\n                div()\n                    .w(px(38.0))\n                    .h(px(30.0))\n                    .flex()\n                    .items_center()\n                    .justify_center()\n                    .child(name.to_string()),\n            )\n        })))\n        .child(caption(\n            &theme,\n            \"Nine lobes exceed the fused budget: every pane retains an opaque face\",\n        ))\n        .child(\n            ('A'..='I').fold(GlassGroup::new(\"scene.glass.lobe-budget\"), |group, name| {\n                group.pane(\n                    format!(\"scene.glass.lobe-budget.{name}\"),\n                    div().w(px(58.0)).h(px(30.0)).child(name.to_string()),\n                )\n            }),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "toolbar",

@@ -113,42 +113,46 @@ pub(super) fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
             Overlay::modal("scene.overlay.dialog")
                 .placement(Placement::Center)
                 .child(
-                    crate::overlay::surface(&theme, crate::overlay::OverlaySurface::MODAL)
-                        .w(px(320.0))
-                        .p(px(theme.spacing.lg))
-                        .gap(px(theme.spacing.sm))
-                        .child(crate::foundation::text(
+                    crate::overlay::surface(
+                        "scene.overlay.surface",
+                        &theme,
+                        crate::overlay::OverlaySurface::MODAL,
+                    )
+                    .w(px(320.0))
+                    .p(px(theme.spacing.lg))
+                    .gap(px(theme.spacing.sm))
+                    .child(crate::foundation::text(
+                        &theme,
+                        TypeScale::Subtitle,
+                        "Delete this workspace?",
+                    ))
+                    .child(
+                        crate::foundation::text(
                             &theme,
-                            TypeScale::Subtitle,
-                            "Delete this workspace?",
-                        ))
-                        .child(
-                            crate::foundation::text(
-                                &theme,
-                                TypeScale::Body,
-                                "Its runs, filters and saved views are removed for everyone. This \
+                            TypeScale::Body,
+                            "Its runs, filters and saved views are removed for everyone. This \
                                  cannot be undone.",
-                            )
-                            .text_tone(&theme, TextTone::Muted),
                         )
-                        .child(
-                            div()
-                                .row()
-                                .justify_end()
-                                .gap(px(theme.spacing.sm))
-                                .child(
-                                    Button::new("scene.overlay.cancel")
-                                        .label("Cancel")
-                                        .secondary()
-                                        .on_click(|_, _| {}),
-                                )
-                                .child(
-                                    Button::new("scene.overlay.confirm")
-                                        .label("Delete")
-                                        .danger()
-                                        .on_click(|_, _| {}),
-                                ),
-                        ),
+                        .text_tone(&theme, TextTone::Muted),
+                    )
+                    .child(
+                        div()
+                            .row()
+                            .justify_end()
+                            .gap(px(theme.spacing.sm))
+                            .child(
+                                Button::new("scene.overlay.cancel")
+                                    .label("Cancel")
+                                    .secondary()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("scene.overlay.confirm")
+                                    .label("Delete")
+                                    .danger()
+                                    .on_click(|_, _| {}),
+                            ),
+                    ),
                 ),
         )
         .into_any_element()
@@ -643,9 +647,34 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// One square of the backdrop every optics plate is read against, and the two
 /// plate footprints built from it. Both are whole numbers of squares.
 const TILE: f32 = 48.0;
-const PLATE_WIDTH: f32 = TILE * 10.0;
+const PLATE_WIDTH: f32 = TILE * 8.0;
 const PLATE_HEIGHT: f32 = TILE * 3.0;
-const JOIN_WIDTH: f32 = TILE * 9.0;
+const JOIN_WIDTH: f32 = PLATE_WIDTH;
+
+/// A deterministic raster media fixture, not downloaded product content.
+fn glass_media() -> Arc<RenderImage> {
+    static IMAGE: OnceLock<Arc<RenderImage>> = OnceLock::new();
+    IMAGE
+        .get_or_init(|| {
+            let mut pixels = Vec::with_capacity(480 * 144 * 4);
+            for y in 0..144 {
+                for x in 0..480 {
+                    let ridge = 65 + ((x as f32 * 0.018).sin() * 30.0) as i32;
+                    let rgba = if y > ridge {
+                        [28, 91 + (x / 8) as u8, 91, 255]
+                    } else {
+                        [110 + (y / 2) as u8, 165, 220, 255]
+                    };
+                    pixels.extend_from_slice(&rgba);
+                }
+            }
+            Arc::new(
+                RenderImage::from_rgba(size(DevicePixels(480), DevicePixels(144)), pixels)
+                    .expect("media fixture dimensions"),
+            )
+        })
+        .clone()
+}
 
 pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
@@ -732,16 +761,35 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child(checkerboard(PLATE_WIDTH, PLATE_HEIGHT))
+                .child(
+                    if preset == GlassPreset::Clear || ident == "scene.glass.media" {
+                        gpui::img(glass_media())
+                            .object_fit(gpui::ObjectFit::Cover)
+                            .w(px(PLATE_WIDTH))
+                            .h(px(PLATE_HEIGHT))
+                            .into_any_element()
+                    } else {
+                        checkerboard(PLATE_WIDTH, PLATE_HEIGHT).into_any_element()
+                    },
+                )
+                .when(ident == "scene.glass.liquid", |element| {
+                    element.child(div().absolute().inset_0().child(filler(
+                        &theme,
+                        "Document text behind Regular glass",
+                        6,
+                    )))
+                })
                 .child(
                     div()
                         .absolute()
                         .top(px(28.0))
-                        .left(px(90.0))
+                        .left(px(52.0))
                         .w(px(280.0))
                         .child(
                             Glass::new(ident)
                                 .preset(preset)
+                                .dimmed(preset == GlassPreset::Clear)
+                                .adaptive(true)
                                 .radius(Radius::Dialog)
                                 .child(label(title, body)),
                         ),
@@ -750,36 +798,50 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
 
     stack(&theme)
         .w(px(900.0))
-        .child(caption(&theme, "Frosted: blurred, and nothing bent"))
-        .child(plate(
-            "scene.glass.frosted",
-            GlassPreset::Frosted,
-            "Frosted",
-            "The control the others are read against",
-        ))
         .child(caption(
             &theme,
-            "Lens: clear inside, the edge bends the sharp backdrop",
+            "Frosted / reduced transparency                       Clear + 35% dimming / media only",
         ))
-        .child(plate(
-            "scene.glass.lens",
-            GlassPreset::Lens,
-            "Lens",
-            "The one-pixel rules bend at the rim and stay sharp",
-        ))
+        .child(
+            row(&theme)
+                .child(crate::foundation::ThemeOverlay::theme(
+                    theme.clone().with_reduce_transparency(true),
+                    plate(
+                        "scene.glass.frosted",
+                        GlassPreset::Liquid,
+                        "Reduce transparency",
+                        "Host preference resolves Regular to Frosted",
+                    ),
+                ))
+                .child(plate(
+                    "scene.glass.clear",
+                    GlassPreset::Clear,
+                    "Clear + dimmed",
+                    "A sharp media fixture, never default chrome",
+                )),
+        )
         .child(caption(
             &theme,
-            "Liquid: clear refraction, additive lift, and a lit hairline",
+            "Regular over text and media: blur, achromatic wash, lensing and hairline",
         ))
-        .child(plate(
-            "scene.glass.liquid",
-            GlassPreset::Liquid,
-            "Liquid",
-            "Subtle dispersion without turning the backdrop into a smear",
-        ))
+        .child(
+            row(&theme)
+                .child(plate(
+                    "scene.glass.liquid",
+                    GlassPreset::Liquid,
+                    "Regular Liquid",
+                    "Large reading surfaces keep the window appearance",
+                ))
+                .child(plate(
+                    "scene.glass.media",
+                    GlassPreset::Liquid,
+                    "Regular on media",
+                    "The same material, not the Clear variant",
+                )),
+        )
         .child(caption(
             &theme,
-            "Grounded: chrome keeps the wash so type on the page cannot show through",
+            "Compact Regular controls: appearance may flip; no opaque face",
         ))
         .child(
             div()
@@ -789,7 +851,16 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child(checkerboard(PLATE_WIDTH, TILE * 2.0))
+                .child(div().absolute().inset_0().bg(gpui::white()))
+                .child(
+                    div()
+                        .absolute()
+                        .right_0()
+                        .top_0()
+                        .w(px(PLATE_WIDTH / 2.0))
+                        .h_full()
+                        .bg(gpui::black()),
+                )
                 .child(
                     div()
                         .absolute()
@@ -799,41 +870,38 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .justify_center()
                         .gap(px(theme.space(Space::Sm)))
                         .child(
-                            Glass::new("scene.glass.grounded.one")
+                            Glass::new("scene.glass.regular.one")
                                 .preset(GlassPreset::Liquid)
                                 .surface(Surface::Raised)
                                 .radius(Radius::Pill)
-                                .grounded(true)
-                                .child(label("Portal", "Unselected face")),
+                                .adaptive(true)
+                                .child(
+                                    div()
+                                        .w(px(110.0))
+                                        .h(px(32.0))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child("Portal"),
+                                ),
                         )
                         .child(
-                            Glass::new("scene.glass.grounded.two")
+                            Glass::new("scene.glass.regular.two")
                                 .preset(GlassPreset::Liquid)
                                 .radius(Radius::Pill)
-                                .grounded(true)
-                                .tint(theme.colors.accent)
-                                .child(label("Harbour", "Current wash")),
+                                .adaptive(true)
+                                .child(
+                                    div()
+                                        .w(px(110.0))
+                                        .h(px(32.0))
+                                        .rounded(px(theme.radius(Radius::Pill)))
+                                        .bg(theme.colors.selected)
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child("Harbour"),
+                                ),
                         ),
-                ),
-        )
-        .child(caption(
-            &theme,
-            "Scroll edge: the soft ramp scatters content under floating glass",
-        ))
-        .child(
-            div()
-                .relative()
-                .h(px(PLATE_HEIGHT))
-                .w(px(PLATE_WIDTH))
-                .surface(&theme, Surface::Panel)
-                .radius(&theme, Radius::Card)
-                .overflow_hidden()
-                .child(checkerboard(PLATE_WIDTH, PLATE_HEIGHT))
-                .child(
-                    crate::layout::ScrollEdgeEffect::new("scene.glass.scroll-edge")
-                        .top(true)
-                        .soft()
-                        .band(36.0),
                 ),
         )
         // The last two demonstrations sit side by side so the whole scene
@@ -880,7 +948,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                     div()
                         .column()
                         .gap(px(theme.space(Space::Sm)))
-                        .child(caption(&theme, "Adaptive: the tint deepens when opposed"))
+                        .child(caption(&theme, "Large adaptive surfaces never flip"))
                         .child(
                             div()
                                 .relative()
@@ -912,7 +980,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                         .absolute()
                                         .top(px(28.0))
                                         .left(px(15.0))
-                                        .w(px(190.0))
+                                        .w(px(160.0))
                                         .child(
                                             Glass::new("scene.glass.adaptive.bright")
                                                 .preset(GlassPreset::Liquid)
@@ -930,7 +998,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                         .absolute()
                                         .top(px(28.0))
                                         .left(px(JOIN_WIDTH / 2.0 + 15.0))
-                                        .w(px(190.0))
+                                        .w(px(160.0))
                                         .child(
                                             Glass::new("scene.glass.adaptive.dark")
                                                 .preset(GlassPreset::Liquid)
@@ -941,6 +1009,33 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 ),
                         ),
                 ),
+        )
+        .child(caption(
+            &theme,
+            "Budget fallback: admitted optics become opaque cards, never holes",
+        ))
+        .child(div().flex().gap(px(4.0)).children(('A'..='R').map(|name| {
+            Glass::new(format!("scene.glass.budget.{name}")).child(
+                div()
+                    .w(px(38.0))
+                    .h(px(30.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(name.to_string()),
+            )
+        })))
+        .child(caption(
+            &theme,
+            "Nine lobes exceed the fused budget: every pane retains an opaque face",
+        ))
+        .child(
+            ('A'..='I').fold(GlassGroup::new("scene.glass.lobe-budget"), |group, name| {
+                group.pane(
+                    format!("scene.glass.lobe-budget.{name}"),
+                    div().w(px(58.0)).h(px(30.0)).child(name.to_string()),
+                )
+            }),
         )
         .into_any_element()
 }

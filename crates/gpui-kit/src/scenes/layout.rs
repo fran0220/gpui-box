@@ -2,6 +2,55 @@
 
 use super::support::*;
 
+pub(super) fn scroll_edge_effect(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "Fixture transcript: content scrolls beneath a Regular glass toolbar",
+        ))
+        .child(
+            div()
+                .relative()
+                .h(px(240.0))
+                .overflow_hidden()
+                .child(
+                    crate::layout::ScrollEdgeEffect::new("scene.scroll-edge.soft")
+                        .top(true)
+                        .soft()
+                        .band(64.0)
+                        .child(filler(&theme, "Earlier messages beneath the toolbar", 10)),
+                )
+                .child(
+                    div().absolute().top(px(8.0)).left(px(16.0)).child(
+                        Glass::new("scene.scroll-edge.toolbar")
+                            .radius(Radius::Pill)
+                            .child(
+                                div()
+                                    .px(px(20.0))
+                                    .py(px(10.0))
+                                    .child("Transcript · fixture"),
+                            ),
+                    ),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "Reduced transparency: opaque scroll-edge backing",
+        ))
+        .child(
+            div().h(px(160.0)).overflow_hidden().child(
+                crate::layout::ScrollEdgeEffect::new("scene.scroll-edge.hard")
+                    .top(true)
+                    .hard()
+                    .band(64.0)
+                    .child(filler(&theme, "The same transcript", 7)),
+            ),
+        )
+        .into_any_element()
+}
+
 pub(super) fn grid(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let item = |id: &'static str, label: &'static str| {

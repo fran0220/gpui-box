@@ -711,3 +711,16 @@ session 219 design intent, not copied Apple source. `GlassMaterial` and the
 Metal, HLSL and WGSL composite paths add saturation and source-over achromatic
 wash before additive optical lift. The historical import receipt is unchanged;
 all framework and platform code remains under the local GPUI Box authority.
+
+### Kit Regular/Clear material policy
+
+The Kit overlay recipes now use Regular Liquid, reserving `Clear` with a
+35% dimming backing for media. Apple HIG Materials and WWDC25 session 219
+provide design intent only; no Apple source or imagery was copied. Small
+controls may resolve their counterpart appearance from backdrop luminance;
+large reading surfaces do not flip. These are original Kit policies layered
+over the existing local GPUI primitives, not another framework import.
+
+`Theme::with_reduce_transparency(bool)` carries a host-projected reader
+preference, outside tokens. All glass presets and built-in overlay recipes
+resolve to Frosted under that theme; Kit does not read platform preferences.

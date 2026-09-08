@@ -249,6 +249,10 @@ into crates/gpui-kit/src/overlay/glass.rs and its effect tokens. Not a Cargo
 dependency; see PROVENANCE.md P12.
 License text: licenses/BEZEL-MIT.txt
 
+Kit Regular/Clear overlay policy also follows Apple HIG Materials and WWDC25
+session 219 as design references only. No Apple source or imagery was copied;
+the scene's raster landscape is an original deterministic test fixture.
+
 crabtalk/zed liquid-glass GPUI adaptation
 --------------------------------------------------------------------------------
 Source: https://github.com/crabtalk/zed

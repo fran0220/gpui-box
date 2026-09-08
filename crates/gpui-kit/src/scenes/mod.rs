@@ -78,7 +78,7 @@ use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
 use layout::{
     aspect_ratio, container, desktop_titlebar, dock_tree, grid, ide_shell, responsive, scroll_area,
-    scroll_fade, scroll_shadow, split_pane, split_tree, toolbar,
+    scroll_edge_effect, scroll_fade, scroll_shadow, split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
@@ -461,6 +461,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "scroll-fade",
             build: scroll_fade,
             shows: Shows::Subjects(&["ScrollFade"]),
+        },
+        Scene {
+            name: "scroll-edge-effect",
+            build: scroll_edge_effect,
+            shows: Shows::Subjects(&["ScrollEdgeEffect"]),
         },
         Scene {
             name: "frost",
