@@ -103,6 +103,10 @@ use operating-system frameworks; they import no additional third-party source
 or media assets.
 License text: licenses/ZED-APACHE-2.0.txt
 
+Achromatic glass material (PROVENANCE.md P20): original GPUI Box saturation
+and wash implementation. Apple HIG Materials and WWDC25 session 219 are design
+references only; no Apple source was copied and no additional license applies.
+
 rasterlottie 0.2.2
 --------------------------------------------------------------------------------
 Source: https://github.com/neodyland/rasterlottie

@@ -408,9 +408,15 @@ gaussian passes but still snapshots and composites clear refraction. A positive
 radius derives a blurred source while retaining the sharp paint-order snapshot
 for the refracted rim. `GlassMaterial::clear()` replaces the historical
 zero-argument `frosted()` constructor; `GlassMaterial::frosted(radius)` names an
-actual frost. The material also carries transmission gain, additive optical
-lift, and hairline width. Kit resolves Liquid/Lens bevel depth from the
-control's short edge; Frosted remains the only preset blurred by default.
+actual frost. The material also carries saturation, an achromatic wash,
+transmission gain, additive optical lift, and hairline width. All renderers
+apply Rec. 709 saturation to the sampled interior and refracted rim, clamp
+negative channels, multiply transmission gain, source-over the black/white
+wash, then add optical lift and edge light. Clear/frosted constructors default
+to saturation 1 and transparent wash. Metal generates its packed material
+layout from Rust; Direct3D and WGPU map it to aligned uniform registers.
+The browser shares WGPU, not a separate glass implementation. Native Windows
+and Linux validation of this extension is still required in their lanes.
 
 Metal uses its platform gaussian when scattering is nonzero. Direct3D and WGPU
 split wide gaussians into bounded passes and both degrade an over-budget blur to

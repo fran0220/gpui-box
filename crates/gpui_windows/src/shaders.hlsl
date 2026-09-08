@@ -1487,7 +1487,9 @@ cbuffer BackdropGlassParams: register(b2) {
     uint backdrop_pad;
     float backdrop_transmission_gain;
     float backdrop_hairline;
-    float2 backdrop_optical_pad;
+    float backdrop_saturation;
+    float backdrop_optical_pad;
+    float4 backdrop_wash;
     float4 backdrop_optical_lift;
     // x = edge (0 none, 1 top, 2 bottom, 3 left, 4 right), y = band in pixels.
     float4 backdrop_edge_mask;
@@ -1628,6 +1630,7 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     // path below even with blur zero: scattering is not the optics switch.
     if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) &&
         backdrop_specular <= 0.0 && backdrop_transmission_gain == 1.0 &&
+        backdrop_saturation == 1.0 && backdrop_wash.a <= 0.0 &&
         backdrop_optical_lift.a <= 0.0 && backdrop_hairline <= 0.0) {
         return apply_backdrop_edge_mask(t_sprite.Load(int3(int2(pt), 0)), pt);
     }
@@ -1680,8 +1683,13 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         lerp(frosted_blue.b, sharp_blue.b, sharpness),
         lerp(frosted_green.a, sharp_green.a, sharpness));
 
-    color.rgb = color.rgb * backdrop_transmission_gain +
-        backdrop_optical_lift.rgb * backdrop_optical_lift.a;
+    // Sample (including the rim), saturation, gain, source-over wash, then lift.
+    float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+    color.rgb = max(lerp(luminance.xxx, color.rgb, backdrop_saturation), 0.0);
+    color.rgb *= backdrop_transmission_gain;
+    color.rgb = lerp(color.rgb, backdrop_wash.rgb, backdrop_wash.a);
+    color.a = backdrop_wash.a + color.a * (1.0 - backdrop_wash.a);
+    color.rgb += backdrop_optical_lift.rgb * backdrop_optical_lift.a;
 
     if (backdrop_specular > 0.0) {
         // The light sits on the unit sphere at `light_angle`, measured

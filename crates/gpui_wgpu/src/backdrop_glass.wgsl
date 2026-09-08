@@ -26,7 +26,9 @@ struct Params {
     optical_lift: vec4<f32>,
     edge_mask_edge: f32,
     edge_mask_band: f32,
-    _mask_pad: vec2<f32>,
+    saturation: f32,
+    _mask_pad: f32,
+    wash: vec4<f32>,
     lobes: array<Lobe, MAX_GLASS_LOBES>,
 }
 
@@ -161,6 +163,7 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
     // path below even with blur zero: scattering is not the optics switch.
     if ((params.bevel <= 0.0 || params.refraction == 0.0) && params.specular <= 0.0 &&
         params.transmission_gain == 1.0 && params.optical_lift.a <= 0.0 &&
+        params.saturation == 1.0 && params.wash.a <= 0.0 &&
         params.hairline <= 0.0) {
         return apply_edge_mask(textureLoad(source, vec2<i32>(point), 0), point);
     }
@@ -215,9 +218,13 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         mix(frosted_green.a, sharp_green.a, sharpness),
     );
 
+    // Sample (including the rim), saturation, gain, source-over wash, then lift.
+    let luminance = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let saturated = max(mix(vec3<f32>(luminance), color.rgb, params.saturation), vec3<f32>(0.0));
+    let transmitted = saturated * params.transmission_gain;
     color = vec4<f32>(
-        color.rgb * params.transmission_gain + params.optical_lift.rgb * params.optical_lift.a,
-        color.a,
+        mix(transmitted, params.wash.rgb, params.wash.a) + params.optical_lift.rgb * params.optical_lift.a,
+        params.wash.a + color.a * (1.0 - params.wash.a),
     );
 
     if (params.specular > 0.0) {

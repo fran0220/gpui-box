@@ -703,3 +703,11 @@ P12 dual-source material; the system view only samples the desktop behind the
 window. Windows maps `SystemGlass` to the current DWM Mica backdrop. The
 scroll-edge ramp and counterpart-appearance flip are original GPUI Box work
 that implement the documented design intent on every renderer.
+
+## P20: achromatic glass material
+
+Original GPUI Box implementation, informed by Apple HIG Materials and WWDC25
+session 219 design intent, not copied Apple source. `GlassMaterial` and the
+Metal, HLSL and WGSL composite paths add saturation and source-over achromatic
+wash before additive optical lift. The historical import receipt is unchanged;
+all framework and platform code remains under the local GPUI Box authority.

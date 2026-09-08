@@ -279,7 +279,9 @@ struct BackdropParams {
     optical_lift: [f32; 4],
     edge_mask_edge: f32,
     edge_mask_band: f32,
-    _mask_pad: [f32; 2],
+    saturation: f32,
+    _mask_pad: f32,
+    wash: [f32; 4],
     lobes: [BackdropLobe; MAX_GLASS_LOBES],
 }
 
@@ -2683,7 +2685,14 @@ impl WgpuRenderer {
             ],
             edge_mask_edge: material.edge_mask_edge,
             edge_mask_band: material.edge_mask_band.0,
-            _mask_pad: [0.0; 2],
+            saturation: material.saturation,
+            _mask_pad: 0.0,
+            wash: [
+                material.wash.r,
+                material.wash.g,
+                material.wash.b,
+                material.wash.a,
+            ],
             lobes,
         };
 
@@ -3853,11 +3862,11 @@ mod tests {
         // declares has no gap the Rust side does not also have.
         assert_eq!(size_of::<BackdropLobe>(), 32);
         assert_eq!(size_of::<BackdropLobe>() % 16, 0);
-        // Everything ahead of the lobe array occupies 128 bytes, which is a
+        // Everything ahead of the lobe array occupies 160 bytes, which is a
         // multiple of 16. The scalar register and optical-lift vector keep the
         // array at the same offset in Rust and WGSL; otherwise the shader
         // would round up where the Rust side did not.
-        const HEADER: usize = 128;
+        const HEADER: usize = 160;
         assert_eq!(HEADER % 16, 0, "the lobe array must start 16-byte aligned");
         assert_eq!(
             size_of::<BackdropParams>(),

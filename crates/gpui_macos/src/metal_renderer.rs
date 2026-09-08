@@ -2364,4 +2364,35 @@ mod tests {
             "an unprobed slot stays empty"
         );
     }
+
+    #[test]
+    fn glass_wash_and_saturation_transform_pixels_without_a_bevel() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let mut scene = probed_scene(gpui::hsla(0., 1., 0.5, 1.), 0);
+        let material = &mut scene.backdrop_glass[0].material;
+        material.saturation = 0.;
+        material.transmission_gain = 0.5;
+        material.wash = gpui::Rgba {
+            r: 1.,
+            g: 1.,
+            b: 1.,
+            a: 0.5,
+        };
+        let image = renderer
+            .render_scene_to_image(&scene, extent)
+            .expect("glass renders");
+        let pixel = image.get_pixel(128, 128).0;
+        // Red -> Rec. 709 grey -> half transmission -> half white wash.
+        let expected = ((0.2126 * 0.5 * 0.5 + 0.5) * 255.0_f32).round() as i16;
+        for channel in &pixel[..3] {
+            assert!((i16::from(*channel) - expected).abs() <= 2, "{pixel:?}");
+        }
+        assert_eq!(pixel[3], 255);
+        assert!(
+            renderer.backdrop_luminance(0).expect("probe ready") < 0.3,
+            "the probe sees the original backdrop, not the white wash"
+        );
+    }
 }

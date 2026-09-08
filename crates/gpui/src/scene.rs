@@ -640,6 +640,13 @@ mod tests {
             dispersion: 4.,
             specular: -1.,
             transmission_gain: f32::NAN,
+            saturation: f32::NAN,
+            wash: Rgba {
+                r: f32::NAN,
+                g: 2.,
+                b: -1.,
+                a: f32::INFINITY,
+            },
             optical_lift: Rgba {
                 r: -1.,
                 g: 2.,
@@ -662,6 +669,8 @@ mod tests {
         assert_eq!(material.dispersion, 1., "dispersion is a fraction");
         assert_eq!(material.specular, 0.);
         assert_eq!(material.transmission_gain, 1.);
+        assert_eq!(material.saturation, 1.);
+        assert_eq!(material.wash, Rgba::default());
         assert_eq!(
             material.optical_lift,
             Rgba {
@@ -693,6 +702,51 @@ mod tests {
     }
 
     #[test]
+    fn saturation_and_wash_require_a_snapshot_without_blur_or_lensing() {
+        for material in [
+            GlassMaterial::<ScaledPixels> {
+                saturation: 0.,
+                ..GlassMaterial::clear()
+            },
+            GlassMaterial::<ScaledPixels> {
+                wash: Rgba {
+                    r: 1.,
+                    g: 1.,
+                    b: 1.,
+                    a: 0.55,
+                },
+                ..GlassMaterial::clear()
+            },
+        ] {
+            assert!(!material.is_flat());
+            assert!(!material.bends_light());
+            assert!(material.needs_backdrop());
+            assert_eq!(material.sanitized(), material);
+        }
+        let material = GlassMaterial::<ScaledPixels> {
+            saturation: -2.,
+            wash: Rgba {
+                r: 0.9,
+                g: 0.1,
+                b: 0.2,
+                a: 2.,
+            },
+            ..GlassMaterial::clear()
+        }
+        .sanitized();
+        assert_eq!(material.saturation, 0.);
+        assert_eq!(
+            material.wash,
+            Rgba {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: 1.
+            }
+        );
+    }
+
+    #[test]
     fn scaling_a_material_moves_its_lengths_and_nothing_else() {
         let logical = GlassMaterial::<Pixels> {
             blur_radius: Pixels(24.),
@@ -701,6 +755,13 @@ mod tests {
             dispersion: 0.16,
             specular: 0.4,
             transmission_gain: 1.042,
+            saturation: 1.5,
+            wash: Rgba {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: 0.55,
+            },
             optical_lift: Rgba {
                 r: 1.,
                 g: 1.,
@@ -728,6 +789,8 @@ mod tests {
         assert_eq!(device.dispersion, logical.dispersion);
         assert_eq!(device.specular, logical.specular);
         assert_eq!(device.transmission_gain, logical.transmission_gain);
+        assert_eq!(device.saturation, logical.saturation);
+        assert_eq!(device.wash, logical.wash);
         assert_eq!(device.optical_lift, logical.optical_lift);
         assert_eq!(
             device.light_angle, logical.light_angle,
@@ -969,7 +1032,7 @@ mod tests {
                 + size_of::<u32>()
         );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
-        assert_eq!(size_of::<GlassMaterial>(), 17 * size_of::<f32>());
+        assert_eq!(size_of::<GlassMaterial>(), 22 * size_of::<f32>());
         assert_eq!(
             size_of::<PolychromeSprite>(),
             size_of::<DrawOrder>()
@@ -1685,6 +1748,15 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// Multiplicative transmission applied after sampling. One preserves the
     /// backdrop; values above one model the measured light gain of clear glass.
     pub transmission_gain: f32,
+    /// Saturation of the sampled backdrop, including the refracted rim, before
+    /// transmission gain. One preserves colour, zero uses Rec. 709 luminance.
+    /// Values above one intensify colour; negative results are clamped to zero.
+    pub saturation: f32,
+    /// Achromatic source-over material wash after saturation and transmission
+    /// gain, before optical lift and edge light. RGB must be all zero (dark) or
+    /// all one (light); alpha is strength. Sanitization selects black or white
+    /// from red at 0.5. This covers the refracted rim, unlike an element fill.
+    pub wash: Rgba,
     /// A colour added after transmission, as `rgb * alpha`. This is not
     /// source-over tint: it lifts the light already passing through the glass.
     pub optical_lift: Rgba,
@@ -1751,6 +1823,8 @@ impl<P: GlassLength> GlassMaterial<P> {
             dispersion: 0.,
             specular: 0.,
             transmission_gain: 1.,
+            saturation: 1.,
+            wash: Rgba::default(),
             optical_lift: Rgba::default(),
             hairline: P::from_raw(0.),
             light_angle: 0.,
@@ -1776,6 +1850,8 @@ impl<P: GlassLength> GlassMaterial<P> {
         !self.bends_light()
             && self.specular <= 0.
             && self.transmission_gain == 1.
+            && self.saturation == 1.
+            && self.wash.a <= 0.
             && self.optical_lift.a <= 0.
             && self.hairline.raw() <= 0.
     }
@@ -1805,6 +1881,18 @@ impl<P: GlassLength> GlassMaterial<P> {
         self.dispersion = finite(self.dispersion, 0.).clamp(0., 1.);
         self.specular = finite(self.specular, 0.).max(0.);
         self.transmission_gain = finite(self.transmission_gain, 1.).max(0.);
+        self.saturation = finite(self.saturation, 1.).max(0.);
+        let wash_channel = if finite(self.wash.r, 0.) >= 0.5 {
+            1.
+        } else {
+            0.
+        };
+        self.wash = Rgba {
+            r: wash_channel,
+            g: wash_channel,
+            b: wash_channel,
+            a: finite(self.wash.a, 0.).clamp(0., 1.),
+        };
         self.optical_lift = Rgba {
             r: finite(self.optical_lift.r, 0.).clamp(0., 1.),
             g: finite(self.optical_lift.g, 0.).clamp(0., 1.),
@@ -1842,6 +1930,8 @@ impl GlassMaterial<Pixels> {
             dispersion: self.dispersion,
             specular: self.specular,
             transmission_gain: self.transmission_gain,
+            saturation: self.saturation,
+            wash: self.wash,
             optical_lift: self.optical_lift,
             hairline: self.hairline.scale(factor),
             light_angle: self.light_angle,

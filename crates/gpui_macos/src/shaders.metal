@@ -1640,6 +1640,7 @@ fragment float4 backdrop_glass_fragment(
 
   if ((bevel <= 0. || refraction == 0.) && specular <= 0. &&
       glass.material.transmission_gain == 1. && optical_lift.a <= 0. &&
+      glass.material.saturation == 1. && glass.material.wash.a <= 0. &&
       glass.material.hairline <= 0.) {
     float4 frosted = source_texture.sample(source_sampler, uv);
     if (edge_mask >= 1.) {
@@ -1697,8 +1698,15 @@ fragment float4 backdrop_glass_fragment(
                         mix(frosted_blue.b, sharp_blue.b, sharpness),
                         mix(frosted_green.a, sharp_green.a, sharpness));
 
-  color.rgb = color.rgb * glass.material.transmission_gain +
-              optical_lift.rgb * optical_lift.a;
+  // Sample (including the rim), saturation, gain, source-over wash, then lift.
+  float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+  color.rgb = max(mix(float3(luminance), color.rgb, glass.material.saturation), 0.);
+  color.rgb *= glass.material.transmission_gain;
+  float4 wash = float4(glass.material.wash.r, glass.material.wash.g,
+                       glass.material.wash.b, glass.material.wash.a);
+  color.rgb = mix(color.rgb, wash.rgb, wash.a);
+  color.a = wash.a + color.a * (1. - wash.a);
+  color.rgb += optical_lift.rgb * optical_lift.a;
 
   if (specular > 0.) {
     // The light sits on the unit sphere at `light_angle`, measured clockwise
