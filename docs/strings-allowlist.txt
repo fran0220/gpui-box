@@ -173,6 +173,7 @@ SCALAR
 SankeyChart
 SchemaForm
 ScrollArea
+ScrollEdgeEffect
 ScrollFade
 SearchField
 SegmentedControl
