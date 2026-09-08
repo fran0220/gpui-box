@@ -2666,7 +2666,7 @@ impl WgpuRenderer {
             viewport,
             direction: [1.0, 0.0],
             sigma: sigma_per_pass,
-            bevel: material.bevel.0,
+            bevel: glass.optical_bevel().0,
             refraction: material.refraction,
             dispersion: material.dispersion,
             specular: material.specular,
@@ -4081,6 +4081,46 @@ mod tests {
             None,
             "an unprobed slot stays empty"
         );
+    }
+
+    #[test]
+    fn glass_menu_corner_does_not_concentrate_light_at_the_arc_centre() {
+        use gpui::{Corners, PlatformHeadlessRenderer, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut headless = match WgpuHeadlessRenderer::new() {
+            Ok(headless) => headless,
+            Err(error) => {
+                eprintln!("skipping: {error}");
+                return;
+            }
+        };
+        for radius in [12., 16.] {
+            let mut scene = probed_scene(gpui::hsla(0., 0., 0.1, 1.), 0);
+            let glass = &mut scene.backdrop_glass[0];
+            glass.corner_radii = Corners::all(ScaledPixels(radius));
+            glass.material.bevel = ScaledPixels(36.);
+            glass.material.refraction = 0.34;
+            glass.material.hairline = ScaledPixels(1.);
+            glass.material.specular = 0.06;
+            glass.material.specular_sharpness = 12.;
+            glass.material.light_angle = std::f32::consts::FRAC_PI_4;
+            let image = headless
+                .render_scene_to_image(&scene, size(DevicePixels(256), DevicePixels(256)))
+                .expect("glass renders");
+            for inset in (radius as u32 - 2)..30 {
+                let diagonal = i16::from(image.get_pixel(191 - inset, 64 + inset)[0]);
+                let adjacent = i16::from(image.get_pixel(191 - inset, 66 + inset)[0]);
+                assert!(
+                    diagonal <= adjacent + 2,
+                    "radius={radius}, inset={inset}: diagonal {diagonal}, face {adjacent}"
+                );
+            }
+            assert!(
+                (3..radius as u32).any(|inset| image.get_pixel(191 - inset, 64 + inset)[0]
+                    > image.get_pixel(128, 128)[0] + 4),
+                "the actual rounded arc must retain its highlight"
+            );
+        }
     }
 
     #[test]

@@ -49,6 +49,10 @@ limitations = ["application context menus use the in-window fallback", "native m
 [framework_context_menu]
 contract = "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
 
+[framework_glass_profile]
+contract = "BackdropGlass::optical_bevel bounds requested dome depth by positive corner radii and half-extents before Metal, Direct3D and WGPU uniform packing. The optical slope vanishes before rounded arc normals collapse; square corners retain incident-face creases. No shader ABI change."
+tests = ["rounded_optical_profiles_flatten_before_the_arc_normal_collapses", "glass_corner_medial_axis_does_not_invent_a_specular_normal", "glass_menu_corner_does_not_concentrate_light_at_the_arc_centre"]
+
 [framework_accessibility]
 cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."
 clipped_role_bounds = "Role-bearing element bounds are intersected with the active content mask before AccessKit publication; fully clipped nodes are omitted for that frame."

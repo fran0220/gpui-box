@@ -49,6 +49,8 @@ WebGL shaders, are GPUI Box work and import no additional source.
 The analytic quad signed-distance-field gradient and the transform-derived
 antialiasing width that sizes the polychrome sprite corner mask are GPUI Box
 work over those existing shader contracts and import no additional source.
+The rounded-glass optical profile reach bound is original GPUI Box geometry
+work shared by Metal, Direct3D and WGPU; it imports no additional source.
 The primitive-aware scroll-edge fade for filled paths, shadows, SVG masks,
 images, and sprite instances is GPUI Box work over those existing paint and
 shader contracts and imports no additional source, shader, or visual asset.

@@ -718,6 +718,10 @@ differentiate the existing polynomial union, and remove sharp-source remixing;
 no upstream source or historical import receipt is changed. CPU shape tests and
 Metal pixel tests cover medial-axis normals, true arc highlights, and rim
 text-stroke scattering without changing material strengths.
+The shared `BackdropGlass::optical_bevel` additionally bounds the profile by
+rounded-corner reach before GPU packing. This original geometry correction
+removes the remaining arc-centre singularity on small-radius menus; it changes
+neither shader ABI nor source provenance.
 
 ### Kit Regular/Clear material policy
 

@@ -71,3 +71,8 @@
   all four rounded corners at 4× and use high-frequency text behind refractive
   edges. Lock defects with pixel tests before accepting replacement baselines;
   do not hide false normals or sharp-source leakage by reducing highlights.
+- A medial-axis regression must sample both sides of a rounded arc's centre,
+  including small menu radii. Analytic SDF derivatives alone do not make an
+  over-deep optical dome regular: its slope must vanish before the arc collapses.
+  Exercise interleaved foreground batches as well as frame-tail glass; enforce
+  shared material geometry at the common upload boundary, not one caller.

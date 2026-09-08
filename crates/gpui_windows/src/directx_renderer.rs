@@ -1903,7 +1903,7 @@ impl BackdropGlassParams {
         Self {
             direction: [0.0, 0.0],
             sigma: 1.0,
-            bevel: glass.material.bevel.0,
+            bevel: glass.optical_bevel().0,
             bounds: bounds(glass.bounds),
             radii: radii(glass.corner_radii),
             mask: bounds(glass.content_mask.bounds),

@@ -921,7 +921,7 @@ impl MetalRenderer {
                 command_encoder =
                     new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
                 if let Err(error) = self.draw_backdrop_glass(
-                    &[glass],
+                    &glass,
                     writer,
                     viewport_size,
                     (&frosted, &scratch),
@@ -1054,7 +1054,7 @@ impl MetalRenderer {
             command_encoder =
                 new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
             if let Err(error) = self.draw_backdrop_glass(
-                &[*glass],
+                glass,
                 writer,
                 viewport_size,
                 (&frosted, &scratch),
@@ -1252,17 +1252,16 @@ impl MetalRenderer {
 
     fn draw_backdrop_glass(
         &self,
-        surfaces: &[BackdropGlass],
+        glass: &BackdropGlass,
         writer: &mut InstanceBufferWriter,
         viewport_size: Size<DevicePixels>,
         textures: (&metal::TextureRef, &metal::TextureRef),
         visible: Bounds<DevicePixels>,
         command_encoder: &metal::RenderCommandEncoderRef,
     ) -> Result<()> {
-        if surfaces.is_empty() {
-            return Ok(());
-        }
-        let instance_binding = writer.write(surfaces)?;
+        let mut optical_glass = *glass;
+        optical_glass.material.bevel = glass.optical_bevel();
+        let instance_binding = writer.write(&[optical_glass])?;
 
         command_encoder.set_render_pipeline_state(&self.backdrop_glass_pipeline_state);
         command_encoder.set_vertex_buffer(
@@ -1300,12 +1299,7 @@ impl MetalRenderer {
         );
 
         command_encoder.set_scissor_rect(metal_scissor(visible));
-        command_encoder.draw_primitives_instanced(
-            metal::MTLPrimitiveType::Triangle,
-            0,
-            6,
-            surfaces.len() as u64,
-        );
+        command_encoder.draw_primitives_instanced(metal::MTLPrimitiveType::Triangle, 0, 6, 1);
         command_encoder.set_scissor_rect(metal::MTLScissorRect {
             x: 0,
             y: 0,
@@ -2370,33 +2364,43 @@ mod tests {
         let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
         let mut renderer = MetalRenderer::new_headless(pool);
         let extent = size(DevicePixels(256), DevicePixels(256));
-        for specular in [0., 0.06] {
+        for (radius, specular, interleaved) in
+            [(12., 0., true), (12., 0.06, true), (16., 0.06, false)]
+        {
             let mut scene = probed_scene(gpui::hsla(0., 0., 0.1, 1.), 0);
             let glass = &mut scene.backdrop_glass[0];
-            glass.corner_radii = Corners::all(ScaledPixels(16.));
+            glass.corner_radii = Corners::all(ScaledPixels(radius));
             glass.material.bevel = ScaledPixels(36.);
             glass.material.refraction = 0.34;
             glass.material.hairline = ScaledPixels(1.);
             glass.material.specular = specular;
             glass.material.specular_sharpness = 12.;
             glass.material.light_angle = std::f32::consts::FRAC_PI_4;
+            if interleaved {
+                let mut foreground = scene.quads[0];
+                foreground.background = Background::from(Hsla::transparent_black());
+                scene.insert_primitive(foreground);
+                scene.finish();
+            }
             let image = renderer
                 .render_scene_to_image(&scene, extent)
                 .expect("glass renders");
-            // Beyond the arc centre the requested bevel has two planar faces.
-            // A stencil straddling their crease invents a bright bisector normal.
+            // Sample both before and after the arc centre, including the menu's
+            // smaller radius. An over-deep dome has a singularity before it;
+            // differencing across the medial crease invents a normal after it.
             // Uniform backdrop excludes refraction; specular=0 excludes hairline.
-            for inset in 18..30 {
+            for inset in (radius as u32 - 2)..30 {
                 let diagonal = i16::from(image.get_pixel(255 - (64 + inset), 64 + inset)[0]);
                 let adjacent = i16::from(image.get_pixel(255 - (64 + inset), 64 + inset + 2)[0]);
                 assert!(
                     diagonal <= adjacent + 2,
-                    "specular={specular}, inset={inset}: diagonal {diagonal}, face {adjacent}"
+                    "radius={radius}, specular={specular}, inset={inset}: diagonal {diagonal}, face {adjacent}"
                 );
             }
             if specular > 0. {
                 assert!(
-                    image.get_pixel(181, 74)[0] > image.get_pixel(128, 128)[0] + 4,
+                    (3..radius as u32).any(|inset| image.get_pixel(191 - inset, 64 + inset)[0]
+                        > image.get_pixel(128, 128)[0] + 4),
                     "the actual rounded arc must retain its highlight"
                 );
             }

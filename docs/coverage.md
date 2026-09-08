@@ -287,6 +287,19 @@ counterpart resolution preserve this preference; an unchanged value does not
 rebuild the resolved theme. Scoped `Theme::with_reduce_transparency` remains
 available for individual exhibits; no root `ThemeOverlay` workaround is needed.
 
+### Rounded glass profile reach, 2026-09-08
+
+The menu's 12 px corner and requested 36 px bevel exposed a second optical
+singularity, distinct from finite-difference medial-axis normals: the analytic
+arc normal still had nonzero dome slope when its parallel curve collapsed at
+the arc centre. Both Metal and Linux WGPU showed the resulting pointed highlight.
+`BackdropGlass::optical_bevel` now bounds the complete optical profile by positive
+corner radii and lobe half-extents before all three renderers pack it. The same
+depth across a union prevents seams; specular strength, hairline, wash and blur
+are unchanged. Square corners retain their intentional incident-face crease.
+CPU and native pixel regressions include the menu radius and sample both before
+and after the arc centre, while requiring a real rim highlight to remain.
+
 ### Downsampled backdrop blur deliberately deferred, 2026-09-04
 
 Metal, Direct3D, and WGPU keep full-resolution backdrop textures and preserve

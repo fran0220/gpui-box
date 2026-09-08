@@ -1007,6 +1007,48 @@ mod tests {
     }
 
     #[test]
+    fn rounded_optical_profiles_flatten_before_the_arc_normal_collapses() {
+        for radius in [4., 12., 16.] {
+            let mut glass = bounded_glass(0);
+            glass.bounds = test_lobe((0., 0.), (128., 128.), radius).bounds;
+            glass.corner_radii = Corners::all(ScaledPixels(radius));
+            glass.material.bevel = ScaledPixels(36.);
+            assert_eq!(glass.optical_bevel(), ScaledPixels(radius));
+            let (lobes, count) = glass.shape();
+            for inset in [radius * 0.875, radius * 0.96, radius + 0.5] {
+                let field = glass_field(point(128. - inset, inset), &lobes[..count], 0.);
+                let (depth, _) = optical_profile(
+                    field.distance,
+                    field.gradient,
+                    glass.optical_bevel().0,
+                    0.34,
+                );
+                let rise = 1. - depth;
+                let normal = [
+                    field.gradient.x * rise,
+                    field.gradient.y * rise,
+                    depth.max(0.001),
+                ];
+                let length = normal.iter().map(|v| v * v).sum::<f32>().sqrt();
+                let dot = (normal[0] * std::f32::consts::FRAC_1_SQRT_2
+                    - normal[1] * std::f32::consts::FRAC_1_SQRT_2
+                    + normal[2] * 0.6)
+                    / (length * 1.36_f32.sqrt());
+                let highlight = dot.clamp(0., 1.).powi(12) * 0.06 * rise;
+                assert!(
+                    highlight * 255. <= 2.,
+                    "radius={radius}, inset={inset}: {highlight}"
+                );
+            }
+            // Explicit unions and unequal radii use the same safe depth.
+            glass.lobes[0] = lobes[0];
+            glass.lobes[1] = test_lobe((100., 0.), (64., 64.), radius * 0.5);
+            glass.lobe_count = 2;
+            assert_eq!(glass.optical_bevel(), ScaledPixels(radius * 0.5));
+        }
+    }
+
+    #[test]
     fn smooth_union_derivatives_match_the_distance_away_from_creases() {
         let lobes = [
             test_lobe((0., 0.), (40., 40.), 8.),
@@ -1777,6 +1819,8 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// How far in from the edge the bevel that bends the backdrop reaches.
     /// Zero leaves the backdrop flat however large the other fields are,
     /// because there is no slope for them to act on.
+    /// Renderers bound this requested depth by the shape's rounded-corner
+    /// reach; see [`BackdropGlass::optical_bevel`].
     pub bevel: P,
     /// How far the bevel displaces the sample, as a fraction of `bevel`. This
     /// is a thickness in disguise: 0 is a flat pane and larger values read as
@@ -2040,6 +2084,35 @@ const _: () = assert!(
 );
 
 impl BackdropGlass {
+    /// Geometrically admissible depth of the optical profile, in device pixels.
+    /// A rounded corner's inward parallel curves collapse at its radius.
+    /// Extending the dome past that point leaves a nonzero slope at the arc
+    /// centre, concentrating directional highlights into a pointed wedge.
+    /// Bound the entire profile (refraction and lighting together), not its
+    /// brightness, so it is flat before any rounded arc collapses. One depth
+    /// across the union avoids seams between lobes or unequal corner radii.
+    /// Square corners retain their intentional incident-face crease.
+    pub fn optical_bevel(&self) -> ScaledPixels {
+        let (lobes, count) = self.shape();
+        let mut bevel = self.material.bevel.0;
+        for lobe in &lobes[..count] {
+            bevel = bevel
+                .min(lobe.bounds.size.width.0 * 0.5)
+                .min(lobe.bounds.size.height.0 * 0.5);
+            for radius in [
+                lobe.corner_radii.top_left,
+                lobe.corner_radii.top_right,
+                lobe.corner_radii.bottom_right,
+                lobe.corner_radii.bottom_left,
+            ] {
+                if radius.0 > 0. {
+                    bevel = bevel.min(radius.0);
+                }
+            }
+        }
+        ScaledPixels(bevel.max(0.))
+    }
+
     /// The lobes that make up the shape, which is the explicit list when
     /// there is one and the surface's own rounded rect when there is not.
     ///
