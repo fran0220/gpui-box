@@ -337,6 +337,12 @@ impl TokenDocument {
             ("effect.scrollEdgeBlur", self.effect.scroll_edge_blur),
             ("effect.glassBevelMin", self.effect.glass_bevel_min),
             ("effect.glassBevelMax", self.effect.glass_bevel_max),
+            (
+                "effect.glassFlipMaxExtent",
+                self.effect.glass_flip_max_extent,
+            ),
+            ("effect.glassShadowMin", self.effect.glass_shadow_min),
+            ("effect.glassShadowMax", self.effect.glass_shadow_max),
             ("effect.glassRefraction", self.effect.glass_refraction),
             ("effect.glassHairline", self.effect.glass_hairline),
             (
@@ -353,6 +359,16 @@ impl TokenDocument {
             return invalid(
                 "effect.glassBevelMin",
                 "must not exceed effect.glassBevelMax",
+            );
+        }
+
+        if !(0.0..=1.0).contains(&self.effect.glass_dimming) {
+            return invalid("effect.glassDimming", "must be between 0 and 1");
+        }
+        if self.effect.glass_shadow_min > self.effect.glass_shadow_max {
+            return invalid(
+                "effect.glassShadowMin",
+                "must not exceed effect.glassShadowMax",
             );
         }
 
@@ -2585,6 +2601,13 @@ pub struct EffectTokens {
     /// Lower and upper bounds for the responsive optical profile, in pixels.
     pub glass_bevel_min: f32,
     pub glass_bevel_max: f32,
+    /// Media dimming opacity behind Clear glass.
+    pub glass_dimming: f32,
+    /// Square root of the largest control area permitted to flip appearance.
+    pub glass_flip_max_extent: f32,
+    /// Shadow alpha multipliers on bright and dark backdrops respectively.
+    pub glass_shadow_min: f32,
+    pub glass_shadow_max: f32,
     /// How far the bevel displaces what is behind it, as a fraction of the
     /// bevel. Read as the thickness of the glass body.
     pub glass_refraction: f32,

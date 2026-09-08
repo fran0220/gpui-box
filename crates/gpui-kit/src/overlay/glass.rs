@@ -1,10 +1,9 @@
 //! A surface that shows what is behind it, out of focus and bent.
 //!
 //! [`Glass`] is the material a popover, a dialog or a rail is placed on when
-//! the window itself is translucent. Liquid and Lens snapshot the sharp
-//! backdrop and bend it at the edge; Frosted independently scatters its
-//! snapshot. Blur is therefore one material axis, not the switch that decides
-//! whether glass exists.
+//! the window itself is translucent. Regular Liquid scatters its interior
+//! while retaining a sharp refracted rim. Clear and Lens preserve sharp
+//! interiors; Frosted scatters without bending the backdrop.
 //!
 //! # One layer, in one order
 //!
@@ -16,19 +15,10 @@
 //! Inside one layer the relationship is structural: surface first, fill and
 //! content after.
 //!
-//! # Fill and optics are different layers
-//!
-//! Liquid and Lens paint no ordinary source-over fill by default: doing that
-//! on top of the additive lift would mute the very refraction that names the
-//! material, which is what a large plate over a ruled backdrop is for.
-//! Compact chrome — a capsule, a fused control cluster, a chip — is the other
-//! reading: [`Glass::grounded`] keeps the same optics and adds the theme's
-//! `effect.glassAlpha` wash so the surface is a face, not a hole. Frosted
-//! still needs its theme-owned fill. `adaptive(true)` is a readability policy
-//! that may deepen an already-present wash, or add one on a clear plate, when
-//! the backdrop opposes the content. A theme that sets `effect.glassAlpha` to
-//! 1 makes either of those fills opaque, so there is deliberately no backdrop
-//! work beneath it.
+//! Regular Liquid owns its blur, saturation and achromatic wash in the
+//! material, not in a source-over fill. Clear is reserved for media, with a
+//! dimming layer behind it. Adaptive appearance is a small-control policy;
+//! large reading surfaces retain the window appearance.
 //!
 //! `docs/coverage.md` records which renderer does which of these today.
 
@@ -43,7 +33,9 @@ use gpui::{
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Appearance, Radius, Space, Surface, Theme, ThemeRegistry};
+use gpui_kit_theme::{
+    ActiveTheme, Appearance, Elevation, Radius, Space, Surface, Theme, ThemeRegistry,
+};
 
 use crate::foundation::{Ident, ThemeOverlay};
 use crate::layout::measure;
@@ -75,10 +67,12 @@ pub enum GlassPreset {
     /// Blurred and tinted, and nothing else. This is what [`super::Frost`]
     /// paints, and what every renderer that can blur at all can produce.
     Frosted,
-    /// The theme's full optics: the edge bends the backdrop, splits it into
-    /// colour, and carries a highlight.
+    /// Regular Liquid Glass: blurred, saturation-adjusted backdrop with an
+    /// achromatic wash, edge lensing and a highlighted rim.
     #[default]
     Liquid,
+    /// Apple Clear variant, only for use above media. Pair with `dimmed(true)`.
+    Clear,
     /// The bend without the colour split or the highlight, for a surface that
     /// sits over text that the dispersion would otherwise fringe.
     Lens,
@@ -89,12 +83,11 @@ impl GlassPreset {
     ///
     /// A frosted surface uses `effect.glassAlpha` to separate its scattered
     /// backdrop from surrounding content. Liquid and Lens use shader-owned
-    /// optics instead; their default fill is transparent. [`Glass::grounded`]
-    /// is how chrome asks for the wash without changing that default.
+    /// optics instead; their wash belongs to the material, not this fill.
     pub fn tint_alpha(self, theme: &Theme) -> f32 {
         match self {
             GlassPreset::Frosted => theme.effects.glass_alpha,
-            GlassPreset::Liquid | GlassPreset::Lens => 0.0,
+            GlassPreset::Liquid | GlassPreset::Lens | GlassPreset::Clear => 0.0,
         }
     }
 
@@ -139,11 +132,27 @@ impl GlassPreset {
                 refraction: effects.glass_refraction,
                 ..GlassMaterial::clear()
             },
+            GlassPreset::Clear => GlassMaterial {
+                refraction: effects.glass_refraction,
+                dispersion: effects.glass_dispersion,
+                specular: effects.glass_specular,
+                transmission_gain: effects.glass_transmission_gain,
+                optical_lift: Rgba {
+                    r: 1.0,
+                    g: 1.0,
+                    b: 1.0,
+                    a: effects.glass_optical_lift,
+                },
+                hairline: px(effects.glass_hairline),
+                light_angle: effects.glass_light_angle,
+                specular_sharpness: effects.glass_specular_sharpness,
+                ..GlassMaterial::clear()
+            },
         }
     }
 
     /// The responsive optical profile this preset resolves once its bounds are
-    /// known. Frosted is flat; the two clear presets scale with their own
+    /// known. Frosted is flat; optical presets scale with their own
     /// control rather than borrowing one fixed pixel bevel.
     fn bevel(self, theme: &Theme) -> Option<ResponsiveBevel> {
         (self != GlassPreset::Frosted).then_some(ResponsiveBevel {
@@ -197,7 +206,7 @@ struct ProbeLease(Option<u32>);
 impl ProbeLease {
     /// The slot this lease holds, claiming the lowest free one on first use.
     /// `None` once every slot is claimed, which a caller treats exactly like
-    /// a renderer that takes no probes: the surface keeps its unadapted fill.
+    /// a renderer that takes no probes: the surface keeps its theme appearance.
     fn slot(&mut self) -> Option<u32> {
         if self.0.is_none() {
             let mut claimed = PROBE_SLOTS.load(Ordering::Relaxed);
@@ -235,26 +244,11 @@ impl Drop for ProbeLease {
 /// The transient visual state an interactive glass surface keeps across
 /// frames: whether it is pressed, which side of the contrast band it last
 /// settled on, and its probe slot.
+#[derive(Default)]
 struct GlassState {
     pressed: bool,
-    deepened: bool,
     appearance_flipped: bool,
     lease: ProbeLease,
-}
-
-impl Default for GlassState {
-    fn default() -> Self {
-        Self {
-            pressed: false,
-            // Adaptive is an explicit readability policy. Until the first
-            // probe resolves, fail safe to its tint rather than briefly
-            // exposing content over an unknown opposing backdrop. A renderer
-            // without probes keeps this legible fallback.
-            deepened: true,
-            appearance_flipped: false,
-            lease: ProbeLease::default(),
-        }
-    }
 }
 
 /// A glass surface: optionally scattered and bent backdrop, optional fill,
@@ -263,6 +257,7 @@ impl Default for GlassState {
 pub struct Glass {
     ident: Ident,
     surface: Surface,
+    elevation: Elevation,
     radius: Radius,
     radius_px: Option<f32>,
     blur: Option<f32>,
@@ -275,10 +270,11 @@ pub struct Glass {
     pressable: bool,
     adaptive: bool,
     adaptive_appearance: bool,
-    grounded: bool,
+    dimmed: bool,
     tint: Option<Hsla>,
     edge_mask: Option<(GlassEdge, f32)>,
     child: Option<AnyElement>,
+    frame: Option<gpui::Stateful<gpui::Div>>,
 }
 
 impl std::fmt::Debug for Glass {
@@ -299,7 +295,7 @@ impl std::fmt::Debug for Glass {
             .field("pressable", &self.pressable)
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
-            .field("grounded", &self.grounded)
+            .field("dimmed", &self.dimmed)
             .field("tint", &self.tint)
             .field("edge_mask", &self.edge_mask)
             .field("has_child", &self.child.is_some())
@@ -312,6 +308,7 @@ impl Glass {
         Self {
             ident: ident.into(),
             surface: Surface::Overlay,
+            elevation: Elevation::Raised,
             radius: Radius::Card,
             radius_px: None,
             blur: None,
@@ -324,17 +321,24 @@ impl Glass {
             pressable: false,
             adaptive: false,
             adaptive_appearance: false,
-            grounded: false,
+            dimmed: false,
             tint: None,
             edge_mask: None,
             child: None,
+            frame: None,
         }
     }
 
-    /// Which surface colour Frosted, grounded, or adaptive Liquid lays over
-    /// the backdrop. Clear Liquid and Lens paint no ordinary fill by default.
+    /// Which surface colour Frosted lays over the backdrop.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
+        self
+    }
+
+    /// Token shadow appropriate to this surface's elevation. The shadow is
+    /// clipped outside the glass, never captured as a dark interior fill.
+    pub fn elevation(mut self, elevation: Elevation) -> Self {
+        self.elevation = elevation;
         self
     }
 
@@ -359,9 +363,8 @@ impl Glass {
         self
     }
 
-    /// How far the backdrop is blurred, in pixels, overriding the preset. The
-    /// Liquid and Lens defaults are zero; adding blur composes frost with their
-    /// optics instead of enabling those optics.
+    /// How far the backdrop is blurred, in pixels, overriding the preset.
+    /// Clear and Lens default to zero; Regular Liquid includes scattering.
     pub fn blur(mut self, blur: f32) -> Self {
         self.blur = Some(blur.max(0.0));
         self
@@ -417,15 +420,9 @@ impl Glass {
         self
     }
 
-    /// Add a tint at `effect.glassAlpha` while the optical source opposes the
-    /// surface colour — a dark panel over a bright backdrop, or a light one
-    /// over a dark backdrop — where clear glass would wash out its content.
-    ///
-    /// The reading comes from [`Window::backdrop_luminance`] one frame after
-    /// the backdrop moved, so the flip lands on the next frame the window
-    /// draws. Before that first reading, and on a renderer that takes no
-    /// probes, the surface keeps the theme tint as a safe readability
-    /// fallback.
+    /// Let small controls flip their material and content appearance from
+    /// backdrop probes. Large surfaces never flip. Before a probe resolves,
+    /// the window theme supplies the direction; no extra fill is painted.
     pub fn adaptive(mut self, adaptive: bool) -> Self {
         self.adaptive = adaptive;
         self
@@ -441,17 +438,10 @@ impl Glass {
         self
     }
 
-    /// Give Liquid and Lens the theme's glass wash as a standing face.
-    ///
-    /// Compact chrome that sits on the page — a capsule, a chip, a fused
-    /// cluster — has to be a material the type underneath cannot show
-    /// through. Name a surface a step above the page (`Raised` or `Panel`);
-    /// Overlay over canvas is the same ink at `glassAlpha` and disappears.
-    /// Large plates that exist to demonstrate refraction leave this off: a
-    /// fill on top of the additive lift would mute the optics. Adaptive
-    /// deepening still applies when the backdrop opposes the face.
-    pub fn grounded(mut self, grounded: bool) -> Self {
-        self.grounded = grounded;
+    /// Dim the media behind Clear glass by `effect.glassDimming`.
+    /// Other presets ignore this setting.
+    pub fn dimmed(mut self, dimmed: bool) -> Self {
+        self.dimmed = dimmed;
         self
     }
 
@@ -474,23 +464,17 @@ impl Glass {
         self
     }
 
+    /// Keep the overlay's existing percentage-sizing and focus boundary.
+    pub(crate) fn frame(mut self, frame: gpui::Stateful<gpui::Div>) -> Self {
+        self.frame = Some(frame);
+        self
+    }
+
     /// The material this surface asks the renderer for, for tests that need to
     /// assert what a wrapper resolved to without rendering a window.
     #[cfg(test)]
     pub(crate) fn material_for_test(&self, theme: &Theme) -> GlassMaterial<Pixels> {
         self.material(theme)
-    }
-
-    #[cfg(test)]
-    fn fill_alpha_for_test(&self, theme: &Theme, deepened: bool) -> f32 {
-        let mut alpha = self.preset.tint_alpha(theme).clamp(0.0, 1.0);
-        if deepened {
-            alpha = alpha.max(theme.effects.glass_alpha);
-        }
-        if self.grounded {
-            alpha = alpha.max(theme.effects.glass_alpha);
-        }
-        alpha.clamp(0.0, 1.0)
     }
 
     /// The material this surface asks the renderer for: the preset's
@@ -524,17 +508,22 @@ impl RenderOnce for Glass {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let mut theme = cx.theme().clone();
         let radius = self.radius_px.unwrap_or_else(|| theme.radius(self.radius));
-        let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
+        let alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
         let mut material = self.material(&theme);
         let bevel = self.preset.bevel(&theme);
 
         let id = self.ident.semantic_id();
-        let interactive =
-            self.track_pointer || self.pressable || self.adaptive || self.adaptive_appearance;
+        let interactive = self.track_pointer
+            || self.pressable
+            || self.adaptive
+            || self.adaptive_appearance
+            || self.preset == GlassPreset::Liquid;
         let state = interactive
             .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
         let measured = measure::cell(&id, window, cx);
         let bounds = measured.get();
+        let adaptive = (self.adaptive || self.adaptive_appearance)
+            && can_flip(bounds, theme.effects.glass_flip_max_extent);
 
         // The pointer carries the light: the angle from the surface's centre
         // to the pointer, clockwise from straight up, which is the convention
@@ -550,6 +539,7 @@ impl RenderOnce for Glass {
         // refraction deepens toward `effect.glassPressDepth` on a spring and
         // returns on release. The layout, the hit target and the semantics
         // never move; only the optics answer the finger.
+        let mut press_depth = 1.0;
         if self.pressable {
             let pressed = state.as_ref().is_some_and(|state| state.borrow().pressed);
             let target = if pressed {
@@ -564,46 +554,32 @@ impl RenderOnce for Glass {
                 window,
                 cx,
             );
+            press_depth = depth;
             material.refraction *= depth;
         }
 
-        if (self.adaptive || self.adaptive_appearance)
+        let mut luminance = None;
+        if (adaptive || self.preset == GlassPreset::Liquid)
             && let Some(state) = &state
         {
             let mut state = state.borrow_mut();
             if let Some(slot) = state.lease.slot() {
                 material.probe = slot;
-                if let Some(luminance) = window.backdrop_luminance(slot) {
-                    if self.adaptive {
-                        state.deepened = deepen_tint(
-                            state.deepened,
-                            luminance,
-                            theme.surface(self.surface).l < 0.5,
-                            theme.effects.glass_contrast_flip_low,
-                            theme.effects.glass_contrast_flip_high,
-                        );
-                    }
-                    if self.adaptive_appearance {
-                        state.appearance_flipped = deepen_tint(
-                            state.appearance_flipped,
-                            luminance,
-                            theme.appearance == Appearance::Dark,
-                            theme.effects.glass_contrast_flip_low,
-                            theme.effects.glass_contrast_flip_high,
-                        );
-                    }
+                luminance = window.backdrop_luminance(slot);
+                if adaptive && let Some(luminance) = luminance {
+                    state.appearance_flipped = deepen_tint(
+                        state.appearance_flipped,
+                        luminance,
+                        theme.appearance == Appearance::Dark,
+                        theme.effects.glass_contrast_flip_low,
+                        theme.effects.glass_contrast_flip_high,
+                    );
                 }
             }
-            if self.adaptive && state.deepened {
-                alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
-            }
-        }
-        if self.grounded {
-            alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
         }
 
         let mut overlay_theme = None;
-        if self.adaptive_appearance
+        if adaptive
             && state
                 .as_ref()
                 .is_some_and(|state| state.borrow().appearance_flipped)
@@ -612,19 +588,35 @@ impl RenderOnce for Glass {
                 .and_then(ThemeRegistry::counterpart)
         {
             theme = counterpart;
+            let probe = material.probe;
+            material = self.material(&theme);
+            material.probe = probe;
+            material.refraction *= press_depth;
+            if self.track_pointer
+                && let Some(angle) = pointer_light_angle(bounds, window.mouse_position())
+            {
+                material.light_angle = angle;
+            }
             overlay_theme = Some(theme.clone());
         }
 
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
-        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
+        let fallback = Some(tone.opacity(1.0));
         let translucent = alpha < 1.0;
 
-        let surface = div()
+        let mut surface = self
+            .frame
+            .unwrap_or_else(|| {
+                div().semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Region))
+            })
             .rounded(px(radius))
-            .bg(fill)
-            .children(self.child)
-            .semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Region));
+            .text_color(theme.colors.text)
+            .shadow(glass_shadows(&theme, self.elevation, luminance))
+            .children(self.child);
+        if alpha > 0.0 {
+            surface = surface.bg(fill);
+        }
 
         if interactive {
             // `semantic_in` already made the surface stateful under its
@@ -651,17 +643,21 @@ impl RenderOnce for Glass {
             }
             // One hover listener carries both concerns: the highlight resets
             // and a press that left the surface lets go.
-            let leave = state.clone();
-            stateful = stateful.on_hover(move |hovered, window, _| {
-                if !*hovered && let Some(state) = &leave {
-                    state.borrow_mut().pressed = false;
-                }
-                window.refresh();
-            });
+            if self.track_pointer || self.pressable {
+                let leave = state.clone();
+                stateful = stateful.on_hover(move |hovered, window, _| {
+                    if !*hovered && let Some(state) = &leave {
+                        state.borrow_mut().pressed = false;
+                    }
+                    window.refresh();
+                });
+            }
             return finish_glass(
                 overlay_theme,
                 BackdropLayer {
                     radius: px(radius),
+                    dimming: (self.dimmed && self.preset == GlassPreset::Clear)
+                        .then_some(theme.effects.glass_dimming),
                     material,
                     bevel,
                     lobes: LobeSource::Surface,
@@ -677,6 +673,8 @@ impl RenderOnce for Glass {
             overlay_theme,
             BackdropLayer {
                 radius: px(radius),
+                dimming: (self.dimmed && self.preset == GlassPreset::Clear)
+                    .then_some(theme.effects.glass_dimming),
                 material,
                 bevel,
                 lobes: LobeSource::Surface,
@@ -704,12 +702,8 @@ fn finish_glass(overlay_theme: Option<Theme>, layer: BackdropLayer) -> AnyElemen
 /// meet. The optics — bevel, refraction, dispersion, the highlight — follow
 /// the fused outline rather than each pane's own.
 ///
-/// A Frosted fill does not fuse: each pane lays its own tint, and the neck
-/// between two panes shows the bare optical source. Liquid and Lens panes are
-/// clear unless the group is [`GlassGroup::grounded`]. A group holds at most
-/// [`MAX_GLASS_LOBES`] panes; panes past that keep their fill and their
-/// content but fall outside the fused shape, so the bound is asserted in
-/// debug rather than silently absorbed.
+/// At most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque
+/// overlay panes instead, preserving every pane's content without holes.
 #[derive(IntoElement)]
 pub struct GlassGroup {
     ident: Ident,
@@ -722,7 +716,7 @@ pub struct GlassGroup {
     pressable: bool,
     adaptive: bool,
     adaptive_appearance: bool,
-    grounded: bool,
+    dimmed: bool,
     tint: Option<Hsla>,
     panes: Vec<(Ident, AnyElement)>,
 }
@@ -741,7 +735,7 @@ impl std::fmt::Debug for GlassGroup {
             .field("pressable", &self.pressable)
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
-            .field("grounded", &self.grounded)
+            .field("dimmed", &self.dimmed)
             .field("tint", &self.tint)
             .field("panes", &self.panes.len())
             .finish()
@@ -761,14 +755,13 @@ impl GlassGroup {
             pressable: false,
             adaptive: false,
             adaptive_appearance: false,
-            grounded: false,
+            dimmed: false,
             tint: None,
             panes: Vec::new(),
         }
     }
 
-    /// Which surface colour each Frosted or grounded pane lays over the
-    /// backdrop. Clear Liquid and Lens panes stay clear.
+    /// Which surface colour each Frosted pane lays over the backdrop.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
         self
@@ -780,8 +773,7 @@ impl GlassGroup {
         self
     }
 
-    /// How far the backdrop is blurred, overriding the preset. Liquid groups
-    /// are clear by default; this opt-in composes scattering with refraction.
+    /// How far the backdrop is blurred, overriding the preset.
     pub fn blur(mut self, blur: f32) -> Self {
         self.blur = Some(blur.max(0.0));
         self
@@ -816,8 +808,8 @@ impl GlassGroup {
         self
     }
 
-    /// Add a tint at `effect.glassAlpha` while the optical source opposes the
-    /// surface colour, using the same probe and hysteresis as [`Glass::adaptive`].
+    /// Let a small fused body flip appearance using [`Glass::adaptive`]'s
+    /// probe, area limit, and hysteresis. Never adds a source-over wash.
     pub fn adaptive(mut self, adaptive: bool) -> Self {
         self.adaptive = adaptive;
         self
@@ -830,11 +822,9 @@ impl GlassGroup {
         self
     }
 
-    /// Give each Liquid or Lens pane the theme's glass wash as a standing
-    /// face. The fused outline keeps its optics; the wash is what stops
-    /// page type from showing through a compact cluster.
-    pub fn grounded(mut self, grounded: bool) -> Self {
-        self.grounded = grounded;
+    /// Dim the media behind Clear glass by `effect.glassDimming`.
+    pub fn dimmed(mut self, dimmed: bool) -> Self {
+        self.dimmed = dimmed;
         self
     }
 
@@ -854,13 +844,14 @@ impl GlassGroup {
 
 impl RenderOnce for GlassGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        debug_assert!(
-            self.panes.len() <= MAX_GLASS_LOBES,
-            "a glass group holds at most {MAX_GLASS_LOBES} panes"
-        );
+        let over_budget = self.panes.len() > MAX_GLASS_LOBES;
         let mut theme = cx.theme().clone();
         let radius = theme.radius(self.radius);
-        let mut alpha = self.preset.tint_alpha(&theme).clamp(0.0, 1.0);
+        let alpha = if over_budget {
+            1.0
+        } else {
+            self.preset.tint_alpha(&theme).clamp(0.0, 1.0)
+        };
         let mut material = self.preset.material(&theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
@@ -872,9 +863,13 @@ impl RenderOnce for GlassGroup {
         let interactive = self.pressable || self.adaptive || self.adaptive_appearance;
         let state = interactive
             .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
+        let measured = measure::cell(&id, window, cx);
+        let adaptive = (self.adaptive || self.adaptive_appearance)
+            && can_flip(measured.get(), theme.effects.glass_flip_max_extent);
 
         // A press deepens the fused outline, not each pane: the group is one
         // body, so the finger answers against the joined refraction.
+        let mut press_depth = 1.0;
         if self.pressable {
             let pressed = state.as_ref().is_some_and(|state| state.borrow().pressed);
             let target = if pressed {
@@ -889,46 +884,28 @@ impl RenderOnce for GlassGroup {
                 window,
                 cx,
             );
+            press_depth = depth;
             material.refraction *= depth;
         }
 
-        if (self.adaptive || self.adaptive_appearance)
-            && let Some(state) = &state
-        {
+        if adaptive && let Some(state) = &state {
             let mut state = state.borrow_mut();
             if let Some(slot) = state.lease.slot() {
                 material.probe = slot;
                 if let Some(luminance) = window.backdrop_luminance(slot) {
-                    if self.adaptive {
-                        state.deepened = deepen_tint(
-                            state.deepened,
-                            luminance,
-                            theme.surface(self.surface).l < 0.5,
-                            theme.effects.glass_contrast_flip_low,
-                            theme.effects.glass_contrast_flip_high,
-                        );
-                    }
-                    if self.adaptive_appearance {
-                        state.appearance_flipped = deepen_tint(
-                            state.appearance_flipped,
-                            luminance,
-                            theme.appearance == Appearance::Dark,
-                            theme.effects.glass_contrast_flip_low,
-                            theme.effects.glass_contrast_flip_high,
-                        );
-                    }
+                    state.appearance_flipped = deepen_tint(
+                        state.appearance_flipped,
+                        luminance,
+                        theme.appearance == Appearance::Dark,
+                        theme.effects.glass_contrast_flip_low,
+                        theme.effects.glass_contrast_flip_high,
+                    );
                 }
             }
-            if self.adaptive && state.deepened {
-                alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
-            }
-        }
-        if self.grounded {
-            alpha = alpha.max(theme.effects.glass_alpha).clamp(0.0, 1.0);
         }
 
         let mut overlay_theme = None;
-        if self.adaptive_appearance
+        if adaptive
             && state
                 .as_ref()
                 .is_some_and(|state| state.borrow().appearance_flipped)
@@ -937,12 +914,22 @@ impl RenderOnce for GlassGroup {
                 .and_then(ThemeRegistry::counterpart)
         {
             theme = counterpart;
+            let counterpart_material = self.preset.material(&theme);
+            material = GlassMaterial {
+                probe: material.probe,
+                smoothing: material.smoothing,
+                ..counterpart_material
+            };
+            material.refraction *= press_depth;
+            if let Some(blur) = self.blur {
+                material.blur_radius = px(blur);
+            }
             overlay_theme = Some(theme.clone());
         }
 
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
-        let fallback = (alpha == 0.0).then(|| tone.opacity(theme.effects.glass_alpha));
+        let fallback = Some(tone.opacity(1.0));
         let translucent = alpha < 1.0;
         let collected: Rc<RefCell<Vec<GlassLobe<Pixels>>>> = Rc::default();
 
@@ -980,13 +967,15 @@ impl RenderOnce for GlassGroup {
                     window.refresh();
                 });
             }
-            let leave = state.clone();
-            stateful = stateful.on_hover(move |hovered, window, _| {
-                if !*hovered && let Some(state) = &leave {
-                    state.borrow_mut().pressed = false;
-                }
-                window.refresh();
-            });
+            if self.pressable {
+                let leave = state.clone();
+                stateful = stateful.on_hover(move |hovered, window, _| {
+                    if !*hovered && let Some(state) = &leave {
+                        state.borrow_mut().pressed = false;
+                    }
+                    window.refresh();
+                });
+            }
             stateful.into_any_element()
         } else {
             row.into_any_element()
@@ -999,9 +988,11 @@ impl RenderOnce for GlassGroup {
                 material,
                 bevel,
                 lobes: LobeSource::Collected(collected),
+                dimming: (self.dimmed && self.preset == GlassPreset::Clear)
+                    .then_some(theme.effects.glass_dimming),
                 translucent,
                 fallback,
-                measured: None,
+                measured: Some(measured),
                 child,
             },
         )
@@ -1092,13 +1083,35 @@ fn pointer_light_angle(bounds: Bounds<Pixels>, mouse: gpui::Point<Pixels>) -> Op
     (dx.abs() + dy.abs() > f32::EPSILON).then(|| dx.atan2(-dy))
 }
 
-/// Whether an adaptive surface's tint is deepened, given where the backdrop's
-/// luminance sits against the flip band.
-///
-/// A dark fill dissolves over a bright backdrop and a light fill over a dark
-/// one, so the deepening side depends on the fill. Inside the band the
-/// previous answer stands: the gap is the hysteresis that stops a backdrop
-/// sitting on one threshold from flipping the surface every frame.
+/// Only measured controls within the token area budget may flip appearance.
+fn can_flip(bounds: Bounds<Pixels>, max_extent: f32) -> bool {
+    let width = f32::from(bounds.size.width);
+    let height = f32::from(bounds.size.height);
+    width > 0.0 && height > 0.0 && width * height <= max_extent * max_extent
+}
+
+fn glass_shadows(
+    theme: &Theme,
+    elevation: Elevation,
+    luminance: Option<f32>,
+) -> Vec<gpui::BoxShadow> {
+    let strength = luminance.map_or(1.0, |luminance| {
+        theme.effects.glass_shadow_min
+            + (theme.effects.glass_shadow_max - theme.effects.glass_shadow_min)
+                * (1.0 - luminance.clamp(0.0, 1.0))
+    });
+    theme
+        .shadow(elevation)
+        .iter()
+        .cloned()
+        .map(|mut shadow| {
+            shadow.color.a = (shadow.color.a * strength).clamp(0.0, 1.0);
+            shadow.style = gpui::ShadowStyle::Ring;
+            shadow
+        })
+        .collect()
+}
+
 fn deepen_tint(deepened: bool, luminance: f32, dark_fill: bool, low: f32, high: f32) -> bool {
     let (deepen, release) = if dark_fill {
         (luminance > high, luminance < low)
@@ -1140,6 +1153,7 @@ pub(crate) enum LobeSource {
 /// a backdrop at all are decided by the caller and passed in already resolved.
 pub(crate) struct BackdropLayer {
     pub(crate) radius: Pixels,
+    pub(crate) dimming: Option<f32>,
     pub(crate) material: GlassMaterial<Pixels>,
     bevel: Option<ResponsiveBevel>,
     pub(crate) lobes: LobeSource,
@@ -1222,6 +1236,20 @@ impl Element for BackdropLayer {
             return;
         }
         window.paint_layer(bounds, |window| {
+            if let Some(alpha) = self.dimming {
+                let black = gpui::hsla(0.0, 0.0, 0.0, alpha);
+                if lobes.is_empty() {
+                    window.paint_quad(
+                        gpui::fill(bounds, black).corner_radii(Corners::all(self.radius)),
+                    );
+                } else {
+                    for lobe in lobes {
+                        window.paint_quad(
+                            gpui::fill(lobe.bounds, black).corner_radii(lobe.corner_radii),
+                        );
+                    }
+                }
+            }
             if let Some(fallback) = self.fallback {
                 window.paint_backdrop_glass_with_fallback(
                     bounds,
@@ -1473,28 +1501,31 @@ mod tests {
     }
 
     #[test]
-    fn adaptive_glass_starts_with_its_safe_tint() {
-        assert!(GlassState::default().deepened);
+    fn adaptive_glass_starts_with_the_window_appearance() {
+        assert!(!GlassState::default().appearance_flipped);
     }
 
     #[test]
-    fn grounded_liquid_keeps_the_theme_wash() {
-        let theme = Theme::studio_dark();
-        let clear = Glass::new("surface").preset(GlassPreset::Liquid);
-        let chrome = Glass::new("chrome")
-            .preset(GlassPreset::Liquid)
-            .grounded(true);
+    fn glass_shadows_are_outside_only_and_heavier_on_dark_backdrops() {
+        let theme = Theme::studio_light();
+        let bright = glass_shadows(&theme, Elevation::Overlay, Some(1.0));
+        let dark = glass_shadows(&theme, Elevation::Overlay, Some(0.0));
+        assert!(!bright.is_empty());
+        for (bright, dark) in bright.iter().zip(&dark) {
+            assert_eq!(bright.style, gpui::ShadowStyle::Ring);
+            assert!(dark.color.a > bright.color.a);
+            assert_eq!(dark.blur_radius, bright.blur_radius);
+        }
+    }
 
-        assert_eq!(clear.fill_alpha_for_test(&theme, false), 0.0);
-        assert_eq!(
-            chrome.fill_alpha_for_test(&theme, false),
-            theme.effects.glass_alpha
-        );
-        assert_eq!(
-            chrome.fill_alpha_for_test(&theme, true),
-            theme.effects.glass_alpha,
-            "grounded chrome is already the wash; deepening does not add a second fill"
-        );
+    #[test]
+    fn only_small_measured_surfaces_may_flip() {
+        assert!(!can_flip(Bounds::default(), 72.0));
+        assert!(can_flip(
+            Bounds::new(gpui::point(px(0.), px(0.)), gpui::size(px(120.), px(32.))),
+            72.0
+        ));
+        assert!(!can_flip(surface_bounds(), 72.0));
     }
 
     #[test]
