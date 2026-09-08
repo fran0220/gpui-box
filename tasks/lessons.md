@@ -64,3 +64,10 @@
   benchmark. Material UI and shadcn/ui are both valid open-source coverage
   baselines here; compare each catalog by behavior, keep their differing name
   granularity explicit, and never substitute an unrequested library.
+
+## 2026-09-08: glass review includes magnified corners and text backdrops
+
+- A whole-frame readability pass does not establish optical correctness. Inspect
+  all four rounded corners at 4× and use high-frequency text behind refractive
+  edges. Lock defects with pixel tests before accepting replacement baselines;
+  do not hide false normals or sharp-source leakage by reducing highlights.

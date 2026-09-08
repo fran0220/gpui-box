@@ -1544,16 +1544,25 @@ float4 backdrop_blur_fragment(BackdropVertexOutput input): SV_Target {
     return color / weight;
 }
 
-// Signed distance to one lobe. Mirrors `lobe_distance` in
-// backdrop_glass.wgsl and `glass_lobe_sdf` in scene.rs.
-float backdrop_lobe_distance(float2 pt, float4 bounds, float4 radii) {
+// Analytic normal and distance. Mirrors `lobe_field` in backdrop_glass.wgsl
+// and `glass_lobe_field` in scene.rs; ties select an incident face.
+float3 backdrop_lobe_field(float2 pt, float4 bounds, float4 radii) {
     float2 half_size = bounds.zw * 0.5;
     float2 local = pt - (bounds.xy + half_size);
     float radius = local.x >= 0.0
         ? (local.y >= 0.0 ? radii.z : radii.y)
         : (local.y >= 0.0 ? radii.w : radii.x);
     float2 delta = abs(local) - half_size + radius;
-    return length(max(delta, float2(0.0, 0.0))) + min(max(delta.x, delta.y), 0.0) - radius;
+    float2 outside = max(delta, float2(0.0, 0.0));
+    float outside_length = length(outside);
+    float2 gradient = delta.x > delta.y ? float2(1.0, 0.0) : float2(0.0, 1.0);
+    if (radius != 0.0 && outside_length > 0.0) {
+        gradient = outside / outside_length;
+    }
+    gradient *= float2(local.x >= 0.0 ? 1.0 : -1.0, local.y >= 0.0 ? 1.0 : -1.0);
+    float distance = radius == 0.0 ? max(delta.x, delta.y)
+        : outside_length + min(max(delta.x, delta.y), 0.0) - radius;
+    return float3(gradient, distance);
 }
 
 // The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
@@ -1565,24 +1574,25 @@ float backdrop_smooth_min(float a, float b, float smoothing) {
     return min(a, b) - h * h * smoothing * 0.25;
 }
 
-// Distance to the surface's shape. Mirrors `glass_distance` in
-// backdrop_glass.wgsl and the union inside `glass_field` in scene.rs,
-// including the no-lobes case that is the surface's own rounded rect.
-float backdrop_glass_distance(float2 pt) {
+// Analytic field of the shape. Smooth-min derivatives use h/2, with no
+// intermediate normalization. Mirrors `glass_field` in scene.rs.
+float3 backdrop_glass_field(float2 pt) {
     if (backdrop_lobe_count == 0u) {
-        return backdrop_lobe_distance(pt, backdrop_bounds, backdrop_radii);
+        return backdrop_lobe_field(pt, backdrop_bounds, backdrop_radii);
     }
-    float distance = backdrop_lobe_distance(pt, backdrop_lobes[0], backdrop_lobes[1]);
+    float3 field = backdrop_lobe_field(pt, backdrop_lobes[0], backdrop_lobes[1]);
     for (uint index = 1u; index < 8u; index++) {
         if (index < backdrop_lobe_count) {
-            distance = backdrop_smooth_min(
-                distance,
-                backdrop_lobe_distance(pt, backdrop_lobes[index * 2u],
-                                       backdrop_lobes[index * 2u + 1u]),
-                backdrop_smoothing);
+            float3 next = backdrop_lobe_field(pt, backdrop_lobes[index * 2u],
+                                              backdrop_lobes[index * 2u + 1u]);
+            float h = backdrop_smoothing > 0.0
+                ? max(backdrop_smoothing - abs(field.z - next.z), 0.0) / backdrop_smoothing : 0.0;
+            float weight = field.z <= next.z ? h * 0.5 : 1.0 - h * 0.5;
+            field = float3(lerp(field.xy, next.xy, weight),
+                           backdrop_smooth_min(field.z, next.z, backdrop_smoothing));
         }
     }
-    return distance;
+    return field;
 }
 
 // Linear fade from a named edge. Mirrors `glass_edge_mask` in scene.rs.
@@ -1620,7 +1630,8 @@ float4 apply_backdrop_edge_mask(float4 color, float2 pt) {
 float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     float2 pt = input.position.xy;
     float2 mask_end = backdrop_mask.xy + backdrop_mask.zw;
-    float distance = backdrop_glass_distance(pt);
+    float3 field = backdrop_glass_field(pt);
+    float distance = field.z;
     if (pt.x < backdrop_mask.x || pt.y < backdrop_mask.y ||
         pt.x >= mask_end.x || pt.y >= mask_end.y || distance > 0.0) {
         discard;
@@ -1635,15 +1646,9 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         return apply_backdrop_edge_mask(t_sprite.Load(int3(int2(pt), 0)), pt);
     }
 
-    // The gradient by central differences, on the same half-pixel stencil as
-    // `glass_field` in scene.rs. See that function for why the normal is
-    // differenced in all four implementations rather than derived in each.
-    const float epsilon = 0.5;
-    float2 gradient = float2(
-        backdrop_glass_distance(pt + float2(epsilon, 0.0)) -
-            backdrop_glass_distance(pt - float2(epsilon, 0.0)),
-        backdrop_glass_distance(pt + float2(0.0, epsilon)) -
-            backdrop_glass_distance(pt - float2(0.0, epsilon)));
+    // Analytic incident-face and smooth-union derivatives; normalize only
+    // after the fold. Differencing across a crease invents a specular normal.
+    float2 gradient = field.xy;
     float gradient_length = length(gradient);
     if (gradient_length > 0.0) {
         gradient = gradient / gradient_length;
@@ -1662,26 +1667,18 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
         displacement *= reach_limit / reach;
     }
 
-    // Frost in the interior, the sharp snapshot at the bent rim. Both sources
-    // use the same displaced coordinates, so blur changes scattering without
-    // changing refraction geometry.
+    // Refract the scattered source even at the rim: mixing the sharp snapshot
+    // back in would resurrect readable backdrop text. With blur zero this
+    // source is already sharp, preserving Clear optics.
     float2 red_uv = (pt + displacement * (1.0 - backdrop_dispersion)) /
         global_viewport_size;
     float2 green_uv = (pt + displacement) / global_viewport_size;
     float2 blue_uv = (pt + displacement * (1.0 + backdrop_dispersion)) /
         global_viewport_size;
-    float sharpness = rise * rise;
     float4 frosted_red = t_sprite.Sample(s_sprite, red_uv);
     float4 frosted_green = t_sprite.Sample(s_sprite, green_uv);
     float4 frosted_blue = t_sprite.Sample(s_sprite, blue_uv);
-    float4 sharp_red = t_backdrop_sharp.Sample(s_sprite, red_uv);
-    float4 sharp_green = t_backdrop_sharp.Sample(s_sprite, green_uv);
-    float4 sharp_blue = t_backdrop_sharp.Sample(s_sprite, blue_uv);
-    float4 color = float4(
-        lerp(frosted_red.r, sharp_red.r, sharpness),
-        lerp(frosted_green.g, sharp_green.g, sharpness),
-        lerp(frosted_blue.b, sharp_blue.b, sharpness),
-        lerp(frosted_green.a, sharp_green.a, sharpness));
+    float4 color = float4(frosted_red.r, frosted_green.g, frosted_blue.b, frosted_green.a);
 
     // Sample (including the rim), saturation, gain, source-over wash, then lift.
     float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));

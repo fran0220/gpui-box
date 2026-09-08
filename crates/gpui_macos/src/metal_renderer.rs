@@ -2366,6 +2366,106 @@ mod tests {
     }
 
     #[test]
+    fn glass_corner_medial_axis_does_not_invent_a_specular_normal() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        for specular in [0., 0.06] {
+            let mut scene = probed_scene(gpui::hsla(0., 0., 0.1, 1.), 0);
+            let glass = &mut scene.backdrop_glass[0];
+            glass.corner_radii = Corners::all(ScaledPixels(16.));
+            glass.material.bevel = ScaledPixels(36.);
+            glass.material.refraction = 0.34;
+            glass.material.hairline = ScaledPixels(1.);
+            glass.material.specular = specular;
+            glass.material.specular_sharpness = 12.;
+            glass.material.light_angle = std::f32::consts::FRAC_PI_4;
+            let image = renderer
+                .render_scene_to_image(&scene, extent)
+                .expect("glass renders");
+            // Beyond the arc centre the requested bevel has two planar faces.
+            // A stencil straddling their crease invents a bright bisector normal.
+            // Uniform backdrop excludes refraction; specular=0 excludes hairline.
+            for inset in 18..30 {
+                let diagonal = i16::from(image.get_pixel(255 - (64 + inset), 64 + inset)[0]);
+                let adjacent = i16::from(image.get_pixel(255 - (64 + inset), 64 + inset + 2)[0]);
+                assert!(
+                    diagonal <= adjacent + 2,
+                    "specular={specular}, inset={inset}: diagonal {diagonal}, face {adjacent}"
+                );
+            }
+            if specular > 0. {
+                assert!(
+                    image.get_pixel(181, 74)[0] > image.get_pixel(128, 128)[0] + 4,
+                    "the actual rounded arc must retain its highlight"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn glass_rim_scatters_text_strokes_as_much_as_the_flat_interior() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let template = probed_scene(Hsla::black(), 0);
+        let mut scene = Scene::default();
+        scene.insert_primitive(template.quads[0]);
+        // Repeated 2px glyph strokes, including stems, bowls and crossbars.
+        let glyph = [
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001,
+        ];
+        for y in 0..128 {
+            for x in 0..128 {
+                if y % 9 < 7 && x % 7 < 5 && glyph[y % 9] & (1 << (x % 7)) != 0 {
+                    let mut quad = template.quads[0];
+                    quad.bounds = Bounds::new(
+                        point(ScaledPixels(x as f32 * 2.), ScaledPixels(y as f32 * 2.)),
+                        size(ScaledPixels(2.), ScaledPixels(2.)),
+                    );
+                    quad.background = Background::from(Hsla::white());
+                    scene.insert_primitive(quad);
+                }
+            }
+        }
+        let mut glass = template.backdrop_glass[0];
+        glass.material.bevel = ScaledPixels(36.);
+        glass.material.refraction = 0.34;
+        scene.insert_backdrop_glass(glass);
+        scene.finish();
+        let variance = |image: &image::RgbaImage, x| {
+            let values: Vec<_> = (96..160)
+                .map(|y| f32::from(image.get_pixel(x, y)[0]))
+                .collect();
+            let mean = values.iter().sum::<f32>() / values.len() as f32;
+            values
+                .iter()
+                .map(|value| (value - mean).powi(2))
+                .sum::<f32>()
+                / values.len() as f32
+        };
+        for blur in [0., 16.] {
+            scene.backdrop_glass[0].material.blur_radius = ScaledPixels(blur);
+            let image = renderer
+                .render_scene_to_image(&scene, extent)
+                .expect("text backdrop renders");
+            let rim = variance(&image, 188);
+            let flat = variance(&image, 128);
+            if blur == 0. {
+                assert!(
+                    rim > 25.,
+                    "clear glass retains sharp strokes, variance={rim}"
+                );
+            } else {
+                assert!(
+                    rim <= 2. * flat + 1.,
+                    "blurred rim variance={rim}, flat={flat}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn glass_wash_and_saturation_transform_pixels_without_a_bevel() {
         let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
         let mut renderer = MetalRenderer::new_headless(pool);

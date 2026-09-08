@@ -712,6 +712,13 @@ Metal, HLSL and WGSL composite paths add saturation and source-over achromatic
 wash before additive optical lift. The historical import receipt is unchanged;
 all framework and platform code remains under the local GPUI Box authority.
 
+The analytic glass-field derivatives and scattered-source rim sampling are
+original GPUI Box corrections. They reuse the local rounded-rect derivative,
+differentiate the existing polynomial union, and remove sharp-source remixing;
+no upstream source or historical import receipt is changed. CPU shape tests and
+Metal pixel tests cover medial-axis normals, true arc highlights, and rim
+text-stroke scattering without changing material strengths.
+
 ### Kit Regular/Clear material policy
 
 The Kit overlay recipes now use Regular Liquid, reserving `Clear` with a

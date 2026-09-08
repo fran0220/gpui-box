@@ -360,7 +360,7 @@ mod tests {
         outward: Point<f32>,
         bevel: f32,
         refraction: f32,
-    ) -> (f32, Point<f32>, f32) {
+    ) -> (f32, Point<f32>) {
         let depth = if bevel > 0.0 {
             (-distance / bevel).clamp(0.0, 1.0)
         } else {
@@ -378,7 +378,7 @@ mod tests {
             offset.x *= limit / reach;
             offset.y *= limit / reach;
         }
-        (depth, offset, rise * rise)
+        (depth, offset)
     }
 
     fn channel_offsets(offset: Point<f32>, dispersion: f32) -> [Point<f32>; 3] {
@@ -516,25 +516,19 @@ mod tests {
     #[test]
     fn the_optical_profile_is_flat_at_the_centre_and_bounded_at_the_rim() {
         let outward = point(1.0, 0.0);
-        let (centre_depth, centre_offset, centre_sharpness) =
-            optical_profile(-18.0, outward, 18.0, 0.34);
+        let (centre_depth, centre_offset) = optical_profile(-18.0, outward, 18.0, 0.34);
         assert_eq!(centre_depth, 1.0);
         assert_eq!(centre_offset, point(0.0, 0.0));
-        assert_eq!(centre_sharpness, 0.0);
 
-        let (rim_depth, rim_offset, rim_sharpness) = optical_profile(0.0, outward, 18.0, 0.34);
+        let (rim_depth, rim_offset) = optical_profile(0.0, outward, 18.0, 0.34);
         assert_eq!(rim_depth, 0.0);
         assert!((rim_offset.x.abs() - 18.0 * 0.45).abs() < 1e-5);
         assert_eq!(rim_offset.y, 0.0);
-        assert_eq!(
-            rim_sharpness, 1.0,
-            "the refracted rim uses the sharp source"
-        );
     }
 
     #[test]
     fn dispersion_is_independent_and_subtle() {
-        let (_, offset, _) = optical_profile(-9.0, point(1.0, 0.0), 18.0, 0.34);
+        let (_, offset) = optical_profile(-9.0, point(1.0, 0.0), 18.0, 0.34);
         let together = channel_offsets(offset, 0.0);
         assert_eq!(together[0], together[1]);
         assert_eq!(together[1], together[2]);
@@ -982,6 +976,54 @@ mod tests {
 
         let top = glass_field(point(50., 5.), &[lobe], 0.);
         assert!(top.gradient.y < -0.9, "the near edge is above");
+    }
+
+    #[test]
+    fn glass_medial_axes_select_real_faces_instead_of_bisectors() {
+        for radius in [0., 4., 16.] {
+            let lobe = test_lobe((0., 0.), (128., 128.), radius);
+            for inset in [18., 24., 30.] {
+                for at in [
+                    point(inset, inset),
+                    point(128. - inset, inset),
+                    point(inset, 128. - inset),
+                    point(128. - inset, 128. - inset),
+                ] {
+                    let field = glass_field(at, &[lobe], 0.);
+                    assert_eq!(field.distance, -inset);
+                    assert_eq!(field.gradient.x, 0.);
+                    assert_eq!(field.gradient.y.abs(), 1.);
+                }
+            }
+            assert_eq!(
+                glass_field(point(64., 64.), &[lobe], 0.).gradient,
+                point(0., 1.)
+            );
+        }
+        let lobe = test_lobe((0., 0.), (128., 128.), 16.);
+        let arc = glass_field(point(120., 8.), &[lobe], 0.);
+        assert!((arc.gradient.x - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-6);
+        assert!((arc.gradient.y + std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn smooth_union_derivatives_match_the_distance_away_from_creases() {
+        let lobes = [
+            test_lobe((0., 0.), (40., 40.), 8.),
+            test_lobe((45., 5.), (40., 40.), 12.),
+            test_lobe((25., 40.), (40., 40.), 4.),
+        ];
+        for at in [point(42., 12.), point(43., 30.), point(36., 39.)] {
+            let epsilon = 0.01;
+            let dx = glass_field(point(at.x + epsilon, at.y), &lobes, 20.).distance
+                - glass_field(point(at.x - epsilon, at.y), &lobes, 20.).distance;
+            let dy = glass_field(point(at.x, at.y + epsilon), &lobes, 20.).distance
+                - glass_field(point(at.x, at.y - epsilon), &lobes, 20.).distance;
+            let length = (dx * dx + dy * dy).sqrt();
+            let gradient = glass_field(at, &lobes, 20.).gradient;
+            assert!((gradient.x - dx / length).abs() < 0.002);
+            assert!((gradient.y - dy / length).abs() < 0.002);
+        }
     }
 
     #[test]
@@ -1723,9 +1765,9 @@ impl GlassLobe<Pixels> {
 /// Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]
 /// snapshots the sharp backdrop and leaves it unchanged; callers independently
 /// add refraction, dispersion, transmission, an optical lift, or edge light.
-/// [`GlassMaterial::frosted`] adds only scattering. A renderer therefore keeps
-/// a sharp snapshot even when it also derives a blurred one: the interior may
-/// be frosted while the refracted rim remains sharp.
+/// [`GlassMaterial::frosted`] adds only scattering. Refraction samples that
+/// scattered source throughout the surface, including the rim. The retained
+/// sharp snapshot restores the original backdrop only under an explicit edge mask.
 #[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(C)]
 pub struct GlassMaterial<P = ScaledPixels> {
@@ -2183,8 +2225,9 @@ pub const MAX_GLASS_GAUSSIAN_PASSES: u32 = 16;
 pub struct GlassField {
     /// Signed distance to the surface's edge, negative inside.
     pub distance: f32,
-    /// The direction the distance increases in, normalized. Zero-length where
-    /// the field is flat, which happens at the exact centre of a lobe.
+    /// The direction the distance increases in, normalized. At a lobe's medial
+    /// axis choose an actual incident face, not their fictitious bisector.
+    /// Zero for an empty field or cancelling smooth-union derivatives.
     pub gradient: Point<f32>,
 }
 
@@ -2212,12 +2255,16 @@ pub fn glass_edge_mask(point: Point<f32>, bounds: Bounds<f32>, edge: f32, band: 
 /// This mirrors `quad_sdf` in the shaders exactly, including the unrounded
 /// fast path, because the two must not disagree about where an edge is.
 pub fn glass_lobe_sdf(point: Point<f32>, lobe: &GlassLobe) -> f32 {
+    glass_lobe_field(point, lobe).distance
+}
+
+fn glass_lobe_field(at: Point<f32>, lobe: &GlassLobe) -> GlassField {
     let half_width = lobe.bounds.size.width.0 / 2.;
     let half_height = lobe.bounds.size.height.0 / 2.;
     let center_x = lobe.bounds.origin.x.0 + half_width;
     let center_y = lobe.bounds.origin.y.0 + half_height;
-    let to_center_x = point.x - center_x;
-    let to_center_y = point.y - center_y;
+    let to_center_x = at.x - center_x;
+    let to_center_y = at.y - center_y;
 
     let radius = if to_center_x < 0. {
         if to_center_y < 0. {
@@ -2233,11 +2280,25 @@ pub fn glass_lobe_sdf(point: Point<f32>, lobe: &GlassLobe) -> f32 {
 
     let corner_x = to_center_x.abs() - half_width + radius;
     let corner_y = to_center_y.abs() - half_height + radius;
-    if radius == 0. {
-        return corner_x.max(corner_y);
-    }
     let outside = (corner_x.max(0.).powi(2) + corner_y.max(0.).powi(2)).sqrt();
-    outside + corner_x.max(corner_y).min(0.) - radius
+    let mut gradient = if corner_x > corner_y {
+        point(1., 0.)
+    } else {
+        point(0., 1.)
+    };
+    if radius != 0. && outside > 0. {
+        gradient = point(corner_x.max(0.) / outside, corner_y.max(0.) / outside);
+    }
+    gradient.x *= if to_center_x >= 0. { 1. } else { -1. };
+    gradient.y *= if to_center_y >= 0. { 1. } else { -1. };
+    GlassField {
+        distance: if radius == 0. {
+            corner_x.max(corner_y)
+        } else {
+            outside + corner_x.max(corner_y).min(0.) - radius
+        },
+        gradient,
+    }
 }
 
 /// The polynomial smooth minimum, which is what makes two lobes join into one
@@ -2255,50 +2316,40 @@ pub fn glass_smooth_min(a: f32, b: f32, smoothing: f32) -> f32 {
 
 /// The distance to the union of `lobes` and the direction it increases in.
 ///
-/// The gradient is taken by central differences rather than analytically. A
-/// smooth minimum's analytic gradient is a weighted sum whose weights each of
-/// the three shading languages would have to reproduce, and the four
-/// implementations disagreeing about a normal is exactly the kind of drift
-/// this function exists to prevent. Differencing is the same four extra
-/// evaluations everywhere, and its result is defined by this function's own
-/// output rather than by a derivation done four times.
+/// Mirrors the three shaders' analytic rounded-rect and smooth-min gradients.
+/// A stencil across a medial-axis crease invents a bisector normal and hence
+/// a specular ridge. Choose one incident face at ties instead. A bevel wider
+/// than its corner radius still has a real crease; this does not smooth it or
+/// change the silhouette. For a smooth union, blend derivatives by h/2 (the
+/// derivative of the polynomial correction), normalizing only after the fold.
 pub fn glass_field(at: Point<f32>, lobes: &[GlassLobe], smoothing: f32) -> GlassField {
-    /// Half the width of the differencing stencil, in device pixels. Below
-    /// half a pixel the difference is dominated by float error near a corner.
-    const EPSILON: f32 = 0.5;
-
-    fn union(at: Point<f32>, lobes: &[GlassLobe], smoothing: f32) -> f32 {
-        let mut distance = f32::MAX;
-        for (index, lobe) in lobes.iter().enumerate() {
-            let lobe_distance = glass_lobe_sdf(at, lobe);
-            distance = if index == 0 {
-                lobe_distance
-            } else {
-                glass_smooth_min(distance, lobe_distance, smoothing)
-            };
-        }
-        distance
-    }
-
-    if lobes.is_empty() {
+    let Some((first, rest)) = lobes.split_first() else {
         return GlassField {
             distance: f32::MAX,
             gradient: point(0., 0.),
         };
-    }
-
-    let distance = union(at, lobes, smoothing);
-    let dx = union(point(at.x + EPSILON, at.y), lobes, smoothing)
-        - union(point(at.x - EPSILON, at.y), lobes, smoothing);
-    let dy = union(point(at.x, at.y + EPSILON), lobes, smoothing)
-        - union(point(at.x, at.y - EPSILON), lobes, smoothing);
-    let length = (dx * dx + dy * dy).sqrt();
-    let gradient = if length > 0. {
-        point(dx / length, dy / length)
-    } else {
-        point(0., 0.)
     };
-    GlassField { distance, gradient }
+    let mut field = glass_lobe_field(at, first);
+    for lobe in rest {
+        let next = glass_lobe_field(at, lobe);
+        let h = if smoothing > 0. {
+            (smoothing - (field.distance - next.distance).abs()).max(0.) / smoothing
+        } else {
+            0.
+        };
+        let weight = if field.distance <= next.distance {
+            h * 0.5
+        } else {
+            1. - h * 0.5
+        };
+        field.gradient = field.gradient * (1. - weight) + next.gradient * weight;
+        field.distance = glass_smooth_min(field.distance, next.distance, smoothing);
+    }
+    let length = (field.gradient.x.powi(2) + field.gradient.y.powi(2)).sqrt();
+    if length > 0. {
+        field.gradient = field.gradient / length;
+    }
+    field
 }
 
 #[derive(Debug, Copy, Clone)]

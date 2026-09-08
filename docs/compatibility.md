@@ -405,8 +405,9 @@ platform reporting a focus modality of its own.
 Backdrop glass is one material contract across Metal, Direct3D, and WGPU.
 `GlassMaterial::blur_radius` controls scattering only: zero performs no
 gaussian passes but still snapshots and composites clear refraction. A positive
-radius derives a blurred source while retaining the sharp paint-order snapshot
-for the refracted rim. `GlassMaterial::clear()` replaces the historical
+radius derives a blurred source for both the interior and refracted rim; the
+sharp paint-order snapshot is retained only for explicit edge-mask restoration.
+`GlassMaterial::clear()` replaces the historical
 zero-argument `frosted()` constructor; `GlassMaterial::frosted(radius)` names an
 actual frost. The material also carries saturation, an achromatic wash,
 transmission gain, additive optical lift, and hairline width. All renderers
@@ -417,6 +418,16 @@ to saturation 1 and transparent wash. Metal generates its packed material
 layout from Rust; Direct3D and WGPU map it to aligned uniform registers.
 The browser shares WGPU, not a separate glass implementation. Native Windows
 and Linux validation of this extension is still required in their lanes.
+
+Glass normals use analytic rounded-rect derivatives and polynomial smooth-min
+weights, normalized after the union. Medial-axis ties choose an incident face:
+averaging across a crease invents a bisector specular highlight. A bevel wider
+than the corner radius still describes a creased surface, not a rounded dome;
+the renderer does not silently change the requested silhouette or bevel width.
+Metal pixel regressions check the inner diagonal against adjacent face pixels,
+retain the real arc highlight, and bound text-stroke variance at a blurred rim
+against the flat interior. Blur-zero Clear remains sharp. These tests do not
+substitute for the Linux/WGPU and Windows/HLSL native validation lanes.
 
 Metal uses its platform gaussian when scattering is nonzero. Direct3D and WGPU
 split wide gaussians into bounded passes and both degrade an over-budget blur to

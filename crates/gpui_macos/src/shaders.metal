@@ -1514,11 +1514,10 @@ struct BackdropGlassFragmentInput {
   uint glass_id [[flat]];
 };
 
-// Signed distance to one lobe. This is `quad_sdf` with the lobe's own bounds
-// and radii; it is written out rather than reused so that the loop below has
-// nothing between it and the arithmetic `glass_field` in scene.rs performs.
-float glass_lobe_sdf(float2 point, GlassLobe_ScaledPixels lobe) {
-  return quad_sdf(point, lobe.bounds, lobe.corner_radii);
+// Analytic normal and distance; medial-axis ties select an incident face.
+float3 glass_lobe_field(float2 point, GlassLobe_ScaledPixels lobe) {
+  return float3(quad_sdf_gradient(point, lobe.bounds, lobe.corner_radii),
+                quad_sdf(point, lobe.bounds, lobe.corner_radii));
 }
 
 // The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
@@ -1548,25 +1547,23 @@ float glass_smooth_min(float a, float b, float smoothing) {
   return min(a, b) - h * h * smoothing * 0.25;
 }
 
-// Distance to the surface's shape. Mirrors the `union` helper inside
-// `glass_field` in scene.rs, including the first-lobe special case that keeps
-// a single-lobe surface exactly equal to its own `quad_sdf`.
-//
-// `single` selects the shape the instance already carries over the lobe array,
-// which is what `BackdropGlass::shape` does on the CPU side. Doing it here
-// rather than at the call sites keeps the distance and the four differenced
-// samples of it going through one piece of arithmetic.
-float glass_sdf(float2 point, BackdropGlass glass, constant GlassLobe_ScaledPixels *lobes,
+// Analytic field of the shape. Smooth-min derivatives use h/2, with no
+// intermediate normalization. Mirrors `glass_field` in scene.rs.
+float3 glass_field(float2 point, BackdropGlass glass, constant GlassLobe_ScaledPixels *lobes,
                 bool single, uint lobe_count, float smoothing) {
   if (single) {
-    return quad_sdf(point, glass.bounds, glass.corner_radii);
+    return float3(quad_sdf_gradient(point, glass.bounds, glass.corner_radii),
+                  quad_sdf(point, glass.bounds, glass.corner_radii));
   }
-  float distance = glass_lobe_sdf(point, lobes[0]);
+  float3 field = glass_lobe_field(point, lobes[0]);
   for (uint index = 1; index < lobe_count; index++) {
-    distance =
-        glass_smooth_min(distance, glass_lobe_sdf(point, lobes[index]), smoothing);
+    float3 next = glass_lobe_field(point, lobes[index]);
+    float h = smoothing > 0. ? max(smoothing - abs(field.z - next.z), 0.) / smoothing : 0.;
+    float weight = field.z <= next.z ? h * 0.5 : 1. - h * 0.5;
+    field = float3(mix(field.xy, next.xy, weight),
+                   glass_smooth_min(field.z, next.z, smoothing));
   }
-  return distance;
+  return field;
 }
 
 vertex BackdropGlassVertexOutput backdrop_glass_vertex(
@@ -1610,8 +1607,8 @@ fragment float4 backdrop_glass_fragment(
   float smoothing = glass.material.smoothing;
   float2 point = input.position.xy;
 
-  float distance =
-      glass_sdf(point, glass, lobes, single, lobe_count, smoothing);
+  float3 field = glass_field(point, glass, lobes, single, lobe_count, smoothing);
+  float distance = field.z;
 
   // Blending is disabled on this pipeline (the surface REPLACES the region),
   // so fragments outside the shape must discard, not return 0.
@@ -1650,19 +1647,9 @@ fragment float4 backdrop_glass_fragment(
     return mix(original, frosted, edge_mask);
   }
 
-  // The gradient by central differences, on the same half-pixel stencil as
-  // `glass_field` in scene.rs. See that function for why the normal is
-  // differenced in all four implementations rather than derived in each.
-  const float epsilon = 0.5;
-  float2 gradient = float2(
-      glass_sdf(point + float2(epsilon, 0.), glass, lobes, single, lobe_count,
-                smoothing) -
-          glass_sdf(point - float2(epsilon, 0.), glass, lobes, single,
-                    lobe_count, smoothing),
-      glass_sdf(point + float2(0., epsilon), glass, lobes, single, lobe_count,
-                smoothing) -
-          glass_sdf(point - float2(0., epsilon), glass, lobes, single,
-                    lobe_count, smoothing));
+  // Analytic incident-face and smooth-union derivatives; normalize only
+  // after the fold. Differencing across a crease invents a specular normal.
+  float2 gradient = field.xy;
   float gradient_length = length(gradient);
   gradient = gradient_length > 0. ? gradient / gradient_length : float2(0.);
 
@@ -1679,24 +1666,17 @@ fragment float4 backdrop_glass_fragment(
     displacement *= reach_limit / reach;
   }
 
-  // Frost in the interior, the sharp snapshot at the bent rim. Both sources
-  // use the same displaced coordinates, so blur changes scattering without
-  // changing refraction geometry.
+  // Refract the scattered source even at the rim: mixing the sharp snapshot
+  // back in would resurrect readable backdrop text. With blur zero this
+  // source is already sharp, preserving Clear optics.
   float dispersion = glass.material.dispersion;
   float2 red_uv = (point + displacement * (1. - dispersion)) / viewport;
   float2 green_uv = (point + displacement) / viewport;
   float2 blue_uv = (point + displacement * (1. + dispersion)) / viewport;
-  float sharpness = rise * rise;
   float4 frosted_red = source_texture.sample(source_sampler, red_uv);
   float4 frosted_green = source_texture.sample(source_sampler, green_uv);
   float4 frosted_blue = source_texture.sample(source_sampler, blue_uv);
-  float4 sharp_red = sharp_texture.sample(source_sampler, red_uv);
-  float4 sharp_green = sharp_texture.sample(source_sampler, green_uv);
-  float4 sharp_blue = sharp_texture.sample(source_sampler, blue_uv);
-  float4 color = float4(mix(frosted_red.r, sharp_red.r, sharpness),
-                        mix(frosted_green.g, sharp_green.g, sharpness),
-                        mix(frosted_blue.b, sharp_blue.b, sharpness),
-                        mix(frosted_green.a, sharp_green.a, sharpness));
+  float4 color = float4(frosted_red.r, frosted_green.g, frosted_blue.b, frosted_green.a);
 
   // Sample (including the rim), saturation, gain, source-over wash, then lift.
   float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));

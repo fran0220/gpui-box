@@ -76,9 +76,9 @@ fn fs_blur(input: Varying) -> @location(0) vec4<f32> {
     return color / weight;
 }
 
-// Signed distance to one rounded rect, negative inside. Mirrors `quad_sdf` in
-// the Metal shaders and `glass_lobe_sdf` in scene.rs.
-fn lobe_distance(point: vec2<f32>, bounds: vec4<f32>, radii: vec4<f32>) -> f32 {
+// Analytic normal and distance. Mirrors `quad_sdf_gradient` / `quad_sdf` in
+// Metal and `glass_lobe_field` in scene.rs; ties select an incident face.
+fn lobe_field(point: vec2<f32>, bounds: vec4<f32>, radii: vec4<f32>) -> vec3<f32> {
     let center = bounds.xy + bounds.zw * 0.5;
     let local = point - center;
     let radius = select(
@@ -86,11 +86,16 @@ fn lobe_distance(point: vec2<f32>, bounds: vec4<f32>, radii: vec4<f32>) -> f32 {
         select(radii.y, radii.z, local.y >= 0.0),
         local.x >= 0.0);
     let delta = abs(local) - bounds.zw * 0.5 + vec2<f32>(radius);
-    return length(max(delta, vec2<f32>(0.0))) + min(max(delta.x, delta.y), 0.0) - radius;
-}
-
-fn rounded_distance(point: vec2<f32>) -> f32 {
-    return lobe_distance(point, params.bounds, params.radii);
+    let outside = max(delta, vec2<f32>(0.0));
+    let outside_length = length(outside);
+    var gradient = select(vec2<f32>(0.0, 1.0), vec2<f32>(1.0, 0.0), delta.x > delta.y);
+    if (radius != 0.0 && outside_length > 0.0) {
+        gradient = outside / outside_length;
+    }
+    gradient *= select(vec2<f32>(-1.0), vec2<f32>(1.0), local >= vec2<f32>(0.0));
+    let distance = select(outside_length + min(max(delta.x, delta.y), 0.0) - radius,
+                          max(delta.x, delta.y), radius == 0.0);
+    return vec3<f32>(gradient, distance);
 }
 
 // The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
@@ -102,9 +107,6 @@ fn smooth_min(a: f32, b: f32, smoothing: f32) -> f32 {
     return min(a, b) - h * h * smoothing * 0.25;
 }
 
-// Distance to the surface's shape. Mirrors `glass_sdf` in the Metal shaders
-// and the `union` helper inside `glass_field` in scene.rs: no lobes means the
-// surface is the single rounded rect it already named.
 // Linear fade from a named edge. Mirrors `glass_edge_mask` in scene.rs.
 fn glass_edge_mask(point: vec2<f32>) -> f32 {
     if (params.edge_mask_edge <= 0.0 || params.edge_mask_band <= 0.0) {
@@ -131,29 +133,36 @@ fn apply_edge_mask(color: vec4<f32>, point: vec2<f32>) -> vec4<f32> {
     return mix(original, color, mask);
 }
 
-fn glass_distance(point: vec2<f32>) -> f32 {
+// Analytic field of the shape. Smooth-min derivatives use h/2, with no
+// intermediate normalization. Mirrors `glass_field` in scene.rs.
+fn glass_field(point: vec2<f32>) -> vec3<f32> {
     if (params.lobe_count == 0u) {
-        return rounded_distance(point);
+        return lobe_field(point, params.bounds, params.radii);
     }
     let count = min(params.lobe_count, MAX_GLASS_LOBES);
-    var distance = lobe_distance(point, params.lobes[0].bounds, params.lobes[0].radii);
+    var field = lobe_field(point, params.lobes[0].bounds, params.lobes[0].radii);
     for (var index = 1u; index < MAX_GLASS_LOBES; index++) {
         if (index < count) {
             let lobe = params.lobes[index];
-            distance = smooth_min(
-                distance,
-                lobe_distance(point, lobe.bounds, lobe.radii),
-                params.smoothing);
+            let next = lobe_field(point, lobe.bounds, lobe.radii);
+            var h = 0.0;
+            if (params.smoothing > 0.0) {
+                h = max(params.smoothing - abs(field.z - next.z), 0.0) / params.smoothing;
+            }
+            let weight = select(1.0 - h * 0.5, h * 0.5, field.z <= next.z);
+            field = vec3<f32>(mix(field.xy, next.xy, weight),
+                              smooth_min(field.z, next.z, params.smoothing));
         }
     }
-    return distance;
+    return field;
 }
 
 @fragment
 fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
     let point = input.position.xy;
     let mask_end = params.mask.xy + params.mask.zw;
-    let distance = glass_distance(point);
+    let field = glass_field(point);
+    let distance = field.z;
     if (point.x < params.mask.x || point.y < params.mask.y || point.x >= mask_end.x ||
         point.y >= mask_end.y || distance > 0.0) {
         discard;
@@ -168,15 +177,9 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         return apply_edge_mask(textureLoad(source, vec2<i32>(point), 0), point);
     }
 
-    // The gradient by central differences, on the same half-pixel stencil as
-    // `glass_field` in scene.rs. See that function for why the normal is
-    // differenced in all four implementations rather than derived in each.
-    let epsilon = 0.5;
-    var gradient = vec2<f32>(
-        glass_distance(point + vec2<f32>(epsilon, 0.0)) -
-            glass_distance(point - vec2<f32>(epsilon, 0.0)),
-        glass_distance(point + vec2<f32>(0.0, epsilon)) -
-            glass_distance(point - vec2<f32>(0.0, epsilon)));
+    // Analytic incident-face and smooth-union derivatives; normalize only
+    // after the fold. Differencing across a crease invents a specular normal.
+    var gradient = field.xy;
     let gradient_length = length(gradient);
     if (gradient_length > 0.0) {
         gradient = gradient / gradient_length;
@@ -198,25 +201,16 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         displacement *= reach_limit / reach;
     }
 
-    // Frost in the interior, the sharp snapshot at the bent rim. Both sources
-    // are sampled at the same displaced coordinate so blur changes scattering,
-    // never the geometry of the refraction.
-    let sharpness = rise * rise;
+    // Refract the scattered source even at the rim: mixing the sharp snapshot
+    // back in would resurrect readable backdrop text. With blur zero this
+    // source is already sharp, preserving Clear optics.
     let red_uv = (point + displacement * (1.0 - params.dispersion)) / params.viewport;
     let green_uv = (point + displacement) / params.viewport;
     let blue_uv = (point + displacement * (1.0 + params.dispersion)) / params.viewport;
     let frosted_red = textureSample(source, source_sampler, red_uv);
     let frosted_green = textureSample(source, source_sampler, green_uv);
     let frosted_blue = textureSample(source, source_sampler, blue_uv);
-    let sharp_red = textureSample(sharp_source, source_sampler, red_uv);
-    let sharp_green = textureSample(sharp_source, source_sampler, green_uv);
-    let sharp_blue = textureSample(sharp_source, source_sampler, blue_uv);
-    var color = vec4<f32>(
-        mix(frosted_red.r, sharp_red.r, sharpness),
-        mix(frosted_green.g, sharp_green.g, sharpness),
-        mix(frosted_blue.b, sharp_blue.b, sharpness),
-        mix(frosted_green.a, sharp_green.a, sharpness),
-    );
+    var color = vec4<f32>(frosted_red.r, frosted_green.g, frosted_blue.b, frosted_green.a);
 
     // Sample (including the rim), saturation, gain, source-over wash, then lift.
     let luminance = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
