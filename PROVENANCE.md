@@ -723,6 +723,11 @@ rounded-corner reach before GPU packing. This original geometry correction
 removes the remaining arc-centre singularity on small-radius menus; it changes
 neither shader ABI nor source provenance.
 
+Framework luminance probe leases and the generation/submission-aware CPU cache
+are original GPUI Box ownership infrastructure. Metal, Direct3D and WGPU retain
+the existing fixed-size GPU readbacks and decode physical slots only for offsets;
+full lease IDs reject stale owners and activations without a new shader interface.
+
 ### Kit Regular/Clear material policy
 
 The Kit overlay recipes now use Regular Liquid, reserving `Clear` with a

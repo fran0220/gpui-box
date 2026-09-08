@@ -24,12 +24,11 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use gpui::{
     AnyElement, App, Bounds, Corners, Element, GlassEdge, GlassLobe, GlassMaterial,
     GlobalElementId, Hsla, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
-    MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
+    LuminanceProbeLease, MAX_GLASS_LOBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
     StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -200,55 +199,6 @@ impl ResponsiveBevel {
     }
 }
 
-/// Which luminance probe slots are claimed, one bit per slot, across the
-/// process. Two windows never collide by sharing a slot number — each window
-/// reads its own renderer — so a process-wide ledger is merely conservative,
-/// never wrong.
-static PROBE_SLOTS: AtomicU32 = AtomicU32::new(0);
-
-/// One surface's claim on a luminance probe slot, freed when the surface
-/// stops rendering and its keyed state is dropped.
-#[derive(Default)]
-struct ProbeLease(Option<u32>);
-
-impl ProbeLease {
-    /// The slot this lease holds, claiming the lowest free one on first use.
-    /// `None` once every slot is claimed, which a caller treats exactly like
-    /// a renderer that takes no probes: the surface keeps its theme appearance.
-    fn slot(&mut self) -> Option<u32> {
-        if self.0.is_none() {
-            let mut claimed = PROBE_SLOTS.load(Ordering::Relaxed);
-            loop {
-                let free = (!claimed).trailing_zeros();
-                if free as usize >= MAX_LUMINANCE_PROBES {
-                    return None;
-                }
-                match PROBE_SLOTS.compare_exchange_weak(
-                    claimed,
-                    claimed | (1 << free),
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => {
-                        self.0 = Some(free);
-                        break;
-                    }
-                    Err(now) => claimed = now,
-                }
-            }
-        }
-        self.0
-    }
-}
-
-impl Drop for ProbeLease {
-    fn drop(&mut self) {
-        if let Some(slot) = self.0 {
-            PROBE_SLOTS.fetch_and(!(1 << slot), Ordering::Relaxed);
-        }
-    }
-}
-
 /// The transient visual state an interactive glass surface keeps across
 /// frames: whether it is pressed, which side of the contrast band it last
 /// settled on, and its probe slot.
@@ -256,7 +206,7 @@ impl Drop for ProbeLease {
 struct GlassState {
     pressed: bool,
     appearance_flipped: bool,
-    lease: ProbeLease,
+    lease: LuminanceProbeLease,
 }
 
 /// A glass surface: optionally scattered and bent backdrop, optional fill,
@@ -575,7 +525,7 @@ impl RenderOnce for Glass {
             && let Some(state) = &state
         {
             let mut state = state.borrow_mut();
-            if let Some(slot) = state.lease.slot() {
+            if let Some(slot) = state.lease.id() {
                 material.probe = slot;
                 luminance = window.backdrop_luminance(slot);
                 if adaptive && let Some(luminance) = luminance {
@@ -908,7 +858,7 @@ impl RenderOnce for GlassGroup {
 
         if adaptive && let Some(state) = &state {
             let mut state = state.borrow_mut();
-            if let Some(slot) = state.lease.slot() {
+            if let Some(slot) = state.lease.id() {
                 material.probe = slot;
                 if let Some(luminance) = window.backdrop_luminance(slot) {
                     state.appearance_flipped = deepen_tint(
@@ -1648,25 +1598,6 @@ mod tests {
             72.0
         ));
         assert!(!can_flip(surface_bounds(), 72.0));
-    }
-
-    #[test]
-    fn probe_slots_are_claimed_once_and_freed_on_drop() {
-        let mut first = ProbeLease::default();
-        let slot = first.slot().expect("a slot is free");
-        assert_eq!(first.slot(), Some(slot), "a lease keeps its slot");
-
-        let mut second = ProbeLease::default();
-        let other = second.slot().expect("a second slot is free");
-        assert_ne!(slot, other, "two leases never share a slot");
-
-        drop(first);
-        // Another test thread may have claimed slots in between, so the
-        // reclaim assertion is that a slot is claimable and it is not the one
-        // still leased, not that it is numerically the freed one.
-        let mut third = ProbeLease::default();
-        let reclaimed = third.slot().expect("a freed slot is claimable again");
-        assert_ne!(reclaimed, other, "a live lease's slot stays claimed");
     }
 
     #[test]

@@ -557,7 +557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2521
+      "symbolCount": 2529
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -21422,6 +21422,20 @@
     },
     {
       "id": "gpui::gpui::reexport-27",
+      "name": "luminance :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use luminance::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-28",
       "name": "particles :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21435,7 +21449,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-28",
+      "id": "gpui::gpui::reexport-29",
       "name": "path_builder :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21446,20 +21460,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use path_builder::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-29",
-      "name": "platform :: *",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use platform::*;",
       "cfg": []
     },
     {
@@ -21478,6 +21478,20 @@
     },
     {
       "id": "gpui::gpui::reexport-30",
+      "name": "platform :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use platform::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-31",
       "name": "profiler :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21491,7 +21505,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-31",
+      "id": "gpui::gpui::reexport-32",
       "name": "queue :: { PriorityQueueReceiver , PriorityQueueSender }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21507,7 +21521,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-32",
+      "id": "gpui::gpui::reexport-33",
       "name": "refineable :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21521,7 +21535,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-33",
+      "id": "gpui::gpui::reexport-34",
       "name": "scene :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21535,7 +21549,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-34",
+      "id": "gpui::gpui::reexport-35",
       "name": "shared_uri :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21549,7 +21563,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-35",
+      "id": "gpui::gpui::reexport-36",
       "name": "spring :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21563,7 +21577,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-36",
+      "id": "gpui::gpui::reexport-37",
       "name": "style :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21577,7 +21591,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-37",
+      "id": "gpui::gpui::reexport-38",
       "name": "styled :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21591,7 +21605,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-38",
+      "id": "gpui::gpui::reexport-39",
       "name": "subscription :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21602,20 +21616,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use subscription::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-39",
-      "name": "svg_renderer :: *",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use svg_renderer::*;",
       "cfg": []
     },
     {
@@ -21634,6 +21634,20 @@
     },
     {
       "id": "gpui::gpui::reexport-40",
+      "name": "svg_renderer :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use svg_renderer::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-41",
       "name": "taffy :: { AvailableSpace , LayoutId }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21647,7 +21661,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-41",
+      "id": "gpui::gpui::reexport-42",
       "name": "test :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21663,7 +21677,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-42",
+      "id": "gpui::gpui::reexport-43",
       "name": "text_system :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21677,7 +21691,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-43",
+      "id": "gpui::gpui::reexport-44",
       "name": "util :: { FutureExt , Timeout }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21691,7 +21705,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-44",
+      "id": "gpui::gpui::reexport-45",
       "name": "view :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21705,7 +21719,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-45",
+      "id": "gpui::gpui::reexport-46",
       "name": "window :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21719,7 +21733,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-46",
+      "id": "gpui::gpui::reexport-47",
       "name": "pollster :: block_on",
       "kind": "reexport",
       "package": "gpui-box",
@@ -24102,6 +24116,108 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use context::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache",
+      "name": "LuminanceProbeCache",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Generation- and submission-aware CPU cache shared by all glass renderers.",
+      "documentation": "Generation- and submission-aware CPU cache shared by all glass renderers.\n\nEach frame registers only probes actually encoded for admitted surfaces.\nMissing probes immediately read `None`, including surfaces painted through\nan opaque budget fallback. Completion callbacks carry the full lease ID\nand submission sequence, not merely the physical GPU slot.",
+      "signature": "# [doc = \" Generation- and submission-aware CPU cache shared by all glass renderers.\"] # [doc = \"\"] # [doc = \" Each frame registers only probes actually encoded for admitted surfaces.\"] # [doc = \" Missing probes immediately read `None`, including surfaces painted through\"] # [doc = \" an opaque budget fallback. Completion callbacks carry the full lease ID\"] # [doc = \" and submission sequence, not merely the physical GPU slot.\"] # [derive (Clone, Copy, Default)] pub struct LuminanceProbeCache { frame : u64, slots : [CachedProbe; MAX_LUMINANCE_PROBES], }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache::begin_frame",
+      "name": "begin_frame",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Register a frame's encoded probe IDs, including an empty frame, and return the sequence to capture with its GPU completion. Continuous owners keep their latest completed value without waiting for the GPU.",
+      "documentation": "Register a frame's encoded probe IDs, including an empty frame, and\nreturn the sequence to capture with its GPU completion. Continuous\nowners keep their latest completed value without waiting for the GPU.",
+      "signature": "pub fn begin_frame (& mut self, probes : impl IntoIterator<Item = u32>) -> u64",
+      "cfg": [],
+      "target": "LuminanceProbeCache"
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache::get",
+      "name": "get",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Latest verified value for this exact active lease, or `None` before its first completion, after replacement, or when not submitted.",
+      "documentation": "Latest verified value for this exact active lease, or `None` before\nits first completion, after replacement, or when not submitted.",
+      "signature": "pub fn get (& self, id : u32) -> Option<f32>",
+      "cfg": [],
+      "target": "LuminanceProbeCache"
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache::publish",
+      "name": "publish",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Publish a completed sample only for its still-active owner and activation. Late older submissions cannot overwrite a newer sample; an older frame of the same continuously active owner remains usable.",
+      "documentation": "Publish a completed sample only for its still-active owner and\nactivation. Late older submissions cannot overwrite a newer sample;\nan older frame of the same continuously active owner remains usable.",
+      "signature": "pub fn publish (& mut self, frame : u64, id : u32, luminance : f32)",
+      "cfg": [],
+      "target": "LuminanceProbeCache"
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeLease",
+      "name": "LuminanceProbeLease",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "A lazy, exclusive claim on one backdrop luminance readback slot.",
+      "documentation": "A lazy, exclusive claim on one backdrop luminance readback slot.\n\nPass [`Self::id`] to [`crate::GlassMaterial::probe`] and\n[`crate::Window::backdrop_luminance`], retaining the lease while using it.\nIDs are opaque: their low **4 bits** address a physical GPU slot and their\nhigh **28 bits** are a per-slot generation. Reacquisition advances that\ngeneration, so a new owner cannot read an old owner's cached sample.\n\nGenerations never wrap. At exhaustion the slot is permanently retired;\nthe all-ones [`NO_LUMINANCE_PROBE`] ID is never issued. Exhaustion therefore\nmakes probes unavailable instead of aliasing an old ID. Allocation remains\nprocess-wide and conservative across windows, as each renderer has its own\ncache. The ID is valid only while its lease is alive.",
+      "signature": "# [doc = \" A lazy, exclusive claim on one backdrop luminance readback slot.\"] # [doc = \"\"] # [doc = \" Pass [`Self::id`] to [`crate::GlassMaterial::probe`] and\"] # [doc = \" [`crate::Window::backdrop_luminance`], retaining the lease while using it.\"] # [doc = \" IDs are opaque: their low **4 bits** address a physical GPU slot and their\"] # [doc = \" high **28 bits** are a per-slot generation. Reacquisition advances that\"] # [doc = \" generation, so a new owner cannot read an old owner's cached sample.\"] # [doc = \"\"] # [doc = \" Generations never wrap. At exhaustion the slot is permanently retired;\"] # [doc = \" the all-ones [`NO_LUMINANCE_PROBE`] ID is never issued. Exhaustion therefore\"] # [doc = \" makes probes unavailable instead of aliasing an old ID. Allocation remains\"] # [doc = \" process-wide and conservative across windows, as each renderer has its own\"] # [doc = \" cache. The ID is valid only while its lease is alive.\"] # [derive (Debug, Default)] pub struct LuminanceProbeLease (Option<u32>);",
+      "cfg": []
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeLease::id",
+      "name": "id",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Return this lease's opaque ID, claiming a free slot on first use. Return `None` when all physical slots are leased or retired; a later call retries if the lease has not acquired a slot yet.",
+      "documentation": "Return this lease's opaque ID, claiming a free slot on first use.\nReturn `None` when all physical slots are leased or retired; a later\ncall retries if the lease has not acquired a slot yet.",
+      "signature": "pub fn id (& mut self) -> Option<u32>",
+      "cfg": [],
+      "target": "LuminanceProbeLease"
+    },
+    {
+      "id": "gpui::luminance::luminance_probe_slot",
+      "name": "luminance_probe_slot",
+      "kind": "function",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Decode only the physical readback index, never the cache's ownership key. The no-probe sentinel has no slot. GPU texture/buffer sizes remain fixed.",
+      "documentation": "Decode only the physical readback index, never the cache's ownership key.\nThe no-probe sentinel has no slot. GPU texture/buffer sizes remain fixed.",
+      "signature": "pub fn luminance_probe_slot (id : u32) -> Option<usize>",
       "cfg": []
     },
     {
@@ -30621,7 +30737,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "The complete optical response of a glass surface.",
       "documentation": "The complete optical response of a glass surface.\n\nBlur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\nsnapshots the sharp backdrop and leaves it unchanged; callers independently\nadd refraction, dispersion, transmission, an optical lift, or edge light.\n[`GlassMaterial::frosted`] adds only scattering. Refraction samples that\nscattered source throughout the surface, including the rim. The retained\nsharp snapshot restores the original backdrop only under an explicit edge mask.",
-      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. Refraction samples that\"] # [doc = \" scattered source throughout the surface, including the rim. The retained\"] # [doc = \" sharp snapshot restores the original backdrop only under an explicit edge mask.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] # [doc = \" Renderers bound this requested depth by the shape's rounded-corner\"] # [doc = \" reach; see [`BackdropGlass::optical_bevel`].\"] pub bevel : P, # [doc = \" How far the bevel displaces the sample, as a fraction of `bevel`. This\"] # [doc = \" is a thickness in disguise: 0 is a flat pane and larger values read as\"] # [doc = \" a deeper body of glass.\"] pub refraction : f32, # [doc = \" How far apart the red and blue samples land, as a fraction of the\"] # [doc = \" refraction offset. Zero samples all three channels together.\"] pub dispersion : f32, # [doc = \" Peak brightness of the rim highlight, 0 for none.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" Saturation of the sampled backdrop, including the refracted rim, before\"] # [doc = \" transmission gain. One preserves colour, zero uses Rec. 709 luminance.\"] # [doc = \" Values above one intensify colour; negative results are clamped to zero.\"] pub saturation : f32, # [doc = \" Achromatic source-over material wash after saturation and transmission\"] # [doc = \" gain, before optical lift and edge light. RGB must be all zero (dark) or\"] # [doc = \" all one (light); alpha is strength. Sanitization selects black or white\"] # [doc = \" from red at 0.5. This covers the refracted rim, unlike an element fill.\"] pub wash : Rgba, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Which luminance probe slot this surface fills, or [`NO_LUMINANCE_PROBE`].\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, # [doc = \" Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,\"] # [doc = \" 3 left, 4 right. Stored as a float so the GPU struct stays one packed\"] # [doc = \" run of 32-bit words.\"] pub edge_mask_edge : f32, # [doc = \" How far that fade reaches from the named edge, in the surface's unit.\"] # [doc = \" Zero disables the mask even when [`Self::edge_mask_edge`] is set.\"] pub edge_mask_band : P, }",
+      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. Refraction samples that\"] # [doc = \" scattered source throughout the surface, including the rim. The retained\"] # [doc = \" sharp snapshot restores the original backdrop only under an explicit edge mask.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] # [doc = \" Renderers bound this requested depth by the shape's rounded-corner\"] # [doc = \" reach; see [`BackdropGlass::optical_bevel`].\"] pub bevel : P, # [doc = \" How far the bevel displaces the sample, as a fraction of `bevel`. This\"] # [doc = \" is a thickness in disguise: 0 is a flat pane and larger values read as\"] # [doc = \" a deeper body of glass.\"] pub refraction : f32, # [doc = \" How far apart the red and blue samples land, as a fraction of the\"] # [doc = \" refraction offset. Zero samples all three channels together.\"] pub dispersion : f32, # [doc = \" Peak brightness of the rim highlight, 0 for none.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" Saturation of the sampled backdrop, including the refracted rim, before\"] # [doc = \" transmission gain. One preserves colour, zero uses Rec. 709 luminance.\"] # [doc = \" Values above one intensify colour; negative results are clamped to zero.\"] pub saturation : f32, # [doc = \" Achromatic source-over material wash after saturation and transmission\"] # [doc = \" gain, before optical lift and edge light. RGB must be all zero (dark) or\"] # [doc = \" all one (light); alpha is strength. Sanitization selects black or white\"] # [doc = \" from red at 0.5. This covers the refracted rim, unlike an element fill.\"] pub wash : Rgba, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Opaque [`crate::LuminanceProbeLease::id`], or [`NO_LUMINANCE_PROBE`].\"] # [doc = \" The u32 carries a generation and physical slot; retain its lease and\"] # [doc = \" never substitute the decoded slot when querying the cache.\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, # [doc = \" Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,\"] # [doc = \" 3 left, 4 right. Stored as a float so the GPU struct stays one packed\"] # [doc = \" run of 32-bit words.\"] pub edge_mask_edge : f32, # [doc = \" How far that fade reaches from the named edge, in the surface's unit.\"] # [doc = \" Zero disables the mask even when [`Self::edge_mask_edge`] is set.\"] pub edge_mask_band : P, }",
       "cfg": []
     },
     {
@@ -36437,9 +36553,9 @@
       "module": "window",
       "path": "gpui::window",
       "source": "crates/gpui/src/window.rs",
-      "summary": "The mean luminance of the optical source a probed glass surface covered, in `0..=1`, or `None` while the slot holds no completed reading. The source is sharp for clear glass and blurred for frost.",
-      "documentation": "The mean luminance of the optical source a probed glass surface\ncovered, in `0..=1`, or `None` while the slot holds no completed\nreading. The source is sharp for clear glass and blurred for frost.\n\nA surface fills a slot by setting [`crate::GlassMaterial::probe`]. The\nrenderer copies the reading back without stalling the frame that took\nit, so the value describes the backdrop one frame ago: a caller that\nflips its own contrast on it must expect the flip to land a frame\nafter the backdrop moved, and `None` on any renderer that takes no\nprobes — the honest reading for a backdrop nobody measured.",
-      "signature": "pub fn backdrop_luminance (& self, slot : u32) -> Option<f32>",
+      "summary": "The mean luminance of the optical source a probed glass surface covered, in `0..=1`, or `None` while this lease holds no completed reading or was absent from the last submitted frame (including budget fallback). The source is sharp for clear glass and blurred for frost.",
+      "documentation": "The mean luminance of the optical source a probed glass surface\ncovered, in `0..=1`, or `None` while this lease holds no completed\nreading or was absent from the last submitted frame (including budget\nfallback). The source is sharp for clear glass and blurred for frost.\n\nPass the opaque ID from a live [`crate::LuminanceProbeLease`], also set\nin [`crate::GlassMaterial::probe`], never its physical slot index. The\nrenderer copies the reading back without stalling the frame that took\nit, so the value describes the backdrop one frame ago: a caller that\nflips its own contrast on it must expect the flip to land a frame\nafter the backdrop moved, and `None` on any renderer that takes no\nprobes — the honest reading for a backdrop nobody measured.",
+      "signature": "pub fn backdrop_luminance (& self, id : u32) -> Option<f32>",
       "cfg": [],
       "target": "Window"
     },
@@ -110777,7 +110893,7 @@
       "source": "crates/gpui_macos/src/metal_renderer.rs",
       "summary": "The luminance the most recently completed frame read for this slot.",
       "documentation": "The luminance the most recently completed frame read for this slot.",
-      "signature": "pub fn backdrop_luminance (& mut self, slot : u32) -> Option<f32>",
+      "signature": "pub fn backdrop_luminance (& mut self, id : u32) -> Option<f32>",
       "cfg": [],
       "target": "MetalRenderer"
     },
@@ -113371,7 +113487,7 @@
       "source": "crates/gpui_wgpu/src/wgpu_renderer.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub struct WgpuRenderer { # [doc = \" Shared GPU context for device recovery coordination (unused on WASM).\"] # [allow (dead_code)] context : Option<GpuContext>, # [doc = \" Compositor GPU hint for adapter selection (unused on WASM).\"] # [allow (dead_code)] compositor_gpu : Option<CompositorGpuHint>, resources : Option<WgpuResources>, surface_config : wgpu::SurfaceConfiguration, atlas : Arc<WgpuAtlas>, path_globals_offset : u64, gamma_offset : u64, instance_data_capacity : u64, max_instance_data_size : u64, instance_data_alignment : u64, uses_webgl_instance_data : bool, rendering_params : RenderingParameters, is_bgr : bool, dual_source_blending : bool, adapter_info : wgpu::AdapterInfo, transparent_alpha_mode : wgpu::CompositeAlphaMode, opaque_alpha_mode : wgpu::CompositeAlphaMode, max_texture_size : u32, last_error : Arc<Mutex<Option<String>>>, failed_frame_count : u32, device_lost : std::sync::Arc<std::sync::atomic::AtomicBool>, surface_configured : bool, needs_redraw : bool, probe_inflight : Option<ProbeInflight>, probe_values : [Option<f32>; MAX_LUMINANCE_PROBES], }",
+      "signature": "pub struct WgpuRenderer { # [doc = \" Shared GPU context for device recovery coordination (unused on WASM).\"] # [allow (dead_code)] context : Option<GpuContext>, # [doc = \" Compositor GPU hint for adapter selection (unused on WASM).\"] # [allow (dead_code)] compositor_gpu : Option<CompositorGpuHint>, resources : Option<WgpuResources>, surface_config : wgpu::SurfaceConfiguration, atlas : Arc<WgpuAtlas>, path_globals_offset : u64, gamma_offset : u64, instance_data_capacity : u64, max_instance_data_size : u64, instance_data_alignment : u64, uses_webgl_instance_data : bool, rendering_params : RenderingParameters, is_bgr : bool, dual_source_blending : bool, adapter_info : wgpu::AdapterInfo, transparent_alpha_mode : wgpu::CompositeAlphaMode, opaque_alpha_mode : wgpu::CompositeAlphaMode, max_texture_size : u32, last_error : Arc<Mutex<Option<String>>>, failed_frame_count : u32, device_lost : std::sync::Arc<std::sync::atomic::AtomicBool>, surface_configured : bool, needs_redraw : bool, probe_inflight : Option<ProbeInflight>, probe_values : LuminanceProbeCache, }",
       "cfg": []
     },
     {
@@ -113385,7 +113501,7 @@
       "source": "crates/gpui_wgpu/src/wgpu_renderer.rs",
       "summary": "The luminance the most recently completed frame read for this slot.",
       "documentation": "The luminance the most recently completed frame read for this slot.",
-      "signature": "pub fn backdrop_luminance (& mut self, slot : u32) -> Option<f32>",
+      "signature": "pub fn backdrop_luminance (& mut self, id : u32) -> Option<f32>",
       "cfg": [],
       "target": "WgpuRenderer"
     },
@@ -141803,6 +141919,12 @@
       "anchor": "headless-capture-order-dependence-glass-probes"
     },
     {
+      "id": "coverage-image-atlas-placement-precision-separate-from-probe-ownership",
+      "title": "Image-atlas placement precision — separate from probe ownership",
+      "guide": "coverage",
+      "anchor": "image-atlas-placement-precision-separate-from-probe-ownership"
+    },
+    {
       "id": "datetime-why-the-seam-is-here",
       "title": "Why the seam is here",
       "guide": "datetime",
@@ -144719,6 +144841,17 @@
     },
     "framework_layout": {
       "measured_reveal": "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."
+    },
+    "framework_luminance_probe": {
+      "contract": "LuminanceProbeLease encodes a 4-bit physical slot and 28-bit generation in the existing u32 material field. Exhausted slots retire without wraparound. Metal, Direct3D and WGPU share LuminanceProbeCache: absent probes read None; completed samples must match full ID and current activation, and cannot overwrite newer samples. No GPU ABI change or new Metal wait.",
+      "tests": [
+        "a_reacquired_slot_cannot_read_or_publish_the_previous_owners_value",
+        "an_unsubmitted_fallback_probe_has_no_reading",
+        "late_old_activation_callbacks_cannot_restore_or_overwrite_readings",
+        "exhausted_generations_retire_slots_instead_of_wrapping",
+        "a_reacquired_probe_requires_its_own_admitted_metal_submission",
+        "a_reacquired_probe_requires_its_own_admitted_wgpu_submission"
+      ]
     },
     "framework_motion": {
       "spring": "SpringConfig analytically advances position and velocity for fixed or steadily moving targets; with_spring retains per-element state across retargeting, supports pause, stop, complete, and cancel, and resolves finite overshoot without clamping. Reduced motion snaps a running spring to its target."

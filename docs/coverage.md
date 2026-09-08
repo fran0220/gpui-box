@@ -1010,7 +1010,7 @@ is their probe ownership: complete/standalone runs assign H/I slots 14/15 with
 `None`, while the selected sequence reuses slots 3/4 and reads the previous
 scene's `Some(0.92572516)` in both themes. That value changes `glass_shadows`.
 
-`ProbeLease::slot`/`Drop` in `overlay/glass.rs` allocates/releases slot numbers
+The former Kit `ProbeLease::slot`/`Drop` allocated/released slot numbers
 without invalidating renderer samples. Keyed state has a two-frame retention
 grace. Metal `read_probe_values` overwrites only requested slots, so an
 unadmitted replacement surface never refreshes its inherited value. The shared
@@ -1019,9 +1019,65 @@ stable stale sample. This is a located product probe-lifetime defect, not merely
 atlas rounding: opening and closing overlays can give a replacement fallback
 surface another surface's shadow strength.
 
-The following product-fix commit will invalidate samples when a lease changes
-owner, with generation-aware completion publication so an old GPU callback cannot restore
-it. The boundary is lease acquisition and the renderer's probe cache; it must
-be consistent on Metal, Direct3D and WGPU. A fresh renderer per scene would
-isolate the harness but would not fix stale product shadows. This review records
-the gap rather than introducing a headless-only reset or weakening the gate.
+The product fix moves ownership to framework `LuminanceProbeLease` and
+`LuminanceProbeCache`. The existing u32 material probe is an opaque ID with
+4 physical-slot bits and 28 generation bits. Reacquisition changes generation;
+exhausted slots retire permanently instead of wrapping or issuing the all-ones
+sentinel. Renderers decode only GPU offsets, retaining full IDs for cached values.
+Each submitted frame registers its actually encoded probes, including an empty
+set: fallback/unsubmitted surfaces read `None`. Callbacks carry the submission
+sequence and full ID, rejecting old owners, previous activations and out-of-order
+older samples. Continuously active owners keep their latest completed reading;
+Metal adds no GPU wait. All three backends use this shared CPU cache without
+changing shader or GPU buffer layouts. No renderer-per-scene reset or tolerance
+increase is used. Portable tests cover reuse, fallback, late callbacks and
+generation exhaustion; a Metal test covers actual GPU submission and slot reuse.
+
+Metal verification: the 14-scene run and complete catalog both pass the existing
+one-step gate, and the complete catalog is 312/312 without replacement baselines.
+The original H/I shadow differences are gone. Whole `glass` frames are **not**
+byte-identical: the separate image-atlas rounding below remains.
+
+The strict cross-platform reproduction uses the native Metal renderer on macOS
+and real software WGPU adapter on Linux/Windows, with no baseline writes:
+
+```bash
+cargo run --manifest-path tools/headless-visual/Cargo.toml -- check-order glass \
+  actions cascader context-menu dialog drawer form mention-input menu menubar \
+  multi-select notification-center overlay toast
+cargo test -p gpui-box-wgpu a_reacquired_probe_requires_its_own_admitted_wgpu_submission -- --nocapture
+```
+
+`check-order` compares raw RGBA bytes, reports exact equality, differing-pixel
+counts, maximum channel step and inclusive bounds as JSON, and saves both target
+frames under `target/headless-order-check/{full,scoped}` and an amplified difference
+map under `diff-x64`. It fails even on the
+known one-step atlas difference: it is a diagnostic, not the tolerant catalog
+gate. The WGPU lease regression requires an adapter on Linux/Windows rather than
+silently skipping there; only a Metal host may skip the software WGPU execution.
+
+## Image-atlas placement precision — separate from probe ownership
+
+After the lease fix, selected/full `glass` frames differ at 80 dark pixels and
+84 light pixels, all by **one** channel step (none above one). Dark bounds are
+(1179,504)–(1430,534), light (1158,504)–(1474,538), in the Regular-on-media
+card's top rim/shadow, not budget capsules H/I. The comparison tolerance is not
+increased and these frames are not described as byte-identical.
+
+Captured CPU inputs rule out probe ownership: both runs publish the same
+Regular-media luminance sequence, ending at `0.49284562` in dark and `0.5068491`
+in light. Sprite bounds are identically `(816,448)+(768×288)` device pixels.
+The identical 384×144 image occupies polychrome texture 0 at tile `(48,0)`
+(TileId 4096) in the selected run, versus `(48,368)` (TileId 4100) in the full
+run, with zero padding in both. Metal's polychrome vertex shader adds this
+atlas origin before normalized-UV interpolation; its fragment linearly samples
+those UVs. This is placement-dependent image sampling precision, not a leftover
+lease value. It is visible at the material/shadow compositing rounding boundary.
+
+Atlas placement is already integral. Removing the half-texel source-rectangle
+inset would break texel-centre semantics, not correct this precision contract.
+A future fix needs tile-local interpolation and translation-invariant sampling,
+with source rectangles, transformed sprites, edge filtering and all three
+shader backends verified. It potentially changes every image/textured-sprite
+baseline on Metal, Linux WGPU and Windows; it is not hidden in probe lifetime
+or addressed by a headless-only atlas reset.

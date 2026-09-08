@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, DevicePixels, Edges, Hsla,
-    Pixels, Point, Radians, Rgba, ScaledPixels, Size, bounds_tree::BoundsTree, point, white,
+    Pixels, Point, Radians, Rgba, ScaledPixels, Size, bounds_tree::BoundsTree,
+    luminance_probe_slot, point, white,
 };
 use std::{
     fmt::Debug,
@@ -881,7 +882,8 @@ mod tests {
             point(ScaledPixels(310.), ScaledPixels(250.)),
         );
         glass.material.blur_radius = ScaledPixels(0.);
-        glass.material.probe = 0;
+        // Generation bits must not suppress a valid physical slot's samples.
+        glass.material.probe = 0x1234_5670;
 
         let region = glass
             .render_region(0, size(DevicePixels(1000), DevicePixels(1000)))
@@ -1855,7 +1857,9 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// How far apart two lobes may be and still join. Zero makes the union a
     /// plain minimum, so lobes meet at a crease.
     pub smoothing: P,
-    /// Which luminance probe slot this surface fills, or [`NO_LUMINANCE_PROBE`].
+    /// Opaque [`crate::LuminanceProbeLease::id`], or [`NO_LUMINANCE_PROBE`].
+    /// The u32 carries a generation and physical slot; retain its lease and
+    /// never substitute the decoded slot when querying the cache.
     ///
     /// A probed surface has the mean luminance of its optical source reported
     /// back through [`crate::Window::backdrop_luminance`], one frame later.
@@ -2227,9 +2231,7 @@ impl BackdropGlass {
         };
         let reach = blur_reach + optical_reach;
         let mut sampled_output = clipped;
-        if self.material.probe != NO_LUMINANCE_PROBE
-            && (self.material.probe as usize) < MAX_LUMINANCE_PROBES
-        {
+        if luminance_probe_slot(self.material.probe).is_some() {
             for [x, y] in
                 self.probe_sample_points(viewport.width.0 as f32, viewport.height.0 as f32)
             {

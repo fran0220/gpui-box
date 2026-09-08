@@ -75,7 +75,8 @@ pub(crate) struct DirectXRenderer {
     probe_requests: Vec<u32>,
     /// The slots the previous frame copied, awaiting a map that never waits.
     probe_pending: Vec<u32>,
-    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
+    probe_pending_frame: u64,
+    probe_values: LuminanceProbeCache,
 }
 
 /// Direct3D objects
@@ -340,7 +341,8 @@ impl DirectXRenderer {
             probe_staging: None,
             probe_requests: Vec::new(),
             probe_pending: Vec::new(),
-            probe_values: [None; MAX_LUMINANCE_PROBES],
+            probe_pending_frame: 0,
+            probe_values: LuminanceProbeCache::default(),
         })
     }
 
@@ -779,9 +781,10 @@ impl DirectXRenderer {
         for glass in pending_glass {
             self.draw_backdrop_glass(glass, render_target, &mut remaining_backdrop_passes)?;
         }
-        if !self.probe_requests.is_empty() {
-            self.probe_pending = std::mem::take(&mut self.probe_requests);
-        }
+        self.probe_pending = std::mem::take(&mut self.probe_requests);
+        self.probe_pending_frame = self
+            .probe_values
+            .begin_frame(self.probe_pending.iter().copied());
         Ok(())
     }
 
@@ -798,9 +801,9 @@ impl DirectXRenderer {
         render_target: &SceneRenderTarget,
         remaining_passes: &mut usize,
     ) -> Result<()> {
-        let probe_slot = glass.material.probe;
-        let takes_probe =
-            probe_slot != NO_LUMINANCE_PROBE && (probe_slot as usize) < MAX_LUMINANCE_PROBES;
+        let probe_id = glass.material.probe;
+        let probe_slot = luminance_probe_slot(probe_id);
+        let takes_probe = probe_slot.is_some();
         if takes_probe {
             self.ensure_probe_staging()?;
         }
@@ -908,7 +911,7 @@ impl DirectXRenderer {
                         staging,
                         0,
                         index as u32,
-                        probe_slot,
+                        probe_slot.expect("only valid probes are encoded") as u32,
                         0,
                         blurred,
                         0,
@@ -941,7 +944,7 @@ impl DirectXRenderer {
             ))));
         }
         if takes_probe {
-            self.probe_requests.push(probe_slot);
+            self.probe_requests.push(probe_id);
         }
         Ok(())
     }
@@ -1011,8 +1014,9 @@ impl DirectXRenderer {
                     mapped.pData as *const u8,
                     pitch * MAX_LUMINANCE_PROBES,
                 );
-                for &slot in &self.probe_pending {
-                    let row = &data[slot as usize * pitch..];
+                for &id in &self.probe_pending {
+                    let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
+                    let row = &data[slot * pitch..];
                     let mut total = 0.0;
                     for index in 0..LUMINANCE_PROBE_SAMPLES {
                         // The render target, and so every texel here, is BGRA.
@@ -1023,7 +1027,11 @@ impl DirectXRenderer {
                             texel[0] as f32 / 255.0,
                         );
                     }
-                    values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+                    values.publish(
+                        self.probe_pending_frame,
+                        id,
+                        total / LUMINANCE_PROBE_SAMPLES as f32,
+                    );
                 }
                 devices.device_context.Unmap(staging, 0);
                 true
@@ -1038,7 +1046,7 @@ impl DirectXRenderer {
     /// The luminance the most recently completed frame read for this slot.
     pub(crate) fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
         self.collect_probes();
-        *self.probe_values.get(slot as usize)?
+        self.probe_values.get(slot)
     }
 
     pub(crate) fn resize(&mut self, new_size: Size<DevicePixels>) -> Result<()> {

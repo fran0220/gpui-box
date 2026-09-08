@@ -76,3 +76,7 @@
   over-deep optical dome regular: its slope must vanish before the arc collapses.
   Exercise interleaved foreground batches as well as frame-tail glass; enforce
   shared material geometry at the common upload boundary, not one caller.
+- A reusable GPU slot is not a cache identity. Retain owner generation and
+  activation through asynchronous readback; unsubmitted surfaces have no value.
+  Diagnose remaining image differences with probe inputs and atlas coordinates
+  before treating them as the same defect or claiming byte-for-byte equality.

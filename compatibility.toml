@@ -53,6 +53,10 @@ contract = "Window::show_context_menu consumes the shared Menu action tree, pres
 contract = "BackdropGlass::optical_bevel bounds requested dome depth by positive corner radii and half-extents before Metal, Direct3D and WGPU uniform packing. The optical slope vanishes before rounded arc normals collapse; square corners retain incident-face creases. No shader ABI change."
 tests = ["rounded_optical_profiles_flatten_before_the_arc_normal_collapses", "glass_corner_medial_axis_does_not_invent_a_specular_normal", "glass_menu_corner_does_not_concentrate_light_at_the_arc_centre"]
 
+[framework_luminance_probe]
+contract = "LuminanceProbeLease encodes a 4-bit physical slot and 28-bit generation in the existing u32 material field. Exhausted slots retire without wraparound. Metal, Direct3D and WGPU share LuminanceProbeCache: absent probes read None; completed samples must match full ID and current activation, and cannot overwrite newer samples. No GPU ABI change or new Metal wait."
+tests = ["a_reacquired_slot_cannot_read_or_publish_the_previous_owners_value", "an_unsubmitted_fallback_probe_has_no_reading", "late_old_activation_callbacks_cannot_restore_or_overwrite_readings", "exhausted_generations_retire_slots_instead_of_wrapping", "a_reacquired_probe_requires_its_own_admitted_metal_submission", "a_reacquired_probe_requires_its_own_admitted_wgpu_submission"]
+
 [framework_accessibility]
 cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."
 clipped_role_bounds = "Role-bearing element bounds are intersected with the active content mask before AccessKit publication; fully clipped nodes are omitted for that frame."

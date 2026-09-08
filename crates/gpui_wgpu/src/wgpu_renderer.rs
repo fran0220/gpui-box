@@ -3,9 +3,9 @@ use anyhow::{Context as _, Result};
 use bytemuck::{Pod, Zeroable};
 use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, DevicePixels, DrawOrder, GpuSpecs,
-    LUMINANCE_PROBE_SAMPLES, MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, Path,
-    Point, PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, get_gamma_correction_ratios,
-    probe_sample_luminance,
+    LUMINANCE_PROBE_SAMPLES, LuminanceProbeCache, MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES,
+    NO_LUMINANCE_PROBE, Path, Point, PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode,
+    get_gamma_correction_ratios, luminance_probe_slot, probe_sample_luminance,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
@@ -327,6 +327,7 @@ struct BackdropTextures {
 struct ProbeInflight {
     buffer: wgpu::Buffer,
     requests: Vec<u32>,
+    frame: u64,
     /// Whether the texels came back blue-first, decided by the texture format
     /// the frame sampled, not by the text subpixel order.
     bgra: bool,
@@ -418,7 +419,7 @@ pub struct WgpuRenderer {
     surface_configured: bool,
     needs_redraw: bool,
     probe_inflight: Option<ProbeInflight>,
-    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
+    probe_values: LuminanceProbeCache,
 }
 
 impl WgpuRenderer {
@@ -910,7 +911,7 @@ impl WgpuRenderer {
             surface_configured: true,
             needs_redraw: false,
             probe_inflight: None,
-            probe_values: [None; MAX_LUMINANCE_PROBES],
+            probe_values: LuminanceProbeCache::default(),
         })
     }
 
@@ -2539,6 +2540,9 @@ impl WgpuRenderer {
             "WebGPU frame submission validation failed",
             Arc::clone(&self.last_error),
         );
+        let probe_frame = self
+            .probe_values
+            .begin_frame(probe_requests.iter().copied());
         if let Some(buffer) = probe_buffer
             && !probe_requests.is_empty()
         {
@@ -2558,6 +2562,7 @@ impl WgpuRenderer {
             self.probe_inflight = Some(ProbeInflight {
                 buffer,
                 requests: probe_requests,
+                frame: probe_frame,
                 bgra,
                 mapped,
             });
@@ -2783,10 +2788,10 @@ impl WgpuRenderer {
         let Some(buffer) = buffer else {
             return;
         };
-        let slot = glass.material.probe;
-        if slot == NO_LUMINANCE_PROBE || slot as usize >= MAX_LUMINANCE_PROBES {
+        let id = glass.material.probe;
+        let Some(slot) = luminance_probe_slot(id) else {
             return;
-        }
+        };
         let Some(textures) = self.resources().backdrop_textures.as_ref() else {
             return;
         };
@@ -2811,8 +2816,8 @@ impl WgpuRenderer {
                 wgpu::TexelCopyBufferInfo {
                     buffer,
                     layout: wgpu::TexelCopyBufferLayout {
-                        offset: ((slot as usize * LUMINANCE_PROBE_SAMPLES + index)
-                            * PROBE_SAMPLE_STRIDE) as u64,
+                        offset: ((slot * LUMINANCE_PROBE_SAMPLES + index) * PROBE_SAMPLE_STRIDE)
+                            as u64,
                         bytes_per_row: None,
                         rows_per_image: None,
                     },
@@ -2824,7 +2829,7 @@ impl WgpuRenderer {
                 },
             );
         }
-        requests.push(slot);
+        requests.push(id);
     }
 
     /// Fold the in-flight probe readback into the slot values.
@@ -2860,11 +2865,11 @@ impl WgpuRenderer {
             .slice(..)
             .get_mapped_range()
             .expect("successfully mapped probe buffer must remain readable until collection");
-        for &slot in &inflight.requests {
+        for &id in &inflight.requests {
+            let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
             let mut total = 0.0;
             for index in 0..LUMINANCE_PROBE_SAMPLES {
-                let offset =
-                    (slot as usize * LUMINANCE_PROBE_SAMPLES + index) * PROBE_SAMPLE_STRIDE;
+                let offset = (slot * LUMINANCE_PROBE_SAMPLES + index) * PROBE_SAMPLE_STRIDE;
                 let texel = &data[offset..offset + 4];
                 let (red, green, blue) = if inflight.bgra {
                     (texel[2], texel[1], texel[0])
@@ -2877,14 +2882,15 @@ impl WgpuRenderer {
                     blue as f32 / 255.0,
                 );
             }
-            self.probe_values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+            self.probe_values
+                .publish(inflight.frame, id, total / LUMINANCE_PROBE_SAMPLES as f32);
         }
     }
 
     /// The luminance the most recently completed frame read for this slot.
-    pub fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+    pub fn backdrop_luminance(&mut self, id: u32) -> Option<f32> {
         self.collect_probes();
-        *self.probe_values.get(slot as usize)?
+        self.probe_values.get(id)
     }
 
     fn draw_backdrop_blur_weights(
@@ -4081,6 +4087,57 @@ mod tests {
             None,
             "an unprobed slot stays empty"
         );
+    }
+
+    #[test]
+    fn a_reacquired_probe_requires_its_own_admitted_wgpu_submission() {
+        use gpui::{Hsla, LuminanceProbeLease, PlatformHeadlessRenderer, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut renderer = match WgpuHeadlessRenderer::new() {
+            Ok(renderer) => renderer,
+            Err(error) => {
+                // Linux/Windows validation must have their software adapter.
+                #[cfg(not(target_os = "macos"))]
+                panic!("native WGPU probe regression requires an adapter: {error}");
+                #[cfg(target_os = "macos")]
+                {
+                    eprintln!("skipping software WGPU on Metal host: {error}");
+                    return;
+                }
+            }
+        };
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let mut first = LuminanceProbeLease::default();
+        let old = first.id().expect("initial probe is free");
+        renderer
+            .render_scene_to_image(&probed_scene(Hsla::white(), old), extent)
+            .expect("glass renders");
+        assert!(
+            renderer
+                .backdrop_luminance(old)
+                .expect("first owner completed")
+                > 0.9
+        );
+        drop(first);
+        let mut second = LuminanceProbeLease::default();
+        let new = second.id().expect("released probe is free");
+        assert_eq!(luminance_probe_slot(new), luminance_probe_slot(old));
+        assert_ne!(new, old);
+        assert_eq!(renderer.backdrop_luminance(new), None);
+        renderer
+            .render_scene_to_image(&probed_scene(Hsla::black(), new), extent)
+            .expect("glass renders");
+        assert!(
+            renderer
+                .backdrop_luminance(new)
+                .expect("new owner completed")
+                < 0.1
+        );
+        assert_eq!(renderer.backdrop_luminance(old), None);
+        renderer
+            .render_scene_to_image(&Scene::default(), extent)
+            .expect("empty frame renders");
+        assert_eq!(renderer.backdrop_luminance(new), None);
     }
 
     #[test]

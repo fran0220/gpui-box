@@ -2765,17 +2765,19 @@ impl Window {
     }
 
     /// The mean luminance of the optical source a probed glass surface
-    /// covered, in `0..=1`, or `None` while the slot holds no completed
-    /// reading. The source is sharp for clear glass and blurred for frost.
+    /// covered, in `0..=1`, or `None` while this lease holds no completed
+    /// reading or was absent from the last submitted frame (including budget
+    /// fallback). The source is sharp for clear glass and blurred for frost.
     ///
-    /// A surface fills a slot by setting [`crate::GlassMaterial::probe`]. The
+    /// Pass the opaque ID from a live [`crate::LuminanceProbeLease`], also set
+    /// in [`crate::GlassMaterial::probe`], never its physical slot index. The
     /// renderer copies the reading back without stalling the frame that took
     /// it, so the value describes the backdrop one frame ago: a caller that
     /// flips its own contrast on it must expect the flip to land a frame
     /// after the backdrop moved, and `None` on any renderer that takes no
     /// probes — the honest reading for a backdrop nobody measured.
-    pub fn backdrop_luminance(&self, slot: u32) -> Option<f32> {
-        self.platform_window.backdrop_luminance(slot)
+    pub fn backdrop_luminance(&self, id: u32) -> Option<f32> {
+        self.platform_window.backdrop_luminance(id)
     }
 
     /// Set the content size of the window.

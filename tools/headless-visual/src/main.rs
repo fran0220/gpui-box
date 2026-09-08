@@ -38,6 +38,13 @@ fn main() -> Result<()> {
     match command.as_deref() {
         Some("capture") => imp::capture(&scenes, shard),
         Some("check") => imp::check(&scenes, shard),
+        Some("check-order") => {
+            anyhow::ensure!(
+                shard.is_none(),
+                "check-order compares the complete catalog, not a shard"
+            );
+            imp::check_order(&scenes)
+        }
         Some("serve") => {
             anyhow::ensure!(
                 scenes.is_empty() && shard.is_none(),
@@ -46,7 +53,7 @@ fn main() -> Result<()> {
             serve::run()
         }
         _ => anyhow::bail!(
-            "usage: headless-visual <capture|check|serve> [--shard INDEX/COUNT] [scene...]"
+            "usage: headless-visual <capture|check|serve> [--shard INDEX/COUNT] [scene...]; check-order TARGET [selected-scenes...]"
         ),
     }
 }
@@ -201,6 +208,95 @@ mod imp {
             missing.len(),
             scratch.display()
         );
+    }
+
+    /// Strict pixel equality between a full catalog and selected catalog order.
+    /// Uses the native platform renderer in both runs (Metal or software WGPU),
+    /// never rewrites baselines, and deliberately fails even on one-step atlas
+    /// rounding. This diagnostic is stricter than the ordinary visual gate.
+    pub fn check_order(selected: &[String]) -> Result<()> {
+        let target = selected
+            .first()
+            .context("check-order requires a target scene")?;
+        for scene in selected {
+            if gpui_kit::scenes::find(scene).is_none() {
+                bail!("unknown scene `{scene}`");
+            }
+        }
+        let names =
+            gpui_kit::tokens::bundled().map(|theme| format!("{target}-{}.png", theme.meta.id));
+        let output = repo_root().join("target/headless-order-check");
+        fs::create_dir_all(output.join("full"))?;
+        fs::create_dir_all(output.join("scoped"))?;
+        fs::create_dir_all(output.join("diff-x64"))?;
+        let mut full = std::collections::BTreeMap::new();
+        capture_frames(&[], None, |name, frame| {
+            if names.iter().any(|expected| expected == name) {
+                frame.save(output.join("full").join(name))?;
+                full.insert(name.to_owned(), frame.clone());
+            }
+            Ok(())
+        })?;
+        let mut exact = true;
+        capture_frames(selected, None, |name, frame| {
+            if !names.iter().any(|expected| expected == name) {
+                return Ok(());
+            }
+            frame.save(output.join("scoped").join(name))?;
+            let expected = full.get(name).context("full catalog omitted target")?;
+            anyhow::ensure!(
+                expected.dimensions() == frame.dimensions(),
+                "{name} changed size"
+            );
+            let mut count = 0usize;
+            let mut over_one = 0usize;
+            let mut maximum = 0u8;
+            let mut bounds = [frame.width(), frame.height(), 0, 0];
+            let mut difference = image::RgbaImage::from_pixel(
+                frame.width(),
+                frame.height(),
+                image::Rgba([0, 0, 0, 255]),
+            );
+            for ((x, y, a), b) in expected.enumerate_pixels().zip(frame.pixels()) {
+                let delta =
+                    a.0.iter()
+                        .zip(b.0)
+                        .map(|(&a, b)| a.abs_diff(b))
+                        .max()
+                        .expect("RGBA has four channels");
+                let intensity = delta.saturating_mul(64);
+                difference.put_pixel(x, y, image::Rgba([intensity, intensity, intensity, 255]));
+                if delta != 0 {
+                    count += 1;
+                    over_one += usize::from(delta > 1);
+                    maximum = maximum.max(delta);
+                    bounds = [
+                        bounds[0].min(x),
+                        bounds[1].min(y),
+                        bounds[2].max(x),
+                        bounds[3].max(y),
+                    ];
+                }
+            }
+            difference.save(output.join("diff-x64").join(name))?;
+            exact &= count == 0;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "frame": name, "byte_identical": count == 0,
+                    "different_pixels": count, "pixels_over_one": over_one,
+                    "max_channel_step": maximum,
+                    "inclusive_bounds": (count != 0).then_some(bounds),
+                })
+            );
+            Ok(())
+        })?;
+        anyhow::ensure!(
+            exact,
+            "target pixels depend on capture order; inspect {} (no tolerance applied)",
+            output.display()
+        );
+        Ok(())
     }
 
     fn repo_root() -> PathBuf {

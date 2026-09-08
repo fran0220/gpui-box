@@ -8,9 +8,9 @@ use cocoa::{
 };
 use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
-    LUMINANCE_PROBE_SAMPLES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, PaintSurface, Path, Point,
-    PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, TextGammaParams, point,
-    probe_sample_luminance, size,
+    LUMINANCE_PROBE_SAMPLES, LuminanceProbeCache, MAX_LUMINANCE_PROBES, PaintSurface, Path, Point,
+    PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, TextGammaParams,
+    luminance_probe_slot, point, probe_sample_luminance, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -155,18 +155,17 @@ fn new_probe_buffer(device: &metal::DeviceRef) -> metal::Buffer {
 fn read_probe_values(
     buffer: &metal::BufferRef,
     requests: &[u32],
-    values: &mut [Option<f32>; MAX_LUMINANCE_PROBES],
+    frame: u64,
+    values: &mut LuminanceProbeCache,
 ) {
     let data = buffer.contents() as *const u8;
-    for &slot in requests {
+    for &id in requests {
+        let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
         let mut total = 0.0;
         for index in 0..LUMINANCE_PROBE_SAMPLES {
             // The drawable and every scratch texture are BGRA8Unorm.
             let texel = unsafe {
-                slice::from_raw_parts(
-                    data.add((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4),
-                    4,
-                )
+                slice::from_raw_parts(data.add((slot * LUMINANCE_PROBE_SAMPLES + index) * 4), 4)
             };
             total += probe_sample_luminance(
                 texel[2] as f32 / 255.0,
@@ -174,7 +173,7 @@ fn read_probe_values(
                 texel[0] as f32 / 255.0,
             );
         }
-        values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+        values.publish(frame, id, total / LUMINANCE_PROBE_SAMPLES as f32);
     }
 }
 
@@ -208,7 +207,7 @@ pub(crate) struct MetalRenderer {
     probe_requests: Vec<u32>,
     /// Latest readings published by completed command buffers. Rendering and
     /// callers only take this CPU lock; neither ever waits for the GPU.
-    probe_values: Arc<Mutex<[Option<f32>; MAX_LUMINANCE_PROBES]>>,
+    probe_values: Arc<Mutex<LuminanceProbeCache>>,
     quads_pipeline_state: metal::RenderPipelineState,
     underlines_pipeline_state: metal::RenderPipelineState,
     monochrome_sprites_pipeline_state: metal::RenderPipelineState,
@@ -506,7 +505,7 @@ impl MetalRenderer {
             probe_buffer,
             probe_buffer_pool: Arc::new(Mutex::new(Vec::new())),
             probe_requests: Vec::new(),
-            probe_values: Arc::new(Mutex::new([None; MAX_LUMINANCE_PROBES])),
+            probe_values: Arc::new(Mutex::new(LuminanceProbeCache::default())),
             quads_pipeline_state,
             underlines_pipeline_state,
             monochrome_sprites_pipeline_state,
@@ -693,6 +692,7 @@ impl MetalRenderer {
         // gets a different buffer, so neither rendering nor a caller asking
         // for the latest value can force a GPU-to-CPU wait.
         let probes = mem::take(&mut self.probe_requests);
+        let probe_frame = self.probe_values.lock().begin_frame(probes.iter().copied());
         if !probes.is_empty() {
             let next_buffer = self
                 .probe_buffer_pool
@@ -705,7 +705,7 @@ impl MetalRenderer {
             let probe_values = Arc::clone(&self.probe_values);
             let block = ConcreteBlock::new(move |_| {
                 if let Some(buffer) = completed_buffer.take() {
-                    read_probe_values(&buffer, &probes, &mut probe_values.lock());
+                    read_probe_values(&buffer, &probes, probe_frame, &mut probe_values.lock());
                     probe_buffer_pool.lock().push(buffer);
                 }
             });
@@ -1185,10 +1185,10 @@ impl MetalRenderer {
         blurred: &metal::TextureRef,
         command_buffer: &metal::CommandBufferRef,
     ) {
-        let slot = glass.material.probe;
-        if slot == NO_LUMINANCE_PROBE || slot as usize >= MAX_LUMINANCE_PROBES {
+        let id = glass.material.probe;
+        let Some(slot) = luminance_probe_slot(id) else {
             return;
-        }
+        };
         let points = glass.probe_sample_points(blurred.width() as f32, blurred.height() as f32);
         let blit = command_buffer.new_blit_command_encoder();
         for (index, [x, y]) in points.into_iter().enumerate() {
@@ -1207,19 +1207,19 @@ impl MetalRenderer {
                     depth: 1,
                 },
                 &self.probe_buffer,
-                ((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4) as u64,
+                ((slot * LUMINANCE_PROBE_SAMPLES + index) * 4) as u64,
                 4,
                 4,
                 metal::MTLBlitOption::empty(),
             );
         }
         blit.end_encoding();
-        self.probe_requests.push(slot);
+        self.probe_requests.push(id);
     }
 
     /// The luminance the most recently completed frame read for this slot.
-    pub fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
-        *self.probe_values.lock().get(slot as usize)?
+    pub fn backdrop_luminance(&mut self, id: u32) -> Option<f32> {
+        self.probe_values.lock().get(id)
     }
 
     /// The cached `MPSImageGaussianBlur` for `sigma` (device px) — Apple's
@@ -2357,6 +2357,46 @@ mod tests {
             None,
             "an unprobed slot stays empty"
         );
+    }
+
+    #[test]
+    fn a_reacquired_probe_requires_its_own_admitted_metal_submission() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let mut first = gpui::LuminanceProbeLease::default();
+        let old = first.id().expect("a probe is available");
+        renderer
+            .render_scene_to_image(&probed_scene(Hsla::white(), old), extent)
+            .expect("glass renders");
+        assert!(
+            renderer
+                .backdrop_luminance(old)
+                .expect("first owner completed")
+                > 0.9
+        );
+        drop(first);
+        let mut second = gpui::LuminanceProbeLease::default();
+        let new = second.id().expect("the released probe is available");
+        assert_eq!(luminance_probe_slot(new), luminance_probe_slot(old));
+        assert_ne!(new, old);
+        assert_eq!(renderer.backdrop_luminance(new), None);
+        renderer
+            .render_scene_to_image(&probed_scene(Hsla::black(), new), extent)
+            .expect("glass renders");
+        assert!(
+            renderer
+                .backdrop_luminance(new)
+                .expect("new owner completed")
+                < 0.1
+        );
+        assert_eq!(renderer.backdrop_luminance(old), None);
+        // A fallback frame has no admitted glass primitive and must clear
+        // active readings even though this owner still holds the lease.
+        renderer
+            .render_scene_to_image(&Scene::default(), extent)
+            .expect("empty frame renders");
+        assert_eq!(renderer.backdrop_luminance(new), None);
     }
 
     #[test]
