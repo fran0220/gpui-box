@@ -1,0 +1,6 @@
+[
+  {"kind":"kit","id":"review.waveform","component":"AudioWaveform","props":{"peaks":[0.15,0.85,0.4,0.7,0.2,1,0.3,0.6],"playhead":0.3}},
+  {"kind":"kit","id":"review.audio","component":"AudioPlayer","props":{"title":"Native audio — unavailable","subtitle":"No transport authority; not simulated playback","peaks":[0.2,0.8,0.5]}},
+  {"kind":"kit","id":"review.video","component":"VideoPlayer","props":{"title":"Native video — unavailable","ratio":1.7777778}},
+  {"kind":"kit","id":"review.model","component":"ModelViewer","props":{"title":"Bounded native glTF refusal","document":"{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"uri\":\"file:///etc/passwd\",\"byteLength\":12}]}","height":180}}
+]
