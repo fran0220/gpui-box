@@ -520,3 +520,6 @@ License text: fixtures/fonts/noto-color-emoji/OFL.txt
 Exact font and license hashes: fixtures/fonts/noto-color-emoji/README.md
 This font is registered only by explicit native review helper calls; it does
 not change the default Kit or isolated test font set.
+
+Shared native-value and viewport-node retention are original GPUI Box changes
+using the existing AccessKit dependency, without importing or forking its code.

@@ -918,3 +918,9 @@ Copyright 2022 Google Inc. Its adjacent README records exact byte hashes and
 source paths; OFL.txt preserves the upstream license. The original GPUI Box
 `tools/app-host/src/review_fonts.rs` helper registers it only when explicitly
 called for capture review. No default fonts or historical import receipt change.
+
+Shared element-value publication and unchanged native parent/viewport-node
+retention are original GPUI Box work using AccessKit's existing TreeUpdate
+protocol. Complete changed values and relationship names remain available;
+no AccessKit package fork, adapter modification or historical import update
+is introduced. Producer value-copy counters exclude platform backend copies.

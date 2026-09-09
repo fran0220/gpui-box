@@ -15,6 +15,51 @@ use unicode_segmentation::UnicodeSegmentation;
 const WIDTH: f32 = 200.0;
 
 #[gpui::test]
+fn native_static_values_are_retained_and_selection_changes_publish_complete_values(
+    cx: &mut TestAppContext,
+) {
+    for count in [1000, 10000] {
+        let source = format!(
+            "[\n{}{{\"tail\":7}}\n]",
+            "{\"asymmetric\":\"界\",\"value\":13},\n".repeat(count)
+        );
+        let bytes = source.len();
+        let (mut harness, slot) = area(cx, move |area| {
+            area.text(source.clone()).wrap(TextAreaWrap::None).rows(8)
+        });
+        let entity = slot.borrow().clone().expect("area");
+        harness.frame();
+        harness.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let work = window.accessibility_value_work();
+            assert_eq!(work.materialized_bytes, 0, "{work:?}");
+            assert_eq!(work.debug_clone_bytes, 0, "{work:?}");
+            assert_eq!(work.retained_bytes, bytes, "{work:?}");
+            assert_eq!(entity.read(cx).accessibility_work().published_runs, 0);
+            entity.update(cx, |area, cx| area.set_selected_range(0..0, cx));
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let work = window.accessibility_value_work();
+            assert_eq!(work.materialized_bytes, bytes, "{work:?}");
+            assert!(work.debug_clone_bytes >= bytes, "{work:?}");
+            let tree: serde_json::Value =
+                serde_json::from_str(&window.debug_a11y_tree_json().expect("tree")).expect("JSON");
+            let field = tree["nodes"]
+                .as_object()
+                .expect("nodes")
+                .values()
+                .find(|node| node["aria"]["role"] == "MultilineTextInput")
+                .expect("field");
+            assert_eq!(
+                field["aria"]["value"].as_str().expect("full Value").len(),
+                bytes
+            );
+        });
+    }
+}
+
+#[gpui::test]
 fn retained_wrap_and_size_changes_keep_utf16_composition_and_one_undo_step(
     cx: &mut TestAppContext,
 ) {

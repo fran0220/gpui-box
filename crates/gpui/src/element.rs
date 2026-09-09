@@ -143,6 +143,16 @@ pub trait Element: 'static + IntoElement {
     /// See the [accessibility guide](crate::_accessibility) for an overview.
     fn write_a11y_info(&self, _node: &mut accesskit::Node) {}
 
+    /// Writes properties while optionally supplying the complete value as
+    /// shared storage. GPUI materializes it only when the final node changes;
+    /// this is native-node retention, not an abbreviated accessible value.
+    /// Implementations returning a value must omit it from `node` here.
+    /// The ordinary `write_a11y_info` contract remains fully materialized.
+    fn write_a11y_info_shared(&self, node: &mut accesskit::Node) -> Option<crate::SharedString> {
+        self.write_a11y_info(node);
+        None
+    }
+
     /// Returns this element's non-topological accessibility relationships.
     ///
     /// Called only when [`Element::a11y_role`] returns `Some`. GPUI resolves
@@ -424,9 +434,12 @@ impl<E: Element> Drawable<E> {
                         x1: ((a11y_bounds.origin.x.0 + a11y_bounds.size.width.0) * scale) as f64,
                         y1: ((a11y_bounds.origin.y.0 + a11y_bounds.size.height.0) * scale) as f64,
                     });
-                    self.element.write_a11y_info(&mut node);
+                    let shared_value = self.element.write_a11y_info_shared(&mut node);
                     window.a11y.node_bounds.insert(node_id, a11y_bounds);
                     pushed_a11y_node = window.a11y.nodes.push(node_id, node);
+                    if pushed_a11y_node && let Some(value) = shared_value {
+                        window.a11y.nodes.set_shared_value(node_id, value);
+                    }
                     if pushed_a11y_node && let Some(element_id) = global_id.0.last() {
                         window.a11y.nodes.register_element_relationships(
                             element_id.clone(),

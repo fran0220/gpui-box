@@ -67,7 +67,7 @@ use uuid::Uuid;
 pub(crate) mod a11y;
 mod prompts;
 
-pub use a11y::A11ySubtreeBuilder;
+pub use a11y::{A11ySubtreeBuilder, A11yValueWork};
 
 use self::a11y::{A11y, ROOT_NODE_ID};
 use crate::util::{

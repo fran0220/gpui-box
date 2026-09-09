@@ -115,6 +115,28 @@ use std::sync::{
 /// The fixed AccessKit node ID used for the root of every window's a11y tree.
 pub(crate) const ROOT_NODE_ID: NodeId = NodeId(0);
 
+/// Actual native-value copying in the last completed accessibility frame.
+/// These counters exclude geometry/child metadata, source flattening, native
+/// adapter copies and explicit platform value queries.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct A11yValueWork {
+    /// UTF-8 bytes materialized from shared element values for changed nodes.
+    pub materialized_bytes: usize,
+    /// Complete value bytes retained natively without retransmission.
+    pub retained_bytes: usize,
+    /// Value bytes cloned to maintain the complete debug/inspection tree.
+    pub debug_clone_bytes: usize,
+    /// Bytes copied to resolve accessible label/description relationships.
+    pub relationship_bytes: usize,
+}
+
+impl Window {
+    /// Value-copy work for the last completed native accessibility frame.
+    pub fn accessibility_value_work(&self) -> A11yValueWork {
+        self.a11y.nodes.value_work
+    }
+}
+
 /// A listener for an accessibility action on a specific node.
 pub(crate) type A11yActionListener =
     Box<dyn FnMut(Option<&accesskit::ActionData>, &mut Window, &mut App) + 'static>;
@@ -295,6 +317,12 @@ impl A11y {
     /// Finalize the tree and produce a [`TreeUpdate`] for the platform adapter.
     pub(crate) fn end_frame(&mut self, frame: debug::FrameDebugInfo) -> TreeUpdate {
         let update = self.nodes.finalize();
+        self.nodes.value_work.debug_clone_bytes = update
+            .nodes
+            .iter()
+            .filter_map(|(_, node)| node.value())
+            .map(str::len)
+            .sum();
         self.debug.capture(
             &update,
             &self.nodes.seen_ids,
@@ -414,11 +442,30 @@ impl<'a> A11ySubtreeBuilder<'a> {
         true
     }
 
+    /// Physical-pixel clip applied to synthetic node bounds. A retained
+    /// geometry cache must invalidate when this changes, even when its
+    /// unclipped source cells are unchanged.
+    pub fn bounds_clip(&self) -> Option<accesskit::Rect> {
+        self.bounds_clip
+    }
+
     /// A mutable reference to the parent node.
     pub fn parent_node(&mut self) -> &mut accesskit::Node {
+        // The legacy mutable-node API promises a complete value, including to
+        // callers inspecting it. Only typed mutation can avoid this copy.
+        self.nodes.materialize_current_value();
         self.nodes
             .current_node_mut()
             .expect("A11ySubtreeBuilder exists only while its element's node is on the stack")
+    }
+
+    /// Updates the parent's selection without forcing its shared value into
+    /// owned storage before the final node-retention comparison.
+    pub fn set_parent_text_selection(&mut self, selection: accesskit::TextSelection) {
+        self.nodes
+            .current_node_mut()
+            .expect("synthetic parent")
+            .set_text_selection(selection);
     }
 }
 
@@ -457,6 +504,9 @@ pub(crate) struct A11yNodeBuilder {
     all_nodes: Vec<(NodeId, accesskit::Node)>,
     seen_ids: FxHashSet<NodeId>,
     published_ids: FxHashSet<NodeId>,
+    shared_values: FxHashMap<NodeId, SharedString>,
+    retained_value_nodes: FxHashMap<NodeId, (accesskit::Node, SharedString)>,
+    value_work: A11yValueWork,
     /// Role-bearing element identities present in this frame. A local
     /// [`ElementId`] is accepted only when it resolves to exactly one node in
     /// the active window, which is what lets deferred overlays refer back to
@@ -485,6 +535,9 @@ impl A11yNodeBuilder {
             all_nodes: Vec::new(),
             seen_ids: FxHashSet::default(),
             published_ids: FxHashSet::default(),
+            shared_values: FxHashMap::default(),
+            retained_value_nodes: FxHashMap::default(),
+            value_work: A11yValueWork::default(),
             relationship_nodes: FxHashMap::default(),
             relationships: Vec::new(),
             focus: None,
@@ -623,6 +676,20 @@ impl A11yNodeBuilder {
         self.nodes_stack.last_mut()
     }
 
+    pub(crate) fn set_shared_value(&mut self, id: NodeId, value: SharedString) {
+        self.shared_values.insert(id, value);
+    }
+
+    fn materialize_current_value(&mut self) {
+        if let Some(id) = self.ids_stack.last()
+            && let Some(value) = self.shared_values.remove(id)
+            && let Some(node) = self.nodes_stack.last_mut()
+        {
+            self.value_work.materialized_bytes += value.len();
+            node.set_value(value.to_string());
+        }
+    }
+
     /// Pop the current node off the stack and finalize it into the all_nodes
     /// list.
     pub(crate) fn pop(&mut self) {
@@ -641,6 +708,8 @@ impl A11yNodeBuilder {
         self.deferred_children.clear();
         self.current_reservation = None;
         self.seen_ids.clear();
+        self.shared_values.clear();
+        self.value_work = A11yValueWork::default();
         self.relationship_nodes.clear();
         self.relationships.clear();
         #[cfg(debug_assertions)]
@@ -752,9 +821,45 @@ impl A11yNodeBuilder {
             focus,
         };
 
-        let update = Self::repair_tree_update(update, &self.seen_ids);
+        let mut update = Self::repair_tree_update(update, &self.seen_ids);
+        self.retain_shared_values(&mut update.nodes);
         self.published_ids.clone_from(&self.seen_ids);
         update
+    }
+
+    fn retain_shared_values(&mut self, nodes: &mut Vec<(NodeId, accesskit::Node)>) {
+        self.retained_value_nodes
+            .retain(|id, _| self.seen_ids.contains(id));
+        nodes.retain_mut(|(id, node)| {
+            let Some(value) = self.shared_values.remove(id) else {
+                self.retained_value_nodes.remove(id);
+                return true;
+            };
+            // A synthetic callback can replace the value explicitly. Its
+            // complete node wins over the element's deferred value.
+            if node.value().is_some() {
+                self.retained_value_nodes.remove(id);
+                return true;
+            }
+            if self.published_ids.contains(id)
+                && self
+                    .retained_value_nodes
+                    .get(id)
+                    .is_some_and(|(previous, previous_value)| {
+                        previous == node
+                            && (std::ptr::eq(previous_value.as_ref(), value.as_ref())
+                                || previous_value == &value)
+                    })
+            {
+                self.value_work.retained_bytes += value.len();
+                return false;
+            }
+            self.retained_value_nodes
+                .insert(*id, (node.clone(), value.clone()));
+            self.value_work.materialized_bytes += value.len();
+            node.set_value(value.to_string());
+            true
+        });
     }
 
     fn resolve_deferred_children(&mut self) {
@@ -861,25 +966,45 @@ impl A11yNodeBuilder {
         // text onto an otherwise unnamed/undescribed owner so those adapters
         // still announce the complete accessible name and description. A
         // caller's explicit scalar always wins.
+        let needed: FxHashSet<_> = self
+            .all_nodes
+            .iter()
+            .flat_map(|(_, node)| {
+                node.labelled_by()
+                    .iter()
+                    .filter(|_| node.label().is_none())
+                    .chain(
+                        node.described_by()
+                            .iter()
+                            .filter(|_| node.description().is_none()),
+                    )
+                    .copied()
+            })
+            .collect();
         let related_text = self
             .all_nodes
             .iter()
+            .filter(|(id, _)| needed.contains(id))
             .filter_map(|(id, node)| {
                 node.label()
                     .or_else(|| node.value())
+                    .or_else(|| self.shared_values.get(id).map(|value| value.as_ref()))
                     .filter(|text| !text.is_empty())
                     .map(|text| (*id, text.to_owned()))
             })
             .collect::<FxHashMap<_, _>>();
+        self.value_work.relationship_bytes = related_text.values().map(String::len).sum();
         for (_, node) in &mut self.all_nodes {
             if node.label().is_none()
                 && let Some(label) = relationship_text(node.labelled_by(), &related_text)
             {
+                self.value_work.relationship_bytes += label.len();
                 node.set_label(label);
             }
             if node.description().is_none()
                 && let Some(description) = relationship_text(node.described_by(), &related_text)
             {
+                self.value_work.relationship_bytes += description.len();
                 node.set_description(description);
             }
         }
@@ -1004,6 +1129,167 @@ mod tests {
         a11y.sync_active_flag();
         a11y.begin_frame();
         a11y
+    }
+
+    #[test]
+    fn shared_parent_values_retain_static_frames_but_publish_complete_changed_values() {
+        for count in [1000, 10000] {
+            let mut value: crate::SharedString = "é界😀\n".repeat(count).into();
+            let mut a11y = new_a11y();
+            for frame in 0..6 {
+                if frame == 3 {
+                    value = format!("{value}終").into();
+                }
+                if frame == 5 {
+                    a11y.nodes.published_ids.clear();
+                }
+                a11y.begin_frame();
+                let mut node = accesskit::Node::new(Role::MultilineTextInput);
+                node.set_bounds(Rect {
+                    x0: 0.0,
+                    y0: 0.0,
+                    x1: if frame >= 4 { 123.0 } else { 101.0 },
+                    y1: 30.0,
+                });
+                node.set_text_selection(accesskit::TextSelection {
+                    anchor: accesskit::TextPosition {
+                        node: NodeId(2),
+                        character_index: 0,
+                    },
+                    focus: accesskit::TextPosition {
+                        node: NodeId(2),
+                        character_index: usize::from(frame >= 2),
+                    },
+                });
+                assert!(a11y.nodes.push(NodeId(1), node));
+                a11y.nodes.set_shared_value(NodeId(1), value.clone());
+                assert!(
+                    a11y.nodes
+                        .push_leaf(NodeId(2), accesskit::Node::new(Role::TextRun))
+                );
+                a11y.nodes.pop();
+                let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+                let parent = update.nodes.iter().find(|(id, _)| *id == NodeId(1));
+                if frame == 1 {
+                    assert!(parent.is_none());
+                    assert_eq!(a11y.nodes.value_work.materialized_bytes, 0);
+                    assert_eq!(a11y.nodes.value_work.debug_clone_bytes, 0);
+                    assert_eq!(a11y.nodes.value_work.retained_bytes, 10 * count);
+                } else {
+                    assert_eq!(
+                        parent.expect("changed parent").1.value(),
+                        Some(value.as_ref())
+                    );
+                    assert_eq!(a11y.nodes.value_work.materialized_bytes, value.len());
+                    assert_eq!(a11y.nodes.value_work.debug_clone_bytes, value.len());
+                }
+                assert_eq!(a11y.nodes.value_work.relationship_bytes, 0);
+                let dump = a11y.debug_tree_json().expect("complete tree");
+                assert!(dump.contains("é界😀"));
+            }
+        }
+    }
+
+    #[test]
+    fn shared_values_still_supply_complete_relationship_names() {
+        let mut a11y = new_a11y();
+        let mut owner = accesskit::Node::new(Role::Button);
+        owner.push_labelled_by(NodeId(2));
+        assert!(a11y.nodes.push_leaf(NodeId(1), owner));
+        assert!(
+            a11y.nodes
+                .push_leaf(NodeId(2), accesskit::Node::new(Role::MultilineTextInput))
+        );
+        let value = "é界 complete description";
+        a11y.nodes.set_shared_value(NodeId(2), value.into());
+        let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+        assert_eq!(
+            update
+                .nodes
+                .iter()
+                .find(|(id, _)| *id == NodeId(1))
+                .expect("owner")
+                .1
+                .label(),
+            Some(value)
+        );
+        assert_eq!(a11y.nodes.value_work.relationship_bytes, 2 * value.len());
+    }
+
+    #[test]
+    fn unchanged_text_cells_republish_when_the_ancestor_clip_changes() {
+        let mut a11y = new_a11y();
+        let mut cache = crate::AccessibleTextCache::default();
+        for (frame, width) in [90.0, 30.0, 30.0].into_iter().enumerate() {
+            a11y.begin_frame();
+            assert!(
+                a11y.nodes
+                    .push(NodeId(1), accesskit::Node::new(Role::MultilineTextInput))
+            );
+            let mut builder =
+                A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes).with_bounds_clip(Rect {
+                    x0: 0.0,
+                    y0: 0.0,
+                    x1: width,
+                    y1: 20.0,
+                });
+            cache
+                .publish(
+                    &mut builder,
+                    "界",
+                    0,
+                    3,
+                    accesskit::TextDirection::LeftToRight,
+                    &std::iter::once(0..3).collect::<Vec<_>>(),
+                    0,
+                    0..3,
+                    1.0,
+                    |_| {
+                        vec![crate::Bounds::new(
+                            crate::point(crate::px(0.0), crate::px(0.0)),
+                            crate::size(crate::px(80.0), crate::px(20.0)),
+                        )]
+                    },
+                )
+                .expect("text");
+            a11y.nodes.pop();
+            let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+            let run = update
+                .nodes
+                .iter()
+                .find(|(_, node)| node.role() == Role::TextRun);
+            if frame == 2 {
+                assert!(run.is_none());
+            } else {
+                assert_eq!(
+                    run.expect("changed clip").1.bounds().expect("bounds").x1,
+                    width.min(80.0)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn mutable_parent_access_materializes_shared_value_and_allows_replacement() {
+        let mut a11y = new_a11y();
+        assert!(a11y.nodes.push(NodeId(1), test_node()));
+        a11y.nodes.set_shared_value(NodeId(1), "é original".into());
+        let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes);
+        assert_eq!(builder.parent_node().value(), Some("é original"));
+        builder.parent_node().set_value("replacement");
+        a11y.nodes.pop();
+        let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+        assert_eq!(
+            update
+                .nodes
+                .iter()
+                .find(|(id, _)| *id == NodeId(1))
+                .expect("parent")
+                .1
+                .value(),
+            Some("replacement")
+        );
+        assert_eq!(a11y.nodes.value_work.materialized_bytes, "é original".len());
     }
 
     #[test]

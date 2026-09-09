@@ -49,6 +49,8 @@ pub struct AccessibleTextCache {
     ids: Arc<[accesskit::NodeId]>,
     published: Option<PublishedAccessibleText>,
     visible: Vec<Range<usize>>,
+    visible_nodes: collections::FxHashMap<accesskit::NodeId, accesskit::Node>,
+    clip: Option<accesskit::Rect>,
     document: Option<EditSnapshot>,
     work: AccessibleTextWork,
 }
@@ -591,6 +593,7 @@ fn publish_accessible_text_inner(
             })
             .collect()
     };
+    let mut visible_nodes = collections::FxHashMap::default();
     for run in 0..run_count {
         let accessible_run = &runs[run];
         let visible = cache.as_ref().is_none_or(|(_, visible)| {
@@ -615,8 +618,6 @@ fn publish_accessible_text_inner(
             work.retained_runs += 1;
             continue;
         }
-        work.published_runs += 1;
-        work.published_text_bytes += accessible_run.value.len();
         let mut node = accesskit::Node::new(accesskit::Role::TextRun);
         node.set_text_direction(accessible_run.direction);
         node.set_value(&text[accessible_run.value.clone()]);
@@ -673,13 +674,24 @@ fn publish_accessible_text_inner(
         if run + 1 < run_count && runs[run + 1].line == accessible_run.line {
             node.set_next_on_line(run_ids[run + 1]);
         }
-        builder.push_child(run_ids[run], node);
+        let unchanged = cache.as_ref().is_some_and(|(cache, _)| {
+            cache.clip == builder.bounds_clip()
+                && cache.visible_nodes.get(&run_ids[run]) == Some(&node)
+        });
+        if visible {
+            visible_nodes.insert(run_ids[run], node.clone());
+        }
+        if unchanged && builder.retain_child(run_ids[run]) {
+            work.retained_runs += 1;
+        } else {
+            work.published_runs += 1;
+            work.published_text_bytes += accessible_run.value.len();
+            builder.push_child(run_ids[run], node);
+        }
     }
     let anchor = accessible_position(text, anchor_byte, &runs, |run| run_ids[run]);
     let focus = accessible_position(text, focus_byte, &runs, |run| run_ids[run]);
-    builder
-        .parent_node()
-        .set_text_selection(accesskit::TextSelection { anchor, focus });
+    builder.set_parent_text_selection(accesskit::TextSelection { anchor, focus });
     let published = if reused {
         cache.as_ref().expect("reused cache").0.published.clone()
     } else {
@@ -712,6 +724,8 @@ fn publish_accessible_text_inner(
             cache.published = published.clone();
         }
         cache.visible = visible.clone();
+        cache.visible_nodes = visible_nodes;
+        cache.clip = builder.bounds_clip();
         cache.work = work;
     }
     published

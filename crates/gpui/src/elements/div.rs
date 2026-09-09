@@ -2005,6 +2005,11 @@ impl Element for Div {
         self.interactivity.write_a11y_info(node);
     }
 
+    fn write_a11y_info_shared(&self, node: &mut accesskit::Node) -> Option<SharedString> {
+        self.interactivity.write_a11y_properties(node);
+        self.interactivity.aria.value.clone()
+    }
+
     fn a11y_relationships(&self) -> &[crate::AccessibilityRelationship] {
         &self.interactivity.aria.relationships
     }
@@ -3646,6 +3651,13 @@ impl Interactivity {
     }
 
     pub(crate) fn write_a11y_info(&self, node: &mut accesskit::Node) {
+        self.write_a11y_properties(node);
+        if let Some(value) = &self.aria.value {
+            node.set_value(value.to_string());
+        }
+    }
+
+    fn write_a11y_properties(&self, node: &mut accesskit::Node) {
         if let Some(label) = &self.aria.label {
             node.set_label(label.to_string());
         }
@@ -3699,9 +3711,6 @@ impl Interactivity {
         }
         if let Some(step) = self.aria.numeric_value_step {
             node.set_numeric_value_step(step);
-        }
-        if let Some(value) = &self.aria.value {
-            node.set_value(value.to_string());
         }
         if let Some(placeholder) = &self.aria.placeholder {
             node.set_placeholder(placeholder.to_string());
@@ -4209,6 +4218,10 @@ where
 
     fn write_a11y_info(&self, node: &mut accesskit::Node) {
         self.element.write_a11y_info(node);
+    }
+
+    fn write_a11y_info_shared(&self, node: &mut accesskit::Node) -> Option<SharedString> {
+        self.element.write_a11y_info_shared(node)
     }
 
     fn a11y_relationships(&self) -> &[crate::AccessibilityRelationship] {
