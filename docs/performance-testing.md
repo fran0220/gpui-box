@@ -8,7 +8,14 @@ item. The authority check is:
 cargo run -p xtask -- performance check
 ```
 
-It writes a machine-readable report to
+GPU execution timing has a separate [renderer timing authority](../tools/renderer-timing/README.md).
+It compares raw same-adapter workload intervals, never CPU time or a
+same-renderer calibration ratio. Structural budgets below do not substitute
+for GPU measurements; an inconclusive timing comparison is not equivalence.
+The root gate runs the renderer comparator's regression tests, not a noisy
+wall-clock performance acceptance test on every build.
+
+The structural performance command writes a machine-readable report to
 `target/performance/report.json`. Each rendering fixture is warmed for two
 explicit redraws and measured on the third. The report covers 1,000- and 10,000-item fixtures with identical viewport budgets for
 List, DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument. It also draws

@@ -79,6 +79,7 @@ DotLottieAsset
 Drawer
 Dropzone
 Editor
+EditorSyntax
 Element(..)
 EmptyState
 Emulator
@@ -197,6 +198,8 @@ StatusItem
 SubagentTree
 Submit
 Switch
+Syntax query exceeded its match limit
+Syntax range is outside the document
 TRUE
 Table
 Tabs
@@ -258,9 +261,11 @@ ability charges cannot exceed their maximum
 an actionable card has one
 an actionable row has one
 array
+bundled JSON grammar and query are compatible
 camelCase
 candidate value
 checked above
+configured parser without cancellation
 empty array
 empty object
 end before start
@@ -270,6 +275,7 @@ game fraction must be finite
 glTF
 handled before mutation
 identity segments are valid UTF-8
+indexed syntax row
 layout came from projected document
 layout is present until paint
 markdown stream closed `{end:?}` past its root

@@ -18,6 +18,8 @@ Coordinator: https://ampcode.com/threads/T-01a0862b-202e-71a0-b491-fbb2fe9d5357
 | Navigation, attachments, Dock, charts, settings, localization, assets | https://ampcode.com/threads/T-01a0865a-ee10-75da-81ff-beb1052435f2 | Implementation assigned |
 | Cross-platform WebView | https://ampcode.com/threads/T-01a0865a-f730-713e-9dcc-9dd492532c3e | Implementation assigned |
 | JS/TS runtime, application host, plugins | https://ampcode.com/threads/T-01a0865a-fe20-726a-918a-b1d6e9c4c744 | Implementation assigned |
+| Renderer timestamp evidence | https://ampcode.com/threads/T-01a08675-02d3-73df-bddf-2d47f1980e19 | Linux delivery integrated; native evidence pending |
+| Retained native JS Kit bindings | https://ampcode.com/threads/T-01a08696-7195-7158-9960-138cdbcc3e2a | Seven-control stage in progress; full catalog incomplete |
 
 Workers use isolated checkouts and local staged commits. The coordinator
 transfers commits/files, resolves shared manifests and generated catalogs,
@@ -134,3 +136,29 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   Wry Xlib child integration requires GTK/GLib event pumping; direct embedding
   in GPUI Wayland is not established. Linux implementation and platform-specific
   constraints remain open, not accepted as a working cross-platform host.
+
+### First combined source checkpoint
+
+- Integrated both scrolling stages, two-axis grid and wide performance fixtures,
+  two retained-document stages, persistent/no-wrap editor plus optional syntax,
+  Sankey including the subnormal-scale fix, NavStack, AttachmentTile, three
+  WebView stages, and renderer timestamp instrumentation/comparison.
+- Shared generated catalogs were regenerated from the combined source. Provenance
+  and compatibility append conflicts retain every stream's records. Borrowed
+  prerequisite commits were excluded from worker deliveries.
+- The first combined gate stopped on disk exhaustion; after generated-cache
+  cleanup, its retry passed workspace tests but found two framework regression
+  test `unwrap()` lint failures missed by the worker's Kit-only Clippy. These
+  assertions were corrected; framework all-target/all-feature Clippy passed.
+- Renderer comparator tests are now part of the root gate: five tests pass,
+  including rejection of a uniform slowdown in both workloads. No measured
+  speedup is claimed. Worker same-revision software Vulkan measurements are
+  controls, not hardware GPU budgets or Metal/WARP evidence.
+- Combined API check and two setup runs pass. Full combined Linux gate and
+  native platform evidence remain pending at this checkpoint; independent
+  worker gates do not certify the combined tree.
+- Still open: editor wheel integration, soft-wrap/event/accessibility costs,
+  multicursor/folding/services; background document coalescing/stale rejection;
+  remaining component/resource scope; complete runtime bindings, native OS
+  sandbox parity, packaging and native browser/renderer execution. Further
+  cross-stream document/editor performance fixtures must use their real APIs.
