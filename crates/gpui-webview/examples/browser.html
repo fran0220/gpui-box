@@ -19,5 +19,7 @@ output { display: block; margin-top: 20px; }
 <script>
 document.querySelector('#message').onclick = () => { window.ipc.postMessage('fixture-message'); document.querySelector('#result').textContent = 'Message sent as untrusted data'; };
 document.querySelector('#popup').onclick = () => window.open('https://example.com');
-window.addEventListener('load', () => window.ipc.postMessage(JSON.stringify({fixture: 'ready', grid: getComputedStyle(document.querySelector('.cards')).display, width: innerWidth, height: innerHeight})));
+const reportViewport = () => window.ipc.postMessage(JSON.stringify({fixture: 'ready', grid: getComputedStyle(document.querySelector('.cards')).display, width: innerWidth, height: innerHeight}));
+window.addEventListener('load', reportViewport);
+window.addEventListener('resize', reportViewport);
 </script></html>

@@ -56,6 +56,14 @@ nontrivial scale transforms, arbitrary opacity, rounded masks, and arbitrary
 GPU/native z-order interleaving are not promised. Do not apply them. Resize and
 DPI changes update physical bounds. Do not move one host between GPUI windows.
 
+On Windows, Wry `build_as_child` does not resize the WebView2 controller when
+its container HWND receives WM_SIZE. GPUI's Win32 toolkit-allocation callback
+therefore passes full physical viewport size to `ICoreWebView2Controller::SetBounds`
+at local origin (0, 0). It never uses the clipped size or calls Wry `set_bounds`,
+which would also reposition GPUI's container. Allocation failures produce a
+distinct `ViewportAllocationFailed` event, never a navigation `LoadFailed`
+that could be mistaken for the smoke's expected offline error.
+
 Unmounting detaches the native child. Handles retain engine/controller state
 until the platform layer has finished detaching. Dropping the caller's host
 alone cannot destroy a still-painted child. Focus delegates to native controls;
@@ -157,6 +165,10 @@ a real closed-loopback-port native load failure. Each successful navigation
 waits for both page-script readiness and native completion, in either order,
 before advancing, avoiding cancellation failures from overlapping loads.
 Unexpected early load/process failures and event loss fail the smoke.
+The fixture reports viewport metrics on load and resize: page load may precede
+GPUI's first frame, but smoke cannot advance until the viewport reaches the
+required size. A viewport permanently stuck at Wry's initial 200×200 fails
+the same deadline; it is never accepted as a successful allocation.
 It does **not** certify rendered pixels, clipping/stacking, dynamic resize/DPI,
 hide/show/detach/destruction, keyboard focus/IME, accessibility, TLS errors,
 process-fault recovery, popup/download/permission callbacks, or hostile iframe

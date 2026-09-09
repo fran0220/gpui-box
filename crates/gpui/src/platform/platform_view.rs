@@ -178,6 +178,7 @@ mod handle {
         hwnd: HWND,
         lifetime: PlatformViewLifetime,
         clip_bounds: Option<Bounds<Pixels>>,
+        resize: Option<Rc<dyn Fn(crate::Size<crate::DevicePixels>)>>,
     }
 
     impl PlatformViewHandle {
@@ -201,6 +202,7 @@ mod handle {
                 hwnd,
                 lifetime: PlatformViewLifetime::default(),
                 clip_bounds: None,
+                resize: None,
             }
         }
 
@@ -218,6 +220,26 @@ mod handle {
         /// Returns the hosted child `HWND` without transferring ownership.
         pub fn as_hwnd(&self) -> HWND {
             self.hwnd
+        }
+
+        /// Installs toolkit allocation after Win32 child geometry is applied.
+        /// Some controllers do not resize their content on WM_SIZE. Receives
+        /// the full viewport in physical pixels, never its clipped size, on the
+        /// owning UI thread. Must not reposition the HWND or reenter GPUI;
+        /// GPUI retains responsibility for geometry, visibility and clipping.
+        pub fn with_win32_resize_handler(
+            mut self,
+            handler: impl Fn(crate::Size<crate::DevicePixels>) + 'static,
+        ) -> Self {
+            self.resize = Some(Rc::new(handler));
+            self
+        }
+
+        /// Called by the Win32 host after applying native child geometry.
+        pub fn notify_win32_resize(&self, size: crate::Size<crate::DevicePixels>) {
+            if let Some(handler) = &self.resize {
+                handler(size);
+            }
         }
 
         /// Returns this view's stable identity.
@@ -250,6 +272,34 @@ mod handle {
     }
 
     impl Eq for PlatformViewHandle {}
+
+    #[test]
+    fn allocation_callback_survives_clones_and_preserves_full_physical_size() {
+        use crate::{DevicePixels, size};
+        use std::cell::Cell;
+        let allocated = Rc::new(Cell::new(size(DevicePixels(0), DevicePixels(0))));
+        let output = allocated.clone();
+        // No native calls: this placeholder tests allocation independently of
+        // HWND creation and must never be passed to the Win32 host.
+        let handle = PlatformViewHandle {
+            hwnd: HWND::default(),
+            lifetime: PlatformViewLifetime::default(),
+            clip_bounds: None,
+            resize: None,
+        }
+        .with_win32_resize_handler(move |size| output.set(size));
+        let clipped = handle.clone().with_clip_bounds(Bounds {
+            origin: crate::point(crate::px(12.), crate::px(4.)),
+            size: size(crate::px(20.), crate::px(30.)),
+        });
+        drop(handle);
+        let full = size(DevicePixels(1350), DevicePixels(975));
+        clipped.notify_win32_resize(full);
+        assert_eq!(allocated.get(), full);
+        let resized = size(DevicePixels(777), DevicePixels(431));
+        clipped.notify_win32_resize(resized);
+        assert_eq!(allocated.get(), resized);
+    }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]

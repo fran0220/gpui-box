@@ -928,3 +928,8 @@ is introduced. Producer value-copy counters exclude platform backend copies.
 Persistent row-index identity and shared-source grapheme representability
 caching are original GPUI Box work. Ropey's public instance comparison is
 used without private storage assumptions, new dependencies or receipt changes.
+
+The Win32 full-viewport toolkit allocation callback and WebView2 controller
+bounds adapter are original GPUI Box corrections. They keep native child
+position/clipping in the framework and toolkit content allocation in the host;
+no upstream source was copied and the frozen import receipt is unchanged.

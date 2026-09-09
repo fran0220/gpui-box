@@ -67,6 +67,8 @@ pub enum BrowserEvent {
     },
     /// Native process failure, including termination or unresponsiveness.
     ProcessFailed(String),
+    /// Host content allocation failed, distinct from a page navigation failure.
+    ViewportAllocationFailed(String),
     PopupRefused(String),
     DownloadRefused(String),
     PermissionRefused(String),

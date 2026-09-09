@@ -145,6 +145,8 @@ Copyright (c) 2020-2023 Ngo Iok Ui & Tauri Programme within The Commons Conserva
 Scope: crates.io API dependency for WKWebView, WebView2 and WebKitGTK browser
 construction and events. GPUI Box host glue is original; no Wry source copied.
 The dependency distribution contains LICENSE-MIT and LICENSE-APACHE.
+Win32 toolkit allocation callbacks and WebView2 controller bounds integration
+are original GPUI Box work; no additional source or license is introduced.
 
 Opt-in renderer timing
 ---------------------

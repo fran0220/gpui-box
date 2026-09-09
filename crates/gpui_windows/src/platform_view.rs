@@ -283,11 +283,19 @@ impl PlatformViewHost {
             rects.push(clip);
 
             let moved = hosting.place(id, placement.bounds, scale_factor);
-            if moved.is_some() || restacked || !unsafe { IsWindowVisible(hwnd) }.as_bool() {
-                place_view(hwnd, below, moved.map(PhysicalRect::from_bounds))
+            if (moved.is_some() || restacked || !unsafe { IsWindowVisible(hwnd) }.as_bool())
+                && place_view(hwnd, below, moved.map(PhysicalRect::from_bounds))
                     .context("failed to place a hosted platform view")
-                    .log_err();
+                    .log_err()
+                    .is_none()
+            {
+                continue;
             }
+            // Toolkit controllers may not allocate descendants on WM_SIZE.
+            // Always use the full viewport, not the per-child clipping region.
+            placement.handle.notify_win32_resize(
+                platform_view_physical_bounds(placement.bounds, scale_factor).size,
+            );
             below = Some(hwnd);
         }
 

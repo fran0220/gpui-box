@@ -80,8 +80,13 @@ fn main() {
                                 (0, BrowserEvent::Message { body, .. }) if body.contains("fixture") => {
                                     let metrics: serde_json::Value = serde_json::from_str(&body).expect("fixture metrics JSON");
                                     assert_eq!(metrics["grid"], "grid");
-                                    assert!(metrics["width"].as_u64().expect("viewport width") >= 600);
-                                    assert!(metrics["height"].as_u64().expect("viewport height") >= 300);
+                                    // Engine load can beat the first GPUI frame. The fixture
+                                    // reports resize too; a permanently unallocated viewport
+                                    // still fails the deadline rather than passing at 200x200.
+                                    if metrics["width"].as_u64().expect("viewport width") < 600
+                                        || metrics["height"].as_u64().expect("viewport height") < 300 {
+                                        continue;
+                                    }
                                     this.host.evaluate_script("window.ipc.postMessage(JSON.stringify({smoke:'script-evaluated',userAgent:navigator.userAgent}))").expect("evaluate authored script");
                                     phase = 1;
                                 }
@@ -95,7 +100,7 @@ fn main() {
                                     cx.quit();
                                     return true;
                                 }
-                                (_, BrowserEvent::LoadFailed { .. } | BrowserEvent::ProcessFailed { .. } | BrowserEvent::EventsDropped { .. }) => {
+                                (_, BrowserEvent::LoadFailed { .. } | BrowserEvent::ProcessFailed { .. } | BrowserEvent::ViewportAllocationFailed(_) | BrowserEvent::EventsDropped { .. }) => {
                                     panic!("unexpected native failure or lost events at phase {phase}");
                                 }
                                 _ => {}

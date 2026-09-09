@@ -5,6 +5,7 @@ use webview2_com::{
     Microsoft::Web::WebView2::Win32::*, NavigationCompletedEventHandler, ProcessFailedEventHandler,
     take_pwstr,
 };
+use windows_native::Win32::Foundation::RECT;
 use windows_native::core::{BOOL, PWSTR};
 use wry::{WebView, WebViewBuilder, WebViewExtWindows};
 
@@ -30,6 +31,7 @@ pub(super) fn build(
 ) -> anyhow::Result<(WebView, PlatformViewHandle, Lifetime)> {
     let parent = Parent(raw);
     let view = builder.build_as_child(&parent)?;
+    let allocation_sender = sender.clone();
     // Wry's public completion callback drops IsSuccess and WebErrorStatus.
     // Add an independent handler without replacing Wry's navigation policy.
     unsafe {
@@ -73,6 +75,23 @@ pub(super) fn build(
     // Wry and GPUI use different windows-rs minor versions. Only the ABI HWND
     // pointer crosses that boundary, never COM interface wrapper types.
     let hwnd = windows::Win32::Foundation::HWND(view.hwnd().0);
-    let handle = unsafe { PlatformViewHandle::from_hwnd(hwnd) };
+    let controller = view.controller();
+    let handle =
+        unsafe { PlatformViewHandle::from_hwnd(hwnd) }.with_win32_resize_handler(move |size| {
+            // GPUI owns the container HWND's position and clip region. Wry's
+            // build_as_child deliberately leaves controller allocation to us.
+            // Calling Wry set_bounds here would reposition the container too.
+            let bounds = RECT {
+                left: 0,
+                top: 0,
+                right: size.width.0,
+                bottom: size.height.0,
+            };
+            if let Err(error) = unsafe { controller.SetBounds(bounds) } {
+                let _ = allocation_sender.send(BrowserEvent::ViewportAllocationFailed(format!(
+                    "WebView2 controller bounds: {error}"
+                )));
+            }
+        });
     Ok((view, handle, Lifetime))
 }
