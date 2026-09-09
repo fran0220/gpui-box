@@ -2,6 +2,108 @@
 
 use super::support::*;
 
+/// An interactive fixture: candidate moves do not alter the declared order.
+pub(super) fn deferred_drop(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::interaction::dnd::{DeferredDrop, DropDecision, DropRefusal};
+    let theme = cx.theme().clone();
+    let mut content = stack(&theme).w(px(660.0)).child(caption(
+        &theme,
+        "Fixture: request a move, then approve or refuse it. The host keeps its order.",
+    ));
+    for (kind, surface) in [
+        (0, "scene.deferred.list"),
+        (1, "scene.deferred.tabs"),
+        (2, "scene.deferred.tree"),
+    ] {
+        let slot = crate::motion::keyed::slot::<Option<DeferredDrop>>(
+            &surface.into(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let controller = slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                DeferredDrop::new(
+                    Duration::from_secs(30),
+                    |intent, _, _| intent.item.id == "gamma" && intent.position.anchor() == "alpha",
+                    |_, _, _| {},
+                )
+            })
+            .clone();
+        let request = controller.clone();
+        let approve = controller.clone();
+        let refuse = controller.clone();
+        let rows = ["alpha", "beta", "gamma"];
+        let element = match kind {
+            0 => List::new(surface, rows.len(), move |index, _, _| {
+                ListItem::new(rows[index], rows[index]).text(rows[index])
+            })
+            .keys(rows)
+            .reorderable(true)
+            .deferred_acceptance(controller, 1)
+            .on_reorder(|_, _, _| {})
+            .into_any_element(),
+            1 => Tabs::new(surface)
+                .tabs(rows.map(|id| TabItem::new(id, id)))
+                .reorderable(true)
+                .deferred_acceptance(controller, 1)
+                .on_reorder(|_, _, _| {})
+                .into_any_element(),
+            _ => Tree::new(surface)
+                .nodes(rows.map(|id| TreeNode::new(id, id)))
+                .reorderable(true)
+                .deferred_acceptance(controller, 1)
+                .on_move(|_, _, _| {})
+                .into_any_element(),
+        };
+        content = content
+            .child(caption(&theme, surface))
+            .child(element)
+            .child(
+                row(&theme)
+                    .child(
+                        Button::new(format!("{surface}.request"))
+                            .label("Request move")
+                            .on_click(move |window, cx| {
+                                request.request(
+                                    DropIntent {
+                                        item: DragItem::new(surface, "gamma", "gamma"),
+                                        position: DropPosition::Before("alpha".into()),
+                                        velocity: crate::motion::Velocity::ZERO,
+                                    },
+                                    window,
+                                    cx,
+                                );
+                            }),
+                    )
+                    .child(
+                        Button::new(format!("{surface}.approve"))
+                            .label("Approve")
+                            .on_click(move |window, cx| {
+                                if let Some((request, _)) = approve.status() {
+                                    approve.resolve(request.id, DropDecision::Accepted, window, cx);
+                                }
+                            }),
+                    )
+                    .child(
+                        Button::new(format!("{surface}.refuse"))
+                            .label("Refuse")
+                            .on_click(move |window, cx| {
+                                if let Some((request, _)) = refuse.status() {
+                                    refuse.resolve(
+                                        request.id,
+                                        DropDecision::Refused(DropRefusal::Policy),
+                                        window,
+                                        cx,
+                                    );
+                                }
+                            }),
+                    ),
+            );
+    }
+    content.into_any_element()
+}
+
 pub(super) fn image_list(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let items = [

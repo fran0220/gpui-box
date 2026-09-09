@@ -53,7 +53,8 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::panic::Location;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use gpui::{
@@ -178,6 +179,438 @@ pub struct DropIntent {
     pub velocity: Velocity,
 }
 
+/// A single-use, process-local request identity, safe to carry as protocol data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct DropRequestId(u64);
+
+impl DropRequestId {
+    pub fn get(self) -> u64 {
+        self.0
+    }
+}
+
+/// A released candidate, not a committed reorder. Replies must name its id.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DropRequest {
+    pub id: DropRequestId,
+    pub surface: SharedString,
+    pub revision: u64,
+    pub owner: Option<gpui::EffectOwner>,
+    pub intent: DropIntent,
+    pub timeout: Duration,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropRefusal {
+    Policy,
+    Stale,
+    Cancelled,
+    TimedOut,
+    Superseded,
+    Revoked,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropDecision {
+    Pending,
+    Accepted,
+    Refused(DropRefusal),
+}
+
+/// Every request has at most one terminal event, including cancellation.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DropDecisionEvent {
+    Requested(Box<DropRequest>),
+    Finished {
+        id: DropRequestId,
+        decision: DropDecision,
+    },
+}
+
+type ValidateDrop = Rc<dyn Fn(&DropIntent, &mut Window, &mut App) -> bool>;
+type DecisionHandler = Rc<dyn Fn(&DropDecisionEvent, &mut Window, &mut App)>;
+
+#[derive(Clone)]
+struct DropMount {
+    surface: SharedString,
+    revision: u64,
+    owner: Option<gpui::EffectOwner>,
+    window: gpui::WindowId,
+    live: Weak<()>,
+    accepts: Accepts,
+    commit: Dropped,
+}
+
+#[derive(Default)]
+struct DecisionState {
+    mount: Option<DropMount>,
+    status: Option<(DropRequest, DropDecision, Instant)>,
+    revoked: bool,
+}
+
+struct DeferredInner {
+    timeout: Duration,
+    validate: ValidateDrop,
+    events: DecisionHandler,
+    state: RefCell<DecisionState>,
+}
+
+/// Retained, nonblocking acceptance shared by List and Tabs.
+///
+/// Keep one controller per mounted surface. The required validator checks
+/// caller-owned payload/source/target identity and current data/owner grants;
+/// it must consult live data, not a request-time snapshot. Native mount,
+/// revision, deadline and synchronous acceptance are also checked at commit.
+/// A same-revision render preserves a request; changing the revision or
+/// removing the surface invalidates it. `revoke` permanently closes an owner.
+/// No OS drag or pointer capture is held while a reply is pending.
+#[derive(Clone)]
+pub struct DeferredDrop(Rc<DeferredInner>);
+
+#[derive(Default)]
+struct Decisions(Vec<Weak<DeferredInner>>);
+impl gpui::Global for Decisions {}
+
+impl DeferredDrop {
+    pub fn new(
+        timeout: Duration,
+        validate: impl Fn(&DropIntent, &mut Window, &mut App) -> bool + 'static,
+        on_event: impl Fn(&DropDecisionEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        Self(Rc::new(DeferredInner {
+            timeout: timeout.clamp(Duration::from_millis(1), Duration::from_secs(30)),
+            validate: Rc::new(validate),
+            events: Rc::new(on_event),
+            state: RefCell::new(DecisionState::default()),
+        }))
+    }
+
+    pub fn status(&self) -> Option<(DropRequest, DropDecision)> {
+        self.0
+            .state
+            .borrow()
+            .status
+            .as_ref()
+            .map(|(request, decision, _)| (request.clone(), *decision))
+    }
+
+    fn terminate(&self, decision: DropDecision, window: &mut Window, cx: &mut App) -> bool {
+        let request = {
+            let mut state = self.0.state.borrow_mut();
+            let Some((request, current, _)) = state.status.as_mut() else {
+                return false;
+            };
+            if *current != DropDecision::Pending {
+                return false;
+            }
+            *current = decision;
+            request.clone()
+        };
+        window.refresh();
+        cx.with_effect_owner(request.owner, |cx| {
+            (self.0.events)(
+                &DropDecisionEvent::Finished {
+                    id: request.id,
+                    decision,
+                },
+                window,
+                cx,
+            )
+        });
+        true
+    }
+
+    pub fn cancel(&self, window: &mut Window, cx: &mut App) {
+        self.terminate(DropDecision::Refused(DropRefusal::Cancelled), window, cx);
+    }
+
+    pub fn revoke(&self, window: &mut Window, cx: &mut App) {
+        self.0.state.borrow_mut().revoked = true;
+        self.terminate(DropDecision::Refused(DropRefusal::Revoked), window, cx);
+    }
+
+    /// Resolves once. Stale, duplicate, foreign-window and Pending replies do
+    /// not commit. Accepted still runs the live validator and current policy.
+    pub fn resolve(
+        &self,
+        id: DropRequestId,
+        decision: DropDecision,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> bool {
+        if decision == DropDecision::Pending {
+            return false;
+        }
+        let (request, expires, mount, revoked) = {
+            let state = self.0.state.borrow();
+            let Some((request, DropDecision::Pending, expires)) = &state.status else {
+                return false;
+            };
+            if request.id != id {
+                return false;
+            }
+            (
+                request.clone(),
+                *expires,
+                state.mount.clone(),
+                state.revoked,
+            )
+        };
+        let Some(mount) = mount else { return false };
+        if mount.window != window.window_handle().window_id() {
+            return false;
+        }
+        let refusal = if revoked {
+            Some(DropRefusal::Revoked)
+        } else if cx.background_executor().now() >= expires {
+            Some(DropRefusal::TimedOut)
+        } else if mount.live.upgrade().is_none()
+            || mount.revision != request.revision
+            || mount.owner != request.owner
+            || mount.surface != request.surface
+        {
+            Some(DropRefusal::Stale)
+        } else if !(mount.accepts)(&request.intent.item, &request.intent.position)
+            || !(self.0.validate)(&request.intent, window, cx)
+        {
+            Some(DropRefusal::Policy)
+        } else {
+            None
+        };
+        let decision = refusal.map_or(decision, DropDecision::Refused);
+        {
+            let mut state = self.0.state.borrow_mut();
+            let Some((current_request, current, _)) = state.status.as_mut() else {
+                return false;
+            };
+            // A validator may synchronously cancel or supersede this request.
+            if current_request.id != id || *current != DropDecision::Pending {
+                return false;
+            }
+            *current = decision;
+        }
+        window.refresh();
+        if decision == DropDecision::Accepted {
+            cx.with_effect_owner(request.owner, |cx| {
+                (mount.commit)(&request.intent, window, cx)
+            });
+        }
+        // Report success only after reporting the caller-owned reorder intent.
+        // A terminal observer may start a new gesture or revoke the owner.
+        cx.with_effect_owner(request.owner, |cx| {
+            (self.0.events)(&DropDecisionEvent::Finished { id, decision }, window, cx)
+        });
+        true
+    }
+
+    /// Submits an explicit candidate through the same path as pointer release.
+    /// Keyboard reorder affordances may call this; it never mutates data.
+    pub fn request(
+        &self,
+        intent: DropIntent,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<DropRequestId> {
+        self.terminate(DropDecision::Refused(DropRefusal::Superseded), window, cx);
+        // A terminal observer may have submitted a newer candidate. It wins;
+        // never overwrite it without a terminal event of its own.
+        if matches!(self.status(), Some((_, DropDecision::Pending))) {
+            return None;
+        }
+        let mount = self.0.state.borrow().mount.clone()?;
+        if self.0.state.borrow().revoked
+            || mount.live.upgrade().is_none()
+            || mount.window != window.window_handle().window_id()
+        {
+            return None;
+        }
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        let id = DropRequestId(
+            NEXT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+                .expect("drop request identities exhausted"),
+        );
+        let request = DropRequest {
+            id,
+            surface: mount.surface,
+            revision: mount.revision,
+            owner: mount.owner,
+            intent,
+            timeout: self.0.timeout,
+        };
+        let expires = cx.background_executor().now() + self.0.timeout;
+        self.0.state.borrow_mut().status = Some((request.clone(), DropDecision::Pending, expires));
+        window.refresh();
+        // A local gate refusal is terminal, not a request sent to the worker.
+        let allowed = (mount.accepts)(&request.intent.item, &request.intent.position)
+            && (self.0.validate)(&request.intent, window, cx);
+        if !matches!(self.status(), Some((current, DropDecision::Pending)) if current.id == id) {
+            return Some(id);
+        }
+        if !allowed {
+            self.terminate(DropDecision::Refused(DropRefusal::Policy), window, cx);
+            return Some(id);
+        }
+        cx.with_effect_owner(request.owner, |cx| {
+            (self.0.events)(&DropDecisionEvent::Requested(Box::new(request)), window, cx)
+        });
+        let weak = Rc::downgrade(&self.0);
+        window
+            .spawn(cx, async move |cx| {
+                loop {
+                    cx.background_executor()
+                        .timer(Duration::from_millis(25))
+                        .await;
+                    let Some(inner) = weak.upgrade() else { break };
+                    let controller = DeferredDrop(inner);
+                    let keep = cx
+                        .update(|window, cx| {
+                            let state = controller.0.state.borrow();
+                            let Some((request, DropDecision::Pending, deadline)) = &state.status
+                            else {
+                                return false;
+                            };
+                            if request.id != id {
+                                return false;
+                            }
+                            let expired = cx.background_executor().now() >= *deadline;
+                            let removed = state.mount.as_ref().is_none_or(|mount| {
+                                mount.live.upgrade().is_none()
+                                    || mount.revision != request.revision
+                                    || mount.owner != request.owner
+                                    || mount.surface != request.surface
+                            });
+                            drop(state);
+                            if expired || removed {
+                                controller.terminate(
+                                    DropDecision::Refused(if removed {
+                                        DropRefusal::Stale
+                                    } else {
+                                        DropRefusal::TimedOut
+                                    }),
+                                    window,
+                                    cx,
+                                );
+                                false
+                            } else {
+                                true
+                            }
+                        })
+                        .unwrap_or(false);
+                    if !keep {
+                        break;
+                    }
+                }
+            })
+            .detach();
+        Some(id)
+    }
+
+    pub(crate) fn mount(
+        &self,
+        surface: SharedString,
+        revision: u64,
+        accepts: Accepts,
+        commit: Dropped,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Dropped {
+        let owner = cx.current_effect_owner();
+        let changed = self.0.state.borrow().mount.as_ref().is_some_and(|old| {
+            old.surface != surface
+                || old.revision != revision
+                || old.owner != owner
+                || old.window != window.window_handle().window_id()
+        });
+        if changed {
+            self.terminate(DropDecision::Refused(DropRefusal::Stale), window, cx);
+        }
+        if !cx.has_global::<Decisions>() {
+            cx.set_global(Decisions::default());
+        }
+        let registry = &mut cx.global_mut::<Decisions>().0;
+        registry.retain(|weak| weak.strong_count() > 0);
+        if !registry
+            .iter()
+            .any(|weak| weak.ptr_eq(&Rc::downgrade(&self.0)))
+        {
+            registry.push(Rc::downgrade(&self.0));
+        }
+        let live = Rc::new(());
+        self.0.state.borrow_mut().mount = Some(DropMount {
+            surface,
+            revision,
+            owner,
+            window: window.window_handle().window_id(),
+            live: Rc::downgrade(&live),
+            accepts,
+            commit,
+        });
+        let controller = self.clone();
+        Rc::new(move |intent, window, cx| {
+            let _live = &live;
+            controller.request(intent.clone(), window, cx);
+        })
+    }
+
+    pub(crate) fn notice(&self, cx: &App) -> Option<gpui::Stateful<gpui::Div>> {
+        let (request, decision) = self.status()?;
+        let key = match decision {
+            DropDecision::Pending => StringKey::DropPending,
+            DropDecision::Accepted => return None,
+            DropDecision::Refused(DropRefusal::TimedOut) => StringKey::DropTimedOut,
+            DropDecision::Refused(DropRefusal::Policy) => StringKey::DropRefused,
+            DropDecision::Refused(_) => StringKey::DropCancelled,
+        };
+        let text = cx.strings().text(key);
+        let theme = cx.theme();
+        let controller = self.clone();
+        Some(
+            div()
+                .p_token(theme, Space::Xs)
+                .text_color(if decision == DropDecision::Pending {
+                    theme.colors.text_muted
+                } else {
+                    theme.colors.danger
+                })
+                .child(text.clone())
+                .child(super::on_pointer_cancel(move |window, cx| {
+                    controller.cancel(window, cx)
+                }))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(format!("{}.drop-decision", request.surface), Role::Status)
+                        .parent(request.surface)
+                        .text(text)
+                        .live(gpui_kit_semantics::LiveRegion::Polite)
+                        .value(format!(
+                            "{} {}",
+                            request.intent.item.id, request.intent.position
+                        ))
+                        .busy(decision == DropDecision::Pending)
+                        .invalid(matches!(decision, DropDecision::Refused(_))),
+                ),
+        )
+    }
+}
+
+fn cancel_decisions(why: DropRefusal, window: &mut Window, cx: &mut App) {
+    let controllers: Vec<_> = cx
+        .try_global::<Decisions>()
+        .map(|registry| registry.0.iter().filter_map(Weak::upgrade).collect())
+        .unwrap_or_default();
+    for inner in controllers {
+        let same_window = inner
+            .state
+            .borrow()
+            .mount
+            .as_ref()
+            .is_some_and(|mount| mount.window == window.window_handle().window_id());
+        if same_window {
+            DeferredDrop(inner).terminate(DropDecision::Refused(why), window, cx);
+        }
+    }
+}
+
 /// Which way a target's slots are laid out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DropAxis {
@@ -252,7 +685,7 @@ pub fn install(cx: &mut App) {
     }
     cx.set_global(SessionGlobal::default());
     cx.observe_keystrokes(|event, window, cx| {
-        if event.keystroke.key == "escape" && cx.has_active_drag() {
+        if event.keystroke.key == "escape" {
             cancel(window, cx);
         }
     })
@@ -319,6 +752,7 @@ pub(crate) fn adopt_external(count: usize, cx: &mut App) {
 /// Abandons a drag in flight. A cancelled drag reports nothing.
 pub fn cancel(window: &mut Window, cx: &mut App) {
     cx.stop_active_drag(window);
+    cancel_decisions(DropRefusal::Cancelled, window, cx);
     clear(cx);
 }
 
@@ -528,7 +962,8 @@ pub fn draggable<E>(element: E, item: DragItem) -> E
 where
     E: StatefulInteractiveElement + Sized,
 {
-    element.on_drag(item, |item, _offset, _window, cx| {
+    element.on_drag(item, |item, _offset, window, cx| {
+        cancel_decisions(DropRefusal::Superseded, window, cx);
         begin(item.clone(), cx);
         let carried = item.clone();
         cx.new(|_| DragGhost::new(carried))
@@ -660,12 +1095,25 @@ where
         }
     });
 
+    drop_surface(element, surface, accepts, on_drop)
+}
+
+/// A stable surface also owns release: make-way animation can move a row's
+/// hitbox away from a stationary pointer without changing the intended slot.
+pub(crate) fn drop_surface<E: InteractiveElement + Sized>(
+    element: E,
+    surface: SharedString,
+    accepts: Accepts,
+    on_drop: Dropped,
+) -> E {
     let element = element.can_drop({
         let surface = surface.clone();
+        let accepts = accepts.clone();
         move |payload: &dyn Any, window: &mut Window, cx: &mut App| {
-            payload.downcast_ref::<DragItem>().is_some()
-                && landing_for(&surface, window.mouse_position(), cx)
-                    .is_some_and(|landing| landing.accepted)
+            payload.downcast_ref::<DragItem>().is_some_and(|item| {
+                landing_for(&surface, window.mouse_position(), cx)
+                    .is_some_and(|landing| accepts(item, &landing.position))
+            })
         }
     });
 
@@ -673,7 +1121,7 @@ where
         let Some(landing) = landing_for(&surface, window.mouse_position(), cx) else {
             return;
         };
-        if !landing.accepted {
+        if !accepts(item, &landing.position) {
             return;
         }
         let intent = DropIntent {

@@ -267,6 +267,8 @@ candidate value
 checked above
 configured parser without cancellation
 ctrl-k ctrl-i
+deferred List acceptance requires stable keys
+drop request identities exhausted
 empty array
 empty object
 end before start

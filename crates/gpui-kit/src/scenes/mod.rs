@@ -64,8 +64,8 @@ use controls::{
     translation_packs, upload_list,
 };
 use data::{
-    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, image_list, kanban,
-    list, masonry, table, tree, tree_grid,
+    data_grid, data_grid_editing, deferred_drop, diagnostics_list, drag_list, drag_tree, flow,
+    image_list, kanban, list, masonry, table, tree, tree_grid,
 };
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
@@ -557,6 +557,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "drag-list",
             build: drag_list,
             shows: Shows::Subjects(&["List"]),
+        },
+        Scene {
+            name: "deferred-drop",
+            build: deferred_drop,
+            shows: Shows::Composition(&["List", "Tabs", "Tree", "Button"]),
         },
         Scene {
             name: "drag-tree",

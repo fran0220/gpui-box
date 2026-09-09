@@ -161,6 +161,7 @@ pub struct Tree {
     on_select: Option<SelectHandler>,
     reorderable: bool,
     accepts: Option<Accepts>,
+    deferred_acceptance: Option<(dnd::DeferredDrop, u64)>,
     on_move: Option<MoveHandler>,
 }
 
@@ -195,6 +196,7 @@ impl Tree {
             on_select: None,
             reorderable: false,
             accepts: None,
+            deferred_acceptance: None,
             on_move: None,
         }
     }
@@ -271,6 +273,14 @@ impl Tree {
         predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static,
     ) -> Self {
         self.accepts = Some(Rc::new(predicate));
+        self
+    }
+
+    /// Defers release acceptance through the shared bounded decision lifecycle.
+    /// Advance revision when data or policy changes. Structural and live
+    /// caller validation run again before a move is reported.
+    pub fn deferred_acceptance(mut self, controller: dnd::DeferredDrop, revision: u64) -> Self {
+        self.deferred_acceptance = Some((controller, revision));
         self
     }
 
@@ -616,6 +626,11 @@ impl Tree {
         let caller = self.accepts.clone();
         let own = surface.clone();
         let accepts: Accepts = Rc::new(move |item: &DragItem, position: &DropPosition| {
+            if find(&nodes, position.anchor()).is_none_or(|node| node.disabled)
+                || (item.source == own && find(&nodes, &item.id).is_none_or(|node| node.disabled))
+            {
+                return false;
+            }
             if item.source == own && subtree(&nodes, &item.id).contains(position.anchor()) {
                 return false;
             }
@@ -624,6 +639,18 @@ impl Tree {
                 None => item.source == own,
             }
         });
+        let on_drop = if let Some((controller, revision)) = &self.deferred_acceptance {
+            controller.mount(
+                surface.clone(),
+                *revision,
+                accepts.clone(),
+                on_drop,
+                window,
+                cx,
+            )
+        } else {
+            on_drop
+        };
         Some(Reorder {
             drag: dnd::surface_drag(&surface, window, cx),
             surface,
@@ -716,6 +743,15 @@ impl RenderOnce for Tree {
             .column()
             .w_full()
             .children(extra);
+
+        if let Some(reorder) = &reorder {
+            stack = dnd::drop_surface(
+                stack,
+                reorder.surface.clone(),
+                reorder.accepts.clone(),
+                reorder.on_drop.clone(),
+            );
+        }
 
         // A tree that draws only its viewport can still be walked end to end,
         // because the keyboard moves over the flattened rows rather than over
@@ -828,6 +864,9 @@ impl RenderOnce for Tree {
             }
         }
 
+        if let Some((controller, _)) = &self.deferred_acceptance {
+            stack = stack.children(controller.notice(cx));
+        }
         stack
             .semantic_in(
                 cx,

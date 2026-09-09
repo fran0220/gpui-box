@@ -136,6 +136,48 @@ structural rather than policy:
 Everything else is policy, and policy is the host's. Without an `accepts`, a
 reorderable surface takes its own items and nothing else.
 
+## Deferred acceptance keeps a released candidate, not the drag
+
+`List`, `Tabs`, and `Tree` accept a retained `dnd::DeferredDrop` through
+`.deferred_acceptance(controller, revision)`. Existing `.accepts` predicates
+remain synchronous gates and are rechecked at release, not trusted from the
+last pointer move. A stationary pointer retains its identity-based landing
+when the make-way animation moves a row's hitbox away from it.
+
+Create one controller per surface with a timeout, a live validator and an
+event callback. The timeout is bounded to 1 ms–30 s. On release,
+`DropDecisionEvent::Requested(Box<DropRequest>)` reports an opaque single-use
+id, surface, revision, effect owner, complete intent and timeout. It does not
+report a reorder. The platform drag is already released; no pointer capture
+or OS drag is retained while waiting for another process.
+
+Reply with `controller.resolve(id, decision, window, cx)`. `Accepted` still
+checks the live mount, owner, revision, deadline, current synchronous policy
+and validator. Only then does the original `on_reorder`/`on_move` report the
+intent. The model remains caller-owned. The return value means the reply was
+consumed, not that it was approved: a stale approval becomes a refusal. Read
+`status()` or `Finished { id, decision }` for the terminal result. Pending,
+wrong-window, duplicate and late replies never replay a reorder.
+
+The required validator must read current payload/source/target/position and
+data-generation/owner-grant state, not an old snapshot captured when the
+request started. `List` additionally requires stable `keys`. Advance the
+supplied revision whenever data or policy changes. Same-revision rerenders
+preserve a candidate; revision changes, surface removal, a superseding drag,
+Escape/pointer cancellation, deadline or explicit `cancel` invalidate it.
+`revoke` permanently closes a controller; a new owner needs a new controller.
+Removal is checked by live native callback leases, independently of diagnostic
+semantic snapshots, and by the bounded pending timer.
+
+`<surface>.drop-decision` is a polite live status with `busy` while pending
+and `invalid` after refusal. Its localized text distinguishes waiting,
+refusal, cancellation and timeout; retry is a new gesture and a new id.
+The `deferred-drop` composition provides interactive request/approve/refuse
+fixtures for all three surfaces. `request(intent, window, cx)` is the same
+candidate path for caller-provided keyboard reorder controls; these surfaces
+do not install a built-in keyboard reorder shortcut. Async worker transport
+and permission policy belong to the host, not this primitive.
+
 ## Cancelling
 
 Escape abandons a drag in flight. The ghost disappears, the indicator

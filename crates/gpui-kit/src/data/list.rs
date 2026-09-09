@@ -133,6 +133,7 @@ pub struct List {
     on_select: Option<SelectHandler>,
     reorderable: bool,
     accepts: Option<Accepts>,
+    deferred_acceptance: Option<(dnd::DeferredDrop, u64)>,
     on_reorder: Option<ReorderHandler>,
 }
 
@@ -174,6 +175,7 @@ impl List {
             on_select: None,
             reorderable: false,
             accepts: None,
+            deferred_acceptance: None,
             on_reorder: None,
         }
     }
@@ -305,6 +307,14 @@ impl List {
         predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static,
     ) -> Self {
         self.accepts = Some(Rc::new(predicate));
+        self
+    }
+
+    /// Defers release acceptance without holding the drag. Supply stable
+    /// `keys` and advance `revision` whenever data or policy changes. The
+    /// controller's live validator also checks caller-owned source state.
+    pub fn deferred_acceptance(mut self, controller: dnd::DeferredDrop, revision: u64) -> Self {
+        self.deferred_acceptance = Some((controller, revision));
         self
     }
 
@@ -463,6 +473,17 @@ impl RenderOnce for List {
         };
 
         let mut container = div().id(ident.element_id()).column().w_full().child(rows);
+        if let Some(reorder) = &reorder {
+            container = dnd::drop_surface(
+                container,
+                reorder.surface.clone(),
+                reorder.accepts.clone(),
+                reorder.on_drop.clone(),
+            );
+        }
+        if let Some((controller, _)) = &self.deferred_acceptance {
+            container = container.children(controller.notice(cx));
+        }
         if self.fills {
             container = container.h_full().min_h_0();
         }
@@ -567,10 +588,39 @@ impl List {
         }
         let on_drop = self.on_reorder.clone()?;
         let surface = self.ident.semantic_id();
-        let accepts = self.accepts.clone().unwrap_or_else(|| {
+        let predicate = self.accepts.clone().unwrap_or_else(|| {
             let own = surface.clone();
             Rc::new(move |item: &DragItem, _: &DropPosition| item.source == own)
         });
+        let accepts: Accepts = if let Some(keys) = &self.keys {
+            let keys = keys.clone();
+            let own = surface.clone();
+            Rc::new(move |item, position| {
+                keys.contains(position.anchor())
+                    && !matches!(position, DropPosition::Into(_))
+                    && (item.source != own
+                        || (keys.contains(&item.id) && &item.id != position.anchor()))
+                    && predicate(item, position)
+            })
+        } else {
+            predicate
+        };
+        let on_drop = if let Some((controller, revision)) = &self.deferred_acceptance {
+            assert!(
+                self.keys.is_some(),
+                "deferred List acceptance requires stable keys"
+            );
+            controller.mount(
+                surface.clone(),
+                *revision,
+                accepts.clone(),
+                on_drop,
+                window,
+                cx,
+            )
+        } else {
+            on_drop
+        };
         Some(Reorder {
             drag: dnd::surface_drag(&surface, window, cx),
             surface,

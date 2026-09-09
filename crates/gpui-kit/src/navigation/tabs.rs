@@ -304,6 +304,7 @@ pub struct Tabs {
     on_close: Option<CloseHandler>,
     reorderable: bool,
     accepts: Option<Accepts>,
+    deferred_acceptance: Option<(dnd::DeferredDrop, u64)>,
     on_reorder: Option<ReorderHandler>,
     overflow: Overflow,
     overflow_menu: Option<Entity<Menu>>,
@@ -338,6 +339,7 @@ impl Tabs {
             on_close: None,
             reorderable: false,
             accepts: None,
+            deferred_acceptance: None,
             on_reorder: None,
             overflow: Overflow::default(),
             overflow_menu: None,
@@ -479,6 +481,14 @@ impl Tabs {
         self
     }
 
+    /// Defers release acceptance without holding the drag. Advance revision
+    /// whenever caller-owned data or policy changes; the live validator checks
+    /// current source identity and owner grants again before committing.
+    pub fn deferred_acceptance(mut self, controller: dnd::DeferredDrop, revision: u64) -> Self {
+        self.deferred_acceptance = Some((controller, revision));
+        self
+    }
+
     /// Reports where a dropped tab should go. The strip does not move it.
     pub fn on_reorder(
         mut self,
@@ -494,10 +504,34 @@ impl Tabs {
         }
         let on_drop = self.on_reorder.clone()?;
         let surface = self.ident.semantic_id();
-        let accepts = self.accepts.clone().unwrap_or_else(|| {
+        let predicate = self.accepts.clone().unwrap_or_else(|| {
             let own = surface.clone();
             Rc::new(move |item: &DragItem, _: &DropPosition| item.source == own)
         });
+        let tabs = self.tabs.clone();
+        let own = surface.clone();
+        let accepts: Accepts = Rc::new(move |item, position| {
+            !matches!(position, DropPosition::Into(_))
+                && tabs
+                    .iter()
+                    .any(|tab| &tab.id == position.anchor() && !tab.disabled)
+                && (item.source != own
+                    || (&item.id != position.anchor()
+                        && tabs.iter().any(|tab| tab.id == item.id && !tab.disabled)))
+                && predicate(item, position)
+        });
+        let on_drop = if let Some((controller, revision)) = &self.deferred_acceptance {
+            controller.mount(
+                surface.clone(),
+                *revision,
+                accepts.clone(),
+                on_drop,
+                window,
+                cx,
+            )
+        } else {
+            on_drop
+        };
         Some(Reorder {
             drag: dnd::surface_drag(&surface, window, cx),
             surface,
@@ -987,13 +1021,21 @@ impl RenderOnce for Tabs {
                     )
             });
 
-        let strip = strip.children(overflow);
+        let mut strip = strip.children(overflow);
+        if let Some(reorder) = &reorder {
+            strip = dnd::drop_surface(
+                strip,
+                reorder.surface.clone(),
+                reorder.accepts.clone(),
+                reorder.on_drop.clone(),
+            );
+        }
         // The strip holds every tab the caller declared, drawn or overflowed,
         // because the keyboard reaches all of them.
         let published = NodeSpec::new(self.ident.semantic_id(), Role::List)
             .value(cx.numbers().count(self.tabs.len()));
 
-        match scrolls {
+        let element = match scrolls {
             // A scrolling element's own bounds travel with its content, so the
             // strip publishes the frame around it instead. Otherwise the one
             // node that says where the strip is would report a rectangle
@@ -1014,6 +1056,18 @@ impl RenderOnce for Tabs {
                 .semantic_in(cx, published)
                 .into_any_element(),
             false => strip.semantic_in(cx, published).into_any_element(),
+        };
+        match self
+            .deferred_acceptance
+            .as_ref()
+            .and_then(|(controller, _)| controller.notice(cx))
+        {
+            Some(notice) => div()
+                .column()
+                .child(element)
+                .child(notice)
+                .into_any_element(),
+            None => element,
         }
     }
 }

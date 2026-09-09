@@ -420,6 +420,10 @@ string_keys! {
     // Drag and drop.
     DragFileOne => "drag.file-one", "1 file";
     DragFileMany => "drag.file-many", "{0} files";
+    DropPending => "drop.pending", "Waiting for permission to move. Escape cancels.";
+    DropRefused => "drop.refused", "Move refused. Drag again to retry.";
+    DropTimedOut => "drop.timed-out", "Move timed out. Drag again to retry.";
+    DropCancelled => "drop.cancelled", "Move cancelled. Drag again to retry.";
 
     // Copy button. The confirmation and the refusal are separate keys because
     // they are separate claims: one says the clipboard took the text and the

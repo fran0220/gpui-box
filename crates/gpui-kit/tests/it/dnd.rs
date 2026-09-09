@@ -26,8 +26,284 @@ fn record(reports: &Reports, intent: &DropIntent) {
 
 const ROWS: [&str; 4] = ["alpha", "beta", "gamma", "delta"];
 
+#[gpui::test]
+fn stationary_drop_keeps_its_intent(cx: &mut TestAppContext) {
+    let output = reports();
+    let mut harness = list_harness(cx, output.clone());
+    harness.drag_start("queue.gamma");
+    let target = harness.point_down("queue.alpha", 0.2);
+    harness.drag_to(target);
+    harness.advance(std::time::Duration::from_millis(200));
+    harness.drop_here();
+    assert_eq!(&*output.borrow(), &["gamma before:alpha"]);
+}
+
+#[gpui::test]
+fn release_rechecks_policy_after_the_last_move(cx: &mut TestAppContext) {
+    let output = reports();
+    let allowed = Rc::new(std::cell::Cell::new(true));
+    let policy = allowed.clone();
+    let events = output.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let policy = policy.clone();
+        let events = events.clone();
+        List::new("queue", ROWS.len(), |index, _, _| {
+            ListItem::new(ROWS[index], row_label(index)).text(row_label(index))
+        })
+        .row_height(32.0)
+        .reorderable(true)
+        .accepts(move |_, _| policy.get())
+        .on_reorder(move |intent, _, _| record(&events, intent))
+        .into_any_element()
+    });
+    harness.drag_start("queue.gamma");
+    let target = harness.point_down("queue.alpha", 0.2);
+    harness.drag_to(target);
+    allowed.set(false);
+    harness.drop_here();
+    assert!(output.borrow().is_empty(), "release must revalidate policy");
+}
+
 fn row_label(index: usize) -> SharedString {
     SharedString::from(format!("Row {}", ROWS[index]))
+}
+
+struct DeferredFixture {
+    harness: Harness,
+    controller: dnd::DeferredDrop,
+    output: Reports,
+    events: Rc<RefCell<Vec<dnd::DropDecisionEvent>>>,
+    rows: Rc<RefCell<Vec<&'static str>>>,
+    revision: Rc<std::cell::Cell<u64>>,
+    mounted: Rc<std::cell::Cell<bool>>,
+    valid: Rc<std::cell::Cell<bool>>,
+    owner: Rc<std::cell::Cell<gpui::EffectOwner>>,
+    callback_owners: Rc<RefCell<Vec<Option<gpui::EffectOwner>>>>,
+    kind: usize,
+}
+
+impl DeferredFixture {
+    fn new(cx: &mut TestAppContext, kind: usize) -> Self {
+        let rows = Rc::new(RefCell::new(vec!["alpha", "beta", "gamma"]));
+        let revision = Rc::new(std::cell::Cell::new(7));
+        let mounted = Rc::new(std::cell::Cell::new(true));
+        let valid = Rc::new(std::cell::Cell::new(true));
+        let owner = Rc::new(std::cell::Cell::new(gpui::EffectOwner::new()));
+        let callback_owners = Rc::new(RefCell::new(Vec::new()));
+        let observed_owners = callback_owners.clone();
+        let output = reports();
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let validation_rows = rows.clone();
+        let validation_live = valid.clone();
+        let event_log = events.clone();
+        let controller = dnd::DeferredDrop::new(
+            std::time::Duration::from_millis(500),
+            move |intent, _, _| {
+                validation_live.get()
+                    && validation_rows.borrow().contains(&intent.item.id.as_ref())
+                    && validation_rows
+                        .borrow()
+                        .contains(&intent.position.anchor().as_ref())
+            },
+            move |event, _, cx| {
+                observed_owners.borrow_mut().push(cx.current_effect_owner());
+                event_log.borrow_mut().push(event.clone());
+            },
+        );
+        let data = rows.clone();
+        let version = revision.clone();
+        let visible = mounted.clone();
+        let acceptance = controller.clone();
+        let reports = output.clone();
+        let mounted_owner = owner.clone();
+        let harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+            if !visible.get() {
+                return div().into_any_element();
+            }
+            let keys = data.borrow().clone();
+            let output = reports.clone();
+            let element = match kind {
+                0 => List::new("queue", keys.len(), {
+                    let keys = keys.clone();
+                    move |index, _, _| ListItem::new(keys[index], keys[index]).text(keys[index])
+                })
+                .keys(keys)
+                .row_height(32.0)
+                .reorderable(true)
+                .deferred_acceptance(acceptance.clone(), version.get())
+                .on_reorder(move |intent, _, _| record(&output, intent))
+                .into_any_element(),
+                1 => Tabs::new("queue")
+                    .tabs(keys.iter().map(|id| TabItem::new(*id, *id)))
+                    .reorderable(true)
+                    .deferred_acceptance(acceptance.clone(), version.get())
+                    .on_reorder(move |intent, _, _| record(&output, intent))
+                    .into_any_element(),
+                _ => Tree::new("queue")
+                    .nodes(keys.iter().map(|id| TreeNode::new(*id, *id)))
+                    .reorderable(true)
+                    .deferred_acceptance(acceptance.clone(), version.get())
+                    .on_move(move |intent, _, _| record(&output, intent))
+                    .into_any_element(),
+            };
+            gpui::effect_owner(mounted_owner.get(), div().w(px(520.0)).child(element))
+                .into_any_element()
+        });
+        Self {
+            harness,
+            controller,
+            output,
+            events,
+            rows,
+            revision,
+            mounted,
+            valid,
+            owner,
+            callback_owners,
+            kind,
+        }
+    }
+
+    fn drop(&mut self) -> dnd::DropRequestId {
+        self.harness.drag_start("queue.gamma");
+        let target = if self.kind == 1 {
+            self.harness.point_across("queue.alpha", 0.2)
+        } else {
+            self.harness.point_down("queue.alpha", 0.1)
+        };
+        self.harness.drag_to(target);
+        self.harness.advance(std::time::Duration::from_millis(200));
+        self.harness.drop_here();
+        self.harness.update(|_, cx| {
+            assert!(
+                !cx.has_active_drag(),
+                "pending must release the platform drag"
+            )
+        });
+        let (request, decision) = self
+            .controller
+            .status()
+            .expect("released candidate retained");
+        assert_eq!(decision, dnd::DropDecision::Pending);
+        assert!(self.output.borrow().is_empty());
+        let status = self
+            .harness
+            .node("queue.drop-decision")
+            .expect("pending status is visible");
+        assert!(status.busy);
+        assert!(!status.invalid);
+        request.id
+    }
+
+    fn reply(&mut self, id: dnd::DropRequestId) -> bool {
+        let controller = self.controller.clone();
+        self.harness
+            .update(|window, cx| controller.resolve(id, dnd::DropDecision::Accepted, window, cx))
+    }
+}
+
+#[gpui::test]
+fn deferred_surfaces_approve_once_after_release_and_preserve_caller_order(cx: &mut TestAppContext) {
+    for kind in 0..3 {
+        let mut fixture = DeferredFixture::new(cx, kind);
+        let id = fixture.drop();
+        // Same-revision renders and a paused pointer are not new decisions.
+        fixture
+            .harness
+            .advance(std::time::Duration::from_millis(100));
+        assert!(fixture.reply(id));
+        assert!(!fixture.reply(id), "a duplicate reply is inert");
+        assert_eq!(&*fixture.output.borrow(), &["gamma before:alpha"]);
+        assert_eq!(&*fixture.rows.borrow(), &["alpha", "beta", "gamma"]);
+        assert_eq!(fixture.events.borrow().len(), 2);
+        assert_eq!(
+            &*fixture.callback_owners.borrow(),
+            &[Some(fixture.owner.get()), Some(fixture.owner.get())]
+        );
+        fixture
+            .harness
+            .update(|_, cx| assert_eq!(cx.current_effect_owner(), None));
+    }
+}
+
+#[gpui::test]
+fn deferred_surfaces_invalidate_stale_cancelled_expired_and_revoked_requests(
+    cx: &mut TestAppContext,
+) {
+    for kind in 0..3 {
+        for case in 0..10 {
+            let mut fixture = DeferredFixture::new(cx, kind);
+            let id = fixture.drop();
+            match case {
+                0 => fixture.revision.set(8),
+                1 => fixture.rows.borrow_mut().retain(|id| *id != "alpha"),
+                2 => fixture.rows.borrow_mut().retain(|id| *id != "gamma"),
+                3 => fixture.mounted.set(false),
+                4 => fixture.harness.cancel_drag(),
+                5 => fixture
+                    .harness
+                    .advance(std::time::Duration::from_millis(501)),
+                6 => {
+                    let controller = fixture.controller.clone();
+                    fixture
+                        .harness
+                        .update(|window, cx| controller.revoke(window, cx));
+                }
+                7 => fixture.valid.set(false),
+                8 => fixture.owner.set(gpui::EffectOwner::new()),
+                _ => fixture
+                    .harness
+                    .context()
+                    .simulate_event(gpui::MouseCancelEvent),
+            }
+            fixture.harness.update(|window, _| window.refresh());
+            fixture.harness.snapshot();
+            fixture.reply(id);
+            assert!(
+                fixture.output.borrow().is_empty(),
+                "kind={kind} invalidation={case}"
+            );
+            assert!(!fixture.reply(id));
+            assert!(matches!(
+                fixture.controller.status(),
+                Some((_, dnd::DropDecision::Refused(_)))
+            ));
+        }
+    }
+}
+
+#[gpui::test]
+fn a_new_drop_supersedes_pending_and_can_retry_refusal(cx: &mut TestAppContext) {
+    for kind in 0..3 {
+        let mut fixture = DeferredFixture::new(cx, kind);
+        let first = fixture.drop();
+        let second = fixture.drop();
+        assert_ne!(first, second);
+        assert!(!fixture.reply(first));
+        let controller = fixture.controller.clone();
+        fixture.harness.update(|window, cx| {
+            controller.resolve(
+                second,
+                dnd::DropDecision::Refused(dnd::DropRefusal::Policy),
+                window,
+                cx,
+            )
+        });
+        let refused = fixture
+            .harness
+            .node("queue.drop-decision")
+            .expect("refusal persists");
+        assert!(refused.invalid);
+        assert!(!refused.busy);
+        let retry = fixture.drop();
+        assert!(fixture.reply(retry));
+        assert_eq!(&*fixture.output.borrow(), &["gamma before:alpha"]);
+        assert_eq!(
+            fixture.events.borrow().len(),
+            6,
+            "three requests, three terminal events"
+        );
+    }
 }
 
 fn list_harness(cx: &mut TestAppContext, reports: Reports) -> Harness {
@@ -46,6 +322,122 @@ fn list_harness(cx: &mut TestAppContext, reports: Reports) -> Harness {
             )
             .into_any_element()
     })
+}
+
+#[gpui::test]
+fn keyboard_fixture_requests_and_escape_cancels_without_a_pointer_drag(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |window, cx| {
+        (gpui_kit::scenes::find("deferred-drop")
+            .expect("decision review scene")
+            .build)(window, cx)
+    });
+    for kind in ["list", "tabs", "tree"] {
+        harness.click(&format!("scene.deferred.{kind}.request"));
+        harness.keystrokes("escape");
+        assert!(
+            harness
+                .node(&format!("scene.deferred.{kind}.drop-decision"))
+                .expect("cancelled")
+                .invalid
+        );
+        // The caller's request button retains keyboard focus after Escape.
+        harness.keystrokes("enter");
+        assert!(
+            harness
+                .node(&format!("scene.deferred.{kind}.drop-decision"))
+                .expect("keyboard candidate")
+                .busy
+        );
+        harness.update(|_, cx| assert!(!cx.has_active_drag()));
+    }
+}
+
+#[gpui::test]
+fn foreign_window_replies_and_exact_deadlines_cannot_commit(cx: &mut TestAppContext) {
+    let mut first = DeferredFixture::new(cx, 0);
+    let mut other = DeferredFixture::new(cx, 1);
+    let id = first.drop();
+    let controller = first.controller.clone();
+    assert!(!other.harness.update(|window, cx| controller.resolve(
+        id,
+        dnd::DropDecision::Accepted,
+        window,
+        cx
+    )));
+    first.harness.advance(std::time::Duration::from_millis(500));
+    assert!(!first.reply(id));
+    assert!(first.output.borrow().is_empty());
+    assert!(matches!(
+        first.controller.status(),
+        Some((_, dnd::DropDecision::Refused(dnd::DropRefusal::TimedOut)))
+    ));
+}
+
+#[gpui::test]
+fn a_terminal_callback_can_submit_a_new_candidate_without_losing_it(cx: &mut TestAppContext) {
+    use dnd::{DeferredDrop, DropDecision, DropDecisionEvent, DropRefusal};
+    let slot: Rc<RefCell<Option<DeferredDrop>>> = Rc::new(RefCell::new(None));
+    let next = slot.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let event_log = events.clone();
+    let intent = DropIntent {
+        item: DragItem::new("queue", "gamma", "gamma"),
+        position: DropPosition::Before("alpha".into()),
+        velocity: gpui_kit::motion::Velocity::ZERO,
+    };
+    let nested_intent = intent.clone();
+    let controller = DeferredDrop::new(
+        std::time::Duration::from_secs(1),
+        |_, _, _| true,
+        move |event, window, cx| {
+            event_log.borrow_mut().push(event.clone());
+            if matches!(
+                event,
+                DropDecisionEvent::Finished {
+                    decision: DropDecision::Refused(DropRefusal::Superseded),
+                    ..
+                }
+            ) {
+                next.borrow()
+                    .as_ref()
+                    .expect("installed controller")
+                    .request(nested_intent.clone(), window, cx);
+            }
+        },
+    );
+    *slot.borrow_mut() = Some(controller.clone());
+    let acceptance = controller.clone();
+    let output = reports();
+    let handler = output.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let handler = handler.clone();
+        List::new("queue", ROWS.len(), |i, _, _| {
+            ListItem::new(ROWS[i], ROWS[i])
+        })
+        .keys(ROWS)
+        .reorderable(true)
+        .deferred_acceptance(acceptance.clone(), 1)
+        .on_reorder(move |intent, _, _| record(&handler, intent))
+        .into_any_element()
+    });
+    let first = harness
+        .update(|window, cx| controller.request(intent.clone(), window, cx))
+        .expect("first candidate");
+    assert!(
+        harness
+            .update(|window, cx| controller.request(intent, window, cx))
+            .is_none(),
+        "reentrant newer candidate wins"
+    );
+    let (newest, decision) = controller.status().expect("retained nested request");
+    assert_ne!(newest.id, first);
+    assert_eq!(decision, DropDecision::Pending);
+    harness.update(|window, cx| {
+        assert!(controller.resolve(newest.id, DropDecision::Accepted, window, cx))
+    });
+    assert_eq!(&*output.borrow(), &["gamma before:alpha"]);
+    assert_eq!(events.borrow().len(), 4);
+    *slot.borrow_mut() = None;
 }
 
 #[gpui::test]

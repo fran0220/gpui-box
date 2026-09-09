@@ -2726,6 +2726,7 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_reorder(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -5034,6 +5035,7 @@
         "overflow_menu(menu: Entity<Menu>) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_reorder(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -5643,6 +5645,7 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_move(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self",
         "loading(loading: bool) -> Self",
         "failure(failure: impl Into<SharedString>) -> Self",
@@ -7711,6 +7714,24 @@
       "queries": []
     },
     {
+      "name": "DeferredDrop",
+      "path": "gpui_kit::interaction::DeferredDrop",
+      "summary": "Retained, nonblocking acceptance shared by List and Tabs.",
+      "variants": [],
+      "construct": [
+        "new(timeout: Duration, validate: impl Fn(&DropIntent, &mut Window, &mut App) -> bool + 'static, on_event: impl Fn(&DropDecisionEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "status() -> Option<(DropRequest, DropDecision)>",
+        "cancel(window: &mut Window, cx: &mut App)",
+        "revoke(window: &mut Window, cx: &mut App)",
+        "resolve(id: DropRequestId, decision: DropDecision, window: &mut Window, cx: &mut App) -> bool",
+        "request(intent: DropIntent, window: &mut Window, cx: &mut App) -> Option<DropRequestId>"
+      ]
+    },
+    {
       "name": "DeliveryState",
       "path": "gpui_kit::content::DeliveryState",
       "summary": "What a host said about a message's journey.",
@@ -8511,6 +8532,33 @@
       "queries": []
     },
     {
+      "name": "DropDecision",
+      "path": "gpui_kit::interaction::DropDecision",
+      "summary": "",
+      "variants": [
+        "Pending",
+        "Accepted",
+        "Refused"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropDecisionEvent",
+      "path": "gpui_kit::interaction::DropDecisionEvent",
+      "summary": "Every request has at most one terminal event, including cancellation.",
+      "variants": [
+        "Requested",
+        "Finished"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DropIntent",
       "path": "gpui_kit::interaction::DropIntent",
       "summary": "One drop, as it is reported to the host.",
@@ -8536,6 +8584,45 @@
         "anchor() -> &SharedString",
         "verb() -> &'static str"
       ]
+    },
+    {
+      "name": "DropRefusal",
+      "path": "gpui_kit::interaction::DropRefusal",
+      "summary": "",
+      "variants": [
+        "Policy",
+        "Stale",
+        "Cancelled",
+        "TimedOut",
+        "Superseded",
+        "Revoked"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropRequest",
+      "path": "gpui_kit::interaction::DropRequest",
+      "summary": "A released candidate, not a committed reorder. Replies must name its id.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropRequestId",
+      "path": "gpui_kit::interaction::DropRequestId",
+      "summary": "A single-use, process-local request identity, safe to carry as protocol data.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "get() -> u64"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DropzoneState",
@@ -16309,6 +16396,19 @@
         "List"
       ],
       "example": "fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let carried = fixture_record(4);\n    let anchor = fixture_record(1);\n    // A capture cannot photograph a gesture, so the drag is placed by hand.\n    // Staging fixes the ghost, the indicator, and the open slot, and takes the\n    // pointer and the spring out of the picture.\n    dnd::stage(\n        StagedDrag::new(DragItem::new(\n            \"scene.drag.records\",\n            carried.0.clone(),\n            carried.1.clone(),\n        ))\n        .landing(\n            \"scene.drag.records\",\n            DropPosition::Before(anchor.0.clone()),\n            Some(1),\n            true,\n        ),\n        cx,\n    );\n\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            SharedString::from(format!(\"{} moving before {}\", carried.1, anchor.1)),\n        ))\n        .child(\n            div()\n                .relative()\n                .child(\n                    div()\n                        .surface(&theme, Surface::Panel)\n                        .radius(&theme, Radius::Card)\n                        .py_token(&theme, Space::Xs)\n                        .overflow_hidden()\n                        .child(\n                            List::new(\"scene.drag.records\", 6, |index, _, _| {\n                                let (id, label) = fixture_record(index);\n                                ListItem::new(id, label.clone()).text(label)\n                            })\n                            // A row slides without its layout slot moving, so the\n                            // viewport is one row taller than the rows it holds and\n                            // the open slot has somewhere to be.\n                            .visible_rows(7)\n                            .reorderable(true)\n                            .on_select(|_, _, _| {})\n                            .on_reorder(|_, _, _| {}),\n                        ),\n                )\n                // The ghost is what the pointer is holding, and the pointer is\n                // beside the rows rather than on top of them: staged over a\n                // row it would cut the label it is meant to be leaving.\n                .children(\n                    dnd::staged_ghost(cx)\n                        .map(|ghost| div().absolute().left(px(248.0)).top(px(52.0)).child(ghost)),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "deferred-drop",
+      "capture": "cargo run -p xtask -- headless capture deferred-drop",
+      "kind": "composition",
+      "subjects": [],
+      "uses": [
+        "List",
+        "Tabs",
+        "Tree",
+        "Button"
+      ],
+      "example": "fn deferred_drop(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::interaction::dnd::{DeferredDrop, DropDecision, DropRefusal};\n    let theme = cx.theme().clone();\n    let mut content = stack(&theme).w(px(660.0)).child(caption(\n        &theme,\n        \"Fixture: request a move, then approve or refuse it. The host keeps its order.\",\n    ));\n    for (kind, surface) in [\n        (0, \"scene.deferred.list\"),\n        (1, \"scene.deferred.tabs\"),\n        (2, \"scene.deferred.tree\"),\n    ] {\n        let slot = crate::motion::keyed::slot::<Option<DeferredDrop>>(\n            &surface.into(),\n            window.window_handle().window_id(),\n            cx,\n        );\n        let controller = slot\n            .borrow_mut()\n            .get_or_insert_with(|| {\n                DeferredDrop::new(\n                    Duration::from_secs(30),\n                    |intent, _, _| intent.item.id == \"gamma\" && intent.position.anchor() == \"alpha\",\n                    |_, _, _| {},\n                )\n            })\n            .clone();\n        let request = controller.clone();\n        let approve = controller.clone();\n        let refuse = controller.clone();\n        let rows = [\"alpha\", \"beta\", \"gamma\"];\n        let element = match kind {\n            0 => List::new(surface, rows.len(), move |index, _, _| {\n                ListItem::new(rows[index], rows[index]).text(rows[index])\n            })\n            .keys(rows)\n            .reorderable(true)\n            .deferred_acceptance(controller, 1)\n            .on_reorder(|_, _, _| {})\n            .into_any_element(),\n            1 => Tabs::new(surface)\n                .tabs(rows.map(|id| TabItem::new(id, id)))\n                .reorderable(true)\n                .deferred_acceptance(controller, 1)\n                .on_reorder(|_, _, _| {})\n                .into_any_element(),\n            _ => Tree::new(surface)\n                .nodes(rows.map(|id| TreeNode::new(id, id)))\n                .reorderable(true)\n                .deferred_acceptance(controller, 1)\n                .on_move(|_, _, _| {})\n                .into_any_element(),\n        };\n        content = content\n            .child(caption(&theme, surface))\n            .child(element)\n            .child(\n                row(&theme)\n                    .child(\n                        Button::new(format!(\"{surface}.request\"))\n                            .label(\"Request move\")\n                            .on_click(move |window, cx| {\n                                request.request(\n                                    DropIntent {\n                                        item: DragItem::new(surface, \"gamma\", \"gamma\"),\n                                        position: DropPosition::Before(\"alpha\".into()),\n                                        velocity: crate::motion::Velocity::ZERO,\n                                    },\n                                    window,\n                                    cx,\n                                );\n                            }),\n                    )\n                    .child(\n                        Button::new(format!(\"{surface}.approve\"))\n                            .label(\"Approve\")\n                            .on_click(move |window, cx| {\n                                if let Some((request, _)) = approve.status() {\n                                    approve.resolve(request.id, DropDecision::Accepted, window, cx);\n                                }\n                            }),\n                    )\n                    .child(\n                        Button::new(format!(\"{surface}.refuse\"))\n                            .label(\"Refuse\")\n                            .on_click(move |window, cx| {\n                                if let Some((request, _)) = refuse.status() {\n                                    refuse.resolve(\n                                        request.id,\n                                        DropDecision::Refused(DropRefusal::Policy),\n                                        window,\n                                        cx,\n                                    );\n                                }\n                            }),\n                    ),\n            );\n    }\n    content.into_any_element()\n}"
     },
     {
       "name": "drag-tree",
