@@ -69,6 +69,19 @@ function profileExists(name) {
     ['--profile-exists', name], { encoding: 'utf8', timeout: 10000 }));
 }
 
+function option(config, flag) {
+  const index = config.execArgv.indexOf(flag);
+  assert.ok(index >= 0 && index + 1 < config.execArgv.length, `missing launcher option ${flag}`);
+  return config.execArgv[index + 1];
+}
+
+test('Windows fixture reads launcher metadata by flag, independent of option order', () => {
+  const config = { execArgv: ['--profile', 'gpui-js-example', '--instance', 'staging', '--'] };
+  assert.equal(option(config, '--profile'), 'gpui-js-example');
+  assert.equal(option(config, '--instance'), 'staging');
+  assert.throws(() => option(config, '--missing'), /missing launcher option/);
+});
+
 test('Windows readiness observer reports an early launcher exit with stderr', async t => {
   const run = launch(t, { execPath: process.execPath, execArgv: ['-e', "process.stderr.write('launch failed');process.exit(125)"], stdio: ['pipe', 'pipe', 'pipe'] }, []);
   await assert.rejects(waitUntil(() => false, 'not ready', run), /child exited code=125.*launch failed/);
@@ -103,8 +116,8 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   assert.deepEqual(originals.map(acl), originalAcls, 'host ACLs must remain unchanged');
   assert.equal(await readFile(secret, 'utf8'), 'host-only-sentinel');
   await config.cleanup();
-  await assert.rejects(access(config.execArgv[1]), { code: 'ENOENT' });
-  assert.equal(profileExists(config.execArgv[10]), false);
+  await assert.rejects(access(option(config, '--instance')), { code: 'ENOENT' });
+  assert.equal(profileExists(option(config, '--profile')), false);
 });
 
 test('native committed allocation is refused before 256 MiB', nativeOptions, async t => {
@@ -171,13 +184,13 @@ test('killing the helper kills the worker, then deferred cleanup removes staging
   const pid = Number(run.output().stdout.trim());
   assert.ok(Number.isInteger(pid) && pid > 0, JSON.stringify(run.output()));
   assert.ok(exists(pid));
-  assert.equal(profileExists(config.execArgv[10]), true);
+  assert.equal(profileExists(option(config, '--profile')), true);
   run.child.kill();
   await run.closed;
   await waitUntil(() => !exists(pid), 'worker survived helper death');
   await config.cleanup();
-  await assert.rejects(access(config.execArgv[1]), { code: 'ENOENT' });
-  assert.equal(profileExists(config.execArgv[10]), false);
+  await assert.rejects(access(option(config, '--instance')), { code: 'ENOENT' });
+  assert.equal(profileExists(option(config, '--profile')), false);
 });
 
 test('host death terminates the helper and worker without their cooperation', nativeOptions, async t => {
@@ -185,11 +198,13 @@ test('host death terminates the helper and worker without their cooperation', na
   const hostScript = join(directory, 'host.mjs');
   const sandboxModule = new URL('../windows-sandbox.mjs', import.meta.url).href;
   await writeFile(hostScript, `
+    import assert from 'node:assert/strict';
     import { windowsSandbox } from ${JSON.stringify(sandboxModule)};
     import { spawn } from 'node:child_process';
+    const option = ${option.toString()};
     const config = await windowsSandbox(${JSON.stringify(root)}, ${JSON.stringify(minimalRuntime)});
     const helper = spawn(config.execPath, [...config.execArgv, '-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: config.stdio });
-    console.log(JSON.stringify({ helper: helper.pid, instance: config.execArgv[1], profile: config.execArgv[10] }));
+    console.log(JSON.stringify({ helper: helper.pid, instance: option(config, '--instance'), profile: option(config, '--profile') }));
     helper.stdout.pipe(process.stdout); helper.stderr.pipe(process.stderr);
     helper.on('error', error => { console.error(error.message); process.exit(125); });
     helper.on('close', (code, signal) => { console.error('helper exited', code, signal); process.exit(code || 125); });
@@ -228,12 +243,12 @@ test('host death terminates the helper and worker without their cooperation', na
 test('failed image creation cleans its provisioned profile without executing a payload', nativeOptions, async t => {
   const { root, minimalRuntime } = await fixture(t);
   const config = await windowsSandbox(root, minimalRuntime);
-  await writeFile(join(config.execArgv[1], 'worker.exe'), 'not a PE executable');
+  await writeFile(join(option(config, '--instance'), 'worker.exe'), 'not a PE executable');
   const run = launch(t, config, []);
   assert.equal((await run.closed)[0], 125);
   assert.match(run.output().stderr, /CreateProcessW failed \(193\)/);
   assert.equal(run.output().stdout, '');
-  assert.equal(profileExists(config.execArgv[10]), false);
+  assert.equal(profileExists(option(config, '--profile')), false);
 });
 
 test('junction packages and missing launcher fail closed', nativeOptions, async t => {
@@ -247,7 +262,7 @@ test('native helper rejects a reparse point introduced after staging without cha
   const { root, minimalRuntime } = await fixture(t);
   const config = await windowsSandbox(root, minimalRuntime);
   const originalAcl = acl(minimalRuntime);
-  await symlink(minimalRuntime, join(config.execArgv[1], 'package', 'escape'), 'junction');
+  await symlink(minimalRuntime, join(option(config, '--instance'), 'package', 'escape'), 'junction');
   const run = launch(t, config, ['-e', 'console.log("UNSAFE-FALLBACK")']);
   assert.equal((await run.closed)[0], 125);
   assert.equal(run.output().stdout, '');

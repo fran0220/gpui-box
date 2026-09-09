@@ -125,6 +125,18 @@ int wmain(int argc, wchar_t **argv) {
     LPWSTR package_sid = NULL, profile_folder = NULL;
     CHECK(ConvertSidToStringSidW(container->TokenAppContainer, &package_sid));
     CHECK(SUCCEEDED(GetAppContainerFolderPath(package_sid, &profile_folder)));
+    const wchar_t *environment_keys[] = {L"LOCALAPPDATA", L"TEMP", L"TMP"};
+    for (int i = 0; i < 3; i++) {
+        wchar_t value[PATH_CAP];
+        DWORD length = GetEnvironmentVariableW(environment_keys[i], value, PATH_CAP);
+        CHECK(length && length < PATH_CAP - 32);
+        size_t prefix = wcslen(profile_folder);
+        CHECK(!_wcsnicmp(value, profile_folder, prefix) &&
+            (!value[prefix] || value[prefix] == L'\\'));
+        wcscat(value, L"\\forbidden-environment.txt");
+        HANDLE write = CreateFileW(value, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+        CHECK(write == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED);
+    }
     wchar_t profile_file[PATH_CAP];
     CHECK(swprintf(profile_file, PATH_CAP, L"%ls\\forbidden.txt", profile_folder) > 0);
     HANDLE profile_write = CreateFileW(profile_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
@@ -325,8 +337,9 @@ int wmain(int argc, wchar_t **argv) {
     LPWSTR profile_path = NULL;
     result = GetAppContainerFolderPath(sidText, &profile_path);
     if (FAILED(result)) { SetLastError((DWORD)result); fail("GetAppContainerFolderPath"); }
+    wchar_t *profile_temp = join(profile_path, L"Temp");
+    CHECK(CreateDirectoryW(profile_temp, NULL) || GetLastError() == ERROR_ALREADY_EXISTS);
     protect_tree(profile_path, acl); // only the newly-created per-instance storage
-    CoTaskMemFree(profile_path);
     LocalFree(descriptor); LocalFree(userText); LocalFree(sidText); free(user); CloseHandle(token);
 
     HANDLE job = CreateJobObjectW(NULL, NULL);
@@ -386,16 +399,29 @@ int wmain(int argc, wchar_t **argv) {
         append_argument(command, argument);
         free(argument);
     }
-    // Never inherit host secrets, NODE_OPTIONS, loader search paths or TEMP.
+    // Never inherit host secrets, NODE_OPTIONS, or loader search paths.
+    // Windows documents rewriting LOCALAPPDATA/TEMP/TMP for AppContainer
+    // creation. The native lane reported error 203 with all three omitted,
+    // even for an invalid image. Seed ONLY these three bootstrap entries
+    // with the private profile, never host temp/home paths.
+    // All directories already exist and have the same read-only container ACL.
     wchar_t windows[PATH_CAP];
     UINT length = GetWindowsDirectoryW(windows, PATH_CAP);
     CHECK(length && length < PATH_CAP);
-    size_t envSize = 2 * wcslen(windows) + 80;
+    const wchar_t *keys[] = {L"LOCALAPPDATA", L"NODE_NO_WARNINGS", L"SystemRoot", L"TEMP", L"TMP", L"WINDIR"};
+    const wchar_t *values[] = {profile_path, L"1", windows, profile_temp, profile_temp, windows};
+    size_t envSize = 1;
+    for (int i = 0; i < 6; i++) envSize += wcslen(keys[i]) + wcslen(values[i]) + 2;
     wchar_t *environment = calloc(envSize, sizeof(wchar_t));
     CHECK(environment);
-    int written = swprintf(environment, envSize, L"NODE_NO_WARNINGS=1");
-    written += 1 + swprintf(environment + written + 1, envSize - written - 1, L"SystemRoot=%ls", windows);
-    swprintf(environment + written + 1, envSize - written - 1, L"WINDIR=%ls", windows);
+    size_t offset = 0;
+    for (int i = 0; i < 6; i++) {
+        int written = swprintf(environment + offset, envSize - offset, L"%ls=%ls", keys[i], values[i]);
+        CHECK(written > 0 && (size_t)written < envSize - offset);
+        offset += (size_t)written + 1;
+    }
+    CHECK(offset + 1 == envSize && environment[offset] == 0);
+    CoTaskMemFree(profile_path); free(profile_temp);
     DWORD executable_attributes = GetFileAttributesW(executable);
     DWORD cwd_attributes = GetFileAttributesW(cwd);
     CHECK(executable_attributes != INVALID_FILE_ATTRIBUTES && !(executable_attributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -411,7 +437,7 @@ int wmain(int argc, wchar_t **argv) {
     if (!CreateProcessW(executable, command, NULL, NULL, TRUE,
         flags, environment, cwd, &startup.StartupInfo, &process)) {
         DWORD error = GetLastError();
-        fprintf(stderr, "Windows sandbox: launch exe=%ls cwd=%ls exeAttributes=0x%lx cwdAttributes=0x%lx flags=0x%lx profile=%ls env=NODE_NO_WARNINGS,SystemRoot,WINDIR\n",
+        fprintf(stderr, "Windows sandbox: launch exe=%ls cwd=%ls exeAttributes=0x%lx cwdAttributes=0x%lx flags=0x%lx profile=%ls env=LOCALAPPDATA,NODE_NO_WARNINGS,SystemRoot,TEMP,TMP,WINDIR\n",
             executable, cwd, executable_attributes, cwd_attributes, flags, name);
         SetLastError(error); fail("CreateProcessW");
     }

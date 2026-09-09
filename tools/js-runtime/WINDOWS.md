@@ -79,8 +79,13 @@ The newly-created profile directory is protected with the same RX-only ACL
 before any worker starts. No capability SIDs or network exemptions are added.
 Windows also creates per-instance registry profile state; this is not a claim
 of a filesystem/registry namespace with no backing state.
-The child receives a clean environment containing only
-Windows directory variables and `NODE_NO_WARNINGS`. An explicit handle list
+The child receives an explicit environment containing only Windows directory
+variables, `NODE_NO_WARNINGS`, and the documented AppContainer bootstrap keys
+`LOCALAPPDATA`, `TEMP`, `TMP`. Those three are seeded from the new profile's
+API-derived path and its `Temp` child, never copied from host environment.
+The temp directory is created before applying the RX-only ACL; the native
+probe requires the resulting environment paths to remain inside the profile
+and rejects writes through all three. An explicit handle list
 passes only duplicated standard pipes; no job or host-process handle leaks.
 `DETACHED_PROCESS` avoids requesting an invisible console. Staging paths are
 expanded to long backslash paths, and image/cwd existence plus host image-open
@@ -112,6 +117,17 @@ are shared launch concerns; the old log did not identify which lookup failed.
 These corrections remain candidates until native execution confirms startup
 and all containment assertions. The test ACL reader now calls Win32 APIs from
 the native probe, so missing PowerShell modules cannot erase ACL assertions.
+
+The next actual run, [34396298822](https://github.com/fran0220/gpui-box/actions/runs/34396298822)
+at source [02468534](https://github.com/fran0220/gpui-box/commit/02468534f3863e1f627559808f55128eb8bc8c4d),
+reached `CreateProcessW` with existing staged executable/cwd but failed with
+203 (`ERROR_ENVVAR_NOT_FOUND`) for both valid and invalid images. Its environment
+contained only `NODE_NO_WARNINGS,SystemRoot,WINDIR`. The explicit profile-backed
+bootstrap entries above are a candidate correction based on the documented
+AppContainer environment rewrite, not a natively verified fix. Failure logs
+retain the exact supplied key list and original Win32 error. Tests also now
+extract `--profile`/`--instance` values by flag: the former positional profile
+index accidentally selected `--`, corrupting teardown verification.
 
 ## Resource semantics and remaining differences
 
