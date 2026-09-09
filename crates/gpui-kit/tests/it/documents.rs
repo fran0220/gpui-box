@@ -2089,3 +2089,93 @@ fn a_block_that_grew_does_not_disturb_the_blocks_around_it(cx: &mut TestAppConte
         "and the block that is still arriving says so"
     );
 }
+
+#[gpui::test]
+fn resolved_markdown_media_remeasures_its_rows_without_reparsing(cx: &mut TestAppContext) {
+    let ready = Rc::new(std::cell::Cell::new(false));
+    let supplied = ready.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let supplied = supplied.clone();
+        AgentDocument::new("media-document")
+            .virtualized(10)
+            .block(AgentDocumentBlock::text("before", "Before image"))
+            .block(AgentDocumentBlock::markdown(
+                "picture",
+                "![Fixture](fixture.png)",
+            ))
+            .block(AgentDocumentBlock::text("after", "After image"))
+            .configure_markdown(move |_, markdown| {
+                let supplied = supplied.clone();
+                markdown.image(move |_, _, _| {
+                    supplied.get().then(|| {
+                        div()
+                            .w(gpui::px(120.0))
+                            .h(gpui::px(96.0))
+                            .child("Resolved fixture")
+                            .into_any_element()
+                    })
+                })
+            })
+            .into_any_element()
+    });
+    let before = harness
+        .bounds("media-document.block.before")
+        .expect("first row");
+    let old_after = harness
+        .bounds("media-document.block.after")
+        .expect("last row");
+    let work = harness
+        .update(|window, cx| AgentDocument::work(&Ident::from("media-document"), window, cx));
+    ready.set(true);
+    harness.update(|window, cx| {
+        AgentDocument::remeasure_block(&Ident::from("media-document"), "picture", window, cx)
+    });
+    harness.frame();
+    assert_eq!(
+        harness
+            .bounds("media-document.block.before")
+            .expect("first row stays"),
+        before
+    );
+    assert!(
+        harness
+            .bounds("media-document.block.after")
+            .expect("last row moves")
+            .origin
+            .y
+            > old_after.origin.y
+    );
+    let after = harness
+        .update(|window, cx| AgentDocument::work(&Ident::from("media-document"), window, cx));
+    assert_eq!(after.parser, work.parser);
+    assert_eq!(after.planned_rows, work.planned_rows);
+}
+
+#[gpui::test]
+fn appending_to_a_selected_markdown_run_keeps_its_selection_identity(cx: &mut TestAppContext) {
+    let source = Rc::new(RefCell::new(String::from("selected tail")));
+    let rendered = source.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        AgentDocument::new("selected")
+            .virtualized(8)
+            .block(AgentDocumentBlock::text("first", "opening text"))
+            .block(AgentDocumentBlock::markdown("tail", rendered.borrow().clone()).streaming(true))
+            .into_any_element()
+    });
+    drag_between_blocks(
+        &mut harness,
+        ("selected.block.first", 0.0),
+        ("selected.block.tail", 0.98),
+    );
+    let before = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("selected across blocks");
+    assert!(before.text.contains("selected tail"));
+    source.borrow_mut().push_str(" appended later");
+    harness.frame();
+    let after = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("selection survives append");
+    assert_eq!(after.text, before.text);
+    assert_eq!(after.participants, before.participants);
+}

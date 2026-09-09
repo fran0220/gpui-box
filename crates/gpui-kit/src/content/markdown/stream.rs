@@ -20,7 +20,10 @@
 
 use super::mend;
 use super::parse::{Block, Document};
-use std::cell::Cell;
+use std::{
+    cell::{Cell, RefCell},
+    sync::Arc,
+};
 
 /// Cumulative parser and source-buffer work, not a CPU-time estimate.
 /// Parsed bytes include boundary discovery and display-mending passes.
@@ -50,6 +53,7 @@ pub struct MarkdownStream {
     parsed: usize,
     revision: u64,
     work: Cell<MarkdownWork>,
+    mended_tail: RefCell<Option<(u64, Option<Arc<Document>>)>>,
 }
 
 pub(crate) type Stream = MarkdownStream;
@@ -144,7 +148,7 @@ impl MarkdownStream {
 
         let tail = &source[boundary..];
         self.record_parse(tail.len());
-        let (document, starts) = Document::parse_indexed(tail);
+        let (document, starts) = Document::parse_fragment(tail, boundary == 0);
         let Some(tail_starts) = starts else {
             self.reset(source);
             return;
@@ -185,7 +189,18 @@ impl MarkdownStream {
     /// The canonical document is never touched by this. A marker that turns
     /// out never to close settles honestly, once, instead of being asserted
     /// forever.
-    pub(crate) fn mended(&self) -> Option<Document> {
+    pub(crate) fn mended_tail(&self) -> Option<Arc<Document>> {
+        if let Some((revision, tail)) = &*self.mended_tail.borrow()
+            && *revision == self.revision
+        {
+            return tail.clone();
+        }
+        let tail = self.compute_mended_tail().map(Arc::new);
+        *self.mended_tail.borrow_mut() = Some((self.revision, tail.clone()));
+        tail
+    }
+
+    fn compute_mended_tail(&self) -> Option<Document> {
         if self.whole {
             return None;
         }
@@ -193,14 +208,23 @@ impl MarkdownStream {
         let last = self.document.blocks.last()?;
         // A fence renders its own contents verbatim and is stable already; a
         // rule and a table have no inline tail to hang.
-        if matches!(last, Block::Code { .. } | Block::Rule | Block::Table { .. }) {
+        if matches!(
+            last,
+            Block::Code { .. } | Block::Frontmatter { .. } | Block::Rule | Block::Table { .. }
+        ) {
             return None;
         }
         let mended = mend::close_hanging(&self.source[start..])?;
 
-        let mut blocks = self.document.blocks[..self.document.blocks.len() - 1].to_vec();
         self.record_parse(mended.len());
-        blocks.extend(Document::parse(&mended).blocks);
+        Some(Document::parse_fragment(&mended, start == 0).0)
+    }
+
+    #[cfg(test)]
+    fn mended(&self) -> Option<Document> {
+        let tail = self.mended_tail()?;
+        let mut blocks = self.document.blocks[..self.document.blocks.len() - 1].to_vec();
+        blocks.extend(tail.blocks.clone());
         Some(Document { blocks })
     }
 
@@ -235,6 +259,50 @@ fn has_reference_definition(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frontmatter_and_later_rules_keep_document_context_at_every_prefix() {
+        for source in [
+            "---\ntitle: Safe\n---\n\nOpening.\n\nMiddle.\n\n---\n\nTail.\n",
+            "+++\ntitle = \"Safe\"\n+++\n\nOpening.\n\nMiddle.\n\n---\n\nTail.\n",
+        ] {
+            let mut stream = Stream::default();
+            for (index, character) in source.char_indices() {
+                stream.append(&source[index..index + character.len_utf8()]);
+                assert_eq!(
+                    stream.document(),
+                    &Document::parse(&source[..index + character.len_utf8()])
+                );
+            }
+            assert!(matches!(
+                stream.document().blocks.first(),
+                Some(Block::Frontmatter { .. })
+            ));
+            assert!(
+                stream
+                    .document()
+                    .blocks
+                    .iter()
+                    .any(|block| matches!(block, Block::Rule))
+            );
+        }
+    }
+
+    #[test]
+    fn static_hanging_marker_reuses_only_the_mended_tail() {
+        let mut stream = Stream::default();
+        stream.read(&format!("{}**tail", "Settled.\n\n".repeat(2000)));
+        let first = stream.mended_tail().expect("mended tail");
+        assert_eq!(first.blocks.len(), 1);
+        let work = stream.work();
+        for _ in 0..100 {
+            assert!(Arc::ptr_eq(
+                &first,
+                &stream.mended_tail().expect("retained tail")
+            ));
+        }
+        assert_eq!(stream.work(), work);
+    }
 
     #[test]
     fn delta_input_copies_only_arriving_bytes_and_counts_every_parser_pass() {

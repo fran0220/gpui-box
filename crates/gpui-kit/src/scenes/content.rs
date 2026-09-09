@@ -455,7 +455,17 @@ pub(super) fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
             .child(Markdown::new(
                 "scene.markdown.unicode-wrap",
                 "设计图通过后仍需运行、测量和批注；截图不能证明可玩。请检查「运行结果」（第12轮），然后比较 Hello world你好世界与 internationalization 2026-09。",
-            )),
+            ))
+            .child(caption(&theme, "Frontmatter stays data"))
+            .child(Markdown::new("scene.markdown.metadata", "---\ntitle: Review fixture\ntrusted: false\n---\n\nMetadata is visible, never applied."))
+            .child(caption(&theme, "Host block plugin · native rendering"))
+            .child(Markdown::new("scene.markdown.plugin", "```notice\nThis fixture uses a trusted native block renderer.\n```\n\n```unknown\nUnknown fences remain code.\n```")
+                .block_renderer(|ident, block, _, _, _| {
+                    if let crate::content::markdown::Block::Code { language, text } = block
+                        && language.as_deref() == Some("notice") {
+                        Some(Callout::new(text.clone(), Tone::Info).id(ident.clone()).into_any_element())
+                    } else { None }
+                })),
     )
         .into_any_element()
 }

@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use gpui::{IntoElement, ParentElement, Styled, TestAppContext};
 use gpui_kit::prelude::*;
-use gpui_kit_semantics::Role;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 type Sink<T> = Rc<RefCell<Vec<T>>>;
@@ -505,5 +505,77 @@ leaning into the screen.";
 so it never wrapped",
         narrow.bounds.height,
         wide.bounds.height
+    );
+}
+
+#[gpui::test]
+fn native_block_plugins_preserve_fallback_and_receive_stable_identity(cx: &mut TestAppContext) {
+    let identities = Rc::new(RefCell::new(Vec::new()));
+    let seen = identities.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let seen = seen.clone();
+        Markdown::new(
+            "plugins",
+            "```notice\nNative notice.\n```\n\n```unknown\nFallback bytes.\n```",
+        )
+        .block_renderer(move |ident, block, order, _, cx| {
+            if let gpui_kit::content::markdown::Block::Code { language, text } = block
+                && language.as_deref() == Some("notice")
+            {
+                seen.borrow_mut().push(ident.semantic_id());
+                Some(
+                    gpui::div()
+                        .child(gpui::StyledText::new(text.clone()).selectable_in_document(
+                            ident.element_id(),
+                            ident.semantic_id(),
+                            order,
+                        ))
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.semantic_id(), Role::Group).text(text.clone()),
+                        )
+                        .into_any_element(),
+                )
+            } else {
+                None
+            }
+        })
+        .into_any_element()
+    });
+    assert_eq!(
+        harness
+            .node("plugins.block-at-0")
+            .expect("plugin text")
+            .text
+            .as_deref(),
+        Some("Native notice.")
+    );
+    assert!(harness.node("plugins.code-unknown.copy").is_some());
+    harness.frame();
+    assert!(
+        identities
+            .borrow()
+            .iter()
+            .all(|id| id.as_ref() == "plugins.block-at-0")
+    );
+}
+
+#[gpui::test]
+fn frontmatter_is_visible_literal_metadata_not_hidden_configuration(cx: &mut TestAppContext) {
+    let (mut harness, events) =
+        markdown(cx, "---\ntitle: Safe\nscript: steal()\n---\n\n# Body", None);
+    let metadata = harness
+        .node("doc.code-yaml")
+        .expect("metadata rendered as code");
+    assert!(metadata.visible);
+    assert!(harness.node("doc.code-yaml.copy").is_some());
+    assert!(harness.node("doc.heading-body").is_some());
+    harness.click("doc.code-yaml.copy");
+    assert_eq!(
+        events.borrow().as_slice(),
+        &[MarkdownEvent::CodeCopied {
+            language: Some("yaml".into()),
+            text: "title: Safe\nscript: steal()\n".into(),
+        }]
     );
 }

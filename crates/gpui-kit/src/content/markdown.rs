@@ -123,6 +123,7 @@ pub enum MarkdownCodePresentation {
 type EventHandler = Rc<dyn Fn(&MarkdownEvent, &mut Window, &mut App)>;
 type ImageSource = Rc<dyn Fn(&ImageRequest, &mut Window, &mut App) -> Option<AnyElement>>;
 type Highlighter = Rc<dyn Fn(&CodeBlock) -> Vec<CodeSpan>>;
+type BlockRenderer = Rc<dyn Fn(&Ident, &Block, u64, &mut Window, &mut App) -> Option<AnyElement>>;
 
 /// A rendered Markdown document.
 #[derive(IntoElement)]
@@ -130,6 +131,7 @@ pub struct Markdown {
     ident: Ident,
     source: SharedString,
     parsed: Option<Rc<Document>>,
+    block_renderer: Option<BlockRenderer>,
     max_lines: Option<usize>,
     /// The first reading-order value this document may claim when it is
     /// embedded in a larger document.
@@ -157,6 +159,19 @@ impl std::fmt::Debug for Markdown {
 }
 
 impl Markdown {
+    /// Installs a trusted native renderer for top-level parsed blocks.
+    /// `None` keeps the safe built-in rendering. The identity and reading-order
+    /// start are supplied so custom content can join document selection.
+    /// Only mounted blocks invoke the callback; it must be repeatable and must
+    /// not treat document text as executable HTML or application configuration.
+    pub fn block_renderer(
+        mut self,
+        renderer: impl Fn(&Ident, &Block, u64, &mut Window, &mut App) -> Option<AnyElement> + 'static,
+    ) -> Self {
+        self.block_renderer = Some(Rc::new(renderer));
+        self
+    }
+
     pub(crate) fn parsed(mut self, document: Rc<Document>) -> Self {
         self.parsed = Some(document);
         self
@@ -167,6 +182,7 @@ impl Markdown {
             ident: ident.into(),
             source: source.into(),
             parsed: None,
+            block_renderer: None,
             max_lines: None,
             selection_order_start: 0,
             on_event: None,
@@ -287,14 +303,23 @@ impl RenderOnce for Markdown {
             reader.read(self.source.as_ref());
         }
         let mended = (self.streaming && self.parsed.is_none())
-            .then(|| reader.mended())
+            .then(|| reader.mended_tail())
             .flatten();
-        let parsed = self
-            .parsed
-            .as_deref()
-            .or(mended.as_ref())
-            .unwrap_or_else(|| reader.document());
-        let truncated = self.max_lines.map(|max| parsed.truncate(max));
+        let parsed = self.parsed.as_deref().unwrap_or_else(|| reader.document());
+        let prefix = &parsed.blocks[..parsed.blocks.len() - usize::from(mended.is_some())];
+        let tail = mended
+            .as_ref()
+            .map_or(&[][..], |tail| tail.blocks.as_slice());
+        let truncated = self.max_lines.map(|max| {
+            if mended.is_some() {
+                Document {
+                    blocks: prefix.iter().chain(tail).cloned().collect(),
+                }
+                .truncate(max)
+            } else {
+                parsed.truncate(max)
+            }
+        });
         let (document, hidden) = match &truncated {
             Some((document, hidden)) => (document, *hidden),
             None => (parsed, 0),
@@ -310,6 +335,14 @@ impl RenderOnce for Markdown {
 
         let mut painter = Painter {
             ident: ident.clone(),
+            names: keyed::slot::<RunNames>(
+                &ident.child("run-names").semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            ),
+            block_start: 0,
+            run_index: 0,
+            seen_names: HashSet::new(),
             theme: theme.clone(),
             on_event: self.on_event.clone(),
             image: self.image.clone(),
@@ -324,8 +357,23 @@ impl RenderOnce for Markdown {
         };
 
         let mut column = div().column().w_full().gap_token(&theme, Space::Md);
-        for block in &document.blocks {
-            column = column.child(painter.block(block, window, cx));
+        let (prefix, tail) = if truncated.is_some() {
+            (document.blocks.as_slice(), &[][..])
+        } else {
+            (prefix, tail)
+        };
+        for (index, block) in prefix.iter().chain(tail).enumerate() {
+            painter.reading_order = self
+                .selection_order_start
+                .saturating_add(index as u64 * (1 << 16));
+            let start = reader.starts().get(index).copied().unwrap_or(index);
+            painter.block_start = start;
+            painter.run_index = 0;
+            let block_ident = ident.child(format!("block-at-{start}"));
+            let custom = self.block_renderer.as_ref().and_then(|renderer| {
+                renderer(&block_ident, block, painter.reading_order, window, cx)
+            });
+            column = column.child(custom.unwrap_or_else(|| painter.block(block, window, cx)));
         }
 
         if hidden > 0 {
@@ -333,6 +381,11 @@ impl RenderOnce for Markdown {
         }
 
         let requests = std::mem::take(&mut painter.requested);
+        painter
+            .names
+            .borrow_mut()
+            .entries
+            .retain(|key, _| painter.seen_names.contains(key));
         report_images(&ident, requests, self.on_event.as_ref(), window, cx);
 
         // The fade learns from the frame that has just been built, and is read
@@ -352,7 +405,7 @@ impl RenderOnce for Markdown {
             }
         }
 
-        let blocks = document.blocks.len();
+        let blocks = prefix.len() + tail.len();
         column.semantic_in(
             cx,
             NodeSpec::new(ident.semantic_id(), Role::Region).value(cx.strings().format_plural(
@@ -428,8 +481,23 @@ struct RunStyle {
 }
 
 /// Walks the tree once, drawing it and minting one id per addressable part.
+#[derive(Default)]
+struct RunNames {
+    entries: HashMap<(usize, usize), RunName>,
+}
+
+struct RunName {
+    kind: String,
+    text: String,
+    stem: String,
+}
+
 struct Painter {
     ident: Ident,
+    names: Rc<RefCell<RunNames>>,
+    block_start: usize,
+    run_index: usize,
+    seen_names: HashSet<(usize, usize)>,
     theme: Theme,
     on_event: Option<EventHandler>,
     image: Option<ImageSource>,
@@ -465,11 +533,11 @@ impl Painter {
     /// because the record is what the next frame compares against. A settled
     /// document simply always gets an empty answer.
     fn arriving(&mut self, text: &str) -> Vec<(Range<usize>, f32)> {
-        let index = self.drawn.len();
-        self.drawn.push(text.to_string());
         let Some(veil) = &self.veil else {
             return Vec::new();
         };
+        let index = self.drawn.len();
+        self.drawn.push(text.to_string());
         // A span is recorded at the end of one frame and read by the next, so
         // it describes the text as that frame drew it. A document that
         // reflowed in between — a link resolved, a code span closed, a block
@@ -498,7 +566,27 @@ impl Painter {
     /// Two links to the same destination are the same thing said twice, so the
     /// repeat is numbered rather than the position.
     fn ident_for(&mut self, kind: &str, name: &str) -> Ident {
-        let stem = format!("{kind}-{}", slug(name));
+        let key = (self.block_start, self.run_index);
+        self.run_index += 1;
+        self.seen_names.insert(key);
+        let mut names = self.names.borrow_mut();
+        let retained = names.entries.entry(key).or_insert_with(|| RunName {
+            kind: kind.to_owned(),
+            text: name.to_owned(),
+            stem: format!("{kind}-{}", slug(name)),
+        });
+        // A run's original content names it. Appending to that same run does
+        // not rename the participant the reader already selected. Destinations
+        // and other non-text identities still change when their meaning does.
+        let appended = kind == "text" && name.starts_with(&retained.text);
+        if retained.kind != kind || (retained.text != name && !appended) {
+            retained.kind = kind.to_owned();
+            retained.stem = format!("{kind}-{}", slug(name));
+        }
+        if retained.text != name {
+            retained.text = name.to_owned();
+        }
+        let stem = retained.stem.clone();
         let count = self.used.entry(stem.clone()).or_insert(0);
         *count += 1;
         match *count {
@@ -521,6 +609,9 @@ impl Painter {
 
     fn block(&mut self, block: &Block, window: &mut Window, cx: &mut App) -> AnyElement {
         match block {
+            Block::Frontmatter { format, text } => {
+                self.code(Some(format.clone()), text.clone(), window, cx)
+            }
             Block::Heading { level, content } => self.heading(*level, content, window, cx),
             Block::Paragraph(inlines) => self.paragraph(inlines, window, cx),
             Block::Code { language, text } => self.code(language.clone(), text.clone(), window, cx),

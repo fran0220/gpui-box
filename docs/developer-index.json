@@ -1123,7 +1123,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4304
+      "symbolCount": 4309
     },
     {
       "name": "gpui-box-kit-assets",
@@ -1418,7 +1418,7 @@
         ]
       },
       "dependencies": [],
-      "symbolCount": 133
+      "symbolCount": 135
     },
     {
       "name": "gpui-box-macos",
@@ -2018,6 +2018,64 @@
       },
       "dependencies": [],
       "symbolCount": 26
+    },
+    {
+      "name": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "manifest": "crates/gpui-webview/Cargo.toml",
+      "cohort": "framework",
+      "layer": 0,
+      "version": "0.1.2",
+      "license": "MIT",
+      "publish": true,
+      "description": "Caller-owned native browser engine hosts for GPUI Box",
+      "readme": null,
+      "features": {},
+      "dependencies": [
+        {
+          "alias": "anyhow",
+          "package": "anyhow",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui",
+          "package": "gpui-box",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui_platform",
+          "package": "gpui-box-platform",
+          "kind": "dev",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "raw-window-handle",
+          "package": "raw-window-handle",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "serde_json",
+          "package": "serde_json",
+          "kind": "dev",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "url",
+          "package": "url",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        }
+      ],
+      "symbolCount": 20
     },
     {
       "name": "gpui-box-wgpu",
@@ -17005,8 +17063,8 @@
       "module": "elements::platform_view",
       "path": "gpui::elements::platform_view",
       "source": "crates/gpui/src/elements/platform_view.rs",
-      "summary": "Hosts a native platform view — an `NSView` on macOS or a child `HWND` on Windows — inside the window, at the bounds this element is laid out at.",
-      "documentation": "Hosts a native platform view — an `NSView` on macOS or a child `HWND` on\nWindows — inside the window, at the bounds this element is laid out at.\n\nThe element itself paints nothing. Size it the way you would size any other\nelement; GPUI owns the native view's frame from then on and repositions it\nafter every frame it is painted in. A frame that does not paint the element\nhides and detaches the view, so unmounting is just not rendering it.\n\n# Stacking\n\nThe hosted view is ordered above GPUI's root scene. Content drawn on that\nsame base surface does not composite over the native view. When the window's\nscene overlay is enabled, deferred and window-level overlay content is drawn\non a separate surface above hosted views.\n\n# Clipping\n\nGPUI keeps the native view at its full layout bounds and applies the current\nrectangular content mask separately. Scrolling therefore crops the native\ncontent instead of resizing and reflowing it. A fully clipped view is\ndetached for that frame.\n\n# Platforms\n\nmacOS and Windows host native views. Elsewhere the element still lays out,\nreserves space, and does not host a view.",
+      "summary": "Hosts a native platform view — an `NSView` on macOS or a child `HWND` on Windows or an X11 child on Linux — at the bounds this element is laid out at.",
+      "documentation": "Hosts a native platform view — an `NSView` on macOS or a child `HWND` on\nWindows or an X11 child on Linux — at the bounds this element is laid out at.\n\nThe element itself paints nothing. Size it the way you would size any other\nelement; GPUI owns the native view's frame from then on and repositions it\nafter every frame it is painted in. A frame that does not paint the element\nhides and detaches the view, so unmounting is just not rendering it.\n\n# Stacking\n\nThe hosted view is ordered above GPUI's root scene. Content drawn on that\nsame base surface does not composite over the native view. When the window's\nscene overlay is enabled, deferred and window-level overlay content is drawn\non a separate surface above hosted views on macOS and Windows. X11 has no\nscene overlay above native children; hide the child before showing a GPUI\noverlay in its area. Rotation, scale, rounded masks and opacity are not\nnative-child composition operations and must not be applied to this element.\n\n# Clipping\n\nGPUI keeps the native view at its full layout bounds and applies the current\nrectangular content mask separately. Scrolling therefore crops the native\ncontent instead of resizing and reflowing it. A fully clipped view is\ndetached for that frame.\n\n# Platforms\n\nmacOS, Windows and Linux X11 host native views. Native Wayland and headless\nbackends reserve layout space only. Hosts must reject unsupported backends\nbefore constructing a native child rather than present empty space as success.",
       "signature": "pub fn platform_view (handle : PlatformViewHandle) -> PlatformView",
       "cfg": []
     },
@@ -49703,7 +49761,7 @@
       "source": "crates/gpui-kit/src/content/agent_document.rs",
       "summary": "A read-only sequence of typed agent output blocks.",
       "documentation": "A read-only sequence of typed agent output blocks.",
-      "signature": "# [doc = \" A read-only sequence of typed agent output blocks.\"] # [derive (IntoElement)] pub struct AgentDocument { ident : Ident, state : AgentDocumentState, blocks : Vec<AgentDocumentBlock>, visible_rows : Option<usize>, on_event : Option<EventHandler>, slots : Slots, }",
+      "signature": "# [doc = \" A read-only sequence of typed agent output blocks.\"] # [derive (IntoElement)] pub struct AgentDocument { ident : Ident, state : AgentDocumentState, blocks : Vec<AgentDocumentBlock>, visible_rows : Option<usize>, on_event : Option<EventHandler>, markdown_options : Option<MarkdownOptions>, slots : Slots, }",
       "cfg": []
     },
     {
@@ -49733,6 +49791,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn blocks (mut self, blocks : impl IntoIterator<Item = AgentDocumentBlock>) -> Self",
+      "cfg": [],
+      "target": "AgentDocument"
+    },
+    {
+      "id": "gpui_kit::content::agent_document::AgentDocument::configure_markdown",
+      "name": "configure_markdown",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::agent_document",
+      "path": "gpui_kit::content::agent_document",
+      "source": "crates/gpui-kit/src/content/agent_document.rs",
+      "summary": "Configures each mounted Markdown row with host-owned image resolution, highlighting or block plugins. The block id is the caller's identity, independent of revision and virtualization. The callback is repeatable.",
+      "documentation": "Configures each mounted Markdown row with host-owned image resolution,\nhighlighting or block plugins. The block id is the caller's identity,\nindependent of revision and virtualization. The callback is repeatable.",
+      "signature": "pub fn configure_markdown (mut self, configure : impl Fn (& SharedString, Markdown) -> Markdown + 'static,) -> Self",
       "cfg": [],
       "target": "AgentDocument"
     },
@@ -49782,6 +49855,21 @@
       "target": "AgentDocument"
     },
     {
+      "id": "gpui_kit::content::agent_document::AgentDocument::remeasure_block",
+      "name": "remeasure_block",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::agent_document",
+      "path": "gpui_kit::content::agent_document",
+      "source": "crates/gpui-kit/src/content/agent_document.rs",
+      "summary": "Invalidates geometry for this caller-owned block after asynchronous image resolution or a native plugin changes size. Unrelated rows and the current scroll anchor stay intact; semantic ids do not change.",
+      "documentation": "Invalidates geometry for this caller-owned block after asynchronous\nimage resolution or a native plugin changes size. Unrelated rows and\nthe current scroll anchor stay intact; semantic ids do not change.",
+      "signature": "pub fn remeasure_block (ident : & Ident, block : & str, window : & mut Window, cx : & mut App)",
+      "cfg": [],
+      "target": "AgentDocument"
+    },
+    {
       "id": "gpui_kit::content::agent_document::AgentDocument::state",
       "name": "state",
       "kind": "method",
@@ -49808,6 +49896,21 @@
       "summary": "Lays out only the blocks that are on screen, in a frame this many blocks tall.",
       "documentation": "Lays out only the blocks that are on screen, in a frame this many\nblocks tall.\n\nA conversation is not a document that happens to be long. It is a\nsurface that grows all day, is scrolled back through, and whose oldest\nblocks are a diff of four hundred lines and a tool call with a table in\nit. Drawn as a column, every one of those is laid out on every frame,\nincluding while the newest block is still arriving a token at a time —\nso the cost of showing the *last* block grows with everything said\nbefore it, which is the shape of a surface that gets slower the longer\nthe conversation is useful.\n\nVirtualized, the cost of a frame is the cost of the screenful. That is\nwhy a block holds a way to build its element rather than a built one:\nthere is no other way to draw a block that scrolled off and came back.\n\nBlocks are matched across frames by their ids, so a block whose text\ngrew re-measures that block and nothing else. Without that a streaming\nreply would discard every height the list had learned on every token,\nand the scrollbar would shudder for as long as the answer took to\narrive.\n\nThe trade is the usual one: a block that has never been on screen has\nno bounds and publishes nothing, so a copy across the whole document\nreaches what was mounted rather than everything that exists.",
       "signature": "pub fn virtualized (mut self, rows : usize) -> Self",
+      "cfg": [],
+      "target": "AgentDocument"
+    },
+    {
+      "id": "gpui_kit::content::agent_document::AgentDocument::work",
+      "name": "work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::agent_document",
+      "path": "gpui_kit::content::agent_document",
+      "source": "crates/gpui-kit/src/content/agent_document.rs",
+      "summary": "Reports actual retained planning work for this virtualized identity.",
+      "documentation": "Reports actual retained planning work for this virtualized identity.",
+      "signature": "pub fn work (ident : & Ident, window : & Window, cx : & mut App) -> AgentDocumentWork",
       "cfg": [],
       "target": "AgentDocument"
     },
@@ -50137,6 +50240,20 @@
       "signature": "pub fn as_str (& self) -> & 'static str",
       "cfg": [],
       "target": "AgentDocumentState"
+    },
+    {
+      "id": "gpui_kit::content::agent_document::AgentDocumentWork",
+      "name": "AgentDocumentWork",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::agent_document",
+      "path": "gpui_kit::content::agent_document",
+      "source": "crates/gpui-kit/src/content/agent_document.rs",
+      "summary": "Work performed by a mounted virtual document's retained plans. Input checks are linear comparisons of caller records, not byte scans. Parser totals cover currently retained Markdown blocks. These counters do not include GPUI layout, key-vector copies into List, or wall-clock time.",
+      "documentation": "Work performed by a mounted virtual document's retained plans.\nInput checks are linear comparisons of caller records, not byte scans.\nParser totals cover currently retained Markdown blocks. These counters do\nnot include GPUI layout, key-vector copies into List, or wall-clock time.",
+      "signature": "# [doc = \" Work performed by a mounted virtual document's retained plans.\"] # [doc = \" Input checks are linear comparisons of caller records, not byte scans.\"] # [doc = \" Parser totals cover currently retained Markdown blocks. These counters do\"] # [doc = \" not include GPUI layout, key-vector copies into List, or wall-clock time.\"] # [derive (Debug, Default, Clone, Copy, PartialEq, Eq)] pub struct AgentDocumentWork { pub input_checks : usize, pub planned_rows : usize, pub parser : crate::content::markdown::MarkdownWork, }",
+      "cfg": []
     },
     {
       "id": "gpui_kit::content::ansi::AnsiRun",
@@ -51853,8 +51970,23 @@
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "A rendered Markdown document.",
       "documentation": "A rendered Markdown document.",
-      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, parsed : Option<Rc<Document>>, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, code_presentation : MarkdownCodePresentation, streaming : bool, }",
+      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, parsed : Option<Rc<Document>>, block_renderer : Option<BlockRenderer>, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, code_presentation : MarkdownCodePresentation, streaming : bool, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::content::markdown::Markdown::block_renderer",
+      "name": "block_renderer",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown",
+      "path": "gpui_kit::content::markdown",
+      "source": "crates/gpui-kit/src/content/markdown.rs",
+      "summary": "Installs a trusted native renderer for top-level parsed blocks. `None` keeps the safe built-in rendering. The identity and reading-order start are supplied so custom content can join document selection. Only mounted blocks invoke the callback; it must be repeatable and must not treat document text as executable HTML or application configuration.",
+      "documentation": "Installs a trusted native renderer for top-level parsed blocks.\n`None` keeps the safe built-in rendering. The identity and reading-order\nstart are supplied so custom content can join document selection.\nOnly mounted blocks invoke the callback; it must be repeatable and must\nnot treat document text as executable HTML or application configuration.",
+      "signature": "pub fn block_renderer (mut self, renderer : impl Fn (& Ident, & Block, u64, & mut Window, & mut App) -> Option<AnyElement> + 'static,) -> Self",
+      "cfg": [],
+      "target": "Markdown"
     },
     {
       "id": "gpui_kit::content::markdown::Markdown::code_presentation",
@@ -52645,7 +52777,7 @@
       "source": "crates/gpui-kit/src/content/markdown/parse.rs",
       "summary": "One block of a document.",
       "documentation": "One block of a document.",
-      "signature": "# [doc = \" One block of a document.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum Block { Heading { level : u8, content : Vec<Inline>, }, Paragraph (Vec<Inline>), Code { # [doc = \" The fence's info string, exactly as it was written.\"] language : Option<SharedString>, text : SharedString, }, Quote (Vec<Block>), List { ordered : bool, start : u64, entries : Vec<ListEntry>, }, Rule, Table { alignment : Vec<CellAlign>, head : Vec<Vec<Inline>>, rows : Vec<Vec<Vec<Inline>>>, }, # [doc = \" An HTML block, kept verbatim and never interpreted.\"] Html (SharedString), }",
+      "signature": "# [doc = \" One block of a document.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum Block { # [doc = \" Leading YAML (`---`) or TOML (`+++`) metadata, retained verbatim.\"] # [doc = \" Parsing metadata into application configuration is always host policy.\"] Frontmatter { format : SharedString, text : SharedString, }, Heading { level : u8, content : Vec<Inline>, }, Paragraph (Vec<Inline>), Code { # [doc = \" The fence's info string, exactly as it was written.\"] language : Option<SharedString>, text : SharedString, }, Quote (Vec<Block>), List { ordered : bool, start : u64, entries : Vec<ListEntry>, }, Rule, Table { alignment : Vec<CellAlign>, head : Vec<Vec<Inline>>, rows : Vec<Vec<Vec<Inline>>>, }, # [doc = \" An HTML block, kept verbatim and never interpreted.\"] Html (SharedString), }",
       "cfg": []
     },
     {
@@ -52730,8 +52862,8 @@
       "module": "content::markdown::parse",
       "path": "gpui_kit::content::markdown::parse",
       "source": "crates/gpui-kit/src/content/markdown/parse.rs",
-      "summary": "Parses `source` with tables, strikethrough, and task lists enabled.",
-      "documentation": "Parses `source` with tables, strikethrough, and task lists enabled.\n\nNothing else is enabled: footnotes, smart punctuation, and math would\neach change what a plain document means, and a reader who wrote three\ndots did not ask for an ellipsis.",
+      "summary": "Parses `source` with tables, strikethrough, task lists, and leading YAML/TOML metadata blocks enabled.",
+      "documentation": "Parses `source` with tables, strikethrough, task lists, and leading\nYAML/TOML metadata blocks enabled.\n\nNothing else is enabled: footnotes, smart punctuation, and math would\neach change what a plain document means, and a reader who wrote three\ndots did not ask for an ellipsis.",
       "signature": "pub fn parse (source : & str) -> Self",
       "cfg": [],
       "target": "Document"
@@ -52818,7 +52950,7 @@
       "source": "crates/gpui-kit/src/content/markdown/stream.rs",
       "summary": "A document being read as it arrives.",
       "documentation": "A document being read as it arrives.",
-      "signature": "# [doc = \" A document being read as it arrives.\"] # [derive (Debug, Default)] pub struct MarkdownStream { source : String, document : Document, # [doc = \" Where each block of [`Self::document`] begins in [`Self::source`].\"] # [doc = \"\"] # [doc = \" Empty when the parser cannot map its events to top-level blocks.\"] starts : Vec<usize>, # [doc = \" Whether this source contains something whose meaning is not local.\"] whole : bool, # [doc = \" How many leading blocks the last update left untouched.\"] stable : usize, # [doc = \" How many bytes the last update actually parsed, which is the claim this\"] # [doc = \" module makes and therefore the one its tests check.\"] parsed : usize, revision : u64, work : Cell<MarkdownWork>, }",
+      "signature": "# [doc = \" A document being read as it arrives.\"] # [derive (Debug, Default)] pub struct MarkdownStream { source : String, document : Document, # [doc = \" Where each block of [`Self::document`] begins in [`Self::source`].\"] # [doc = \"\"] # [doc = \" Empty when the parser cannot map its events to top-level blocks.\"] starts : Vec<usize>, # [doc = \" Whether this source contains something whose meaning is not local.\"] whole : bool, # [doc = \" How many leading blocks the last update left untouched.\"] stable : usize, # [doc = \" How many bytes the last update actually parsed, which is the claim this\"] # [doc = \" module makes and therefore the one its tests check.\"] parsed : usize, revision : u64, work : Cell<MarkdownWork>, mended_tail : RefCell<Option<(u64, Option<Arc<Document>>)>>, }",
       "cfg": []
     },
     {
@@ -111810,6 +111942,36 @@
       "cfg": []
     },
     {
+      "id": "gpui_linux::linux::x11::platform_view::NativeChildren::clear",
+      "name": "clear",
+      "kind": "method",
+      "package": "gpui-box-linux",
+      "crate": "gpui_linux",
+      "module": "linux::x11::platform_view",
+      "path": "gpui_linux::linux::x11::platform_view",
+      "source": "crates/gpui_linux/src/linux/x11/platform_view.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn clear (& mut self, connection : & XCBConnection) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "NativeChildren"
+    },
+    {
+      "id": "gpui_linux::linux::x11::platform_view::NativeChildren::update",
+      "name": "update",
+      "kind": "method",
+      "package": "gpui-box-linux",
+      "crate": "gpui_linux",
+      "module": "linux::x11::platform_view",
+      "path": "gpui_linux::linux::x11::platform_view",
+      "source": "crates/gpui_linux/src/linux/x11/platform_view.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn update (& mut self, connection : & XCBConnection, parent : u32, scale : f32, update : & PlatformViewUpdate,) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "NativeChildren"
+    },
+    {
       "id": "gpui_linux::linux::x11::window::Callbacks",
       "name": "Callbacks",
       "kind": "struct",
@@ -111849,7 +112011,7 @@
       "source": "crates/gpui_linux/src/linux/x11/window.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub struct X11WindowState { pub destroyed : bool, parent : Option<X11WindowStatePtr>, children : FxHashSet<xproto::Window>, client : X11ClientStatePtr, executor : ForegroundExecutor, atoms : XcbAtoms, x_root_window : xproto::Window, x_screen_index : usize, visual_id : u32, pub (crate) counter_id : sync::Counter, pub (crate) last_sync_counter : Option<sync::Int64>, bounds : Bounds<Pixels>, scale_factor : f32, renderer : WgpuRenderer, display : Rc<dyn PlatformDisplay>, input_handler : Option<PlatformInputHandler>, appearance : WindowAppearance, background_appearance : WindowBackgroundAppearance, maximized_vertical : bool, maximized_horizontal : bool, hidden : bool, active : bool, hovered : bool, pub (crate) force_render_after_recovery : bool, fullscreen : bool, client_side_decorations_supported : bool, decorations : WindowDecorations, edge_constraints : Option<EdgeConstraints>, pub handle : AnyWindowHandle, last_insets : [u32; 4], accesskit_adapter : Option<accesskit_unix::Adapter>, }",
+      "signature": "pub struct X11WindowState { pub destroyed : bool, parent : Option<X11WindowStatePtr>, children : FxHashSet<xproto::Window>, client : X11ClientStatePtr, executor : ForegroundExecutor, atoms : XcbAtoms, x_root_window : xproto::Window, x_screen_index : usize, visual_id : u32, pub (crate) counter_id : sync::Counter, pub (crate) last_sync_counter : Option<sync::Int64>, bounds : Bounds<Pixels>, scale_factor : f32, renderer : WgpuRenderer, display : Rc<dyn PlatformDisplay>, input_handler : Option<PlatformInputHandler>, appearance : WindowAppearance, background_appearance : WindowBackgroundAppearance, maximized_vertical : bool, maximized_horizontal : bool, hidden : bool, active : bool, hovered : bool, pub (crate) force_render_after_recovery : bool, fullscreen : bool, client_side_decorations_supported : bool, decorations : WindowDecorations, edge_constraints : Option<EdgeConstraints>, pub handle : AnyWindowHandle, last_insets : [u32; 4], accesskit_adapter : Option<accesskit_unix::Adapter>, # [cfg (target_os = \"linux\")] native_children : super::platform_view::NativeChildren, }",
       "cfg": []
     },
     {
@@ -114437,6 +114599,303 @@
       "documentation": "",
       "signature": "pub struct WebWindow { inner : Rc<WebWindowInner>, display : Rc<dyn PlatformDisplay>, lifecycle : Rc<Cell<WebWindowLifecycle>>, active_window : Rc<RefCell<Option<AnyWindowHandle>>>, _raf_closure : Closure<dyn FnMut ()>, _resize_observer : Option<web_sys::ResizeObserver>, _resize_observer_closure : Closure<dyn FnMut (js_sys::Array)>, _event_listeners : WebEventListeners, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_webview::BrowserEvent",
+      "name": "BrowserEvent",
+      "kind": "enum",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "",
+      "path": "gpui_webview",
+      "source": "crates/gpui-webview/src/lib.rs",
+      "summary": "Engine notifications. PageFinished is deliberately not a success assertion: native failure notifications may follow it. Do not log URLs or messages without the application's privacy/redaction policy.",
+      "documentation": "Engine notifications. PageFinished is deliberately not a success assertion:\nnative failure notifications may follow it. Do not log URLs or messages\nwithout the application's privacy/redaction policy.",
+      "signature": "# [doc = \" Engine notifications. PageFinished is deliberately not a success assertion:\"] # [doc = \" native failure notifications may follow it. Do not log URLs or messages\"] # [doc = \" without the application's privacy/redaction policy.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub enum BrowserEvent { NavigationStarted (String), NavigationRefused (String), PageFinished (String), LoadFailed { url : String, description : String, }, # [doc = \" Native process failure, including termination or unresponsiveness.\"] ProcessFailed (String), PopupRefused (String), DownloadRefused (String), PermissionRefused (String), # [doc = \" Untrusted page data, NEVER a privileged runtime command. In particular\"] # [doc = \" Linux Wry reports the main URL for iframe IPC, not the sender's origin.\"] Message { reported_url : String, body : String, }, MessageRefused, # [doc = \" The caller did not drain the bounded event queue quickly enough. State\"] # [doc = \" is incomplete; do not infer success from a stream with missing events.\"] EventsDropped (usize), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_webview::NavigationPolicy",
+      "name": "NavigationPolicy",
+      "kind": "struct",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "",
+      "path": "gpui_webview",
+      "source": "crates/gpui-webview/src/lib.rs",
+      "summary": "Synchronous navigation policy. This governs navigation, not subresource networking; it is not a network sandbox or an IPC authorization policy.",
+      "documentation": "Synchronous navigation policy. This governs navigation, not subresource\nnetworking; it is not a network sandbox or an IPC authorization policy.",
+      "signature": "# [doc = \" Synchronous navigation policy. This governs navigation, not subresource\"] # [doc = \" networking; it is not a network sandbox or an IPC authorization policy.\"] # [derive (Clone, Debug, Default)] pub struct NavigationPolicy { # [doc = \" Empty allows all HTTP(S) origins. Entries are parsed and normalized.\"] pub origins : Vec<Url>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_webview::NavigationPolicy::allows",
+      "name": "allows",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "",
+      "path": "gpui_webview",
+      "source": "crates/gpui-webview/src/lib.rs",
+      "summary": "Rejects local files, executable schemes, credentials, and opaque origins.",
+      "documentation": "Rejects local files, executable schemes, credentials, and opaque origins.",
+      "signature": "pub fn allows (& self, address : & str) -> bool",
+      "cfg": [],
+      "target": "NavigationPolicy"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost",
+      "name": "BrowserHost",
+      "kind": "struct",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "A UI-thread-only, caller-owned browser. The handle retains its engine until GPUI has detached the last painted view. Never move it between GPUI windows.",
+      "documentation": "A UI-thread-only, caller-owned browser. The handle retains its engine until\nGPUI has detached the last painted view. Never move it between GPUI windows.",
+      "signature": "# [doc = \" A UI-thread-only, caller-owned browser. The handle retains its engine until\"] # [doc = \" GPUI has detached the last painted view. Never move it between GPUI windows.\"] pub struct BrowserHost { engine : Rc<Engine>, handle : PlatformViewHandle, events : EventInbox, sender : EventSender, navigation : NavigationPolicy, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::back",
+      "name": "back",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn back (& self) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::can_go_back",
+      "name": "can_go_back",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn can_go_back (& self) -> anyhow::Result<bool>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::can_go_forward",
+      "name": "can_go_forward",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn can_go_forward (& self) -> anyhow::Result<bool>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::drain_events",
+      "name": "drain_events",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Drains notifications without reentering GPUI from a native callback.",
+      "documentation": "Drains notifications without reentering GPUI from a native callback.",
+      "signature": "pub fn drain_events (& self) -> impl Iterator<Item = BrowserEvent> + '_",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::evaluate_script",
+      "name": "evaluate_script",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Executes caller-authored code. Do not interpolate page-controlled text; this is not the isolated application/plugin runtime.",
+      "documentation": "Executes caller-authored code. Do not interpolate page-controlled text;\nthis is not the isolated application/plugin runtime.",
+      "signature": "pub fn evaluate_script (& self, script : & str) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::focus",
+      "name": "focus",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn focus (& self) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::focus_parent",
+      "name": "focus_parent",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn focus_parent (& self) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::forward",
+      "name": "forward",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn forward (& self) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::handle",
+      "name": "handle",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Render with `gpui::platform_view`. Rectangular clipping only; no rotation, scaling, rounded masks, opacity, or GPU-scene interleaving is promised.",
+      "documentation": "Render with `gpui::platform_view`. Rectangular clipping only; no rotation,\nscaling, rounded masks, opacity, or GPU-scene interleaving is promised.",
+      "signature": "pub fn handle (& self) -> PlatformViewHandle",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::load_html",
+      "name": "load_html",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Loads caller-owned HTML with the engine's complete HTML/CSS support. Relative URLs have no application base URL. Content is not trusted by IPC.",
+      "documentation": "Loads caller-owned HTML with the engine's complete HTML/CSS support.\nRelative URLs have no application base URL. Content is not trusted by IPC.",
+      "signature": "pub fn load_html (& self, html : & str) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::navigate",
+      "name": "navigate",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn navigate (& self, url : & str) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Creates a child on the window's UI thread. Linux requires an X11 GPUI window (including XWayland) and GTK using the same X server. Native Wayland is rejected, never silently replaced with an inert handle.",
+      "documentation": "Creates a child on the window's UI thread. Linux requires an X11 GPUI\nwindow (including XWayland) and GTK using the same X server. Native\nWayland is rejected, never silently replaced with an inert handle.",
+      "signature": "pub fn new (window : & Window, cx : & App, options : BrowserOptions) -> anyhow::Result<Self>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::reload",
+      "name": "reload",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn reload (& self) -> anyhow::Result<()>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserHost::url",
+      "name": "url",
+      "kind": "method",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn url (& self) -> anyhow::Result<String>",
+      "cfg": [],
+      "target": "BrowserHost"
+    },
+    {
+      "id": "gpui_webview::native::BrowserOptions",
+      "name": "BrowserOptions",
+      "kind": "struct",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "native",
+      "path": "gpui_webview::native",
+      "source": "crates/gpui-webview/src/native.rs",
+      "summary": "Security defaults: HTTP(S) navigation, no popup, download, permission grants or script bridge. HTML is rendered by the OS browser, not GPUI's text parser.",
+      "documentation": "Security defaults: HTTP(S) navigation, no popup, download, permission grants\nor script bridge. HTML is rendered by the OS browser, not GPUI's text parser.",
+      "signature": "# [doc = \" Security defaults: HTTP(S) navigation, no popup, download, permission grants\"] # [doc = \" or script bridge. HTML is rendered by the OS browser, not GPUI's text parser.\"] # [derive (Default)] pub struct BrowserOptions { pub navigation : NavigationPolicy, # [doc = \" Opt in to receiving untrusted messages. Never authorizes native actions.\"] pub receive_messages : bool, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_webview::reexport-1",
+      "name": "native :: { BrowserHost , BrowserOptions }",
+      "kind": "reexport",
+      "package": "gpui-box-webview",
+      "crate": "gpui_webview",
+      "module": "",
+      "path": "gpui_webview",
+      "source": "crates/gpui-webview/src/lib.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [cfg (any (target_os = \"linux\", target_os = \"macos\", target_os = \"windows\"))] pub use native::{ BrowserHost, BrowserOptions };",
+      "cfg": [
+        "cfg (any (target_os = \"linux\", target_os = \"macos\", target_os = \"windows\"))"
+      ]
     },
     {
       "id": "gpui_wgpu::cosmic_text_system::CosmicTextSystem",
@@ -120432,9 +120891,12 @@
       "source": "crates/gpui-kit/src/content/agent_document.rs",
       "summary": "A read-only sequence of typed agent output blocks.",
       "construct": [
+        "remeasure_block(ident: &Ident, block: &str, window: &mut Window, cx: &mut App)",
+        "work(ident: &Ident, window: &Window, cx: &mut App) -> AgentDocumentWork",
         "new(ident: impl Into<Ident>) -> Self"
       ],
       "options": [
+        "configure_markdown(configure: impl Fn(&SharedString, Markdown) -> Markdown + 'static) -> Self",
         "virtualized(rows: usize) -> Self",
         "state(state: AgentDocumentState) -> Self",
         "block(block: AgentDocumentBlock) -> Self",
@@ -123106,6 +123568,7 @@
         "new(ident: impl Into<Ident>, source: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "block_renderer(renderer: impl Fn(&Ident, &Block, u64, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
         "max_lines(lines: usize) -> Self",
         "selection_order_start(order: u64) -> Self",
         "on_event(handler: impl Fn(&MarkdownEvent, &mut Window, &mut App) + 'static) -> Self",
@@ -126394,6 +126857,16 @@
       ]
     },
     {
+      "name": "AgentDocumentWork",
+      "path": "gpui_kit::content::AgentDocumentWork",
+      "summary": "Work performed by a mounted virtual document's retained plans. Input checks are linear comparisons of caller records, not byte scans. Parser totals cover currently retained Markdown blocks. These counters do not include GPUI layout, key-vector copies into List, or wall-clock time.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "AgentExecutionState",
       "path": "gpui_kit::agent::AgentExecutionState",
       "summary": "Mutually exclusive execution state for an agent, task, or run.",
@@ -126984,6 +127457,7 @@
       "path": "gpui_kit::content::Block",
       "summary": "One block of a document.",
       "variants": [
+        "Frontmatter",
         "Heading",
         "Paragraph",
         "Code",
@@ -143441,6 +143915,12 @@
       "title": "Upstream resynchronization assessment",
       "path": "docs/upstream-resync-assessment.md",
       "summary": "This is a cost assessment, not an import plan or an update receipt. GPUI Box remains the development authority, no upstream tree was merged, and the frozen vendor refs were not advanced."
+    },
+    {
+      "slug": "webview",
+      "title": "Native browser host",
+      "path": "docs/webview.md",
+      "summary": "`gpui-box-webview` is an independent caller-owned host, not a Kit transport or the application/plugin JavaScript runtime. `BrowserHost` owns Wry 0.57.0 and the operating-system browser: WKWebView on macOS, WebView2 on Windows, WebKitGTK 4.1 on Linux X11/XWayland. These engines supply full HTML, CSS, JavaScript, DOM, text selection and native keyboard/IME behavior. Their web standards/codec coverage follows the installed engine, not a GPUI HTML subset."
     }
   ],
   "recipes": [
@@ -143569,6 +144049,12 @@
       "title": "Editable layout ownership and lazy source geometry",
       "guide": "compatibility",
       "anchor": "editable-layout-ownership-and-lazy-source-geometry"
+    },
+    {
+      "id": "compatibility-native-browser-host-evidence",
+      "title": "Native browser host evidence",
+      "guide": "compatibility",
+      "anchor": "native-browser-host-evidence"
     },
     {
       "id": "component-contracts-general-contract",
@@ -143827,6 +144313,12 @@
       "title": "Incremental source-text foundation",
       "guide": "coverage",
       "anchor": "incremental-source-text-foundation"
+    },
+    {
+      "id": "coverage-native-browser-engines-remain-independent-of-kit",
+      "title": "Native browser engines remain independent of Kit",
+      "guide": "coverage",
+      "anchor": "native-browser-engines-remain-independent-of-kit"
     },
     {
       "id": "datetime-why-the-seam-is-here",
@@ -144715,6 +145207,24 @@
       "title": "Cost comparison and decision",
       "guide": "upstream-resync-assessment",
       "anchor": "cost-comparison-and-decision"
+    },
+    {
+      "id": "webview-linux-route-and-native-constraints",
+      "title": "Linux route and native constraints",
+      "guide": "webview",
+      "anchor": "linux-route-and-native-constraints"
+    },
+    {
+      "id": "webview-security-and-truthful-events",
+      "title": "Security and truthful events",
+      "guide": "webview",
+      "anchor": "security-and-truthful-events"
+    },
+    {
+      "id": "webview-reproduce-validation",
+      "title": "Reproduce validation",
+      "guide": "webview",
+      "anchor": "reproduce-validation"
     }
   ],
   "scenes": [
@@ -145824,7 +146334,7 @@
       "uses": [
         "Markdown"
       ],
-      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let document = stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        );\n    div().row().child(document).child(\n        stack(&theme).w(px(272.0))\n            .child(caption(&theme, \"Unicode line breaks · CJK and Latin\"))\n            .child(Markdown::new(\n                \"scene.markdown.unicode-wrap\",\n                \"设计图通过后仍需运行、测量和批注；截图不能证明可玩。请检查「运行结果」（第12轮），然后比较 Hello world你好世界与 internationalization 2026-09。\",\n            )),\n    )\n        .into_any_element()\n}"
+      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let document = stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        );\n    div().row().child(document).child(\n        stack(&theme).w(px(272.0))\n            .child(caption(&theme, \"Unicode line breaks · CJK and Latin\"))\n            .child(Markdown::new(\n                \"scene.markdown.unicode-wrap\",\n                \"设计图通过后仍需运行、测量和批注；截图不能证明可玩。请检查「运行结果」（第12轮），然后比较 Hello world你好世界与 internationalization 2026-09。\",\n            ))\n            .child(caption(&theme, \"Frontmatter stays data\"))\n            .child(Markdown::new(\"scene.markdown.metadata\", \"---\\ntitle: Review fixture\\ntrusted: false\\n---\\n\\nMetadata is visible, never applied.\"))\n            .child(caption(&theme, \"Host block plugin · native rendering\"))\n            .child(Markdown::new(\"scene.markdown.plugin\", \"```notice\\nThis fixture uses a trusted native block renderer.\\n```\\n\\n```unknown\\nUnknown fences remain code.\\n```\")\n                .block_renderer(|ident, block, _, _, _| {\n                    if let crate::content::markdown::Block::Code { language, text } = block\n                        && language.as_deref() == Some(\"notice\") {\n                        Some(Callout::new(text.clone(), Tone::Info).id(ident.clone()).into_any_element())\n                    } else { None }\n                })),\n    )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-document",
@@ -146879,6 +147389,13 @@
         "revisions_remeasure_offscreen_rows_without_reidentifying_them",
         "history_and_reorder_are_not_new_tail_messages"
       ]
+    },
+    "framework_x11_platform_view": {
+      "commands": [
+        "xvfb-run -a cargo test -p gpui-box-linux x11_native_children -- --ignored",
+        "cargo test -p gpui-box platform_view --features test-support"
+      ],
+      "contract": "Linux X11 (including XWayland) hosts caller-owned native child XIDs in rectangular clip windows; full viewport allocation, physical-pixel resize, native input crop, paint-order stacking and detach/lifetime restoration are supported. Native Wayland, GPU transforms, rounded masks and X11 GPUI scene overlays above native children are not supported."
     },
     "kit_dock_tree": {
       "excluded": [

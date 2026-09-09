@@ -59,6 +59,12 @@ pub struct ListEntry {
 /// One block of a document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Block {
+    /// Leading YAML (`---`) or TOML (`+++`) metadata, retained verbatim.
+    /// Parsing metadata into application configuration is always host policy.
+    Frontmatter {
+        format: SharedString,
+        text: SharedString,
+    },
     Heading {
         level: u8,
         content: Vec<Inline>,
@@ -94,7 +100,9 @@ impl Block {
     pub fn lines(&self) -> usize {
         match self {
             Self::Heading { .. } | Self::Paragraph(_) | Self::Rule => 1,
-            Self::Code { text, .. } | Self::Html(text) => text.lines().count().max(1),
+            Self::Code { text, .. } | Self::Frontmatter { text, .. } | Self::Html(text) => {
+                text.lines().count().max(1)
+            }
             Self::Quote(blocks) => blocks.iter().map(Block::lines).sum::<usize>().max(1),
             Self::List { entries, .. } => entries.iter().map(ListEntry::lines).sum(),
             Self::Table { rows, .. } => 1 + rows.len(),
@@ -165,13 +173,14 @@ pub struct Document {
 }
 
 impl Document {
-    /// Parses `source` with tables, strikethrough, and task lists enabled.
+    /// Parses `source` with tables, strikethrough, task lists, and leading
+    /// YAML/TOML metadata blocks enabled.
     ///
     /// Nothing else is enabled: footnotes, smart punctuation, and math would
     /// each change what a plain document means, and a reader who wrote three
     /// dots did not ask for an ellipsis.
     pub fn parse(source: &str) -> Self {
-        build(Parser::new_ext(source, options()))
+        Self::parse_fragment(source, true).0
     }
 
     pub fn lines(&self) -> usize {
@@ -194,9 +203,20 @@ impl Document {
 
     /// Build the tree and its boundaries in one parser traversal.
     pub(crate) fn parse_indexed(source: &str) -> (Self, Option<Vec<usize>>) {
+        Self::parse_fragment(source, true)
+    }
+
+    pub(crate) fn parse_fragment(source: &str, frontmatter: bool) -> (Self, Option<Vec<usize>>) {
         let mut starts = Vec::new();
         let mut depth = 0usize;
-        let document = build(Parser::new_ext(source, options()).into_offset_iter().map(
+        let mut options = options();
+        if frontmatter {
+            options.insert(
+                Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
+                    | Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS,
+            );
+        }
+        let document = build(Parser::new_ext(source, options).into_offset_iter().map(
             |(event, range)| {
                 match &event {
                     Event::Start(_) => {
@@ -287,6 +307,7 @@ fn options() -> Options {
 #[derive(Debug)]
 enum Frame {
     Root,
+    Frontmatter(&'static str),
     Paragraph,
     Heading(u8),
     Quote,
@@ -366,6 +387,10 @@ fn build<'a>(events: impl Iterator<Item = Event<'a>>) -> Document {
 
 fn frame(tag: Tag<'_>) -> Frame {
     match tag {
+        Tag::MetadataBlock(kind) => Frame::Frontmatter(match kind {
+            pulldown_cmark::MetadataBlockKind::YamlStyle => "yaml",
+            pulldown_cmark::MetadataBlockKind::PlusesStyle => "toml",
+        }),
         Tag::Paragraph => Frame::Paragraph,
         Tag::Heading { level, .. } => Frame::Heading(match level {
             HeadingLevel::H1 => 1,
@@ -453,6 +478,13 @@ fn close(stack: &mut Vec<(Frame, Level)>, end: TagEnd) {
     };
 
     match frame {
+        Frame::Frontmatter(format) => add_block(
+            parent,
+            Block::Frontmatter {
+                format: format.into(),
+                text: level.text.into(),
+            },
+        ),
         Frame::Paragraph => {
             if !level.inlines.is_empty() {
                 add_block(parent, Block::Paragraph(level.inlines));
@@ -574,7 +606,9 @@ fn push_text(stack: &mut [(Frame, Level)], text: &str) {
     };
     match frame {
         // A code fence's body and an image's alt text are strings, not prose.
-        Frame::Code { .. } | Frame::Html | Frame::Image { .. } => level.text.push_str(text),
+        Frame::Code { .. } | Frame::Frontmatter(_) | Frame::Html | Frame::Image { .. } => {
+            level.text.push_str(text)
+        }
         _ => level.inlines.push(Inline::Text(text.into())),
     }
 }
@@ -654,6 +688,7 @@ mod tests {
             .blocks
             .iter()
             .map(|block| match block {
+                Block::Frontmatter { .. } => "frontmatter",
                 Block::Heading { .. } => "heading",
                 Block::Paragraph(_) => "paragraph",
                 Block::Code { .. } => "code",

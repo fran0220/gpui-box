@@ -47,6 +47,65 @@ Both halves of that matter, and they fail differently:
   believes nothing was written. Silence is the worse failure of the two, so
   the tag is visible and marked.
 
+### Native Markdown is not a browser HTML surface
+
+The native subset is Markdown headings, paragraphs, emphasis, strike-through,
+links, images supplied by the host, code fences, quotes, lists, task markers,
+rules, and tables. There is **no interpreted HTML subset**: even `<b>` and
+`<br>` remain visible literals. CSS, scripts, event attributes, forms, iframes,
+DOM APIs, and browser layout are not implemented by Markdown. `BrowserPanel`
+is the separate browser/WebView surface; its host owns navigation and engine
+policy. Supplying a block plugin does not enable a browser or sanitize HTML.
+
+Leading `---` YAML and `+++` TOML frontmatter are `Block::Frontmatter` values.
+The metadata body is retained verbatim and drawn as selectable, copyable code
+by default. It never mutates theme, permissions, configuration, or application
+state. Only the document's beginning recognizes frontmatter; a rule at the
+beginning of an incremental tail remains a rule.
+
+`Markdown::block_renderer` receives each mounted top-level parsed block, a
+source-offset-derived identity, and a reading-order start. Returning `None`
+uses the normal safe renderer, including unknown fence languages and HTML.
+A plugin is trusted host code, not document code: validate its input, use the
+supplied identity for semantic targets, and use fewer than 65,536 reading-order
+values starting at the supplied value for selectable runs. The next block
+has a separate partition. Plugin elements are rebuilt when mounted, so the
+callback must be repeatable. Native plugins for notices, math, diagrams, or
+structured results can be supplied without teaching Markdown any product model.
+
+`AgentDocument::configure_markdown` applies the same host image, highlighter,
+and plugin policy to every mounted Markdown row. It receives the caller's
+block id, independent of revision. After asynchronous media or plugin geometry
+changes, call `AgentDocument::remeasure_block`: it invalidates only that block's
+virtual rows through the framework and preserves the current pixel anchor.
+
+### Retained parsing and planning work
+
+`MarkdownStream::read` accepts source replacements and detects appends;
+`append` accepts only a delta and avoids comparing or copying the settled
+source prefix. Both retain parsed blocks and parse the affected tail with the
+same context as the canonical parser. Tree and source boundaries are collected
+in one traversal. Link-reference definitions require whole-document parsing
+because they can change earlier links, including multiline reference labels.
+Virtual rows receive those fully resolved parsed blocks, not independently
+parsed source slices. Source ranges alone do not preserve reference context.
+
+Static Markdown borrows its tree. Streaming display mending caches only the
+affected final block, never clones the settled document on a static frame.
+AgentDocument retains parsed row trees and its flattened plan across static
+frames. Stable row keys and content revisions are separate: an append changes
+only affected row revisions, not semantic identities. Caller revision changes
+invalidate typed custom blocks; Markdown derives revisions per parsed part.
+
+`MarkdownStream::work` counts parser passes, bytes submitted to those passes
+(including boundary discovery, fallback and mending), and source-buffer writes.
+It does not measure CPU time or syntax-tree allocation. `AgentDocument::work`
+also reports input comparisons and rows planned by the actual mounted virtual
+document. Static reconciliation is linear in caller blocks and does not rebuild
+the flattened plan; copying key/revision vectors into List and GPUI layout are
+outside those counters. A never-mounted row still has no selection geometry;
+virtualization does not promise a complete copy of unseen content.
+
 ### A link states where it goes, and this crate opens nothing
 
 Before a link is taken, its destination is in two places the reader can reach:

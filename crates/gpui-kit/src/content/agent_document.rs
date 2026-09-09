@@ -31,6 +31,7 @@ use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
+type MarkdownOptions = Rc<dyn Fn(&SharedString, Markdown) -> Markdown>;
 
 /// Each block receives this many reading-order values for selectable runs.
 /// A block count or a Markdown run count that reaches 2³² cannot be laid out
@@ -361,6 +362,17 @@ pub enum AgentDocumentEvent {
     },
 }
 
+/// Work performed by a mounted virtual document's retained plans.
+/// Input checks are linear comparisons of caller records, not byte scans.
+/// Parser totals cover currently retained Markdown blocks. These counters do
+/// not include GPUI layout, key-vector copies into List, or wall-clock time.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct AgentDocumentWork {
+    pub input_checks: usize,
+    pub planned_rows: usize,
+    pub parser: crate::content::markdown::MarkdownWork,
+}
+
 /// A read-only sequence of typed agent output blocks.
 #[derive(IntoElement)]
 pub struct AgentDocument {
@@ -369,6 +381,7 @@ pub struct AgentDocument {
     blocks: Vec<AgentDocumentBlock>,
     visible_rows: Option<usize>,
     on_event: Option<EventHandler>,
+    markdown_options: Option<MarkdownOptions>,
     slots: Slots,
 }
 
@@ -386,6 +399,50 @@ impl std::fmt::Debug for AgentDocument {
 }
 
 impl AgentDocument {
+    /// Invalidates geometry for this caller-owned block after asynchronous
+    /// image resolution or a native plugin changes size. Unrelated rows and
+    /// the current scroll anchor stay intact; semantic ids do not change.
+    pub fn remeasure_block(ident: &Ident, block: &str, window: &mut Window, cx: &mut App) {
+        let plans = keyed::slot::<RowPlans>(
+            &ident.child("row-plans").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let plans = plans.borrow();
+        for (index, row) in plans.plan.rows.iter().enumerate() {
+            if plans.inputs[row.block].id.as_ref() == block {
+                crate::data::viewport::remeasure_rows(
+                    &ident.child("blocks"),
+                    index..index + 1,
+                    window,
+                    cx,
+                );
+            }
+        }
+    }
+
+    /// Reports actual retained planning work for this virtualized identity.
+    pub fn work(ident: &Ident, window: &Window, cx: &mut App) -> AgentDocumentWork {
+        let plans = keyed::slot::<RowPlans>(
+            &ident.child("row-plans").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let plans = plans.borrow();
+        let mut work = AgentDocumentWork {
+            input_checks: plans.input_checks,
+            planned_rows: plans.planned_rows,
+            ..Default::default()
+        };
+        for plan in plans.markdown.values() {
+            let parser = plan.reader.work();
+            work.parser.parser_passes += parser.parser_passes;
+            work.parser.parsed_bytes += parser.parsed_bytes;
+            work.parser.copied_bytes += parser.copied_bytes;
+        }
+        work
+    }
+
     pub fn new(ident: impl Into<Ident>) -> Self {
         Self {
             ident: ident.into(),
@@ -393,8 +450,20 @@ impl AgentDocument {
             blocks: Vec::new(),
             visible_rows: None,
             on_event: None,
+            markdown_options: None,
             slots: Slots::default(),
         }
+    }
+
+    /// Configures each mounted Markdown row with host-owned image resolution,
+    /// highlighting or block plugins. The block id is the caller's identity,
+    /// independent of revision and virtualization. The callback is repeatable.
+    pub fn configure_markdown(
+        mut self,
+        configure: impl Fn(&SharedString, Markdown) -> Markdown + 'static,
+    ) -> Self {
+        self.markdown_options = Some(Rc::new(configure));
+        self
     }
 
     /// Lays out only the blocks that are on screen, in a frame this many
@@ -540,19 +609,21 @@ impl RenderOnce for AgentDocument {
                         window.window_handle().window_id(),
                         cx,
                     );
-                    let plan = Rc::new(retained.borrow_mut().read(&blocks));
+                    let plan = retained.borrow_mut().read(&blocks);
                     // Ids rather than a count, so a block that grew re-measures
                     // itself alone instead of discarding every height the list
                     // had learned.
-                    let keys: Vec<SharedString> = plan.iter().map(|row| row.key(&blocks)).collect();
-                    let count = plan.len();
+                    let keys = plan.keys.clone();
+                    let revisions = plan.revisions.clone();
+                    let count = plan.rows.len();
                     let listed = Rc::clone(&blocks);
                     let rows_plan = Rc::clone(&plan);
                     let list_ident = ident.child("blocks");
                     let document = ident.clone();
                     let on_event = self.on_event.clone();
+                    let markdown_options = self.markdown_options.clone();
                     List::new(list_ident, count, move |index, window, cx| {
-                        let row = &rows_plan[index];
+                        let row = &rows_plan.rows[index];
                         let block = &listed[row.block];
                         let theme = cx.theme().clone();
                         // A row carries the space that follows it, because a
@@ -563,6 +634,7 @@ impl RenderOnce for AgentDocument {
                         let after = match &row.part {
                             Some(part) if !part.last => Space::Md,
                             _ => rows_plan
+                                .rows
                                 .get(index + 1)
                                 .map(|next| block_space(block.kind, listed[next.block].kind))
                                 .unwrap_or(Space::Lg),
@@ -577,7 +649,7 @@ impl RenderOnce for AgentDocument {
                                     block,
                                     row.block as u64,
                                     row.part.as_ref(),
-                                    on_event.clone(),
+                                    (on_event.clone(), markdown_options.clone()),
                                     window,
                                     cx,
                                 ))
@@ -588,6 +660,7 @@ impl RenderOnce for AgentDocument {
                     // and a four-hundred-line diff are both one block.
                     .flowing()
                     .keys(keys)
+                    .revisions(revisions)
                     .visible_rows(rows)
                     .into_any_element()
                 }
@@ -601,7 +674,7 @@ impl RenderOnce for AgentDocument {
                             // order.
                             order as u64,
                             None,
-                            self.on_event.clone(),
+                            (self.on_event.clone(), self.markdown_options.clone()),
                             window,
                             cx,
                         );
@@ -701,6 +774,55 @@ impl PlannedRow {
 #[derive(Default)]
 struct RowPlans {
     markdown: HashMap<SharedString, MarkdownPlan>,
+    inputs: Vec<PlanInput>,
+    plan: Rc<RowPlan>,
+    input_checks: usize,
+    planned_rows: usize,
+}
+
+struct PlanInput {
+    id: SharedString,
+    source: Option<SharedString>,
+    revision: u64,
+    streaming: bool,
+    kind: AgentBlockKind,
+    label: Option<SharedString>,
+}
+
+impl PlanInput {
+    fn matches(&self, block: &AgentDocumentBlock) -> bool {
+        let source = match &block.body {
+            AgentBlockBody::Markdown(source) => Some(source),
+            _ => None,
+        };
+        self.id == block.id
+            && self.source.as_ref() == source
+            && self.revision == block.revision
+            && self.streaming == block.streaming
+            && self.kind == block.kind
+            && self.label == block.label
+    }
+
+    fn from_block(block: &AgentDocumentBlock) -> Self {
+        Self {
+            id: block.id.clone(),
+            source: match &block.body {
+                AgentBlockBody::Markdown(source) => Some(source.clone()),
+                _ => None,
+            },
+            revision: block.revision,
+            streaming: block.streaming,
+            kind: block.kind,
+            label: block.label.clone(),
+        }
+    }
+}
+
+#[derive(Default)]
+struct RowPlan {
+    rows: Vec<PlannedRow>,
+    keys: Vec<SharedString>,
+    revisions: Vec<u64>,
 }
 
 #[derive(Default)]
@@ -719,8 +841,8 @@ impl MarkdownPlan {
         }
         self.reader.read(source);
         self.generation += 1;
-        let mended = streaming.then(|| self.reader.mended()).flatten();
-        let document = mended.as_ref().unwrap_or_else(|| self.reader.document());
+        let mended = streaming.then(|| self.reader.mended_tail()).flatten();
+        let document = self.reader.document();
         let starts = self.reader.starts();
         let split = starts.len() == document.blocks.len();
         let count = if split { starts.len() } else { 1 };
@@ -742,8 +864,12 @@ impl MarkdownPlan {
                     return part.clone();
                 }
                 let parsed = if split {
-                    parse::Document {
-                        blocks: vec![document.blocks[index].clone()],
+                    if last && let Some(mended) = &mended {
+                        (**mended).clone()
+                    } else {
+                        parse::Document {
+                            blocks: vec![document.blocks[index].clone()],
+                        }
                     }
                 } else {
                     document.clone()
@@ -767,9 +893,19 @@ impl MarkdownPlan {
 }
 
 impl RowPlans {
-    fn read(&mut self, blocks: &[AgentDocumentBlock]) -> Vec<PlannedRow> {
-        self.markdown
-            .retain(|id, _| blocks.iter().any(|block| &block.id == id));
+    fn read(&mut self, blocks: &[AgentDocumentBlock]) -> Rc<RowPlan> {
+        if self.inputs.len() == blocks.len()
+            && self.inputs.iter().zip(blocks).all(|(input, block)| {
+                self.input_checks += 1;
+                input.matches(block)
+            })
+        {
+            return self.plan.clone();
+        }
+        let identities: std::collections::HashSet<_> =
+            blocks.iter().map(|block| &block.id).collect();
+        self.markdown.retain(|id, _| identities.contains(id));
+        self.inputs = blocks.iter().map(PlanInput::from_block).collect();
         let mut plan = Vec::with_capacity(blocks.len());
         for (index, block) in blocks.iter().enumerate() {
             let parts = match &block.body {
@@ -795,7 +931,39 @@ impl RowPlans {
                 }),
             }
         }
-        plan
+        self.planned_rows += plan.len();
+        let keys = plan.iter().map(|row| row.key(blocks)).collect();
+        let revisions = plan
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                use std::hash::{Hash, Hasher};
+                let block = &blocks[row.block];
+                let mut revision = std::collections::hash_map::DefaultHasher::new();
+                block.kind.hash(&mut revision);
+                if row.part.as_ref().is_none_or(|part| part.last) {
+                    plan.get(index + 1)
+                        .map(|next| blocks[next.block].kind)
+                        .hash(&mut revision);
+                }
+                row.part
+                    .as_ref()
+                    .map_or(block.revision, |part| part.revision)
+                    .hash(&mut revision);
+                if row.part.as_ref().is_none_or(|part| part.index == 0) {
+                    block.label.hash(&mut revision);
+                }
+                (block.streaming && row.part.as_ref().is_none_or(|part| part.last))
+                    .hash(&mut revision);
+                revision.finish()
+            })
+            .collect();
+        self.plan = Rc::new(RowPlan {
+            rows: plan,
+            keys,
+            revisions,
+        });
+        self.plan.clone()
     }
 }
 
@@ -804,10 +972,11 @@ fn render_block(
     block: &AgentDocumentBlock,
     order: u64,
     part: Option<&Part>,
-    on_event: Option<EventHandler>,
+    callbacks: (Option<EventHandler>, Option<MarkdownOptions>),
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
+    let (on_event, markdown_options) = callbacks;
     let theme = cx.theme().clone();
     let ident = document.child(format!("block.{}", block.id));
     let ident = match part {
@@ -853,6 +1022,9 @@ fn render_block(
                 })
                 .selection_order_start(selection_order)
                 .streaming(streaming)
+                .when_some(markdown_options, |markdown, configure| {
+                    configure(&block.id, markdown)
+                })
                 .when_some(on_event, |markdown, on_event| {
                     markdown.on_event(move |event, window, cx| {
                         on_event(
@@ -995,6 +1167,53 @@ mod tests {
         assert!(Rc::ptr_eq(&first, &plan.parts[0].document));
         assert!(plan.reader.work().parsed_bytes - work.parsed_bytes < 100);
         assert_eq!(plan.parts[0].revision, 1);
+    }
+
+    #[test]
+    fn ten_thousand_blocks_have_linear_static_checks_and_no_row_replanning() {
+        let mut plans = RowPlans::default();
+        let mut blocks: Vec<_> = (0..10_000)
+            .map(|index| {
+                AgentDocumentBlock::markdown(
+                    format!("message-{index}"),
+                    format!("Message {index}."),
+                )
+            })
+            .collect();
+        let first = plans.read(&blocks);
+        for _ in 0..10 {
+            assert!(Rc::ptr_eq(&first, &plans.read(&blocks)));
+        }
+        assert_eq!(plans.input_checks, 100_000);
+        assert_eq!(plans.planned_rows, 10_000);
+        assert_eq!(
+            plans
+                .markdown
+                .values()
+                .map(|plan| plan.reader.work().parser_passes)
+                .sum::<usize>(),
+            10_000
+        );
+        blocks.pop();
+        let next = plans.read(&blocks);
+        assert_eq!(plans.markdown.len(), 9_999);
+        assert_eq!(next.rows.len(), 9_999);
+        assert_eq!(first.keys[0], next.keys[0]);
+        assert_eq!(first.revisions[0], next.revisions[0]);
+    }
+
+    #[test]
+    fn row_revisions_change_only_for_affected_markdown_content() {
+        let mut plans = RowPlans::default();
+        let first = plans
+            .read(&[AgentDocumentBlock::markdown("answer", "One.\n\nTwo.\n\nThree.").revision(1)]);
+        let next =
+            plans.read(&[
+                AgentDocumentBlock::markdown("answer", "One.\n\nTwo.\n\nThree. More.").revision(2),
+            ]);
+        assert_eq!(first.keys, next.keys);
+        assert_eq!(first.revisions[..2], next.revisions[..2]);
+        assert_ne!(first.revisions[2], next.revisions[2]);
     }
 
     #[test]
