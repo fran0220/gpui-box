@@ -1,7 +1,7 @@
 import type { ControlProps, KitNode, SlotNode } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
 export interface KitColor { h: number; s: number; l: number; a: number }
-export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[] }
+export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[]; NumberInput: number }
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 export type ButtonStyle = ButtonVariant | 'filled' | 'light' | 'subtle' | 'default' | 'transparent' | 'white';
 export type ControlGround = 'backdrop' | 'canvas' | 'sunken' | 'panel' | 'raised' | 'overlay';
@@ -12,6 +12,7 @@ export interface ToggleItem { id: string; label: string; icon?: BuiltinIconDescr
 export interface FilterCondition { id: string; field: string; operator: string; value: string; tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' }
 export interface TransferItem { id: string; label: string; disabled?: boolean }
 export interface ControlsExtraFactories {
+  NumberInput(id: string, props?: ControlProps & { value?: number; min?: number; max?: number; step?: number; pageStep?: number; precision?: number; name?: string; unit?: string; prefix?: string; required?: boolean; invalid?: boolean }, events?: { change?(value: number): void; unparsable?(text: string): void; submit?(): void }): KitNode;
   TransferList(id: string, props?: ControlProps & { source?: TransferItem[]; target?: TransferItem[]; sourceSelected?: string[]; targetSelected?: string[]; sourceLabel?: string; targetLabel?: string; query?: string }, events?: { toggleSource?(id: string): void; toggleTarget?(id: string): void; moveToTarget?(): void; moveToSource?(): void; queryChange?(query: string): void }): KitNode;
   SettingsRow(id: string, props: { label: string; description?: string; labelWidth?: number; badge?: string; value?: string; searchTerms?: string[]; managed?: string }, events?: Record<string, never>, slots?: { control?: SlotNode[] }): KitNode;
   SearchInput(id: string, props?: ControlProps & { name?: string; placeholder?: string; value?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
@@ -25,6 +26,26 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 export interface ControlsExtraMethodContracts {
+  NumberInput: {
+    invoke: {
+      set_value: { args: { value: number }; result: null };
+      set_invalid: { args: { invalid: boolean }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+      set_required: { args: { required: boolean }; result: null };
+      set_range: { args: { min: number | null; max: number | null }; result: null };
+      set_steps: { args: { step: number; page_step: number | null }; result: null };
+      set_precision: { args: { precision: number }; result: null };
+      set_presentation: { args: { name: string | null; unit: string | null; prefix: string | null; size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+    };
+    query: {
+      current: { args: Record<string, never>; result: number | null };
+      shown: { args: Record<string, never>; result: number | null };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      is_invalid: { args: Record<string, never>; result: boolean };
+      invalid_reason: { args: Record<string, never>; result: string | null };
+      can_step: { args: { delta: number }; result: boolean };
+    };
+  };
   TransferList: {
     invoke: {
       set_query: { args: { query: string }; result: null };

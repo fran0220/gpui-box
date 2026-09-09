@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('number options and named command/query arguments reject nonfinite and unbounded data', () => {
+  validateValue({ value: -4.25, min: 9, max: -3, step: 0.25, precision: 2 }, familySchemas.NumberInput.props);
+  for (const props of [{value: NaN}, {value: Infinity}, {step: 0}, {pageStep: -1}, {precision: 1.5}, {precision: 13}, {bind: {signal: 2}}]) {
+    assert.throws(() => validateValue(props, familySchemas.NumberInput.props));
+  }
+  for (const [method, args] of [['set_range',{min:null}], ['set_steps',{step:1,pageStep:3}], ['set_presentation',{name:null,unit:null,prefix:null,size:'huge'}]]) {
+    assert.throws(() => validateValue(args, familyMethods.NumberInput.invoke[method].args));
+  }
+  validateValue(null, familyMethods.NumberInput.query.current.result);
+  assert.throws(() => validateValue('4', familyMethods.NumberInput.query.shown.result));
+});
+
 test('color payloads are complete, finite normalized HSLA without executable fields', () => {
   const color = { h: 0.125, s: 0.75, l: 0.25, a: 0.5 };
   const schema = familySchemas.ColorPicker.props;
@@ -53,6 +65,15 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.NumberInput('number', {min:-3,max:9,precision:2}, {change(value) { const n: number = value; }, unparsable(text) { const s: string = text; }});
+type NumberMethods = ControlsExtraMethodContracts['NumberInput']['invoke'];
+const numberValues: { [K in keyof NumberMethods]: NumberMethods[K]['args'] } = {
+set_value:{value:3.5},set_invalid:{invalid:false},set_disabled:{disabled:false},set_required:{required:true},set_range:{min:null,max:9},set_steps:{step:0.5,page_step:null},set_precision:{precision:2},set_presentation:{name:null,unit:'ms',prefix:null,size:'lg'}
+};
+// @ts-expect-error optional native numeric query is not always a number
+const alwaysNumber: number = null as ControlsExtraMethodContracts['NumberInput']['query']['current']['result'];
+// @ts-expect-error no serialized signal handles
+kit.NumberInput('bad', {bind:{signal:1}});
 kit.Button('button', {variant:'white', color:{custom:{h:0.1,s:0.7,l:0.2,a:0.5}}});
 kit.IconButton('icon', {icon:{key:'plus-circle',weight:'fill'},accessibleName:'Add'});
 kit.Toggle('toggle', {pressed:true}, {press(value) { const checked: boolean = value; }});

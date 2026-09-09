@@ -10,6 +10,9 @@ const unit = { type: 'number', min: 0, max: 1 };
 const color = object({ h: unit, s: unit, l: unit, a: unit }, ['h', 's', 'l', 'a']);
 const common = { disabled: boolean, size: choice('xs', 'sm', 'md', 'lg') };
 const integer = { type: 'number', integer: true, min: 0, max: 1000000 };
+const number = { type: 'number', min: -1e12, max: 1e12 };
+const precision = { type: 'number', integer: true, min: 0, max: 12 };
+const step = { ...number, min: Number.MIN_VALUE };
 const method = (fields, result) => ({ args: object(fields, Object.keys(fields)), result });
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
@@ -19,11 +22,13 @@ const button = { ...common, accessibleName: string, semanticParent: identity, ic
 const transferItems = array(object({ id: identity, label: string, disabled: boolean }, ['id', 'label']));
 
 export const familyBindings = Object.freeze({
+  NumberInput: { prop: 'value', event: 'change' },
   Toggle: { prop: 'pressed', event: 'press' },
   ToggleGroup: { prop: 'pressed', event: 'change', project: 'pressed' },
 });
 
 export const familySchemas = Object.freeze({
+  NumberInput: { props: object({ ...common, value: number, min: number, max: number, step, pageStep: step, precision, name: string, unit: string, prefix: string, required: boolean, invalid: boolean }), events: { change: number, unparsable: string, submit: choice(null) } },
   TransferList: { props: object({ ...common, source: transferItems, target: transferItems, sourceSelected: array(identity), targetSelected: array(identity), sourceLabel: string, targetLabel: string, query: string }), events: { toggleSource: identity, toggleTarget: identity, moveToTarget: choice(null), moveToSource: choice(null), queryChange: string } },
   SettingsRow: { props: object({ label: string, description: string, labelWidth: { type: 'number', min: 0, max: 100000 }, badge: string, value: string, searchTerms: array(string), managed: string }, ['label']), events: {}, slots: ['control'] },
   SearchInput: { props: object({ ...common, name: string, placeholder: string, value: string }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
@@ -37,6 +42,23 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  NumberInput: {
+    invoke: {
+      set_value: method({ value: number }, choice(null)),
+      set_invalid: method({ invalid: boolean }, choice(null)),
+      set_disabled: method({ disabled: boolean }, choice(null)),
+      set_required: method({ required: boolean }, choice(null)),
+      set_range: method({ min: { ...number, nullable: true }, max: { ...number, nullable: true } }, choice(null)),
+      set_steps: method({ step, page_step: { ...step, nullable: true } }, choice(null)),
+      set_precision: method({ precision }, choice(null)),
+      set_presentation: method({ name: { ...string, nullable: true }, unit: { ...string, nullable: true }, prefix: { ...string, nullable: true }, size: common.size }, choice(null)),
+    },
+    query: {
+      current: method({}, { ...number, nullable: true }), shown: method({}, { ...number, nullable: true }),
+      is_disabled: method({}, boolean), is_invalid: method({}, boolean),
+      invalid_reason: method({}, { ...string, nullable: true }), can_step: method({ delta: number }, boolean),
+    },
+  },
   TransferList: {
     invoke: {
       set_query: method({ query: string }, choice(null)),

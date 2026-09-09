@@ -3,6 +3,7 @@
 use super::*;
 use gpui::{Hsla, ParentElement};
 use gpui_kit::controls::button::{ButtonJoin, ButtonStyle, IconPosition};
+use gpui_kit::controls::number_input::{NumberInput, NumberInputEvent};
 use gpui_kit::state::ValidationState;
 use gpui_kit_theme::{ColorChoice, SemanticColor, Surface, Variant};
 
@@ -21,6 +22,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SearchInput",
     "SettingsRow",
     "TransferList",
+    "NumberInput",
 ];
 
 struct Entry<T: 'static> {
@@ -34,6 +36,7 @@ struct Entry<T: 'static> {
 pub(super) struct State {
     searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
     transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
+    numbers: RefCell<HashMap<Key, Rc<Entry<NumberInput>>>>,
 }
 
 impl State {
@@ -54,6 +57,9 @@ impl State {
         self.transfers
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "TransferList"));
+        self.numbers
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "NumberInput"));
     }
 
     pub(super) fn render(
@@ -64,6 +70,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("NumberInput") {
+            return self.render_number(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("TransferList") {
             return self.render_transfer(node, window, cx, emit);
         }
@@ -151,6 +160,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("NumberInput") {
+            return self.invoke_number(node, method, args, query, cx);
+        }
         if node.component.as_deref() == Some("TransferList") {
             return self.invoke_transfer(node, method, args, query, cx);
         }
@@ -204,6 +216,186 @@ impl State {
                     );
                 }
                 _ => anyhow::bail!("unsupported SearchInput command"),
+            }
+            Ok(Value::Null)
+        })
+    }
+}
+
+impl State {
+    fn render_number(
+        &self,
+        node: &Node,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> AnyElement {
+        let key = (node.instance, node.id.clone());
+        let existing = self.numbers.borrow().get(&key).cloned();
+        let entry = existing.unwrap_or_else(|| {
+            let entity = cx.new(|cx| NumberInput::new(node.id.clone(), window, cx));
+            let route = Rc::new(RefCell::new(Route {
+                events: node.events.clone(),
+                emit: emit.clone(),
+                disabled: flag(node, "disabled"),
+            }));
+            let callback = Rc::downgrade(&route);
+            let subscription =
+                cx.subscribe(&entity, move |entity, event: &NumberInputEvent, cx| {
+                    if entity.read(cx).is_disabled() {
+                        return;
+                    }
+                    let (name, payload) = match event {
+                        NumberInputEvent::Changed(value) => ("change", json!(value)),
+                        NumberInputEvent::Unparsable(value) => {
+                            ("unparsable", json!(value.as_ref()))
+                        }
+                        NumberInputEvent::Submit => ("submit", Value::Null),
+                    };
+                    let target = callback.upgrade().and_then(|route| {
+                        let route = route.borrow();
+                        (!route.disabled)
+                            .then(|| {
+                                route
+                                    .events
+                                    .get(name)
+                                    .map(|action| (action.clone(), route.emit.clone()))
+                            })
+                            .flatten()
+                    });
+                    if let Some((action, emit)) = target {
+                        emit(&action, payload);
+                    }
+                });
+            let entry = Rc::new(Entry {
+                entity,
+                route,
+                props: Default::default(),
+                _subscription: subscription,
+            });
+            self.numbers.borrow_mut().insert(key, entry.clone());
+            entry
+        });
+        *entry.route.borrow_mut() = Route {
+            events: node.events.clone(),
+            emit,
+            disabled: flag(node, "disabled"),
+        };
+        if *entry.props.borrow() != node.props {
+            entry.entity.update(cx, |number, cx| {
+                number.set_range(
+                    node.props.get("min").and_then(Value::as_f64),
+                    node.props.get("max").and_then(Value::as_f64),
+                    cx,
+                );
+                number.set_steps(
+                    node.props.get("step").and_then(Value::as_f64).unwrap_or(1.),
+                    node.props.get("pageStep").and_then(Value::as_f64),
+                    cx,
+                );
+                number.set_precision(
+                    node.props
+                        .get("precision")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0) as usize,
+                    cx,
+                );
+                let optional = |key| {
+                    node.props
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .map(|s| SharedString::from(s.to_owned()))
+                };
+                number.set_presentation(
+                    optional("name"),
+                    optional("unit"),
+                    optional("prefix"),
+                    size(node),
+                    cx,
+                );
+                number.set_required(flag(node, "required"), cx);
+                number.set_invalid(flag(node, "invalid"), cx);
+                number.set_disabled(flag(node, "disabled"), cx);
+                if let Some(value) = node.props.get("value").and_then(Value::as_f64)
+                    && entry.props.borrow().get("value") != node.props.get("value")
+                {
+                    number.set_value(value, cx);
+                }
+            });
+            *entry.props.borrow_mut() = node.props.clone();
+        }
+        entry.entity.clone().into_any_element()
+    }
+
+    fn invoke_number(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        cx: &mut App,
+    ) -> anyhow::Result<Value> {
+        let entity = self
+            .numbers
+            .borrow()
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| entry.entity.clone())
+            .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+        anyhow::ensure!(
+            query || (!flag(node, "disabled") && !entity.read(cx).is_disabled()),
+            "disabled target refuses invocation"
+        );
+        if query {
+            let number = entity.read(cx);
+            return match method {
+                "current" => Ok(json!(number.current())),
+                "shown" => Ok(json!(number.shown(cx))),
+                "is_disabled" => Ok(json!(number.is_disabled())),
+                "is_invalid" => Ok(json!(number.is_invalid(cx))),
+                "invalid_reason" => Ok(json!(number.invalid_reason(cx).as_deref())),
+                "can_step" => Ok(json!(
+                    number.can_step(args["delta"].as_f64().unwrap_or_default(), cx)
+                )),
+                _ => anyhow::bail!("unsupported NumberInput query"),
+            };
+        }
+        entity.update(cx, |number, cx| {
+            match method {
+                "set_value" => number.set_value(args["value"].as_f64().unwrap_or_default(), cx),
+                "set_invalid" => number.set_invalid(args["invalid"].as_bool().unwrap_or(false), cx),
+                "set_disabled" => {
+                    number.set_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
+                }
+                "set_required" => {
+                    number.set_required(args["required"].as_bool().unwrap_or(false), cx)
+                }
+                "set_range" => number.set_range(args["min"].as_f64(), args["max"].as_f64(), cx),
+                "set_steps" => number.set_steps(
+                    args["step"].as_f64().unwrap_or(1.),
+                    args["page_step"].as_f64(),
+                    cx,
+                ),
+                "set_precision" => {
+                    number.set_precision(args["precision"].as_u64().unwrap_or(0) as usize, cx)
+                }
+                "set_presentation" => {
+                    let optional =
+                        |key: &str| args[key].as_str().map(|s| SharedString::from(s.to_owned()));
+                    let size = match args["size"].as_str() {
+                        Some("xs") => ControlSize::Xs,
+                        Some("sm") => ControlSize::Sm,
+                        Some("lg") => ControlSize::Lg,
+                        _ => ControlSize::Md,
+                    };
+                    number.set_presentation(
+                        optional("name"),
+                        optional("unit"),
+                        optional("prefix"),
+                        size,
+                        cx,
+                    );
+                }
+                _ => anyhow::bail!("unsupported NumberInput command"),
             }
             Ok(Value::Null)
         })

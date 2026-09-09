@@ -206,6 +206,57 @@ impl NumberInput {
         cx.notify();
     }
 
+    /// Replaces optional bounds without replacing the typist's text or selection.
+    pub fn set_range(&mut self, min: Option<f64>, max: Option<f64>, cx: &mut Context<Self>) {
+        (self.min, self.max) = match (min, max) {
+            (Some(min), Some(max)) if min > max => (Some(max), Some(min)),
+            bounds => bounds,
+        };
+        cx.notify();
+    }
+
+    /// Replaces the step grid; an absent page step restores ten ordinary steps.
+    pub fn set_steps(&mut self, step: f64, page_step: Option<f64>, cx: &mut Context<Self>) {
+        if step > 0.0 {
+            self.step = step;
+        }
+        self.page_step = page_step.filter(|step| *step > 0.0);
+        cx.notify();
+    }
+
+    /// Changes future number formatting without overwriting an in-progress edit.
+    pub fn set_precision(&mut self, precision: usize, cx: &mut Context<Self>) {
+        self.precision = precision;
+        cx.notify();
+    }
+
+    /// Replaces presentation, including removing optional adornments and names.
+    pub fn set_presentation(
+        &mut self,
+        name: Option<SharedString>,
+        unit: Option<SharedString>,
+        prefix: Option<SharedString>,
+        size: ControlSize,
+        cx: &mut Context<Self>,
+    ) {
+        self.name = None;
+        self.field
+            .update(cx, |field, cx| field.set_name(name.unwrap_or_default(), cx));
+        self.unit = unit;
+        self.prefix = prefix;
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     /// Replaces the number from the host side.
     ///
     /// The host already knows the number it just set, so this reports

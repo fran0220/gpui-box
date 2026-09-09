@@ -74,6 +74,174 @@ fn node(component: &str, id: &str, props: Value, events: Value) -> Node {
     .expect("fixture descriptor")
 }
 
+#[gpui::test]
+fn number_native_steps_queries_options_and_disabled_commands(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let descriptor = Rc::new(RefCell::new(node(
+        "NumberInput",
+        "number",
+        json!({"value":7.5,"min":9,"max":-3,"step":2,"precision":1,"name":"Amount"}),
+        json!({"change":"changed"}),
+    )));
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_state, build_node, output) = (state.clone(), descriptor.clone(), events.clone());
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let node = build_node.borrow();
+        build_state.reconcile(&node, cx);
+        let output = output.clone();
+        build_state.render(
+            &node,
+            BTreeMap::new(),
+            window,
+            cx,
+            Rc::new(move |_, value| output.borrow_mut().push(value)),
+        )
+    });
+    harness.click("number.increment");
+    assert_eq!(*events.borrow(), vec![json!(9.0)]);
+    harness.update(|window, cx| {
+        for (method, args, expected) in [
+            ("current", json!({}), json!(7.5)),
+            ("shown", json!({}), json!(9.0)),
+            ("can_step", json!({"delta":2}), json!(false)),
+            ("can_step", json!({"delta":-2}), json!(true)),
+            ("is_invalid", json!({}), json!(false)),
+            ("invalid_reason", json!({}), Value::Null),
+            ("is_disabled", json!({}), json!(false)),
+        ] {
+            assert_eq!(
+                state
+                    .invoke(&descriptor.borrow(), method, &args, true, window, cx)
+                    .expect(method),
+                expected
+            );
+        }
+    });
+    let entity = state.controls_extra.numbers.borrow()[&(0, "number".into())]
+        .entity
+        .clone();
+    let field = harness.update(|_, cx| entity.read(cx).field().clone());
+    harness.click("number.field");
+    harness.keystrokes("home shift-right");
+    let selection = harness.update(|_, cx| field.read(cx).selected_range());
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("unit".into(), json!("ms"));
+    harness.update(|_, cx| cx.refresh_windows());
+    harness.update(|window, cx| {
+        assert_eq!(field.read(cx).selected_range(), selection);
+        assert_eq!(entity.read(cx).shown(cx), Some(9.0));
+        assert_eq!(entity.read(cx).field().entity_id(), field.entity_id());
+        for (method, args) in [
+            ("set_range", json!({"min":-2,"max":8})),
+            ("set_steps", json!({"step":0.25,"page_step":3})),
+            ("set_precision", json!({"precision":2})),
+            (
+                "set_presentation",
+                json!({"name":null,"unit":null,"prefix":"$","size":"sm"}),
+            ),
+            ("set_required", json!({"required":true})),
+            ("set_invalid", json!({"invalid":false})),
+            ("set_value", json!({"value":-4.25})),
+        ] {
+            assert_eq!(
+                state
+                    .invoke(&descriptor.borrow(), method, &args, false, window, cx)
+                    .expect(method),
+                Value::Null
+            );
+        }
+        assert_eq!(entity.read(cx).shown(cx), Some(-4.25));
+        assert!(entity.read(cx).is_invalid(cx));
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "invalid_reason",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .expect("reason")
+                .is_string()
+        );
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_range",
+                &json!({"min":null,"max":null}),
+                false,
+                window,
+                cx,
+            )
+            .expect("remove range");
+        assert!(!entity.read(cx).is_invalid(cx));
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                window,
+                cx,
+            )
+            .expect("disable");
+        assert_eq!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "is_disabled",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .expect("disabled query"),
+            json!(true)
+        );
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "set_disabled",
+                    &json!({"disabled":false}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "set_value",
+                    &json!({"value":3}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+    });
+    harness.click("number.increment");
+    assert_eq!(*events.borrow(), vec![json!(9.0)]);
+    let removed = node("Button", "replacement", json!({}), json!({}));
+    harness.update(|_, cx| state.reconcile(&removed, cx));
+    assert!(state.controls_extra.numbers.borrow().is_empty());
+    harness.update(|window, cx| {
+        assert!(
+            state
+                .invoke(&descriptor.borrow(), "shown", &json!({}), true, window, cx)
+                .is_err()
+        );
+        entity.update(cx, |_, cx| cx.emit(NumberInputEvent::Changed(27.)));
+    });
+    assert_eq!(*events.borrow(), vec![json!(9.0)]);
+}
+
 #[test]
 fn native_descriptors_and_methods_reject_closed_shape_and_relational_errors() {
     for (component, props) in [
