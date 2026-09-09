@@ -72,17 +72,30 @@ fn initials_size(size: f32) -> Option<f32> {
 ///
 /// With no image it falls back to initials, and with nothing to take initials
 /// from it stays an empty circle rather than inventing a letter.
-#[derive(Debug, IntoElement)]
+#[derive(IntoElement)]
 pub struct Avatar {
     ident: Option<Ident>,
     name: SharedString,
-    image: Option<SharedString>,
+    image: Option<gpui::ImageSource>,
     size: f32,
     tint: Option<Hsla>,
     presence: AvatarPresence,
     /// The colour the mark is cut out of when it overlaps another one. Only a
     /// stack sets this; a mark standing on its own has nothing to cut.
     stacked_on: Option<Hsla>,
+}
+
+impl std::fmt::Debug for Avatar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Avatar")
+            .field("ident", &self.ident)
+            .field("name", &self.name)
+            .field("has_image", &self.image.is_some())
+            .field("size", &self.size)
+            .field("tint", &self.tint)
+            .field("presence", &self.presence)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Avatar {
@@ -112,7 +125,14 @@ impl Avatar {
 
     /// A resource path or URI the asset source can resolve.
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(image.into().into());
+        self
+    }
+
+    /// A caller-resolved image, including a custom loader whose authorization
+    /// remains with the host. The avatar does not turn it into a resource path.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(image);
         self
     }
 
@@ -367,6 +387,17 @@ impl RenderOnce for AvatarGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolved_image_keeps_custom_loader_and_identity() {
+        let loader = std::sync::Arc::new(|_: &mut Window, _: &mut App| None);
+        let avatar = Avatar::new("Ada Lovelace")
+            .presence(AvatarPresence::Busy)
+            .image_source(gpui::ImageSource::Custom(loader));
+        assert!(matches!(avatar.image, Some(gpui::ImageSource::Custom(_))));
+        assert_eq!(avatar.presence, AvatarPresence::Busy);
+        assert_eq!(avatar.initials().as_ref(), "AL");
+    }
 
     #[test]
     fn initials_take_at_most_two_words() {
