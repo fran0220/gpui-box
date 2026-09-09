@@ -27,15 +27,29 @@
 #define CPU_RATE 2500
 #define PATH_CAP 32768
 
+static void profile_root(const wchar_t *name, wchar_t *path);
+
 #ifndef GPUI_SANDBOX_PROBE
 static const wchar_t *owned_profile;
 static HANDLE owned_job, owned_worker;
 static DWORD delete_profile(const wchar_t *name) {
+    wchar_t directory[PATH_CAP];
+    profile_root(name, directory);
     HRESULT result;
     for (int attempt = 0;; attempt++) {
         result = DeleteAppContainerProfile(name);
         if (SUCCEEDED(result) || result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
-            result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND)) return 0;
+            result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND)) {
+            if (GetFileAttributesW(directory) == INVALID_FILE_ATTRIBUTES) {
+                DWORD error = GetLastError();
+                if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) return 0;
+                result = HRESULT_FROM_WIN32(error);
+            } else {
+                // Successful API return need not mean profile storage has
+                // vanished. Recheck after worker handle release, boundedly.
+                result = HRESULT_FROM_WIN32(ERROR_BUSY);
+            }
+        }
         if (attempt == 20 || (result != HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) &&
             result != E_ACCESSDENIED && result != HRESULT_FROM_WIN32(ERROR_BUSY))) break;
         Sleep(100); // job termination can release profile handles asynchronously
@@ -50,9 +64,9 @@ static DWORD cleanup_owned(void) {
         CloseHandle(owned_worker); owned_worker = NULL;
     }
     if (owned_profile) {
-        DWORD result = delete_profile(owned_profile);
+        const wchar_t *name = owned_profile;
         owned_profile = NULL;
-        return result;
+        return delete_profile(name);
     }
     return 0;
 }
@@ -143,6 +157,8 @@ int wmain(int argc, wchar_t **argv) {
             environment_keys[i], value, GetFileAttributesW(value), profile_folder);
         CHECK(!_wcsnicmp(value, profile_folder, prefix) &&
             (!value[prefix] || value[prefix] == L'\\'));
+        CHECK(i == 0 ? value[prefix] == 0 : !_wcsicmp(value + prefix, L"\\Temp"));
+        CHECK(GetFileAttributesW(value) != INVALID_FILE_ATTRIBUTES);
         wcscat(value, L"\\forbidden-environment.txt");
         HANDLE write = CreateFileW(value, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
         CHECK(write == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED);
@@ -428,14 +444,17 @@ int wmain(int argc, wchar_t **argv) {
     // Never inherit host secrets, NODE_OPTIONS, or loader search paths.
     // Windows documents rewriting LOCALAPPDATA/TEMP/TMP for AppContainer
     // creation. The native lane reported error 203 with all three omitted,
-    // even for an invalid image. Seed ONLY these three bootstrap entries
-    // with the private profile, never host temp/home paths.
-    // All directories already exist and have the same read-only container ACL.
+    // even for an invalid image. LOCALAPPDATA is the INPUT base to that
+    // rewrite: passing AC here duplicated Packages/<name>/AC in the child.
+    // Obtain only this known-folder bootstrap value, not the host environment.
+    // TEMP/TMP remain private. No ACL grant is made to the input base.
+    PWSTR local_app_data = NULL;
+    CHECK(SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &local_app_data)));
     wchar_t windows[PATH_CAP];
     UINT length = GetWindowsDirectoryW(windows, PATH_CAP);
     CHECK(length && length < PATH_CAP);
     const wchar_t *keys[] = {L"LOCALAPPDATA", L"NODE_NO_WARNINGS", L"SystemRoot", L"TEMP", L"TMP", L"WINDIR"};
-    const wchar_t *values[] = {profile_path, L"1", windows, profile_temp, profile_temp, windows};
+    const wchar_t *values[] = {local_app_data, L"1", windows, profile_temp, profile_temp, windows};
     size_t envSize = 1;
     for (int i = 0; i < 6; i++) envSize += wcslen(keys[i]) + wcslen(values[i]) + 2;
     wchar_t *environment = calloc(envSize, sizeof(wchar_t));
@@ -447,6 +466,7 @@ int wmain(int argc, wchar_t **argv) {
         offset += (size_t)written + 1;
     }
     CHECK(offset + 1 == envSize && environment[offset] == 0);
+    CoTaskMemFree(local_app_data);
     free(profile_path); free(profile_temp);
     DWORD executable_attributes = GetFileAttributesW(executable);
     DWORD cwd_attributes = GetFileAttributesW(cwd);

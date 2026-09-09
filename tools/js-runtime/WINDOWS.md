@@ -86,8 +86,13 @@ Windows also creates per-instance registry profile state; this is not a claim
 of a filesystem/registry namespace with no backing state.
 The child receives an explicit environment containing only Windows directory
 variables, `NODE_NO_WARNINGS`, and the documented AppContainer bootstrap keys
-`LOCALAPPDATA`, `TEMP`, `TMP`. Those three are seeded from the new profile's
-`AC` directory and its `Temp` child, never copied from host environment.
+`LOCALAPPDATA`, `TEMP`, `TMP`. The launch-input `LOCALAPPDATA` is obtained from
+`SHGetKnownFolderPath(FOLDERID_LocalAppData)`: Windows appends the private
+`Packages/<moniker>/AC` itself. Pre-appending it caused a duplicated path in
+actual native execution. TEMP/TMP are seeded with the private `AC/Temp`.
+No host environment block or host directory ACL grant is inherited. The probe
+requires the resulting child paths to equal its API-derived AC and AC/Temp,
+to exist, and to deny writes with ACCESS_DENIED.
 The profile root is bounded to the host's `FOLDERID_LocalAppData` plus
 `Packages/<fresh UUID moniker>`, verified absent before provisioning. Only that
 new root receives recursive ACL changes. The identity-dependent
@@ -117,6 +122,9 @@ profile, including normal failure and observed host death. Deferred host
 cleanup invokes `--delete-profile <gpui-js-UUID>` as well, covering abrupt
 helper death, then removes staging. Cleanup is idempotent and reports profile
 deletion refusal; it does not silently report successful cleanup.
+Even a successful deletion API result must leave the exact profile root absent.
+The helper retries the API for at most two seconds while storage remains and
+reports failure if it persists; it never recursively deletes a guessed path.
 An abrupt death of both host and helper, OS crash, or power loss can leave
 read-only copies and registered per-instance profile state. No worker survives
 job-handle closure, and no source ACL grant was made. Such crash leftovers need
@@ -154,6 +162,19 @@ write denial and profile removal assertions remain strict. Exact environment
 key/path/attributes and bounded profile-path diagnostics distinguish missing
 directories from access denials and actual leftovers from identity lookup errors.
 These corrections require a new native run; Linux compilation is not a pass.
+
+Run [34413155692](https://github.com/fran0220/gpui-box/actions/runs/34413155692)
+at [0703a7a7](https://github.com/fran0220/gpui-box/commit/0703a7a78bda414191822a19c9d3aa9c452bfbbe)
+passed real Node argument mapping, TS rendering/inspector denial, CPU status
+and measured 30-second user budget, allocation refusal, helper-death cleanup,
+invalid-image cleanup and reparse rejection. The combined adversarial probe
+failed at its first environment write: LOCALAPPDATA contained duplicated
+`Packages/<moniker>/AC`, so later raw filesystem/network/spawn/handle assertions
+were not reached. Source and host parent ACL equality passed before that failure.
+The host-death test observed both processes gone but the exact profile root
+still present. Its log does not establish why removal failed. The bootstrap
+correction and deletion-postcondition retry above are candidates, not verified
+native fixes; both strict assertions must pass on a subsequent native run.
 
 - The process and job each permit **256 MiB committed memory**, not 256 MiB
   virtual address space or resident memory. A failed allocation is refused;
