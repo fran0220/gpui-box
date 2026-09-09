@@ -20,6 +20,7 @@
 #include <wchar.h>
 #include <stdint.h>
 #include <objbase.h>
+#include <shlobj.h>
 
 #define MEMORY_LIMIT ((SIZE_T)256 * 1024 * 1024)
 #define CPU_SECONDS 30
@@ -65,24 +66,31 @@ static void fail(const char *operation) {
 }
 #define CHECK(expr) do { if (!(expr)) fail(#expr); } while (0)
 
+// Resolve the host's known folder, then bound every profile ACL/existence
+// operation to the freshly generated moniker. GetAppContainerFolderPath's
+// identity-dependent result is not authority to mutate arbitrary host paths.
+static void profile_root(const wchar_t *name, wchar_t *path) {
+    UUID uuid;
+    CHECK(wcslen(name) == 44 && !wcsncmp(name, L"gpui-js-", 8) &&
+        UuidFromStringW((RPC_WSTR)(name + 8), &uuid) == RPC_S_OK);
+    PWSTR local = NULL;
+    CHECK(SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &local)));
+    CHECK(wcslen(local) + wcslen(name) + 12 < PATH_CAP);
+    CHECK(swprintf(path, PATH_CAP, L"%ls\\Packages\\%ls", local, name) > 0);
+    CoTaskMemFree(local);
+}
+
 #ifdef GPUI_SANDBOX_PROBE
 /* Native adversarial probe: no Node permission model can mask OS failures. */
 int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 3);
     if (!wcscmp(argv[1], L"--profile-exists")) {
-        PSID sid = NULL; LPWSTR text = NULL, folder = NULL;
-        CHECK(SUCCEEDED(DeriveAppContainerSidFromAppContainerName(argv[2], &sid)));
-        CHECK(ConvertSidToStringSidW(sid, &text));
-        HRESULT result = GetAppContainerFolderPath(text, &folder);
-        BOOL exists = FALSE;
-        if (SUCCEEDED(result)) {
-            DWORD attributes = GetFileAttributesW(folder);
-            exists = attributes != INVALID_FILE_ATTRIBUTES;
-            CHECK(exists || GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND);
-        } else {
-            CHECK(result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
-        }
-        CoTaskMemFree(folder); LocalFree(text); FreeSid(sid);
+        wchar_t folder[PATH_CAP];
+        profile_root(argv[2], folder);
+        DWORD attributes = GetFileAttributesW(folder);
+        BOOL exists = attributes != INVALID_FILE_ATTRIBUTES;
+        CHECK(exists || GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND);
+        fprintf(stderr, "Windows sandbox probe: profile=%ls folder=%ls attributes=0x%lx\n", argv[2], folder, attributes);
         puts(exists ? "true" : "false"); return 0;
     }
     if (!wcscmp(argv[1], L"--acl")) {
@@ -131,6 +139,8 @@ int wmain(int argc, wchar_t **argv) {
         DWORD length = GetEnvironmentVariableW(environment_keys[i], value, PATH_CAP);
         CHECK(length && length < PATH_CAP - 32);
         size_t prefix = wcslen(profile_folder);
+        fprintf(stderr, "Windows sandbox probe: env key=%ls path=%ls attributes=0x%lx profile=%ls\n",
+            environment_keys[i], value, GetFileAttributesW(value), profile_folder);
         CHECK(!_wcsnicmp(value, profile_folder, prefix) &&
             (!value[prefix] || value[prefix] == L'\\'));
         wcscat(value, L"\\forbidden-environment.txt");
@@ -250,6 +260,19 @@ static wchar_t *remap(const wchar_t *argument, const wchar_t *root,
     const wchar_t *prefix = L"--allow-fs-read=";
     size_t offset = !wcsncmp(argument, prefix, wcslen(prefix)) ? wcslen(prefix) : 0;
     const wchar_t *value = argument + offset;
+    // Node realpath canonicalizes the source roots, whereas appended entry
+    // paths may still use the runner's 8.3 TEMP alias. Expand existing absolute
+    // paths before matching, but preserve non-package arguments byte-for-byte.
+    wchar_t expanded[PATH_CAP];
+    if ((wcslen(value) > 2 && value[1] == L':' &&
+         (value[2] == L'\\' || value[2] == L'/')) ||
+        (value[0] == L'\\' && value[1] == L'\\')) {
+        DWORD length = GetLongPathNameW(value, expanded, PATH_CAP);
+        if (length && length < PATH_CAP) {
+            for (wchar_t *p = expanded; *p; p++) if (*p == L'/') *p = L'\\';
+            value = expanded;
+        }
+    }
     const wchar_t *source = NULL, *target = NULL;
     // Longest prefix wins when runtime and package are nested.
     if (is_under(value, root)) { source = root; target = L"package"; }
@@ -313,6 +336,10 @@ int wmain(int argc, wchar_t **argv) {
     const wchar_t *name = argv[10];
     CHECK(wcslen(name) == 44 && !wcsncmp(name, L"gpui-js-", 8) &&
         UuidFromStringW((RPC_WSTR)(name + 8), &uuid) == RPC_S_OK);
+    wchar_t profile_directory[PATH_CAP];
+    profile_root(name, profile_directory);
+    CHECK(GetFileAttributesW(profile_directory) == INVALID_FILE_ATTRIBUTES &&
+        (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND));
     PSID sid = NULL;
     HRESULT result = CreateAppContainerProfile(name, name, L"GPUI Box isolated runtime", NULL, 0, &sid);
     if (FAILED(result)) { SetLastError((DWORD)result); fail("CreateAppContainerProfile"); }
@@ -334,12 +361,11 @@ int wmain(int argc, wchar_t **argv) {
     BOOL present, defaulted;
     CHECK(GetSecurityDescriptorDacl(descriptor, &present, &acl, &defaulted) && present);
     protect_tree(instance, acl);
-    LPWSTR profile_path = NULL;
-    result = GetAppContainerFolderPath(sidText, &profile_path);
-    if (FAILED(result)) { SetLastError((DWORD)result); fail("GetAppContainerFolderPath"); }
+    wchar_t *profile_path = join(profile_directory, L"AC");
+    CHECK(CreateDirectoryW(profile_path, NULL) || GetLastError() == ERROR_ALREADY_EXISTS);
     wchar_t *profile_temp = join(profile_path, L"Temp");
     CHECK(CreateDirectoryW(profile_temp, NULL) || GetLastError() == ERROR_ALREADY_EXISTS);
-    protect_tree(profile_path, acl); // only the newly-created per-instance storage
+    protect_tree(profile_directory, acl); // never an identity-dependent host folder
     LocalFree(descriptor); LocalFree(userText); LocalFree(sidText); free(user); CloseHandle(token);
 
     HANDLE job = CreateJobObjectW(NULL, NULL);
@@ -421,7 +447,7 @@ int wmain(int argc, wchar_t **argv) {
         offset += (size_t)written + 1;
     }
     CHECK(offset + 1 == envSize && environment[offset] == 0);
-    CoTaskMemFree(profile_path); free(profile_temp);
+    free(profile_path); free(profile_temp);
     DWORD executable_attributes = GetFileAttributesW(executable);
     DWORD cwd_attributes = GetFileAttributesW(cwd);
     CHECK(executable_attributes != INVALID_FILE_ATTRIBUTES && !(executable_attributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -450,6 +476,12 @@ int wmain(int argc, wchar_t **argv) {
     DWORD waited = WaitForMultipleObjects(2, wait, FALSE, INFINITE), exitCode = 125;
     CHECK(waited == WAIT_OBJECT_0 || waited == WAIT_OBJECT_0 + 1);
     if (waited == WAIT_OBJECT_0) CHECK(GetExitCodeProcess(process.hProcess, &exitCode));
+    if (exitCode == 0xc0000044UL) { // STATUS_QUOTA_EXCEEDED
+        FILETIME created, exited, kernel, user_time;
+        CHECK(GetProcessTimes(process.hProcess, &created, &exited, &kernel, &user_time));
+        unsigned long long ticks = ((unsigned long long)user_time.dwHighDateTime << 32) | user_time.dwLowDateTime;
+        fprintf(stderr, "Windows sandbox: quota exit user_100ns=%llu\n", ticks);
+    }
     DWORD cleanup_error = cleanup_owned(); // kills/reaps before deleting profile
     CloseHandle(parent);
     free(command); free(environment); free(executable); free(cwd);

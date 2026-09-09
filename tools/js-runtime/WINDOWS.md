@@ -30,11 +30,11 @@ mkdir -p target/js-runtime-windows
 x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -municode \
   tools/js-runtime/native/windows-launch.c \
   -o target/js-runtime-windows/gpui-sandbox-launch.exe \
-  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32
+  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32 -lshell32 -luuid
 x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -municode \
   -DGPUI_SANDBOX_PROBE tools/js-runtime/native/windows-launch.c \
   -o target/js-runtime-windows/windows-probe.exe \
-  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32
+  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32 -lshell32 -luuid
 ```
 
 Only the launcher ships, as `runtime/gpui-sandbox-launch.exe`. Packaging sets
@@ -65,6 +65,11 @@ The helper remaps original absolute package/runtime path arguments and
 each argument using Windows CRT rules. Debug's `--allow-inspector` stays before
 the worker. Relative imports continue to work; absolute host paths embedded
 inside package code do not become grants.
+Existing absolute arguments are expanded from 8.3 aliases before prefix matching;
+arguments outside both source roots retain their exact original spelling.
+Node preserves symlink paths for main and imported modules because the staged
+trees reject links. This avoids its realpath walk through denied host ancestors;
+it does not grant access to drive roots or user directories.
 
 Before launch, the helper applies protected ACLs recursively to the **copies
 only**: SYSTEM and the host user retain full access; one random AppContainer SID
@@ -82,7 +87,13 @@ of a filesystem/registry namespace with no backing state.
 The child receives an explicit environment containing only Windows directory
 variables, `NODE_NO_WARNINGS`, and the documented AppContainer bootstrap keys
 `LOCALAPPDATA`, `TEMP`, `TMP`. Those three are seeded from the new profile's
-API-derived path and its `Temp` child, never copied from host environment.
+`AC` directory and its `Temp` child, never copied from host environment.
+The profile root is bounded to the host's `FOLDERID_LocalAppData` plus
+`Packages/<fresh UUID moniker>`, verified absent before provisioning. Only that
+new root receives recursive ACL changes. The identity-dependent
+`GetAppContainerFolderPath` result is not authority for host-side ACL changes
+or post-deletion existence tests. Host LocalAppData and Packages ACLs are tested
+for exact preservation, including when the adversarial probe fails.
 The temp directory is created before applying the RX-only ACL; the native
 probe requires the resulting environment paths to remain inside the profile
 and rejects writes through all three. An explicit handle list
@@ -130,6 +141,19 @@ extract `--profile`/`--instance` values by flag: the former positional profile
 index accidentally selected `--`, corrupting teardown verification.
 
 ## Resource semantics and remaining differences
+
+Actual run [34406540756](https://github.com/fran0220/gpui-box/actions/runs/34406540756)
+at [8939172a](https://github.com/fran0220/gpui-box/commit/8939172a6c3ae1c18f0cb22c8989d14d280413f3)
+launched native payloads: committed-allocation refusal, helper-death teardown,
+and reparse rejection passed. It did **not** pass the Windows sandbox suite.
+The candidate now corrects short-path mapping and Node ancestor resolution;
+the CPU test expects native `STATUS_QUOTA_EXCEEDED`, with actual process user
+time accounting, instead of a Win32 error mapping. Invalid images can report
+193 or 216; they must still execute nothing and leave no profile. Environment
+write denial and profile removal assertions remain strict. Exact environment
+key/path/attributes and bounded profile-path diagnostics distinguish missing
+directories from access denials and actual leftovers from identity lookup errors.
+These corrections require a new native run; Linux compilation is not a pass.
 
 - The process and job each permit **256 MiB committed memory**, not 256 MiB
   virtual address space or resident memory. A failed allocation is refused;

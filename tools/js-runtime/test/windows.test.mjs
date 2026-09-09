@@ -94,7 +94,9 @@ test('Windows factory refuses execution on another OS', { skip: windows }, async
 test('native AppContainer blocks host reads, writes, network, spawning and leaked handles', nativeOptions, async t => {
   const { root, minimalRuntime, secret } = await fixture(t);
   assert.ok(process.env.GPUI_WINDOWS_SANDBOX_PROBE, 'build and set GPUI_WINDOWS_SANDBOX_PROBE');
-  const originals = [root, minimalRuntime, secret, process.env.GPUI_WINDOWS_SANDBOX_PROBE];
+  assert.ok(process.env.LOCALAPPDATA);
+  const originals = [root, minimalRuntime, secret, process.env.GPUI_WINDOWS_SANDBOX_PROBE,
+    process.env.LOCALAPPDATA, join(process.env.LOCALAPPDATA, 'Packages')];
   const originalAcls = originals.map(acl);
   const server = createServer(socket => { socket.destroy(); assert.fail('sandbox reached host listener'); });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
@@ -107,6 +109,7 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
     env: { ...process.env, GPUI_TEST_SECRET: 'must-not-inherit' },
   });
   const [code] = await run.closed;
+  assert.deepEqual(originals.map(acl), originalAcls, 'source and host profile-parent ACLs must remain unchanged');
   assert.equal(code, 0, run.output().stderr);
   assert.deepEqual(JSON.parse(run.output().stdout), {
     appcontainer: true, capabilities: 0, readonly: true, hostDenied: true,
@@ -137,7 +140,11 @@ test('native infinite loop is terminated by the 30-second user CPU budget', { ..
   const run = launch(t, config, ['spin', secret]);
   const [code] = await run.closed;
   assert.match(run.output().stdout, /spinning/);
-  assert.equal(code >>> 0, 0x718, `expected ERROR_NOT_ENOUGH_QUOTA, got ${code}: ${run.output().stderr}`);
+  // Job time-limit termination returns an NTSTATUS, not its Win32 mapping.
+  assert.equal(code >>> 0, 0xc0000044, `expected STATUS_QUOTA_EXCEEDED, got ${code}: ${run.output().stderr}`);
+  const accounting = /quota exit user_100ns=(\d+)/.exec(run.output().stderr);
+  assert.ok(accounting, run.output().stderr);
+  assert.ok(BigInt(accounting[1]) >= 300000000n, 'worker must receive its full 30-second user CPU budget');
 });
 
 test('Node runs with exact argument quoting, mapped read paths, clean environment and read-only package', nativeOptions, async t => {
@@ -246,7 +253,8 @@ test('failed image creation cleans its provisioned profile without executing a p
   await writeFile(join(option(config, '--instance'), 'worker.exe'), 'not a PE executable');
   const run = launch(t, config, []);
   assert.equal((await run.closed)[0], 125);
-  assert.match(run.output().stderr, /CreateProcessW failed \(193\)/);
+  // Loader revisions report BAD_EXE_FORMAT or EXE_MACHINE_TYPE_MISMATCH.
+  assert.match(run.output().stderr, /CreateProcessW failed \((193|216)\)/);
   assert.equal(run.output().stdout, '');
   assert.equal(profileExists(option(config, '--profile')), false);
 });

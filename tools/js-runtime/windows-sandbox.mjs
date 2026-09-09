@@ -61,6 +61,9 @@ export async function windowsSandbox(root, runtimeRoot, {
         '--profile', profile,
         '--',
         ...(node ? [
+          // Copies contain no links. Avoid Node realpath's ancestor lstat of
+          // host drive/user directories, which the AppContainer cannot read.
+          '--preserve-symlinks', '--preserve-symlinks-main',
           '--disable-wasm-trap-handler', '--max-old-space-size=64', '--permission',
           `--allow-fs-read=${sourceRoot}`, `--allow-fs-read=${sourceRuntime}`,
           '--disable-proto=throw',
