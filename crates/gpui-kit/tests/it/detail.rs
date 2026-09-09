@@ -13,6 +13,62 @@ type Calls = Rc<RefCell<Vec<String>>>;
 
 // ------------------------------------------------------------ settings rows
 
+#[cfg(feature = "fixtures")]
+#[gpui::test]
+fn settings_page_exhibit_sidebar_and_results_never_overlap(cx: &mut TestAppContext) {
+    for theme in ["studio-light", "studio-dark"] {
+        let scene = gpui_kit::scenes::find("settings-page").expect("settings page exhibit");
+        let mut harness = Harness::new(cx, gpui_kit::install, scene.build);
+        harness.update(|_, cx| assert!(gpui_kit_theme::activate_theme(theme, cx)));
+        for empty in [false, true] {
+            if empty {
+                harness.click("scene.settings-page.query.query");
+                harness.keystrokes("z z z z z");
+            }
+            let sidebar = harness
+                .node("scene.settings-page.categories")
+                .expect("actual Sidebar bounds")
+                .bounds;
+            let slot = harness
+                .node("scene.settings-page.list.sidebar")
+                .expect("sidebar slot bounds")
+                .bounds;
+            let selected = harness
+                .node("scene.settings-page.categories.all")
+                .expect("selected item bounds")
+                .bounds;
+            let results = harness.node("scene.settings-page.list").expect("results");
+            assert_eq!(
+                results.value.as_deref(),
+                Some(if empty { "0" } else { "4" })
+            );
+            assert!(sidebar.width > 0.0 && results.bounds.width > 0.0);
+            assert!(
+                sidebar.x + sidebar.width <= slot.x + slot.width + 0.5,
+                "{theme}: Sidebar must fit its allocation"
+            );
+            assert!(
+                sidebar.x + sidebar.width <= results.bounds.x,
+                "{theme}: actual Sidebar must not overlap results"
+            );
+            assert!(
+                selected.x + selected.width <= results.bounds.x,
+                "{theme}: selected background must not overlap results"
+            );
+            let target = if empty {
+                "scene.settings-page.list.empty"
+            } else {
+                "scene.settings-page.general"
+            };
+            let body = harness.node(target).expect("state-specific content").bounds;
+            assert!(
+                sidebar.x + sidebar.width <= body.x,
+                "{theme}: content starts after Sidebar"
+            );
+        }
+    }
+}
+
 #[gpui::test]
 fn settings_page_chrome_survives_no_matches_and_retains_layout(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {

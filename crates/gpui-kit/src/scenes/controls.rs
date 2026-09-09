@@ -1710,13 +1710,13 @@ pub(super) fn settings_page(window: &mut Window, cx: &mut App) -> AnyElement {
             })
             .slot("sidebar", move |_, _| {
                 let category = category.clone();
-                div().w(px(160.0)).child(Sidebar::new("scene.settings-page.categories")
+                Sidebar::new("scene.settings-page.categories")
                     .section(SidebarSection::new("sections").items([
                         SidebarItem::new("all", "All settings"), SidebarItem::new("general", "General"),
                         SidebarItem::new("appearance", "Appearance")]))
                     .active(selected.clone()).on_select(move |id, _, cx| category.update(cx, |value, cx| {
                         *value = id; cx.notify();
-                    }))).into_any_element()
+                    })).into_any_element()
             })
             .slot("footer", move |_, _| {
                 let search = search.clone();
