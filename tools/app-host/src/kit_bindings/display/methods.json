@@ -1,0 +1,94 @@
+{
+  "HighlightedText": {
+    "invoke": {},
+    "query": {
+      "published_hits": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000,
+          "integer": true
+        }
+      }
+    }
+  },
+  "Icon": {
+    "invoke": {},
+    "query": {
+      "resolved_size": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "min": 5e-324,
+          "max": 1000000
+        }
+      },
+      "resolved_color": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "object",
+          "fields": {
+            "h": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "s": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "l": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "a": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            }
+          },
+          "required": [
+            "h",
+            "s",
+            "l",
+            "a"
+          ]
+        }
+      },
+      "flips_in": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "direction": {
+              "enum": [
+                "ltr",
+                "rtl"
+              ]
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        },
+        "result": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

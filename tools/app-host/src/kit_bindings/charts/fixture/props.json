@@ -1,0 +1,523 @@
+{
+  "AreaChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "axes": {
+      "xLabel": "Day",
+      "yLabel": "Value",
+      "xStart": "Mon",
+      "xEnd": "Wed",
+      "yStart": "0",
+      "yEnd": "20"
+    },
+    "crosshair": true,
+    "current": {
+      "seriesId": "west",
+      "pointId": "tue"
+    }
+  },
+  "BarChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "axes": {
+      "xLabel": "Day",
+      "yLabel": "Value",
+      "xStart": "Mon",
+      "xEnd": "Wed",
+      "yStart": "0",
+      "yEnd": "20"
+    }
+  },
+  "CandlestickChart": {
+    "label": "OHLC",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "day",
+          "x": 0.3,
+          "open": 0.2,
+          "high": 0.9,
+          "low": 0.1,
+          "close": 0.7,
+          "label": "Tuesday",
+          "value": "7.1"
+        }
+      ]
+    },
+    "bodyWidth": 0.1
+  },
+  "ChartLegend": {
+    "series": [
+      {
+        "id": "west",
+        "label": "West",
+        "points": [
+          {
+            "id": "mon",
+            "x": 0.1,
+            "y": 0.2,
+            "label": "Monday",
+            "value": "2.1"
+          },
+          {
+            "id": "tue",
+            "x": 0.4,
+            "y": 0.85,
+            "label": "Tuesday",
+            "value": "17.3",
+            "weight": 0.4
+          },
+          {
+            "id": "wed",
+            "x": 0.9,
+            "y": 0.45,
+            "label": "Wednesday",
+            "value": "9.2"
+          }
+        ]
+      }
+    ]
+  },
+  "GaugeChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "LineChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "axes": {
+      "xLabel": "Day",
+      "yLabel": "Value",
+      "xStart": "Mon",
+      "xEnd": "Wed",
+      "yStart": "0",
+      "yEnd": "20"
+    },
+    "crosshair": true,
+    "smooth": true
+  },
+  "PieChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "donut": true
+  },
+  "Plot": {
+    "label": "Native paint",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "mark",
+          "label": "A",
+          "value": "12",
+          "bounds": {
+            "x": 0.1,
+            "y": 0.4,
+            "width": 0.2,
+            "height": 0.5
+          }
+        }
+      ]
+    },
+    "paint": [
+      {
+        "kind": "rect",
+        "bounds": {
+          "x": 0.1,
+          "y": 0.4,
+          "width": 0.2,
+          "height": 0.5
+        },
+        "tint": {
+          "h": 0.6,
+          "s": 0.7,
+          "l": 0.5,
+          "a": 1
+        }
+      },
+      {
+        "kind": "line",
+        "points": [
+          {
+            "x": 0.4,
+            "y": 0.8
+          },
+          {
+            "x": 0.8,
+            "y": 0.2
+          }
+        ],
+        "width": 2,
+        "tint": {
+          "h": 0.05,
+          "s": 0.7,
+          "l": 0.5,
+          "a": 1
+        }
+      }
+    ]
+  },
+  "RadarChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "SankeyChart": {
+    "label": "Traffic",
+    "state": {
+      "kind": "ready",
+      "data": {
+        "nodes": [
+          {
+            "id": "west",
+            "label": "West",
+            "value": "13",
+            "bounds": {
+              "x": 0,
+              "y": 0.1,
+              "width": 0.08,
+              "height": 0.6
+            }
+          },
+          {
+            "id": "east",
+            "label": "East",
+            "value": "13",
+            "bounds": {
+              "x": 0.9,
+              "y": 0.2,
+              "width": 0.08,
+              "height": 0.6
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "flow",
+            "source": "west",
+            "target": "east",
+            "label": "Traffic",
+            "value": "13",
+            "start": {
+              "x": 0.08,
+              "y": 0.4
+            },
+            "end": {
+              "x": 0.9,
+              "y": 0.5
+            },
+            "startWidth": 0.3,
+            "endWidth": 0.3
+          }
+        ]
+      }
+    }
+  },
+  "ScatterChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "axes": {
+      "xLabel": "Day",
+      "yLabel": "Value",
+      "xStart": "Mon",
+      "xEnd": "Wed",
+      "yStart": "0",
+      "yEnd": "20"
+    },
+    "crosshair": true
+  },
+  "Sparkline": {
+    "label": "Trend",
+    "state": {
+      "kind": "stale",
+      "reason": "Refresh failed",
+      "data": {
+        "points": [
+          {
+            "x": 0,
+            "y": 0.2
+          },
+          {
+            "x": 0.4,
+            "y": 0.9
+          },
+          {
+            "x": 1,
+            "y": 0.5
+          }
+        ],
+        "current": "9.2",
+        "minimum": "2.1",
+        "maximum": "17.3"
+      }
+    }
+  },
+  "StackedBarChart": {
+    "label": "Caller readings",
+    "state": {
+      "kind": "ready",
+      "data": [
+        {
+          "id": "west",
+          "label": "West",
+          "points": [
+            {
+              "id": "mon",
+              "x": 0.1,
+              "y": 0.2,
+              "label": "Monday",
+              "value": "2.1"
+            },
+            {
+              "id": "tue",
+              "x": 0.4,
+              "y": 0.85,
+              "label": "Tuesday",
+              "value": "17.3",
+              "weight": 0.4
+            },
+            {
+              "id": "wed",
+              "x": 0.9,
+              "y": 0.45,
+              "label": "Wednesday",
+              "value": "9.2"
+            }
+          ]
+        }
+      ]
+    },
+    "axes": {
+      "xLabel": "Day",
+      "yLabel": "Value",
+      "xStart": "Mon",
+      "xEnd": "Wed",
+      "yStart": "0",
+      "yEnd": "20"
+    }
+  }
+}

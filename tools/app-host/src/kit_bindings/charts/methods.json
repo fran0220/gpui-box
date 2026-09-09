@@ -1,0 +1,419 @@
+{
+  "Sparkline": {
+    "invoke": {},
+    "query": {
+      "published_points": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "min": 0,
+          "max": 1024,
+          "integer": true
+        }
+      }
+    }
+  },
+  "SankeyChart": {
+    "invoke": {},
+    "query": {
+      "layout": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "data": {
+              "type": "object",
+              "fields": {
+                "nodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "label": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "value": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "bounds": {
+                        "type": "object",
+                        "fields": {
+                          "x": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "y": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "width": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "height": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ]
+                      },
+                      "tint": {
+                        "type": "object",
+                        "fields": {
+                          "h": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "s": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "l": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "a": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          }
+                        },
+                        "required": [
+                          "h",
+                          "s",
+                          "l",
+                          "a"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "value",
+                      "bounds"
+                    ]
+                  },
+                  "max": 1024
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "source": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "target": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "label": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "value": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "start": {
+                        "type": "object",
+                        "fields": {
+                          "x": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "y": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y"
+                        ]
+                      },
+                      "end": {
+                        "type": "object",
+                        "fields": {
+                          "x": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "y": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y"
+                        ]
+                      },
+                      "startWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "endWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "tint": {
+                        "type": "object",
+                        "fields": {
+                          "h": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "s": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "l": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          },
+                          "a": {
+                            "type": "number",
+                            "min": 0,
+                            "max": 1
+                          }
+                        },
+                        "required": [
+                          "h",
+                          "s",
+                          "l",
+                          "a"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "source",
+                      "target",
+                      "label",
+                      "value",
+                      "start",
+                      "end",
+                      "startWidth",
+                      "endWidth"
+                    ]
+                  },
+                  "max": 1024
+                }
+              },
+              "required": [
+                "nodes",
+                "links"
+              ]
+            },
+            "weights": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000000
+              },
+              "max": 1024
+            },
+            "nodeWidth": {
+              "type": "number",
+              "min": 5e-324,
+              "max": 0.999999
+            },
+            "gap": {
+              "type": "number",
+              "min": 0,
+              "max": 0.999999
+            },
+            "alignment": {
+              "enum": [
+                "left",
+                "right",
+                "justify"
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "weights",
+            "nodeWidth",
+            "gap",
+            "alignment"
+          ]
+        },
+        "result": {
+          "type": "object",
+          "fields": {
+            "scale": {
+              "type": "number",
+              "min": 0,
+              "max": 1.7976931348623157e+308
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "bounds": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "width": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "height": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "width",
+                      "height"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "bounds"
+                ]
+              },
+              "max": 1024
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "start": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "end": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "startWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "endWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "start",
+                  "end",
+                  "startWidth",
+                  "endWidth"
+                ]
+              },
+              "max": 1024
+            }
+          },
+          "required": [
+            "scale",
+            "nodes",
+            "links"
+          ]
+        }
+      }
+    }
+  }
+}
