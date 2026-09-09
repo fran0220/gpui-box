@@ -1003,9 +1003,11 @@ styles already built by the caller, nor image pixels or inherited text styles.
 A descendant that reads `cx.theme().radius(Radius::Control)` inside that overlay
 must use that radius directly, without multiplying by viewport zoom again. A raw
 image built outside the overlay with a captured unscaled radius still needs its
-explicit zoom multiplication (or can rely on the thumbnail slot's own scaled
-Control-radius clipping). Moving that image into a render-time theme-reading
-component is what makes removing the caller multiplier correct.
+explicit zoom multiplication. Images must keep their own rounded style: GPUI's
+`overflow_hidden` content mask is rectangular, so the thumbnail wrapper's radius
+does not round its children. Moving an image into a render-time theme-reading
+component is what makes removing the caller multiplier correct, not removing
+the image's radius.
 
 ### A refusal is not an absence and not an error
 
