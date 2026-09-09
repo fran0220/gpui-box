@@ -136,8 +136,11 @@
     "surfaceColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["backdrop", "canvas", "sunken", "panel", "raised", "overlay", "scrim"],
+      "required": ["backdrop", "canvas", "sunken", "panel", "raised", "overlay", "scrim", "control", "controlHover", "controlPressed"],
       "properties": {
+        "control": { "$ref": "#/$defs/color" },
+        "controlHover": { "$ref": "#/$defs/color" },
+        "controlPressed": { "$ref": "#/$defs/color" },
         "backdrop": { "$ref": "#/$defs/color" },
         "canvas": { "$ref": "#/$defs/color" },
         "sunken": { "$ref": "#/$defs/color" },
@@ -165,6 +168,8 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "controlHairline",
+        "controlHighlight",
         "hover",
         "active",
         "selected",
@@ -179,6 +184,8 @@
         "whiteFillActive"
       ],
       "properties": {
+        "controlHairline": { "$ref": "#/$defs/color" },
+        "controlHighlight": { "$ref": "#/$defs/color" },
         "hover": { "$ref": "#/$defs/color" },
         "active": { "$ref": "#/$defs/color" },
         "selected": { "$ref": "#/$defs/color" },

@@ -234,11 +234,31 @@
       }
     },
     "paletteSteps": {
-      "filled": ["600", "500", "400"],
-      "hover": ["700", "600", "500"],
-      "active": ["800", "700", "600"],
-      "readableDark": ["300", "200", "400"],
-      "readableLight": ["700", "800", "600"]
+      "filled": [
+        "600",
+        "500",
+        "400"
+      ],
+      "hover": [
+        "700",
+        "600",
+        "500"
+      ],
+      "active": [
+        "800",
+        "700",
+        "600"
+      ],
+      "readableDark": [
+        "300",
+        "200",
+        "400"
+      ],
+      "readableLight": [
+        "700",
+        "800",
+        "600"
+      ]
     },
     "surface": {
       "backdrop": "{neutral.10}",
@@ -246,6 +266,9 @@
       "sunken": "{neutral.25}",
       "panel": "{neutral.100}",
       "raised": "{neutral.200}",
+      "control": "#fdf6e3",
+      "controlHover": "#fffdf6",
+      "controlPressed": "#f6efdb",
       "overlay": "{neutral.150}",
       "scrim": "{neutral.ink}"
     },
@@ -266,6 +289,8 @@
       "hairlineStrong": "{neutral.850}/8c",
       "track": "{neutral.850}/8c",
       "divider": "{neutral.850}/14",
+      "controlHairline": "#00000024",
+      "controlHighlight": "#ffffffcc",
       "focus": "#1b6fab",
       "primaryFill": "{neutral.800}",
       "whiteFill": "#ffffff",
@@ -680,7 +705,7 @@
   "effect": {
     "edgeFadeBand": 20,
     "focusRingWidth": 2,
-    "focusRingAlpha": 1.0,
+    "focusRingAlpha": 1,
     "glowAlpha": 0.18,
     "glowBlur": 12,
     "glowSpread": -5,
@@ -720,8 +745,8 @@
     "nodeOverviewVeilAlpha": 0.55,
     "nodeAuraRestingAlpha": 0.72,
     "nodeAuraPulseFloorAlpha": 0.54,
-    "nodeAuraPulsePeakAlpha": 1.0,
-    "nodeAuraSettlePeakAlpha": 1.0,
+    "nodeAuraPulsePeakAlpha": 1,
+    "nodeAuraSettlePeakAlpha": 1,
     "nodeAuraSettleExpansion": 0.65,
     "nodeEdgeHoverWidthScale": 1.8,
     "nodeEdgeSelectedWidthScale": 2.4,

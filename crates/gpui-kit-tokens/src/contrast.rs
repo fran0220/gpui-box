@@ -56,6 +56,38 @@ const CHART_SURFACES: [(&str, Surface); 3] = [
 /// Evaluates every required pair for one theme.
 pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     let mut checks = Vec::new();
+    for (name, value) in [
+        ("color.surface.control", &tokens.color.surface.control),
+        (
+            "color.surface.controlHover",
+            &tokens.color.surface.control_hover,
+        ),
+        (
+            "color.surface.controlPressed",
+            &tokens.color.surface.control_pressed,
+        ),
+    ] {
+        let background =
+            Color::resolve(name, value, &tokens.color.palette).expect("validated control color");
+        for (tone_name, tone, minimum) in [
+            ("color.text.primary", TextTone::Primary, TEXT_MINIMUM),
+            ("color.text.muted", TextTone::Muted, TEXT_MINIMUM),
+            (
+                "color.text.placeholder",
+                TextTone::Placeholder,
+                NON_TEXT_MINIMUM,
+            ),
+            ("color.text.disabled", TextTone::Disabled, NON_TEXT_MINIMUM),
+        ] {
+            checks.push(check(
+                tone_name,
+                tokens.text(tone),
+                name,
+                background,
+                minimum,
+            ));
+        }
+    }
     let surfaces = [
         ("color.surface.backdrop", Surface::Backdrop),
         ("color.surface.canvas", Surface::Canvas),
@@ -1085,8 +1117,12 @@ mod tests {
         // against each of the three surfaces a chart is drawn on, the ten
         // live canvas roles and the two stackings of an edge label,
         // `onAccent` against `accent`, and the primary fill against each of
-        // the six surfaces with its own label over it.
-        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 12 + 1 + 6 + 1);
+        // the six surfaces with its own label over it. Four text roles also
+        // cover the three in-content control fills.
+        assert_eq!(
+            checks.len(),
+            6 * 23 + 2 * 10 + 16 + 3 * 8 + 12 + 1 + 6 + 1 + 3 * 4
+        );
     }
 
     /// The primary fill is a role a theme owns, not the prose colour under a

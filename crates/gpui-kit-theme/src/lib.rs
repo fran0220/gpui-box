@@ -285,6 +285,12 @@ pub struct ThemeData {
 
 #[derive(Debug, Clone)]
 pub struct Colors {
+    /// Bordered in-content control material, never a backdrop glass surface.
+    pub control: Hsla,
+    pub control_hover: Hsla,
+    pub control_pressed: Hsla,
+    pub control_hairline: Hsla,
+    pub control_highlight: Hsla,
     /// Appearance-independent reading roles for Clear glass above media.
     pub on_media_foreground: Hsla,
     pub on_media_background: Hsla,
@@ -1021,6 +1027,23 @@ impl Theme {
             density,
             reduce_transparency: false,
             colors: Colors {
+                control: media_color("color.surface.control", &tokens.color.surface.control),
+                control_hover: media_color(
+                    "color.surface.controlHover",
+                    &tokens.color.surface.control_hover,
+                ),
+                control_pressed: media_color(
+                    "color.surface.controlPressed",
+                    &tokens.color.surface.control_pressed,
+                ),
+                control_hairline: media_color(
+                    "color.interactive.controlHairline",
+                    &tokens.color.interactive.control_hairline,
+                ),
+                control_highlight: media_color(
+                    "color.interactive.controlHighlight",
+                    &tokens.color.interactive.control_highlight,
+                ),
                 on_media_foreground: media_color(
                     "color.onMediaForeground",
                     &tokens.color.on_media_foreground,

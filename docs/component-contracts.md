@@ -11,6 +11,13 @@ Every component:
 5. remains independent of host services and product models;
 6. exposes a stable semantic target when it is actionable or assertable.
 
+In-content fields, bordered buttons and selection knobs share an opaque
+control fill, a quiet definition hairline and a top inset highlight. They do
+not use Liquid Glass. Hover and pressed fills belong to the same material;
+focus and invalidity are halos without layout changes. Selection is tonal,
+and rule/divider lines do not carry a 3:1 contrast requirement. Grouped
+settings contain aligned rows and inset rules rather than unrelated wells.
+
 ## Buttons
 
 `Button` supports Primary, Secondary, Ghost, Danger, and Link variants across

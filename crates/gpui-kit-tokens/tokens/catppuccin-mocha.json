@@ -234,11 +234,31 @@
       }
     },
     "paletteSteps": {
-      "filled": ["600", "500", "400"],
-      "hover": ["700", "600", "500"],
-      "active": ["800", "700", "600"],
-      "readableDark": ["300", "200", "400"],
-      "readableLight": ["700", "800", "600"]
+      "filled": [
+        "600",
+        "500",
+        "400"
+      ],
+      "hover": [
+        "700",
+        "600",
+        "500"
+      ],
+      "active": [
+        "800",
+        "700",
+        "600"
+      ],
+      "readableDark": [
+        "300",
+        "200",
+        "400"
+      ],
+      "readableLight": [
+        "700",
+        "800",
+        "600"
+      ]
     },
     "surface": {
       "backdrop": "{neutral.10}",
@@ -247,7 +267,10 @@
       "panel": "{neutral.100}",
       "raised": "{neutral.200}",
       "overlay": "{neutral.150}",
-      "scrim": "#272b45"
+      "scrim": "#272b45",
+      "control": "#333446",
+      "controlHover": "#353648",
+      "controlPressed": "#2c2d3e"
     },
     "text": {
       "primary": "{neutral.800}",
@@ -266,6 +289,8 @@
       "hairlineStrong": "{neutral.900}/66",
       "track": "{neutral.900}/66",
       "divider": "{neutral.900}/10",
+      "controlHairline": "#ffffff1a",
+      "controlHighlight": "#ffffff14",
       "focus": "#89b4fa",
       "primaryFill": "{neutral.800}",
       "whiteFill": "#ffffff",
@@ -720,8 +745,8 @@
     "nodeOverviewVeilAlpha": 0.55,
     "nodeAuraRestingAlpha": 0.72,
     "nodeAuraPulseFloorAlpha": 0.54,
-    "nodeAuraPulsePeakAlpha": 1.0,
-    "nodeAuraSettlePeakAlpha": 1.0,
+    "nodeAuraPulsePeakAlpha": 1,
+    "nodeAuraSettlePeakAlpha": 1,
     "nodeAuraSettleExpansion": 0.65,
     "nodeEdgeHoverWidthScale": 1.8,
     "nodeEdgeSelectedWidthScale": 2.4,

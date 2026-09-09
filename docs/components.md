@@ -20,6 +20,12 @@ component grows a literal a reader could read.
 
 ## Controls
 
+In-content controls share the token-backed control material: an opaque fill,
+quiet definition hairline and one-pixel top inset highlight. Focus/invalid
+states add halos; selection is tonal fill. Knobs reuse `Elevation::Raised`.
+This family is distinct from floating Liquid Glass surfaces. Small through
+medium action controls use `Radius::Control`; large controls use capsules.
+
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `Button` | builder | click | No handler is installed while disabled or loading |

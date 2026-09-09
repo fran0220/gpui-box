@@ -552,6 +552,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 10.87 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 5.11 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.63 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.21 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 10.41 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 4.89 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.47 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.07 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 12.79 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 6.01 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.26 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.77 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 16.79 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 7.89 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 6.30 | 3.0 |
@@ -1345,6 +1357,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 16.44 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 6.79 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 4.58 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.92 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 17.61 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 7.28 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 4.91 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 4.19 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 14.65 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 6.05 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.08 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.49 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 13.10 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 5.41 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 4.30 | 3.0 |
@@ -2138,6 +2162,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 8.44 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 5.48 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.69 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.11 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 8.19 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 5.32 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.58 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.02 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 9.36 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 6.08 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.09 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.45 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 12.97 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 8.42 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 6.64 | 3.0 |
@@ -2931,6 +2967,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 7.52 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 6.18 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 4.45 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.87 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 7.99 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 6.56 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 4.73 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 4.11 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 7.06 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 5.80 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.18 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.63 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 6.04 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 4.95 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 4.06 | 3.0 |
@@ -3724,6 +3772,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 8.46 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 7.22 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.87 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.18 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 8.07 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 6.89 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.69 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.03 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 9.59 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 8.18 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.39 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.60 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 14.18 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 12.09 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 7.96 | 3.0 |
@@ -4517,6 +4577,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 7.63 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 5.83 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.80 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.17 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 7.29 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 5.58 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.63 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.03 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 8.32 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 6.36 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.14 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.45 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 11.84 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 9.05 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 7.11 | 3.0 |
@@ -5310,6 +5382,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 8.84 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 7.07 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.67 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.12 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 8.58 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 6.86 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.56 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.03 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 9.14 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 7.31 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 3.79 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.23 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 12.33 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 9.86 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 6.09 | 3.0 |
@@ -6103,6 +6187,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 11.05 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 6.42 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.64 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.06 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 10.88 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 6.33 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.59 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.01 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 11.93 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 6.94 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 3.93 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.30 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 17.01 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 9.90 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 6.68 | 3.0 |
@@ -6896,6 +6992,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 6.81 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 5.59 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 3.76 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.12 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 6.62 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 5.43 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 3.66 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 3.04 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 7.29 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 5.98 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.02 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.34 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 10.62 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 8.71 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 7.15 | 3.0 |
@@ -7689,6 +7797,18 @@ Row stagger maximum items: `8`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.control` | 6.77 | 4.5 |
+| `color.text.muted` | `color.surface.control` | 5.97 | 4.5 |
+| `color.text.placeholder` | `color.surface.control` | 4.33 | 3.0 |
+| `color.text.disabled` | `color.surface.control` | 3.85 | 3.0 |
+| `color.text.primary` | `color.surface.controlHover` | 7.18 | 4.5 |
+| `color.text.muted` | `color.surface.controlHover` | 6.33 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlHover` | 4.59 | 3.0 |
+| `color.text.disabled` | `color.surface.controlHover` | 4.09 | 3.0 |
+| `color.text.primary` | `color.surface.controlPressed` | 6.36 | 4.5 |
+| `color.text.muted` | `color.surface.controlPressed` | 5.61 | 4.5 |
+| `color.text.placeholder` | `color.surface.controlPressed` | 4.07 | 3.0 |
+| `color.text.disabled` | `color.surface.controlPressed` | 3.62 | 3.0 |
 | `color.text.primary` | `color.surface.backdrop` | 5.43 | 4.5 |
 | `color.text.muted` | `color.surface.backdrop` | 4.79 | 4.5 |
 | `color.text.faint` | `color.surface.backdrop` | 4.08 | 3.0 |

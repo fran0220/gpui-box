@@ -1925,7 +1925,21 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 73] = [
+        let fixed: [(&'static str, &str); 78] = [
+            ("color.surface.control", &self.surface.control),
+            ("color.surface.controlHover", &self.surface.control_hover),
+            (
+                "color.surface.controlPressed",
+                &self.surface.control_pressed,
+            ),
+            (
+                "color.interactive.controlHairline",
+                &self.interactive.control_hairline,
+            ),
+            (
+                "color.interactive.controlHighlight",
+                &self.interactive.control_highlight,
+            ),
             ("color.onMediaForeground", &self.on_media_foreground),
             ("color.onMediaBackground", &self.on_media_background),
             ("color.onMediaHairline", &self.on_media_hairline),
@@ -2038,8 +2052,12 @@ impl ColorTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SurfaceColors {
+    /// In-content editable and actionable surfaces, outside the plane ladder.
+    pub control: String,
+    pub control_hover: String,
+    pub control_pressed: String,
     /// The substrate behind the page. A card can sit on it; a well cannot,
     /// which is why it is not compared to `sunken`.
     pub backdrop: String,
@@ -2074,6 +2092,8 @@ pub struct TextColors {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InteractiveColors {
+    pub control_hairline: String,
+    pub control_highlight: String,
     pub hover: String,
     pub active: String,
     pub selected: String,
@@ -2810,6 +2830,41 @@ mod tests {
         let ids: Vec<&str> = bundled().iter().map(|doc| doc.meta.id.as_str()).collect();
         assert_eq!(ids, vec!["studio-dark", "studio-light"]);
         assert_eq!(studio_light().meta.appearance, Appearance::Light);
+    }
+
+    #[test]
+    fn control_material_is_opaque_readable_and_quiet_in_every_theme() {
+        for tokens in bundled().into_iter().chain(presets()) {
+            let edge = tokens.resolved(
+                "control hairline",
+                &tokens.color.interactive.control_hairline,
+            );
+            for fill in [
+                &tokens.color.surface.control,
+                &tokens.color.surface.control_hover,
+                &tokens.color.surface.control_pressed,
+            ] {
+                let fill = tokens.resolved("control fill", fill);
+                assert_eq!(fill.alpha, 1.0, "{} must not use glass", tokens.meta.id);
+                let defined = over(edge, fill);
+                assert!(
+                    contrast_ratio(defined, fill) < 3.0,
+                    "{} definition is not an outline",
+                    tokens.meta.id
+                );
+                assert!(
+                    (defined.lightness() - fill.lightness()).abs() >= 1.5,
+                    "{} definition vanished",
+                    tokens.meta.id
+                );
+            }
+            for check in contrast::report(tokens)
+                .into_iter()
+                .filter(|check| check.background.starts_with("color.surface.control"))
+            {
+                assert!(check.passes(), "{}: {check:?}", tokens.meta.id);
+            }
+        }
     }
 
     #[test]

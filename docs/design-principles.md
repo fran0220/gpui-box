@@ -16,8 +16,7 @@ from surface, spacing, grouping, and elevation.
 
 ## A line says something a surface cannot
 
-Every line in the library is one of three things, and a component that draws a
-fourth is drawing decoration:
+Every line in the library has one of four meanings:
 
 - a **rule**, which divides content sharing one surface. It is
   [`foundation::rule`](../crates/gpui-kit/src/foundation/styled_ext.rs), a child
@@ -28,10 +27,23 @@ fourth is drawing decoration:
   gutter, a resize seam. These are `interactive.track` and
   `interactive.hairlineStrong`, and they carry the 3:1 non-text contrast the
   guidelines ask of a control boundary;
-- a **report** — focus, invalidity, a drop target, a refusal. These are borders,
-  in the colour of the thing being reported, and they are the reason a resting
-  control keeps a transparent border of the same width: becoming invalid must
-  not reflow the row.
+- a **report** — focus, invalidity, a drop target, a refusal. These are state
+  marks in the colour of the thing being reported. Fields use paint-only
+  halos; a border-based report reserves its width while resting. Becoming
+  invalid must not reflow the row;
+- **control definition** — an in-content editable or actionable surface has a
+  quiet `interactive.controlHairline`, an opaque `surface.control` fill one
+  tonal step from its container, and a one-pixel top inset highlight from
+  `interactive.controlHighlight`. This material says “this can be operated”;
+  it is not a high-contrast outline. The definition edge stays below 3:1.
+  Focus and invalidity remain paint-only halos, preserving resting geometry.
+
+Content controls do not use Liquid Glass. Glass belongs to floating controls
+and media captions. Raised selection knobs use `elevation.raised` shadows;
+their selection remains a tonal fill, not an accent-coloured label by default.
+Control radii are 8, grouped containers 12, and cards 12 or 16 logical pixels,
+resolved from tokens; the padding between nested shapes preserves concentric
+corners. Large action controls can use the capsule radius.
 
 A rule and a divider are decorative and deliberately do **not** carry 3:1. A
 theme whose hairline clears 3:1 against every surface has drawn an outline

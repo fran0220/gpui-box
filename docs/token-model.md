@@ -150,6 +150,15 @@ tokens check` applies the same contract to the bundled documents.
 
 ### Lines a pointer acts on, and lines that only divide
 
+In-content control definition is a separate material role:
+`color.surface.control`, `controlHover`, and `controlPressed` are opaque
+fills, with `color.interactive.controlHairline` below 3:1 and a one-pixel top
+inset `controlHighlight`. These are not plane-ladder surfaces and do not use
+backdrop glass. Labels retain their text contrast floors on every control
+state. Knobs reuse `elevation.raised` rather than introducing a duplicate
+`effect.controlKnobShadow` scale. Focus and invalidity add halos; selection
+remains tonal fill. Rules and dividers still do not carry the 3:1 floor.
+
 The 3:1 non-text floor asks whether a reader can find a boundary they have to
 aim at. It is the right question for `interactive.track` and
 `interactive.hairlineStrong` — a slider rail, a switch edge, a scrollbar gutter,
