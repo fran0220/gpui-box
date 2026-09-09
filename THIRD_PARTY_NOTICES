@@ -461,3 +461,7 @@ Stable measured/uniform row remapping, separate Kit geometry revisions, and
 native-unit per-axis nested wheel remainders are original GPUI Box modifications to the
 historically imported framework. No additional third-party source or license
 was introduced; all existing framework copyright notices remain in force.
+
+Single-pass accessible text word indexing and bounded bidi-run scanning are
+original GPUI Box work using the existing Unicode dependencies. Existing
+framework notices and the frozen import receipt remain unchanged.

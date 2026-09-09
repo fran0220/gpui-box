@@ -824,3 +824,10 @@ Metal command-buffer timing integration are original GPUI Box work over the
 existing local renderer packages. No source was ported and the frozen import
 receipt is unchanged. Normal rendering remains asynchronous. Completion waits,
 query readback and pixel capture are not GPU execution or display latency.
+
+### Accessible text indexing
+
+Accessible text word-boundary indexing and bounded bidi-run scanning are
+original GPUI Box modifications. They retain global Unicode segmentation
+across visual rows and AccessKit run limits; no new external source, platform
+API, or historical import receipt is introduced.

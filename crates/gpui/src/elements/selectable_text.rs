@@ -11,6 +11,7 @@ struct AccessibleRun<'a> {
     start_byte: usize,
     start_character: usize,
     character_lengths: Vec<u8>,
+    word_starts: Vec<u8>,
     line: usize,
     direction: accesskit::TextDirection,
 }
@@ -38,6 +39,25 @@ fn run_end_character(run: &AccessibleRun<'_>) -> usize {
     run.start_character + run.character_lengths.len()
 }
 
+// Segment the document once, rather than rescanning it for every published
+// run. Counting starts strictly before the word preserves prefix-grapheme
+// semantics even if a word boundary is inside an extended grapheme.
+fn indexed_word_starts(text: &str, graphemes: &[(usize, &str)]) -> (Vec<(usize, usize)>, usize) {
+    let mut character = 0;
+    let mut visited_bytes = 0;
+    let words = text
+        .unicode_word_indices()
+        .map(|(offset, _)| {
+            while character < graphemes.len() && graphemes[character].0 < offset {
+                visited_bytes += graphemes[character].1.len();
+                character += 1;
+            }
+            (offset, character)
+        })
+        .collect();
+    (words, visited_bytes)
+}
+
 fn accessible_runs<'a>(
     text: &'a str,
     visual_rows: &[Range<usize>],
@@ -49,6 +69,7 @@ fn accessible_runs<'a>(
             start_byte: 0,
             start_character: 0,
             character_lengths: Vec::new(),
+            word_starts: Vec::new(),
             line: 0,
             direction: fallback_direction,
         }];
@@ -69,6 +90,7 @@ fn accessible_runs<'a>(
         _ => Level::ltr(),
     });
     let bidi = BidiInfo::new(text, fallback_level);
+    let (words, _) = indexed_word_starts(text, &graphemes);
     let mut runs = Vec::new();
     for (line, row) in visual_rows.iter().enumerate() {
         let mut start =
@@ -81,12 +103,13 @@ fn accessible_runs<'a>(
             } else {
                 accesskit::TextDirection::LeftToRight
             };
-            let direction_end = graphemes[start + 1..row_end]
+            let limit = (start + MAX_ACCESSIBLE_RUN_CHARS).min(row_end);
+            let direction_end = graphemes[start + 1..limit]
                 .iter()
                 .position(|(offset, _)| bidi.levels[*offset].is_rtl() != level.is_rtl())
                 .map(|offset| start + offset + 1)
-                .unwrap_or(row_end);
-            let end = (start + MAX_ACCESSIBLE_RUN_CHARS).min(direction_end);
+                .unwrap_or(limit);
+            let end = direction_end;
             let start_byte = graphemes[start].0;
             let end_byte = graphemes
                 .get(end)
@@ -99,6 +122,11 @@ fn accessible_runs<'a>(
                 character_lengths: graphemes[start..end]
                     .iter()
                     .map(|(_, grapheme)| grapheme.len() as u8)
+                    .collect(),
+                word_starts: words[words.partition_point(|(offset, _)| *offset < start_byte)
+                    ..words.partition_point(|(offset, _)| *offset < end_byte)]
+                    .iter()
+                    .map(|(_, character)| (character - start) as u8)
                     .collect(),
                 line,
                 direction,
@@ -118,6 +146,7 @@ fn accessible_runs<'a>(
             start_byte: text.len(),
             start_character: graphemes.len(),
             character_lengths: Vec::new(),
+            word_starts: Vec::new(),
             line: visual_rows.len(),
             direction: fallback_direction,
         });
@@ -219,16 +248,8 @@ fn publish_accessible_text_inner(
         node.set_text_direction(accessible_run.direction);
         node.set_value(accessible_run.value);
         node.set_character_lengths(accessible_run.character_lengths.clone());
-        let run_end_byte = accessible_run.start_byte + accessible_run.value.len();
-        let word_starts = text
-            .unicode_word_indices()
-            .filter(|(offset, _)| accessible_run.start_byte <= *offset && *offset < run_end_byte)
-            .map(|(offset, _)| {
-                (text[..offset].graphemes(true).count() - accessible_run.start_character) as u8
-            })
-            .collect::<Vec<_>>();
-        if !word_starts.is_empty() {
-            node.set_word_starts(word_starts);
+        if !accessible_run.word_starts.is_empty() {
+            node.set_word_starts(accessible_run.word_starts.clone());
         }
         if let Some((bounds_for_range, scale)) = geometry {
             let mut positions = Vec::with_capacity(accessible_run.character_lengths.len());
@@ -365,6 +386,58 @@ pub fn byte_offset_for_published_position(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexed_words_preserve_global_boundaries_across_runs() {
+        for text in [
+            format!("{}tail e\u{301}👩‍💻 אבג123 abc\r\n界中文", "a".repeat(254)),
+            "can't a\u{301}b אבג DEF\nfoo_bar 12.34 ไทย".into(),
+        ] {
+            let mut rows = hard_rows(&text);
+            // A visual break inside a word must not invent a new word start.
+            rows.splice(0..1, [0..2, 2..rows[0].end]);
+            let runs = accessible_runs(&text, &rows, accesskit::TextDirection::LeftToRight);
+            for run in runs {
+                let expected = text
+                    .unicode_word_indices()
+                    .filter(|(offset, _)| {
+                        run.start_byte <= *offset && *offset < run.start_byte + run.value.len()
+                    })
+                    .map(|(offset, _)| {
+                        (text[..offset].graphemes(true).count() - run.start_character) as u8
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(run.word_starts, expected, "{}", run.value);
+            }
+        }
+    }
+
+    #[test]
+    fn large_accessible_word_index_visits_each_byte_at_most_once() {
+        for rows in [1000, 10000] {
+            let text = format!(
+                "[\n{}{{\"tail\":7}}\n]",
+                "{\"asymmetric\":\"界\",\"value\":13},\n".repeat(rows)
+            );
+            let graphemes = text.grapheme_indices(true).collect::<Vec<_>>();
+            let (words, visited_bytes) = indexed_word_starts(&text, &graphemes);
+            assert!(visited_bytes <= text.len());
+            assert_eq!(words.len(), rows * 4 + 2);
+            let runs = accessible_runs(
+                &text,
+                &hard_rows(&text),
+                accesskit::TextDirection::LeftToRight,
+            );
+            assert_eq!(
+                runs.iter().map(|run| run.word_starts.len()).sum::<usize>(),
+                words.len()
+            );
+            assert_eq!(
+                runs.iter().map(|run| run.value.len()).sum::<usize>(),
+                text.len()
+            );
+        }
+    }
 
     fn hard_rows(text: &str) -> Vec<Range<usize>> {
         let mut rows = Vec::new();

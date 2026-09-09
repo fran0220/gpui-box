@@ -541,3 +541,12 @@ last `set_value`, rather than shrinking when a shorter row enters the viewport.
 This deliberately permits trailing blank space after shortening the widest
 line; it avoids a horizontal jump while browsing and never pre-shapes unseen
 lines to discover their widths.
+
+Accessible text publication segments words once globally and indexes their
+grapheme positions once, retaining word starts across visual, bidi, and
+255-grapheme run boundaries. Bidi direction scans stop at the run limit.
+Publication still builds a full-document accessibility tree and copies its
+source snapshot: this removes quadratic segmentation, not all linear costs.
+The platform-independent tests include mixed Unicode and 1,000/10,000-row
+JSON fixtures with a byte-visit budget. Native accessibility adapter behavior
+is unchanged; macOS and Windows execution remains a separate validation lane.
