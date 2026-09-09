@@ -28,6 +28,8 @@ impl TextAreaElement {
 pub struct PrepaintState {
     layout: Option<EditableTextLayout>,
     source_text: gpui::SharedString,
+    rows: std::sync::Arc<[std::ops::Range<usize>]>,
+    indexed_rows: usize,
     cursors: Vec<PaintQuad>,
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
@@ -196,6 +198,19 @@ impl Element for TextAreaElement {
                 .max(0.0) as usize;
             layout.set_painted_rows(first..end);
         }
+        // Row topology and cell geometry must describe the same prepaint,
+        // including the first frame after an edit or wrap-width change.
+        let (rows, indexed_rows) = if area
+            .last_layout
+            .as_ref()
+            .is_some_and(|previous| layout.shares_row_index_with(previous))
+        {
+            (area.last_layout_rows.clone(), 0)
+        } else {
+            let rows: std::sync::Arc<[_]> = layout.visual_rows(&source_text).into();
+            let count = rows.len();
+            (rows, count)
+        };
         let accessible_geometry = text_edit::AccessibleTextGeometry::capture_ranges(
             source_text.clone(),
             window.scale_factor(),
@@ -207,7 +222,10 @@ impl Element for TextAreaElement {
         *area
             .accessible_geometry
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(super::AccessibleLayout {
+            geometry: accessible_geometry,
+            rows: area.line_projection.is_none().then(|| rows.clone()),
+        });
         let visible = layout.painted_source_ranges();
         let cursors = selections
             .iter()
@@ -242,6 +260,8 @@ impl Element for TextAreaElement {
         PrepaintState {
             layout: Some(layout),
             source_text,
+            rows,
+            indexed_rows,
             cursors,
             selection,
             scroll_offset,
@@ -311,6 +331,8 @@ impl Element for TextAreaElement {
                         prepaint.source_text.clone(),
                         bounds,
                         caret_width,
+                        prepaint.rows.clone(),
+                        prepaint.indexed_rows,
                     );
                     // Geometry and accessibility consumers need one
                     // corrective frame when shaped rows, bounds, or scrolling

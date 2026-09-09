@@ -498,10 +498,17 @@ pub struct TextArea {
     highlights: Vec<(Range<usize>, HighlightStyle)>,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
-    accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
+    accessible_geometry: Arc<Mutex<Option<AccessibleLayout>>>,
     accessible_cache: Arc<Mutex<gpui::AccessibleTextCache>>,
     /// Held so the focus listeners live as long as the area does.
     _subscriptions: Vec<Subscription>,
+}
+
+struct AccessibleLayout {
+    geometry: text_edit::AccessibleTextGeometry,
+    // Folded visual rows omit source. In that case the logical full-source
+    // rows captured by render remain authoritative for native text.
+    rows: Option<Arc<[Range<usize>]>>,
 }
 
 impl TextArea {
@@ -1385,23 +1392,12 @@ impl TextArea {
         text: SharedString,
         bounds: Bounds<Pixels>,
         caret_width: Pixels,
+        rows: Arc<[Range<usize>]>,
+        indexed_rows: usize,
     ) -> bool {
-        let same_index = self
-            .last_layout
-            .as_ref()
-            .is_some_and(|previous| layout.shares_row_index_with(previous));
-        let rows_changed = if same_index {
-            false
-        } else {
-            let rows = layout.visual_rows(&text);
-            self.row_index_work += rows.len();
-            if self.last_layout_rows.as_ref() == rows {
-                false
-            } else {
-                self.last_layout_rows = rows.into();
-                true
-            }
-        };
+        self.row_index_work += indexed_rows;
+        let rows_changed = self.last_layout_rows != rows;
+        self.last_layout_rows = rows;
         let changed =
             self.last_layout_text != text || self.last_bounds != Some(bounds) || rows_changed;
         self.last_layout = Some(layout);
@@ -2442,9 +2438,13 @@ impl Render for TextArea {
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
                     .take();
-                let geometry = geometry
+                let current = geometry
                     .as_ref()
-                    .filter(|geometry| geometry.matches(&content));
+                    .filter(|current| current.geometry.matches(&content));
+                let rows = current
+                    .and_then(|current| current.rows.as_deref())
+                    .unwrap_or(&accessible_rows);
+                let geometry = current.map(|current| &current.geometry);
                 let snapshot = accessible_cache
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -2454,7 +2454,7 @@ impl Render for TextArea {
                         anchor,
                         focus,
                         accessible_direction,
-                        &accessible_rows,
+                        rows,
                         accessibility_revision,
                         geometry
                             .map_or_else(Vec::new, |geometry| geometry.visible_ranges().to_vec()),

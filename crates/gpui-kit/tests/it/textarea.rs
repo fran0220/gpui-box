@@ -56,6 +56,14 @@ fn mounted_soft_wrap_retains_shape_on_scroll_and_rewraps_one_edited_paragraph(
                 })
             );
             assert_eq!(entity.read(cx).wrapped_index_work(), count + 1);
+            let work = entity.read(cx).accessibility_work();
+            assert_eq!(work.segmented_bytes, paragraph.len() + 2, "{work:?}");
+            assert!(work.published_runs < 32, "{work:?}");
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let work = entity.read(cx).accessibility_work();
+            assert_eq!(work.segmented_bytes, 0, "{work:?}");
+            assert_eq!(work.published_runs, 0, "{work:?}");
         });
     }
 }

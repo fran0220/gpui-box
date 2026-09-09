@@ -1197,13 +1197,36 @@ accessibility cell geometry captures only paintable bytes. Shaping budgets
 measure actual input bytes and lines (`EditableTextWork`), not allocation
 counts. Dense and lazy Unicode/bidi geometry are compared directly.
 
-This is not a claim of bounded total editor frame or edit work: whole-value
-events and semantic values still require contiguous snapshots, logical
-accessibility publication and row enumeration remain document-wide, and
-soft-wrap still uses full-document layout. A very long visible hard line is
-shaped whole. Those remaining paths must be migrated before advertising a
-viewport-bounded large-file editor; multicursor, folding and caller language
-services are not implied by this foundation.
+TextArea `Change` and Editor `Changed` carry persistent `EditSnapshot` values;
+subscribers opt into contiguous whole-document text with `snapshot.text()`.
+The internal Editor subscription preserves the snapshot rather than forcing
+legacy string materialization. This is an API migration for consumers that
+previously accepted strings. `painted_lines()` returns owned shared lines;
+new event variants and work-counter fields also require consumers with
+exhaustive matches or struct literals to migrate.
+
+Soft-wrap retains exact paragraph shapes across revisions and viewport changes.
+Cold layout and font/width reflow shape all paragraphs; a local edit reshapes
+the changed paragraph, but rebuilds document-wide wrapped and row indexes.
+Warm scrolling reuses both shapes and indexes. Accessibility receives rows
+from that same prepaint, avoiding a hard-row to wrapped-row topology reset
+after an edit. Folded layouts retain full-source accessibility rows, including
+hidden text. Mounted tests distinguish first-edit publication from the next
+settled draw rather than hiding rebuild work behind a warm frame.
+
+Static native parents retain complete Value, and identical visible TextRuns
+are reused. Row arrays and grapheme representability are revision-keyed.
+These caches do not bound total frame or edit work: stock native tree metadata,
+changed selection/value publication, explicit full-value queries, and source
+snapshot materialization still have document-sized costs. A very long visible
+hard line or wrapped paragraph is shaped whole. No native Value/AXValue is
+omitted to meet a budget, and no local AccessKit fork is assumed.
+
+Multicursor/rectangle edits, source folding, and caller-owned language services
+have their own behavior tests and exhibits; their presence does not establish
+a viewport-bounded large-file editor. Shaping, parser, row-index and publication
+counters report their named work only, not total allocations or native backend
+costs. Linux headless evidence does not replace the native platform lanes.
 
 ## Native browser engines remain independent of Kit
 
