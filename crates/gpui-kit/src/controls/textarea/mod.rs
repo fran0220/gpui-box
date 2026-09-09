@@ -469,6 +469,9 @@ pub struct TextArea {
     visible_rows: usize,
     scroll_offset: Pixels,
     horizontal_scroll_offset: Pixels,
+    reveal_caret: bool,
+    scroll_dirty: bool,
+    known_text_width: Pixels,
     /// The horizontal position vertical motion aims for, so a run of up or
     /// down keys through a short line does not drag the caret leftwards.
     goal_x: Option<Pixels>,
@@ -531,6 +534,9 @@ impl TextArea {
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
             horizontal_scroll_offset: px(0.0),
+            reveal_caret: true,
+            scroll_dirty: false,
+            known_text_width: px(0.0),
             goal_x: None,
             is_selecting: false,
             last_layout: None,
@@ -778,6 +784,7 @@ impl TextArea {
         }
         self.scroll_offset = px(0.0);
         self.horizontal_scroll_offset = px(0.0);
+        self.known_text_width = px(0.0);
         self.goal_x = None;
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
@@ -961,6 +968,37 @@ impl TextArea {
         self.scroll_offset
     }
 
+    fn scroll_wheel(
+        &mut self,
+        event: &gpui::ScrollWheelEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (Some(layout), Some(bounds)) = (&self.last_layout, self.last_bounds) else {
+            return;
+        };
+        let line_height = layout.line_height();
+        let delta = event.delta.pixel_delta(line_height);
+        let before = point(self.horizontal_scroll_offset, self.scroll_offset);
+        let max_x = match self.wrap {
+            TextAreaWrap::Soft => px(0.0),
+            TextAreaWrap::None => (self.known_text_width - bounds.size.width).max(px(0.0)),
+        };
+        let max_y = (layout.height() - bounds.size.height).max(px(0.0));
+        self.horizontal_scroll_offset = (before.x - delta.x).clamp(px(0.0), max_x);
+        self.scroll_offset = (before.y - delta.y).clamp(px(0.0), max_y);
+        let consumed = point(
+            before.x - self.horizontal_scroll_offset,
+            before.y - self.scroll_offset,
+        );
+        if consumed != point(px(0.0), px(0.0)) {
+            self.reveal_caret = false;
+            self.scroll_dirty = true;
+            window.consume_scroll_delta(consumed, line_height, cx);
+            cx.notify();
+        }
+    }
+
     pub(crate) fn source_viewport(
         &self,
         line_height: Pixels,
@@ -973,10 +1011,10 @@ impl TextArea {
             .scroll_offset
             .max(px(0.0))
             .min((height - viewport_height).max(px(0.0)));
-        if caret_y < scroll {
+        if self.reveal_caret && caret_y < scroll {
             scroll = caret_y;
         }
-        if caret_y + line_height > scroll + viewport_height {
+        if self.reveal_caret && caret_y + line_height > scroll + viewport_height {
             scroll = caret_y + line_height - viewport_height;
         }
         let first = (scroll / line_height).floor() as usize;
@@ -1183,6 +1221,7 @@ impl TextArea {
     }
 
     fn record_edit(&mut self, before: &str, cx: &mut Context<Self>) {
+        self.reveal_caret = true;
         let after = self.edit.text();
         let (replaced, inserted) = replacement_between(before, after);
         let inserted = SharedString::from(inserted.to_owned());
@@ -1195,7 +1234,12 @@ impl TextArea {
         }));
     }
 
-    fn emit_selection_if_changed(&self, selection_before: Range<usize>, cx: &mut Context<Self>) {
+    fn emit_selection_if_changed(
+        &mut self,
+        selection_before: Range<usize>,
+        cx: &mut Context<Self>,
+    ) {
+        self.reveal_caret = true;
         let selection = self.edit.selection();
         if selection != selection_before {
             cx.emit(TextAreaEvent::SelectionChanged(selection));
@@ -1798,7 +1842,9 @@ impl Render for TextArea {
                 },
             )
             .when(!self.disabled, |element| {
-                element.track_focus(&self.focus_handle)
+                element
+                    .track_focus(&self.focus_handle)
+                    .on_scroll_wheel(cx.listener(Self::scroll_wheel))
             })
             .when(!self.disabled && !self.read_only, |element| {
                 element

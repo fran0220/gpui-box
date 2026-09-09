@@ -14,6 +14,30 @@ use unicode_segmentation::UnicodeSegmentation;
 /// wraps onto several visual rows.
 const WIDTH: f32 = 200.0;
 
+#[gpui::test]
+fn read_only_soft_wrap_can_browse_without_revealing_the_caret(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| {
+        area.text("first words wrap onto another visual line; then more words follow.\nsecond paragraph continues across several narrow rows.")
+            .rows(2)
+            .read_only(true)
+    });
+    let entity = slot.borrow().clone().expect("area");
+    harness.update(|_, cx| {
+        entity.update(cx, |area, cx| area.set_selected_range(0..0, cx));
+    });
+    let before = harness.update(|_, cx| entity.read(cx).caret_bounds().expect("caret"));
+    harness.scroll("form.notes", 31.0);
+    harness.frame();
+    harness.update(|_, cx| {
+        let area = entity.read(cx);
+        assert_eq!(area.cursor_offset(), 0);
+        assert_eq!(
+            area.caret_bounds().expect("caret").top(),
+            before.top() - px(31.0)
+        );
+    });
+}
+
 /// Opens a window holding one text area, and hands back the entity so a test
 /// can read the committed value the way an owning view would.
 fn area(

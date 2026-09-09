@@ -152,19 +152,24 @@ impl Element for TextAreaElement {
             layout.total_rows().clamp(min_rows, max_rows)
         };
 
-        // Long text scrolls under a fixed frame, so the caret stays visible
-        // instead of being painted outside the control.
-        let scroll_offset = layout.scroll_offset_to_reveal(
-            cursor,
-            bounds.size.height,
-            self.area.read(cx).scroll_offset(),
-        );
+        // Browsing does not move or reveal the caret. Only explicit editing
+        // and selection/navigation intent asks this frame to reveal it.
+        let scroll_offset = if area.reveal_caret {
+            layout.scroll_offset_to_reveal(cursor, bounds.size.height, area.scroll_offset())
+        } else {
+            area.scroll_offset()
+                .clamp(px(0.0), (layout.height() - bounds.size.height).max(px(0.0)))
+        };
         let horizontal_scroll_offset = match wrap {
             TextAreaWrap::Soft => px(0.0),
-            TextAreaWrap::None => layout.horizontal_scroll_offset_to_reveal(
+            TextAreaWrap::None if area.reveal_caret => layout.horizontal_scroll_offset_to_reveal(
                 cursor,
                 bounds.size.width,
-                self.area.read(cx).horizontal_scroll_offset(),
+                area.horizontal_scroll_offset(),
+            ),
+            TextAreaWrap::None => area.horizontal_scroll_offset().clamp(
+                px(0.0),
+                (area.known_text_width.max(layout.text_width()) - bounds.size.width).max(px(0.0)),
             ),
         };
 
@@ -184,7 +189,13 @@ impl Element for TextAreaElement {
             .accessible_geometry
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
-        let cursor = (selected.is_empty()).then(|| {
+        let caret_paintable = wrap == TextAreaWrap::Soft
+            || empty
+            || layout
+                .painted_source_ranges()
+                .iter()
+                .any(|range| range.start <= cursor && cursor <= range.end);
+        let cursor = (selected.is_empty() && caret_paintable).then(|| {
             fill(
                 layout.caret_bounds(cursor, origin, px(theme.measures.caret_width)),
                 theme.colors.accent,
@@ -255,9 +266,12 @@ impl Element for TextAreaElement {
                 let caret_width = px(cx.theme().measures.caret_width);
                 self.area.update(cx, |area, cx| {
                     let grew = area.visible_rows() != visible_rows;
-                    let scroll_changed = area.scroll_offset() != scroll_offset;
+                    let scroll_changed = area.scroll_dirty || area.scroll_offset() != scroll_offset;
                     let horizontal_scroll_changed =
                         area.horizontal_scroll_offset() != horizontal_scroll_offset;
+                    area.scroll_dirty = false;
+                    area.reveal_caret = false;
+                    area.known_text_width = area.known_text_width.max(layout.text_width());
                     area.set_visible_rows(visible_rows);
                     area.set_scroll_offset(scroll_offset);
                     area.set_horizontal_scroll_offset(horizontal_scroll_offset);

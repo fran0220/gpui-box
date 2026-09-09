@@ -3,12 +3,187 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gpui::{
-    AppContext as _, Entity, HighlightStyle, IntoElement, TestAppContext, div, prelude::*, px,
+    AppContext as _, Entity, HighlightStyle, InputEvent as _, IntoElement, Modifiers, ScrollDelta,
+    ScrollWheelEvent, TestAppContext, TouchPhase, div, point, prelude::*, px,
 };
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
+
+#[gpui::test]
+fn wheel_returns_unused_native_axes_to_the_parent(cx: &mut TestAppContext) {
+    let slot = EditorSlot::default();
+    let build_slot = slot.clone();
+    let residuals = Rc::new(RefCell::new(Vec::new()));
+    let seen = residuals.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let entity = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    Editor::new(
+                        "source",
+                        "Source",
+                        "one\ntwo\nthree\nfour\nfive\nsix\nseven",
+                        window,
+                        cx,
+                    )
+                    .rows(2)
+                })
+            })
+            .clone();
+        let seen = seen.clone();
+        div()
+            .w(px(420.0))
+            .h(px(280.0))
+            .on_scroll_wheel(move |event, _, _| {
+                let ScrollDelta::Lines(delta) = event.delta else {
+                    panic!("residual must retain native line units");
+                };
+                seen.borrow_mut().push(delta);
+            })
+            .child(entity)
+            .into_any_element()
+    });
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().clone();
+        area.update(cx, |area, cx| area.set_selected_range(0..0, cx));
+    });
+    let at = harness.bounds("source.input").expect("bounds").center();
+    let line_height = harness.update(|_, cx| {
+        let geometry = entity.read(cx).geometry(cx).expect("geometry");
+        let line_height = geometry.lines[0].bounds.size.height;
+        assert_eq!(geometry.lines.len(), 7);
+        assert!(
+            geometry.viewport.size.height < line_height * 7.0,
+            "{geometry:?}"
+        );
+        assert!(
+            geometry.viewport.contains(&at),
+            "event {at:?}, viewport {geometry:?}"
+        );
+        line_height
+    });
+    // Vertical motion fits; the editor has no horizontal overflow. A parent
+    // must receive all three native horizontal units and none of the two Y.
+    harness.update(|window, cx| {
+        window.dispatch_event(
+            ScrollWheelEvent {
+                position: at,
+                delta: ScrollDelta::Lines(point(-3.0, -2.0)),
+                modifiers: Modifiers::none(),
+                touch_phase: TouchPhase::Moved,
+            }
+            .to_platform_input(),
+            cx,
+        );
+    });
+    assert_eq!(*residuals.borrow(), vec![point(-3.0, 0.0)]);
+    residuals.borrow_mut().clear();
+    harness.update(|window, cx| {
+        assert_eq!(
+            entity
+                .read(cx)
+                .geometry(cx)
+                .expect("geometry")
+                .vertical_scroll,
+            line_height * 2.0
+        );
+        // Returning past the top consumes exactly two units, leaving three.
+        window.dispatch_event(
+            ScrollWheelEvent {
+                position: at,
+                delta: ScrollDelta::Lines(point(1.0, 5.0)),
+                modifiers: Modifiers::none(),
+                touch_phase: TouchPhase::Moved,
+            }
+            .to_platform_input(),
+            cx,
+        );
+    });
+    assert_eq!(*residuals.borrow(), vec![point(1.0, 3.0)]);
+    harness.update(|_, cx| {
+        assert_eq!(
+            entity
+                .read(cx)
+                .geometry(cx)
+                .expect("geometry")
+                .vertical_scroll,
+            px(0.0)
+        );
+    });
+}
+
+#[gpui::test]
+fn wheel_browses_independently_and_preserves_horizontal_width(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "", |editor| editor.rows(3));
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            editor.set_value(
+                format!("{}\n{}", "wide ".repeat(60), "short\n".repeat(80)),
+                cx,
+            );
+        });
+    });
+    harness.click("source.input");
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-home"
+    } else {
+        "ctrl-home"
+    });
+    let at = harness.bounds("source.input").expect("bounds").center();
+    harness.update(|window, cx| {
+        window.dispatch_event(
+            ScrollWheelEvent {
+                position: at,
+                delta: ScrollDelta::Pixels(point(px(-37.0), px(-83.0))),
+                modifiers: Modifiers::none(),
+                touch_phase: TouchPhase::Moved,
+            }
+            .to_platform_input(),
+            cx,
+        );
+    });
+    harness.frame();
+    harness.frame();
+    harness.update(|_, cx| {
+        let editor = entity.read(cx);
+        let geometry = editor.geometry(cx).expect("geometry");
+        assert_eq!(geometry.horizontal_scroll, px(37.0));
+        assert_eq!(geometry.vertical_scroll, px(83.0));
+        let area = editor.text_area().read(cx);
+        assert_eq!(area.cursor_offset(), 0, "wheel must not move the caret");
+        assert!(
+            area.shaping_work().expect("layout").shaped_lines <= 4,
+            "offscreen caret must not demand another shaped row"
+        );
+    });
+    harness.keystrokes("right");
+    harness.update(|_, cx| {
+        let editor = entity.read(cx);
+        let geometry = editor.geometry(cx).expect("geometry");
+        assert_eq!(
+            geometry.vertical_scroll,
+            px(0.0),
+            "navigation reveals again"
+        );
+        assert!(geometry.horizontal_scroll < px(37.0));
+        assert_eq!(editor.text_area().read(cx).cursor_offset(), 1);
+    });
+    harness.scroll("source.input", 91.0);
+    harness.keystrokes("x");
+    harness.update(|_, cx| {
+        let editor = entity.read(cx);
+        assert_eq!(
+            editor.geometry(cx).expect("geometry").vertical_scroll,
+            px(0.0)
+        );
+        assert!(editor.snapshot(cx).text.starts_with("wxide"));
+    });
+}
 
 #[cfg(feature = "syntax")]
 #[gpui::test]

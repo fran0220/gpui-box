@@ -528,3 +528,16 @@ passes; macOS compilation and both platforms' interactive browser validation
 remain required. This is not native Wayland parity. See [webview.md](webview.md)
 for the XWayland product route, unsupported composition operations, permission
 policy constraints and exact reproduction commands.
+
+## Editable viewport browsing
+
+TextArea/Editor wheel and touchpad input can leave the caret offscreen.
+Only editing and explicit selection/navigation reveal it again. Read-only
+areas remain scrollable; disabled areas do not install a wheel handler.
+Consumption uses `Window::consume_scroll_delta`, including independent axes,
+partial-edge remainders and native line units, without swallowing overshoot.
+The no-wrap horizontal extent retains the maximum width measured since the
+last `set_value`, rather than shrinking when a shorter row enters the viewport.
+This deliberately permits trailing blank space after shortening the widest
+line; it avoids a horizontal jump while browsing and never pre-shapes unseen
+lines to discover their widths.
