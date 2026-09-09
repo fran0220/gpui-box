@@ -2,6 +2,7 @@
 import { iconSchema } from './kit-icon-schema.mjs';
 import { menuItemsSchema, validateMenuItems } from './kit-overlay-schema.mjs';
 import { selectOptionSchema } from './kit-select-option-schema.mjs';
+import { dragItemSchema } from './kit-drag-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { ...string, min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -64,6 +65,8 @@ const serviceResult={oneOf:[object({state:choice('idle','loading','empty'),attem
 const mentionCandidate=object({id:identity,label:string,description:string,replacement:string,searchTerms:array(string),refusal:string},['id','label']);
 const mentionSuggestions={oneOf:[object({state:choice('idle','loading','empty'),attempts:integer},['state']),object({state:choice('ready','refreshing'),value:array(mentionCandidate),attempts:integer},['state','value']),object({state:choice('error','unavailable'),reason:string,value:array(mentionCandidate),attempts:integer},['state','reason'])]};
 const mentionQuery={...object({text:string,range:byteRange},['text','range']),nullable:true};
+const uploadState={oneOf:[object({state:choice('queued','done','cancelled')},['state']),object({state:choice('uploading'),fraction:{...unit,nullable:true}},['state','fraction']),object({state:choice('failed','refused'),reason:string},['state','reason'])]};
+const uploadItem=object({id:identity,name:string,size:string,state:uploadState},['id','name','state']);
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -83,6 +86,8 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  Dropzone:{props:object({disabled:boolean,invalid:boolean,label:string,hint:string,refusal:string,accepts:array(string),icon:iconSchema,state:choice('idle','accepting','refusing')},['label']),events:{drop:dragItemSchema,filesRefused:object({state:choice('unavailable'),reason:string},['state','reason'])}},
+  UploadList:{props:object({...common,uploads:array(uploadItem),showOverall:boolean}),events:{retry:identity,cancel:identity,remove:identity},slots:['dropzone','empty']},
   MentionInput:{props:object({disabled:boolean,readOnly:boolean,value:string,placeholder:string,rows:rowCount,suggestions:mentionSuggestions}),events:{changed:string,submitted:choice(null),cancelled:choice(null),focused:choice(null),blurred:choice(null),pasteRefused:pasteRefusal,queryChanged:mentionQuery,accepted:object({id:identity,range:byteRange},['id','range'])}},
   Editor:{props:object({disabled:boolean,readOnly:boolean,label:string,value:string,rows:rowCount,lineNumbers:boolean,languageServices:boolean}),events:{changed:string,edited:textEdit,selectionChanged:byteRange,foldChanged:object({id:identity,collapsed:boolean},['id','collapsed']),pasteRefused:pasteRefusal,submitted:choice(null),cancelled:choice(null),focused:choice(null),blurred:choice(null),serviceRequested:editorRequest,serviceAccepted:identity,definitionRequested:object({target:identity,range:byteRange},['target','range']),codeActionRequested:identity}},
   TextArea:{props:object(textAreaProps),events:textAreaEvents},
@@ -116,6 +121,7 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  UploadList:{invoke:{},query:{overall:method({},{oneOf:[object({state:choice('known'),fraction:unit},['state','fraction']),object({state:choice('indeterminate','settled')},['state'])]})}},
   MentionInput:{invoke:{set_suggestions:method({suggestions:mentionSuggestions},choice(null))},query:{editor:method({},object({$nativeRef:identity,type:choice('TextArea')},['$nativeRef','type'])),active_query:method({},mentionQuery),is_open:method({},boolean)}},
   Editor:{invoke:{
     set_diagnostics:method({revision:integer,diagnostics:array(object({id:identity,range:byteRange,message:string,severity:choice('error','warning','information','hint')},['id','range','message','severity']))},boolean),

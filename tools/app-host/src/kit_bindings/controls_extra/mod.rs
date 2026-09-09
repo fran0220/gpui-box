@@ -25,6 +25,9 @@ mod recorder;
 mod search;
 mod selection;
 mod text_area;
+mod upload;
+
+pub(super) use upload::constructed as upload_list;
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -61,6 +64,8 @@ pub(super) const COMPONENTS: &[&str] = &[
     "TextArea",
     "Editor",
     "MentionInput",
+    "Dropzone",
+    "UploadList",
 ];
 
 pub(super) fn settings_section(
@@ -501,6 +506,8 @@ impl State {
         emit: Emit,
     ) -> AnyElement {
         match node.component.as_deref() {
+            Some("Dropzone") => return upload::dropzone(node, emit).into_any_element(),
+            Some("UploadList") => return upload::list(node, slots, emit).into_any_element(),
             Some("MentionInput") => return self.render_mention(node, window, cx, emit),
             Some("Editor") => return self.render_editor(node, window, cx, emit),
             Some("TextArea") => return self.render_text_area(node, window, cx, emit),
@@ -625,6 +632,7 @@ impl State {
         cx: &mut App,
     ) -> anyhow::Result<Value> {
         match node.component.as_deref() {
+            Some("UploadList") if query && method == "overall" => return Ok(upload::overall(node)),
             Some("MentionInput") => return self.invoke_mention(node, method, args, query, cx),
             Some("Editor") => return self.invoke_editor(node, method, args, query, _window, cx),
             Some("TextArea") => {

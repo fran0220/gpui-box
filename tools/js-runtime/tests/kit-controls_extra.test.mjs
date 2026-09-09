@@ -8,6 +8,16 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('uploads preserve unknown progress and refuse invented external file authority',()=>{
+ for(const state of [{state:'queued'},{state:'done'},{state:'cancelled'},{state:'uploading',fraction:null},{state:'uploading',fraction:0.2},{state:'failed',reason:'Failed'},{state:'refused',reason:'Policy'}])validateValue({uploads:[{id:'a',name:'Caller fixture',state}]},familySchemas.UploadList.props);
+ for(const state of [{state:'uploading'},{state:'uploading',fraction:1.1},{state:'failed'},{state:'refused',fraction:0}])assert.throws(()=>validateValue({uploads:[{id:'a',name:'Caller fixture',state}]},familySchemas.UploadList.props));
+ validateValue({state:'indeterminate'},familyMethods.UploadList.query.overall.result);
+ assert.throws(()=>validateValue({state:'indeterminate',fraction:0},familyMethods.UploadList.query.overall.result));
+ validateValue({id:'row',source:'list',label:'Fixture',kind:'row',icon:null},familySchemas.Dropzone.events.drop);
+ assert.throws(()=>validateValue({id:'row',source:'list',label:'Fixture',kind:'row',icon:null,path:'/private'},familySchemas.Dropzone.events.drop));
+ assert.throws(()=>validateValue({label:'Drop',readFiles:true},familySchemas.Dropzone.props));
+});
+
 test('mentions keep retained candidate values on failure and expose only native editor refs',()=>{
  const candidate={id:'user',label:'Caller fixture',replacement:'@fixture',searchTerms:['alias'],refusal:'Policy'};
  for(const state of ['ready','refreshing'])validateValue({suggestions:{state,value:[candidate]}},familyMethods.MentionInput.invoke.set_suggestions.args);
@@ -287,6 +297,12 @@ kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remov
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
 kit.TextArea('area',{wrap:'none',autosize:{min:2,max:5}},{edited(edit){const inserted:string=edit.inserted;},change(text){const full:string=text;}});
 kit.Editor('editor',{languageServices:true},{serviceRequested(request){const full:string=request.document;}});
+const zone=kit.Dropzone('zone',{label:'Drop',accepts:['row']},{drop(item){const key:string=item.id;}});
+kit.UploadList('uploads',{uploads:[{id:'pending',name:'Pending',state:{state:'uploading',fraction:null}}]}, {retry(id){const key:string=id;}},{dropzone:[zone]});
+// @ts-expect-error dropzone requires an actual typed Dropzone descriptor
+kit.UploadList('bad',{}, {},{dropzone:[kit.Button('button')]});
+// @ts-expect-error host paths are not passed to the worker
+kit.Dropzone('bad',{label:'Drop'},{filesRefused(event:{paths:string[]}) {}});
 kit.MentionInput('mention',{suggestions:{state:'refreshing',value:[{id:'x',label:'X',replacement:'@x'}]}},{changed(text){const value:string=text;},accepted(event){const id:string=event.id;}});
 // @ts-expect-error native mention change is a complete string, not lazy snapshot metadata
 kit.MentionInput('bad',{}, {changed(value:{revision:number}) {}});

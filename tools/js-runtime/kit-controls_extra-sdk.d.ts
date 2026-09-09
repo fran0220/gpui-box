@@ -1,4 +1,4 @@
-import type { ControlProps, KitNode, SlotNode, SelectOption, KitMethodContracts } from './kit-sdk.js';
+import type { ControlProps, KitNode, SlotNode, SelectOption, KitMethodContracts, KitDragItem } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
 import type { MenuItemDescriptor } from './kit-overlay-sdk.js';
 import type { NativeRef } from './reference-sdk.js';
@@ -35,6 +35,8 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  Dropzone(id:string,props:{label:string;disabled?:boolean;invalid?:boolean;hint?:string;refusal?:string;accepts?:string[];icon?:BuiltinIconDescriptor;state?:'idle'|'accepting'|'refusing'},events?:{drop?(item:KitDragItem):void;filesRefused?(refusal:{state:'unavailable';reason:string}):void}):Omit<KitNode,'component'> & {component:'Dropzone'};
+  UploadList(id:string,props?:ControlProps & {showOverall?:boolean;uploads?:{id:string;name:string;size?:string;state:{state:'queued'|'done'|'cancelled'}|{state:'uploading';fraction:number|null}|{state:'failed'|'refused';reason:string}}[]},events?:{retry?(id:string):void;cancel?(id:string):void;remove?(id:string):void},slots?:{dropzone?:[Omit<KitNode,'component'> & {component:'Dropzone'}];empty?:SlotNode[]}):KitNode;
   MentionInput(id:string,props?:{disabled?:boolean;readOnly?:boolean;value?:string;placeholder?:string;rows?:number;suggestions?:KitMethodContracts['MentionInput']['invoke']['set_suggestions']['args']['suggestions']},events?:{changed?(text:string):void;submitted?():void;cancelled?():void;focused?():void;blurred?():void;pasteRefused?(refusal:PasteRefusal):void;queryChanged?(query:{text:string;range:ByteRange}|null):void;accepted?(value:{id:string;range:ByteRange}):void}):KitNode;
   Editor(id:string,props?:EditorProps,events?:EditorEvents):KitNode;
   TextArea(id:string,props?:TextAreaProps,events?:TextAreaEvents):KitNode;
@@ -95,6 +97,7 @@ interface OptionCommands {
 }
 interface SelectionQueries extends FocusQueries {is_disabled:SelectionQuery<boolean>}
 export interface ControlsExtraMethodContracts {
+  UploadList: KitMethodContracts['UploadList'];
   MentionInput: KitMethodContracts['MentionInput'];
   Editor: KitMethodContracts['Editor'];
   TextArea:{invoke:{
