@@ -1,8 +1,8 @@
-# Standalone native app host (stage 1)
+# Standalone native app host
 
 The Rust package renders JS-created trees with this repository's local GPUI and
 Kit. No component depends back on the host, runtime or plugins. No WebView is used.
-This is a runnable first stage, **not full Kit binding or platform security parity**.
+This is a runnable partial implementation, **not full Kit binding or platform security parity**.
 
 ## Run
 
@@ -65,6 +65,27 @@ replacement, with bounded input/output queues. JS state/events use script genera
 and render revision; native identities are derived from declared semantic IDs,
 never array positions. Plugin panels/commands are namespaced by plugin identity.
 Permissions are host-owned controls in the supervisor, not plugin-provided prompts.
+
+`gpui.invoke(target, method, args)` and `gpui.query(target, method, args)` return
+Promises for explicitly implemented native methods. A target is a typed Kit node
+or `{id, component}` matching a mounted descriptor; names and named JSON arguments
+come from the adapter's closed schemas. No Rust object, closure, arbitrary method
+lookup, or focus-based routing crosses the process boundary. Native execution uses
+the target generation's EffectOwner and cannot create a trusted clipboard gesture.
+Commands refuse disabled native controls even if their descriptor still says enabled;
+queries may read them.
+
+Each worker permits 32 pending native requests with three-second deadlines.
+Responses correlate request ID, generation and revision; rerender and disposal
+cancel pending Promises, and stale responses cannot resolve a replacement request.
+Cancellation is not rollback: an already dispatched setter may have executed.
+Use quiet setters when a subsequent query must complete before an event-driven
+rerender. Results are bounded JSON, validated by the native method schema.
+
+Lazy lists and overlays receive reusable host-owned factories over validated slot
+descriptors. Each call constructs fresh elements without holding the retained-state
+map borrow. Factories retain only a weak state handle and reject expired render
+revisions; dropping the Host invalidates factories and revokes clipboard grants.
 
 ```sh
 node --test tools/js-runtime/test/*.test.mjs tools/plugin-platform/test/*.test.mjs tools/app-host/test/*.test.mjs

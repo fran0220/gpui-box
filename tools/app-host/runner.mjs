@@ -20,6 +20,7 @@ const platform = new PluginPlatform(resolve(data, 'plugins'));
 let app, appFrame, status = 'Loading app…', error = '', revision = 0, callbacks = new Map();
 let plugins = [], closing = false, busy = false, pendingReload = false;
 const panels = new Map(), permissions = new Map();
+let nativeTargets = new Map();
 let watcher, debounce, debugServer, lastView;
 const output = message => {
   if (process.stdout.writableLength > MAX_MESSAGE) { void shutdown(); return; }
@@ -45,6 +46,9 @@ function copyTree(node, owner, session, frame) {
   }
   if (node.children) copied.children = node.children.map(child => copyTree(child, owner, session, frame));
   if (node.kind === 'kit') {
+    const key = `${session.generation}:${node.id}`;
+    const targets = nativeTargets.get(key) ?? [];
+    targets.push({ id, component: node.component }); nativeTargets.set(key, targets);
     copied.events = {};
     if (!node.props.disabled) for (const [name, action] of Object.entries(node.events)) {
       const routed = `${id}:event:${name}`;
@@ -62,6 +66,7 @@ function find(tree, id) {
 function render() {
   if (closing) return;
   callbacks = new Map();
+  nativeTargets = new Map();
   const children = [text('host.title', 'GPUI Box · Native JavaScript app'), text('host.status', status)];
   if (error) children.push(text('host.error', `Error (last verified view retained): ${error.slice(0, 2000)}`));
   children.push(button('host.reload', 'Reload app', () => reload()));
@@ -122,6 +127,17 @@ function decide(key, allow) {
 function clearPermissions(session) {
   for (const [key, permission] of permissions) if (permission.session === session) permissions.delete(key);
 }
+function invokeNative(session, request) {
+  const active = session === app || [...platform.active.values()].some(plugin => plugin.session === session);
+  const targets = nativeTargets.get(`${session.generation}:${request.target.id}`) ?? [];
+  if (!active || targets.length !== 1 || targets[0].component !== request.target.component) {
+    session.finishNative(request.id, request.revision, null, 'Native target is inactive, invisible, or ambiguous');
+    return;
+  }
+  output({ kind: 'invoke', id: request.id, instance: session.generation, revision,
+    workerRevision: request.revision, target: targets[0].id, component: request.target.component,
+    mode: request.mode, method: request.method, args: request.args, deadline: request.deadline });
+}
 function diagnose(message) { error = message; process.stderr.write(message.slice(0, 16384) + '\n'); render(); }
 async function refreshPlugins() { plugins = await platform.discover(); render(); }
 platform.on('changed', () => {
@@ -130,6 +146,10 @@ platform.on('changed', () => {
   void refreshPlugins().catch(e => diagnose(e.message));
 });
 platform.on('diagnostic', message => diagnose(`${message.id}: ${message.message}`));
+platform.on('invoke', ({ plugin, request }) => {
+  const session = platform.active.get(plugin)?.session;
+  if (session?.generation === request.generation) invokeNative(session, request);
+});
 platform.on('render', frame => { panels.set(frame.id, frame); render(); });
 platform.on('permission', ({ id, capability, generation }) => {
   const session = platform.active.get(id)?.session;
@@ -149,6 +169,7 @@ async function reload() {
     candidate.on('error', message => diagnose(message.message));
     candidate.on('fault', message => diagnose(message.message));
     candidate.on('log', message => process.stderr.write(`[app ${candidate.generation}] ${message.message}\n`));
+    candidate.on('invoke', request => invokeNative(candidate, request));
     candidate.on('permission', ({ capability }) => prompt(manifest.id, candidate, capability));
     candidate.on('exit', ({ expected }) => {
       clearPermissions(candidate);
@@ -180,6 +201,11 @@ readFrames(process.stdin, message => {
     const callback = callbacks.get(message.action);
     Promise.resolve().then(() => callback?.(validatePayload(message.payload ?? null))).catch(e => diagnose(e.message));
   } else if (message.kind === 'key') platform.key(message.key);
+  else if (message.kind === 'native-response') {
+    const session = [app, ...[...platform.active.values()].map(active => active.session)]
+      .find(session => session && !session.closed && session.generation === message.instance);
+    session?.finishNative(message.id, message.workerRevision, message.value, message.error);
+  }
   else if (message.kind === 'native-permission' && ['clipboard.read', 'clipboard.write'].includes(message.capability)) {
     const session = [app, ...[...platform.active.values()].map(active => active.session)]
       .find(session => session && !session.closed && session.generation === message.instance);

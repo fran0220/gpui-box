@@ -3,6 +3,7 @@ import { inspect } from 'node:util';
 import { validateTree } from './tree.mjs';
 import { readFrames, encodeFrame, validatePayload } from './wire.mjs';
 import { createKitBindings } from './kit-bindings.mjs';
+import { invocationTarget } from './invocation.mjs';
 import inspector from 'node:inspector';
 
 const generation = Number(process.argv[3]);
@@ -14,6 +15,8 @@ let sequence = 0;
 const handlers = new Map();
 const commands = new Map();
 const pending = new Map();
+const nativeCalls = new Map();
+let tree;
 const cleanups = [];
 let debuggerSession;
 const report = (error) => send({ kind: 'error', message: String(error?.stack ?? error).slice(0, 16384) });
@@ -23,9 +26,23 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
 function render() {
   if (disposed || !mounted) return;
   handlers.clear();
-  const tree = mounted();
-  validateTree(tree);
+  const next = mounted();
+  validateTree(next);
+  tree = next;
+  for (const call of nativeCalls.values()) call.reject(new Error('Native request cancelled by render revision change'));
+  nativeCalls.clear();
   send({ kind: 'render', revision: ++revision, tree });
+}
+async function invoke(target, method, args = {}, mode = 'invoke') {
+  if (disposed) throw new Error('Session disposed');
+  invocationTarget(tree, target, method, args, mode);
+  if (nativeCalls.size >= 32) throw new Error('Native request limit exceeded');
+  return new Promise((resolve, reject) => {
+    const id = ++sequence;
+    const timer = setTimeout(() => { nativeCalls.delete(id); reject(new Error('Native request timed out')); }, 3000);
+    nativeCalls.set(id, { revision, resolve(value) { clearTimeout(timer); resolve(value); }, reject(error) { clearTimeout(timer); reject(error); } });
+    send({ kind: 'invoke', id, revision, target: { id: target.id, component: target.component }, method, args, mode });
+  });
 }
 function request(capability, args) {
   if (disposed) return Promise.reject(new Error('Session disposed'));
@@ -37,6 +54,8 @@ function request(capability, args) {
   });
 }
 globalThis.gpui = Object.freeze({
+  invoke: (target, method, args) => invoke(target, method, args),
+  query: (target, method, args) => invoke(target, method, args, 'query'),
   kit: createKitBindings((id, event, handler) => {
     const action = `${id}:${event}`;
     if (handlers.has(action)) throw new Error('Duplicate Kit event identity');
@@ -77,6 +96,13 @@ readFrames(process.stdin, async message => {
       const call = pending.get(message.id);
       pending.delete(message.id);
       if (message.error) call?.reject(new Error(message.error)); else call?.resolve(message.value);
+    } else if (message.kind === 'native-response') {
+      const call = nativeCalls.get(message.id);
+      if (!call) return;
+      nativeCalls.delete(message.id);
+      if (message.revision !== call.revision || revision !== call.revision) call.reject(new Error('Stale native response'));
+      else if (message.error) call.reject(new Error(message.error));
+      else call.resolve(validatePayload(message.value));
     } else if (message.kind === 'debug-evaluate') {
       if (process.argv[4] !== 'debug') throw new Error('Debugger not enabled');
       if (typeof message.expression !== 'string' || message.expression.length > 16384) throw new Error('Debug request exceeds limit');
@@ -90,6 +116,8 @@ readFrames(process.stdin, async message => {
       clearInterval(heartbeat);
       for (const call of pending.values()) call.reject(new Error('Session disposed'));
       pending.clear();
+      for (const call of nativeCalls.values()) call.reject(new Error('Session disposed'));
+      nativeCalls.clear();
       debuggerSession?.disconnect();
       for (const cleanup of cleanups.reverse()) { try { await cleanup(); } catch (error) { report(error); } }
       send({ kind: 'disposed' });

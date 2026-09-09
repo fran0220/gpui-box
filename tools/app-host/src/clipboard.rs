@@ -17,7 +17,7 @@ pub(super) struct Grants {
     pub write: bool,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct Policy {
     owners: HashMap<u64, EffectOwner>,
     access: Rc<RefCell<HashMap<EffectOwner, (u64, Grants)>>>,
@@ -39,6 +39,9 @@ impl Policy {
     }
     pub(super) fn owner(&self, instance: u64) -> Option<EffectOwner> {
         self.owners.get(&instance).copied()
+    }
+    pub(super) fn revoke(&self) {
+        self.access.borrow_mut().clear();
     }
     pub(super) fn reconcile(&mut self, root: &Node, grants: &BTreeMap<u64, Grants>) {
         fn visit(node: &Node, live: &mut HashSet<u64>) {
@@ -145,6 +148,12 @@ mod tests {
                     Some("allowed")
                 )
             })
+        });
+        policy.revoke();
+        cx.update(|cx| {
+            cx.with_effect_owner(Some(current), |cx| {
+                assert!(cx.try_read_from_clipboard().is_err());
+            });
         });
     }
 }

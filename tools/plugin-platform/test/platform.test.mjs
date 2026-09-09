@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, writeFile, truncate } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { PluginPlatform, validateBundle, validateManifest, safePath } from '../platform.mjs';
+import { PluginPlatform, validateBundle, validateManifest, safePath, bundleDirectory } from '../platform.mjs';
 
 const manifest = (id = 'example', version = '1.0.0') => ({ schema: 1, id, version, entry: 'main.mjs', permissions: [], dependencies: {}, contributes: { commands: [{ id: 'add', title: 'Add' }], keymaps: [{ key: 'ctrl-j', command: 'add' }], panels: [{ id: 'panel', title: 'Example panel' }] } });
 const source = `const n = gpui.state(5); gpui.command('add', () => n.set(x => x + 2)); gpui.mount(() => gpui.text('panel', n.get()));`;
@@ -85,7 +85,8 @@ test('plugin crash removes only its own contribution; peer survives', async t =>
 
 test('malicious manifest and bundle paths are rejected before any install write', async t => {
   const p = await platform(t);
-  for (const path of ['../escape', '/absolute', 'C:\\escape', 'a/../../escape', 'a//b', '.receipt.json', 'a/./b']) assert.throws(() => safePath(path), /Invalid bundle path/);
+  for (const path of ['../escape', '/absolute', 'C:\\escape', 'a/../../escape', 'a//b', '.receipt.json', 'a/./b', 'NUL.txt', 'dir/COM1.mjs', 'aux.js', 'module.']) assert.throws(() => safePath(path), /Invalid bundle path/);
+  assert.equal(safePath('console.mjs'), 'console.mjs');
   for (const patch of [{ id: '../escape' }, { version: '1.0.0/../../escape' }, { permissions: ['everything'] }, { extra: true }, { dependencies: { other: '^1.0.0' } }]) {
     assert.throws(() => validateManifest({ ...manifest(), ...patch }));
   }
@@ -96,6 +97,14 @@ test('malicious manifest and bundle paths are rejected before any install write'
   assert.throws(() => validateBundle(corrupted), /integrity/);
   await p.install(bundle(manifest('constructor')));
   assert.equal((await p.discover())[0].id, 'constructor');
+});
+
+test('packaging bounds source files before allocating their contents', async t => {
+  const p = await platform(t);
+  const path = resolve(p.root, 'main.mjs');
+  await writeFile(path, '');
+  await truncate(path, 4 * 1024 * 1024 + 1);
+  await assert.rejects(bundleDirectory(p.root, manifest()), /Bundle source exceeds/);
 });
 
 test('immutable versions cannot overwrite known-good code', async t => {

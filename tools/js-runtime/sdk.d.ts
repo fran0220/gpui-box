@@ -1,9 +1,11 @@
-import type { KitAPI, KitNode } from './kit-sdk.js';
+import type { KitAPI, KitNode, KitInvoke, KitQuery } from './kit-sdk.js';
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
 export type Node = KitNode | { kind: 'column' | 'row' | 'text' | 'button'; id: string; text?: string; children?: Node[]; disabled?: boolean; action?: string };
 export interface State<T> { get(): T; set(value: T | ((previous: T) => T)): void }
 export interface GPUI {
   readonly kit: Readonly<KitAPI>;
+  readonly invoke: KitInvoke;
+  readonly query: KitQuery;
   mount(view: () => Node): void;
   state<T>(initial: T): State<T>;
   column(id: string, children: Node[]): Node;

@@ -12,7 +12,7 @@ function object(value, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !keys.includes(k))) throw new Error('Invalid manifest fields');
 }
 export function safePath(path) {
-  if (typeof path !== 'string' || path.length > 240 || !/^[a-zA-Z0-9_./-]+$/.test(path) || path.split('/').some(p => !p || p === '.' || p === '..' || p.startsWith('.')))
+  if (typeof path !== 'string' || path.length > 240 || !/^[a-zA-Z0-9_./-]+$/.test(path) || path.split('/').some(p => !p || p === '.' || p === '..' || p.startsWith('.') || p.endsWith('.') || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p)))
     throw new Error('Invalid bundle path');
   return path;
 }
@@ -61,6 +61,7 @@ export function validateBundle(bundle) {
 export async function bundleDirectory(root, manifest) {
   validateManifest(manifest);
   const files = {};
+  let bytes = 0, count = 0;
   async function visit(path = '') {
     for (const name of (await readdir(resolve(root, path))).sort()) {
       if (name.startsWith('.') || name === 'node_modules') continue;
@@ -68,7 +69,11 @@ export async function bundleDirectory(root, manifest) {
       const stat = await lstat(resolve(root, relative));
       if (stat.isSymbolicLink()) throw new Error('Symlinks are not allowed in bundles');
       if (stat.isDirectory()) await visit(relative);
-      else if (stat.isFile()) files[relative] = await readFile(resolve(root, relative), 'utf8');
+      else if (stat.isFile()) {
+        bytes += stat.size;
+        if (++count > 256 || bytes > 4 * 1024 * 1024) throw new Error('Bundle source exceeds file or byte limit');
+        files[relative] = await readFile(resolve(root, relative), 'utf8');
+      }
       else throw new Error('Only regular files are allowed in bundles');
     }
   }
@@ -167,6 +172,10 @@ export class PluginPlatform extends EventEmitter {
     session.on('fault', message => this.emit('diagnostic', { id, ...message }));
     let activated = false;
     session.on('render', message => { if (activated) this.emit('render', { id, ...message }); });
+    session.on('invoke', request => {
+      if (activated && this.listenerCount('invoke')) this.emit('invoke', { plugin: id, request });
+      else session.finishNative(request.id, request.revision, null, 'Native invocation unavailable during activation or without a native host');
+    });
     session.on('permission', message => {
       if (activated) this.emit('permission', { id, generation: session.generation, ...message });
       else session.decide(message.capability, false); // Activation cannot silently acquire capabilities.

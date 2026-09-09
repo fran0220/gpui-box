@@ -6,6 +6,14 @@ const root = new URL('../../', import.meta.url);
 const catalog = JSON.parse(await readFile(new URL('docs/api-index.json', root), 'utf8'));
 const names = new Set(catalog.components.map(component => component.name));
 for (const name of Object.keys(bindings)) if (!names.has(name)) throw new Error(`Binding has no Kit authority: ${name}`);
+for (const component of catalog.components) {
+  const signatures = ['construct', 'options', 'commands', 'queries'].flatMap(key => component[key] ?? []);
+  for (const methods of Object.values(bindings[component.name]?.nativeMethods ?? {})) {
+    for (const name of Object.keys(methods)) {
+      if (!signatures.some(signature => signature.startsWith(`${name}(`))) throw new Error(`Native binding has no Rust method authority: ${component.name}.${name}`);
+    }
+  }
+}
 const components = catalog.components.map(component => ({
   name: component.name,
   source: component.source,

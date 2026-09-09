@@ -38,6 +38,7 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
             Host {
                 bridge,
                 frame,
+                rendered_revision: Default::default(),
                 focus,
                 error: None,
                 kit: Default::default(),
@@ -83,10 +84,36 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                 cx,
             );
         })?;
-        std::thread::sleep(Duration::from_millis(500));
+        // Keep the native request/response pump alive while an isolated callback
+        // awaits a native query, rather than sleeping with requests queued.
+        let mut received = false;
+        for _ in 0..50 {
+            cx.update(|cx| {
+                handle.update(cx, |host, window, cx| {
+                    while let Ok(frame) = host.bridge.incoming.try_recv() {
+                        host.frame = Some(frame?);
+                        received = true;
+                        cx.notify();
+                    }
+                    if host
+                        .frame
+                        .as_ref()
+                        .is_some_and(|frame| frame.revision == host.rendered_revision.get())
+                    {
+                        while let Ok(request) = host.bridge.requests.try_recv() {
+                            host.invoke_request(request, window, cx);
+                        }
+                    }
+                    Ok::<_, anyhow::Error>(())
+                })
+            })??;
+            cx.run_until_parked();
+            cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))?;
+            std::thread::sleep(Duration::from_millis(10));
+        }
         cx.update(|cx| {
             handle.update(cx, |host, _, cx| {
-                let mut changed = false;
+                let mut changed = received;
                 while let Ok(next) = host.bridge.incoming.try_recv() {
                     host.frame = Some(next?);
                     changed = true;
@@ -95,7 +122,11 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                 if let Ok(expected) = std::env::var("GPUI_CAPTURE_EXPECT") {
                     fn contains(node: &Node, expected: &str) -> bool {
                         node.text == expected
-                            || node.children.iter().any(|child| contains(child, expected))
+                            || node
+                                .children
+                                .iter()
+                                .chain(node.slots.values().flatten())
+                                .any(|child| contains(child, expected))
                     }
                     ensure!(
                         host.frame

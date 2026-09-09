@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { validateTree } from './tree.mjs';
 import { createSandbox, nativeBackend } from './sandbox.mjs';
 import { readFrames, encodeFrame, MAX_MESSAGE, validatePayload } from './wire.mjs';
+import { invocationTarget } from './invocation.mjs';
 
 const runtimeRoot = dirname(fileURLToPath(import.meta.url));
 let nextGeneration = 0;
@@ -37,6 +38,7 @@ export class Session extends EventEmitter {
     this.debugRequests = new Map();
     this.debugSequence = 0;
     this.operations = new Set();
+    this.nativeRequests = new Map();
   }
   start() {
     if (this.starting || this.child || this.closed) return Promise.reject(new Error('Session cannot be started twice'));
@@ -97,9 +99,11 @@ export class Session extends EventEmitter {
         if (message.kind === 'render') {
           validateTree(message.tree);
           if (!Number.isSafeInteger(message.revision) || message.revision <= this.revision) throw new Error('Invalid revision');
+          this.cancelNative('Native request cancelled by render revision change');
           this.revision = message.revision;
           this.tree = message.tree;
         }
+        if (message.kind === 'invoke') { this.handleNative(message); return; }
         if (message.kind === 'request') { void this.handleRequest(message); return; }
         if (!['render', 'ready', 'log', 'error', 'disposed'].includes(message.kind)) throw new Error('Unknown worker message');
         this.emit(message.kind, message);
@@ -125,6 +129,31 @@ export class Session extends EventEmitter {
     return true;
   }
   command(command) { this.send({ kind: 'command', command }); }
+  handleNative(message) {
+    const { id, revision, target, method, args, mode } = message;
+    const reject = error => this.send({ kind: 'native-response', id, revision, error: error.message.slice(0, 2048) });
+    try {
+      if (!Number.isSafeInteger(id) || id <= 0 || this.nativeRequests.has(id) || this.nativeRequests.size >= 32) throw new Error('Invalid or excessive native requests');
+      if (this.closed || revision !== this.revision) throw new Error('Stale native request');
+      invocationTarget(this.tree, target, method, args, mode);
+      if (!this.listenerCount('invoke')) throw new Error('Native invocation unavailable in this host');
+      const timer = setTimeout(() => this.finishNative(id, revision, null, 'Native request timed out'), 3000);
+      this.nativeRequests.set(id, { revision, timer });
+      this.emit('invoke', { id, generation: this.generation, revision, target: { id: target.id, component: target.component }, method, args, mode, deadline: Date.now() + 3000 });
+    } catch (error) { reject(error); }
+  }
+  finishNative(id, revision, value, error) {
+    const pending = this.nativeRequests.get(id);
+    if (!pending || pending.revision !== revision) return false;
+    this.nativeRequests.delete(id); clearTimeout(pending.timer);
+    if (revision !== this.revision) error = 'Stale native response';
+    try { if (!error) validatePayload(value); } catch (failure) { error = failure.message; }
+    this.send({ kind: 'native-response', id, revision, ...(error ? { error: String(error).slice(0, 2048) } : { value }) });
+    return true;
+  }
+  cancelNative(error) {
+    for (const [id, pending] of this.nativeRequests) this.finishNative(id, pending.revision, null, error);
+  }
   debugEvaluate(expression) {
     if (!this.options.debug || this.closed) return Promise.reject(new Error('Debug evaluation unavailable'));
     if (typeof expression !== 'string' || expression.length > 16384 || this.debugRequests.size >= 4) return Promise.reject(new Error('Debug request exceeds limit'));
@@ -263,6 +292,7 @@ export class Session extends EventEmitter {
     throw new Error(`Unsupported capability: ${capability}`);
   }
   cancelRequests() {
+    this.cancelNative('Session disposed');
     for (const finish of this.debugRequests.values()) finish({ error: 'Session disposed' });
     this.debugRequests.clear();
     for (const abort of this.aborts) abort.abort();

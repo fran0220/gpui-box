@@ -38,7 +38,11 @@
         ],
         "events": [
           "toggle"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1060,7 +1064,11 @@
         ],
         "events": [
           "change"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1613,8 +1621,224 @@
       "source": "crates/gpui-kit/src/overlay/dialog.rs",
       "path": "gpui_kit::overlay::Dialog",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Dialog",
+        "status": "partial",
+        "props": [
+          "title",
+          "description",
+          "confirmLabel",
+          "cancelLabel",
+          "destructive",
+          "dismissable"
+        ],
+        "events": [
+          "open",
+          "close",
+          "confirm",
+          "cancel",
+          "dismiss"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "close": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "confirm": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "cancel": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "dismiss": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_title": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "title": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "title"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_description": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "description": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "description"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_confirm_label": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "label": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_cancel_label": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "label": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_dismissable": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "dismissable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "dismissable"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_destructive": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "destructive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "destructive"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_dismissable": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1632,6 +1856,11 @@
         "commands": [
           "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_description(description: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_content(content: Option<Body>, cx: &mut Context<Self>)",
+          "set_confirm_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_cancel_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+          "set_destructive(destructive: bool, cx: &mut Context<Self>)",
           "open(window: &mut Window, cx: &mut Context<Self>)",
           "close(window: &mut Window, cx: &mut Context<Self>)",
           "confirm(window: &mut Window, cx: &mut Context<Self>)",
@@ -1685,7 +1914,11 @@
           "label",
           "axis"
         ],
-        "events": []
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2609,8 +2842,29 @@
       "source": "crates/gpui-kit/src/data/list.rs",
       "path": "gpui_kit::data::List",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.List",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "rows",
+          "selected",
+          "rowHeight",
+          "visibleRows",
+          "flowing",
+          "anchoredToEnd",
+          "fills",
+          "arriving",
+          "reorderable"
+        ],
+        "events": [
+          "select",
+          "reorder"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -3344,7 +3598,11 @@
         ],
         "events": [
           "select"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -3568,8 +3826,172 @@
       "source": "crates/gpui-kit/src/overlay/popover.rs",
       "path": "gpui_kit::overlay::Popover",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Popover",
+        "status": "partial",
+        "props": [
+          "trigger",
+          "placement",
+          "hang",
+          "dismissable"
+        ],
+        "events": [
+          "open",
+          "close",
+          "dismiss"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "close": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "toggle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "dismiss": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_trigger": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_dismissable": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "dismissable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "dismissable"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placement": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placement": {
+                    "enum": [
+                      "above",
+                      "below"
+                    ]
+                  }
+                },
+                "required": [
+                  "placement"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_hang": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "hang": {
+                    "enum": [
+                      "start",
+                      "end"
+                    ]
+                  }
+                },
+                "required": [
+                  "hang"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_dismissable": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -3584,6 +4006,12 @@
           "dismissable(dismissable: bool) -> Self"
         ],
         "commands": [
+          "set_trigger(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+          "set_trigger_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+          "set_content(content: Option<Content>, cx: &mut Context<Self>)",
+          "set_placement(placement: Placement, cx: &mut Context<Self>)",
+          "set_hang(hang: Hang, cx: &mut Context<Self>)",
+          "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
           "open(window: &mut Window, cx: &mut Context<Self>)",
           "close(window: &mut Window, cx: &mut Context<Self>)",
           "toggle(window: &mut Window, cx: &mut Context<Self>)",
@@ -3733,7 +4161,11 @@
         ],
         "events": [
           "select"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4010,7 +4442,11 @@
           "height",
           "fitHeight"
         ],
-        "events": []
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4168,7 +4604,11 @@
         ],
         "events": [
           "select"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4207,7 +4647,265 @@
           "change",
           "open",
           "close"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_options": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "min": 1,
+                          "max": 256
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "disabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "options"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selected": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_clearable": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "clearable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "clearable"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "selected_id": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "min": 1,
+                "max": 256,
+                "nullable": true
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "selected_option": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  },
+                  "group": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "disabled",
+                  "description",
+                  "group"
+                ],
+                "nullable": true
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4235,7 +4933,8 @@
         "queries": [
           "selected_id() -> Option<&SharedString>",
           "selected_option() -> Option<&SelectOption>",
-          "is_open() -> bool"
+          "is_open() -> bool",
+          "is_disabled() -> bool"
         ],
         "slots": []
       }
@@ -4423,7 +5122,11 @@
         "events": [
           "change",
           "rangeChange"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4575,7 +5278,11 @@
         "events": [
           "resize",
           "collapse"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4825,7 +5532,11 @@
         ],
         "events": [
           "change"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4903,7 +5614,11 @@
         "events": [
           "select",
           "close"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -5110,7 +5825,324 @@
           "focus",
           "blur",
           "clipboardDenied"
-        ]
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_text_quietly": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_secret": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "secret": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "secret"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_bare": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "bare": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "bare"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_max_length": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "max_length": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "max_length"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_read_only": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "read_only": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "read_only"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_required": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "required"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "value": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "is_empty": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_secret": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "selected_range": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "start": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "end": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ]
+              }
+            },
+            "cursor_offset": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [

@@ -24,8 +24,9 @@ const MAX_FRAME: u64 = 256 * 1024;
 mod capture;
 mod clipboard;
 mod kit_bindings;
+mod native;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct Node {
     kind: Kind,
@@ -126,7 +127,12 @@ impl Node {
     }
 }
 
-fn read_frame(reader: &mut impl BufRead) -> Result<Option<Frame>> {
+enum Incoming {
+    Frame(Frame),
+    Invoke(native::Invocation),
+}
+
+fn read_incoming(reader: &mut impl BufRead) -> Result<Option<Incoming>> {
     let mut bytes = Vec::new();
     let count = reader.take(MAX_FRAME + 1).read_until(b'\n', &mut bytes)?;
     if count == 0 {
@@ -136,19 +142,35 @@ fn read_frame(reader: &mut impl BufRead) -> Result<Option<Frame>> {
         count as u64 <= MAX_FRAME && bytes.last() == Some(&b'\n'),
         "protocol frame exceeds limit or is truncated"
     );
-    let frame: Frame = serde_json::from_slice(&bytes)?;
+    let value: Value = serde_json::from_slice(&bytes)?;
+    if value.get("kind").and_then(Value::as_str) == Some("invoke") {
+        let request: native::Invocation = serde_json::from_value(value)?;
+        request.validate()?;
+        return Ok(Some(Incoming::Invoke(request)));
+    }
+    let frame: Frame = serde_json::from_value(value)?;
     ensure!(
         frame.kind == "render" && frame.generation == 0,
         "unsupported host protocol"
     );
     frame.tree.validate(0, &mut HashSet::new())?;
-    Ok(Some(frame))
+    Ok(Some(Incoming::Frame(frame)))
+}
+
+#[cfg(test)]
+fn read_frame(reader: &mut impl BufRead) -> Result<Option<Frame>> {
+    match read_incoming(reader)? {
+        Some(Incoming::Frame(frame)) => Ok(Some(frame)),
+        None => Ok(None),
+        Some(Incoming::Invoke(_)) => bail!("expected render frame"),
+    }
 }
 
 struct Bridge {
     child: Child,
     outgoing: SyncSender<Value>,
     incoming: Receiver<Result<Frame>>,
+    requests: Receiver<native::Invocation>,
 }
 
 impl Bridge {
@@ -172,11 +194,17 @@ impl Bridge {
             }
         });
         let (read_queue, incoming) = mpsc::sync_channel(16);
+        let (request_queue, requests) = mpsc::sync_channel(32);
         std::thread::spawn(move || {
             let mut reader = BufReader::new(output);
             loop {
-                match read_frame(&mut reader) {
-                    Ok(Some(frame)) => {
+                match read_incoming(&mut reader) {
+                    Ok(Some(Incoming::Invoke(request))) => {
+                        if request_queue.send(request).is_err() {
+                            break;
+                        }
+                    }
+                    Ok(Some(Incoming::Frame(frame))) => {
                         if read_queue.send(Ok(frame)).is_err() {
                             break;
                         }
@@ -198,6 +226,7 @@ impl Bridge {
             child,
             outgoing,
             incoming,
+            requests,
         })
     }
 }
@@ -219,23 +248,40 @@ impl Drop for Bridge {
 struct Host {
     bridge: Bridge,
     frame: Option<Frame>,
+    rendered_revision: std::rc::Rc<std::cell::Cell<u64>>,
     error: Option<String>,
     focus: FocusHandle,
-    kit: kit_bindings::KitState,
+    kit: std::rc::Rc<kit_bindings::KitState>,
     clipboard: clipboard::Policy,
 }
 
-impl Host {
+#[derive(Clone)]
+struct NodeRenderer {
+    outgoing: std::sync::mpsc::SyncSender<Value>,
+    kit: std::rc::Weak<kit_bindings::KitState>,
+    rendered_revision: std::rc::Rc<std::cell::Cell<u64>>,
+    clipboard: clipboard::Policy,
+}
+
+impl NodeRenderer {
     fn node(
-        &mut self,
+        &self,
         node: &Node,
         revision: u64,
         window: &mut Window,
         cx: &mut App,
     ) -> gpui::AnyElement {
+        let kit = self.kit.upgrade();
+        let Some(kit) = kit.filter(|_| self.rendered_revision.get() == revision) else {
+            return div()
+                .id(SharedString::from(node.id.clone()))
+                .semantic_in(cx, NodeSpec::new(node.id.clone(), Role::Text))
+                .child("Unavailable: native view expired")
+                .into_any_element();
+        };
         let owner = self.clipboard.owner(node.instance);
         cx.with_effect_owner(owner, |cx| {
-            let element = self.node_inner(node, revision, window, cx);
+            let element = self.node_inner(node, revision, &kit, window, cx);
             match owner {
                 Some(owner) => gpui::effect_owner(owner, element).into_any_element(),
                 None => element,
@@ -244,9 +290,10 @@ impl Host {
     }
 
     fn node_inner(
-        &mut self,
+        &self,
         node: &Node,
         revision: u64,
+        kit: &kit_bindings::KitState,
         window: &mut Window,
         cx: &mut App,
     ) -> gpui::AnyElement {
@@ -254,26 +301,32 @@ impl Host {
         let id = SharedString::from(node.id.clone());
         match node.kind {
             Kind::Kit => {
-                let slots = node
-                    .slots
-                    .iter()
-                    .map(|(name, children)| {
-                        (
-                            name.clone(),
-                            children
-                                .iter()
-                                .map(|child| self.node(child, revision, window, cx))
-                                .collect(),
-                        )
-                    })
-                    .collect();
-                let outgoing = self.bridge.outgoing.clone();
+                let mut slots = kit_bindings::KitSlots::new();
+                for (name, children) in &node.slots {
+                    let renderer = self.clone();
+                    let children = children.clone();
+                    slots.insert(
+                        name.clone(),
+                        std::rc::Rc::new(move |window, cx| {
+                            div()
+                                .flex()
+                                .flex_col()
+                                .children(
+                                    children
+                                        .iter()
+                                        .map(|child| renderer.node(child, revision, window, cx)),
+                                )
+                                .into_any_element()
+                        }),
+                    );
+                }
+                let outgoing = self.outgoing.clone();
                 let emit = std::rc::Rc::new(move |action: &str, payload: Value| {
                     if serde_json::to_vec(&payload).is_ok_and(|bytes| bytes.len() <= 16384) {
                         let _ = outgoing.try_send(json!({"kind":"event", "generation":0, "revision":revision, "action":action, "payload":payload}));
                     }
                 });
-                self.kit.render(node, slots, window, cx, emit)
+                kit.render(node, slots, window, cx, emit)
             }
             Kind::Button => {
                 let mut button = Button::new(id)
@@ -282,7 +335,7 @@ impl Host {
                 if !node.disabled
                     && let Some(action) = node.action.clone()
                 {
-                    let outgoing = self.bridge.outgoing.clone();
+                    let outgoing = self.outgoing.clone();
                     button = button.on_click(move |_, _| {
                         if outgoing.try_send(json!({ "kind": "event", "generation": 0, "revision": revision, "action": action })).is_err() {
                             eprintln!("Runtime event queue unavailable; action refused");
@@ -351,11 +404,25 @@ impl Render for Host {
         if let Some(frame) = self.frame.clone() {
             self.clipboard.reconcile(&frame.tree, &frame.clipboard);
             self.kit.reconcile(&frame.tree, cx);
-            root = root.child(self.node(&frame.tree, frame.revision, window, cx));
+            let renderer = NodeRenderer {
+                outgoing: self.bridge.outgoing.clone(),
+                kit: std::rc::Rc::downgrade(&self.kit),
+                rendered_revision: self.rendered_revision.clone(),
+                clipboard: self.clipboard.clone(),
+            };
+            self.rendered_revision.set(frame.revision);
+            root = root.child(renderer.node(&frame.tree, frame.revision, window, cx));
         } else {
             root = root.child("Loading native JavaScript app…");
         }
         root
+    }
+}
+
+impl Drop for Host {
+    fn drop(&mut self) {
+        self.rendered_revision.set(0);
+        self.clipboard.revoke();
     }
 }
 
@@ -391,13 +458,13 @@ fn main() -> Result<()> {
                     cx.new(|cx| {
                         let focus = cx.focus_handle();
                         window.focus(&focus, cx);
-                        cx.spawn(async move |host, cx| {
+                        cx.spawn_in(window, async move |host, cx| {
                             loop {
                                 cx.background_executor()
                                     .timer(Duration::from_millis(16))
                                     .await;
                                 if host
-                                    .update(cx, |host: &mut Host, cx| {
+                                    .update_in(cx, |host: &mut Host, window, cx| {
                                         let mut changed = false;
                                         while let Ok(frame) = host.bridge.incoming.try_recv() {
                                             changed = true;
@@ -416,6 +483,14 @@ fn main() -> Result<()> {
                                                 }
                                             }
                                         }
+                                        if host.frame.as_ref().is_some_and(|frame| {
+                                            frame.revision == host.rendered_revision.get()
+                                        }) {
+                                            while let Ok(request) = host.bridge.requests.try_recv()
+                                            {
+                                                host.invoke_request(request, window, cx);
+                                            }
+                                        }
                                         if changed {
                                             cx.notify();
                                         }
@@ -431,6 +506,7 @@ fn main() -> Result<()> {
                         Host {
                             bridge,
                             frame: None,
+                            rendered_revision: Default::default(),
                             error: None,
                             focus,
                             kit: Default::default(),
@@ -454,6 +530,57 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "capture")]
+    #[gpui::test]
+    fn expired_factory_cannot_resurrect_native_state_or_retain_its_owner(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui_kit_testkit::harness::Harness;
+        use std::{cell::Cell, rc::Rc};
+        let kit = Rc::new(kit_bindings::KitState::default());
+        let revision = Rc::new(Cell::new(1));
+        let (outgoing, _events) = mpsc::sync_channel(8);
+        let node: Node = serde_json::from_value(json!({"kind":"kit","component":"TextInput","id":"input","instance":7,"props":{"text":"fresh"}})).expect("input fixture");
+        let renderer = NodeRenderer {
+            outgoing,
+            kit: Rc::downgrade(&kit),
+            rendered_revision: revision.clone(),
+            clipboard: Default::default(),
+        };
+        let captured = node.clone();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+            renderer.node(&captured, 1, window, cx)
+        });
+        harness.update(|window, cx| {
+            assert_eq!(
+                kit.invoke(&node, "value", &json!({}), true, window, cx)
+                    .expect("mounted input"),
+                json!("fresh")
+            );
+            let empty: Node = serde_json::from_value(json!({"kind":"column","id":"empty"}))
+                .expect("empty fixture");
+            kit.reconcile(&empty, cx);
+        });
+        revision.set(2);
+        harness.frame();
+        harness.update(|window, cx| {
+            assert!(
+                kit.invoke(&node, "value", &json!({}), true, window, cx)
+                    .is_err()
+            )
+        });
+        assert_eq!(
+            harness.node("input").expect("expired view").role,
+            Role::Text
+        );
+        let weak = Rc::downgrade(&kit);
+        drop(kit);
+        assert!(
+            weak.upgrade().is_none(),
+            "a retained renderer must not own KitState"
+        );
+    }
 
     #[test]
     fn native_protocol_validates_before_retaining() {

@@ -59,7 +59,7 @@ export interface KitBindingCatalog {
   readonly "DescriptionList": { readonly source: "crates/gpui-kit/src/display/description_list.rs"; readonly status: "unbound" };
   readonly "DesktopTitlebar": { readonly source: "crates/gpui-kit/src/layout/titlebar.rs"; readonly status: "unbound" };
   readonly "DiagnosticsList": { readonly source: "crates/gpui-kit/src/data/diagnostics_list.rs"; readonly status: "unbound" };
-  readonly "Dialog": { readonly source: "crates/gpui-kit/src/overlay/dialog.rs"; readonly status: "unbound" };
+  readonly "Dialog": { readonly source: "crates/gpui-kit/src/overlay/dialog.rs"; readonly status: "partial" };
   readonly "DiffView": { readonly source: "crates/gpui-kit/src/content/diff_view.rs"; readonly status: "unbound" };
   readonly "Divider": { readonly source: "crates/gpui-kit/src/display/empty.rs"; readonly status: "partial" };
   readonly "Dock": { readonly source: "crates/gpui-kit/src/layout/dock.rs"; readonly status: "unbound" };
@@ -94,7 +94,7 @@ export interface KitBindingCatalog {
   readonly "KeybindingRecorder": { readonly source: "crates/gpui-kit/src/controls/keybinding_recorder.rs"; readonly status: "unbound" };
   readonly "KeymapEditor": { readonly source: "crates/gpui-kit/src/controls/keymap_editor.rs"; readonly status: "unbound" };
   readonly "LineChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "unbound" };
-  readonly "List": { readonly source: "crates/gpui-kit/src/data/list.rs"; readonly status: "unbound" };
+  readonly "List": { readonly source: "crates/gpui-kit/src/data/list.rs"; readonly status: "partial" };
   readonly "ListRow": { readonly source: "crates/gpui-kit/src/display/card.rs"; readonly status: "unbound" };
   readonly "LoadMore": { readonly source: "crates/gpui-kit/src/display/loading.rs"; readonly status: "unbound" };
   readonly "LogStream": { readonly source: "crates/gpui-kit/src/content/log_stream.rs"; readonly status: "unbound" };
@@ -129,7 +129,7 @@ export interface KitBindingCatalog {
   readonly "PersonaPortrait": { readonly source: "crates/gpui-kit/src/agent/persona.rs"; readonly status: "unbound" };
   readonly "PieChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "unbound" };
   readonly "Plot": { readonly source: "crates/gpui-kit/src/display/plot.rs"; readonly status: "unbound" };
-  readonly "Popover": { readonly source: "crates/gpui-kit/src/overlay/popover.rs"; readonly status: "unbound" };
+  readonly "Popover": { readonly source: "crates/gpui-kit/src/overlay/popover.rs"; readonly status: "partial" };
   readonly "ProgressBar": { readonly source: "crates/gpui-kit/src/display/progress.rs"; readonly status: "unbound" };
   readonly "ProgressCircle": { readonly source: "crates/gpui-kit/src/display/progress_circle.rs"; readonly status: "unbound" };
   readonly "PromptBuilder": { readonly source: "crates/gpui-kit/src/agent/prompt.rs"; readonly status: "unbound" };
