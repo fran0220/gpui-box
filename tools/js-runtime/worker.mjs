@@ -144,9 +144,15 @@ readFrames(process.stdin, async message => {
       if (process.argv[4] !== 'debug') throw new Error('Debugger not enabled');
       if (typeof message.expression !== 'string' || message.expression.length > 16384) throw new Error('Debug request exceeds limit');
       if (!debuggerSession) { debuggerSession = new inspector.Session(); debuggerSession.connect(); }
-      debuggerSession.post('Runtime.evaluate', { expression: message.expression, returnByValue: true, awaitPromise: true, timeout: 1000 }, (error, value) => {
-        try { send({ kind: 'debug-response', id: message.id, ...(error ? { error: error.message } : { value }) }); }
-        catch (error) { send({ kind: 'debug-response', id: message.id, error: error.message }); }
+      const objectGroup = `gpui-debug-${message.id}`;
+      debuggerSession.post('Runtime.evaluate', { expression: message.expression, objectGroup, returnByValue: true, awaitPromise: true, timeout: 1000 }, (error, value) => {
+        if (disposed) return;
+        debuggerSession.post('Runtime.releaseObjectGroup', { objectGroup }, releaseError => {
+          if (disposed) return;
+          const failure = error ?? releaseError;
+          try { send({ kind: 'debug-response', id: message.id, ...(failure ? { error: failure.message } : { value }) }); }
+          catch (error) { send({ kind: 'debug-response', id: message.id, error: error.message }); }
+        });
       });
     } else if (message.kind === 'dispose') {
       disposed = true;

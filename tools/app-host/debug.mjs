@@ -28,7 +28,24 @@ async function evaluateRequest(request, evaluate, signal) {
 }
 
 export async function startDebug(data, evaluate) {
-  if (process.platform === 'win32') return startWindowsDebug(data, evaluate);
+  const pending = new Set();
+  const ownedEvaluate = (expression, options) => {
+    options.signal.throwIfAborted();
+    if (pending.size >= 4) throw new Error('Debug evaluator cleanup capacity exceeded');
+    const operation = Promise.resolve().then(() => evaluate(expression, options));
+    pending.add(operation);
+    operation.finally(() => pending.delete(operation)).catch(() => {});
+    return operation;
+  };
+  const drain = async () => {
+    let timer;
+    try {
+      await Promise.race([Promise.allSettled([...pending]), new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Debug evaluator cleanup deadline exceeded')), 5000);
+      })]);
+    } finally { clearTimeout(timer); }
+  };
+  if (process.platform === 'win32') return startWindowsDebug(data, ownedEvaluate, drain);
   const directory = resolve(data, 'debug');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const info = await lstat(directory);
@@ -43,7 +60,7 @@ export async function startDebug(data, evaluate) {
     let used = false;
     readFrames(socket, request => {
       if (used) { socket.destroy(); return; } used = true;
-      evaluateRequest(request, evaluate, AbortSignal.any([cancel.signal, shutdown.signal])).then(
+      evaluateRequest(request, ownedEvaluate, AbortSignal.any([cancel.signal, shutdown.signal])).then(
         value => socket.end(encodeFrame({ value })),
         error => socket.end(encodeFrame({ error: error.message })),
       ).catch(() => socket.destroy());
@@ -55,18 +72,18 @@ export async function startDebug(data, evaluate) {
   catch (error) { server.close(); throw error; }
   let closing;
   return { endpoint: debugEndpoint(data), security: { transport: 'posix-socket' }, close() {
-    return closing ||= new Promise((resolve, reject) => {
+    return closing ||= (async () => {
       shutdown.abort();
       for (const socket of clients) socket.destroy();
-      server.close(error => error ? reject(error) : resolve());
-    });
+      await Promise.all([drain(), new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))]);
+    })();
   } };
 }
 
-async function startWindowsDebug(data, evaluate) {
+async function startWindowsDebug(data, evaluate, drain) {
   const child = spawn(debugPipeHelper(), ['serve', debugEndpoint(data)], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   const cancel = new AbortController();
-  let stderr = '', stopping = false, closing, ready = false, busy = false, failure;
+  let stderr = '', stopping = false, closing, ready = false, busy = false, failure, requestCancel;
   let resolveReady, rejectReady;
   const started = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
   const fail = error => {
@@ -83,7 +100,7 @@ async function startWindowsDebug(data, evaluate) {
       const error = failure || new Error(`Windows debug helper exited (${code ?? signal}): ${stderr.trim()}`);
       rejectReady(error); reject(error);
     }
-  }));
+  })).finally(drain);
   closed.catch(() => {}); // Observable via closed/close, without an unhandled rejection.
   readFrames(child.stdout, message => {
     if (!ready) {
@@ -94,9 +111,11 @@ async function startWindowsDebug(data, evaluate) {
       ready = true; resolveReady(message.security); return;
     }
     if (stopping) return;
+    if (busy && message?.cancel === true && Object.keys(message).length === 1) { requestCancel.abort(); return; }
     if (busy) { fail(new Error('Unexpected concurrent debug request')); return; }
     busy = true;
-    evaluateRequest(message, evaluate, cancel.signal).then(
+    requestCancel = new AbortController();
+    evaluateRequest(message, evaluate, AbortSignal.any([cancel.signal, requestCancel.signal])).then(
       value => encodeFrame({ value }),
       error => encodeFrame({ error: error.message }),
     ).then(frame => { busy = false; if (!stopping && !cancel.signal.aborted) child.stdin.write(frame); }, fail);

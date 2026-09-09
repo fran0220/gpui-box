@@ -94,6 +94,21 @@ test('developer CLI evaluates inside app through a private socket and shutdown r
   await assert.rejects(evaluateDebug(h.data, '7 + 3'));
 });
 
+test('debug disconnect retires the isolated generation and Reload restores evaluation', async t => {
+  const h = await host(t, false, true);
+  const instance = find(h.frame.tree, 'app.value').instance;
+  const cancel = new AbortController();
+  const request = assert.rejects(evaluateDebug(h.data, 'new Promise(() => { setInterval(() => {}, 20); })', { signal: cancel.signal }), /cancelled/);
+  await new Promise(resolve => setTimeout(resolve, 200));
+  cancel.abort();
+  await request;
+  await h.wait(tree => find(tree, 'host.error')?.text.includes('Debug evaluation cancelled'));
+  await assert.rejects(evaluateDebug(h.data, '19'), /unavailable/);
+  h.click('host.reload');
+  await h.wait(tree => find(tree, 'app.value')?.instance !== instance && !find(tree, 'host.error'));
+  assert.equal((await evaluateDebug(h.data, '19 + 23')).result.value, 42);
+});
+
 test('supervisor namespaces Kit events and preserves typed payloads, rejecting stale native frames', async t => {
   const h = await host(t, true);
   await writeFile(resolve(h.app, 'main.mts'), `const checked=gpui.state(false); gpui.mount(()=>gpui.kit.Checkbox('check',{checked:checked.get(),label:String(checked.get())},{change:value=>checked.set(value)}));`);

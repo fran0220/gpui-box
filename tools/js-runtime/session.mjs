@@ -278,13 +278,29 @@ export class Session extends EventEmitter {
   cancelPredicates(reason) {
     for (const finish of this.predicateRequests.values()) finish({ error: reason });
   }
-  debugEvaluate(expression) {
+  debugEvaluate(expression, { signal } = {}) {
     if (!this.options.debug || this.closed) return Promise.reject(new Error('Debug evaluation unavailable'));
+    if (signal?.aborted) return Promise.reject(new Error('Debug evaluation cancelled'));
     if (typeof expression !== 'string' || expression.length > 16384 || this.debugRequests.size >= 4) return Promise.reject(new Error('Debug request exceeds limit'));
     return new Promise((resolve, reject) => {
       const id = ++this.debugSequence;
-      const timer = setTimeout(() => { this.debugRequests.delete(id); reject(new Error('Debug request timed out')); }, 3000);
-      this.debugRequests.set(id, message => { clearTimeout(timer); message.error ? reject(new Error(message.error)) : resolve(message.value); });
+      const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); };
+      const cancel = reason => {
+        if (!this.debugRequests.delete(id)) return;
+        cleanup();
+        // Inspector cannot undo arbitrary evaluated Promise/timer ownership.
+        // Retire the isolated process, and reject only after reaping/cleanup.
+        this.fail(`${reason}; reload the app to start a new generation`);
+        this.stop().then(() => reject(new Error(reason)), reject);
+      };
+      const abort = () => cancel('Debug evaluation cancelled');
+      const timer = setTimeout(() => cancel('Debug request timed out'), 3000);
+      this.debugRequests.set(id, message => {
+        if (!this.debugRequests.delete(id)) return;
+        cleanup();
+        message.error ? reject(new Error(message.error)) : resolve(message.value);
+      });
+      signal?.addEventListener('abort', abort, { once: true });
       this.send({ kind: 'debug-evaluate', id, expression });
     });
   }

@@ -301,10 +301,11 @@ process.stdin.on('end', () => void shutdown());
 process.on('SIGTERM', () => void shutdown()); process.on('SIGINT', () => void shutdown());
 process.stdout.on('error', () => void shutdown());
 await mkdir(data, { recursive: true, mode: 0o700 });
-if (flag('--debug')) debugServer = await startDebug(data, expression => {
+if (flag('--debug')) debugServer = await startDebug(data, (expression, options) => {
   if (!app) throw new Error('No active app generation');
-  return app.debugEvaluate(expression);
+  return app.debugEvaluate(expression, options);
 });
+debugServer?.closed?.catch(error => { diagnose(error.message); void shutdown(); });
 await refreshPlugins();
 void reload();
 if (flag('--dev')) watcher = watch(root, { recursive: true }, (_event, filename) => {

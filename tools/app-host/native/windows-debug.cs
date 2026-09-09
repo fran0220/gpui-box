@@ -144,6 +144,7 @@ internal static class DebugPipe
                 {
                     var connection = Task.Factory.FromAsync(pipe.BeginWaitForConnection, pipe.EndWaitForConnection, null);
                     if (!WaitClient(connection, host, -1, pipe)) return;
+                    Task<int> pendingEof = null;
                     try
                     {
                         var read = ReadFrame(pipe);
@@ -162,18 +163,26 @@ internal static class DebugPipe
                             MaxDepth = 16, MaxStringContentLength = Limit, MaxArrayLength = Limit
                         })) { while (json.Read()) { } }
                         Console.WriteLine(request);
+                        // Observe disconnect while evaluation is pending, not only
+                        // after writing its result. One client owns one request.
+                        var eof = pendingEof = pipe.ReadAsync(new byte[1], 0, 1);
+                        int completed = Task.WaitAny(new Task[] { host, eof }, Deadline);
+                        if (completed < 0) throw new InvalidOperationException("Debug host response timed out");
+                        bool disconnected = completed == 1;
+                        if (disconnected) Console.WriteLine("{\"cancel\":true}");
                         // Timeout here is fatal: never deliver a late host reply to a later client.
                         if (!host.Wait(Deadline)) throw new InvalidOperationException("Debug host response timed out");
                         string response = host.GetAwaiter().GetResult();
                         if (response == null) return;
                         host = Task.Run(() => ReadFrame(input));
-                        byte[] bytes = Utf8.GetBytes(response + "\n");
-                        if (!WaitClient(pipe.WriteAsync(bytes, 0, bytes.Length), host, Deadline, pipe)) return;
-                        // DisconnectNamedPipe discards unread output. Wait for the
-                        // client's EOF (evaluateDebug closes after reading) instead
-                        // of using the unbounded synchronous FlushFileBuffers API.
-                        var eof = pipe.ReadAsync(new byte[1], 0, 1);
-                        if (!WaitClient(eof, host, Deadline, pipe)) return;
+                        if (!disconnected)
+                        {
+                            byte[] bytes = Utf8.GetBytes(response + "\n");
+                            if (!WaitClient(pipe.WriteAsync(bytes, 0, bytes.Length), host, Deadline, pipe)) return;
+                            // DisconnectNamedPipe discards unread output. Reuse the
+                            // existing EOF read rather than blocking FlushFileBuffers.
+                            if (!WaitClient(eof, host, Deadline, pipe)) return;
+                        }
                         if (eof.GetAwaiter().GetResult() != 0) throw new IOException("Multiple debug requests");
                     }
                     catch (IOException) { }
@@ -182,6 +191,16 @@ internal static class DebugPipe
                     catch (System.Security.SecurityException) { }
                     catch (XmlException) { }
                     catch (DecoderFallbackException) { }
+                    finally
+                    {
+                        if (pendingEof != null && !pendingEof.IsCompleted)
+                        {
+                            if (!CancelIoEx(pipe.SafePipeHandle, IntPtr.Zero) && Marshal.GetLastWin32Error() != 1168)
+                                throw new Win32Exception(Marshal.GetLastWin32Error());
+                            try { if (!pendingEof.Wait(1000)) throw new InvalidOperationException("Debug EOF cancellation timed out"); }
+                            catch (AggregateException) { }
+                        }
+                    }
                     pipe.Disconnect();
                 }
             }

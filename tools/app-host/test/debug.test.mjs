@@ -90,7 +90,7 @@ test('debug frame limit accepts the boundary and rejects one byte more', { timeo
 test('evaluation deadline aborts the evaluator and does not poison the next request', { timeout: 15000 }, async t => {
   let signal;
   const { data } = await fixture(t, (expression, options) => {
-    if (expression === 'stall') { signal = options.signal; return new Promise(() => {}); }
+    if (expression === 'stall') { signal = options.signal; return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })); }
     return 23;
   });
   await assert.rejects(evaluateDebug(data, 'stall'), /cancelled or timed out/);
@@ -102,12 +102,21 @@ test('caller cancellation and closing active evaluation are bounded', { timeout:
   let entered;
   const called = new Promise(resolve => { entered = resolve; });
   let evaluationSignal;
-  const { data, server } = await fixture(t, (_, { signal }) => { evaluationSignal = signal; entered(); return new Promise(() => {}); });
+  let cleaned;
+  const cleanup = new Promise(resolve => { cleaned = resolve; });
+  const { data, server } = await fixture(t, (_, { signal }) => {
+    evaluationSignal = signal; entered();
+    return new Promise((_, reject) => signal.addEventListener('abort', () => { cleaned(); reject(new Error('cancelled')); }, { once: true }));
+  });
   const cancel = new AbortController();
   const request = assert.rejects(evaluateDebug(data, 'pending', { signal: cancel.signal }), /cancelled/);
   await called;
   cancel.abort();
   await request;
+  let timer;
+  try { await Promise.race([cleanup, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Client disconnect did not cancel evaluator before deadline')), 1500); })]); }
+  finally { clearTimeout(timer); }
+  assert.equal(evaluationSignal.aborted, true, 'client disconnect alone cancels on Windows and POSIX');
   await server.close();
   assert.equal(evaluationSignal.aborted, true);
 });

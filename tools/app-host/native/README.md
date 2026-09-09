@@ -46,8 +46,14 @@ reusing the first-instance handle; evaluation has a 3.5-second deadline and rece
 AbortSignal as the second argument's `signal`. Evaluators must honor that signal
 to cancel underlying work; the transport cannot preempt arbitrary synchronous
 JavaScript. `evaluateDebug(..., {signal})` closes its connection on cancellation.
-On Windows a disconnected evaluator is aborted by the evaluation deadline or
-server shutdown, not immediately by pipe disconnect notification.
+On Windows the helper observes pipe disconnect while awaiting the host result,
+aborts that request, and drains its response before accepting another client.
+The runner forwards cancellation to Session: cancelled or timed-out evaluations
+retire and reap the isolated worker, including evaluation-created timers and
+pending promises. Reload starts a fresh generation. Successful evaluations keep
+the worker and release their inspector object group. A pre-aborted request never
+executes. Server close waits for evaluator cleanup (bounded to five seconds),
+and rejects if an evaluator ignores cancellation instead of claiming cleanup.
 
 Closing the server cancels evaluation and closes helper stdin. EOF interrupts
 idle accept and client reads. A five-second cleanup deadline terminates a stuck
