@@ -30,11 +30,12 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout, Entity,
-    EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
-    Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
-    Window, accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
+    AccessibleAction, App, Bounds, ClipboardDenied, ClipboardItem, Context, CursorStyle,
+    EditableTextLayout, Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, ParentElement, Pixels, Point, Render, SharedString, StatefulInteractiveElement,
+    Styled, Subscription, UTF16Selection, Window, accesskit::ActionData, actions, div, point,
+    prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize};
@@ -216,6 +217,10 @@ impl std::fmt::Debug for TextInputEvent {
 }
 
 impl EventEmitter<TextInputEvent> for TextInput {}
+
+/// Clipboard policy refusals are separate from editing events: a refused cut
+/// is not a text change, and composing controls need not reinterpret it.
+impl EventEmitter<ClipboardDenied> for TextInput {}
 
 /// One line of editable text.
 ///
@@ -958,7 +963,9 @@ impl TextInput {
             return;
         }
         let selected = self.edit.text()[self.edit.selection()].to_string();
-        cx.write_to_clipboard(ClipboardItem::new_string(selected));
+        if let Err(denial) = cx.try_write_to_clipboard(ClipboardItem::new_string(selected)) {
+            cx.emit(denial);
+        }
     }
 
     fn cut(&mut self, _: &Cut, _window: &mut Window, cx: &mut Context<Self>) {
@@ -966,12 +973,22 @@ impl TextInput {
             return;
         }
         let selected = self.edit.text()[self.edit.selection()].to_string();
-        cx.write_to_clipboard(ClipboardItem::new_string(selected));
+        if let Err(denial) = cx.try_write_to_clipboard(ClipboardItem::new_string(selected)) {
+            cx.emit(denial);
+            return;
+        }
         self.apply_edit(None, "", text_edit::Cause::Cut, cx);
     }
 
     fn paste(&mut self, _: &Paste, _window: &mut Window, cx: &mut Context<Self>) {
-        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+        let item = match cx.try_read_from_clipboard() {
+            Ok(item) => item,
+            Err(denial) => {
+                cx.emit(denial);
+                return;
+            }
+        };
+        let Some(text) = item.and_then(|item| item.text()) else {
             return;
         };
         // A single-line control accepts pasted lines as spaces rather than
@@ -1519,5 +1536,52 @@ mod retained_options_tests {
                 assert!(!input.edit.undo());
             })
         });
+    }
+
+    #[gpui::test]
+    fn denied_clipboard_actions_preserve_text_selection_and_history(cx: &mut TestAppContext) {
+        let owner = gpui::EffectOwner::new();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            let input = build
+                .borrow_mut()
+                .get_or_insert_with(|| cx.new(|cx| TextInput::new("policy.input", window, cx)))
+                .clone();
+            gpui::effect_owner(owner, input).into_any_element()
+        });
+        harness.click("policy.input");
+        harness.keystrokes("a b c");
+        let input = slot.borrow().clone().expect("input built");
+        let denials = Rc::new(RefCell::new(Vec::new()));
+        let reports = denials.clone();
+        let subscription = harness.update(|_, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string("external".into()));
+            cx.set_clipboard_policy(|_, _| false);
+            cx.subscribe(&input, move |_, denial: &ClipboardDenied, _| {
+                reports.borrow_mut().push(*denial)
+            })
+        });
+        let primary = if cfg!(target_os = "macos") {
+            "cmd"
+        } else {
+            "ctrl"
+        };
+        harness.keystrokes(&format!("{primary}-a"));
+        let selection = harness.update(|_, cx| input.read(cx).selected_range());
+        harness.keystrokes(&format!("{primary}-c {primary}-x {primary}-v"));
+        harness.update(|_, cx| {
+            input.update(cx, |input, _| {
+                assert_eq!(input.value().as_ref(), "abc");
+                assert_eq!(input.selected_range(), selection);
+                assert!(
+                    input.edit.undo(),
+                    "denied cut must not clear or alter typing history"
+                );
+                assert_eq!(input.value().as_ref(), "");
+            });
+        });
+        assert_eq!(&*denials.borrow(), &[ClipboardDenied::Denied; 3]);
+        drop(subscription);
     }
 }

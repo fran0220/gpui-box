@@ -2,17 +2,16 @@
 //!
 //! # What GPUI offers, and what it does not
 //!
-//! [`gpui::App::write_to_clipboard`] takes a [`gpui::ClipboardItem`] and
-//! returns `()`. There is no `Result`, no error, and no callback: the platform
-//! layer takes the item and the call is over. So a button that showed a tick
-//! because `write_to_clipboard` returned would be showing a tick because a
-//! function with no failure mode did not fail, which is not evidence of
-//! anything.
+//! [`gpui::App::try_write_to_clipboard`] checks the current owner's policy and
+//! reports a refusal before any platform mutation. An authorized submission
+//! still has no platform delivery receipt. It cannot by itself justify a tick.
 //!
-//! The one thing GPUI does offer is [`gpui::App::read_from_clipboard`], which
-//! returns `Option<ClipboardItem>`. That is real evidence, so it is what this
+//! GPUI also offers [`gpui::App::try_read_from_clipboard`]. That is real
+//! readback evidence when authorized, so it is what this
 //! component uses: it writes, reads back, and compares. A read that comes back
 //! empty, or comes back holding something else, is reported as a failure.
+//! A write allowed but read denied is reported as unavailable verification,
+//! not as a refused write and not as verified success.
 //!
 //! That check is honest but not complete, and the gap is stated rather than
 //! papered over: a platform where a write silently succeeds into a clipboard
@@ -88,10 +87,16 @@ type Copier = Rc<dyn Fn(&str, &mut App) -> Result<(), SharedString>>;
 
 /// Writes to the platform clipboard and reads it back to check.
 ///
-/// The readback is the whole point: the write itself cannot report anything.
+/// The readback verifies delivery; an authorized write alone is only submission.
 pub fn verified_clipboard_copy(text: &str, cx: &mut App) -> Result<(), SharedString> {
-    cx.write_to_clipboard(ClipboardItem::new_string(text.to_string()));
-    match cx.read_from_clipboard().and_then(|item| item.text()) {
+    cx.try_write_to_clipboard(ClipboardItem::new_string(text.to_string()))
+        .map_err(|denial| SharedString::from(denial.to_string()))?;
+    let read = cx.try_read_from_clipboard().map_err(|denial| {
+        SharedString::from(format!(
+            "Clipboard write submitted; verification unavailable: {denial}"
+        ))
+    })?;
+    match read.and_then(|item| item.text()) {
         Some(read) if read == text => Ok(()),
         _ => Err(cx.strings().text(StringKey::CopyFailedDetail)),
     }
@@ -236,7 +241,8 @@ impl CopyButton {
             Err(reason) => {
                 // A refusal is not put on a timer: see the module note.
                 self.state = CopyState::Failed(reason.clone());
-                self.default_failure = default_copier;
+                self.default_failure =
+                    default_copier && reason == cx.strings().text(StringKey::CopyFailedDetail);
                 self.remaining = None;
                 self.last_tick = None;
                 cx.emit(CopyEvent::Failed(reason));
@@ -399,5 +405,84 @@ impl Render for CopyButton {
                     .invalid(self.state.is_failed()),
             )
             .min_h(px(0.0))
+    }
+}
+
+#[cfg(test)]
+mod clipboard_policy_tests {
+    use super::*;
+    use gpui::{AppContext as _, ClipboardOperation, EffectOwner, TestAppContext, effect_owner};
+    use gpui_kit_testkit::harness::Harness;
+    use std::cell::{Cell, RefCell};
+
+    #[gpui::test]
+    fn verification_distinguishes_denied_write_denied_read_and_success(cx: &mut TestAppContext) {
+        let owner = EffectOwner::new();
+        let inspector = EffectOwner::new();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            let button = build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| CopyButton::new("policy.copy", window, cx).text("replacement"))
+                })
+                .clone();
+            effect_owner(owner, button).into_any_element()
+        });
+        let button = slot.borrow().clone().expect("copy button built");
+        let mode = Rc::new(Cell::new(0));
+        let policy_mode = mode.clone();
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let reports = events.clone();
+        let subscription = harness.update(|_, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string("sentinel".into()));
+            cx.set_clipboard_policy(move |current, operation| {
+                current == inspector
+                    || (current == owner
+                        && (policy_mode.get() == 2
+                            || (policy_mode.get() == 1 && operation == ClipboardOperation::Write)))
+            });
+            cx.subscribe(&button, move |_, event: &CopyEvent, _| {
+                reports.borrow_mut().push(event.clone())
+            })
+        });
+        harness.click("policy.copy.action");
+        harness.update(|_, cx| {
+            assert!(button.read(cx).state().is_failed());
+            cx.with_effect_owner(Some(inspector), |cx| {
+                assert_eq!(
+                    cx.try_read_from_clipboard()
+                        .expect("inspector read")
+                        .expect("clipboard value")
+                        .text()
+                        .as_deref(),
+                    Some("sentinel")
+                )
+            });
+        });
+        mode.set(1);
+        harness.click("policy.copy.action");
+        harness.update(|_, cx| {
+            assert!(matches!(button.read(cx).state(), CopyState::Failed(reason) if reason.starts_with("Clipboard write submitted; verification unavailable:")));
+            cx.with_effect_owner(Some(inspector), |cx| assert_eq!(cx.try_read_from_clipboard().expect("inspector read").expect("clipboard value").text().as_deref(), Some("replacement")));
+        });
+        assert!(
+            harness
+                .node("policy.copy.status")
+                .expect("refusal status")
+                .invalid
+        );
+        assert!(
+            events
+                .borrow()
+                .iter()
+                .all(|event| matches!(event, CopyEvent::Failed(_)))
+        );
+        mode.set(2);
+        harness.click("policy.copy.action");
+        harness.update(|_, cx| assert!(button.read(cx).state().is_copied()));
+        assert_eq!(events.borrow().last(), Some(&CopyEvent::Copied));
+        drop(subscription);
     }
 }

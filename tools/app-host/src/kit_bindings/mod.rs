@@ -60,7 +60,7 @@ struct Retained {
     control: Control,
     route: Rc<RefCell<Route>>,
     props: serde_json::Map<String, Value>,
-    _subscription: Subscription,
+    _subscriptions: Vec<Subscription>,
 }
 #[derive(Default)]
 pub(super) struct KitState {
@@ -312,11 +312,20 @@ impl KitState {
                                 };
                                 callback.borrow().send(name, value);
                             });
+                        let callback = route.clone();
+                        let denial_subscription =
+                            cx.subscribe(&entity, move |_, denial: &gpui::ClipboardDenied, _| {
+                                let reason = match denial {
+                                    gpui::ClipboardDenied::MissingOwner => "missingOwner",
+                                    gpui::ClipboardDenied::Denied => "denied",
+                                };
+                                callback.borrow().send("clipboardDenied", json!(reason));
+                            });
                         Retained {
                             control: Control::Input(entity),
                             route,
                             props: Default::default(),
-                            _subscription: subscription,
+                            _subscriptions: vec![subscription, denial_subscription],
                         }
                     } else {
                         let entity = cx.new(|cx| {
@@ -341,7 +350,7 @@ impl KitState {
                             control: Control::Select(entity),
                             route,
                             props: Default::default(),
-                            _subscription: subscription,
+                            _subscriptions: vec![subscription],
                         }
                     }
                 });

@@ -30,9 +30,11 @@ aggregate budgets, revision/generation checks, namespaces, and permissions.
   Tabs reorder/overflow-menu/save-state, Pagination page-size entity, and
   ScrollArea bound scroll targets are not yet adapted.
 - Markdown is held until the host provides owner-aware native clipboard policy.
-  TextInput native clipboard gestures are also **not permission-complete**:
-  denying a JS capability does not by itself gate GPUI copy/cut/paste. A refused
-  cut must preserve text, and a refused copy must not report success.
+  TextInput uses the framework's fallible clipboard API and emits
+  `clipboardDenied: 'missingOwner' | 'denied'` without editing on refusal.
+  The host must install the owner policy and scope native elements; this adapter
+  does not grant a trusted-gesture exception. End-to-end permission coverage
+  remains conditional on the runtime and framework owners' integrated tests.
 - Components absent from registration have no adapter. No generic placeholder
   is counted as an implementation.
 

@@ -355,6 +355,12 @@
         "enum": [
           null
         ]
+      },
+      "clipboardDenied": {
+        "enum": [
+          "missingOwner",
+          "denied"
+        ]
       }
     }
   },

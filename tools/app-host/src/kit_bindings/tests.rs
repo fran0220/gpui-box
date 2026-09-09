@@ -282,3 +282,50 @@ fn layout_slots_keep_asymmetric_split_geometry(cx: &mut TestAppContext) {
         "30% split should be left of midpoint"
     );
 }
+
+#[gpui::test]
+fn clipboard_refusal_routes_data_only_and_tears_down(cx: &mut TestAppContext) {
+    let owner = gpui::EffectOwner::new();
+    let state = Rc::new(RefCell::new(KitState::default()));
+    let build_state = state.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let descriptor = node(
+        "TextInput",
+        "clipboard.field",
+        json!({"text":"retained"}),
+        json!({"clipboardDenied":"refusal","change":"change"}),
+    );
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let output = output.clone();
+        let rendered = build_state.borrow_mut().render(
+            &descriptor,
+            BTreeMap::new(),
+            window,
+            cx,
+            Rc::new(move |action, payload| output.borrow_mut().push((action.to_owned(), payload))),
+        );
+        gpui::effect_owner(owner, rendered).into_any_element()
+    });
+    harness.update(|_, cx| cx.set_clipboard_policy(|_, _| false));
+    harness.click("clipboard.field");
+    let primary = if cfg!(target_os = "macos") {
+        "cmd"
+    } else {
+        "ctrl"
+    };
+    harness.keystrokes(&format!("{primary}-a {primary}-x"));
+    assert_eq!(&*events.borrow(), &[("refusal".into(), json!("denied"))]);
+    harness.update(|_, cx| {
+        let mut state = state.borrow_mut();
+        let Control::Input(entity) = &state.retained.values().next().expect("retained").control
+        else {
+            panic!("input")
+        };
+        assert_eq!(entity.read(cx).value().as_ref(), "retained");
+        let empty: Node = serde_json::from_value(json!({"kind":"column","id":"empty"}))
+            .expect("empty root fixture");
+        state.reconcile(&empty, cx);
+        assert!(state.retained.is_empty());
+    });
+}

@@ -84,6 +84,7 @@ kit.Checkbox('check', {checked:null}, {change(value) { const checked: boolean = 
 kit.Slider('range', {min:-10,max:20,value:-3,high:17}, {rangeChange(value) { const high: number = value.high; }});
 kit.Select('select', {selected:null}, {change(value) { const selected: string|null = value; }});
 kit.SplitPane('panes', {ratio:0.3}, {collapse(side) { const value: 'start'|'end' = side; }}, {start:[kit.Radio('nested')]});
+kit.TextInput('secure', {}, {clipboardDenied(reason) { const refusal: 'missingOwner'|'denied' = reason; }});
 // @ts-expect-error ScrollArea has only content slot
 kit.ScrollArea('scroll', {}, {}, {start:[]});
 // @ts-expect-error radio does not have the switch option
