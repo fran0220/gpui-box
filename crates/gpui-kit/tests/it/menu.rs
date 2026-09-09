@@ -671,7 +671,8 @@ fn native_context_menu_dispatches_and_reports_native_dismissal(cx: &mut TestAppC
         let menu = menu.clone();
         move |window, cx| {
             menu.update(cx, |menu, cx| {
-                menu.open_at(gpui::point(px(180.0), px(140.0)), window, cx);
+                menu.open_at(gpui::point(px(180.0), px(140.0)), window, cx)
+                    .expect("open native menu");
             });
         }
     });
@@ -695,7 +696,8 @@ fn a_context_menu_reports_the_command_and_closes(cx: &mut TestAppContext) {
         let menu = menu.clone();
         move |window, cx| {
             menu.update(cx, |menu, cx| {
-                menu.open_at(gpui::point(px(120.0), px(120.0)), window, cx);
+                menu.open_at(gpui::point(px(120.0), px(120.0)), window, cx)
+                    .expect("open context menu");
             });
         }
     });

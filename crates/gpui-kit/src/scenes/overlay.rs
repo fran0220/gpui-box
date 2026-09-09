@@ -317,7 +317,9 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
             })
     });
     context.update(cx, |context, cx| {
-        context.open_at(gpui::point(px(180.0), px(150.0)), window, cx);
+        context
+            .open_at(gpui::point(px(180.0), px(150.0)), window, cx)
+            .expect("in-window fixture");
     });
 
     let palette = cx.new(|cx| {

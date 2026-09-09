@@ -248,6 +248,22 @@ impl NotificationCenter {
         self
     }
 
+    /// Applies the same oldest-first retention as `record`, preserving read
+    /// state and the truthful lower-bound unread count after any eviction.
+    pub fn set_capacity(&mut self, capacity: usize, cx: &mut Context<Self>) {
+        self.capacity = capacity.max(1);
+        while self.notifications.len() > self.capacity {
+            self.notifications.remove(0);
+            self.dropped = true;
+        }
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
     /// Files a notification and shows a toast of it, reporting whether the
     /// toast was delivered.
     ///

@@ -13,9 +13,9 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, NativeMenuOutcome, ParentElement,
-    Pixels, Point, Render, SharedString, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, NativeMenuError, NativeMenuOutcome,
+    NativeMenuSessionId, ParentElement, Pixels, Point, Render, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -211,6 +211,41 @@ struct MenuState {
     /// The row the keyboard is on in the deepest open panel, which is not a
     /// choice until it is taken.
     active: Option<usize>,
+}
+
+impl MenuState {
+    /// Preserve the keyboard's business identities across caller replacement.
+    /// A removed/refused submenu truncates the path at its surviving parent.
+    fn reconcile(&mut self, old: &[MenuItem], new: &[MenuItem]) {
+        let mut old_level = old;
+        let mut new_level = new;
+        let mut path = Vec::new();
+        for old_index in &self.path {
+            let Some(old_item) = old_level.get(*old_index) else {
+                break;
+            };
+            let Some(index) = new_level.iter().position(|item| {
+                item.id == old_item.id && item.is_selectable() && item.children().is_some()
+            }) else {
+                self.path = path;
+                self.active = first_selectable(new_level);
+                return;
+            };
+            path.push(index);
+            old_level = old_item.children().unwrap_or_default();
+            new_level = new_level[index].children().unwrap_or_default();
+        }
+        self.active = self
+            .active
+            .and_then(|index| old_level.get(index))
+            .and_then(|old| {
+                new_level
+                    .iter()
+                    .position(|item| item.id == old.id && item.is_selectable())
+            })
+            .or_else(|| first_selectable(new_level));
+        self.path = path;
+    }
 }
 
 /// The items of the panel `path` addresses.
@@ -729,11 +764,36 @@ impl Menu {
         &self.items
     }
 
+    pub fn set_trigger(&mut self, label: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.trigger = label.into();
+        cx.notify();
+    }
+
+    pub fn set_trigger_icon(&mut self, icon: Option<Icon>, cx: &mut Context<Self>) {
+        self.trigger_icon = icon;
+        cx.notify();
+    }
+
+    pub fn set_trigger_join(&mut self, join: ButtonJoin, cx: &mut Context<Self>) {
+        self.trigger_join = join;
+        cx.notify();
+    }
+
+    pub fn set_placement(&mut self, placement: Placement, cx: &mut Context<Self>) {
+        self.placement = placement;
+        cx.notify();
+    }
+
+    pub fn set_hang(&mut self, hang: Hang, cx: &mut Context<Self>) {
+        self.hang = hang;
+        cx.notify();
+    }
+
     /// Replaces the items from the host side, dropping a cursor that pointed
     /// into what is no longer offered.
     pub fn set_items(&mut self, items: Vec<MenuItem>, cx: &mut Context<Self>) {
+        self.state.reconcile(&self.items, &items);
         self.items = items;
-        self.state.reset();
         cx.notify();
     }
 
@@ -1018,6 +1078,8 @@ pub enum ContextMenuEvent {
     Invoked(SharedString),
     Dismissed,
     Closed,
+    /// Native presentation or cancellation was refused; this is not dismissal.
+    Unavailable(SharedString),
 }
 
 /// Where a [`ContextMenu`] is presented.
@@ -1054,6 +1116,9 @@ pub struct ContextMenu {
     presentation: ContextMenuPresentation,
     open: bool,
     native_open: bool,
+    native_session: Option<NativeMenuSessionId>,
+    native_reopen: bool,
+    native_dismiss_requested: bool,
     position: Point<Pixels>,
     pending_focus: bool,
     state: MenuState,
@@ -1073,7 +1138,15 @@ impl std::fmt::Debug for ContextMenu {
 }
 
 impl ContextMenu {
-    pub fn new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        cx.on_release_in(window, |menu, window, cx| {
+            if let Some(session) = menu.native_session {
+                // Invalidation is synchronous even if the OS refuses closure.
+                let _ = window.cancel_context_menu(session);
+            }
+            menu.trap.release(window, cx);
+        })
+        .detach();
         Self {
             ident: ident.into(),
             focus_handle: cx.focus_handle(),
@@ -1084,6 +1157,9 @@ impl ContextMenu {
             presentation: ContextMenuPresentation::default(),
             open: false,
             native_open: false,
+            native_session: None,
+            native_reopen: false,
+            native_dismiss_requested: false,
             position: gpui::point(px(0.0), px(0.0)),
             pending_focus: false,
             state: MenuState::default(),
@@ -1108,9 +1184,16 @@ impl ContextMenu {
         self
     }
 
-    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+    pub fn set_name(
+        &mut self,
+        name: impl Into<SharedString>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.replace_native(window)?;
         self.name = name.into();
         cx.notify();
+        Ok(())
     }
 
     /// What the wrapped region stands for. Reported when the menu opens, so a
@@ -1129,10 +1212,63 @@ impl ContextMenu {
         self
     }
 
-    pub fn set_items(&mut self, items: Vec<MenuItem>, cx: &mut Context<Self>) {
-        self.items = items;
-        self.state.reset();
+    /// Sets the presentation used the next time the surface opens.
+    pub fn set_presentation(
+        &mut self,
+        presentation: ContextMenuPresentation,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.replace_native(window)?;
+        self.presentation = presentation;
         cx.notify();
+        Ok(())
+    }
+
+    pub fn set_target(
+        &mut self,
+        target: Option<SharedString>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.replace_native(window)?;
+        self.target = target;
+        cx.notify();
+        Ok(())
+    }
+
+    pub fn set_content(
+        &mut self,
+        content: Option<Content>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.replace_native(window)?;
+        self.content = content;
+        cx.notify();
+        Ok(())
+    }
+
+    pub fn set_items(
+        &mut self,
+        items: Vec<MenuItem>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.replace_native(window)?;
+        self.state.reconcile(&self.items, &items);
+        self.items = items;
+        cx.notify();
+        Ok(())
+    }
+
+    fn replace_native(&mut self, window: &mut Window) -> Result<(), NativeMenuError> {
+        if let Some(session) = self.native_session {
+            window.cancel_context_menu(session)?;
+            self.native_reopen = true;
+            self.native_dismiss_requested = false;
+        }
+        Ok(())
     }
 
     pub fn is_open(&self) -> bool {
@@ -1150,9 +1286,9 @@ impl ContextMenu {
         position: Point<Pixels>,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) {
+    ) -> Result<(), NativeMenuError> {
         if self.native_open {
-            return;
+            return Ok(());
         }
         self.position = position;
         self.state.reset();
@@ -1161,24 +1297,36 @@ impl ContextMenu {
         if self.presentation == ContextMenuPresentation::Native {
             self.trap.engage(window, cx);
             self.focus_handle.focus(window, cx);
-            if let Ok(task) = window.show_context_menu(self.native_menu(), position, cx) {
-                self.native_open = true;
-                let window_handle = window.window_handle();
-                cx.spawn(async move |menu, cx| {
-                    let outcome = task.await;
-                    window_handle
-                        .update(cx, |_, window, cx| {
-                            menu.update(cx, |menu, cx| {
-                                menu.finish_native(outcome, window, cx);
+            match window.show_context_menu(self.native_menu(), position, cx) {
+                Ok(task) => {
+                    self.native_open = true;
+                    let session = task.id();
+                    let owner = task.effect_owner();
+                    self.native_session = Some(session);
+                    let window_handle = window.window_handle();
+                    cx.spawn(async move |menu, cx| {
+                        let outcome = task.await;
+                        window_handle
+                            .update(cx, |_, window, cx| {
+                                cx.with_effect_owner(owner, |cx| {
+                                    menu.update(cx, |menu, cx| {
+                                        menu.finish_native(session, outcome, window, cx);
+                                    })
+                                    .ok();
+                                });
                             })
                             .ok();
-                        })
-                        .ok();
-                })
-                .detach();
-                self.emit_opened(cx);
-                cx.notify();
-                return;
+                    })
+                    .detach();
+                    self.emit_opened(cx);
+                    cx.notify();
+                    return Ok(());
+                }
+                Err(NativeMenuError::NotSupported(_)) => {}
+                Err(error) => {
+                    self.trap.release(window, cx);
+                    return Err(error);
+                }
             }
         }
 
@@ -1189,6 +1337,7 @@ impl ContextMenu {
         }
         self.emit_opened(cx);
         cx.notify();
+        Ok(())
     }
 
     fn emit_opened(&self, cx: &mut Context<Self>) {
@@ -1205,18 +1354,37 @@ impl ContextMenu {
 
     fn finish_native(
         &mut self,
+        session: NativeMenuSessionId,
         outcome: NativeMenuOutcome,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.native_open {
+        if self.native_session != Some(session) {
             return;
         }
         self.native_open = false;
+        self.native_session = None;
+        let reopen = std::mem::take(&mut self.native_reopen);
+        let dismissed = std::mem::take(&mut self.native_dismiss_requested);
+        if reopen && outcome != NativeMenuOutcome::Unavailable {
+            if let Err(error) = self.open_at(self.position, window, cx) {
+                cx.emit(ContextMenuEvent::Unavailable(error.to_string().into()));
+                cx.emit(ContextMenuEvent::Closed);
+                cx.notify();
+            }
+            return;
+        }
         self.state.reset();
         self.trap.release(window, cx);
-        if outcome == NativeMenuOutcome::Dismissed {
+        if outcome == NativeMenuOutcome::Dismissed
+            || (outcome == NativeMenuOutcome::Cancelled && dismissed)
+        {
             cx.emit(ContextMenuEvent::Dismissed);
+        }
+        if outcome == NativeMenuOutcome::Unavailable {
+            cx.emit(ContextMenuEvent::Unavailable(
+                "native menu unavailable".into(),
+            ));
         }
         cx.emit(ContextMenuEvent::Closed);
         cx.notify();
@@ -1233,9 +1401,18 @@ impl ContextMenu {
         }
     }
 
-    pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn close(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        self.native_reopen = false;
+        if let Some(session) = self.native_session {
+            window.cancel_context_menu(session)?;
+            return Ok(());
+        }
         if !self.open {
-            return;
+            return Ok(());
         }
         self.open = false;
         self.pending_focus = false;
@@ -1243,21 +1420,33 @@ impl ContextMenu {
         self.trap.release(window, cx);
         cx.emit(ContextMenuEvent::Closed);
         cx.notify();
+        Ok(())
     }
 
-    pub fn dismiss(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn dismiss(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), NativeMenuError> {
+        if self.native_session.is_some() {
+            self.close(window, cx)?;
+            self.native_dismiss_requested = true;
+            return Ok(());
+        }
         if !self.open {
-            return;
+            return Ok(());
         }
         cx.emit(ContextMenuEvent::Dismissed);
-        self.close(window, cx);
+        self.close(window, cx)
     }
 
     fn take(&mut self, path: Vec<usize>, window: &mut Window, cx: &mut Context<Self>) {
         match self.state.activate(&self.items, &path) {
             Activation::Invoked(id) => {
                 cx.emit(ContextMenuEvent::Invoked(id));
-                self.close(window, cx);
+                if let Err(error) = self.close(window, cx) {
+                    cx.emit(ContextMenuEvent::Unavailable(error.to_string().into()));
+                }
             }
             Activation::OpenedSubmenu => cx.notify(),
             Activation::Ignored => {}
@@ -1278,7 +1467,9 @@ impl ContextMenu {
                 cx.stop_propagation();
             }
             Handled::Close => {
-                self.dismiss(window, cx);
+                if let Err(error) = self.dismiss(window, cx) {
+                    cx.emit(ContextMenuEvent::Unavailable(error.to_string().into()));
+                }
                 cx.stop_propagation();
             }
             Handled::None => {}
@@ -1316,7 +1507,11 @@ impl Render for ContextMenu {
             )
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
-            .on_mouse_down_out(cx.listener(|menu, _, window, cx| menu.dismiss(window, cx)))
+            .on_mouse_down_out(cx.listener(|menu, _, window, cx| {
+                if let Err(error) = menu.dismiss(window, cx) {
+                    cx.emit(ContextMenuEvent::Unavailable(error.to_string().into()));
+                }
+            }))
             .semantic_in(
                 cx,
                 NodeSpec::new(menu_id.clone(), Role::Menu)
@@ -1339,7 +1534,9 @@ impl Render for ContextMenu {
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(|menu, event: &MouseDownEvent, window, cx| {
-                    menu.open_at(event.position, window, cx);
+                    if let Err(error) = menu.open_at(event.position, window, cx) {
+                        cx.emit(ContextMenuEvent::Unavailable(error.to_string().into()));
+                    }
                     cx.stop_propagation();
                 }),
             )

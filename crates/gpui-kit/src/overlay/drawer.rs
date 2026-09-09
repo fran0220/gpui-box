@@ -210,6 +210,44 @@ impl Drawer {
         cx.notify();
     }
 
+    /// Moves the existing drawer without replacing its focus trap or presence.
+    pub fn set_edge(&mut self, edge: Edge, cx: &mut Context<Self>) {
+        self.edge = edge;
+        self.drag = None;
+        self.preview = None;
+        cx.notify();
+    }
+
+    pub fn set_description(&mut self, description: Option<SharedString>, cx: &mut Context<Self>) {
+        self.description = description;
+        cx.notify();
+    }
+
+    pub fn set_content(&mut self, body: Option<Body>, cx: &mut Context<Self>) {
+        self.body = body;
+        cx.notify();
+    }
+
+    pub fn set_footer(&mut self, footer: Option<Body>, cx: &mut Context<Self>) {
+        self.footer = footer;
+        cx.notify();
+    }
+
+    pub fn set_dismissable(&mut self, dismissable: bool, cx: &mut Context<Self>) {
+        self.dismissable = dismissable;
+        cx.notify();
+    }
+
+    /// Revoking resize also cancels a drag preview; no resize is committed.
+    pub fn set_resizable(&mut self, resizable: bool, cx: &mut Context<Self>) {
+        self.resizable = resizable;
+        if !resizable {
+            self.drag = None;
+            self.preview = None;
+        }
+        cx.notify();
+    }
+
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.open {
             return;

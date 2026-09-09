@@ -314,6 +314,29 @@ impl ToastLayer {
         self
     }
 
+    pub fn set_corner(&mut self, corner: ToastCorner, cx: &mut Context<Self>) {
+        self.corner = corner;
+        cx.notify();
+    }
+
+    /// Shrinking capacity starts the usual exit for excess evictable toasts;
+    /// it does not reset the timers of the ones that remain.
+    pub fn set_capacity(&mut self, capacity: usize, cx: &mut Context<Self>) {
+        self.capacity = capacity.max(1);
+        while self.standing() > self.capacity {
+            let Some(index) = self.entries.iter().position(Entry::evictable) else {
+                break;
+            };
+            self.entries[index].presence.hide();
+        }
+        cx.notify();
+    }
+
+    pub fn set_reserved_edges(&mut self, edges: impl Into<Edges<Pixels>>, cx: &mut Context<Self>) {
+        self.reserved_edges = edges.into();
+        cx.notify();
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }

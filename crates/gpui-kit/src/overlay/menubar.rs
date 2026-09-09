@@ -165,16 +165,70 @@ impl Menubar {
         &self.menus
     }
 
-    /// Replaces the titles, closing anything that was open.
+    /// Reconciles by menu identity. A still-offered menu retains its native
+    /// entity, open state and focus; removing or disabling it closes it first.
     pub fn set_menus(
         &mut self,
         menus: Vec<MenubarMenu>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.close(window, cx);
+        if self
+            .open
+            .as_ref()
+            .is_some_and(|id| !menus.iter().any(|menu| &menu.id == id && !menu.disabled))
+        {
+            self.close(window, cx);
+        }
+        let mut old: std::collections::HashMap<_, _> = self
+            .menus
+            .iter()
+            .zip(self.views.iter())
+            .filter_map(|(menu, view)| view.as_ref().map(|view| (menu.id.clone(), view.clone())))
+            .collect();
+        let size = self.size;
+        let mut views = Vec::with_capacity(menus.len());
+        for menu in &menus {
+            if menu.disabled {
+                views.push(None);
+                continue;
+            }
+            let view = if let Some(view) = old.remove(&menu.id) {
+                view.update(cx, |view, cx| {
+                    view.set_trigger(menu.label.clone(), cx);
+                    view.set_items(menu.items.clone(), cx);
+                    view.set_trigger_style(ButtonVariant::Ghost, size, cx);
+                });
+                view
+            } else {
+                let id = menu.id.clone();
+                let view = cx.new(|cx| {
+                    Menu::new(self.ident.child(id.as_ref()), window, cx)
+                        .trigger(menu.label.clone())
+                        .trigger_variant(ButtonVariant::Ghost)
+                        .control_size(size)
+                        .items(menu.items.clone())
+                });
+                cx.subscribe(&view, move |bar, _, event: &MenuEvent, cx| {
+                    bar.on_menu_event(&id, event, cx)
+                })
+                .detach();
+                view
+            };
+            views.push(Some(view));
+        }
         self.menus = menus;
-        self.build_views(window, cx);
+        self.views = views;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        for view in self.views.iter().flatten() {
+            view.update(cx, |view, cx| {
+                view.set_trigger_style(ButtonVariant::Ghost, size, cx)
+            });
+        }
         cx.notify();
     }
 

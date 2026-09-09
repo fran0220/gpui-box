@@ -189,6 +189,51 @@ impl HoverCard {
         self
     }
 
+    pub fn set_name(&mut self, name: Option<SharedString>, cx: &mut Context<Self>) {
+        self.name = name;
+        cx.notify();
+    }
+
+    pub fn set_trigger(&mut self, trigger: Option<Content>, cx: &mut Context<Self>) {
+        self.trigger = trigger;
+        cx.notify();
+    }
+
+    pub fn set_content(&mut self, content: Option<Content>, cx: &mut Context<Self>) {
+        self.content = content;
+        cx.notify();
+    }
+
+    pub fn set_placement(&mut self, placement: Placement, cx: &mut Context<Self>) {
+        self.placement = placement;
+        cx.notify();
+    }
+
+    pub fn set_hang(&mut self, hang: Hang, cx: &mut Context<Self>) {
+        self.hang = hang;
+        cx.notify();
+    }
+
+    /// A changed delay restarts a pending opening, not an already open card.
+    pub fn set_open_delay(&mut self, delay: Duration, cx: &mut Context<Self>) {
+        self.open_delay = delay;
+        if matches!(self.countdown, Some((Phase::Opening, _))) {
+            self.countdown = Some((Phase::Opening, delay));
+            self.last_tick = None;
+        }
+        cx.notify();
+    }
+
+    /// A changed grace restarts a pending departure without moving focus.
+    pub fn set_grace(&mut self, grace: Duration, cx: &mut Context<Self>) {
+        self.grace = grace;
+        if matches!(self.countdown, Some((Phase::Leaving, _))) {
+            self.countdown = Some((Phase::Leaving, grace));
+            self.last_tick = None;
+        }
+        cx.notify();
+    }
+
     pub fn is_open(&self) -> bool {
         self.open
     }
@@ -430,5 +475,65 @@ impl Render for HoverCard {
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Group).expanded(self.open),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[gpui::test]
+    fn replacement_keeps_focus_and_restarts_only_the_pending_timer(cx: &mut gpui::TestAppContext) {
+        crate::install(&mut cx.app.borrow_mut());
+        let card = cx.add_window(|window, cx| HoverCard::new("card", window, cx));
+        card.update(cx, |card, window, cx| {
+            let focus = card.focus_handle.clone();
+            card.set_over_trigger(true, cx);
+            card.set_open_delay(Duration::from_millis(217), cx);
+            assert_eq!(
+                card.countdown,
+                Some((Phase::Opening, Duration::from_millis(217)))
+            );
+            card.set_grace(Duration::from_millis(93), cx);
+            assert_eq!(
+                card.countdown,
+                Some((Phase::Opening, Duration::from_millis(217)))
+            );
+            card.set_over_trigger(false, cx);
+            assert!(card.countdown.is_none());
+            card.open(cx);
+            card.set_name(Some("Updated".into()), cx);
+            card.set_content(
+                Some(Rc::new(|_, _| {
+                    div().child("Replacement").into_any_element()
+                })),
+                cx,
+            );
+            card.set_trigger(None, cx);
+            card.set_placement(Placement::Above, cx);
+            card.set_hang(Hang::End, cx);
+            assert!(card.is_open());
+            assert_eq!(card.focus_handle, focus);
+            card.set_over_card(true, cx);
+            card.set_over_card(false, cx);
+            card.set_grace(Duration::from_millis(151), cx);
+            assert_eq!(
+                card.countdown,
+                Some((Phase::Leaving, Duration::from_millis(151)))
+            );
+            card.set_open_delay(Duration::ZERO, cx);
+            assert_eq!(
+                card.countdown,
+                Some((Phase::Leaving, Duration::from_millis(151)))
+            );
+            card.dismiss(window, cx);
+            assert!(card.countdown.is_none());
+            assert!(!card.is_open());
+            assert!(card.trigger_focus.is_focused(window));
+            card.set_over_trigger(true, cx);
+            assert!(card.is_open());
+            assert_eq!(card.focus_handle, focus);
+        })
+        .expect("update hover card");
     }
 }
