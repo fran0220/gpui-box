@@ -15,6 +15,67 @@ use unicode_segmentation::UnicodeSegmentation;
 const WIDTH: f32 = 200.0;
 
 #[gpui::test]
+fn denied_clipboard_preserves_multiselection_and_history(cx: &mut TestAppContext) {
+    let owner = gpui::EffectOwner::new();
+    let slot: Rc<RefCell<Option<Entity<TextArea>>>> = Rc::new(RefCell::new(None));
+    let build_slot = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let area = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| TextArea::new("clipboard.area", window, cx).text("é middle 😀 end"))
+            })
+            .clone();
+        gpui::effect_owner(owner, div().w(px(300.0)).child(area)).into_any_element()
+    });
+    harness.click("clipboard.area");
+    let entity = slot.borrow().clone().expect("area");
+    let selections = vec![(10..14, true), (0..2, false)];
+    harness.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("sentinel".into()));
+        cx.set_clipboard_policy(|_, _| false);
+        entity.update(cx, |area, cx| {
+            area.set_selections(selections.clone(), cx);
+        });
+    });
+    harness.keystrokes(&format!(
+        "{} {} {}",
+        primary("c"),
+        primary("x"),
+        primary("v")
+    ));
+    harness.update(|_, cx| {
+        assert_eq!(entity.read(cx).value().as_ref(), "é middle 😀 end");
+        assert_eq!(entity.read(cx).selections(), selections);
+        assert_eq!(entity.read(cx).revision(), 0);
+        cx.set_clipboard_policy(move |seen, _| seen == owner);
+        assert_eq!(
+            cx.with_effect_owner(Some(owner), |cx| cx.try_read_from_clipboard())
+                .expect("allowed")
+                .and_then(|item| item.text())
+                .as_deref(),
+            Some("sentinel")
+        );
+    });
+    harness.keystrokes(&primary("x"));
+    harness.update(|_, cx| {
+        assert_eq!(entity.read(cx).value().as_ref(), " middle  end");
+        assert_eq!(
+            cx.with_effect_owner(Some(owner), |cx| cx.try_read_from_clipboard())
+                .expect("allowed")
+                .and_then(|item| item.text())
+                .as_deref(),
+            Some("😀\né")
+        );
+    });
+    harness.keystrokes(&primary("z"));
+    harness.update(|_, cx| {
+        assert_eq!(entity.read(cx).value().as_ref(), "é middle 😀 end");
+        assert_eq!(entity.read(cx).selections(), selections);
+    });
+}
+
+#[gpui::test]
 fn read_only_soft_wrap_can_browse_without_revealing_the_caret(cx: &mut TestAppContext) {
     let (mut harness, slot) = area(cx, |area| {
         area.text("first words wrap onto another visual line; then more words follow.\nsecond paragraph continues across several narrow rows.")

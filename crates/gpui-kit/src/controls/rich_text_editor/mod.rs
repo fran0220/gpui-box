@@ -986,7 +986,7 @@ impl RichTextEditor {
         let (projection, anchor, head) = self.flat_selection(cx);
         let range = anchor.min(head)..anchor.max(head);
         if let Some(selected) = projection.text().get(range) {
-            cx.write_to_clipboard(ClipboardItem::new_string(selected.to_owned()));
+            let _ = cx.try_write_to_clipboard(ClipboardItem::new_string(selected.to_owned()));
         }
     }
 
@@ -1000,7 +1000,12 @@ impl RichTextEditor {
             return;
         }
         if let Some(selected) = projection.text().get(range.clone()) {
-            cx.write_to_clipboard(ClipboardItem::new_string(selected.to_owned()));
+            if cx
+                .try_write_to_clipboard(ClipboardItem::new_string(selected.to_owned()))
+                .is_err()
+            {
+                return;
+            }
             self.apply_flat_edit(range, SharedString::default(), RichTextInputKind::Cut, cx);
         }
     }
@@ -1009,7 +1014,12 @@ impl RichTextEditor {
         if self.disabled || self.read_only {
             return;
         }
-        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+        let Some(text) = cx
+            .try_read_from_clipboard()
+            .ok()
+            .flatten()
+            .and_then(|item| item.text())
+        else {
             return;
         };
         self.replace_plain_text(

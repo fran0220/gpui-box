@@ -12,6 +12,43 @@ use gpui_kit_testkit::harness::Harness;
 type SessionSlot = Rc<RefCell<Option<Entity<RichTextEditSession>>>>;
 type EditorSlot = Rc<RefCell<Option<Entity<RichTextEditor>>>>;
 
+#[gpui::test]
+fn missing_clipboard_owner_does_not_cut_or_change_history(cx: &mut TestAppContext) {
+    let document = RichTextDocument::empty("first").expect("fixture");
+    let (mut harness, slot, _) = editor(cx, document, |editor| editor.toolbar(false));
+    harness.click("form.rich");
+    harness.keystrokes("a b c");
+    harness.keystrokes(&primary("a"));
+    let session = slot.borrow().clone().expect("session");
+    let selection = harness.update(|_, cx| session.read(cx).selection().clone());
+    harness.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("sentinel".into()));
+        // Even an otherwise permissive policy cannot authorize a missing owner.
+        cx.set_clipboard_policy(|_, _| true);
+    });
+    harness.keystrokes(&format!(
+        "{} {} {}",
+        primary("c"),
+        primary("x"),
+        primary("v")
+    ));
+    assert_eq!(block_texts(&mut harness, &slot), ["abc"]);
+    harness.update(|_, cx| {
+        assert_eq!(session.read(cx).selection(), &selection);
+        let clipboard = cx
+            .with_effect_owner(Some(gpui::EffectOwner::new()), |cx| {
+                cx.try_read_from_clipboard()
+            })
+            .expect("explicit owner");
+        assert_eq!(
+            clipboard.and_then(|item| item.text()).as_deref(),
+            Some("sentinel")
+        );
+    });
+    harness.keystrokes(&primary("z"));
+    assert_eq!(block_texts(&mut harness, &slot), [""]);
+}
+
 fn editor(
     cx: &mut TestAppContext,
     document: RichTextDocument,

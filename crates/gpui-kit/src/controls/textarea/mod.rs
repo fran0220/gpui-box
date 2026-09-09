@@ -1782,24 +1782,39 @@ impl TextArea {
     }
 
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
-        if self.edit.selection().is_empty() {
+        let selected = self.selected_clipboard_text();
+        if selected.is_empty() {
             return;
         }
-        let selected = self.edit.text()[self.edit.selection()].to_string();
-        cx.write_to_clipboard(ClipboardItem::new_string(selected));
+        let _ = cx.try_write_to_clipboard(ClipboardItem::new_string(selected));
     }
 
     fn cut(&mut self, _: &Cut, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.edit.selection().is_empty() {
+        if self.disabled || self.read_only {
             return;
         }
-        let selected = self.edit.text()[self.edit.selection()].to_string();
-        cx.write_to_clipboard(ClipboardItem::new_string(selected));
+        let selected = self.selected_clipboard_text();
+        if selected.is_empty()
+            || cx
+                .try_write_to_clipboard(ClipboardItem::new_string(selected))
+                .is_err()
+        {
+            return;
+        }
         self.apply_edit(None, "", text_edit::Cause::Cut, cx);
     }
 
+    fn selected_clipboard_text(&self) -> String {
+        self.selections()
+            .into_iter()
+            .filter(|(range, _)| !range.is_empty())
+            .filter_map(|(range, _)| self.document().slice(range))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     fn paste(&mut self, _: &Paste, _window: &mut Window, cx: &mut Context<Self>) {
-        let Some(item) = cx.read_from_clipboard() else {
+        let Ok(Some(item)) = cx.try_read_from_clipboard() else {
             return;
         };
         if let Some(text) = item.text() {
