@@ -69,10 +69,10 @@ use data::{
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
-    animated_number, avatar, badge, banner, bubble, card, chart, detail, divider, empty_state,
-    failure_panel, heatmap, icon, loading, metric_card, outcome_panel, performance_hud, plot,
-    progress_bar, progress_circle, rating, sparkline, stage_progress, state_ladder, status, tag,
-    trace,
+    animated_number, attachment, avatar, badge, banner, bubble, card, chart, detail, divider,
+    empty_state, failure_panel, heatmap, icon, loading, metric_card, outcome_panel,
+    performance_hud, plot, progress_bar, progress_circle, rating, sparkline, stage_progress,
+    state_ladder, status, tag, trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -924,6 +924,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "plot",
             build: plot,
             shows: Shows::Subjects(&["CandlestickChart", "Plot", "SankeyChart"]),
+        },
+        Scene {
+            name: "attachment",
+            build: attachment,
+            shows: Shows::Subjects(&["AttachmentTile"]),
         },
         Scene {
             name: "metric-card",

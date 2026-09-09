@@ -2,6 +2,78 @@
 
 use super::support::*;
 
+pub(super) fn attachment(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::display::attachment::{AttachmentState, AttachmentTile};
+    let theme = cx.theme().clone();
+    let states = [
+        ("ready", "Verified preview", AttachmentState::Ready),
+        ("queued", "Waiting for a worker", AttachmentState::Queued),
+        (
+            "transfer",
+            "Known transfer total",
+            AttachmentState::Transferring {
+                completed: 3,
+                total: Some(8),
+            },
+        ),
+        (
+            "unknown",
+            "Unknown transfer total",
+            AttachmentState::Transferring {
+                completed: 3,
+                total: None,
+            },
+        ),
+        (
+            "paused",
+            "Paused transfer",
+            AttachmentState::Paused {
+                completed: 3,
+                total: Some(8),
+            },
+        ),
+        (
+            "processing",
+            "Transfer complete, processing pending",
+            AttachmentState::Processing,
+        ),
+        (
+            "failed",
+            "Last verified preview retained",
+            AttachmentState::Failed("The host refused this upload".into()),
+        ),
+        (
+            "unavailable",
+            "Unavailable media",
+            AttachmentState::Unavailable("Media is not available on this host".into()),
+        ),
+        (
+            "cancelled",
+            "Cancelled by caller",
+            AttachmentState::Cancelled,
+        ),
+    ];
+    stack(&theme).w(px(860.0))
+        .child(caption(&theme, "Fixture attachments: composed media, title, description, actions; transfer completion does not imply readiness"))
+        .child(div().row().flex_wrap().gap_token(&theme, Space::Md)
+            .children(states.into_iter().map(|(id, title, state)| {
+                let preview = matches!(state, AttachmentState::Ready | AttachmentState::Failed(_));
+                let tile = AttachmentTile::new(format!("scene.attachment.{id}"), title)
+                    .description("Fixture asset · caller-owned state")
+                    .state(state)
+                    .when(preview, |tile| tile.slot("media", |_, cx| {
+                        let theme = cx.theme();
+                        div().w_full().h(px(52.0)).bg(theme.colors.control_hover)
+                            .child(crate::foundation::text(theme, TypeScale::Label, "Local preview"))
+                            .into_any_element()
+                    }))
+                    .slot("actions", move |_, _| Button::new(format!("scene.attachment.{id}.open"))
+                        .label("Inspect fixture").on_click(|_, _| {}).into_any_element());
+                div().w(px(250.0)).child(tile)
+            })))
+        .into_any_element()
+}
+
 pub(super) fn performance_hud(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let summary = gpui::FrameTimingSummary {

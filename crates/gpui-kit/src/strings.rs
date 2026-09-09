@@ -101,6 +101,14 @@ string_keys! {
     Expand => "common.expand", "Expand";
     Collapse => "common.collapse", "Collapse";
 
+    // Attachment transfer and processing are separate facts.
+    AttachmentReady => "attachment.ready", "Ready";
+    AttachmentQueued => "attachment.queued", "Queued";
+    AttachmentTransferring => "attachment.transferring", "Transferring";
+    AttachmentPaused => "attachment.paused", "Transfer paused";
+    AttachmentProcessing => "attachment.processing", "Processing";
+    AttachmentCancelled => "attachment.cancelled", "Transfer cancelled";
+
     // Sensitive text controls.
     PasswordReveal => "password.reveal", "Reveal password";
     PasswordConceal => "password.conceal", "Conceal password";

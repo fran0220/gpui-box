@@ -5,6 +5,7 @@ mod it {
     mod agent_permission_cost;
     mod agent_presentation;
     mod anchor_list;
+    mod attachment;
     mod auth;
     mod canvas;
     mod cascader;

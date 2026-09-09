@@ -426,6 +426,32 @@
       ]
     },
     {
+      "name": "AttachmentTile",
+      "kind": "builder",
+      "path": "gpui_kit::display::AttachmentTile",
+      "source": "crates/gpui-kit/src/display/attachment.rs",
+      "summary": "A standalone attachment tile, separate from message-list attachment metadata. All four slots compose native elements: media, title, description, and actions. A supplied preview remains visible on failure because already-known media is not erased by a failed transfer or refresh.",
+      "construct": [
+        "new(ident: impl Into<Ident>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "description(description: impl Into<SharedString>) -> Self",
+        "state(state: AttachmentState) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [
+        "media",
+        "title",
+        "description",
+        "actions"
+      ],
+      "reports": [],
+      "scenes": [
+        "attachment"
+      ]
+    },
+    {
       "name": "AudioPlayer",
       "kind": "builder",
       "path": "gpui_kit::media::AudioPlayer",
@@ -6550,6 +6576,28 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "AttachmentState",
+      "path": "gpui_kit::display::AttachmentState",
+      "summary": "Facts reported by the caller. Finishing a transfer does not imply that processing finished; only Ready makes that claim. Unknown totals stay indeterminate, including a supplied zero total.",
+      "variants": [
+        "Ready",
+        "Queued",
+        "Transferring",
+        "Paused",
+        "Processing",
+        "Unavailable",
+        "Failed",
+        "Cancelled"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_busy() -> bool",
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "AudioWaveformState",
@@ -16866,6 +16914,18 @@
         "SankeyChart"
       ],
       "example": "fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let accent = theme.colors.accent;\n    let custom_marks = vec![\n        PlotMark::new(\n            \"first\",\n            \"First stage\",\n            \"18 jobs\",\n            bounds(point(0.08, 0.58), size(0.18, 0.28)),\n        ),\n        PlotMark::new(\n            \"middle\",\n            \"Middle stage\",\n            \"34 jobs\",\n            bounds(point(0.40, 0.30), size(0.18, 0.56)),\n        ),\n        PlotMark::new(\n            \"last\",\n            \"Last stage\",\n            \"26 jobs\",\n            bounds(point(0.72, 0.44), size(0.18, 0.42)),\n        ),\n    ];\n    let painted_marks = custom_marks.clone();\n    let candles = [\n        Candlestick::new(\"monday\", 0.10, 0.32, 0.58, 0.20, 0.50, \"Monday\", \"32–50\"),\n        Candlestick::new(\"tuesday\", 0.30, 0.52, 0.66, 0.38, 0.44, \"Tuesday\", \"52–44\"),\n        Candlestick::new(\n            \"wednesday\",\n            0.50,\n            0.45,\n            0.80,\n            0.40,\n            0.72,\n            \"Wednesday\",\n            \"45–72\",\n        ),\n        Candlestick::new(\n            \"thursday\", 0.70, 0.70, 0.76, 0.34, 0.42, \"Thursday\", \"70–42\",\n        ),\n        Candlestick::new(\"friday\", 0.90, 0.44, 0.88, 0.36, 0.82, \"Friday\", \"44–82\"),\n    ];\n    let source_tint = identity_tint(&theme, \"agent.read\");\n    let target_tint = identity_tint(&theme, \"agent.write\");\n    let sankey = SankeyData::new(\n        [\n            SankeyNode::new(\n                \"queued\",\n                \"Queued\",\n                \"48 jobs\",\n                bounds(point(0.03, 0.20), size(0.08, 0.58)),\n            )\n            .tint(source_tint),\n            SankeyNode::new(\n                \"running\",\n                \"Running\",\n                \"34 jobs\",\n                bounds(point(0.46, 0.28), size(0.08, 0.42)),\n            ),\n            SankeyNode::new(\n                \"completed\",\n                \"Completed\",\n                \"26 jobs\",\n                bounds(point(0.89, 0.12), size(0.08, 0.32)),\n            )\n            .tint(target_tint),\n            SankeyNode::new(\n                \"deferred\",\n                \"Deferred\",\n                \"8 jobs\",\n                bounds(point(0.89, 0.62), size(0.08, 0.18)),\n            )\n            .tint(theme.colors.warning),\n        ],\n        [\n            SankeyLink::new(\n                \"queue-running\",\n                \"queued\",\n                \"running\",\n                \"Queued to running\",\n                \"34 jobs\",\n                point(0.11, 0.48),\n                point(0.46, 0.49),\n                0.30,\n            )\n            .tint(source_tint),\n            SankeyLink::new(\n                \"running-completed\",\n                \"running\",\n                \"completed\",\n                \"Running to completed\",\n                \"26 jobs\",\n                point(0.54, 0.44),\n                point(0.89, 0.28),\n                0.24,\n            )\n            .tint(target_tint),\n            SankeyLink::new(\n                \"running-deferred\",\n                \"running\",\n                \"deferred\",\n                \"Running to deferred\",\n                \"8 jobs\",\n                point(0.54, 0.62),\n                point(0.89, 0.71),\n                0.10,\n            )\n            .tint(theme.colors.warning),\n        ],\n    )\n    .layout(\n        &[34.0, 26.0, 8.0],\n        0.08,\n        0.16,\n        crate::display::plot::SankeyAlignment::Justify,\n    )\n    .expect(\"acyclic fixture with valid flow weights\")\n    .0;\n\n    let column = || div().column().flex_1().min_w_0();\n    stack(&theme)\n        .w(px(920.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry and exact wording remain caller-owned\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .w_full()\n                .gap(px(theme.space(Space::Lg)))\n                .child(\n                    column().child(\n                        Plot::new(\n                            \"scene.plot.custom\",\n                            \"Pipeline\",\n                            PlotState::Ready(custom_marks),\n                        )\n                        .current(\"middle\")\n                        .on_current(|_, _, _| {})\n                        .paint(move |frame, window, _| {\n                            for mark in &painted_marks {\n                                window\n                                    .paint_quad(gpui::fill(frame.mark_bounds(mark.bounds), accent));\n                            }\n                        }),\n                    ),\n                )\n                .child(\n                    column().child(\n                        CandlestickChart::new(\n                            \"scene.plot.candles\",\n                            \"Daily range\",\n                            PlotState::Ready(candles.into()),\n                        )\n                        .current(\"wednesday\")\n                        .on_current(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    column().child(\n                        SankeyChart::new(\"scene.plot.sankey\", \"Run flow\", PlotState::Ready(sankey))\n                            .current(\"node.running\")\n                            .on_current(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "attachment",
+      "capture": "cargo run -p xtask -- headless capture attachment",
+      "kind": "exhibit",
+      "subjects": [
+        "AttachmentTile"
+      ],
+      "uses": [
+        "AttachmentTile"
+      ],
+      "example": "fn attachment(_window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::display::attachment::{AttachmentState, AttachmentTile};\n    let theme = cx.theme().clone();\n    let states = [\n        (\"ready\", \"Verified preview\", AttachmentState::Ready),\n        (\"queued\", \"Waiting for a worker\", AttachmentState::Queued),\n        (\n            \"transfer\",\n            \"Known transfer total\",\n            AttachmentState::Transferring {\n                completed: 3,\n                total: Some(8),\n            },\n        ),\n        (\n            \"unknown\",\n            \"Unknown transfer total\",\n            AttachmentState::Transferring {\n                completed: 3,\n                total: None,\n            },\n        ),\n        (\n            \"paused\",\n            \"Paused transfer\",\n            AttachmentState::Paused {\n                completed: 3,\n                total: Some(8),\n            },\n        ),\n        (\n            \"processing\",\n            \"Transfer complete, processing pending\",\n            AttachmentState::Processing,\n        ),\n        (\n            \"failed\",\n            \"Last verified preview retained\",\n            AttachmentState::Failed(\"The host refused this upload\".into()),\n        ),\n        (\n            \"unavailable\",\n            \"Unavailable media\",\n            AttachmentState::Unavailable(\"Media is not available on this host\".into()),\n        ),\n        (\n            \"cancelled\",\n            \"Cancelled by caller\",\n            AttachmentState::Cancelled,\n        ),\n    ];\n    stack(&theme).w(px(860.0))\n        .child(caption(&theme, \"Fixture attachments: composed media, title, description, actions; transfer completion does not imply readiness\"))\n        .child(div().row().flex_wrap().gap_token(&theme, Space::Md)\n            .children(states.into_iter().map(|(id, title, state)| {\n                let preview = matches!(state, AttachmentState::Ready | AttachmentState::Failed(_));\n                let tile = AttachmentTile::new(format!(\"scene.attachment.{id}\"), title)\n                    .description(\"Fixture asset · caller-owned state\")\n                    .state(state)\n                    .when(preview, |tile| tile.slot(\"media\", |_, cx| {\n                        let theme = cx.theme();\n                        div().w_full().h(px(52.0)).bg(theme.colors.control_hover)\n                            .child(crate::foundation::text(theme, TypeScale::Label, \"Local preview\"))\n                            .into_any_element()\n                    }))\n                    .slot(\"actions\", move |_, _| Button::new(format!(\"scene.attachment.{id}.open\"))\n                        .label(\"Inspect fixture\").on_click(|_, _| {}).into_any_element());\n                div().w(px(250.0)).child(tile)\n            })))\n        .into_any_element()\n}"
     },
     {
       "name": "metric-card",

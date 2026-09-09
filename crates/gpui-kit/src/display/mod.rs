@@ -1,6 +1,7 @@
 //! Components that present caller-owned data without owning it.
 
 pub mod animated_number;
+pub mod attachment;
 pub mod avatar;
 pub mod badge;
 pub mod bubble;
