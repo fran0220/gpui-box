@@ -1,0 +1,332 @@
+/* GPUI Box Windows sandbox. Build instructions: ../WINDOWS.md.
+ * Windows 10+; fail closed on any missing containment primitive.
+ * The trusted host supplies private copies, never host source directories.
+ */
+#define _WIN32_WINNT 0x0A00
+#ifndef UNICODE
+#define UNICODE
+#endif
+#ifndef _UNICODE
+#define _UNICODE
+#endif
+#include <winsock2.h>
+#include <windows.h>
+#include <rpc.h>
+#include <userenv.h>
+#include <sddl.h>
+#include <aclapi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <wchar.h>
+#include <stdint.h>
+
+#define MEMORY_LIMIT ((SIZE_T)256 * 1024 * 1024)
+#define CPU_SECONDS 30
+#define CPU_RATE 2500
+#define PATH_CAP 32768
+
+static void fail(const char *operation) {
+    fprintf(stderr, "Windows sandbox: %s failed (%lu)\n", operation, GetLastError());
+    ExitProcess(125);
+}
+#define CHECK(expr) do { if (!(expr)) fail(#expr); } while (0)
+
+#ifdef GPUI_SANDBOX_PROBE
+/* Native adversarial probe: no Node permission model can mask OS failures. */
+int wmain(int argc, wchar_t **argv) {
+    CHECK(argc >= 3);
+    if (!wcscmp(argv[1], L"spin")) {
+        volatile uint64_t counter = 0;
+        puts("spinning"); fflush(stdout);
+        for (;;) counter++;
+    }
+    if (!wcscmp(argv[1], L"memory")) {
+        unsigned allocations = 0;
+        while (VirtualAlloc(NULL, 8 * 1024 * 1024, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) {
+            if (++allocations > 64) return 2;
+        }
+        printf("{\"allocations\":%u}\n", allocations);
+        return allocations > 0 && allocations < 32 ? 0 : 3;
+    }
+    HANDLE token;
+    DWORD value, size;
+    CHECK(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
+    CHECK(GetTokenInformation(token, TokenIsAppContainer, &value, sizeof(value), &size));
+    CHECK(value == 1);
+    GetTokenInformation(token, TokenCapabilities, NULL, 0, &size);
+    TOKEN_GROUPS *groups = malloc(size);
+    CHECK(groups && GetTokenInformation(token, TokenCapabilities, groups, size, &size));
+    CHECK(groups->GroupCount == 0);
+    free(groups);
+    CloseHandle(token);
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+    JOBOBJECT_CPU_RATE_CONTROL_INFORMATION cpu;
+    CHECK(QueryInformationJobObject(NULL, JobObjectExtendedLimitInformation, &limits, sizeof(limits), NULL));
+    CHECK(QueryInformationJobObject(NULL, JobObjectCpuRateControlInformation, &cpu, sizeof(cpu), NULL));
+    DWORD required = JOB_OBJECT_LIMIT_ACTIVE_PROCESS | JOB_OBJECT_LIMIT_PROCESS_MEMORY |
+        JOB_OBJECT_LIMIT_JOB_MEMORY | JOB_OBJECT_LIMIT_PROCESS_TIME | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    CHECK((limits.BasicLimitInformation.LimitFlags & required) == required);
+    CHECK(limits.BasicLimitInformation.ActiveProcessLimit == 1);
+    // Expectations intentionally do not reuse the launcher's policy macros.
+    CHECK(limits.ProcessMemoryLimit == 268435456 && limits.JobMemoryLimit == 268435456);
+    CHECK(limits.BasicLimitInformation.PerProcessUserTimeLimit.QuadPart == 300000000LL);
+    CHECK(cpu.ControlFlags == (JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP));
+    CHECK(cpu.CpuRate == 2500);
+    HANDLE file = CreateFileW(argv[2], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    CHECK(file == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED);
+    file = CreateFileW(L"forbidden.txt", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    CHECK(file == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED);
+    wchar_t cwd[PATH_CAP];
+    CHECK(GetCurrentDirectoryW(PATH_CAP, cwd));
+    CHECK(SetNamedSecurityInfoW(cwd, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+        NULL, NULL, NULL, NULL) == ERROR_ACCESS_DENIED);
+    wchar_t self[PATH_CAP];
+    CHECK(GetModuleFileNameW(NULL, self, PATH_CAP));
+    STARTUPINFOW startup = { .cb = sizeof(startup) };
+    PROCESS_INFORMATION process = {0};
+    CHECK(!CreateProcessW(self, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &process));
+    CHECK(!CreateProcessW(self, NULL, NULL, NULL, FALSE, CREATE_BREAKAWAY_FROM_JOB, NULL, NULL, &startup, &process));
+    // A listener is established by the test parent: refusal is not a closed port.
+    WSADATA wsa;
+    CHECK(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
+    SOCKET socketHandle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    CHECK(socketHandle != INVALID_SOCKET);
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = htons((u_short)_wtoi(argv[1]));
+    CHECK(connect(socketHandle, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR);
+    CHECK(WSAGetLastError() == WSAEACCES);
+    closesocket(socketHandle);
+    socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    CHECK(socketHandle != INVALID_SOCKET);
+    address.sin_addr.s_addr = htonl(0xc0000201); // TEST-NET-1, not a live service
+    address.sin_port = htons(9);
+    CHECK(sendto(socketHandle, "x", 1, 0, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR);
+    CHECK(WSAGetLastError() == WSAEACCES);
+    closesocket(socketHandle);
+    WSACleanup();
+    // The parent passes an inherited sentinel as fd 3 to the launcher; it must
+    // not survive the launcher's explicit three-handle allowlist.
+    // Enumerate handles and reject any inherited disk handle (stdio are pipes).
+    for (uintptr_t handle = 4; handle < 65536; handle += 4) {
+        CHECK(GetFileType((HANDLE)handle) != FILE_TYPE_DISK);
+    }
+    puts("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"networkDenied\":true,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}");
+    return 0;
+}
+#else
+static wchar_t *join(const wchar_t *root, const wchar_t *suffix) {
+    size_t length = wcslen(root) + wcslen(suffix) + 2;
+    CHECK(length < PATH_CAP);
+    wchar_t *result = calloc(length, sizeof(wchar_t));
+    CHECK(result);
+    swprintf(result, length, L"%ls\\%ls", root, suffix);
+    return result;
+}
+
+// Explicit protected ACLs discard inherited access (including broad package
+// groups). The caller retains ownership; the unique sandbox SID gets RX only.
+static void protect_tree(wchar_t *path, PACL acl) {
+    DWORD attributes = GetFileAttributesW(path);
+    CHECK(attributes != INVALID_FILE_ATTRIBUTES);
+    CHECK(!(attributes & FILE_ATTRIBUTE_REPARSE_POINT));
+    // Protect children first. Replacing a parent's inheritable ACL first can
+    // revoke the host's access to not-yet-protected children; inheritable
+    // grants could instead propagate through an unexamined junction.
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+        wchar_t *pattern = join(path, L"*");
+        WIN32_FIND_DATAW entry;
+        HANDLE scan = FindFirstFileW(pattern, &entry);
+        free(pattern);
+        CHECK(scan != INVALID_HANDLE_VALUE);
+        do {
+            if (!wcscmp(entry.cFileName, L".") || !wcscmp(entry.cFileName, L"..")) continue;
+            wchar_t *child = join(path, entry.cFileName);
+            protect_tree(child, acl);
+            free(child);
+        } while (FindNextFileW(scan, &entry));
+        CHECK(GetLastError() == ERROR_NO_MORE_FILES);
+        FindClose(scan);
+    }
+    DWORD error = SetNamedSecurityInfoW(path, SE_FILE_OBJECT,
+        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+        NULL, NULL, acl, NULL);
+    if (error) { SetLastError(error); fail("private copy ACL"); }
+}
+
+static int is_under(const wchar_t *path, const wchar_t *root) {
+    size_t n = wcslen(root);
+    return !_wcsnicmp(path, root, n) &&
+        (path[n] == 0 || path[n] == L'\\' || path[n] == L'/');
+}
+
+static wchar_t *remap(const wchar_t *argument, const wchar_t *root,
+                       const wchar_t *runtime, const wchar_t *instance) {
+    const wchar_t *prefix = L"--allow-fs-read=";
+    size_t offset = !wcsncmp(argument, prefix, wcslen(prefix)) ? wcslen(prefix) : 0;
+    const wchar_t *value = argument + offset;
+    const wchar_t *source = NULL, *target = NULL;
+    // Longest prefix wins when runtime and package are nested.
+    if (is_under(value, root)) { source = root; target = L"package"; }
+    if (is_under(value, runtime) && (!source || wcslen(runtime) > wcslen(source))) {
+        source = runtime; target = L"runtime";
+    }
+    if (!source) return _wcsdup(argument);
+    wchar_t *destination = join(instance, target);
+    size_t length = offset + wcslen(destination) + wcslen(value + wcslen(source)) + 1;
+    wchar_t *result = calloc(length, sizeof(wchar_t));
+    CHECK(result);
+    wcsncpy(result, argument, offset);
+    wcscat(result, destination);
+    wcscat(result, value + wcslen(source));
+    free(destination);
+    return result;
+}
+
+// Windows CRT command-line quoting, including quotes and trailing backslashes.
+static void append_argument(wchar_t *command, const wchar_t *argument) {
+    size_t used = wcslen(command), slashes = 0;
+    CHECK(used + 2 * wcslen(argument) + 4 < PATH_CAP);
+    wchar_t *out = command + used;
+    if (used) *out++ = L' ';
+    *out++ = L'"';
+    for (const wchar_t *p = argument;; p++) {
+        if (*p == L'\\') { slashes++; continue; }
+        size_t count = (*p == L'"' || !*p) ? slashes * 2 : slashes;
+        while (count--) *out++ = L'\\';
+        slashes = 0;
+        if (!*p) break;
+        if (*p == L'"') *out++ = L'\\';
+        *out++ = *p;
+    }
+    *out++ = L'"';
+    *out = 0;
+}
+
+int wmain(int argc, wchar_t **argv) {
+    CHECK(argc >= 10 && !wcscmp(argv[1], L"--instance") &&
+        !wcscmp(argv[3], L"--root") && !wcscmp(argv[5], L"--runtime") &&
+        !wcscmp(argv[7], L"--parent") && !wcscmp(argv[9], L"--"));
+    wchar_t *instance = argv[2];
+    CHECK(wcslen(instance) > 3 && GetFileAttributesW(instance) != INVALID_FILE_ATTRIBUTES);
+    HANDLE parent = OpenProcess(SYNCHRONIZE, FALSE, wcstoul(argv[8], NULL, 10));
+    CHECK(parent);
+    CHECK(WaitForSingleObject(parent, 0) == WAIT_TIMEOUT);
+
+    // A random, derived SID has no registered profile, persistent writable
+    // storage, network exemptions, or profile cleanup race after abrupt death.
+    UUID uuid;
+    CHECK(UuidCreate(&uuid) == RPC_S_OK);
+    RPC_WSTR uuidText = NULL;
+    CHECK(UuidToStringW(&uuid, &uuidText) == RPC_S_OK);
+    wchar_t name[128];
+    swprintf(name, 128, L"gpui-js-%ls", uuidText);
+    RpcStringFreeW(&uuidText);
+    PSID sid = NULL;
+    HRESULT result = DeriveAppContainerSidFromAppContainerName(name, &sid);
+    if (FAILED(result)) { SetLastError((DWORD)result); fail("derive AppContainer SID"); }
+    HANDLE token;
+    DWORD size;
+    CHECK(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
+    GetTokenInformation(token, TokenUser, NULL, 0, &size);
+    TOKEN_USER *user = malloc(size);
+    CHECK(user && GetTokenInformation(token, TokenUser, user, size, &size));
+    LPWSTR userText = NULL, sidText = NULL;
+    CHECK(ConvertSidToStringSidW(user->User.Sid, &userText));
+    CHECK(ConvertSidToStringSidW(sid, &sidText));
+    wchar_t sddl[1024];
+    swprintf(sddl, 1024, L"D:P(A;;FA;;;SY)(A;;FA;;;%ls)(A;;GRGX;;;%ls)", userText, sidText);
+    PSECURITY_DESCRIPTOR descriptor = NULL;
+    CHECK(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &descriptor, NULL));
+    PACL acl;
+    BOOL present, defaulted;
+    CHECK(GetSecurityDescriptorDacl(descriptor, &present, &acl, &defaulted) && present);
+    protect_tree(instance, acl);
+    LocalFree(descriptor); LocalFree(userText); LocalFree(sidText); free(user); CloseHandle(token);
+
+    HANDLE job = CreateJobObjectW(NULL, NULL);
+    CHECK(job);
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_ACTIVE_PROCESS |
+        JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_JOB_MEMORY |
+        JOB_OBJECT_LIMIT_PROCESS_TIME | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
+        JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
+    limits.BasicLimitInformation.ActiveProcessLimit = 1;
+    limits.BasicLimitInformation.PerProcessUserTimeLimit.QuadPart = CPU_SECONDS * 10000000LL;
+    limits.ProcessMemoryLimit = MEMORY_LIMIT;
+    limits.JobMemoryLimit = MEMORY_LIMIT;
+    CHECK(SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)));
+    JOBOBJECT_CPU_RATE_CONTROL_INFORMATION cpu = {0};
+    cpu.ControlFlags = JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP;
+    cpu.CpuRate = CPU_RATE;
+    CHECK(SetInformationJobObject(job, JobObjectCpuRateControlInformation, &cpu, sizeof(cpu)));
+
+    STARTUPINFOEXW startup = {0};
+    startup.StartupInfo.cb = sizeof(startup);
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    HANDLE inherited[3];
+    DWORD standard[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+    for (int i = 0; i < 3; i++) {
+        HANDLE original = GetStdHandle(standard[i]);
+        CHECK(GetFileType(original) == FILE_TYPE_PIPE);
+        CHECK(DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(), &inherited[i],
+            0, TRUE, DUPLICATE_SAME_ACCESS));
+    }
+    startup.StartupInfo.hStdInput = inherited[0];
+    startup.StartupInfo.hStdOutput = inherited[1];
+    startup.StartupInfo.hStdError = inherited[2];
+    SIZE_T bytes = 0;
+    InitializeProcThreadAttributeList(NULL, 3, 0, &bytes);
+    startup.lpAttributeList = malloc(bytes);
+    CHECK(startup.lpAttributeList && InitializeProcThreadAttributeList(startup.lpAttributeList, 3, 0, &bytes));
+    SECURITY_CAPABILITIES capabilities = {0};
+    capabilities.AppContainerSid = sid;
+    CHECK(UpdateProcThreadAttribute(startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+        &capabilities, sizeof(capabilities), NULL, NULL));
+    CHECK(UpdateProcThreadAttribute(startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+        inherited, sizeof(inherited), NULL, NULL));
+    // Atomic membership: even TerminateProcess on the helper between creation
+    // and first instruction cannot orphan a worker outside the job.
+    CHECK(UpdateProcThreadAttribute(startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
+        &job, sizeof(job), NULL, NULL));
+    wchar_t *executable = join(instance, L"worker.exe");
+    wchar_t *cwd = join(instance, L"package");
+    wchar_t *command = calloc(PATH_CAP, sizeof(wchar_t));
+    CHECK(command);
+    append_argument(command, executable);
+    for (int i = 10; i < argc; i++) {
+        wchar_t *argument = remap(argv[i], argv[4], argv[6], instance);
+        CHECK(argument);
+        append_argument(command, argument);
+        free(argument);
+    }
+    // Never inherit host secrets, NODE_OPTIONS, loader search paths or TEMP.
+    wchar_t windows[PATH_CAP];
+    UINT length = GetWindowsDirectoryW(windows, PATH_CAP);
+    CHECK(length && length < PATH_CAP);
+    size_t envSize = 2 * wcslen(windows) + 80;
+    wchar_t *environment = calloc(envSize, sizeof(wchar_t));
+    CHECK(environment);
+    int written = swprintf(environment, envSize, L"NODE_NO_WARNINGS=1");
+    written += 1 + swprintf(environment + written + 1, envSize - written - 1, L"SystemRoot=%ls", windows);
+    swprintf(environment + written + 1, envSize - written - 1, L"WINDIR=%ls", windows);
+    PROCESS_INFORMATION process = {0};
+    CHECK(CreateProcessW(executable, command, NULL, NULL, TRUE,
+        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
+        environment, cwd, &startup.StartupInfo, &process));
+    for (int i = 0; i < 3; i++) CloseHandle(inherited[i]);
+    DeleteProcThreadAttributeList(startup.lpAttributeList);
+    free(startup.lpAttributeList); FreeSid(sid);
+    CloseHandle(process.hThread);
+    HANDLE wait[] = {process.hProcess, parent};
+    DWORD waited = WaitForMultipleObjects(2, wait, FALSE, INFINITE), exitCode = 125;
+    CHECK(waited == WAIT_OBJECT_0 || waited == WAIT_OBJECT_0 + 1);
+    if (waited == WAIT_OBJECT_0) CHECK(GetExitCodeProcess(process.hProcess, &exitCode));
+    CloseHandle(job); // kills the worker if its host exited
+    CHECK(WaitForSingleObject(process.hProcess, INFINITE) == WAIT_OBJECT_0);
+    CloseHandle(process.hProcess); CloseHandle(parent);
+    free(command); free(environment); free(executable); free(cwd);
+    return (int)exitCode;
+}
+#endif
