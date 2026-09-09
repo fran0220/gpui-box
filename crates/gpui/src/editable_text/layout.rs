@@ -14,8 +14,8 @@ use std::{
 };
 
 use crate::{
-    Bounds, EditSnapshot, Pixels, Point, TextAlign, TextRun, WindowTextSystem, WrappedLine, point,
-    px, size,
+    Bounds, EditSnapshot, EditableLineProjection, Pixels, Point, TextAlign, TextRun,
+    WindowTextSystem, WrappedLine, point, px, size,
 };
 
 /// Far enough right to land past the end of any shaped row.
@@ -46,6 +46,7 @@ pub struct EditableTextWork {
 
 struct SourceLines {
     document: EditSnapshot,
+    projection: EditableLineProjection,
     text_system: Arc<WindowTextSystem>,
     font_size: Pixels,
     runs: Vec<TextRun>,
@@ -158,6 +159,38 @@ impl EditableTextLayout {
         runs: Vec<TextRun>,
         visible: Range<usize>,
     ) -> Self {
+        let projection = EditableLineProjection::new(document.line_count(), [])
+            .expect("nonempty source line index");
+        Self::unwrapped_projected(
+            document,
+            text_system,
+            font_size,
+            line_height,
+            runs,
+            visible,
+            projection,
+        )
+        .expect("identity projection")
+    }
+
+    /// No-wrap geometry with omitted complete source lines. `visible` indexes
+    /// projected rows, not source lines. Painting, hit testing, selections and
+    /// IME share this mapping; omitted positions map to the preceding displayed
+    /// row's end, or the first row's start when no predecessor exists. Returns
+    /// None for a projection of a different source line count.
+    #[allow(clippy::too_many_arguments)]
+    pub fn unwrapped_projected(
+        document: EditSnapshot,
+        text_system: Arc<WindowTextSystem>,
+        font_size: Pixels,
+        line_height: Pixels,
+        runs: Vec<TextRun>,
+        visible: Range<usize>,
+        projection: EditableLineProjection,
+    ) -> Option<Self> {
+        if projection.source_lines() != document.line_count() {
+            return None;
+        }
         let mut start = 0;
         let run_starts = runs
             .iter()
@@ -167,8 +200,8 @@ impl EditableTextLayout {
                 at
             })
             .collect();
-        let total_rows = document.line_count();
-        Self {
+        let total_rows = projection.rows();
+        Some(Self {
             lines: Vec::new(),
             starts: Vec::new(),
             rows: Vec::new(),
@@ -177,6 +210,7 @@ impl EditableTextLayout {
             line_height,
             source: Some(SourceLines {
                 document,
+                projection,
                 text_system,
                 font_size,
                 runs,
@@ -185,7 +219,7 @@ impl EditableTextLayout {
                 shaped: RefCell::new(BTreeMap::new()),
                 work: Cell::default(),
             }),
-        }
+        })
     }
 
     /// Shaping performed so far by this layout, including on-demand queries.
@@ -206,7 +240,11 @@ impl EditableTextLayout {
             return source
                 .visible
                 .clone()
-                .filter_map(|row| source.document.line_range(row))
+                .filter_map(|row| {
+                    source
+                        .document
+                        .line_range(source.projection.source_line(row))
+                })
                 .collect();
         }
         std::iter::once(0..self.text_len).collect()
@@ -257,12 +295,12 @@ impl EditableTextLayout {
     /// Where each hard line should be painted relative to the text origin.
     pub fn painted_lines(&self) -> Box<dyn Iterator<Item = (Arc<WrappedLine>, Pixels)> + '_> {
         if let Some(source) = &self.source {
-            return Box::new(
-                source
-                    .visible
-                    .clone()
-                    .map(|row| (source.line(row), self.line_height * row as f32)),
-            );
+            return Box::new(source.visible.clone().map(|row| {
+                (
+                    source.line(source.projection.source_line(row)),
+                    self.line_height * row as f32,
+                )
+            }));
         }
         Box::new(
             self.lines
@@ -303,16 +341,18 @@ impl EditableTextLayout {
     ) -> Point<Pixels> {
         if let Some(source) = &self.source {
             let offset = offset.min(self.text_len);
-            let row = source.document.line_at(offset);
+            let source_line = source.document.line_at(offset);
+            let row = source.projection.row(source_line);
+            let displayed_line = source.projection.source_line(row);
             let start = source
                 .document
-                .line_range(row)
+                .line_range(displayed_line)
                 .expect("indexed source row")
                 .start;
-            let line = source.line(row);
+            let line = source.line(displayed_line);
             let position = line
                 .position_for_index_aligned(
-                    (offset - start).min(line.len()),
+                    offset.saturating_sub(start).min(line.len()),
                     self.line_height,
                     align,
                     align_width,
@@ -339,7 +379,7 @@ impl EditableTextLayout {
     /// The visual row containing a UTF-8 byte offset.
     pub fn row_for_offset(&self, offset: usize) -> usize {
         if let Some(source) = &self.source {
-            return source.document.line_at(offset);
+            return source.projection.row(source.document.line_at(offset));
         }
         let y = self.position_for_offset(offset).y;
         ((y / self.line_height) as usize).min(self.total_rows - 1)
@@ -403,7 +443,7 @@ impl EditableTextLayout {
         align_width: Pixels,
     ) -> usize {
         if let Some(source) = &self.source {
-            let row = row.min(self.total_rows - 1);
+            let row = source.projection.source_line(row);
             let start = source
                 .document
                 .line_range(row)
@@ -450,7 +490,11 @@ impl EditableTextLayout {
         debug_assert_eq!(text.len(), self.text_len);
         if let Some(source) = &self.source {
             return (0..self.total_rows)
-                .filter_map(|row| source.document.line_range(row))
+                .filter_map(|row| {
+                    source
+                        .document
+                        .line_range(source.projection.source_line(row))
+                })
                 .collect();
         }
         (0..self.total_rows)
@@ -490,12 +534,12 @@ impl EditableTextLayout {
             }
             let start = source
                 .document
-                .line_range(source.visible.start)
+                .line_range(source.projection.source_line(source.visible.start))
                 .expect("visible first row")
                 .start;
             let end = source
                 .document
-                .line_range(source.visible.end - 1)
+                .line_range(source.projection.source_line(source.visible.end - 1))
                 .expect("visible last row")
                 .end;
             range.start = range.start.max(start);
@@ -526,7 +570,7 @@ impl EditableTextLayout {
         if let Some(source) = &self.source {
             let first = source.document.line_at(start);
             let last = source.document.line_at(end - 1) + 1;
-            for row in first..last {
+            for row in source.projection.lines_in(first..last) {
                 let line_start = source
                     .document
                     .line_range(row)
@@ -538,7 +582,10 @@ impl EditableTextLayout {
                 if local_start < local_end {
                     result.extend(line.bounds_for_range(
                         local_start..local_end,
-                        point(origin.x, origin.y + self.line_height * row as f32),
+                        point(
+                            origin.x,
+                            origin.y + self.line_height * source.projection.row(row) as f32,
+                        ),
                         self.line_height,
                         align,
                         align_width,
@@ -693,6 +740,69 @@ impl EditableTextLayout {
 mod tests {
     use super::*;
     use crate::{TestAppContext, TextStyle};
+
+    #[crate::test]
+    fn projected_geometry_skips_hidden_source_for_paint_hit_testing_and_selection(
+        cx: &mut TestAppContext,
+    ) {
+        let text = format!("header界\n{}tail😀\nend", "hidden\n".repeat(20_000));
+        let document = EditSnapshot::new(&text);
+        let projection =
+            EditableLineProjection::new(document.line_count(), std::iter::once(1..20_001))
+                .expect("projection");
+        let layout = EditableTextLayout::unwrapped_projected(
+            document.clone(),
+            Arc::new(WindowTextSystem::new(cx.text_system().clone())),
+            px(14.0),
+            px(20.0),
+            vec![TextStyle::default().to_run(document.len())],
+            0..3,
+            projection,
+        )
+        .expect("matching line index");
+        assert_eq!(layout.height(), px(60.0));
+        assert_eq!(layout.painted_lines().count(), 3);
+        assert_eq!(
+            layout.shaping_work(),
+            EditableTextWork {
+                shaped_lines: 3,
+                shaped_bytes: "header界tail😀end".len()
+            }
+        );
+        let tail = document.line_range(20_001).expect("tail");
+        let position = layout.position_for_offset(tail.start + 4);
+        assert_eq!(position.y, px(20.0));
+        assert_eq!(layout.offset_for_position(position), tail.start + 4);
+        assert_eq!(layout.offset_at_row(1, px(-1.0)), tail.start);
+        assert_eq!(layout.row_for_offset(tail.start), 1);
+        assert!(
+            layout
+                .bounds_for_range(
+                    10..tail.start,
+                    point(px(0.0), px(0.0)),
+                    TextAlign::Left,
+                    px(400.0)
+                )
+                .is_empty()
+        );
+        let selection = layout.painted_bounds_for_range(
+            0..document.len(),
+            point(px(0.0), px(0.0)),
+            TextAlign::Left,
+            px(400.0),
+        );
+        assert_eq!(selection.len(), 3);
+        assert!(selection.iter().all(|bounds| bounds.bottom() <= px(60.0)));
+        assert_eq!(layout.shaping_work().shaped_lines, 3);
+        assert_eq!(
+            layout.position_for_offset(50),
+            layout.position_for_offset("header界".len())
+        );
+        assert_eq!(
+            layout.visual_rows(&text),
+            [0..10, tail.clone(), tail.end..document.len()]
+        );
+    }
 
     #[crate::test]
     fn source_layout_shapes_viewport_bytes_and_exact_offscreen_queries(cx: &mut TestAppContext) {

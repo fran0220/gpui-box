@@ -28,6 +28,7 @@ pub(crate) struct AccessibleTextGeometry {
     source: SharedString,
     pub(crate) scale_factor: f32,
     graphemes: HashMap<(usize, usize), Vec<Bounds<Pixels>>>,
+    ranges: Vec<Range<usize>>,
 }
 
 impl AccessibleTextGeometry {
@@ -54,7 +55,8 @@ impl AccessibleTextGeometry {
         mut bounds_for_range: impl FnMut(Range<usize>) -> Vec<Bounds<Pixels>>,
     ) -> Self {
         let mut graphemes = HashMap::new();
-        for range in ranges {
+        let ranges: Vec<_> = ranges.into_iter().collect();
+        for range in &ranges {
             for (offset, grapheme) in source[range.clone()].grapheme_indices(true) {
                 let start = range.start + offset;
                 let range = start..start + grapheme.len();
@@ -66,6 +68,7 @@ impl AccessibleTextGeometry {
             source,
             scale_factor,
             graphemes,
+            ranges,
         }
     }
 
@@ -73,18 +76,8 @@ impl AccessibleTextGeometry {
         self.source.as_ref() == source
     }
 
-    pub(crate) fn visible_range(&self) -> Range<usize> {
-        self.graphemes
-            .keys()
-            .map(|(start, _)| *start)
-            .min()
-            .unwrap_or(0)
-            ..self
-                .graphemes
-                .keys()
-                .map(|(_, end)| *end)
-                .max()
-                .unwrap_or(0)
+    pub(crate) fn visible_ranges(&self) -> &[Range<usize>] {
+        &self.ranges
     }
 
     pub(crate) fn bounds_for_range(&self, range: Range<usize>) -> Vec<Bounds<Pixels>> {

@@ -3,13 +3,89 @@
 use std::{cell::RefCell, rc::Rc};
 
 use gpui::{
-    AppContext as _, Entity, HighlightStyle, InputEvent as _, IntoElement, Modifiers, ScrollDelta,
-    ScrollWheelEvent, TestAppContext, TouchPhase, div, point, prelude::*, px,
+    AppContext as _, Entity, Focusable as _, HighlightStyle, InputEvent as _, IntoElement,
+    Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, div, point, prelude::*,
+    px,
 };
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
+
+#[gpui::test]
+fn folded_rows_keep_source_identity_and_expand_for_hidden_navigation(cx: &mut TestAppContext) {
+    use gpui_kit::controls::editor::EditorFold;
+    let source = "header\n界 hidden\nאבג hidden\nlast hidden\ntail😀\n";
+    let (mut harness, slot) = editor(cx, source, |editor| editor.rows(4));
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            editor.set_selections([(0..0, false)], cx);
+            assert!(editor.set_folds(
+                0,
+                vec![EditorFold {
+                    id: "body".into(),
+                    lines: 0..4
+                }],
+                cx
+            ));
+            assert!(editor.set_fold_collapsed("body", true, cx));
+            assert!(!editor.set_folds(9, Vec::new(), cx));
+        })
+    });
+    harness.frame();
+    harness.update(|_, cx| {
+        let editor = entity.read(cx);
+        let geometry = editor.geometry(cx).expect("folded geometry");
+        assert_eq!(
+            geometry
+                .lines
+                .iter()
+                .map(|line| line.line)
+                .collect::<Vec<_>>(),
+            [1, 5, 6]
+        );
+        assert_eq!(editor.snapshot(cx).text.as_ref(), source);
+        let work = editor.text_area().read(cx).shaping_work().expect("work");
+        assert!(work.shaped_lines <= 3, "{work:?}");
+    });
+    harness.click("source.fold.body");
+    harness.update(|_, cx| assert!(!entity.read(cx).is_fold_collapsed("body")));
+    harness.click("source.fold.body");
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            assert!(editor.is_fold_collapsed("body"));
+            editor.set_selections([(8..8, false)], cx);
+        })
+    });
+    harness.frame();
+    harness.update(|_, cx| {
+        assert!(!entity.read(cx).is_fold_collapsed("body"));
+        assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), source);
+    });
+    harness.update(|window, cx| {
+        let area = entity.read(cx).text_area().clone();
+        window.focus(&area.read(cx).focus_handle(cx), cx);
+        area.update(cx, |area, cx| area.set_selected_range(0..0, cx));
+    });
+    harness.keystrokes("ctrl-alt-f");
+    harness.update(|_, cx| assert!(entity.read(cx).is_fold_collapsed("body")));
+    harness.keystrokes("down");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.document().line_at(area.cursor_offset()), 4);
+    });
+    harness.keystrokes("x");
+    harness.update(|_, cx| {
+        assert!(!entity.read(cx).is_fold_collapsed("body"));
+    });
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-z"
+    } else {
+        "ctrl-z"
+    });
+    harness.update(|_, cx| assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), source));
+}
 
 fn completion() -> AsyncValue<EditorServiceResult, gpui::SharedString> {
     AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {

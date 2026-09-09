@@ -457,6 +457,7 @@ pub struct TextArea {
     enter: Enter,
     frame: Frame,
     wrap: TextAreaWrap,
+    line_projection: Option<gpui::EditableLineProjection>,
     /// Whether the vertical arrows belong to something other than the caret.
     /// Set from the host's render while a surface over the area is listing
     /// options, because that is the only thing that knows there is one.
@@ -532,6 +533,7 @@ impl TextArea {
             enter: Enter::Opens,
             frame: Frame::Own,
             wrap: TextAreaWrap::Soft,
+            line_projection: None,
             arrows_claimed: false,
             completion_claimed: false,
             indentation_claimed: false,
@@ -1114,14 +1116,48 @@ impl TextArea {
         }
     }
 
+    pub(crate) fn source_projection(&self) -> gpui::EditableLineProjection {
+        self.line_projection.clone().unwrap_or_else(|| {
+            gpui::EditableLineProjection::new(self.document().line_count(), [])
+                .expect("source line index")
+        })
+    }
+
+    pub(crate) fn set_line_projection(
+        &mut self,
+        projection: Option<gpui::EditableLineProjection>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.line_projection == projection {
+            return;
+        }
+        let anchor = self.last_layout.as_ref().map(|layout| {
+            let height = layout.line_height();
+            let row = (self.scroll_offset / height).floor() as usize;
+            (
+                self.source_projection().source_line(row),
+                self.scroll_offset - height * row as f32,
+                height,
+            )
+        });
+        self.line_projection = projection;
+        if let Some((line, fraction, height)) = anchor {
+            self.scroll_offset = height * self.source_projection().row(line) as f32 + fraction;
+        }
+        self.last_layout = None;
+        self.scroll_dirty = true;
+        cx.notify();
+    }
+
     pub(crate) fn source_viewport(
         &self,
         line_height: Pixels,
         viewport_height: Pixels,
     ) -> (Pixels, Range<usize>) {
         let document = self.document();
-        let height = line_height * document.line_count() as f32;
-        let caret_y = line_height * document.line_at(self.cursor_offset()) as f32;
+        let projection = self.source_projection();
+        let height = line_height * projection.rows() as f32;
+        let caret_y = line_height * projection.row(document.line_at(self.cursor_offset())) as f32;
         let mut scroll = self
             .scroll_offset
             .max(px(0.0))
@@ -1136,8 +1172,32 @@ impl TextArea {
         let last = ((scroll + viewport_height) / line_height).ceil() as usize;
         (
             scroll,
-            first.min(document.line_count())..last.min(document.line_count()),
+            first.min(projection.rows())..last.min(projection.rows()),
         )
+    }
+
+    pub(crate) fn visible_source_ranges(
+        &self,
+        line_height: Pixels,
+        height: Pixels,
+    ) -> Vec<Range<usize>> {
+        let (_, rows) = self.source_viewport(line_height, height);
+        let projection = self.source_projection();
+        let document = self.document();
+        let mut ranges: Vec<Range<usize>> = Vec::new();
+        for row in rows {
+            if let Some(range) = document.line_range(projection.source_line(row)) {
+                if let Some(previous) = ranges
+                    .last_mut()
+                    .filter(|previous| previous.end == range.start)
+                {
+                    previous.end = range.end;
+                } else {
+                    ranges.push(range);
+                }
+            }
+        }
+        ranges
     }
 
     pub fn horizontal_scroll_offset(&self) -> Pixels {
@@ -1250,7 +1310,8 @@ impl TextArea {
     }
 
     fn accessible_rows(&self) -> Vec<Range<usize>> {
-        if self.last_layout_text == *self.edit.text()
+        if self.line_projection.is_none()
+            && self.last_layout_text == *self.edit.text()
             && let Some(layout) = &self.last_layout
         {
             return layout.visual_rows(self.edit.text());
@@ -1368,6 +1429,7 @@ impl TextArea {
 
     fn record_edit(&mut self, before: &gpui::EditSnapshot, cx: &mut Context<Self>) {
         self.reveal_caret = true;
+        self.line_projection = None;
         let difference = self.edit.snapshot().difference_from(before);
         self.revision = self.revision.saturating_add(1);
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
@@ -2271,7 +2333,7 @@ impl Render for TextArea {
                 let snapshot = accessible_cache
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .publish_document(
+                    .publish_document_regions(
                         builder,
                         &document,
                         anchor,
@@ -2279,7 +2341,8 @@ impl Render for TextArea {
                         accessible_direction,
                         &accessible_rows,
                         accessibility_revision,
-                        geometry.map_or(0..0, |geometry| geometry.visible_range()),
+                        geometry
+                            .map_or_else(Vec::new, |geometry| geometry.visible_ranges().to_vec()),
                         geometry.map_or(1.0, |geometry| geometry.scale_factor),
                         |range| {
                             geometry

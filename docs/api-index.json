@@ -1933,6 +1933,7 @@
         "Edited",
         "Changed",
         "SelectionChanged",
+        "FoldChanged",
         "Pasted",
         "Submitted",
         "Cancelled",
@@ -1944,7 +1945,8 @@
       "scenes": [
         "editor",
         "editor-multicursor",
-        "editor-services"
+        "editor-services",
+        "editor-folding"
       ]
     },
     {
@@ -8851,6 +8853,7 @@
         "Edited",
         "Changed",
         "SelectionChanged",
+        "FoldChanged",
         "Pasted",
         "Submitted",
         "Cancelled",
@@ -8859,6 +8862,16 @@
         "Parsed",
         "SyntaxUnavailable"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorFold",
+      "path": "gpui_kit::controls::EditorFold",
+      "summary": "A fold header and its body, in zero-based, half-open source line indices. The first line remains visible. Identities must be unique and stable across caller updates. Nested folds are supported; crossing ranges are refused.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],
@@ -15729,6 +15742,18 @@
         "Editor"
       ],
       "example": "fn editor_services(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::controls::editor::*;\n    if !cx.has_global::<SceneEditorServices>() {\n        let editors = [\"ready\", \"loading\", \"refused\", \"hover\"].map(|state| {\n            let editor = cx.new(|cx| {\n                Editor::new(\n                    format!(\"scene.editor.services.{state}\"),\n                    format!(\"Language service {state} fixture\"),\n                    \"let count = val;\\n// caller-owned fixture\",\n                    window,\n                    cx,\n                )\n                .rows(3)\n                .language_services(true)\n            });\n            editor.update(cx, |editor, cx| {\n                let kind = if state == \"hover\" {\n                    EditorServiceKind::Hover\n                } else {\n                    EditorServiceKind::Completion\n                };\n                let request = editor\n                    .request_service(kind, 14, cx)\n                    .expect(\"fixture request\");\n                editor.set_diagnostics(\n                    0,\n                    vec![EditorDiagnostic {\n                        id: \"unresolved-value\".into(),\n                        range: 12..15,\n                        message: \"Fixture: unresolved name\".into(),\n                        severity: EditorDiagnosticSeverity::Warning,\n                    }],\n                    cx,\n                );\n                editor.set_semantic_tokens(\n                    0,\n                    vec![EditorSemanticToken {\n                        range: 0..3,\n                        class: gpui_kit_theme::SyntaxColor::Keyword,\n                    }],\n                    cx,\n                );\n                let result = match state {\n                    \"loading\" => AsyncValue::loading(),\n                    \"refused\" => AsyncValue::refused(\"Fixture host denied this request\"),\n                    \"hover\" => AsyncValue::ready(EditorServiceResult::Hover(EditorHover {\n                        range: 12..15,\n                        contents: \"Fixture: value → integer\\nDocumentation is caller text.\".into(),\n                    })),\n                    _ => AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {\n                        id: \"value\".into(),\n                        label: \"value\".into(),\n                        detail: Some(\" · integer (fixture)\".into()),\n                        effect: EditorServiceEffect::Edits(vec![EditorReplacement {\n                            range: 12..15,\n                            text: \"value\".into(),\n                        }]),\n                    }])),\n                };\n                editor.set_service_result(request.id, result, cx);\n            });\n            editor\n        });\n        cx.set_global(SceneEditorServices(editors.into()));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(900.0))\n        .child(caption(&theme, \"caller fixtures · completion / loading / host refusal / hover + diagnostic · no server process\"))\n        .children(cx.global::<SceneEditorServices>().0.chunks(2).map(|pair| {\n            row(&theme).items_start().children(pair.iter().map(|editor| div().w(px(430.0)).h(px(225.0)).child(editor.clone())))\n        }))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "editor-folding",
+      "capture": "cargo run -p xtask -- headless capture editor-folding",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_folding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneFoldedEditor>() {\n        let editor = cx.new(|cx| Editor::new(\"scene.editor.folding\", \"Folded Unicode source fixture\", \"fn outer() {\\n    let 界 = 13;\\n    if ready {\\n        process();\\n    }\\n}\\nfn tail() {}\\n\", window, cx).rows(6));\n        editor.update(cx, |editor, cx| {\n            use crate::controls::editor::EditorFold;\n            editor.set_folds(\n                0,\n                vec![\n                    EditorFold {\n                        id: \"outer\".into(),\n                        lines: 0..6,\n                    },\n                    EditorFold {\n                        id: \"ready\".into(),\n                        lines: 2..5,\n                    },\n                ],\n                cx,\n            );\n            editor.set_fold_collapsed(\"ready\", true, cx);\n        });\n        cx.set_global(SceneFoldedEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · nested source folds · gutter toggles or Ctrl-Alt-F · hidden text remains in the document\"))\n        .child(cx.global::<SceneFoldedEditor>().0.clone())\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",

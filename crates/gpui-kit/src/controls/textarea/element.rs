@@ -120,14 +120,16 @@ impl Element for TextAreaElement {
         let layout = if wrap == TextAreaWrap::None && !empty {
             let document = area.document();
             let (_, visible) = area.source_viewport(line_height, bounds.size.height);
-            let layout = EditableTextLayout::unwrapped(
+            let layout = EditableTextLayout::unwrapped_projected(
                 document,
                 window.text_system().clone(),
                 font_size,
                 line_height,
                 runs,
                 visible,
-            );
+                area.source_projection(),
+            )
+            .expect("current source line projection");
             // Width and painting share these same shaped visible rows.
             layout.painted_lines().for_each(drop);
             layout

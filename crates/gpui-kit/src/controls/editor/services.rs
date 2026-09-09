@@ -354,23 +354,31 @@ impl Editor {
 
     pub(super) fn diagnostic_spans(
         &self,
-        mut base: (u64, Vec<(Range<usize>, gpui::HighlightStyle)>),
+        base: (u64, Vec<(Range<usize>, gpui::HighlightStyle)>),
         cx: &Context<Self>,
     ) -> (u64, Vec<(Range<usize>, gpui::HighlightStyle)>) {
         let area = self.area.read(cx);
         let revision = area.revision();
         let theme = cx.theme();
-        let document = area.document();
         let line_height = px(theme
             .type_style(gpui_kit_theme::TypeScale::Code)
             .line_height);
-        let (_, rows) = area.source_viewport(line_height, line_height * self.rows as f32);
-        let visible = document
-            .line_range(rows.start)
-            .map_or(0, |range| range.start)
-            ..document
-                .line_range(rows.end.saturating_sub(1))
-                .map_or(document.len(), |range| range.end);
+        let ranges = area.visible_source_ranges(line_height, line_height * self.rows as f32);
+        let spans = ranges
+            .into_iter()
+            .flat_map(|range| self.diagnostic_spans_in(base.clone(), range, cx).1)
+            .collect();
+        (revision, spans)
+    }
+
+    fn diagnostic_spans_in(
+        &self,
+        mut base: (u64, Vec<(Range<usize>, gpui::HighlightStyle)>),
+        visible: Range<usize>,
+        cx: &Context<Self>,
+    ) -> (u64, Vec<(Range<usize>, gpui::HighlightStyle)>) {
+        let revision = self.area.read(cx).revision();
+        let theme = cx.theme();
         base.1
             .retain(|(range, _)| range.start < visible.end && visible.start < range.end);
         if base.0 != revision {

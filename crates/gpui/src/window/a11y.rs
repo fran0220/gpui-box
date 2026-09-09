@@ -1031,6 +1031,60 @@ mod tests {
     }
 
     #[test]
+    fn disjoint_painted_regions_do_not_republish_hidden_unicode_paragraphs() {
+        let text = format!("header\n{}tail😀\n", "界 אבג asymmetric\n".repeat(2000));
+        let mut buffer = crate::EditBuffer::new(crate::EditRules::default());
+        buffer.set_text(&text);
+        let document = buffer.snapshot();
+        let rows: Vec<_> = (0..document.line_count())
+            .map(|line| document.line_range(line).expect("line"))
+            .collect();
+        let tail = text.find("tail").expect("tail");
+        let mut a11y = new_a11y();
+        let mut cache = crate::AccessibleTextCache::default();
+        for frame in 0..2 {
+            a11y.begin_frame();
+            assert!(
+                a11y.nodes
+                    .push(NodeId(1), accesskit::Node::new(Role::MultilineTextInput))
+            );
+            {
+                let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes);
+                cache
+                    .publish_document_regions(
+                        &mut builder,
+                        &document,
+                        0,
+                        document.len(),
+                        accesskit::TextDirection::LeftToRight,
+                        &rows,
+                        0,
+                        vec![0..7, tail..text.len()],
+                        1.0,
+                        |_| Vec::new(),
+                    )
+                    .expect("complete logical text");
+            }
+            a11y.nodes.pop();
+            a11y.end_frame(super::debug::FrameDebugInfo::default());
+            if frame == 1 {
+                let work = cache.work();
+                assert_eq!(work.segmented_bytes, 0);
+                assert!(work.published_runs <= 3, "{work:?}");
+                assert!(work.published_text_bytes <= 20, "{work:?}");
+                assert!(work.retained_runs >= 2000, "{work:?}");
+            }
+            assert_eq!(
+                a11y.debug_tree_json()
+                    .expect("complete tree")
+                    .matches("asymmetric")
+                    .count(),
+                2000
+            );
+        }
+    }
+
+    #[test]
     fn edited_paragraphs_retain_other_native_nodes_and_reject_stale_positions() {
         for count in [1000, 10000] {
             let row = "{\"asymmetric\":\"界\",\"value\":13},\n";

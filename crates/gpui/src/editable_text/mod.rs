@@ -10,12 +10,14 @@ mod buffer;
 mod document;
 mod history;
 mod layout;
+mod projection;
 mod style_runs;
 
 pub use buffer::{EditBuffer, EditOutcome, EditRules};
 pub use document::{EditDifference, EditSnapshot};
 pub use history::EditCause;
 pub use layout::{EditableTextLayout, EditableTextWork};
+pub use projection::EditableLineProjection;
 pub use style_runs::{EditableStyleRun, EditableStyleRuns};
 
 use std::ops::Range;

@@ -14,6 +14,8 @@ pub use syntax::{EditorParseWork, EditorSyntax, EditorSyntaxCapture, EditorSynta
 
 mod services;
 pub use services::*;
+mod folding;
+pub use folding::EditorFold;
 
 use std::ops::Range;
 use std::rc::Rc;
@@ -41,7 +43,8 @@ gpui::actions!(
         RequestCompletion,
         RequestHover,
         RequestDefinition,
-        RequestCodeActions
+        RequestCodeActions,
+        ToggleFold
     ]
 );
 
@@ -51,6 +54,7 @@ pub(crate) fn install(cx: &mut App) {
         gpui::KeyBinding::new("f12", RequestDefinition, Some("Editor")),
         gpui::KeyBinding::new("ctrl-k ctrl-i", RequestHover, Some("Editor")),
         gpui::KeyBinding::new("ctrl-.", RequestCodeActions, Some("Editor")),
+        gpui::KeyBinding::new("ctrl-alt-f", ToggleFold, Some("Editor")),
     ]);
 }
 
@@ -187,6 +191,8 @@ pub enum EditorEvent {
     Changed(gpui::EditSnapshot),
     /// The byte selection changed on grapheme boundaries.
     SelectionChanged(Range<usize>),
+    /// A caller-identified fold changed its transient collapsed state.
+    FoldChanged { id: SharedString, collapsed: bool },
     /// The platform clipboard supplied non-text input.
     Pasted(Pasted),
     /// The configured submit chord was pressed.
@@ -227,6 +233,8 @@ pub struct Editor {
     hover_position: Option<(u64, usize)>,
     diagnostics: Option<(u64, Vec<EditorDiagnostic>)>,
     semantic_tokens: Option<(u64, Vec<EditorSemanticToken>)>,
+    folds: Vec<EditorFold>,
+    collapsed_folds: std::collections::HashSet<SharedString>,
     #[cfg(feature = "syntax")]
     syntax: Option<EditorSyntax>,
     _subscription: Subscription,
@@ -283,6 +291,8 @@ impl Editor {
             hover_position: None,
             diagnostics: None,
             semantic_tokens: None,
+            folds: Vec::new(),
+            collapsed_folds: std::collections::HashSet::new(),
             #[cfg(feature = "syntax")]
             syntax: None,
             _subscription: subscription,
@@ -398,7 +408,7 @@ impl Editor {
             .into_iter()
             .enumerate()
             .map(|(index, range)| EditorLineGeometry {
-                line: index + 1,
+                line: self.area.read(cx).document().line_at(range.start) + 1,
                 range,
                 bounds: Bounds::new(
                     point(origin.x, origin.y + geometry.line_height * index as f32),
@@ -436,6 +446,8 @@ impl Editor {
     ) {
         match event {
             TextAreaEvent::Edited(edit) => {
+                self.folds.clear();
+                self.collapsed_folds.clear();
                 let refresh = self
                     .service_popup
                     .as_ref()
@@ -455,6 +467,7 @@ impl Editor {
             }
             TextAreaEvent::Change(value) => cx.emit(EditorEvent::Changed(value.clone())),
             TextAreaEvent::SelectionChanged(selection) => {
+                self.expand_caret_fold(cx);
                 if self.service_popup.as_ref().is_some_and(|popup| {
                     popup.request.position != area.read(cx).cursor_offset()
                         || popup.request.selection != *selection
@@ -554,21 +567,16 @@ impl Editor {
         {
             return fallback;
         }
-        let document = area.document();
         let theme = cx.theme();
         let line_height = px(theme
             .type_style(gpui_kit_theme::TypeScale::Code)
             .line_height);
-        let (_, rows) = area.source_viewport(line_height, line_height * self.rows as f32);
-        let first = document
-            .line_range(rows.start)
-            .map(|range| range.start)
-            .unwrap_or(0);
-        let last = document
-            .line_range(rows.end.saturating_sub(1))
-            .map(|range| range.end)
-            .unwrap_or(document.len());
-        match syntax.highlights(first..last, theme) {
+        let ranges = area.visible_source_ranges(line_height, line_height * self.rows as f32);
+        let spans = ranges.into_iter().try_fold(Vec::new(), |mut spans, range| {
+            spans.extend(syntax.highlights(range, theme)?);
+            Ok::<_, SharedString>(spans)
+        });
+        match spans {
             Ok(spans) => (
                 revision,
                 spans
@@ -643,8 +651,9 @@ impl Render for Editor {
             .type_style(gpui_kit_theme::TypeScale::Code)
             .line_height);
         let scroll = self.area.read(cx).scroll_offset();
-        let first_line = ((scroll / line_height).floor() as usize).min(line_count - 1);
-        let last_line = (first_line + self.rows + 1).min(line_count);
+        let projection = self.area.read(cx).source_projection();
+        let first_line = ((scroll / line_height).floor() as usize).min(projection.rows() - 1);
+        let last_line = (first_line + self.rows + 1).min(projection.rows());
         let numbers = self.line_numbers.then(|| {
             div()
                 .relative()
@@ -659,7 +668,9 @@ impl Render for Editor {
                         .top(line_height * first_line as f32 - scroll)
                         .left(px(0.0))
                         .w_full()
-                        .children((first_line..last_line).map(|index| {
+                        .children((first_line..last_line).map(|row| {
+                            let index = projection.source_line(row);
+                            let toggle = self.fold_toggle(index, cx);
                             div()
                                 .h(line_height)
                                 .pr(px(theme.spacing.xs))
@@ -671,6 +682,7 @@ impl Render for Editor {
                                 } else {
                                     theme.colors.text_faint
                                 })
+                                .children(toggle)
                                 .child(cx.numbers().count(index + 1))
                         })),
                 )
@@ -689,6 +701,21 @@ impl Render for Editor {
             .well(&theme)
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .track_focus(&focus)
+            .when(!self.disabled, |element| {
+                element.on_action(cx.listener(|editor, _: &ToggleFold, _, cx| {
+                    let area = editor.area.read(cx);
+                    let line = area.document().line_at(area.cursor_offset());
+                    let id = editor
+                        .folds
+                        .iter()
+                        .rev()
+                        .find(|fold| fold.lines.contains(&line))
+                        .map(|fold| fold.id.clone());
+                    if let Some(id) = id {
+                        editor.set_fold_collapsed(&id, !editor.is_fold_collapsed(&id), cx);
+                    }
+                }))
+            })
             .when(self.services_enabled && !self.disabled, |element| {
                 element
                     .on_action(cx.listener(|editor, _: &RequestCompletion, _, cx| {

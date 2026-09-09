@@ -5,6 +5,10 @@ GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
 source and assets retain the licenses and attribution below. GPUI Box is an
 independent derivative and is not an official Zed Industries project.
 
+Source-line projection, projected editable geometry, disjoint accessibility
+regions and Kit fold policy are original GPUI Box work without new third-party
+source or licenses. Historical import receipts remain frozen.
+
 Windows per-child hosting regions, empty-frame clearing, and retry-safe native
 region ownership are original GPUI Box corrections; no additional source was
 imported and the historical receipts remain frozen.

@@ -267,6 +267,7 @@ candidate value
 checked above
 configured parser without cancellation
 ctrl-k ctrl-i
+current source line projection
 deferred List acceptance requires stable keys
 drop request identities exhausted
 empty array
@@ -314,6 +315,7 @@ row keys must be unique
 series is nonempty
 slot was filled
 soft break
+source line index
 split `{id}` contains panels
 split `{id}` has {found} children, not 2
 stack `{id}` has children
@@ -330,6 +332,7 @@ unknown
 unknown-limit
 unrenderable, required
 unrendered html
+validated fold ranges
 visible series are drawn by the caller
 voice {field} {reason}
 withheld

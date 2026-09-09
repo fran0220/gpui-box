@@ -1571,6 +1571,40 @@ pub(super) fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElemen
         .into_any_element()
 }
 
+struct SceneFoldedEditor(Entity<Editor>);
+
+impl Global for SceneFoldedEditor {}
+
+pub(super) fn editor_folding(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneFoldedEditor>() {
+        let editor = cx.new(|cx| Editor::new("scene.editor.folding", "Folded Unicode source fixture", "fn outer() {\n    let 界 = 13;\n    if ready {\n        process();\n    }\n}\nfn tail() {}\n", window, cx).rows(6));
+        editor.update(cx, |editor, cx| {
+            use crate::controls::editor::EditorFold;
+            editor.set_folds(
+                0,
+                vec![
+                    EditorFold {
+                        id: "outer".into(),
+                        lines: 0..6,
+                    },
+                    EditorFold {
+                        id: "ready".into(),
+                        lines: 2..5,
+                    },
+                ],
+                cx,
+            );
+            editor.set_fold_collapsed("ready", true, cx);
+        });
+        cx.set_global(SceneFoldedEditor(editor));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme).w(px(760.0))
+        .child(caption(&theme, "fixture · nested source folds · gutter toggles or Ctrl-Alt-F · hidden text remains in the document"))
+        .child(cx.global::<SceneFoldedEditor>().0.clone())
+        .into_any_element()
+}
+
 struct SceneEditorServices(Vec<Entity<Editor>>);
 
 impl Global for SceneEditorServices {}

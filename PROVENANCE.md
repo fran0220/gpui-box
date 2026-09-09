@@ -4,6 +4,11 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+The source-line projection index, projected editable geometry, and disjoint
+painted accessibility regions are original GPUI Box framework work. Editor
+fold identities and transient toggle policy are original Kit work; no new
+source import or historical receipt change is involved.
+
 The September 2026 Windows hosting corrections (per-child regions, complete
 empty-frame submission, and retry-safe saved-region ownership) are original
 GPUI Box work. They do not change either frozen import receipt.

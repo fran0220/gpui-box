@@ -48,7 +48,7 @@ pub struct AccessibleTextCache {
     runs: Arc<[AccessibleRun]>,
     ids: Arc<[accesskit::NodeId]>,
     published: Option<PublishedAccessibleText>,
-    visible: Range<usize>,
+    visible: Vec<Range<usize>>,
     document: Option<EditSnapshot>,
     work: AccessibleTextWork,
 }
@@ -92,6 +92,36 @@ impl AccessibleTextCache {
         rows: &[Range<usize>],
         revision: u64,
         visible: Range<usize>,
+        scale: f32,
+        geometry: impl Fn(Range<usize>) -> Vec<Bounds<Pixels>>,
+    ) -> Option<PublishedAccessibleText> {
+        self.publish_document_regions(
+            builder,
+            document,
+            anchor,
+            focus,
+            direction,
+            rows,
+            revision,
+            vec![visible],
+            scale,
+            geometry,
+        )
+    }
+
+    /// Publishes disjoint painted regions without treating omitted source gaps
+    /// as visible. Logical text remains complete, including folded paragraphs.
+    #[allow(clippy::too_many_arguments)]
+    pub fn publish_document_regions(
+        &mut self,
+        builder: &mut A11ySubtreeBuilder,
+        document: &EditSnapshot,
+        anchor: usize,
+        focus: usize,
+        direction: accesskit::TextDirection,
+        rows: &[Range<usize>],
+        revision: u64,
+        visible: Vec<Range<usize>>,
         scale: f32,
         geometry: impl Fn(Range<usize>) -> Vec<Bounds<Pixels>>,
     ) -> Option<PublishedAccessibleText> {
@@ -148,7 +178,7 @@ impl AccessibleTextCache {
             rows,
             revision,
             Some((&geometry, scale)),
-            Some((self, visible)),
+            Some((self, vec![visible])),
             None,
         )
     }
@@ -483,7 +513,7 @@ fn publish_accessible_text_inner(
     visual_rows: &[Range<usize>],
     revision: u64,
     geometry: Option<(&dyn Fn(Range<usize>) -> Vec<Bounds<Pixels>>, f32)>,
-    mut cache: Option<(&mut AccessibleTextCache, Range<usize>)>,
+    mut cache: Option<(&mut AccessibleTextCache, Vec<Range<usize>>)>,
     difference: Option<&crate::EditDifference>,
 ) -> Option<PublishedAccessibleText> {
     let reused = cache.as_ref().is_some_and(|(cache, _)| {
@@ -564,12 +594,17 @@ fn publish_accessible_text_inner(
     for run in 0..run_count {
         let accessible_run = &runs[run];
         let visible = cache.as_ref().is_none_or(|(_, visible)| {
-            accessible_run.value.start < visible.end && visible.start < accessible_run.value.end
+            visible.iter().any(|visible| {
+                accessible_run.value.start < visible.end && visible.start < accessible_run.value.end
+            })
         });
         let was_visible = cache.as_ref().is_some_and(|(cache, _)| {
             old_index(run).is_some_and(|index| {
                 let old = &cache.runs[index];
-                old.value.start < cache.visible.end && cache.visible.start < old.value.end
+                cache
+                    .visible
+                    .iter()
+                    .any(|visible| old.value.start < visible.end && visible.start < old.value.end)
             })
         });
         if old_index(run).is_some()

@@ -660,3 +660,24 @@ rows are available. The mounted first-draw regression checks native value and
 all 1,003 text runs before any settling frame, plus the combined former/current
 viewport publication budget. This continuity is required for retained native
 ids to remain reusable across real edits.
+
+### Source folding preserves document coordinates
+
+`EditableLineProjection` stores visible line spans rather than one entry per
+source line. `EditableTextLayout::unwrapped_projected` shares the projection
+across paint, clipping geometry, hit testing, selection and vertical navigation.
+`AccessibleTextCache::publish_document_regions` keeps disjoint painted ranges
+separate while retaining complete logical text and native Value/AXValue.
+This does not make complete metadata or native parent values sublinear.
+
+`Editor::set_folds` accepts revision-tagged, caller-identified hard-line ranges.
+The header remains visible. Nested ranges are accepted, crossing ranges refused.
+Gutter controls and Ctrl-Alt-F toggle transient state; a source edit invalidates
+the ranges, and navigation into hidden text expands its ancestors. Callers
+publish new ranges after parsing the edited revision. Disabled controls have
+no toggle handler; read-only controls still allow browsing. The additive
+`EditorEvent::FoldChanged` variant requires exhaustive consumers to add a case.
+Line geometry reports original source line numbers, not projected row numbers.
+The `editor-folding` exhibit reviews nested collapsed and expanded headers.
+Linux framework/input checks cover projection and retained Unicode text;
+macOS/Windows rendering and native adapter checks remain their dispatch lanes.
