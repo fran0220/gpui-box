@@ -56,6 +56,17 @@ impl TreeGridRow {
         self
     }
 
+    /// Builds cells only when their columns are mounted or explicitly copied.
+    /// Uses the same horizontal virtualization contract as [`GridRow::cells_with`].
+    /// Eager cells supplied with [`Self::cell`] take precedence.
+    pub fn cells_with(
+        mut self,
+        render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static,
+    ) -> Self {
+        self.row = self.row.cells_with(render);
+        self
+    }
+
     pub fn branch(mut self, expanded: bool) -> Self {
         self.has_children = true;
         self.expanded = expanded;

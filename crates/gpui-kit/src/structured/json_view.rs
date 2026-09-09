@@ -87,10 +87,37 @@ pub enum JsonValue {
     String(SharedString),
     Array(Vec<JsonValue>),
     /// Members in document order. A repeated key is kept, not collapsed.
+    /// Rendering repeated keys requires [`Self::IdentifiedObject`]; without
+    /// caller identities the view reports an identity error, retaining this data.
     Object(Vec<(SharedString, JsonValue)>),
+    /// Ordered members with caller-owned identity independent of key and value.
+    IdentifiedObject(Vec<JsonMember>),
     /// Present, and not shown. Carries a description of the shape and no part
     /// of the value.
     Redacted(SharedString),
+}
+
+/// One identified object member. IDs must be nonempty and unique among siblings.
+/// A key may repeat; the ID must survive reorder and value or key edits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JsonMember {
+    pub id: SharedString,
+    pub key: SharedString,
+    pub value: JsonValue,
+}
+
+impl JsonMember {
+    pub fn new(
+        id: impl Into<SharedString>,
+        key: impl Into<SharedString>,
+        value: JsonValue,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            key: key.into(),
+            value,
+        }
+    }
 }
 
 impl JsonValue {
@@ -113,6 +140,13 @@ impl JsonValue {
                 .map(|(key, value)| (key.into(), value))
                 .collect(),
         )
+    }
+
+    /// Identifies members by caller ID. Paths use the reserved `~2` prefix
+    /// followed by an RFC 6901 escaped ID, e.g. `~2record~1a` for `record/a`.
+    /// Ordinary keys escape every `~`, so legacy paths cannot collide with it.
+    pub fn identified_object(members: impl IntoIterator<Item = JsonMember>) -> Self {
+        Self::IdentifiedObject(members.into_iter().collect())
     }
 
     /// Withholds a subtree, described by a shape the caller wrote.
@@ -143,6 +177,12 @@ impl JsonValue {
                 cx.numbers().plural(members.len()),
                 &[cx.numbers().count(members.len()).as_ref()],
             ),
+            JsonValue::IdentifiedObject(members) => strings.format_plural(
+                StringKey::JsonShapeEntryOne,
+                StringKey::JsonShapeEntries,
+                cx.numbers().plural(members.len()),
+                &[cx.numbers().count(members.len()).as_ref()],
+            ),
             JsonValue::Array(items) => strings.format_plural(
                 StringKey::JsonShapeItemOne,
                 StringKey::JsonShapeItems,
@@ -161,7 +201,7 @@ impl JsonValue {
             Self::Number(_) => ValueKind::Number,
             Self::String(_) => ValueKind::String,
             Self::Array(_) => ValueKind::Array,
-            Self::Object(_) => ValueKind::Object,
+            Self::Object(_) | Self::IdentifiedObject(_) => ValueKind::Object,
             Self::Redacted(_) => ValueKind::Redacted,
         }
     }
@@ -173,7 +213,24 @@ impl JsonValue {
         match self {
             Self::Array(items) => items.len(),
             Self::Object(members) => members.len(),
+            Self::IdentifiedObject(members) => members.len(),
             _ => 0,
+        }
+    }
+
+    fn valid_identities(&self) -> bool {
+        let mut ids = std::collections::HashSet::new();
+        match self {
+            Self::Object(members) => members
+                .iter()
+                .all(|(key, value)| ids.insert(key.as_ref()) && value.valid_identities()),
+            Self::IdentifiedObject(members) => members.iter().all(|member| {
+                !member.id.is_empty()
+                    && ids.insert(member.id.as_ref())
+                    && member.value.valid_identities()
+            }),
+            Self::Array(items) => items.iter().all(Self::valid_identities),
+            _ => true,
         }
     }
 }
@@ -207,6 +264,10 @@ impl ValueKind {
                 SharedString::new_static("empty object")
             }
             JsonValue::Object(_) => SharedString::new_static("object"),
+            JsonValue::IdentifiedObject(members) if members.is_empty() => {
+                SharedString::new_static("empty object")
+            }
+            JsonValue::IdentifiedObject(_) => SharedString::new_static("object"),
             // The shape is not published: a snapshot carries that the value
             // was withheld and nothing that describes it.
             JsonValue::Redacted(_) => SharedString::new_static("withheld"),
@@ -251,6 +312,15 @@ fn join(parent: &str, token: &str) -> SharedString {
     }
 }
 
+fn identified_path(parent: &str, id: &str) -> SharedString {
+    let token = format!("~2{}", escape(id));
+    if parent.is_empty() {
+        token.into()
+    } else {
+        format!("{parent}/{token}").into()
+    }
+}
+
 /// What is drawn to the right of a key.
 ///
 /// The container marks and the three JSON literals are syntax rather than
@@ -267,6 +337,10 @@ fn shown_text(value: &JsonValue) -> SharedString {
         JsonValue::Array(_) => SharedString::new_static("[…]"),
         JsonValue::Object(members) if members.is_empty() => SharedString::new_static("{}"),
         JsonValue::Object(_) => SharedString::new_static("{…}"),
+        JsonValue::IdentifiedObject(members) if members.is_empty() => {
+            SharedString::new_static("{}")
+        }
+        JsonValue::IdentifiedObject(_) => SharedString::new_static("{…}"),
         JsonValue::Redacted(_) => SharedString::new_static("••••••••"),
     }
 }
@@ -286,6 +360,9 @@ fn flatten(
         JsonValue::Object(members) => members
             .first()
             .map(|(key, _)| join(path.as_ref(), key.as_ref())),
+        JsonValue::IdentifiedObject(members) => members
+            .first()
+            .map(|member| identified_path(path.as_ref(), member.id.as_ref())),
         JsonValue::Array(items) if !items.is_empty() => Some(join(path.as_ref(), "0")),
         _ => None,
     };
@@ -309,6 +386,19 @@ fn flatten(
         return;
     }
     match value {
+        JsonValue::IdentifiedObject(members) => {
+            for member in members {
+                flatten(
+                    &member.value,
+                    identified_path(path.as_ref(), member.id.as_ref()),
+                    member.key.clone(),
+                    level + 1,
+                    Some(&path),
+                    expanded,
+                    out,
+                );
+            }
+        }
         JsonValue::Object(members) => {
             for (key, member) in members {
                 flatten(
@@ -457,7 +547,23 @@ impl JsonView {
 
     fn lines(&self, cx: &App) -> Vec<Line> {
         let mut lines = Vec::new();
+        if !self.value.valid_identities() {
+            return lines;
+        }
         match &self.value {
+            JsonValue::IdentifiedObject(members) => {
+                for member in members {
+                    flatten(
+                        &member.value,
+                        identified_path("", member.id.as_ref()),
+                        member.key.clone(),
+                        1,
+                        None,
+                        &self.expanded,
+                        &mut lines,
+                    );
+                }
+            }
             JsonValue::Object(members) => {
                 for (key, member) in members {
                     flatten(
@@ -592,6 +698,12 @@ fn keystroke_move(
 
 impl RenderOnce for JsonView {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        if !self.value.valid_identities() {
+            return crate::display::empty::EmptyState::new(self.ident.child("identity-error"), "Object member identities required")
+                .kind(crate::display::empty::EmptyKind::Failed)
+                .detail("Repeated keys require unique caller-owned member IDs. The document has not been changed.")
+                .into_any_element();
+        }
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let row_height = self.row_height.unwrap_or(metrics.height);
@@ -692,10 +804,13 @@ impl RenderOnce for JsonView {
             });
         }
 
-        container.semantic_in(
-            cx,
-            NodeSpec::new(view.ident.semantic_id(), Role::Tree).value(cx.numbers().count(count)),
-        )
+        container
+            .semantic_in(
+                cx,
+                NodeSpec::new(view.ident.semantic_id(), Role::Tree)
+                    .value(cx.numbers().count(count)),
+            )
+            .into_any_element()
     }
 }
 

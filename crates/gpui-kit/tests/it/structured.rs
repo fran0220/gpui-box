@@ -14,6 +14,101 @@ use gpui_kit_testkit::harness::Harness;
 
 // ------------------------------------------------------------------ documents
 
+#[gpui::test]
+fn identified_duplicate_members_keep_paths_across_reorder_and_value_edits(cx: &mut TestAppContext) {
+    let members = Rc::new(RefCell::new(vec![
+        JsonMember::new("number/~", "same", JsonValue::number("1.10")),
+        JsonMember::new("hidden", "same", JsonValue::redacted("private shape")),
+        JsonMember::new(
+            "branch",
+            "same",
+            JsonValue::object([("child", JsonValue::Bool(false))]),
+        ),
+    ]));
+    let build = members.clone();
+    let mut h = Harness::new(cx, gpui_kit::install, move |_, _| {
+        JsonView::new(
+            "members",
+            JsonValue::identified_object(build.borrow().clone()),
+        )
+        .expanded_paths(&["~2branch"])
+        .selected("~2number~1~0")
+        .visible_rows(6)
+        .into_any_element()
+    });
+    let first = h.node("members.~2number~1~0").expect("number member");
+    assert_eq!(first.value.as_deref(), Some("1.10"));
+    assert!(first.selected);
+    assert_eq!(
+        h.node("members.~2hidden")
+            .expect("redacted member")
+            .value
+            .as_deref(),
+        Some("withheld")
+    );
+    assert!(h.node("members.~2branch/child").is_some());
+    h.accessibility_tree(); // Debug duplicate-id assertion is active.
+    members.borrow_mut().rotate_left(1);
+    members
+        .borrow_mut()
+        .iter_mut()
+        .find(|m| m.id.as_ref() == "number/~")
+        .expect("stable numeric member")
+        .value = JsonValue::number("9.001");
+    h.frame();
+    let changed = h.node("members.~2number~1~0").expect("updated member");
+    assert_eq!(changed.id, first.id);
+    assert_eq!(changed.value.as_deref(), Some("9.001"));
+    assert!(changed.selected);
+    assert!(h.node("members.~2branch/child").is_some());
+    h.accessibility_tree();
+}
+
+#[gpui::test]
+fn ambiguous_object_identity_is_reported_without_dropping_or_renaming_members(
+    cx: &mut TestAppContext,
+) {
+    let duplicates = JsonValue::object([
+        ("same", JsonValue::number("1.10")),
+        ("same", JsonValue::redacted("shape")),
+    ]);
+    let retained = duplicates.clone();
+    let mut h = Harness::new(cx, gpui_kit::install, move |_, _| {
+        JsonView::new("legacy", duplicates.clone()).into_any_element()
+    });
+    assert!(h.node("legacy.identity-error").is_some());
+    h.accessibility_tree();
+    let JsonValue::Object(members) = retained else {
+        panic!("preserved object")
+    };
+    assert_eq!(members.len(), 2);
+    h.remount(|_, _| {
+        JsonView::new(
+            "invalid",
+            JsonValue::identified_object([
+                JsonMember::new("duplicate", "a", JsonValue::Null),
+                JsonMember::new("duplicate", "b", JsonValue::Null),
+            ]),
+        )
+        .into_any_element()
+    });
+    assert!(h.node("invalid.identity-error").is_some());
+    h.accessibility_tree();
+    h.remount(|_, _| {
+        JsonView::new(
+            "compatible",
+            JsonValue::object([
+                ("~2number/~", JsonValue::Null),
+                ("unique", JsonValue::Bool(true)),
+            ]),
+        )
+        .into_any_element()
+    });
+    assert!(h.node("compatible.~02number~1~0").is_some());
+    assert!(h.node("compatible.unique").is_some());
+    assert!(h.node("compatible.~2number~1~0").is_none());
+}
+
 /// A document holding the three facts a viewer usually confuses, plus a
 /// subtree the caller withheld.
 fn document() -> JsonValue {

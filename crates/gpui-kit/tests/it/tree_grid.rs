@@ -264,3 +264,66 @@ fn a_wide_tree_grid_keeps_hierarchy_context_frozen_while_fields_scroll(cx: &mut 
     );
     assert!(field_after.origin.x < owner_header_before.right());
 }
+
+#[gpui::test]
+fn lazy_tree_grid_cells_follow_both_viewports_and_eager_cells_override(cx: &mut TestAppContext) {
+    let built = Rc::new(RefCell::new(Vec::new()));
+    let output = built.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let output = output.clone();
+        div()
+            .w(px(430.))
+            .child(
+                TreeGrid::new("lazy-tree", 137, move |row, _, _| {
+                    let output = output.clone();
+                    TreeGridRow::new(format!("r{row}"), 1)
+                        .cell("c0", "Pinned override")
+                        .cells_with(move |column, _, _| {
+                            output.borrow_mut().push((row, column.to_string()));
+                            Cell::from(format!("{row}/{column}"))
+                        })
+                })
+                .columns((0..61).map(|i| {
+                    GridColumn::new(format!("c{i}"), format!("Column {i}"))
+                        .fixed(if i == 0 { 170. } else { 193. })
+                        .pinned(i == 0)
+                }))
+                .visible_rows(5),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    assert!(!built.borrow().is_empty());
+    assert!(
+        built
+            .borrow()
+            .iter()
+            .all(|(r, c)| *r < 10 && c != "c0" && c != "c60")
+    );
+    assert!(harness.node("lazy-tree.r0.c0").is_some());
+    built.borrow_mut().clear();
+    let at = harness.point_in("lazy-tree");
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: at,
+        delta: ScrollDelta::Pixels(point(px(-2400.), px(0.))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    harness.context().run_until_parked();
+    harness.frame();
+    assert!(
+        built.borrow().iter().any(|(_, c)| c
+            .trim_start_matches('c')
+            .parse::<usize>()
+            .expect("numeric fixture column")
+            > 8),
+        "built: {:?}",
+        built.borrow()
+    );
+    assert!(built.borrow().iter().all(|(_, c)| c != "c0" && c != "c60"));
+    built.borrow_mut().clear();
+    harness.scroll("lazy-tree", 1800.);
+    harness.frame();
+    assert!(built.borrow().iter().any(|(r, _)| *r > 20));
+    assert!(built.borrow().len() < 137 * 61 / 2);
+}

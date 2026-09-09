@@ -10487,6 +10487,18 @@
       ]
     },
     {
+      "name": "JsonMember",
+      "path": "gpui_kit::structured::JsonMember",
+      "summary": "One identified object member. IDs must be nonempty and unique among siblings. A key may repeat; the ID must survive reorder and value or key edits.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, key: impl Into<SharedString>, value: JsonValue) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "JsonValue",
       "path": "gpui_kit::structured::JsonValue",
       "summary": "A JSON value, plus the one thing JSON cannot say: that a subtree is being withheld on purpose.",
@@ -10497,6 +10509,7 @@
         "String",
         "Array",
         "Object",
+        "IdentifiedObject",
         "Redacted"
       ],
       "construct": [
@@ -10504,6 +10517,7 @@
         "string(text: impl Into<SharedString>) -> Self",
         "array(items: impl IntoIterator<Item = JsonValue>) -> Self",
         "object(members: impl IntoIterator<Item = (impl Into<SharedString>, JsonValue)>) -> Self",
+        "identified_object(members: impl IntoIterator<Item = JsonMember>) -> Self",
         "redacted(shape: impl Into<SharedString>) -> Self",
         "redacted_from(value: &JsonValue, cx: &App) -> Self"
       ],
@@ -15161,6 +15175,7 @@
       "options": [
         "text(text: impl Into<SharedString>) -> Self",
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
+        "cells_with(render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static) -> Self",
         "branch(expanded: bool) -> Self",
         "parent(id: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
