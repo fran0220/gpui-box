@@ -84,9 +84,13 @@ fixture or change any existing allocation ratchet.
 Markdown history contains distinct message identities and parsed emphasis and
 inline code. A static redraw must add zero parser passes, parsed/copied bytes,
 or planned rows; its input comparisons are explicitly linear in message count.
-The next two frames insert a new 21-byte Markdown message and append another
+The next two phases insert a new 21-byte Markdown message and append another
 21 bytes to that same source. Parser work must be exactly one pass and 21/42
 parsed bytes respectively; each update copies exactly 21 source bytes.
+These phases include scrolling to the new tail and settling its redraw;
+semantic assertions prove the streamed message is mounted. Allocation and
+caller-conversion observations include every render in those phases, not
+just the final frame whose structural counters are checked.
 These small per-message sources exercise the synchronous retained-plan path,
 not background parsing of a single source above the worker threshold.
 

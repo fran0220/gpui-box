@@ -258,15 +258,19 @@ fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
             .collect::<Vec<_>>(),
     ));
     let input = blocks.clone();
+    let conversions = Rc::new(Cell::new(0usize));
+    let converted = conversions.clone();
     let mut cx = TestAppContext::single();
     let mut harness = Harness::new(&mut cx, gpui_kit::install, move |_, _| {
         AgentDocument::new("perf.markdown")
             .blocks(input.borrow().iter().map(|(id, source)| {
+                converted.set(converted.get() + 1);
                 AgentDocumentBlock::markdown(id.clone(), source.clone()).streaming(true)
             }))
             .virtualized(VISIBLE_ROWS)
             .into_any_element()
     });
+    harness.scroll("perf.markdown", 1_000_000_000.0);
     harness.frame();
     harness.frame();
     let mut reports = Vec::new();
@@ -281,8 +285,13 @@ fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
         } else if phase == "stream" {
             blocks.borrow_mut().last_mut().expect("tail").1 = format!("{delta}{delta}").into();
         }
+        conversions.set(0);
         begin_allocation_measurement();
         harness.frame();
+        if phase != "static" {
+            harness.scroll("perf.markdown", 1_000_000_000.0);
+            harness.frame();
+        }
         let allocations = end_allocation_measurement();
         let requested_bytes = HEAP_REQUESTED_BYTES.load(Ordering::Acquire);
         let after =
@@ -292,6 +301,10 @@ fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
         let copied = after.parser.copied_bytes - before.parser.copied_bytes;
         let planned = after.planned_rows - before.planned_rows;
         if phase == "static" {
+            anyhow::ensure!(
+                before.parser.parser_passes == items && before.planned_rows == items,
+                "initial history was not parsed and planned exactly once"
+            );
             anyhow::ensure!(
                 after.input_checks - before.input_checks == items,
                 "history input comparisons changed"
@@ -308,12 +321,21 @@ fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
                     && planned == items + if phase == "stream" { 2 } else { 1 },
                 "Markdown append work: {passes}/{parsed}/{copied}/{planned}"
             );
+            anyhow::ensure!(
+                harness
+                    .current_snapshot()
+                    .nodes
+                    .iter()
+                    .any(|node| node.id.starts_with("perf.markdown.block.new-message.")),
+                "streamed message was not mounted"
+            );
         }
         reports.push(serde_json::json!({"name":"markdown-history", "phase":phase,
             "dataset_items":items, "parser_passes":passes, "parsed_bytes":parsed,
             "copied_bytes":copied, "planned_rows":planned,
             "input_checks":after.input_checks-before.input_checks,
-            "caller_input_conversions":blocks.borrow().len(), "heap_allocations":allocations,
+            "caller_input_conversions":conversions.get(), "heap_allocations":allocations,
+            "measurement_scope":"update, tail reveal, and settled redraw; static is one redraw",
             "heap_requested_bytes":requested_bytes,
             "checked_frame":check_document_frame(&mut harness)?, "total_work_bounded":false}));
     }
