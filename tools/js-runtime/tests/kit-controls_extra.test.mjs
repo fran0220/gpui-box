@@ -8,6 +8,15 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('settings constructors require explicit titles and reject invented mutable methods', () => {
+  validateValue({title:'Storage',labelWidth:160,dimmedBy:'Policy'},familySchemas.SettingsSection.props);
+  for (const props of [{}, {title:'Storage',labelWidth:-1}, {title:'Storage',dimmedBy:true}, {title:'Storage',onChange:'callback'}]) {
+    assert.throws(() => validateValue(props,familySchemas.SettingsSection.props));
+  }
+  assert.equal(familyMethods.SettingsList,undefined);
+  assert.equal(familyMethods.SettingsSection,undefined);
+});
+
 test('copy contracts bound durations and prohibit serialized clipboard callbacks', () => {
   validateValue({text:'fixture',glyphOnly:'Copy value',confirmationMs:0}, familySchemas.CopyButton.props);
   for (const props of [{confirmationMs:-1},{confirmationMs:60001},{confirmationMs:0.5},{copier:'write'},{glyphOnly:''}]) {
@@ -87,6 +96,13 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.SettingsList('settings', {query:'quota'}, {}, {sections:[kit.SettingsSection('section', {title:'Storage'}, {}, {rows:[kit.SettingsRow('row', {label:'Capacity'}, {}, {control:[kit.Button('change',{label:'Change'})]})]})],header:[],empty:[],sidebar:[],footer:[]});
+// @ts-expect-error sections require native section builders, not ordinary rows
+kit.SettingsList('bad', {}, {}, {sections:[kit.SettingsRow('row',{label:'Wrong'})]});
+// @ts-expect-error section title is required
+kit.SettingsSection('bad', {});
+// @ts-expect-error typed row slots do not accept arbitrary text nodes
+kit.SettingsSection('bad', {title:'Bad'}, {}, {rows:[{kind:'text',id:'wrong'}]});
 kit.CopyButton('copy', {text:'fixture',glyphOnly:'Copy fixture'}, {copied() {}, failed(reason) { const text: string = reason; }});
 type CopyMethods = ControlsExtraMethodContracts['CopyButton']['invoke'];
 const copyValues: { [K in keyof CopyMethods]: CopyMethods[K]['args'] } = {

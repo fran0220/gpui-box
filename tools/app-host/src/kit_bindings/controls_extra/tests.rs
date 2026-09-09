@@ -3,6 +3,94 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn settings_nested_slots_filter_and_refusals_preserve_child_events(cx: &mut TestAppContext) {
+    use std::{cell::Cell, sync::mpsc};
+    let descriptor: Node = serde_json::from_value(json!({
+        "kind":"kit","component":"SettingsList","id":"settings","instance":7,
+        "slots":{
+            "header":[{"kind":"text","id":"header","instance":7,"text":"Fixture header"}],
+            "empty":[{"kind":"text","id":"empty","instance":7,"text":"No match"}],
+            "sections":[
+                {"kind":"kit","component":"SettingsSection","id":"storage","instance":7,"props":{"title":"Storage","description":"Fixture options","labelWidth":120},"slots":{
+                    "action":[{"kind":"button","id":"reset","instance":7,"text":"Reset","action":"reset"}],
+                    "rows":[
+                        {"kind":"kit","component":"SettingsRow","id":"capacity","instance":7,"props":{"label":"Capacity","searchTerms":["quota"]},"slots":{"control":[{"kind":"kit","component":"Button","id":"change","instance":7,"props":{"label":"Change"},"events":{"click":"change"}}]}},
+                        {"kind":"kit","component":"SettingsRow","id":"locked","instance":7,"props":{"label":"Lock","managed":"Policy"},"slots":{"control":[{"kind":"kit","component":"SearchInput","id":"hidden","instance":7,"props":{"value":"not mounted"}}]}}
+                    ],
+                    "content":[
+                        {"kind":"text","id":"block-before","instance":7,"text":"Before mixed row"},
+                        {"kind":"kit","component":"SettingsRow","id":"mixed-row","instance":7,"props":{"label":"Mixed row","value":"Fixture value"}},
+                        {"kind":"text","id":"block-after","instance":7,"text":"After mixed row"}
+                    ]
+                }},
+                {"kind":"kit","component":"SettingsSection","id":"dimmed","instance":7,"props":{"title":"Unavailable settings","dimmedBy":"Not applicable"},"slots":{"rows":[{"kind":"kit","component":"SettingsRow","id":"withheld-row","instance":7,"props":{"label":"Withheld"},"slots":{"control":[{"kind":"kit","component":"SearchInput","id":"withheld","instance":7}]}}]}}
+            ]
+        }
+    })).expect("nested settings fixture");
+    let descriptor = Rc::new(RefCell::new(descriptor));
+    let kit = Rc::new(KitState::default());
+    let (outgoing, events) = mpsc::sync_channel(8);
+    let renderer = Rc::new(RefCell::new(crate::NodeRenderer {
+        outgoing,
+        kit: Rc::downgrade(&kit),
+        rendered_revision: Rc::new(Cell::new(1)),
+        clipboard: Default::default(),
+    }));
+    let (build_node, build_renderer, build_kit) =
+        (descriptor.clone(), renderer.clone(), kit.clone());
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let node = build_node.borrow();
+        let mut renderer = build_renderer.borrow_mut();
+        renderer.clipboard.reconcile(&node, &BTreeMap::new(), cx);
+        build_kit.reconcile(&node, cx);
+        renderer.node(&node, 1, window, cx)
+    });
+    assert!(
+        kit.controls_extra.searches.borrow().is_empty(),
+        "refused controls were never built"
+    );
+    let bounds = ["block-before", "mixed-row", "block-after"]
+        .map(|id| harness.node(id).expect("ordered content").bounds);
+    assert!(bounds.windows(2).all(|pair| pair[0].y < pair[1].y));
+    harness.click("change");
+    assert_eq!(
+        events.try_recv().expect("nested row action")["action"],
+        "change"
+    );
+    harness.click("reset");
+    assert_eq!(
+        events.try_recv().expect("section action")["action"],
+        "reset"
+    );
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("query".into(), json!("quota"));
+    harness.update(|_, cx| cx.refresh_windows());
+    assert!(harness.node("change").is_some());
+    assert!(harness.node("locked").is_none());
+    assert!(harness.node("dimmed").is_none());
+    assert!(
+        harness.node("block-before").is_none(),
+        "blocks require a section match"
+    );
+    assert!(harness.node("header").is_some());
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("query".into(), json!("no such setting"));
+    harness.update(|_, cx| cx.refresh_windows());
+    assert!(harness.node("change").is_none());
+    assert!(harness.node("empty").is_some());
+    assert!(harness.node("header").is_some());
+    let old_context = renderer.borrow().build_context(&descriptor.borrow(), 1);
+    renderer.borrow().rendered_revision.set(2);
+    harness.update(|window, cx| {
+        assert!(settings_list(&descriptor.borrow(), old_context, window, cx).is_err());
+    });
+}
+
+#[gpui::test]
 fn copy_native_owner_policy_readback_retained_options_and_commands(cx: &mut TestAppContext) {
     use gpui::{ClipboardItem, ClipboardOperation, EffectOwner};
     use std::cell::Cell;

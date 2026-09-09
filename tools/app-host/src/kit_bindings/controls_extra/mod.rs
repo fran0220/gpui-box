@@ -30,7 +30,77 @@ pub(super) const COMPONENTS: &[&str] = &[
     "KeymapEditor",
     "ButtonGroup",
     "CopyButton",
+    "SettingsSection",
+    "SettingsList",
 ];
+
+pub(super) fn settings_section(
+    node: &Node,
+    context: crate::construction::NativeBuildContext,
+    window: &mut Window,
+    cx: &mut App,
+) -> anyhow::Result<SettingsSection> {
+    let mut section = SettingsSection::new(node.id.clone(), text(node, "title"));
+    if node.props.contains_key("description") {
+        section = section.description(text(node, "description"));
+    }
+    if node.props.contains_key("labelWidth") {
+        section = section.label_width(gpui::px(number(node, "labelWidth", 0.)));
+    }
+    if node.props.contains_key("dimmedBy") {
+        // Do not construct controls or subscribe to events that cannot apply.
+        return Ok(section.dimmed_by(text(node, "dimmedBy")));
+    }
+    section = section.rows(context.typed.build(
+        "rows",
+        "SettingsRow",
+        window,
+        cx,
+        |child, context, _, _, window, cx| Ok(settings_row(child, context.slots, window, cx)),
+    )?);
+    // `rows` is the homogeneous convenience slot; `content` preserves arbitrary
+    // native row/block interleaving, including every child's effect boundary.
+    for content in context.typed.build_mixed(
+        "content",
+        "SettingsRow",
+        window,
+        cx,
+        |child, context, _, _, window, cx| Ok(settings_row(child, context.slots, window, cx)),
+    )? {
+        section = match content {
+            crate::construction::TypedSlotContent::Typed(row) => section.row(row),
+            crate::construction::TypedSlotContent::Element(element) => section.child(element),
+        };
+    }
+    if let Some(action) = context.slots.get("action").cloned() {
+        section = section.action(move |window, cx| action(window, cx));
+    }
+    Ok(section)
+}
+
+pub(super) fn settings_list(
+    node: &Node,
+    context: crate::construction::NativeBuildContext,
+    window: &mut Window,
+    cx: &mut App,
+) -> anyhow::Result<SettingsList> {
+    let sections = context.typed.build(
+        "sections",
+        "SettingsSection",
+        window,
+        cx,
+        |child, context, _, _, window, cx| settings_section(child, context, window, cx),
+    )?;
+    let mut list = SettingsList::new(node.id.clone())
+        .query(text(node, "query"))
+        .sections(sections);
+    for name in ["empty", "header", "sidebar", "footer"] {
+        if let Some(slot) = context.slots.get(name).cloned() {
+            list = list.slot(name, move |window, cx| slot(window, cx));
+        }
+    }
+    Ok(list)
+}
 
 /// The host supplies the mounted, revision-checked typed construction context.
 /// Child handlers and scopes survive the native group's join/size transforms.

@@ -32,6 +32,8 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  SettingsList: { props: object({ query: string }), events: {}, slots: ['sections', 'empty', 'header', 'sidebar', 'footer'] },
+  SettingsSection: { props: object({ title: string, description: string, dimmedBy: string, labelWidth: { type: 'number', min: 0, max: 100000 } }, ['title']), events: {}, slots: ['rows', 'content', 'action'] },
   CopyButton: { props: object({ ...common, text: string, label: string, glyphOnly: identity, variant, confirmationMs: confirmation }), events: { copied: choice(null), failed: string } },
   ButtonGroup: { props: object(common), events: {}, slots: ['buttons'] },
   KeymapEditor: { props: object({ disabled: boolean, commands: array(keymapCommand), query: string }), events: { addCaptured: object({ command_id: identity, keystroke: string }, ['command_id', 'keystroke']), remove: object({ command_id: identity, binding_id: identity }, ['command_id', 'binding_id']), reset: object({ command_id: identity }, ['command_id']), recordingCancelled: object({ command_id: identity }, ['command_id']) } },
