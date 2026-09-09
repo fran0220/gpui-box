@@ -1916,33 +1916,23 @@ impl Render for TextArea {
             })
             .w_full()
             .column()
-            // In a host's frame the area contributes only the text: a well
-            // inside the host's well is two surfaces for one control, and the
+            // In a host's frame the area contributes only the text: a frame
+            // inside the host's frame is two surfaces for one control, and the
             // type belongs to whatever the host put the area in.
             .when(self.frame == Frame::Own, |element| {
-                element
-                    .px(px(metrics.padding_x))
-                    .py(px(theme.spacing.xs))
-                    .radius(&theme, Radius::Control)
-                    .well(&theme)
-                    // The recess every field in the library rests in, and
-                    // invalidity colours the space it already holds rather
-                    // than adding a line. A refused area says so the way the
-                    // rest of the library does, in the weight of its text.
-                    .when(self.invalid, |element| {
-                        element
-                            .bg(theme.surface(gpui_kit_theme::Surface::Sunken).blend(
-                                theme.color_wash(
-                                    theme.colors.danger,
-                                    gpui_kit_theme::SemanticWash::Faint,
-                                ),
-                            ))
-                            .glow(&theme, theme.colors.danger)
-                    })
-                    .when(focused && !self.invalid, |element| {
-                        element.shadow(theme.focus_ring())
-                    })
-                    .text_size(px(metrics.font_size))
+                super::field::field_chrome(
+                    element,
+                    &theme,
+                    super::field::FieldState {
+                        focused,
+                        invalid: self.invalid,
+                        disabled: self.disabled,
+                    },
+                )
+                .px(px(metrics.padding_x))
+                .py(px(theme.spacing.xs))
+                .radius(&theme, Radius::Control)
+                .text_size(px(metrics.font_size))
             })
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_color(if self.disabled {

@@ -11,7 +11,7 @@ use gpui::{
     SharedString, Styled, Window, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Theme, TypeScale};
 
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
@@ -480,7 +480,11 @@ impl RenderOnce for Switch {
             .flex()
             .items_center()
             .rounded_full()
-            .p(px(theme.space(Space::Xxs)))
+            .border(px(theme.borders.hairline))
+            .border_color(theme.colors.control_hairline)
+            .p(px(
+                (theme.space(Space::Xxs) - theme.borders.hairline).max(0.0)
+            ))
             .bg(theme.colors.active.lerp(theme.colors.accent, drawn))
             .when(self.invalid, |track| {
                 track.shadow(theme.glow(theme.colors.danger))
@@ -489,7 +493,8 @@ impl RenderOnce for Switch {
                 div()
                     .size(knob)
                     .rounded_full()
-                    .bg(theme.colors.text_on_accent)
+                    .bg(theme.colors.white_fill)
+                    .elevation(&theme, Elevation::Raised)
                     .ml((width - knob - px(4.0)) * drawn),
             );
 

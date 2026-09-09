@@ -1650,6 +1650,24 @@ impl Theme {
         self.elevation.get(level)
     }
 
+    /// In-content control lighting: the requested elevation plus a top inset
+    /// highlight. Knobs use `Raised`; fields use `Flat`. Focus and invalid
+    /// halos append to this list so they never erase the resting material.
+    pub fn control_shadows(&self, level: Elevation) -> Vec<BoxShadow> {
+        let mut shadows = self.shadow(level).to_vec();
+        shadows.push(
+            BoxShadow::new(
+                px(0.0),
+                // The definition border paints last and covers the first
+                // hairline. Leave one more visible just inside that edge.
+                px(self.borders.hairline * 2.0),
+                self.colors.control_highlight,
+            )
+            .inset(),
+        );
+        shadows
+    }
+
     pub fn layer(&self, layer: Layer) -> i32 {
         self.z_index.get(layer)
     }

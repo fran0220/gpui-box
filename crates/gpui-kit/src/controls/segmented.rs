@@ -209,6 +209,11 @@ impl RenderOnce for SegmentedControl {
         let metrics = theme.control.get(self.size);
         let actionable = self.actionable();
         let strip_id = self.ident.semantic_id();
+        let radius = if self.size == ControlSize::Lg {
+            Radius::Pill
+        } else {
+            Radius::Control
+        };
         // One background for the whole strip, drawn inside whichever segment
         // holds. Because it is the same element from frame to frame, changing
         // the choice moves it rather than redrawing it somewhere else.
@@ -223,24 +228,22 @@ impl RenderOnce for SegmentedControl {
                 let ident = self.ident.child(segment.id.as_ref());
                 let hover_group = ident.child("hover").semantic_id();
                 let id = segment.id.clone();
-                // The raised pill says which segment the strip is on; the
-                // accent says the same thing in the one colour the rest of
-                // the library reserves for "this is the current answer", so a
-                // strip and a toggle group agree without being drawn alike.
+                // The raised knob carries selection. Colour is optional,
+                // caller-requested tint rather than a second default signal.
                 let label_color = if refused {
                     theme.colors.text_faint
                 } else if selected {
-                    segment.tint.unwrap_or(theme.colors.accent)
+                    segment.tint.unwrap_or(theme.colors.text)
                 } else {
-                    theme.colors.text_muted
+                    theme.colors.text
                 };
 
                 let fill = selected.then(|| {
                     div()
                         .absolute()
                         .inset_0()
-                        .radius(&theme, Radius::Control)
-                        .frame(&theme, Surface::Raised, Elevation::Raised)
+                        .radius(&theme, radius)
+                        .control_surface(&theme, Elevation::Raised)
                         .flip(&selection, window, cx)
                 });
 
@@ -249,12 +252,12 @@ impl RenderOnce for SegmentedControl {
                     .group(hover_group.clone())
                     .row()
                     .justify_center()
-                    .flex_none()
+                    .min_w_0()
                     .relative()
                     .h(px(metrics.height - 2.0 * theme.borders.hairline))
                     .gap(px(metrics.gap))
                     .px(px(metrics.padding_x))
-                    .radius(&theme, Radius::Control)
+                    .radius(&theme, radius)
                     .children(fill)
                     .when(segment.disabled, |element| {
                         element.opacity(theme.opacity.disabled)
@@ -293,12 +296,15 @@ impl RenderOnce for SegmentedControl {
 
         let mut strip = div()
             .id(self.ident.child("strip").element_id())
-            .row()
+            .grid()
+            .grid_cols(self.segments.len().max(1) as u16)
             .flex_none()
             .gap(px(theme.space(Space::Xxs)))
             .p(px(theme.space(Space::Xxs)))
-            .radius(&theme, Radius::Control)
+            .radius(&theme, radius)
             .surface(&theme, Surface::Sunken)
+            .border(px(theme.borders.hairline))
+            .border_color(theme.colors.control_hairline)
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

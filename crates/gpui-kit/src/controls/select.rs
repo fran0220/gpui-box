@@ -16,7 +16,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
@@ -655,97 +655,91 @@ impl Render for Select {
         let hang = geometry.map_or(Hang::Start, |geometry| geometry.hang);
         let menu = geometry.map(|geometry| self.menu(geometry, cx));
 
-        let trigger = div()
-            .id(self.ident.element_id())
-            .when(!self.disabled, |element| {
-                element
-                    .track_focus(&self.focus_handle)
-                    .on_key_down(cx.listener(Self::on_key_down))
-            })
-            .w_full()
-            .row_reading(direction)
-            .items_center()
-            .justify_between()
-            .gap(px(theme.space(Space::Sm)))
-            .h(px(metrics.height))
-            .px(px(metrics.padding_x))
-            .radius(&theme, Radius::Control)
-            .well(&theme)
-            .when(self.invalid, |element| {
-                element
-                    .bg(theme.surface(gpui_kit_theme::Surface::Sunken).blend(
-                        theme.color_wash(theme.colors.danger, gpui_kit_theme::SemanticWash::Faint),
-                    ))
-                    .glow(&theme, theme.colors.danger)
-            })
-            .when(focused && !self.invalid, |element| {
-                element.shadow(theme.focus_ring())
-            })
-            .when(!self.disabled, |element| {
-                element.cursor_pointer().on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(|select, _, window, cx| select.toggle(window, cx)),
-                )
-            })
-            .child(
-                foundation_text(&theme, TypeScale::Label, label)
-                    .flex_1()
-                    .min_w_0()
-                    .text_size(px(metrics.font_size))
-                    .text_color(if self.disabled {
-                        theme.colors.text_disabled
-                    } else if !has_choice {
-                        theme.colors.text_placeholder
-                    } else {
-                        theme.colors.text
-                    }),
+        let trigger = super::field::field_shell(
+            &theme,
+            self.size,
+            super::field::FieldState {
+                focused,
+                invalid: self.invalid,
+                disabled: self.disabled,
+            },
+        )
+        .id(self.ident.element_id())
+        .when(!self.disabled, |element| {
+            element
+                .track_focus(&self.focus_handle)
+                .on_key_down(cx.listener(Self::on_key_down))
+        })
+        .w_full()
+        .row_reading(direction)
+        .items_center()
+        .justify_between()
+        .h(px(metrics.height))
+        .when(!self.disabled, |element| {
+            element.cursor_pointer().on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|select, _, window, cx| select.toggle(window, cx)),
             )
-            // The two affordances travel together at the trailing edge. Left
-            // to a space-between row the clear lands wherever the value
-            // happened to end, which is a control floating in the middle of a
-            // field.
-            .child(
-                div()
-                    .row_reading(direction)
-                    .flex_none()
-                    .gap_token(&theme, Space::Xs)
-                    .when(self.clearable && has_choice && !self.disabled, |element| {
-                        let clear = self.ident.child("clear");
-                        element.child(
-                            div()
-                                .id(clear.element_id())
-                                .flex_none()
-                                .cursor_pointer()
-                                .on_mouse_down(
-                                    MouseButton::Left,
-                                    cx.listener(|select, _, _, cx| {
-                                        select.clear(cx);
-                                        cx.stop_propagation();
-                                    }),
-                                )
-                                .child(
-                                    icon(Icon::Close)
-                                        .size(px(metrics.icon_size * 0.8))
-                                        .text_color(theme.colors.text_muted),
-                                )
-                                .semantic_in(
-                                    cx,
-                                    NodeSpec::new(clear.semantic_id(), Role::Button)
-                                        .parent(self.ident.semantic_id())
-                                        .text(cx.strings().text(StringKey::SelectClear)),
-                                ),
-                        )
-                    })
-                    .child(
-                        // One glyph in both states: the menu itself shows
-                        // whether the control is open, and a flipped arrow
-                        // would say it twice.
-                        icon(Icon::AltArrowDown)
-                            .size(px(metrics.icon_size * 0.9))
-                            .text_color(theme.colors.text_muted),
-                    ),
-            )
-            .semantic_in(cx, spec);
+        })
+        .child(
+            foundation_text(&theme, TypeScale::Label, label)
+                .flex_1()
+                .min_w_0()
+                .text_size(px(metrics.font_size))
+                .text_color(if self.disabled {
+                    theme.colors.text_disabled
+                } else if !has_choice {
+                    theme.colors.text_placeholder
+                } else {
+                    theme.colors.text
+                }),
+        )
+        // The two affordances travel together at the trailing edge. Left
+        // to a space-between row the clear lands wherever the value
+        // happened to end, which is a control floating in the middle of a
+        // field.
+        .child(
+            div()
+                .row_reading(direction)
+                .flex_none()
+                .gap_token(&theme, Space::Xs)
+                .when(self.clearable && has_choice && !self.disabled, |element| {
+                    let clear = self.ident.child("clear");
+                    element.child(
+                        div()
+                            .id(clear.element_id())
+                            .flex_none()
+                            .cursor_pointer()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|select, _, _, cx| {
+                                    select.clear(cx);
+                                    cx.stop_propagation();
+                                }),
+                            )
+                            .child(
+                                icon(Icon::Close)
+                                    .size(px(metrics.icon_size * 0.8))
+                                    .text_color(theme.colors.text_muted),
+                            )
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(clear.semantic_id(), Role::Button)
+                                    .parent(self.ident.semantic_id())
+                                    .text(cx.strings().text(StringKey::SelectClear)),
+                            ),
+                    )
+                })
+                .child(
+                    // One glyph in both states: the menu itself shows
+                    // whether the control is open, and a flipped arrow
+                    // would say it twice.
+                    icon(Icon::AltArrowDown)
+                        .size(px(metrics.icon_size * 0.9))
+                        .text_color(theme.colors.text_muted),
+                ),
+        )
+        .semantic_in(cx, spec);
         let measured = Rc::clone(&self.trigger_bounds);
         let trigger = div()
             .w_full()

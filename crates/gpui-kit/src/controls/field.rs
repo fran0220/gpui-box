@@ -3,8 +3,8 @@
 //! One frame carries the surface, focus and invalid treatment every editable
 //! control wears. The editable surface itself arrives with `TextInput`.
 
-use gpui::{Styled, div, prelude::FluentBuilder, px};
-use gpui_kit_theme::{ControlSize, Radius, SemanticWash, Space, Surface, Theme};
+use gpui::{InteractiveElement, Styled, div, px};
+use gpui_kit_theme::{ControlSize, Elevation, Radius, SemanticWash, Space, Theme};
 
 use crate::foundation::StyledExt;
 
@@ -57,7 +57,7 @@ pub fn nested_control_size(size: ControlSize) -> ControlSize {
 /// control is not two nested frames.
 pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui::Div {
     let metrics = theme.control.get(size);
-    div()
+    field_chrome(div(), theme, state)
         .w_full()
         .flex()
         .flex_row()
@@ -66,20 +66,6 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         .min_h(px(metrics.height))
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
-        .well(theme)
-        // The recess is the whole resting treatment. Invalidity deepens it
-        // with a danger wash and halo; focus is the shared soft halo resolved
-        // against this exact fill.
-        .when(state.invalid, |field| {
-            field
-                .bg(theme
-                    .surface(Surface::Sunken)
-                    .blend(theme.color_wash(theme.colors.danger, SemanticWash::Faint)))
-                .shadow(theme.glow(theme.colors.danger))
-        })
-        .when(state.focused && !state.invalid, |field| {
-            field.shadow(theme.focus_ring())
-        })
         .text_size(px(metrics.font_size))
         .font_fallbacks(gpui_kit_assets::text_fallbacks())
         .text_color(if state.disabled {
@@ -89,10 +75,65 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         })
 }
 
+/// Geometry-independent material shared by single-line shells and owned
+/// multiline frames. Host-framed editors deliberately do not call this.
+pub(crate) fn field_chrome<T: Styled + InteractiveElement>(
+    field: T,
+    theme: &Theme,
+    state: FieldState,
+) -> T {
+    let fill = if state.invalid {
+        theme
+            .colors
+            .control
+            .blend(theme.color_wash(theme.colors.danger, SemanticWash::Faint))
+    } else {
+        theme.colors.control
+    };
+    let mut shadows = theme.control_shadows(Elevation::Flat);
+    if state.invalid {
+        shadows.extend(theme.glow(theme.colors.danger));
+    } else if state.focused {
+        shadows.extend(theme.focus_ring_on(fill));
+    }
+    let field = field
+        .control_surface(theme, Elevation::Flat)
+        .bg(fill)
+        .shadow(shadows);
+    if !state.disabled && !state.invalid {
+        field.hover(|style| style.bg(theme.colors.control_hover))
+    } else {
+        field
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use gpui_kit_theme::Theme;
+
+    #[test]
+    fn interaction_halos_preserve_the_control_highlight() {
+        let theme = Theme::studio_dark();
+        for state in [
+            FieldState::default(),
+            FieldState::default().focused(true),
+            FieldState::default().invalid(true),
+            FieldState::default().focused(true).invalid(true),
+        ] {
+            let mut field = field_shell(&theme, ControlSize::Md, state);
+            let shadows = field.style().box_shadow.as_ref().expect("control lighting");
+            assert_eq!(
+                shadows
+                    .iter()
+                    .filter(|s| s.style == gpui::ShadowStyle::Inset)
+                    .count(),
+                1
+            );
+            assert_eq!(shadows[0].color, theme.colors.control_highlight);
+            assert_eq!(shadows.len() > 1, state.focused || state.invalid);
+        }
+    }
 
     /// A stepper has to be shorter than the field around it, or the field's
     /// own corners and border are behind it rather than around it.

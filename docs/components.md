@@ -66,6 +66,19 @@ medium action controls use `Radius::Control`; large controls use capsules.
 | `ColorPicker`, `ColorSwatch` | builder | the colour under continuous adjustment, or the caller-owned swatch that was picked | Hue, saturation-brightness, optional opacity, presets, and recents over one caller-owned `Hsla`. A swatch applies nothing and keeps selection separate from the colour it reports |
 | `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
 
+In-content fields and Select triggers share `StyledExt::control_surface`:
+`surface.control`, `interactive.controlHairline`, and a top inset
+`interactive.controlHighlight`. Focus and invalid halos append without
+replacing the highlight. This material is opaque, not Liquid Glass.
+Owned TextArea frames (including MentionInput's editor) share the same field
+material and state policy without adopting single-line layout. `Frame::Host`
+continues to contribute no fill, border, padding, or halo of its own.
+`Theme::control_shadows(Elevation::Raised)` reuses the elevation authority for
+knobs instead of adding another shadow token. Segmented strips have equal
+widths and neutral selected text unless a segment explicitly supplies tint;
+Xs–Md use Control corners and Lg uses capsules. Switches retain accent on-state
+tracks, with a definition edge and a Raised knob shadow.
+
 ### Sensitive text remains one editor
 
 `PasswordInput` and `OneTimeCodeInput` do not duplicate editing. Each owns one

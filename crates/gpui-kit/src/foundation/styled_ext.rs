@@ -141,6 +141,16 @@ pub trait StyledExt: Styled + Sized {
         }
     }
 
+    /// A bordered in-content control, not a glass surface. The definition
+    /// edge is deliberately quieter than a focus indicator; the top inset
+    /// highlight remains when callers append interaction halos.
+    fn control_surface(self, theme: &Theme, elevation: Elevation) -> Self {
+        self.bg(theme.colors.control)
+            .border(px(theme.borders.hairline))
+            .border_color(theme.colors.control_hairline)
+            .shadow(theme.control_shadows(elevation))
+    }
+
     /// The shell every card-shaped surface in the library is made of.
     ///
     /// [`Card`](crate::display::card::Card) is the component a caller reaches

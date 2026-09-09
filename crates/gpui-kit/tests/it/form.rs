@@ -476,6 +476,31 @@ fn a_number_drawn_as_wrong_can_say_what_is_wrong_with_it(cx: &mut TestAppContext
 
 // -- SegmentedControl -----------------------------------------------------
 
+#[gpui::test]
+fn segments_with_asymmetric_labels_have_equal_widths(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        SegmentedControl::new("equal")
+            .segments([
+                Segment::new("short", "A"),
+                Segment::new("long", "Much longer label"),
+                Segment::new("middle", "Medium"),
+            ])
+            .selected("long")
+            .into_any_element()
+    });
+    let short = harness.node("equal.short").expect("short").bounds;
+    let long = harness.node("equal.long").expect("long").bounds;
+    let middle = harness.node("equal.middle").expect("middle").bounds;
+    assert!((short.width - long.width).abs() <= 1.0);
+    assert!((middle.width - long.width).abs() <= 1.0);
+    assert!(
+        short.width > 80.0,
+        "longest label determines equal track width"
+    );
+    assert!(short.x + short.width <= long.x);
+    assert!(long.x + long.width <= middle.x);
+}
+
 fn segmented(cx: &mut TestAppContext) -> (Harness, Rc<RefCell<Vec<String>>>) {
     let picked: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
     let sink = picked.clone();

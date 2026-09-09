@@ -380,6 +380,18 @@ pub(super) fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_change(|_, _, _| {}),
         )
         .child(
+            Switch::new("scene.choice.background-updates")
+                .label("Background updates")
+                .on(false)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Switch::new("scene.choice.managed-updates")
+                .label("Managed updates")
+                .on(true)
+                .disabled(true),
+        )
+        .child(
             Slider::new("scene.choice.temperature")
                 .label("Temperature")
                 .range(0.0, 2.0)
@@ -628,8 +640,8 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                     SegmentedControl::new("scene.form.visibility")
                         .label("Visibility")
                         .segments([
-                            Segment::new("private", "Private"),
-                            Segment::new("team", "Team"),
+                            Segment::new("private", "Only me"),
+                            Segment::new("team", "Workspace team"),
                             Segment::new("public", "Public").disabled(true),
                         ])
                         .selected("team")
@@ -637,16 +649,15 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 ),
         )
         .child(
-            // Beside the strip above, which is on the accent: the answer here
-            // is which colour-identified thing, so the segment that holds
-            // wears that thing's own colour and the rest of the strip is
-            // unchanged.
+            // The neutral strip above uses a raised knob alone. This large
+            // capsule opts into identity tint; selection does not invent it.
             FormField::new("scene.form.lane.form-field", "Lane")
                 .control("scene.form.lane")
                 .description("Each lane keeps the colour it is known by.")
                 .child(
                     SegmentedControl::new("scene.form.lane")
                         .label("Lane")
+                        .control_size(ControlSize::Lg)
                         .segments([
                             Segment::new("read", "Read")
                                 .tint(super::display::identity_tint(&theme, "agent.read")),
@@ -1203,6 +1214,16 @@ pub(super) fn input(window: &mut Window, cx: &mut App) -> AnyElement {
                 .control("scene.input.provider")
                 .description("Where a run is sent.")
                 .child(provider),
+        )
+        .child(caption(&theme, "Focused chrome fixture · not an editor"))
+        .child(
+            crate::controls::field::field_shell(
+                &theme,
+                ControlSize::Md,
+                crate::controls::field::FieldState::default().focused(true),
+            )
+            .child("Halo retains the inner highlight")
+            .semantic_in(cx, NodeSpec::new("scene.input.focused-chrome", Role::Group)),
         )
         .into_any_element()
 }
