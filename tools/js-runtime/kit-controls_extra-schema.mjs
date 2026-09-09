@@ -1,6 +1,7 @@
 // Only implemented native surfaces are advertised. All values are data-only.
 import { iconSchema } from './kit-icon-schema.mjs';
 import { menuItemsSchema, validateMenuItems } from './kit-overlay-schema.mjs';
+import { selectOptionSchema } from './kit-select-option-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { ...string, min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -34,6 +35,13 @@ const hitCount = { oneOf: [
 const searchEvents = { queryChanged:string,next:choice(null),previous:choice(null),cancelled:choice(null),matchCaseToggled:boolean,wholeWordToggled:boolean };
 const searchEvent = { oneOf:Object.entries(searchEvents).map(([kind,value])=>object({kind:choice(kind),value},['kind','value'])) };
 const textInputQuery = method({},object({$nativeRef:identity,type:choice('TextInput')},['$nativeRef','type']));
+const selectionProps = {...common,placeholder:string,invalid:boolean};
+const selectionCommands = {
+  set_placeholder:method({placeholder:{...string,nullable:true}},choice(null)),
+  set_invalid:method({invalid:boolean},choice(null)),set_disabled:method({disabled:boolean},choice(null)),set_control_size:method({size:common.size},choice(null)),
+};
+const optionCommands = {set_options:method({options:array(selectOptionSchema)},choice(null)),set_name:method({name:string},choice(null))};
+const selectionQueries = {is_disabled:method({},boolean),focus_handle:focusQuery};
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -53,6 +61,9 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  Combobox:{props:object({...selectionProps,name:string,options:array(selectOptionSchema),selected:identity,query:string,allowCustom:boolean}),events:{queryChanged:string,selected:identity,custom:string,opened:choice(null),closed:choice(null)}},
+  MultiSelect:{props:object({...selectionProps,name:string,options:array(selectOptionSchema),selected:array(identity),clearable:boolean}),events:{queryChanged:string,toggled:identity,removed:identity,cleared:choice(null),opened:choice(null),closed:choice(null)}},
+  TagInput:{props:object({...selectionProps,tags:array(identity),max:integer,collapseAt:integer,reorderable:boolean}),events:{added:string,removed:string,duplicate:string,refused:string,editRequested:string,moved:object({from:integer,to:integer},['from','to'])}},
   SearchField: { props:object({...common,placeholder:string,query:string,matchCase:boolean,wholeWord:boolean,count:hitCount}),events:searchEvents },
   FindReplace: { props:object({...common,count:hitCount}),events:{search:searchEvent,replacementChanged:string,replaceOne:choice(null),replaceAll:object({count:integer},['count']),close:choice(null)} },
   PasswordInput: { props: object({ ...authProps, placeholder: string }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
@@ -79,6 +90,9 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  Combobox:{invoke:{...selectionCommands,...optionCommands,set_selected:method({selected:{...identity,nullable:true}},choice(null)),set_query:method({text:string},choice(null)),set_allow_custom:method({allow:boolean},choice(null)),open:method({},choice(null)),toggle:method({},choice(null))},query:{...selectionQueries,query_input:textInputQuery,is_open:method({},boolean),query_text:method({},string),selected_id:method({},{...identity,nullable:true}),selected_option:method({},{...object({...selectOptionSchema.fields,description:{...string,nullable:true},group:{...string,nullable:true}},Object.keys(selectOptionSchema.fields)),nullable:true})}},
+  MultiSelect:{invoke:{...selectionCommands,...optionCommands,set_selected:method({selected:array(identity)},choice(null)),set_clearable:method({clearable:boolean},choice(null)),open:method({},choice(null))},query:{...selectionQueries,query_input:textInputQuery,selected_ids:method({},array(identity)),is_open:method({},boolean)}},
+  TagInput:{invoke:{...selectionCommands,set_tags:method({tags:array(identity)},choice(null)),set_max:method({max:{...integer,nullable:true}},choice(null)),set_collapse_at:method({visible:{...integer,nullable:true}},choice(null)),set_reorderable:method({reorderable:boolean},choice(null))},query:{...selectionQueries,field:textInputQuery,current:method({},array(identity)),targeted:method({},{...string,nullable:true}),refusal:method({},{...string,nullable:true})}},
   SearchField: {
     invoke:{set_query:method({text:string},choice(null)),set_count:method({count:hitCount},choice(null)),set_match_case:method({on:{...boolean,nullable:true}},choice(null)),set_whole_word:method({on:{...boolean,nullable:true}},choice(null)),set_placeholder:method({placeholder:{...string,nullable:true}},choice(null)),set_disabled:method({disabled:boolean},choice(null)),set_control_size:method({size:common.size},choice(null)),focus:method({},choice(null))},
     query:{count:method({},hitCount),query_text:method({},string),is_disabled:method({},boolean),query_input:textInputQuery,focus_handle:focusQuery},

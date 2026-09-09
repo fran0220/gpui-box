@@ -238,6 +238,43 @@ impl TagInput {
         &self.tags
     }
 
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    /// Restore the localized default without replacing the draft editor.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder;
+        let placeholder = self
+            .placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::TagInputPlaceholder));
+        self.field
+            .update(cx, |field, cx| field.set_placeholder(placeholder, cx));
+        cx.notify();
+    }
+
+    /// Change future acceptance; never truncate existing caller-owned tags.
+    pub fn set_max(&mut self, max: Option<usize>, cx: &mut Context<Self>) {
+        self.max = max;
+        cx.notify();
+    }
+
+    pub fn set_reorderable(&mut self, reorderable: bool, cx: &mut Context<Self>) {
+        self.reorderable = reorderable;
+        cx.notify();
+    }
+
+    pub fn set_collapse_at(&mut self, visible: Option<usize>, cx: &mut Context<Self>) {
+        self.collapse_at = visible.map(|visible| visible.max(1));
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
     pub fn field(&self) -> &Entity<TextInput> {
         &self.field
     }
@@ -368,11 +405,11 @@ impl Focusable for TagInput {
 impl Render for TagInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
-        if self.field.read(cx).placeholder_text().is_empty() {
-            let placeholder = self
-                .placeholder
-                .clone()
-                .unwrap_or_else(|| cx.strings().text(StringKey::TagInputPlaceholder));
+        let placeholder = self
+            .placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::TagInputPlaceholder));
+        if self.field.read(cx).placeholder_text() != &placeholder {
             self.field
                 .update(cx, |field, cx| field.set_placeholder(placeholder, cx));
         }

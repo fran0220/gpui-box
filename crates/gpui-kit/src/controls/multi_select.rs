@@ -21,6 +21,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::controls::select::SelectOption;
+use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt, text};
 use crate::layout::measure;
@@ -155,6 +156,60 @@ impl MultiSelect {
 
     pub fn selected_ids(&self) -> &[SharedString] {
         &self.selected
+    }
+
+    pub fn query_input(&self) -> &Entity<TextInput> {
+        &self.query
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        self.query
+            .update(cx, |query, cx| query.set_disabled(disabled, cx));
+        if disabled && self.open {
+            // A host policy change closes the popup, not the user's draft.
+            self.open = false;
+            self.active = None;
+            cx.emit(MultiSelectEvent::Closed);
+        }
+        cx.notify();
+    }
+
+    pub fn set_name(&mut self, name: SharedString, cx: &mut Context<Self>) {
+        self.name = name.clone();
+        self.query.update(cx, |query, cx| query.set_name(name, cx));
+        cx.notify();
+    }
+
+    /// `None` restores the localized selection placeholder without resetting text.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder;
+        let placeholder = self
+            .placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::SelectPlaceholder));
+        self.query
+            .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
+        cx.notify();
+    }
+
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        self.invalid = invalid;
+        cx.notify();
+    }
+
+    pub fn set_clearable(&mut self, clearable: bool, cx: &mut Context<Self>) {
+        self.clearable = clearable;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
     }
 
     pub fn is_open(&self) -> bool {
@@ -526,6 +581,18 @@ impl Render for MultiSelect {
                         .copied()
                         .map(|index| self.option(index, cx)),
                 )
+                .when(visible_indices.is_empty(), |list| {
+                    list.child(
+                        EmptyState::new(
+                            self.ident.child("empty"),
+                            cx.strings().format(
+                                StringKey::ComboboxNoMatch,
+                                &[self.query.read(cx).value().as_ref()],
+                            ),
+                        )
+                        .kind(EmptyKind::Empty),
+                    )
+                })
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("list").semantic_id(), Role::List),

@@ -246,6 +246,29 @@ impl Combobox {
         &self.query
     }
 
+    /// Restore the localized default with `None`, retaining the query editor.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder;
+        let placeholder = self.resolved_placeholder(cx);
+        self.query
+            .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
+        cx.notify();
+    }
+
+    pub fn set_allow_custom(&mut self, allow: bool, cx: &mut Context<Self>) {
+        self.allow_custom = allow;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         self.query
@@ -744,8 +767,8 @@ impl Render for Combobox {
                     .update(cx, |query, cx| query.set_text_quietly(label, cx));
             }
         }
-        if self.query.read(cx).placeholder_text().is_empty() {
-            let placeholder = self.resolved_placeholder(cx);
+        let placeholder = self.resolved_placeholder(cx);
+        if self.query.read(cx).placeholder_text() != &placeholder {
             self.query
                 .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
         }

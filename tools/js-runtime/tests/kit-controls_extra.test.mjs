@@ -8,6 +8,24 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('selection controls reuse full option metadata and exact native intent contracts',()=>{
+  const options=[{id:'a',label:'Alpha',description:'First',group:'Letters',disabled:true},{id:'b',label:'Beta'}];
+  for(const component of ['Combobox','MultiSelect']){
+    validateValue({options},familySchemas[component].props);
+    validateValue({options},familyMethods[component].invoke.set_options.args);
+    assert.throws(()=>validateValue({options:[options[0],options[0]]},familyMethods[component].invoke.set_options.args));
+    assert.throws(()=>validateValue({options:[{id:'x',label:'X',value:'invented'}]},familySchemas[component].props));
+  }
+  validateValue({id:'a',label:'Alpha',description:null,group:'Letters',disabled:true},familyMethods.Combobox.query.selected_option.result);
+  validateValue(null,familyMethods.Combobox.query.selected_option.result);
+  assert.throws(()=>validateValue({id:'a',label:'Alpha'},familyMethods.Combobox.query.selected_option.result));
+  validateValue({max:null},familyMethods.TagInput.invoke.set_max.args);
+  validateValue({visible:null},familyMethods.TagInput.invoke.set_collapse_at.args);
+  assert.throws(()=>validateValue({max:-1},familyMethods.TagInput.invoke.set_max.args));
+  validateValue({from:2,to:0},familySchemas.TagInput.events.moved);
+  assert.throws(()=>validateValue(['a'],familySchemas.MultiSelect.events.toggled));
+});
+
 test('search counts preserve unavailable and incomplete answers and nested native events', () => {
   for (const count of [{state:'unsearched'},{state:'counting'},{state:'none'},{state:'known',total:7,current:2},{state:'tooMany',counted:500},{state:'unavailable',reason:'Refused'}]) {
     validateValue({count},familyMethods.SearchField.invoke.set_count.args);
@@ -225,6 +243,13 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.Combobox('combo',{options:[{id:'a',label:'Alpha',description:'First',group:'Letters'}],allowCustom:true},{custom(text){const value:string=text;}});
+kit.MultiSelect('multi',{selected:['a']},{toggled(id){const value:string=id;}});
+kit.TagInput('tags',{tags:['a'],collapseAt:1},{moved(event){const index:number=event.from;}});
+// @ts-expect-error multi-select emits one toggled identity, not a replacement array
+kit.MultiSelect('bad',{}, {toggled(ids:string[]) {}});
+// @ts-expect-error options do not serialize native callbacks
+kit.Combobox('bad',{options:[{id:'a',label:'Alpha',onClick(){}}]});
 kit.SearchField('searchfield', {count:{state:'known',total:7,current:null},matchCase:true}, {next() {}});
 kit.FindReplace('find', {}, {search(event) { if(event.kind==='queryChanged') {const value:string=event.value;} }});
 // @ts-expect-error an incomplete count is not an exact total

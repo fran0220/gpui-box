@@ -20,6 +20,7 @@ use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 mod auth;
 mod recorder;
 mod search;
+mod selection;
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -49,6 +50,9 @@ pub(super) const COMPONENTS: &[&str] = &[
     "OneTimeCodeInput",
     "SearchField",
     "FindReplace",
+    "Combobox",
+    "MultiSelect",
+    "TagInput",
 ];
 
 pub(super) fn settings_section(
@@ -187,6 +191,9 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    comboboxes: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::combobox::Combobox>>>>,
+    multi_selects: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::multi_select::MultiSelect>>>>,
+    tag_inputs: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::tag_input::TagInput>>>>,
     search_fields: RefCell<HashMap<Key, Rc<Entry<SearchField>>>>,
     find_replaces: RefCell<HashMap<Key, Rc<Entry<FindReplace>>>>,
     passwords: RefCell<HashMap<Key, Rc<Entry<PasswordInput>>>>,
@@ -204,6 +211,21 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "Combobox" => self
+                .comboboxes
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "MultiSelect" => self
+                .multi_selects
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "TagInput" => self
+                .tag_inputs
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
             "SearchField" => self
                 .search_fields
                 .borrow()
@@ -271,6 +293,12 @@ impl State {
         cx: &App,
         refs: &crate::references::Registration<'_>,
     ) -> Option<anyhow::Result<Value>> {
+        if matches!(
+            node.component.as_deref(),
+            Some("Combobox" | "MultiSelect" | "TagInput")
+        ) {
+            return self.selection_reference_query(node, method, args, cx, refs);
+        }
         if matches!(
             node.component.as_deref(),
             Some("SearchField" | "FindReplace")
@@ -361,6 +389,15 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.comboboxes
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "Combobox"));
+        self.multi_selects
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "MultiSelect"));
+        self.tag_inputs
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "TagInput"));
         self.search_fields
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "SearchField"));
@@ -405,6 +442,12 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        match node.component.as_deref() {
+            Some("Combobox") => return self.render_combobox(node, window, cx, emit),
+            Some("MultiSelect") => return self.render_multi_select(node, window, cx, emit),
+            Some("TagInput") => return self.render_tag_input(node, window, cx, emit),
+            _ => {}
+        }
         if node.component.as_deref() == Some("SearchField") {
             return self.render_search_field(node, window, cx, emit);
         }
@@ -519,6 +562,18 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        match node.component.as_deref() {
+            Some("Combobox") => {
+                return self.invoke_combobox(node, method, args, query, _window, cx);
+            }
+            Some("MultiSelect") => {
+                return self.invoke_multi_select(node, method, args, query, _window, cx);
+            }
+            Some("TagInput") => {
+                return self.invoke_tag_input(node, method, args, query, _window, cx);
+            }
+            _ => {}
+        }
         if matches!(
             node.component.as_deref(),
             Some("SearchField" | "FindReplace")

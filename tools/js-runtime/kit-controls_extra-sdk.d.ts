@@ -1,4 +1,4 @@
-import type { ControlProps, KitNode, SlotNode } from './kit-sdk.js';
+import type { ControlProps, KitNode, SlotNode, SelectOption } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
 import type { MenuItemDescriptor } from './kit-overlay-sdk.js';
 import type { NativeRef } from './reference-sdk.js';
@@ -23,6 +23,9 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  Combobox(id:string,props?:ControlProps & {name?:string;placeholder?:string;invalid?:boolean;options?:SelectOption[];selected?:string;query?:string;allowCustom?:boolean},events?:{queryChanged?(text:string):void;selected?(id:string):void;custom?(text:string):void;opened?():void;closed?():void}):KitNode;
+  MultiSelect(id:string,props?:ControlProps & {name?:string;placeholder?:string;invalid?:boolean;options?:SelectOption[];selected?:string[];clearable?:boolean},events?:{queryChanged?(text:string):void;toggled?(id:string):void;removed?(id:string):void;cleared?():void;opened?():void;closed?():void}):KitNode;
+  TagInput(id:string,props?:ControlProps & {placeholder?:string;invalid?:boolean;tags?:string[];max?:number;collapseAt?:number;reorderable?:boolean},events?:{added?(text:string):void;removed?(text:string):void;duplicate?(text:string):void;refused?(reason:string):void;editRequested?(text:string):void;moved?(event:{from:number;to:number}):void}):KitNode;
   SearchField(id: string, props?: ControlProps & { placeholder?: string; query?: string; matchCase?: boolean; wholeWord?: boolean; count?: HitCount }, events?: { queryChanged?(value:string):void;next?():void;previous?():void;cancelled?():void;matchCaseToggled?(value:boolean):void;wholeWordToggled?(value:boolean):void }): KitNode;
   FindReplace(id: string, props?: ControlProps & { count?: HitCount }, events?: { search?(event:SearchFieldEvent):void;replacementChanged?(value:string):void;replaceOne?():void;replaceAll?(value:{count:number}):void;close?():void }): KitNode;
   PasswordInput(id: string, props?: SensitiveInputProps & { placeholder?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
@@ -62,7 +65,23 @@ interface SensitiveInputQueries extends FocusQueries {
   value: { args: Record<string, never>; result: string };
   is_disabled: { args: Record<string, never>; result: boolean };
 }
+type SelectionCommand<Args> = {args:Args;result:null};
+type SelectionQuery<Result> = {args:Record<string,never>;result:Result};
+interface SelectionCommands {
+  set_placeholder:SelectionCommand<{placeholder:string|null}>;
+  set_invalid:SelectionCommand<{invalid:boolean}>;
+  set_disabled:SelectionCommand<{disabled:boolean}>;
+  set_control_size:SelectionCommand<{size:'xs'|'sm'|'md'|'lg'}>;
+}
+interface OptionCommands {
+  set_options:SelectionCommand<{options:SelectOption[]}>;
+  set_name:SelectionCommand<{name:string}>;
+}
+interface SelectionQueries extends FocusQueries {is_disabled:SelectionQuery<boolean>}
 export interface ControlsExtraMethodContracts {
+  Combobox:{invoke:SelectionCommands & OptionCommands & {set_selected:SelectionCommand<{selected:string|null}>;set_query:SelectionCommand<{text:string}>;set_allow_custom:SelectionCommand<{allow:boolean}>;open:SelectionCommand<Record<string,never>>;toggle:SelectionCommand<Record<string,never>>};query:SelectionQueries & {query_input:SelectionQuery<NativeRef<'TextInput'>>;is_open:SelectionQuery<boolean>;query_text:SelectionQuery<string>;selected_id:SelectionQuery<string|null>;selected_option:SelectionQuery<{id:string;label:string;disabled:boolean;description:string|null;group:string|null}|null>}};
+  MultiSelect:{invoke:SelectionCommands & OptionCommands & {set_selected:SelectionCommand<{selected:string[]}>;set_clearable:SelectionCommand<{clearable:boolean}>;open:SelectionCommand<Record<string,never>>};query:SelectionQueries & {query_input:SelectionQuery<NativeRef<'TextInput'>>;is_open:SelectionQuery<boolean>;selected_ids:SelectionQuery<string[]>}};
+  TagInput:{invoke:SelectionCommands & {set_tags:SelectionCommand<{tags:string[]}>;set_max:SelectionCommand<{max:number|null}>;set_collapse_at:SelectionCommand<{visible:number|null}>;set_reorderable:SelectionCommand<{reorderable:boolean}>};query:SelectionQueries & {field:SelectionQuery<NativeRef<'TextInput'>>;current:SelectionQuery<string[]>;targeted:SelectionQuery<string|null>;refusal:SelectionQuery<string|null>}};
   SearchField: {
     invoke: {
       set_query: {args:{text:string};result:null};
