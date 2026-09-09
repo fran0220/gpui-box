@@ -579,3 +579,35 @@ fn frontmatter_is_visible_literal_metadata_not_hidden_configuration(cx: &mut Tes
         }]
     );
 }
+
+#[gpui::test]
+fn background_markdown_survives_large_small_large_replacements(cx: &mut TestAppContext) {
+    let padding = " \n".repeat(70000);
+    let source = Rc::new(RefCell::new(format!("# Large first\n\n{padding}")));
+    let rendered = source.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        Markdown::new("async-doc", rendered.borrow().clone()).into_any_element()
+    });
+    harness.frame();
+    assert!(harness.node("async-doc.heading-large-first").is_some());
+    *source.borrow_mut() = "# Small replacement".into();
+    harness.frame();
+    assert!(
+        harness
+            .node("async-doc.heading-small-replacement")
+            .is_some()
+    );
+    assert!(harness.node("async-doc.heading-large-first").is_none());
+    *source.borrow_mut() = format!("# Large latest\n\n{padding}");
+    harness.frame();
+    assert!(harness.node("async-doc.heading-large-latest").is_some());
+    assert!(
+        harness
+            .node("async-doc.heading-small-replacement")
+            .is_none()
+    );
+    source.borrow_mut().push_str("\n## Appended\n");
+    harness.frame();
+    assert!(harness.node("async-doc.heading-appended").is_some());
+    assert!(harness.node("async-doc.heading-large-latest").is_some());
+}

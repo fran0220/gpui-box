@@ -465,7 +465,12 @@ pub(super) fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
                         && language.as_deref() == Some("notice") {
                         Some(Callout::new(text.clone(), Tone::Info).id(ident.clone()).into_any_element())
                     } else { None }
-                })),
+                }))
+            // Hold worker states deterministically; the executor/coalescing
+            // tests exercise the actual transition into and out of them.
+            .child(caption(&theme, "Background parsing · state fixtures"))
+            .child(Markdown::new("scene.markdown.loading", "").parsing(true))
+            .child(Markdown::new("scene.markdown.refreshing", "The **last verified text** stays visible while its replacement is parsed.").parsing(true)),
     )
         .into_any_element()
 }

@@ -2179,3 +2179,63 @@ fn appending_to_a_selected_markdown_run_keeps_its_selection_identity(cx: &mut Te
     assert_eq!(after.text, before.text);
     assert_eq!(after.participants, before.participants);
 }
+
+#[gpui::test]
+fn background_agent_document_publishes_replacements_and_static_frames_reuse_work(
+    cx: &mut TestAppContext,
+) {
+    let padding = " \n".repeat(70000);
+    let source = Rc::new(RefCell::new(format!("# First large\n\n{padding}")));
+    let rendered = source.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        AgentDocument::new("async-agent")
+            .virtualized(8)
+            .block(AgentDocumentBlock::markdown(
+                "answer",
+                rendered.borrow().clone(),
+            ))
+            .into_any_element()
+    });
+    harness.frame();
+    assert!(
+        harness
+            .snapshot()
+            .nodes
+            .iter()
+            .any(|node| node.text.as_deref() == Some("First large"))
+    );
+    let work =
+        harness.update(|window, cx| AgentDocument::work(&Ident::from("async-agent"), window, cx));
+    for _ in 0..10 {
+        harness.frame();
+    }
+    let after =
+        harness.update(|window, cx| AgentDocument::work(&Ident::from("async-agent"), window, cx));
+    assert_eq!(after.parser, work.parser);
+    assert_eq!(after.planned_rows, work.planned_rows);
+    *source.borrow_mut() = format!("# Latest large\n\n{padding}");
+    harness.frame();
+    assert!(
+        harness
+            .snapshot()
+            .nodes
+            .iter()
+            .any(|node| node.text.as_deref() == Some("Latest large"))
+    );
+    assert!(
+        !harness
+            .snapshot()
+            .nodes
+            .iter()
+            .any(|node| node.text.as_deref() == Some("First large"))
+    );
+    *source.borrow_mut() = "# Small final".into();
+    harness.frame();
+    assert!(
+        harness
+            .snapshot()
+            .nodes
+            .iter()
+            .any(|node| node.text.as_deref() == Some("Small final"))
+    );
+}

@@ -10,7 +10,7 @@
 //! with the identity of the block that produced them. A reconnect therefore
 //! updates the same block rather than appending another anonymous message.
 
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, StyledText,
@@ -19,7 +19,10 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
-use crate::content::markdown::{Markdown, MarkdownEvent, parse, stream::Stream};
+use crate::content::markdown::{
+    Markdown, MarkdownEvent, parse,
+    stream::{BACKGROUND_BYTES, Background, Stream},
+};
 use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -435,7 +438,10 @@ impl AgentDocument {
             ..Default::default()
         };
         for plan in plans.markdown.values() {
-            let parser = plan.reader.work();
+            let parser = plan
+                .background
+                .as_ref()
+                .map_or_else(|| plan.reader.work(), |background| background.borrow().work);
             work.parser.parser_passes += parser.parser_passes;
             work.parser.parsed_bytes += parser.parsed_bytes;
             work.parser.copied_bytes += parser.copied_bytes;
@@ -548,7 +554,7 @@ impl RenderOnce for AgentDocument {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let state_name = self.state.as_str();
-        let busy = matches!(&self.state, AgentDocumentState::Loading(_));
+        let mut busy = matches!(&self.state, AgentDocumentState::Loading(_));
         let ident = self.ident.clone();
         let block_count = self.blocks.len();
 
@@ -609,7 +615,9 @@ impl RenderOnce for AgentDocument {
                         window.window_handle().window_id(),
                         cx,
                     );
-                    let plan = retained.borrow_mut().read(&blocks);
+                    let mut retained = retained.borrow_mut();
+                    busy |= retained.prepare(&blocks, window, cx);
+                    let plan = retained.read(&blocks);
                     // Ids rather than a count, so a block that grew re-measures
                     // itself alone instead of discarding every height the list
                     // had learned.
@@ -832,67 +840,165 @@ struct MarkdownPlan {
     reader: Stream,
     parts: Vec<Part>,
     generation: u64,
+    background: Option<Rc<RefCell<Background>>>,
+    background_generation: Option<u64>,
+}
+
+struct ParsedParts<'a> {
+    document: &'a parse::Document,
+    starts: &'a [usize],
+    stable: usize,
+    mended: Option<&'a parse::Document>,
 }
 
 impl MarkdownPlan {
     fn read(&mut self, source: &SharedString, streaming: bool) {
+        if let Some(background) = &self.background {
+            let background = background.borrow();
+            if self.background_generation == Some(background.generation) {
+                return;
+            }
+            self.generation += 1;
+            self.parts = plan_parts(
+                &self.parts,
+                self.generation,
+                &background.source,
+                self.streaming,
+                background.streaming,
+                ParsedParts {
+                    document: &background.document,
+                    starts: &background.starts,
+                    stable: background.stable,
+                    mended: background.mended.as_deref(),
+                },
+            );
+            if self.parts.is_empty() && background.pending() {
+                self.parts.push(Part {
+                    index: 0,
+                    last: true,
+                    range: 0..0,
+                    document: background.document.clone(),
+                    revision: self.generation,
+                });
+            }
+            self.source = Some(background.source.clone());
+            self.streaming = background.streaming;
+            self.background_generation = Some(background.generation);
+            return;
+        }
         if self.source.as_ref() == Some(source) && self.streaming == streaming {
             return;
         }
         self.reader.read(source);
         self.generation += 1;
         let mended = streaming.then(|| self.reader.mended_tail()).flatten();
-        let document = self.reader.document();
-        let starts = self.reader.starts();
-        let split = starts.len() == document.blocks.len();
-        let count = if split { starts.len() } else { 1 };
-        let old = std::mem::take(&mut self.parts);
-        self.parts = (0..count)
-            .map(|index| {
-                let range = if split {
-                    starts[index]..starts.get(index + 1).copied().unwrap_or(source.len())
-                } else {
-                    0..source.len()
-                };
-                let last = index + 1 == count;
-                if index < self.reader.stable()
-                    && let Some(part) = old.get(index)
-                    && part.range == range
-                    && part.last == last
-                    && !(last && self.streaming != streaming)
-                {
-                    return part.clone();
-                }
-                let parsed = if split {
-                    if last && let Some(mended) = &mended {
-                        (**mended).clone()
-                    } else {
-                        parse::Document {
-                            blocks: vec![document.blocks[index].clone()],
-                        }
-                    }
-                } else {
-                    document.clone()
-                };
-                let unchanged = old.get(index).filter(|part| {
-                    part.range == range && part.last == last && *part.document == parsed
-                });
-                Part {
-                    index,
-                    last,
-                    range,
-                    document: unchanged
-                        .map_or_else(|| Rc::new(parsed), |part| part.document.clone()),
-                    revision: unchanged.map_or(self.generation, |part| part.revision),
-                }
-            })
-            .collect();
+        self.parts = plan_parts(
+            &self.parts,
+            self.generation,
+            source,
+            self.streaming,
+            streaming,
+            ParsedParts {
+                document: self.reader.document(),
+                starts: self.reader.starts(),
+                stable: self.reader.stable(),
+                mended: mended.as_deref(),
+            },
+        );
         self.source = Some(source.clone());
         self.streaming = streaming;
     }
 }
 
+fn plan_parts(
+    old: &[Part],
+    generation: u64,
+    source: &str,
+    previous_streaming: bool,
+    streaming: bool,
+    parsed: ParsedParts<'_>,
+) -> Vec<Part> {
+    let ParsedParts {
+        document,
+        starts,
+        stable,
+        mended,
+    } = parsed;
+    let split = starts.len() == document.blocks.len();
+    let count = if split { starts.len() } else { 1 };
+    (0..count)
+        .map(|index| {
+            let range = if split {
+                starts[index]..starts.get(index + 1).copied().unwrap_or(source.len())
+            } else {
+                0..source.len()
+            };
+            let last = index + 1 == count;
+            if index < stable
+                && let Some(part) = old.get(index)
+                && part.range == range
+                && part.last == last
+                && !(last && previous_streaming != streaming)
+            {
+                return part.clone();
+            }
+            let parsed = if split {
+                if last && let Some(mended) = mended {
+                    mended.clone()
+                } else {
+                    parse::Document {
+                        blocks: vec![document.blocks[index].clone()],
+                    }
+                }
+            } else {
+                document.clone()
+            };
+            let unchanged = old.get(index).filter(|part| {
+                part.range == range && part.last == last && *part.document == parsed
+            });
+            Part {
+                index,
+                last,
+                range,
+                document: unchanged.map_or_else(|| Rc::new(parsed), |part| part.document.clone()),
+                revision: unchanged.map_or(generation, |part| part.revision),
+            }
+        })
+        .collect()
+}
+
 impl RowPlans {
+    fn prepare(&mut self, blocks: &[AgentDocumentBlock], window: &Window, cx: &mut App) -> bool {
+        let mut pending = false;
+        for block in blocks {
+            let AgentBlockBody::Markdown(source) = &block.body else {
+                continue;
+            };
+            if source.len() >= BACKGROUND_BYTES {
+                let plan = self.markdown.entry(block.id.clone()).or_default();
+                let background = plan.background.get_or_insert_with(|| {
+                    Rc::new(RefCell::new(Background::seeded(
+                        std::mem::take(&mut plan.reader),
+                        plan.streaming,
+                    )))
+                });
+                Background::read(background, source.clone(), block.streaming, window, cx);
+                let background = background.borrow();
+                pending |= background.pending();
+                if plan.background_generation != Some(background.generation) {
+                    self.inputs.clear();
+                }
+            } else if let Some(plan) = self.markdown.get_mut(&block.id)
+                && plan.background.take().is_some()
+            {
+                plan.source = None;
+                plan.background_generation = None;
+                self.inputs.clear();
+            }
+        }
+        pending
+    }
+
     fn read(&mut self, blocks: &[AgentDocumentBlock]) -> Rc<RowPlan> {
         if self.inputs.len() == blocks.len()
             && self.inputs.iter().zip(blocks).all(|(input, block)| {
@@ -1018,7 +1124,9 @@ fn render_block(
             let block_id = block.id.clone();
             Markdown::new(ident.child("markdown"), source.clone())
                 .when_some(part, |markdown, part| {
-                    markdown.parsed(part.document.clone())
+                    markdown
+                        .parsed(part.document.clone())
+                        .parsing(part.document.blocks.is_empty())
                 })
                 .selection_order_start(selection_order)
                 .streaming(streaming)

@@ -20,8 +20,10 @@
 
 use super::mend;
 use super::parse::{Block, Document};
+use gpui::{App, SharedString, Window};
 use std::{
     cell::{Cell, RefCell},
+    rc::Rc,
     sync::Arc,
 };
 
@@ -57,6 +59,142 @@ pub struct MarkdownStream {
 }
 
 pub(crate) type Stream = MarkdownStream;
+
+/// Large sources are parsed off the UI executor. One worker owns each source
+/// identity; updates arriving while it works replace the pending request.
+pub(crate) const BACKGROUND_BYTES: usize = 128 * 1024;
+
+#[derive(Default)]
+pub(crate) struct Background {
+    pub(crate) document: Rc<Document>,
+    pub(crate) mended: Option<Arc<Document>>,
+    pub(crate) starts: Rc<Vec<usize>>,
+    pub(crate) source: SharedString,
+    pub(crate) streaming: bool,
+    pub(crate) stable: usize,
+    pub(crate) generation: u64,
+    pub(crate) work: MarkdownWork,
+    reader: Option<Stream>,
+    desired: Option<(SharedString, bool)>,
+    request: u64,
+    running: bool,
+    publication_gap: bool,
+}
+
+struct BackgroundResult {
+    reader: Stream,
+    source: SharedString,
+    streaming: bool,
+    document: Document,
+    mended: Option<Arc<Document>>,
+    starts: Vec<usize>,
+    stable: usize,
+}
+
+impl BackgroundResult {
+    fn parse(mut reader: Stream, source: SharedString, streaming: bool) -> Self {
+        reader.read(&source);
+        let document = reader.document().clone();
+        let mended = streaming.then(|| reader.mended_tail()).flatten();
+        let starts = reader.starts().to_vec();
+        let stable = reader.stable();
+        Self {
+            reader,
+            source,
+            streaming,
+            document,
+            mended,
+            starts,
+            stable,
+        }
+    }
+}
+
+impl Background {
+    /// Transition from the synchronous path without blanking its last value.
+    /// The previous source is below the background threshold, so this one-time
+    /// snapshot copy is bounded; subsequent snapshots are built by the worker.
+    pub(crate) fn seeded(reader: Stream, streaming: bool) -> Self {
+        let source = SharedString::from(reader.source.clone());
+        let mut work = reader.work.get();
+        work.copied_bytes += reader.source.len();
+        reader.work.set(work);
+        let mut state = Self::default();
+        state.finish(0, BackgroundResult::parse(reader, source, streaming));
+        state
+    }
+
+    pub(crate) fn pending(&self) -> bool {
+        self.desired.as_ref().is_some_and(|(source, streaming)| {
+            source != &self.source || *streaming != self.streaming
+        })
+    }
+
+    pub(crate) fn read(
+        cell: &Rc<RefCell<Self>>,
+        source: SharedString,
+        streaming: bool,
+        window: &Window,
+        cx: &mut App,
+    ) {
+        let mut state = cell.borrow_mut();
+        if state
+            .desired
+            .as_ref()
+            .is_none_or(|(old, mode)| old != &source || *mode != streaming)
+        {
+            state.desired = Some((source.clone(), streaming));
+            state.request += 1;
+        }
+        if state.running || !state.pending() {
+            return;
+        }
+        state.running = true;
+        let request = state.request;
+        let reader = state.reader.take().unwrap_or_default();
+        drop(state);
+        let job = cx
+            .background_executor()
+            .spawn(async move { BackgroundResult::parse(reader, source, streaming) });
+        let weak = Rc::downgrade(cell);
+        let handle = window.window_handle();
+        cx.spawn(async move |cx| {
+            let result = job.await;
+            if let Some(cell) = weak.upgrade() {
+                cell.borrow_mut().finish(request, result);
+                // A stale completion still schedules the latest request on the
+                // next render, but cannot publish its obsolete document.
+                let _ = handle.update(cx, |_, window, _| window.refresh());
+            }
+        })
+        .detach();
+    }
+
+    fn finish(&mut self, request: u64, result: BackgroundResult) -> bool {
+        self.running = false;
+        self.work = result.reader.work();
+        self.reader = Some(result.reader);
+        if request != self.request {
+            self.publication_gap = true;
+            return false;
+        }
+        self.document = Rc::new(result.document);
+        self.mended = result.mended;
+        self.starts = Rc::new(result.starts);
+        // The worker's stable prefix is relative to its previous input, not
+        // necessarily the last document the UI was allowed to publish.
+        self.stable = if self.publication_gap {
+            0
+        } else {
+            result.stable
+        };
+        self.publication_gap = false;
+        self.source = result.source;
+        self.streaming = result.streaming;
+        self.generation += 1;
+        true
+    }
+}
 
 impl MarkdownStream {
     /// The revision of the retained source; unchanged reads do not advance it.
@@ -259,6 +397,99 @@ fn has_reference_definition(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stale_parse_never_publishes_or_reuses_an_unpublished_prefix() {
+        let old = "Old first.\n\nSecond.\n\nThird.\n\nTail.";
+        let replacement = "New first.\n\nSecond.\n\nThird.\n\nTail.";
+        let latest = format!("{replacement} More.");
+        let mut reader = Stream::default();
+        reader.read(old);
+        let copied = reader.work().copied_bytes;
+        let mut background = Background::seeded(reader, false);
+        assert_eq!(background.work.copied_bytes, copied + old.len());
+        background.request = 2;
+        background.desired = Some((latest.clone().into(), false));
+        let obsolete = BackgroundResult::parse(
+            background.reader.take().expect("seeded reader"),
+            replacement.into(),
+            false,
+        );
+        assert!(!background.finish(1, obsolete));
+        assert_eq!(*background.document, Document::parse(old));
+        assert!(background.pending());
+        let current = BackgroundResult::parse(
+            background.reader.take().expect("completed reader"),
+            latest.clone().into(),
+            false,
+        );
+        assert!(current.stable > 0, "worker can reuse the obsolete prefix");
+        assert!(background.finish(2, current));
+        assert_eq!(*background.document, Document::parse(&latest));
+        assert_eq!(background.stable, 0, "UI cannot reuse that prefix");
+        assert!(!background.pending());
+    }
+
+    #[gpui::test]
+    fn background_coalesces_pending_inputs_and_static_reads_do_no_work(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        struct Fixture;
+        impl gpui::Render for Fixture {
+            fn render(
+                &mut self,
+                _: &mut Window,
+                _: &mut gpui::Context<Self>,
+            ) -> impl gpui::IntoElement {
+                gpui::div()
+            }
+        }
+        let window = cx.add_window(|_, _| Fixture);
+        let cell = Rc::new(RefCell::new(Background::default()));
+        let source = "Paragraph.\n\n".repeat(12000);
+        window
+            .update(cx, |_, window, cx| {
+                for revision in 0..10 {
+                    Background::read(
+                        &cell,
+                        format!("{source}Tail {revision}").into(),
+                        false,
+                        window,
+                        cx,
+                    );
+                }
+                assert!(cell.borrow().document.blocks.is_empty());
+            })
+            .expect("fixture window");
+        cx.run_until_parked();
+        assert!(
+            cell.borrow().document.blocks.is_empty(),
+            "obsolete first request rejected"
+        );
+        let latest: SharedString = format!("{source}Tail 9").into();
+        window
+            .update(cx, |_, window, cx| {
+                Background::read(&cell, latest.clone(), false, window, cx);
+            })
+            .expect("fixture window");
+        cx.run_until_parked();
+        assert_eq!(*cell.borrow().document, Document::parse(&latest));
+        assert!(!cell.borrow().pending());
+        let work = cell.borrow().work;
+        assert_eq!(
+            work.parser_passes, 2,
+            "only first and latest input are parsed"
+        );
+        window
+            .update(cx, |_, window, cx| {
+                for _ in 0..100 {
+                    Background::read(&cell, latest.clone(), false, window, cx);
+                }
+            })
+            .expect("fixture window");
+        cx.run_until_parked();
+        assert_eq!(cell.borrow().work, work);
+    }
 
     #[test]
     fn frontmatter_and_later_rules_keep_document_context_at_every_prefix() {

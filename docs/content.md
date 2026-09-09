@@ -97,6 +97,19 @@ frames. Stable row keys and content revisions are separate: an append changes
 only affected row revisions, not semantic identities. Caller revision changes
 invalidate typed custom blocks; Markdown derives revisions per parsed part.
 
+At 128 KiB, standalone Markdown and virtualized AgentDocument move parsing to
+GPUI's background executor. Each source identity has at most one parse in
+flight; arriving replacements coalesce into the latest pending source. Small
+documents keep synchronous incremental updates. A large initial document
+shows localized Loading with a busy semantic state; a refresh retains the
+last verified document until the current parse completes. Characters may
+therefore appear together rather than one per frame. Obsolete completions
+never publish, and a worker prefix not previously published cannot be reused
+as a visible prefix. Completion refreshes only the owning window. Dropping a
+document or replacing it with a small source discards its completion target.
+This moves parsing, not standalone layout, off the UI executor: use virtualized
+AgentDocument for very long rendered documents.
+
 `MarkdownStream::work` counts parser passes, bytes submitted to those passes
 (including boundary discovery, fallback and mending), and source-buffer writes.
 It does not measure CPU time or syntax-tree allocation. `AgentDocument::work`

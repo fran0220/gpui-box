@@ -32,6 +32,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui::{
     AnyElement, App, ClipboardItem, FontWeight, HighlightStyle, Hsla, InteractiveElement,
@@ -131,6 +132,9 @@ pub struct Markdown {
     ident: Ident,
     source: SharedString,
     parsed: Option<Rc<Document>>,
+    parsed_tail: Option<Arc<Document>>,
+    parsed_starts: Option<Rc<Vec<usize>>>,
+    pending: bool,
     block_renderer: Option<BlockRenderer>,
     max_lines: Option<usize>,
     /// The first reading-order value this document may claim when it is
@@ -177,11 +181,19 @@ impl Markdown {
         self
     }
 
+    pub(crate) fn parsing(mut self, pending: bool) -> Self {
+        self.pending = pending;
+        self
+    }
+
     pub fn new(ident: impl Into<Ident>, source: impl Into<SharedString>) -> Self {
         Self {
             ident: ident.into(),
             source: source.into(),
             parsed: None,
+            parsed_tail: None,
+            parsed_starts: None,
+            pending: false,
             block_renderer: None,
             max_lines: None,
             selection_order_start: 0,
@@ -285,10 +297,48 @@ impl Markdown {
 }
 
 impl RenderOnce for Markdown {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
         let now = cx.background_executor().now();
+
+        if self.parsed.is_none() {
+            let retained = keyed::slot::<Option<Rc<RefCell<stream::Background>>>>(
+                &ident.child("background").semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            );
+            let mut retained = retained.borrow_mut();
+            if self.source.len() >= stream::BACKGROUND_BYTES {
+                let background = retained.get_or_insert_with(|| {
+                    let previous = keyed::slot::<Stream>(
+                        &ident.child("source").semantic_id(),
+                        window.window_handle().window_id(),
+                        cx,
+                    );
+                    Rc::new(RefCell::new(stream::Background::seeded(
+                        std::mem::take(&mut *previous.borrow_mut()),
+                        self.streaming,
+                    )))
+                });
+                stream::Background::read(
+                    background,
+                    self.source.clone(),
+                    self.streaming,
+                    window,
+                    cx,
+                );
+                let background = background.borrow();
+                self.parsed = Some(background.document.clone());
+                self.parsed_tail = background.mended.clone();
+                self.parsed_starts = Some(background.starts.clone());
+                self.pending = background.pending();
+            } else {
+                // Drop the weak completion target too: a superseded large
+                // parse must not overwrite a newer synchronous replacement.
+                *retained = None;
+            }
+        }
 
         // Parsing goes through the incremental reader whether the document is
         // streaming or not: a source that did not change costs nothing to read
@@ -302,9 +352,11 @@ impl RenderOnce for Markdown {
         if self.parsed.is_none() {
             reader.read(self.source.as_ref());
         }
-        let mended = (self.streaming && self.parsed.is_none())
-            .then(|| reader.mended_tail())
-            .flatten();
+        let mended = self.parsed_tail.clone().or_else(|| {
+            (self.streaming && self.parsed.is_none())
+                .then(|| reader.mended_tail())
+                .flatten()
+        });
         let parsed = self.parsed.as_deref().unwrap_or_else(|| reader.document());
         let prefix = &parsed.blocks[..parsed.blocks.len() - usize::from(mended.is_some())];
         let tail = mended
@@ -366,7 +418,11 @@ impl RenderOnce for Markdown {
             painter.reading_order = self
                 .selection_order_start
                 .saturating_add(index as u64 * (1 << 16));
-            let start = reader.starts().get(index).copied().unwrap_or(index);
+            let starts = self
+                .parsed_starts
+                .as_deref()
+                .map_or_else(|| reader.starts(), |starts| starts.as_slice());
+            let start = starts.get(index).copied().unwrap_or(index);
             painter.block_start = start;
             painter.run_index = 0;
             let block_ident = ident.child(format!("block-at-{start}"));
@@ -406,14 +462,25 @@ impl RenderOnce for Markdown {
         }
 
         let blocks = prefix.len() + tail.len();
+        if self.pending && blocks == 0 {
+            column = column.child(
+                crate::display::status::StatusLine::new(
+                    cx.strings().text(StringKey::Loading),
+                    crate::display::badge::Tone::Info,
+                )
+                .busy(ident.child("parsing")),
+            );
+        }
         column.semantic_in(
             cx,
-            NodeSpec::new(ident.semantic_id(), Role::Region).value(cx.strings().format_plural(
-                StringKey::MarkdownBlockOne,
-                StringKey::MarkdownBlocks,
-                cx.numbers().plural(blocks),
-                &[cx.numbers().count(blocks).as_ref()],
-            )),
+            NodeSpec::new(ident.semantic_id(), Role::Region)
+                .busy(self.pending)
+                .value(cx.strings().format_plural(
+                    StringKey::MarkdownBlockOne,
+                    StringKey::MarkdownBlocks,
+                    cx.numbers().plural(blocks),
+                    &[cx.numbers().count(blocks).as_ref()],
+                )),
         )
     }
 }
