@@ -54,7 +54,8 @@ export class Session extends EventEmitter {
       stdio: ['pipe', 'pipe', 'pipe'],
     };
     if (this.closed) {
-      await isolation.afterSpawn?.(); await isolation.cleanup?.();
+      try { await isolation.afterSpawn?.(); }
+      finally { await isolation.cleanup?.(); }
       throw new Error('Session disposed during launch');
     }
     const isolated = this.options.sandbox === 'linux';
@@ -76,13 +77,24 @@ export class Session extends EventEmitter {
     child.stderr.on('data', chunk => { if (meter(chunk.length)) this.emit('log', { level: 'error', message: chunk.toString().slice(0, 16384) }); });
     child.stdin.on('error', error => { if (!this.closed) this.fail(error.message); });
     child.on('error', error => this.fail(error.message));
-    this.exitPromise = new Promise(resolve => child.on('close', async (code, signal) => {
-      clearInterval(this.watchdog); this.cancelRequests();
-      const expected = this.closed; this.closed = true;
-      try { await isolation.cleanup?.(); }
-      catch (error) { this.emit('log', { level: 'error', message: `OS cleanup failed: ${error.message}` }); }
-      this.emit('exit', { code, signal, expected }); resolve();
+    // Only close proves that the owned child and its stdio have been reaped.
+    // Cleanup stays attached even if a caller's shutdown deadline expires.
+    this.closePromise = new Promise(resolve => child.once('close', (code, signal) => {
+      this.childClosed = true;
+      resolve({ code, signal });
     }));
+    this.exitPromise = this.closePromise.then(async ({ code, signal }) => {
+      clearInterval(this.watchdog);
+      const expected = this.closed; this.closed = true;
+      const errors = [];
+      try { this.cancelRequests(); } catch (error) { errors.push(error); }
+      try { await isolation.cleanup?.(); }
+      catch (error) { errors.push(error); }
+      try { this.emit('exit', { code, signal, expected }); } catch (error) { errors.push(error); }
+      if (errors.length) throw new AggregateError(errors, 'Worker exit cleanup failed');
+    });
+    // Natural exits may precede stop(); retain the rejection for that caller.
+    this.exitPromise.catch(() => {});
     readFrames(child.stdout, message => {
       if (message?.generation !== this.generation) return;
       if (this.closed && !['log', 'disposed'].includes(message.kind)) return;
@@ -113,7 +125,8 @@ export class Session extends EventEmitter {
       if (Date.now() - lastHeartbeat > this.options.timeoutMs) this.fail('Worker heartbeat deadline exceeded');
     }, 100);
     // Attach all handlers before yielding: a missing backend can fail immediately.
-    await isolation.afterSpawn?.();
+    try { await isolation.afterSpawn?.(); }
+    catch (error) { this.fail(error.message); throw error; }
     return this;
   }
   send(message) {
@@ -302,24 +315,59 @@ export class Session extends EventEmitter {
   }
   fail(message) {
     if (this.closed) return;
-    this.emit('fault', { message });
     this.closed = true;
     clearInterval(this.watchdog);
-    this.cancelRequests();
-    this.child?.kill('SIGKILL');
+    try { this.child?.kill('SIGKILL'); }
+    catch (error) { (this.lifecycleErrors ??= []).push(error); }
+    try { this.emit('fault', { message }); }
+    catch (error) { (this.lifecycleErrors ??= []).push(error); }
+    // Event callbacks cannot await shutdown. The same promise remains available
+    // to the owner, including any reap/cleanup failure.
+    this.stop().catch(() => {});
   }
-  async stop() {
-    this.cancelRequests();
-    if (!this.child?.pid || this.child.exitCode !== null || this.child.signalCode !== null) {
-      this.closed = true; await this.starting?.catch(() => {}); await this.exitPromise;
-      await Promise.allSettled([...this.operations]); return;
-    }
-    this.send({ kind: 'dispose' });
-    this.closed = true;
-    clearInterval(this.watchdog);
-    this.cancelRequests();
-    const timer = setTimeout(() => this.child.kill('SIGKILL'), 250);
-    try { await this.exitPromise; } finally { clearTimeout(timer); }
-    await Promise.allSettled([...this.operations]);
+  stop() {
+    if (this.stopPromise) return this.stopPromise;
+    // One overall budget includes launch, reaping, native staging cleanup
+    // (which can take two seconds on Windows), and outstanding operations.
+    const deadline = Date.now() + 5000;
+    const bounded = async (promise, stage) => {
+      let timer;
+      try {
+        return await Promise.race([promise, new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`Session shutdown deadline exceeded: ${stage}`)), Math.max(0, deadline - Date.now()));
+        })]);
+      } finally { clearTimeout(timer); }
+    };
+    // Install the shared promise before synchronous cancellation/listeners can
+    // reenter, while still closing admission before stop() returns.
+    const { promise, resolve, reject } = Promise.withResolvers();
+    this.stopPromise = promise;
+    const shutdown = async () => {
+      const errors = this.lifecycleErrors ??= [];
+      try { this.send({ kind: 'dispose' }); } catch (error) { errors.push(error); }
+      this.closed = true;
+      clearInterval(this.watchdog);
+      try { this.cancelRequests(); } catch (error) { errors.push(error); }
+      const timer = setTimeout(() => {
+        try { if (!this.childClosed) this.child?.kill('SIGKILL'); } catch (error) { errors.push(error); }
+      }, 250);
+      try {
+        try { await bounded(this.starting, 'launch'); } catch (error) { errors.push(error); }
+        if (this.child) {
+          // exitCode/signalCode and kill() success are not close/reap proof.
+          if (!this.closePromise) errors.push(new Error('Worker close/reap proof unavailable'));
+          else {
+            try { await bounded(this.closePromise, 'worker close/reap not confirmed'); }
+            catch (error) { errors.push(error); }
+          }
+        }
+        try { await bounded(this.exitPromise, 'post-close cleanup'); } catch (error) { errors.push(error); }
+        try { await bounded(Promise.allSettled([...this.operations]), 'pending operations'); }
+        catch (error) { errors.push(error); }
+      } finally { clearTimeout(timer); }
+      if (errors.length) throw new AggregateError(errors, 'Session shutdown failed: ' + errors.map(error => error.message).join('; '));
+    };
+    shutdown().then(resolve, reject);
+    return this.stopPromise;
   }
 }

@@ -13,8 +13,20 @@ async function fixture(t, source, options = {}) {
   const session = new Session({ root, entry: 'app.mts', trusted: true, ...options });
   const errors = [];
   session.on('error', error => errors.push(error.message));
-  t.after(async () => { await session.stop(); await rm(root, { recursive: true, force: true }); });
-  return { session, root, errors };
+  const sessions = new Set([session]);
+  t.after(async () => {
+    // One hook owns the shared cwd: Node skips subsequent after hooks if an
+    // earlier hook throws. Windows cannot remove a running child's cwd.
+    const stopped = await Promise.allSettled([...sessions].map(session => session.stop()));
+    const failures = stopped.filter(result => result.status === 'rejected').map(result => result.reason);
+    try { await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); }
+    catch (error) { failures.push(error); }
+    if (failures.length) throw new AggregateError(failures, 'Fixture cleanup failed');
+    for (const session of sessions) {
+      if (session.child?.pid) assert.ok(session.child.exitCode !== null || session.child.signalCode !== null, 'owned worker must be reaped');
+    }
+  });
+  return { session, root, errors, sessions };
 }
 const event = (emitter, name) => once(emitter, name, { signal: AbortSignal.timeout(5000) }).then(([value]) => value);
 
@@ -39,7 +51,7 @@ test('real TS modules, async events, state, disabled actions and stale revisions
 });
 
 test('reload is a new generation; old async callbacks cannot mutate replacement; cleanup runs', async t => {
-  const { session, root } = await fixture(t, `
+  const { session, root, sessions } = await fixture(t, `
     const count = gpui.state(1);
     gpui.onDispose(() => console.log('cleanup-finished'));
     gpui.mount(() => gpui.button('later', String(count.get()), async () => {
@@ -52,8 +64,8 @@ test('reload is a new generation; old async callbacks cannot mutate replacement;
   assert.match((await cleanup).message, /cleanup-finished/);
   assert.notEqual(session.child.exitCode, null);
   const replacement = new Session({ root, entry: 'app.mts', trusted: true });
+  sessions.add(replacement);
   replacement.on('error', () => {});
-  t.after(() => replacement.stop());
   const frame = event(replacement, 'render'); await replacement.start(); await frame;
   assert.equal(replacement.event('later', session.revision, session.generation), false);
   await new Promise(r => setTimeout(r, 600));
@@ -81,8 +93,12 @@ test('host-mediated storage and rooted reads work; traversal and symlinks fail',
   for (const path of ['../outside', '/etc/passwd', 'nested/../../outside', 'C:\\escape']) {
     await assert.rejects(containedFile(root, path), /Invalid relative path/);
   }
-  await symlink('/etc/passwd', resolve(root, 'escape'));
-  await assert.rejects(containedFile(root, 'escape'), /escapes/);
+  const outside = await mkdtemp(resolve(tmpdir(), 'gpui-outside-'));
+  try {
+    await writeFile(resolve(outside, 'target.txt'), 'outside capability root');
+    await symlink(outside, resolve(root, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    await assert.rejects(containedFile(root, 'escape/target.txt'), /escapes/);
+  } finally { await rm(outside, { recursive: true, force: true }); }
   await session.capability('storage', { op: 'set', key: 'counter', value: { value: 31 } });
   assert.deepEqual(await session.capability('storage', { op: 'get', key: 'counter' }), { value: 31 });
   await assert.rejects(session.capability('storage', { op: 'set', key: '../escape', value: 0 }), /Invalid storage key/);
@@ -107,8 +123,8 @@ test('unsupported policies and untrusted execution fail closed; bounded process 
   const { session } = await fixture(t, '');
   await assert.rejects(session.capability('network', { url: 'https://example.com' }), /denied/);
   await assert.rejects(session.capability('process', { command: 'shell', args: [] }), /denied/);
-  session.options.executables.echo = '/bin/echo';
-  assert.equal(await session.capability('process', { command: 'echo', args: ['hello; not a shell'] }), 'hello; not a shell\n');
+  session.options.executables.echo = process.execPath;
+  assert.equal(await session.capability('process', { command: 'echo', args: ['-e', 'process.stdout.write(process.argv[1])', 'hello; not a shell'] }), 'hello; not a shell');
 });
 
 test('tree validation rejects duplicate identities, unsupported components, and depth', () => {
@@ -132,13 +148,13 @@ test('storage quota serializes racing writes and bounds UTF-8 bytes', async t =>
 });
 
 test('broker denies spoofed origins and commands; disposal cancels pending consent and child operation', async t => {
-  const { session } = await fixture(t, '', { requested: ['storage'], origins: ['https://allowed.example'], executables: { sleep: '/bin/sleep', relative: 'echo' } });
+  const { session } = await fixture(t, '', { requested: ['storage'], origins: ['https://allowed.example'], executables: { sleep: process.execPath, relative: 'echo' } });
   for (const url of ['https://allowed.example.evil', 'http://allowed.example', 'https://allowed.example:444', 'https://user@allowed.example'])
     await assert.rejects(session.capability('network', { url }), /denied/);
   for (const command of ['constructor', '__proto__', 'relative', '/bin/sleep'])
     await assert.rejects(session.capability('process', { command, args: [] }), /denied/);
   const pending = assert.rejects(session.permitted('storage'), /Permission denied/);
-  const sleeping = assert.rejects(session.capability('process', { command: 'sleep', args: ['5'] }), /abort/i);
+  const sleeping = assert.rejects(session.capability('process', { command: 'sleep', args: ['-e', 'setTimeout(() => {}, 5000)'] }), /abort/i);
   const start = Date.now();
   await session.stop(); await pending; await sleeping;
   assert.ok(Date.now() - start < 2000, 'cancel should not wait for process timeout');
@@ -157,7 +173,7 @@ test('Kit event payloads reach the current callback and reject wrong types and o
   const next = event(session, 'render'); session.event(action, session.revision, session.generation, true);
   assert.equal((await next).tree.children[0].text, 'true');
   assert.equal(session.event(action, session.revision, session.generation - 1, false), false);
-  const refused = new Promise(resolve => session.once('error', resolve));
+  const refused = event(session, 'error');
   session.event(action, session.revision, session.generation, 'false'); await refused;
   assert.match(errors.at(-1), /expected boolean/);
   assert.equal(session.tree.children[0].text, 'true');
