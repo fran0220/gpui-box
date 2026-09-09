@@ -92,9 +92,10 @@ pub fn verified_clipboard_copy(text: &str, cx: &mut App) -> Result<(), SharedStr
     cx.try_write_to_clipboard(ClipboardItem::new_string(text.to_string()))
         .map_err(|denial| SharedString::from(denial.to_string()))?;
     let read = cx.try_read_from_clipboard().map_err(|denial| {
-        SharedString::from(format!(
-            "Clipboard write submitted; verification unavailable: {denial}"
-        ))
+        cx.strings().format(
+            StringKey::CopyVerificationUnavailable,
+            &[&denial.to_string()],
+        )
     })?;
     match read.and_then(|item| item.text()) {
         Some(read) if read == text => Ok(()),
@@ -359,11 +360,9 @@ impl Render for CopyButton {
                 theme.colors.success
             };
             let mark_ident = status_ident.child("mark");
-            let help = if default_failure {
-                reason.clone().unwrap_or_else(|| state_text.clone())
-            } else {
-                state_text.clone()
-            };
+            // A submitted write with unavailable verification must not acquire
+            // a "not copied" claim merely by hovering its failure mark.
+            let help = reason.clone().unwrap_or_else(|| state_text.clone());
             // The status reads as the reason it was given, verbatim: a
             // reader of the tree is told why, not merely that.
             let spec = NodeSpec::new(status_ident.semantic_id(), Role::Status)
@@ -462,9 +461,18 @@ mod clipboard_policy_tests {
             });
         });
         mode.set(1);
+        harness.update(|_, cx| {
+            crate::strings::set_strings(
+                [(
+                    StringKey::CopyVerificationUnavailable,
+                    "写入已提交；无法验证：{0}".into(),
+                )],
+                cx,
+            )
+        });
         harness.click("policy.copy.action");
         harness.update(|_, cx| {
-            assert!(matches!(button.read(cx).state(), CopyState::Failed(reason) if reason.starts_with("Clipboard write submitted; verification unavailable:")));
+            assert!(matches!(button.read(cx).state(), CopyState::Failed(reason) if reason.as_ref() == "写入已提交；无法验证：clipboard operation denied by host"));
             cx.with_effect_owner(Some(inspector), |cx| assert_eq!(cx.try_read_from_clipboard().expect("inspector read").expect("clipboard value").text().as_deref(), Some("replacement")));
         });
         assert!(

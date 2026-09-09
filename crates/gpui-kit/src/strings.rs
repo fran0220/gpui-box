@@ -410,6 +410,7 @@ string_keys! {
     CopyDone => "copy.done", "Copied";
     CopyFailed => "copy.failed", "Not copied";
     CopyFailedDetail => "copy.failed-detail", "The clipboard did not take it.";
+    CopyVerificationUnavailable => "copy.verification-unavailable", "Clipboard write submitted; verification unavailable: {0}";
 
     // Approval. The scope of an "always" is part of the wording on the
     // control, so there is no key here for an unscoped one to be worded with.
