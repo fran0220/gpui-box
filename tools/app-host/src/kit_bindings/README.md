@@ -46,22 +46,42 @@ Cancellation does not roll back an already executed setter. In particular,
 query; this is not an atomic setter/event transaction. The method fixture uses
 `set_text_quietly` to avoid that echo while testing the native round trip.
 
+`kit.bind(component, id, state, props?, handlers?)` adapts caller-owned JS
+`get`/`set` state to controlled props and typed events for Checkbox, Switch,
+Slider, SegmentedControl, TextInput, and Select. `kit.bind_value('Radio', id,
+state, value, props?, handlers?)` compares bounded JSON values structurally and
+copies the chosen value. Both replace the binding event before registration,
+so duplicate action identity checks remain intact. Disabled controls install
+no callbacks. These are adapted semantics, not transported native Binding or
+Signal handles, and they do not add native component/method registrations.
+
+The optional second `createKitBindings` registrar prepares a worker-only
+predicate contract. List/Tabs factories accept a fifth-argument
+`{ accepts(intent): boolean | Promise<boolean> }`; descriptors contain only its
+opaque reference. Unknown/accessor callbacks fail before registration and a
+missing registrar refuses callbacks. This is an integration prerequisite, not
+end-to-end acceptance support: the Host must provide a live deferred controller
+with revision/owner cancellation before exposing this capability.
+
 ## Explicit remaining gaps
 
-- Native Entity/Focus references, typed native child composites, and arbitrary
-  locale callbacks remain unsupported. The four date `*_snapshot` wire queries
+- Native Entity/Focus references and typed native child composites require
+  explicit host routing; arbitrary locale callbacks remain unsupported.
+  The four date `*_snapshot` wire queries
   return data, not native references. Coverage metadata names the Rust getters
   they read; it does not make the original reference getters callable.
 - `controls_extra.familyBindings` and `ControlsExtraBindingValues` await the
-  separately owned central `kit.bind` helper. This integration does not expose
+  central `kit.bind` family mapping. This integration does not expose
   family reactive bindings or add native predicate/construction-context plumbing.
-- Only declared commands and queries are bound; other public methods, reactive
-  bindings, arbitrary callbacks, and native entity references remain unsupported.
+- Only declared commands, queries, and adapted binding helpers are supported;
+  other public methods and arbitrary callbacks remain unsupported.
 - Segment icons/tints, token/style options,
-  Tabs reorder/overflow-menu/save-state, Pagination page-size entity, and
-  ScrollArea bound scroll targets are not yet adapted. List currently supports
-  native same-list reorder intent but not caller-supplied cross-list acceptance
-  predicates or drag velocity in its event payload.
+  Tabs overflow-menu/save-state, Pagination page-size entity, and
+  ScrollArea bound scroll targets are not yet adapted. List/Tabs expose native
+  same-surface reorder intent including label, kind, position, and velocity;
+  arbitrary acceptance predicates await Host/controller/worker integration of
+  the shared deferred-decision API. Runtime references and typed-native context
+  are separate prerequisites and are not counted as complete here.
 - Markdown is held until the host provides owner-aware native clipboard policy.
   TextInput uses the framework's fallible clipboard API and emits
   `clipboardDenied: 'missingOwner' | 'denied'` without editing on refusal.

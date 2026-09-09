@@ -26,6 +26,7 @@ const common = { disabled: boolean, size: choice('xs', 'sm', 'md', 'lg') };
 const labeled = { ...common, label: string, description: string };
 const selectionItem = object({ id: identity, label: string, disabled: boolean }, ['id', 'label']);
 const selectOption = object({ ...selectionItem.fields, description: string, group: string }, ['id', 'label']);
+const dropIntent = object({ id: identity, source: identity, label: string, kind: identity, anchor: identity, position: choice('before', 'after', 'into'), velocity: object({ x: number, y: number }, ['x', 'y']) }, ['id', 'source', 'label', 'kind', 'anchor', 'position', 'velocity']);
 
 export const kitSchemas = Object.freeze({
   ...controlsSchemas, ...navigationSchemas, ...layoutSchemas, ...dateSchemas,
@@ -39,12 +40,12 @@ export const kitSchemas = Object.freeze({
   TextInput: { props: object({ ...common, text: string, name: string, placeholder: string, invalid: boolean, required: boolean, readOnly: boolean, secret: boolean, bare: boolean, maxLength: integer }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null), clipboardDenied: choice('missingOwner', 'denied') } },
   Select: { props: object({ ...common, options: array(selectOption), selected: { ...identity, nullable: true }, name: string, placeholder: string, invalid: boolean, clearable: boolean }), events: { change: { ...identity, nullable: true }, open: choice(null), close: choice(null) } },
   Pagination: { props: object({ ...common, page: { ...integer, min: 1 }, totalPages: { ...integer, min: 1 }, hasNext: boolean, siblings: integer }), events: { select: { ...integer, min: 1 } } },
-  Tabs: { props: object({ ...common, tabs: array(object({ ...selectionItem.fields, badge: string, closable: boolean }, ['id', 'label'])), selected: identity, capsules: boolean, scrolling: boolean, overflowAfter: integer }), events: { select: identity, close: identity } },
+  Tabs: { props: object({ ...common, tabs: array(object({ ...selectionItem.fields, badge: string, closable: boolean }, ['id', 'label'])), selected: identity, capsules: boolean, scrolling: boolean, overflowAfter: integer, reorderable: boolean }), events: { select: identity, close: identity, reorder: dropIntent }, predicates: { accepts: dropIntent } },
   Accordion: { props: object({ size: common.size, sections: array(object({ id: identity, title: string, description: string, disabled: boolean }, ['id', 'title'])), expanded: array(identity), exclusive: boolean }), events: { toggle: object({ id: identity, expanded: boolean }, ['id', 'expanded']) }, slotIds: 'sections' },
   ScrollArea: { props: object({ axis: choice('vertical', 'horizontal', 'both'), label: string, width: positive, height: positive, fitHeight: boolean }), events: {}, slots: ['content'] },
   SplitPane: { props: object({ axis: choice('horizontal', 'vertical'), ratio: { type: 'number', min: 0, max: 1 }, minStart: { ...number, min: 0 }, minEnd: { ...number, min: 0 }, step: positive, collapsible: boolean, handleLabel: string }), events: { resize: { type: 'number', min: 0, max: 1 }, collapse: choice('start', 'end') }, slots: ['start', 'end'] },
   Divider: { props: object({ label: string, axis: choice('horizontal', 'vertical') }), events: {} },
-  List: { props: object({ ...common, rows: array(object({ ...selectionItem.fields, within: identity }, ['id', 'label'])), selected: identity, rowHeight: positive, visibleRows: { ...integer, min: 1 }, flowing: boolean, anchoredToEnd: boolean, fills: boolean, arriving: boolean, reorderable: boolean }), events: { select: identity, reorder: object({ id: identity, source: identity, anchor: identity, position: choice('before', 'after', 'into') }, ['id', 'source', 'anchor', 'position']) }, slotIds: 'rows' },
+  List: { props: object({ ...common, rows: array(object({ ...selectionItem.fields, within: identity }, ['id', 'label'])), selected: identity, rowHeight: positive, visibleRows: { ...integer, min: 1 }, flowing: boolean, anchoredToEnd: boolean, fills: boolean, arriving: boolean, reorderable: boolean }), events: { select: identity, reorder: dropIntent }, slotIds: 'rows', predicates: { accepts: dropIntent } },
   Popover: { props: object({ trigger: string, placement: choice('above', 'below'), hang: choice('start', 'end'), dismissable: boolean }), events: { open: choice(null), close: choice(null), dismiss: choice(null) }, slots: ['content'] },
   Dialog: { props: object({ title: string, description: string, confirmLabel: string, cancelLabel: string, destructive: boolean, dismissable: boolean }), events: { open: choice(null), close: choice(null), confirm: choice(null), cancel: choice(null), dismiss: choice(null) }, slots: ['content'] },
 });
@@ -274,6 +275,9 @@ export function validateKitDescriptor(node) {
   const events = Object.fromEntries(Object.keys(kitSchemas[node.component].events).map(name => [name, identity]));
   validateValue(node.events, object(events), 'events');
   if (node.props.disabled && Object.keys(node.events).length) throw new TypeError('Disabled control has actions');
+  const predicates = Object.fromEntries(Object.keys(kitSchemas[node.component].predicates ?? {}).map(name => [name, identity]));
+  validateValue(node.predicates === undefined ? {} : node.predicates, object(predicates), 'predicates');
+  if (node.props.disabled && Object.keys(node.predicates ?? {}).length) throw new TypeError('Disabled control has predicates');
   return node;
 }
 

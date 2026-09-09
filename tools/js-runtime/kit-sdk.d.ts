@@ -17,10 +17,20 @@ export interface ControlProps { disabled?: boolean; size?: KitSize }
 export interface ChoiceProps extends ControlProps { label?: string; description?: string }
 export interface SelectionItem { id: string; label: string; disabled?: boolean }
 export interface SelectOption extends SelectionItem { description?: string; group?: string }
+export interface KitDropIntent { id: string; source: string; label: string; kind: string; anchor: string; position: 'before' | 'after' | 'into'; velocity: { x: number; y: number } }
+export interface KitDropPredicates { accepts?(intent: KitDropIntent): boolean | Promise<boolean> }
 export interface SlotNode { kind: string; id: string }
 export type KitSlots = Record<string, SlotNode[]>;
-export interface KitNode<C extends keyof KitFactories = keyof KitFactories> { kind: 'kit'; component: C; id: string; props: object; slots: KitSlots; events: Record<string, string> }
-export type KitAPI = { [C in keyof KitFactories]: (...args: Parameters<KitFactories[C]>) => KitNode<C> };
+export interface KitNode<C extends keyof KitFactories = keyof KitFactories> { kind: 'kit'; component: C; id: string; props: object; slots: KitSlots; events: Record<string, string>; predicates?: Record<string, string> }
+export type KitAPI = { [C in keyof KitFactories]: (...args: Parameters<KitFactories[C]>) => KitNode<C> } & KitBindingAPI;
+export type KitJSONValue = null | boolean | number | string | KitJSONValue[] | { [key: string]: KitJSONValue };
+export interface KitStateBinding<T> { get(): T; set(value: T): void }
+export interface KitBindingValues { Checkbox: boolean; Switch: boolean; Slider: number; SegmentedControl: string; TextInput: string; Select: string | null }
+/** JS state/event adaptation; never a native Binding or Signal handle. */
+export interface KitBindingAPI {
+  bind<C extends keyof KitBindingValues>(component: C, id: string, state: KitStateBinding<KitBindingValues[NoInfer<C>]>, props?: Parameters<KitFactories[NoInfer<C>]>[1], handlers?: Parameters<KitFactories[NoInfer<C>]>[2]): KitNode<C>;
+  bind_value<T extends KitJSONValue>(component: 'Radio', id: string, state: KitStateBinding<T>, value: NoInfer<T>, props?: Parameters<KitFactories['Radio']>[1], handlers?: Parameters<KitFactories['Radio']>[2]): KitNode<'Radio'>;
+}
 export interface KitFactories extends ControlsExtraFactories, NavigationExtraFactories, LayoutExtraFactories, DatetimeFactories, DisplayFactories, ChartsFactories, AgentFactories, GameEffectsFactories, CanvasFactories, OverlayFactories, ContentFactories, MediaFactories, DataFactories, StructuredFactories {
   Checkbox(id: string, props?: ChoiceProps & { checked?: boolean | null }, events?: { change?(checked: boolean): void }): KitNode;
   Radio(id: string, props?: ChoiceProps & { selected?: boolean }, events?: { select?(): void }): KitNode;
@@ -30,16 +40,16 @@ export interface KitFactories extends ControlsExtraFactories, NavigationExtraFac
   TextInput(id: string, props?: ControlProps & { text?: string; name?: string; placeholder?: string; invalid?: boolean; required?: boolean; readOnly?: boolean; secret?: boolean; bare?: boolean; maxLength?: number }, events?: { change?(text: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void; clipboardDenied?(reason: 'missingOwner' | 'denied'): void }): KitNode;
   Select(id: string, props?: ControlProps & { options?: SelectOption[]; selected?: string | null; name?: string; placeholder?: string; invalid?: boolean; clearable?: boolean }, events?: { change?(id: string | null): void; open?(): void; close?(): void }): KitNode;
   Pagination(id: string, props?: ControlProps & { page?: number; totalPages?: number; hasNext?: boolean; siblings?: number }, events?: { select?(page: number): void }): KitNode;
-  Tabs(id: string, props?: ControlProps & { tabs?: (SelectionItem & { badge?: string; closable?: boolean })[]; selected?: string; capsules?: boolean; scrolling?: boolean; overflowAfter?: number }, events?: { select?(id: string): void; close?(id: string): void }): KitNode;
+  Tabs(id: string, props?: ControlProps & { tabs?: (SelectionItem & { badge?: string; closable?: boolean })[]; selected?: string; capsules?: boolean; scrolling?: boolean; overflowAfter?: number; reorderable?: boolean }, events?: { select?(id: string): void; close?(id: string): void; reorder?(intent: KitDropIntent): void }, slots?: Record<string, never>, predicates?: KitDropPredicates): KitNode;
   Accordion(id: string, props?: { size?: KitSize; sections?: { id: string; title: string; description?: string; disabled?: boolean }[]; expanded?: string[]; exclusive?: boolean }, events?: { toggle?(value: { id: string; expanded: boolean }): void }, slots?: KitSlots): KitNode;
   ScrollArea(id: string, props?: { axis?: 'vertical' | 'horizontal' | 'both'; label?: string; width?: number; height?: number; fitHeight?: boolean }, events?: Record<string, never>, slots?: { content?: SlotNode[] }): KitNode;
   SplitPane(id: string, props?: { axis?: 'horizontal' | 'vertical'; ratio?: number; minStart?: number; minEnd?: number; step?: number; collapsible?: boolean; handleLabel?: string }, events?: { resize?(ratio: number): void; collapse?(side: 'start' | 'end'): void }, slots?: { start?: SlotNode[]; end?: SlotNode[] }): KitNode;
   Divider(id: string, props?: { label?: string; axis?: 'horizontal' | 'vertical' }): KitNode;
-  List(id: string, props?: ControlProps & { rows?: (SelectionItem & { within?: string })[]; selected?: string; rowHeight?: number; visibleRows?: number; flowing?: boolean; anchoredToEnd?: boolean; fills?: boolean; arriving?: boolean; reorderable?: boolean }, events?: { select?(id: string): void; reorder?(intent: { id: string; source: string; anchor: string; position: 'before' | 'after' | 'into' }): void }, slots?: KitSlots): KitNode;
+  List(id: string, props?: ControlProps & { rows?: (SelectionItem & { within?: string })[]; selected?: string; rowHeight?: number; visibleRows?: number; flowing?: boolean; anchoredToEnd?: boolean; fills?: boolean; arriving?: boolean; reorderable?: boolean }, events?: { select?(id: string): void; reorder?(intent: KitDropIntent): void }, slots?: KitSlots, predicates?: KitDropPredicates): KitNode;
   Popover(id: string, props?: { trigger?: string; placement?: 'above' | 'below'; hang?: 'start' | 'end'; dismissable?: boolean }, events?: { open?(): void; close?(): void; dismiss?(): void }, slots?: { content?: SlotNode[] }): KitNode;
   Dialog(id: string, props?: { title?: string; description?: string; confirmLabel?: string; cancelLabel?: string; destructive?: boolean; dismissable?: boolean }, events?: { open?(): void; close?(): void; confirm?(): void; cancel?(): void; dismiss?(): void }, slots?: { content?: SlotNode[] }): KitNode;
 }
-export declare function createKitBindings(registerHandler: (id: string, event: string, handler: (payload: unknown) => unknown) => string): Readonly<KitAPI>;
+export declare function createKitBindings(registerHandler: (id: string, event: string, handler: (payload: unknown) => unknown) => string, registerPredicate?: (id: string, component: string, name: string, callback: (payload: unknown) => boolean | Promise<boolean>) => string): Readonly<KitAPI>;
 // Generated from kitMethods by generateKitMethodTypes.
 export interface KitMethodContracts {
   TransferList: {

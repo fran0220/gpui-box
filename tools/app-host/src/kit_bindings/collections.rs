@@ -61,10 +61,7 @@ pub(super) fn render_list(node: &Node, slots: KitSlots, emit: Emit) -> AnyElemen
             list = list.on_select(move |id, _, _| emit(&action, json!(id.as_ref())));
         }
         if let Some(action) = node.events.get("reorder").cloned() {
-            list = list.on_reorder(move |intent, _, _| emit(&action, json!({
-                "id":intent.item.id.as_ref(), "source":intent.item.source.as_ref(),
-                "anchor":intent.position.anchor().as_ref(), "position":intent.position.verb(),
-            })));
+            list = list.on_reorder(move |intent, _, _| emit(&action, drop_payload(intent)));
         }
     }
     list.into_any_element()

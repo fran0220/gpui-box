@@ -84,12 +84,18 @@ pub(super) fn render(
             if flag(node, "scrolling") {
                 control = control.scrolling();
             }
+            control = control.reorderable(flag(node, "reorderable"));
             if let Some(action) = event("select") {
                 let emit = emit.clone();
                 control = control.on_select(move |id, _, _| emit(&action, json!(id.as_ref())));
             }
             if let Some(action) = event("close") {
+                let emit = emit.clone();
                 control = control.on_close(move |id, _, _| emit(&action, json!(id.as_ref())));
+            }
+            if let Some(action) = event("reorder") {
+                control =
+                    control.on_reorder(move |intent, _, _| emit(&action, drop_payload(intent)));
             }
             control.into_any_element()
         }

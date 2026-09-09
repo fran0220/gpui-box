@@ -5798,6 +5798,9 @@
           "integer": true,
           "min": 0,
           "max": 1000000
+        },
+        "reorderable": {
+          "type": "boolean"
         }
       },
       "required": []
@@ -5812,6 +5815,136 @@
         "type": "string",
         "min": 1,
         "max": 256
+      },
+      "reorder": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "source": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "label": {
+            "type": "string",
+            "max": 16384
+          },
+          "kind": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "anchor": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "position": {
+            "enum": [
+              "before",
+              "after",
+              "into"
+            ]
+          },
+          "velocity": {
+            "type": "object",
+            "fields": {
+              "x": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              },
+              "y": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "label",
+          "kind",
+          "anchor",
+          "position",
+          "velocity"
+        ]
+      }
+    },
+    "predicates": {
+      "accepts": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "source": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "label": {
+            "type": "string",
+            "max": 16384
+          },
+          "kind": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "anchor": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "position": {
+            "enum": [
+              "before",
+              "after",
+              "into"
+            ]
+          },
+          "velocity": {
+            "type": "object",
+            "fields": {
+              "x": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              },
+              "y": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "label",
+          "kind",
+          "anchor",
+          "position",
+          "velocity"
+        ]
       }
     }
   },
@@ -6103,6 +6236,15 @@
             "min": 1,
             "max": 256
           },
+          "label": {
+            "type": "string",
+            "max": 16384
+          },
+          "kind": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
           "anchor": {
             "type": "string",
             "min": 1,
@@ -6114,17 +6256,105 @@
               "after",
               "into"
             ]
+          },
+          "velocity": {
+            "type": "object",
+            "fields": {
+              "x": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              },
+              "y": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
           }
         },
         "required": [
           "id",
           "source",
+          "label",
+          "kind",
           "anchor",
-          "position"
+          "position",
+          "velocity"
         ]
       }
     },
-    "slotIds": "rows"
+    "slotIds": "rows",
+    "predicates": {
+      "accepts": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "source": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "label": {
+            "type": "string",
+            "max": 16384
+          },
+          "kind": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "anchor": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "position": {
+            "enum": [
+              "before",
+              "after",
+              "into"
+            ]
+          },
+          "velocity": {
+            "type": "object",
+            "fields": {
+              "x": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              },
+              "y": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "label",
+          "kind",
+          "anchor",
+          "position",
+          "velocity"
+        ]
+      }
+    }
   },
   "Popover": {
     "props": {

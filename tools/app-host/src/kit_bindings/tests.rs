@@ -943,3 +943,106 @@ fn host_overlay_factories_reopen_with_retained_input_and_release_state(cx: &mut 
         );
     }
 }
+
+#[gpui::test]
+fn native_list_and_tabs_reorder_report_intent_without_mutating_caller_order(
+    cx: &mut TestAppContext,
+) {
+    for component in ["List", "Tabs"] {
+        for (disabled, delay) in [(false, 0), (true, 0), (false, 200)] {
+            let rows = json!([{"id":"alpha","label":"Alpha"},{"id":"beta","label":"Beta"},{"id":"gamma","label":"Gamma"}]);
+            let mut props = json!({"reorderable":true,"disabled":disabled});
+            props[if component == "List" { "rows" } else { "tabs" }] = rows;
+            let descriptor = node(
+                component,
+                "reorder-control",
+                props,
+                if disabled {
+                    json!({})
+                } else {
+                    json!({"reorder":"dropped"})
+                },
+            );
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let output = events.clone();
+            let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+                let output = output.clone();
+                div()
+                    .w(px(520.))
+                    .child(KitState::default().render(
+                        &descriptor,
+                        KitSlots::new(),
+                        window,
+                        cx,
+                        Rc::new(move |action, payload| {
+                            output.borrow_mut().push((action.to_owned(), payload))
+                        }),
+                    ))
+                    .into_any_element()
+            });
+            let before = harness
+                .snapshot()
+                .children_of("reorder-control")
+                .iter()
+                .map(|node| node.id.clone())
+                .collect::<Vec<_>>();
+            harness.drag_start("reorder-control.gamma");
+            if !disabled {
+                assert!(
+                    harness.node("dnd.drag").is_some(),
+                    "{component} starts native drag"
+                );
+            }
+            let target = if component == "List" {
+                harness.point_down("reorder-control.alpha", 0.2)
+            } else {
+                harness.point_across("reorder-control.alpha", 0.2)
+            };
+            harness.drag_to(target);
+            if delay > 0 {
+                harness.advance(std::time::Duration::from_millis(delay));
+            }
+            harness.drop_here();
+            if disabled {
+                assert!(
+                    events.borrow().is_empty(),
+                    "disabled {component} cannot reorder"
+                );
+            } else {
+                assert_eq!(
+                    &*events.borrow(),
+                    &[(
+                        "dropped".into(),
+                        json!({"id":"gamma","source":"reorder-control","label":"Gamma","kind":"row","anchor":"alpha","position":"before","velocity":{"x":0.,"y":0.}})
+                    )],
+                    "{component} emits native reorder"
+                );
+            }
+            assert_eq!(
+                harness
+                    .snapshot()
+                    .children_of("reorder-control")
+                    .iter()
+                    .map(|node| node.id.clone())
+                    .collect::<Vec<_>>(),
+                before,
+                "{component} retains caller order"
+            );
+        }
+    }
+}
+
+#[test]
+fn drop_velocity_serialization_preserves_axes_and_signs() {
+    use gpui_kit::{
+        interaction::{DragItem, DropIntent, DropPosition},
+        motion::Velocity,
+    };
+    let payload = drop_payload(&DropIntent {
+        item: DragItem::new("source", "item", "Label"),
+        position: DropPosition::After("anchor".into()),
+        velocity: Velocity::new(-12.5, 84.),
+    });
+    assert_eq!(payload["velocity"], json!({"x":-12.5,"y":84.}));
+    assert_eq!(payload["position"], "after");
+}

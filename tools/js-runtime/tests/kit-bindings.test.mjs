@@ -53,10 +53,85 @@ test('disabled controls register no callable handlers', () => {
   assert.deepEqual(kit.Switch('permission', { disabled: true }, { change() {} }).events, {});
 });
 
+test('state binding seeds controlled native props and registers only the replacement callback', () => {
+  for (const [component, property, event, initial, next] of [
+    ['Checkbox', 'checked', 'change', false, true], ['Switch', 'on', 'change', true, false],
+    ['Slider', 'value', 'change', 0.23, 0.47], ['SegmentedControl', 'selected', 'select', 'alpha', 'beta'],
+    ['TextInput', 'text', 'change', 'old', 'new'], ['Select', 'selected', 'change', null, 'beta'],
+  ]) {
+    const actions = new Map();
+    const kit = createKitBindings((id, name, handler) => { const key = `${id}:${name}`; assert.equal(actions.has(key), false); actions.set(key, handler); return key; });
+    let current = initial;
+    const state = { get: () => current, set: value => { current = value; } };
+    const node = kit.bind(component, 'bound', state, {}, { [event]() { assert.fail('replaced handler called'); } });
+    assert.equal(node.props[property], initial);
+    validateKitDescriptor(JSON.parse(JSON.stringify(node)));
+    assert.equal(actions.size, 1);
+    actions.get(node.events[event])(next);
+    assert.equal(current, next);
+    assert.equal(node.props[property], initial, 'events do not mutate the previous frame');
+    actions.clear();
+    assert.equal(kit.bind(component, 'bound', state).props[property], next);
+    actions.clear();
+    assert.deepEqual(kit.bind(component, 'bound', state, { disabled: true }).events, {});
+    assert.equal(actions.size, 0);
+  }
+});
+
+test('radio binding compares JSON values structurally and owns a copy of its choice', () => {
+  let current = { id: 'alpha', details: [1, 2] };
+  const state = { get: () => current, set: value => { current = value; } };
+  const actions = new Map();
+  const kit = createKitBindings((id, name, handler) => { actions.set(id, handler); return `${id}:${name}`; });
+  assert.equal(kit.bind_value('Radio', 'same', state, { details: [1, 2], id: 'alpha' }).props.selected, true);
+  const choice = { id: 'beta', details: [2, 1] };
+  assert.equal(kit.bind_value('Radio', 'other', state, choice).props.selected, false);
+  choice.id = 'mutated';
+  actions.get('other')(null);
+  assert.deepEqual(current, { id: 'beta', details: [2, 1] });
+  assert.throws(() => kit.bind_value('Radio', 'function', state, { callback() {} }));
+  assert.throws(() => kit.bind('Checkbox', 'wrong', { get: () => 'yes', set() {} }), /value type/);
+  assert.throws(() => kit.bind('Dialog', 'wrong', state), /Unsupported bound/);
+});
+
+test('predicate registrars receive typed data callbacks and descriptors retain only opaque refs', async () => {
+  const callbacks = new Map();
+  const kit = createKitBindings(() => 'event', (id, component, name, callback) => {
+    const ref = `${component}:${id}:${name}`; callbacks.set(ref, callback); return ref;
+  });
+  const payload = { id: 'beta', source: 'list', label: 'Beta', kind: 'row', anchor: 'alpha', position: 'before', velocity: { x: -12, y: 7 } };
+  const descriptor = kit.List('list', { reorderable: true }, {}, {}, { accepts: async intent => intent.id === 'beta' });
+  validateKitDescriptor(JSON.parse(JSON.stringify(descriptor)));
+  assert.deepEqual(descriptor.predicates, { accepts: 'List:list:accepts' });
+  assert.equal(await callbacks.get(descriptor.predicates.accepts)(payload), true);
+  assert.throws(() => callbacks.get(descriptor.predicates.accepts)({ ...payload, owner: 'secret-token' }), /unknown field/);
+  const invalid = kit.Tabs('tabs', {}, {}, {}, { accepts: () => 'yes' });
+  assert.throws(() => callbacks.get(invalid.predicates.accepts)(payload), /boolean/);
+  const invalidAsync = kit.Tabs('async-tabs', {}, {}, {}, { accepts: async () => 1 });
+  await assert.rejects(callbacks.get(invalidAsync.predicates.accepts)(payload), /boolean/);
+  const count = callbacks.size;
+  assert.equal(kit.List('disabled', { disabled: true }, {}, {}, { accepts: () => true }).predicates, undefined);
+  assert.equal(callbacks.size, count);
+  assert.throws(() => validateKitDescriptor({ ...descriptor, predicates: { execute: 'ref' } }), /unknown field/);
+  assert.throws(() => validateKitDescriptor({ ...descriptor, predicates: { accepts: 123 } }), /string/);
+  assert.throws(() => validateKitDescriptor({ ...descriptor, predicates: null }), /object/);
+  assert.throws(() => validateKitDescriptor({ ...descriptor, props: { disabled: true } }), /Disabled/);
+});
+
+test('unsupported or accessor predicates fail before either registrar runs', () => {
+  let registrations = 0;
+  const kit = createKitBindings(() => { registrations++; return 'event'; }, () => { registrations++; return 'predicate'; });
+  assert.throws(() => kit.List('list', {}, { select() {} }, {}, { get accepts() { assert.fail('accessor executed'); } }), /invalid predicates/);
+  assert.throws(() => kit.Checkbox('check', {}, { change() {} }, {}, { accepts() { return true; } }), /invalid predicates/);
+  assert.equal(registrations, 0);
+  assert.throws(() => createKitBindings(() => 'event').List('list', {}, {}, {}, { accepts() { return true; } }), /unavailable/);
+});
+
 test('specific schemas reject unknown options, invalid ranges, duplicate business identities', () => {
   const kit = createKitBindings(() => 'action');
   assert.throws(() => kit.Radio('r', { on: true }), /unknown field/);
   assert.throws(() => kit.Checkbox('', {}), /string length/);
+  assert.throws(() => kit.Checkbox('bad-unicode', { label: '\ud800' }), /Unicode/);
   assert.throws(() => kit.Slider('s', { min: -10, max: 20, value: -3, high: -4 }), /invalid range/);
   assert.throws(() => kit.Slider('s', { step: 0 }), /invalid number/);
   assert.throws(() => kit.Slider('s', { value: NaN }), /invalid number/);
@@ -146,6 +221,16 @@ kit.DateInput('date', {});
 query({id:'date', component:'DateInput'}, 'calendar');
 // @ts-expect-error wrong family cannot widen native method target
 query(kit.SearchInput('search'), 'ratio');
+declare const boolState: { get(): boolean; set(value: boolean): void };
+declare const textState: { get(): string; set(value: string): void };
+const boundKind: 'Checkbox' = kit.bind('Checkbox', 'bound', boolState, {label:'Bound'}).component;
+kit.bind_value('Radio', 'choice', textState, 'beta', {label:'Beta'});
+// @ts-expect-error component fixes the binding value type
+kit.bind('Checkbox', 'bad-state', textState);
+// @ts-expect-error arbitrary native components do not acquire fake bind support
+kit.bind('Dialog', 'bad-component', boolState);
+// @ts-expect-error radio choice must match caller state value type
+kit.bind_value('Radio', 'bad-choice', textState, 123);
 // @ts-expect-error wrong component's method cannot widen target inference
 query(input, 'selected_id');
 // @ts-expect-error query result is not arbitrary
@@ -162,6 +247,9 @@ invoke(kit.Select('grouped'), 'set_options', {options:[{id:'b',label:'B',descrip
 kit.SplitPane('panes', {ratio:0.3}, {collapse(side) { const value: 'start'|'end' = side; }}, {start:[kit.Radio('nested')]});
 kit.TextInput('secure', {}, {clipboardDenied(reason) { const refusal: 'missingOwner'|'denied' = reason; }});
 kit.List('list', {rows:[{id:'a',label:'A'}]}, {select(id) { const selected:string=id; }}, {a:[kit.Radio('row')]});
+kit.List('predicate-list', {reorderable:true}, {}, {}, {accepts(intent) { const velocity:number=intent.velocity.x; return intent.position === 'before'; }});
+// @ts-expect-error predicate result must be literal boolean or Promise<boolean>
+kit.Tabs('predicate-tabs', {}, {}, {}, {accepts() { return 'yes'; }});
 // @ts-expect-error ScrollArea has only content slot
 kit.ScrollArea('scroll', {}, {}, {start:[]});
 // @ts-expect-error radio does not have the switch option

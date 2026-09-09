@@ -143,6 +143,14 @@ fn number(node: &Node, key: &str, default: f32) -> f32 {
         .and_then(Value::as_f64)
         .map_or(default, |v| v as f32)
 }
+fn drop_payload(intent: &gpui_kit::interaction::DropIntent) -> Value {
+    json!({
+        "id":intent.item.id.as_ref(), "source":intent.item.source.as_ref(),
+        "label":intent.item.label.as_ref(), "kind":intent.item.kind.as_ref(),
+        "anchor":intent.position.anchor().as_ref(), "position":intent.position.verb(),
+        "velocity":{"x":intent.velocity.x,"y":intent.velocity.y},
+    })
+}
 fn size(node: &Node) -> ControlSize {
     match text(node, "size").as_str() {
         "xs" => ControlSize::Xs,
