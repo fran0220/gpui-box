@@ -1,6 +1,7 @@
 //! Pure media presentation. No transport, decoder, path, URL or process authority.
-use super::{Emit, KitSlots, Node, number, text};
-use gpui::{AnyElement, App, IntoElement, Window};
+use super::{Emit, KitSlots, Node, flag, number, text};
+use gpui::{AnyElement, App, IntoElement, Styled, Window};
+use gpui_kit::foundation::Disableable;
 use gpui_kit::media::*;
 use serde_json::{Value, json};
 
@@ -9,6 +10,13 @@ mod tests;
 
 pub(super) const COMPONENTS: &[&str] =
     &["AudioWaveform", "AudioPlayer", "VideoPlayer", "ModelViewer"];
+
+pub(super) fn validate_descriptor(node: &Node) -> anyhow::Result<()> {
+    if let Some(reference) = node.props.get("posterResource") {
+        super::content::validate_resource(reference)?;
+    }
+    Ok(())
+}
 
 #[derive(Default)]
 pub(super) struct State;
@@ -76,6 +84,7 @@ pub(super) fn render(
         "AudioPlayer" => {
             // Native AudioPlayer's no-transport state is genuinely unavailable.
             let mut control = AudioPlayer::new(node.id.clone())
+                .disabled(flag(node, "disabled"))
                 .title(text(node, "title"))
                 .subtitle(text(node, "subtitle"))
                 .peaks(peaks());
@@ -94,7 +103,9 @@ pub(super) fn render(
             control.into_any_element()
         }
         "VideoPlayer" => {
-            let mut control = VideoPlayer::new(node.id.clone()).title(text(node, "title"));
+            let mut control = VideoPlayer::new(node.id.clone())
+                .title(text(node, "title"))
+                .disabled(flag(node, "disabled"));
             if node.props.contains_key("ratio") {
                 control = control.ratio(number(node, "ratio", 16. / 9.));
             }
@@ -112,12 +123,19 @@ pub(super) fn render(
             }
             if let Some(build) = slots.get("poster").cloned() {
                 control = control.poster(move |window, cx| Some(build(window, cx)));
+            } else if let Some(reference) = node.props.get("posterResource").cloned() {
+                control = control.poster(move |_, cx| {
+                    super::content::image_resource(&reference, cx)
+                        .ok()
+                        .map(|image| image.size_full().into_any_element())
+                });
             }
             // A supplied element is not a decoded video frame or a playing transport.
             control.into_any_element()
         }
         "ModelViewer" => {
             let mut control = ModelViewer::new(node.id.clone())
+                .disabled(flag(node, "disabled"))
                 .title(text(node, "title"))
                 .shading(if text(node, "shading") == "wireframe" {
                     ModelShading::Wireframe
@@ -137,7 +155,9 @@ pub(super) fn render(
             } else if text(node, "state") == "loading" {
                 control = control.loading();
             }
-            if let Some(action) = node.events.get("event").cloned() {
+            if !flag(node, "disabled")
+                && let Some(action) = node.events.get("event").cloned()
+            {
                 control = control.on_event(move |event, _, _| {
                     emit(
                         &action,

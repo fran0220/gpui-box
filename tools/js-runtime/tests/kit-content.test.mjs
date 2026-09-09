@@ -5,8 +5,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { familySchemas, familyMethods } from '../kit-content-schema.mjs';
+import { familySchemas, familyMethods, validateDescriptor } from '../kit-content-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
+
+test('cross-field contracts reject ambiguous data and unowned resource locators', () => {
+  const check = (component, props, slots = {}) => {
+    validateValue(props, familySchemas[component].props);
+    validateDescriptor({ component, props, slots });
+  };
+  assert.throws(() => check('CodeView', { text: 'a', lines: [{ number: 3, text: 'b' }] }), /choose text or lines/);
+  assert.throws(() => check('CodeView', { lines: [{ number: 3, text: 'a' }, { number: 3, text: 'b' }] }), /duplicate line/);
+  assert.throws(() => check('AgentDocument', { blocks: [{ id: 'code', kind: 'code' }] }), /needs its slot/);
+  assert.throws(() => check('AgentDocument', { blocks: [{ id: 'text', kind: 'text' }] }), /text required/);
+  check('AgentDocument', { blocks: [{ id: 'code', kind: 'code' }] }, { code: [] });
+  assert.throws(() => check('ImageViewer', { minZoom: 3, maxZoom: 2 }), /zoom range/);
+  check('Markdown', { source: '![approved](picture)', images: [{ src: 'picture', resource: { key: 'pixels' } }] });
+  for (const resource of [{ key: '../pixels' }, { key: 'https://example.test/a' }, { key: 'pixels', path: '/tmp/a' }]) {
+    assert.throws(() => check('Markdown', { source: '![x](x)', images: [{ src: 'x', resource }] }));
+  }
+});
 
 test('content membership and every native fixture use the closed executable contract', () => {
   const catalog = JSON.parse(readFileSync(new URL('../../../docs/api-index.json', import.meta.url)));

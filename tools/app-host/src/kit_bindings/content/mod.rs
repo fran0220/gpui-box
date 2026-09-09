@@ -1,10 +1,14 @@
 //! Caller-owned content. Strings are content, never native IO authority.
 use super::{Emit, KitSlots, Node, flag, number, text};
+use crate::resources::{ResourceRef, Resources};
 use anyhow::{Result, bail, ensure};
-use gpui::{AnyElement, App, IntoElement, SharedString, Window};
-use gpui_kit::{content::*, foundation::slot::Slotted};
+use gpui::{AnyElement, App, IntoElement, SharedString, Styled, StyledImage, Window};
+use gpui_kit::{
+    content::*,
+    foundation::{Disableable, slot::Slotted},
+};
 use serde_json::{Value, json};
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -23,11 +27,91 @@ pub(super) const COMPONENTS: &[&str] = &[
     "Terminal",
 ];
 
-/// Builders retain native visual state through their stable Ident. This map holds
-/// only mounted query targets; it does not duplicate the parser or selection state.
+pub(super) fn validate_descriptor(node: &Node) -> Result<()> {
+    let data = props(node);
+    for image in items(&data, "images")
+        .chain(items(&data["markdownOptions"], "images"))
+        .chain(items(&data, "frames"))
+    {
+        if let Some(reference) = image.get("resource") {
+            validate_resource(reference)?;
+        }
+    }
+    if node.component.as_deref() == Some("CodeView") {
+        ensure!(
+            !(node.props.contains_key("text") && node.props.contains_key("lines")),
+            "choose code text or lines"
+        );
+        let mut numbers = std::collections::HashSet::new();
+        for line in items(&data, "lines") {
+            ensure!(
+                numbers.insert(n(line, "number")),
+                "duplicate code line number"
+            );
+        }
+    }
+    if node.component.as_deref() == Some("AgentDocument") {
+        for block in items(&data, "blocks") {
+            match block["kind"].as_str().unwrap_or_default() {
+                "text" | "markdown" => {
+                    ensure!(block.get("text").is_some(), "document block text required")
+                }
+                "notice" => ensure!(
+                    block.get("text").is_some() || node.slots.contains_key(&s(block, "id")),
+                    "notice text or slot required"
+                ),
+                _ => ensure!(
+                    node.slots.contains_key(&s(block, "id")),
+                    "typed document block requires slot"
+                ),
+            }
+        }
+    }
+    if node.component.as_deref() == Some("ImageViewer") {
+        ensure!(
+            number(node, "minZoom", 0.1) <= number(node, "maxZoom", 10.),
+            "invalid image zoom range"
+        );
+    }
+    Ok(())
+}
+
+pub(super) fn validate_resource(value: &Value) -> Result<()> {
+    let reference: ResourceRef = serde_json::from_value(value.clone())?;
+    ensure!(
+        !reference.key.is_empty()
+            && reference.key.len() <= 128
+            && reference
+                .key
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'),
+        "invalid resource key"
+    );
+    Ok(())
+}
+
+type TerminalStates = HashMap<(u64, String), Rc<RefCell<TerminalData>>>;
+
+/// Builders retain native visual state through their stable Ident. The runtime
+/// namespaces it per mount. This state owns query targets and pure ANSI emulators;
+/// dropping it does not claim immediate destruction of framework keyed caches.
 #[derive(Default)]
 pub(super) struct State {
     mounted: RefCell<HashMap<(u64, String), Node>>,
+    terminals: RefCell<TerminalStates>,
+}
+
+struct TerminalData {
+    source: Option<String>,
+    emulator: Emulator,
+}
+impl Default for TerminalData {
+    fn default() -> Self {
+        Self {
+            source: None,
+            emulator: Emulator::new(80, 24),
+        }
+    }
 }
 
 impl State {
@@ -45,6 +129,10 @@ impl State {
         self.mounted
             .borrow_mut()
             .retain(|key, node| live.get(key) == node.component.as_ref());
+        self.terminals.borrow_mut().retain(|key, _| {
+            live.get(key)
+                .is_some_and(|component| component == "Terminal")
+        });
     }
 
     pub(super) fn render(
@@ -58,6 +146,15 @@ impl State {
         self.mounted
             .borrow_mut()
             .insert((node.instance, node.id.clone()), node.clone());
+        if node.component.as_deref() == Some("Terminal") {
+            let retained = self
+                .terminals
+                .borrow_mut()
+                .entry((node.instance, node.id.clone()))
+                .or_default()
+                .clone();
+            return terminal(node, slots, retained, emit);
+        }
         render(node, slots, window, cx, emit)
     }
 
@@ -174,7 +271,7 @@ fn tone(value: &Value) -> gpui_kit::display::badge::Tone {
         _ => Tone::Neutral,
     }
 }
-fn spans(value: &Value, key: &str) -> Vec<CodeSpan> {
+pub(super) fn spans(value: &Value, key: &str) -> Vec<CodeSpan> {
     use gpui_kit_theme::SyntaxColor;
     items(value, key)
         .map(|span| CodeSpan {
@@ -202,7 +299,7 @@ fn send(node: &Node, emit: &Emit, event: &str, value: Value) {
     }
 }
 
-fn markdown_event(event: &MarkdownEvent) -> Value {
+pub(super) fn markdown_event(event: &MarkdownEvent) -> Value {
     match event {
         MarkdownEvent::LinkClicked { href } => json!({"kind":"linkClicked","href":href.as_ref()}),
         MarkdownEvent::ImageRequested { src, alt } => {
@@ -219,24 +316,64 @@ fn markdown_event(event: &MarkdownEvent) -> Value {
 }
 
 fn markdown(node: &Node) -> Markdown {
-    let mut control = Markdown::new(node.id.clone(), text(node, "source"))
-        .streaming(flag(node, "streaming"))
-        .code_presentation(if text(node, "codePresentation") == "card" {
+    configure_markdown(
+        Markdown::new(node.id.clone(), text(node, "source")).streaming(flag(node, "streaming")),
+        &props(node),
+    )
+}
+
+pub(super) fn configure_markdown(mut control: Markdown, options: &Value) -> Markdown {
+    if options.get("codePresentation").is_some() {
+        control = control.code_presentation(if s(options, "codePresentation") == "card" {
             MarkdownCodePresentation::Card
         } else {
             MarkdownCodePresentation::Flat
         });
-    if let Some(lines) = node.props.get("maxLines").and_then(Value::as_u64) {
+    }
+    if let Some(lines) = options.get("maxLines").and_then(Value::as_u64) {
         control = control.max_lines(lines as usize);
     }
-    if let Some(order) = node
-        .props
-        .get("selectionOrderStart")
-        .and_then(Value::as_u64)
-    {
+    if let Some(order) = options.get("selectionOrderStart").and_then(Value::as_u64) {
         control = control.selection_order_start(order);
     }
+    if options.get("highlights").is_some() {
+        let highlights = items(options, "highlights").cloned().collect::<Vec<_>>();
+        control = control.highlight(move |code| {
+            highlights
+                .iter()
+                .find(|item| {
+                    item["text"].as_str() == Some(code.text.as_ref())
+                        && item["language"].as_str() == code.language.as_deref()
+                })
+                .map_or_else(Vec::new, |item| spans(item, "spans"))
+        });
+    }
+    if options.get("images").is_some() {
+        let images = items(options, "images").cloned().collect::<Vec<_>>();
+        control = control.image(move |request, _, cx| {
+            images
+                .iter()
+                .find(|image| image["src"].as_str() == Some(request.src.as_ref()))
+                .and_then(|image| image_resource(&image["resource"], cx).ok())
+                .map(IntoElement::into_any_element)
+        });
+    }
     control
+}
+
+/// Resolve at the point of use; the Custom loader also checks revocation during
+/// native image layout/paint. Never cache the resulting pixels in adapter state.
+pub(super) fn image_resource(reference: &Value, cx: &App) -> Result<gpui::Img> {
+    let reference: ResourceRef = serde_json::from_value(reference.clone())?;
+    Ok(gpui::img(Resources::image(&reference, cx)?).object_fit(gpui::ObjectFit::Contain))
+}
+
+pub(super) fn message_body(value: &Value) -> MessageBody {
+    if b(value, "markdown") {
+        MessageBody::Markdown(s(value, "text").into())
+    } else {
+        MessageBody::Text(s(value, "text").into())
+    }
 }
 
 fn code_view(node: &Node) -> CodeView {
@@ -321,6 +458,10 @@ fn document(node: &Node, slots: &KitSlots) -> AgentDocument {
     }
     if let Some(rows) = node.props.get("virtualized").and_then(Value::as_u64) {
         document = document.virtualized(rows as usize);
+    }
+    if let Some(options) = node.props.get("markdownOptions").cloned() {
+        document =
+            document.configure_markdown(move |_, markdown| configure_markdown(markdown, &options));
     }
     document
 }
@@ -450,14 +591,20 @@ pub(super) fn render(
                 result.state(match frame["state"].as_str() {
                     Some("loading") => ImageState::Loading,
                     Some("error") => ImageState::Failed(s(frame, "reason").into()),
-                    Some("ready") if slots.contains_key(&s(frame, "id")) => ImageState::Ready,
-                    _ => ImageState::Unavailable(
-                        "Native image resource authority unavailable".into(),
-                    ),
+                    Some("ready")
+                        if slots.contains_key(&s(frame, "id"))
+                            || frame
+                                .get("resource")
+                                .is_some_and(|reference| image_resource(reference, cx).is_ok()) =>
+                    {
+                        ImageState::Ready
+                    }
+                    _ => ImageState::Unavailable("Image resource refused or unavailable".into()),
                 })
             });
-            let mut control =
-                ImageViewer::new(node.id.clone(), frames).fit(match text(node, "fit").as_str() {
+            let mut control = ImageViewer::new(node.id.clone(), frames)
+                .disabled(flag(node, "disabled"))
+                .fit(match text(node, "fit").as_str() {
                     "cover" => FitMode::Cover,
                     "actual" => FitMode::Actual,
                     "zoom" => FitMode::Zoom(number(node, "zoom", 1.)),
@@ -474,11 +621,17 @@ pub(super) fn render(
                     control.zoom_range(number(node, "minZoom", 0.1), number(node, "maxZoom", 10.));
             }
             control = control.image(move |frame, window, cx| {
-                slots
+                let slot = slots
                     .get(frame.id().as_ref())
-                    .map(|build| build(window, cx))
+                    .map(|build| build(window, cx));
+                slot.or_else(|| {
+                    items(&data, "frames")
+                        .find(|item| item["id"].as_str() == Some(frame.id().as_ref()))
+                        .and_then(|item| image_resource(&item["resource"], cx).ok())
+                        .map(|image| image.size_full().into_any_element())
+                })
             });
-            if node.events.contains_key("event") {
+            if !flag(node, "disabled") && node.events.contains_key("event") {
                 control=control.on_event(move |event,_,_|send(&callback,&emit,"event",match event {
                 ImageViewerEvent::FitChanged(fit)=>json!({"kind":"fitChanged","fit":fit.name(),"zoom":if let FitMode::Zoom(value)=fit{Some(*value)}else{None}}),
                 ImageViewerEvent::Stepped{id}=>json!({"kind":"stepped","id":id.as_ref()}),
@@ -487,47 +640,7 @@ pub(super) fn render(
             }
             control.into_any_element()
         }
-        "Terminal" => {
-            let mut control = Terminal::new(node.id.clone())
-                .focused(flag(node, "focused"))
-                .scrollback(flag(node, "scrollback"));
-            let has_data = node.props.contains_key("text");
-            let state = match text(node, "state").as_str() {
-                "loading" => TerminalState::Loading,
-                "error" => TerminalState::Error(text(node, "reason").into()),
-                _ if has_data => TerminalState::Ready,
-                _ => TerminalState::Unavailable(
-                    "Native terminal process authority unavailable".into(),
-                ),
-            };
-            control = control.state(state);
-            if has_data {
-                let text = text(node, "text");
-                // The emulator is a pure ANSI fold. Replies are intentionally not sent
-                // to a process; this adapter has no process or PTY handle.
-                control = control.grid(move |geometry, _| {
-                    let mut emulator =
-                        Emulator::new(geometry.cols.min(512), geometry.rows.min(256));
-                    emulator.feed(text.as_bytes());
-                    Some(GridSnapshot {
-                        lines: emulator.lines(),
-                        cursor: emulator.cursor(),
-                    })
-                });
-            }
-            if node.events.contains_key("event") {
-                control=control.on_event(move |event,_,_| {
-                let hit=|hit:CellHit|json!({"row":hit.row,"col":hit.col,"side":match hit.side{CellSide::Left=>"left",CellSide::Right=>"right"}});
-                send(&callback,&emit,"event",match event {
-                    TerminalEvent::SelectionStarted{hit:cell,kind}=>json!({"kind":"selectionStarted","hit":hit(cell),"selectionKind":match kind{SelectionKind::Drag=>"drag",SelectionKind::Word=>"word",SelectionKind::Line=>"line"}}),
-                    TerminalEvent::SelectionUpdated{hit:cell}=>json!({"kind":"selectionUpdated","hit":hit(cell)}),
-                    TerminalEvent::SelectionCleared=>json!({"kind":"selectionCleared"}),
-                    TerminalEvent::Scrolled{lines}=>json!({"kind":"scrolled","lines":lines}),
-                });
-            });
-            }
-            slotted(control, slots).into_any_element()
-        }
+        "Terminal" => terminal(node, slots, Rc::default(), emit),
         "AgentDocument" => {
             let control = document(node, &slots).on_event(move |event, _, _| {
                 let AgentDocumentEvent::Markdown { block, event } = event;
@@ -642,11 +755,7 @@ pub(super) fn render(
         }
         "MessageList" => {
             let messages = items(&data, "messages").map(|message| {
-                let body = if b(message, "markdown") {
-                    MessageBody::Markdown(s(message, "text").into())
-                } else {
-                    MessageBody::Text(s(message, "text").into())
-                };
+                let body = message_body(message);
                 let mut result =
                     Message::new(s(message, "id"), body).streaming(b(message, "streaming"));
                 if message.get("author").is_some() {
@@ -709,6 +818,7 @@ pub(super) fn render(
         }
         "TransportBar" => {
             let mut control = TransportBar::new(node.id.clone())
+                .disabled(flag(node, "disabled"))
                 .label(text(node, "label"))
                 .state(match text(node, "state").as_str() {
                     "playing" => TransportState::Playing,
@@ -750,8 +860,8 @@ pub(super) fn render(
                     range["end"].as_f64().unwrap_or_default() as f32,
                 )
             }));
-            control
-                .on_event(move |event, _, _| {
+            if !flag(node, "disabled") && node.events.contains_key("event") {
+                control = control.on_event(move |event, _, _| {
                     let value = match event {
                         TransportEvent::PlayRequested => json!({"kind":"playRequested"}),
                         TransportEvent::PauseRequested => json!({"kind":"pauseRequested"}),
@@ -773,9 +883,92 @@ pub(super) fn render(
                         }
                     };
                     send(&callback, &emit, "event", value);
-                })
-                .into_any_element()
+                });
+            }
+            control.into_any_element()
         }
         _ => unreachable!("validated content registration"),
     }
+}
+
+fn terminal(
+    node: &Node,
+    slots: KitSlots,
+    retained: Rc<RefCell<TerminalData>>,
+    emit: Emit,
+) -> AnyElement {
+    let has_data = node.props.contains_key("text") || retained.borrow().source.is_some();
+    let state = match text(node, "state").as_str() {
+        "loading" => TerminalState::Loading,
+        "error" => TerminalState::Error(text(node, "reason").into()),
+        "unavailable" => TerminalState::Unavailable(text(node, "reason").into()),
+        _ if has_data => TerminalState::Ready,
+        _ => TerminalState::Unavailable("Native terminal process authority unavailable".into()),
+    };
+    let mut control = Terminal::new(node.id.clone())
+        .state(state)
+        .focused(flag(node, "focused"))
+        .scrollback(flag(node, "scrollback"));
+    if has_data {
+        let source = node
+            .props
+            .get("text")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let held = retained.clone();
+        control = control.grid(move |geometry, _| {
+            let mut data = held.borrow_mut();
+            let cols = geometry.cols.clamp(1, 512);
+            let rows = geometry.rows.clamp(1, 256);
+            if data.emulator.cols() != usize::from(cols)
+                || data.emulator.rows() != usize::from(rows)
+            {
+                data.emulator.resize(cols, rows);
+            }
+            if let Some(source) = &source
+                && data.source.as_ref() != Some(source)
+            {
+                let prefix = data
+                    .source
+                    .as_ref()
+                    .filter(|previous| source.starts_with(previous.as_str()))
+                    .map(String::len);
+                if let Some(prefix) = prefix {
+                    data.emulator.feed(&source.as_bytes()[prefix..]);
+                } else {
+                    data.emulator = Emulator::new(cols, rows);
+                    data.emulator.feed(source.as_bytes());
+                }
+                data.source = Some(source.clone());
+            }
+            Some(GridSnapshot {
+                lines: data.emulator.lines(),
+                cursor: data.emulator.cursor(),
+            })
+        });
+        let node = node.clone();
+        control=control.on_event(move |event,window,_|{
+            let hit=|hit:CellHit|json!({"row":hit.row,"col":hit.col,"side":match hit.side{CellSide::Left=>"left",CellSide::Right=>"right"}});
+            let payload={
+                let mut data=retained.borrow_mut();
+                match event {
+                    TerminalEvent::SelectionStarted{hit:cell,kind}=>{
+                        let point=data.emulator.grid_point(cell.row,cell.col);
+                        data.emulator.start_selection(kind,point,cell.side);
+                        json!({"kind":"selectionStarted","hit":hit(cell),"selectionKind":match kind{SelectionKind::Drag=>"drag",SelectionKind::Word=>"word",SelectionKind::Line=>"line"}})
+                    }
+                    TerminalEvent::SelectionUpdated{hit:cell}=>{
+                        let point=data.emulator.grid_point(cell.row,cell.col);
+                        data.emulator.update_selection(point,cell.side);
+                        json!({"kind":"selectionUpdated","hit":hit(cell)})
+                    }
+                    TerminalEvent::SelectionCleared=>{data.emulator.clear_selection();json!({"kind":"selectionCleared"})}
+                    TerminalEvent::Scrolled{lines}=>{data.emulator.scroll(lines);json!({"kind":"scrolled","lines":lines})}
+                }
+            };
+            send(&node,&emit,"event",payload);
+            window.refresh();
+        });
+    }
+    slotted(control, slots).into_any_element()
 }
