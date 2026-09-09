@@ -3,6 +3,185 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn copy_native_owner_policy_readback_retained_options_and_commands(cx: &mut TestAppContext) {
+    use gpui::{ClipboardItem, ClipboardOperation, EffectOwner};
+    use std::cell::Cell;
+    let owner = EffectOwner::new();
+    let access = Rc::new(Cell::new(0_u8));
+    let policy = access.clone();
+    cx.update(|cx| {
+        cx.write_to_clipboard(ClipboardItem::new_string("unchanged".into()));
+        cx.set_clipboard_policy(move |requested, operation| {
+            requested == owner
+                && match operation {
+                    ClipboardOperation::Read => policy.get() & 1 != 0,
+                    ClipboardOperation::Write => policy.get() & 2 != 0,
+                    _ => false,
+                }
+        });
+    });
+    let state = Rc::new(KitState::default());
+    let descriptor = Rc::new(RefCell::new(node(
+        "CopyButton",
+        "copy",
+        json!({"text":"fixture payload","glyphOnly":"Copy fixture","confirmationMs":60000}),
+        json!({"copied":"copied","failed":"failed"}),
+    )));
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_state, build_node, output) = (state.clone(), descriptor.clone(), events.clone());
+    let mut harness = Harness::new(
+        cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            gpui_kit::foundation::register_owner_state(owner, cx);
+        },
+        move |window, cx| {
+            let node = build_node.borrow();
+            build_state.reconcile(&node, cx);
+            let output = output.clone();
+            let element = cx.with_effect_owner(Some(owner), |cx| {
+                build_state.render(
+                    &node,
+                    BTreeMap::new(),
+                    window,
+                    cx,
+                    Rc::new(move |action, value| {
+                        output.borrow_mut().push((action.to_owned(), value))
+                    }),
+                )
+            });
+            gpui::effect_owner(owner, element).into_any_element()
+        },
+    );
+    let entity = state.controls_extra.copies.borrow()[&(0, "copy".into())]
+        .entity
+        .clone();
+    harness.click("copy.action");
+    assert_eq!(events.borrow()[0].0, "failed");
+    access.set(1);
+    harness.update(|_, cx| {
+        cx.with_effect_owner(Some(owner), |cx| {
+            assert_eq!(
+                cx.try_read_from_clipboard()
+                    .expect("authorized read")
+                    .and_then(|item| item.text()),
+                Some("unchanged".into())
+            );
+        })
+    });
+    access.set(2);
+    harness.click("copy.action");
+    assert_eq!(events.borrow()[1].0, "failed");
+    assert!(
+        events.borrow()[1]
+            .1
+            .as_str()
+            .expect("verification refusal")
+            .to_lowercase()
+            .contains("submitted")
+    );
+    access.set(3);
+    harness.click("copy.action");
+    assert_eq!(events.borrow()[2], ("copied".into(), Value::Null));
+    descriptor.borrow_mut().props.remove("glyphOnly");
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("label".into(), json!("Copy again"));
+    harness.update(|_, cx| cx.refresh_windows());
+    assert_eq!(
+        state.controls_extra.copies.borrow()[&(0, "copy".into())]
+            .entity
+            .entity_id(),
+        entity.entity_id()
+    );
+    harness.update(|window, cx| {
+        cx.with_effect_owner(Some(owner), |cx| {
+            assert_eq!(
+                state
+                    .invoke(&descriptor.borrow(), "state", &json!({}), true, window, cx)
+                    .expect("state"),
+                json!({"state":"copied","reason":null})
+            );
+            for (method, args) in [
+                ("set_text", json!({"text":"new fixture payload"})),
+                ("set_label", json!({"label":null})),
+                ("set_glyph_only", json!({"name":"Copy value"})),
+                ("set_variant", json!({"variant":"ghost"})),
+                ("set_control_size", json!({"size":"lg"})),
+                ("set_confirmation", json!({"confirmation_ms":30000})),
+            ] {
+                assert_eq!(
+                    state
+                        .invoke(&descriptor.borrow(), method, &args, false, window, cx)
+                        .expect(method),
+                    Value::Null
+                );
+                assert!(entity.read(cx).state().is_copied());
+            }
+            state
+                .invoke(&descriptor.borrow(), "copy", &json!({}), false, window, cx)
+                .expect("copy command");
+            assert_eq!(
+                cx.try_read_from_clipboard()
+                    .expect("authorized read")
+                    .and_then(|item| item.text()),
+                Some("new fixture payload".into())
+            );
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "set_disabled",
+                    &json!({"disabled":true}),
+                    false,
+                    window,
+                    cx,
+                )
+                .expect("disable");
+            assert_eq!(
+                state
+                    .invoke(
+                        &descriptor.borrow(),
+                        "is_disabled",
+                        &json!({}),
+                        true,
+                        window,
+                        cx
+                    )
+                    .expect("disabled query"),
+                json!(true)
+            );
+            assert!(
+                state
+                    .invoke(&descriptor.borrow(), "copy", &json!({}), false, window, cx)
+                    .is_err()
+            );
+            assert!(
+                state
+                    .invoke(
+                        &descriptor.borrow(),
+                        "set_disabled",
+                        &json!({"disabled":false}),
+                        false,
+                        window,
+                        cx
+                    )
+                    .is_err()
+            );
+        })
+    });
+    let emitted = events.borrow().len();
+    harness.click("copy.action");
+    assert_eq!(events.borrow().len(), emitted);
+    *descriptor.borrow_mut() = node("Button", "replacement", json!({}), json!({}));
+    harness.update(|_, cx| {
+        state.reconcile(&descriptor.borrow(), cx);
+        cx.refresh_windows();
+    });
+    assert!(state.controls_extra.copies.borrow().is_empty());
+}
+
+#[gpui::test]
 fn typed_button_group_uses_guarded_child_actions_and_refuses_stale_context(
     cx: &mut TestAppContext,
 ) {

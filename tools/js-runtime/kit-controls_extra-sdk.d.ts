@@ -16,6 +16,7 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  CopyButton(id: string, props?: ControlProps & { text?: string; label?: string; glyphOnly?: string; variant?: ButtonVariant; confirmationMs?: number }, events?: { copied?(): void; failed?(reason: string): void }): KitNode;
   ButtonGroup(id: string, props?: ControlProps, events?: Record<string, never>, slots?: { buttons?: (NativeKitButtonNode | { kind: 'button'; id: string })[] }): KitNode;
   KeymapEditor(id: string, props?: { disabled?: boolean; commands?: KeymapCommand[]; query?: string }, events?: { addCaptured?(value: { command_id: string; keystroke: string }): void; remove?(value: { command_id: string; binding_id: string }): void; reset?(value: { command_id: string }): void; recordingCancelled?(value: { command_id: string }): void }): KitNode;
   NumberInput(id: string, props?: ControlProps & { value?: number; min?: number; max?: number; step?: number; pageStep?: number; precision?: number; name?: string; unit?: string; prefix?: string; required?: boolean; invalid?: boolean }, events?: { change?(value: number): void; unparsable?(text: string): void; submit?(): void }): KitNode;
@@ -32,6 +33,22 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 export interface ControlsExtraMethodContracts {
+  CopyButton: {
+    invoke: {
+      copy: { args: Record<string, never>; result: null };
+      set_text: { args: { text: string }; result: null };
+      set_label: { args: { label: string | null }; result: null };
+      set_glyph_only: { args: { name: string | null }; result: null };
+      set_variant: { args: { variant: ButtonVariant }; result: null };
+      set_control_size: { args: { size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+      set_confirmation: { args: { confirmation_ms: number }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+    };
+    query: {
+      state: { args: Record<string, never>; result: { state: 'idle' | 'copied' | 'failed'; reason: string | null } };
+      is_disabled: { args: Record<string, never>; result: boolean };
+    };
+  };
   KeymapEditor: {
     invoke: {
       set_commands: { args: { commands: KeymapCommand[] }; result: null };

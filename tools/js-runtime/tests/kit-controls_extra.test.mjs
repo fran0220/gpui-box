@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('copy contracts bound durations and prohibit serialized clipboard callbacks', () => {
+  validateValue({text:'fixture',glyphOnly:'Copy value',confirmationMs:0}, familySchemas.CopyButton.props);
+  for (const props of [{confirmationMs:-1},{confirmationMs:60001},{confirmationMs:0.5},{copier:'write'},{glyphOnly:''}]) {
+    assert.throws(() => validateValue(props,familySchemas.CopyButton.props));
+  }
+  for (const [method,args] of [['copy',{text:'extra'}],['set_confirmation',{confirmationMs:30}],['set_glyph_only',{name:''}],['set_label',{}]]) {
+    assert.throws(() => validateValue(args,familyMethods.CopyButton.invoke[method].args));
+  }
+  validateValue({state:'failed',reason:'Verification refused'},familyMethods.CopyButton.query.state.result);
+  assert.throws(() => validateValue({state:'submitted',reason:null},familyMethods.CopyButton.query.state.result));
+});
+
 test('keymap metadata is closed and command and binding identities cannot collide', () => {
   const command = { id: 'save', label: 'Save', bindings: [{ id: 'custom', keystroke: 'ctrl-k' }] };
   validateValue({ commands: [command] }, familySchemas.KeymapEditor.props);
@@ -75,6 +87,15 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.CopyButton('copy', {text:'fixture',glyphOnly:'Copy fixture'}, {copied() {}, failed(reason) { const text: string = reason; }});
+type CopyMethods = ControlsExtraMethodContracts['CopyButton']['invoke'];
+const copyValues: { [K in keyof CopyMethods]: CopyMethods[K]['args'] } = {
+copy:{},set_text:{text:'next'},set_label:{label:null},set_glyph_only:{name:null},set_variant:{variant:'ghost'},set_control_size:{size:'lg'},set_confirmation:{confirmation_ms:30},set_disabled:{disabled:true}
+};
+// @ts-expect-error custom native copier needs a host capability bridge
+kit.CopyButton('bad', {copier:() => {}});
+// @ts-expect-error failed reports refusal text rather than success boolean
+kit.CopyButton('bad', {}, {failed(reason:boolean) {}});
 kit.ButtonGroup('group', {size:'sm'}, {}, {buttons:[kit.Button('child', {label:'Run'}, {click() {}}), {kind:'button',id:'legacy'}]});
 // @ts-expect-error typed native group cannot consume a text element
 kit.ButtonGroup('bad', {}, {}, {buttons:[{kind:'text',id:'wrong'}]});

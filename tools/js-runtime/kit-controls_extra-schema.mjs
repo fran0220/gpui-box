@@ -12,6 +12,7 @@ const common = { disabled: boolean, size: choice('xs', 'sm', 'md', 'lg') };
 const integer = { type: 'number', integer: true, min: 0, max: 1000000 };
 const number = { type: 'number', min: -1e12, max: 1e12 };
 const precision = { type: 'number', integer: true, min: 0, max: 12 };
+const confirmation = { type: 'number', integer: true, min: 0, max: 60000 };
 const step = { ...number, min: Number.MIN_VALUE };
 const method = (fields, result) => ({ args: object(fields, Object.keys(fields)), result });
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
@@ -31,6 +32,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  CopyButton: { props: object({ ...common, text: string, label: string, glyphOnly: identity, variant, confirmationMs: confirmation }), events: { copied: choice(null), failed: string } },
   ButtonGroup: { props: object(common), events: {}, slots: ['buttons'] },
   KeymapEditor: { props: object({ disabled: boolean, commands: array(keymapCommand), query: string }), events: { addCaptured: object({ command_id: identity, keystroke: string }, ['command_id', 'keystroke']), remove: object({ command_id: identity, binding_id: identity }, ['command_id', 'binding_id']), reset: object({ command_id: identity }, ['command_id']), recordingCancelled: object({ command_id: identity }, ['command_id']) } },
   NumberInput: { props: object({ ...common, value: number, min: number, max: number, step, pageStep: step, precision, name: string, unit: string, prefix: string, required: boolean, invalid: boolean }), events: { change: number, unparsable: string, submit: choice(null) } },
@@ -47,6 +49,16 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  CopyButton: {
+    invoke: {
+      copy: method({}, choice(null)), set_text: method({ text: string }, choice(null)),
+      set_label: method({ label: { ...string, nullable: true } }, choice(null)),
+      set_glyph_only: method({ name: { ...identity, nullable: true } }, choice(null)),
+      set_variant: method({ variant }, choice(null)), set_control_size: method({ size: common.size }, choice(null)),
+      set_confirmation: method({ confirmation_ms: confirmation }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
+    },
+    query: { state: method({}, object({ state: choice('idle', 'copied', 'failed'), reason: { ...string, nullable: true } }, ['state', 'reason'])), is_disabled: method({}, boolean) },
+  },
   KeymapEditor: { invoke: { set_commands: method({ commands: array(keymapCommand) }, choice(null)), set_query: method({ query: string }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)) }, query: { current_commands: method({}, array(keymapResult)), active_command: method({}, { ...identity, nullable: true }), is_disabled: method({}, boolean) } },
   NumberInput: {
     invoke: {

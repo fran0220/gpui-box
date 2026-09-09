@@ -3,12 +3,13 @@
 use super::*;
 use gpui::{Hsla, ParentElement};
 use gpui_kit::controls::button::{ButtonJoin, ButtonStyle, IconPosition};
+use gpui_kit::controls::copy_button::{CopyButton, CopyEvent, CopyState};
 use gpui_kit::controls::keymap_editor::{
     KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
 };
 use gpui_kit::controls::number_input::{NumberInput, NumberInputEvent};
 use gpui_kit::state::ValidationState;
-use gpui_kit_theme::{ColorChoice, SemanticColor, Surface, Variant};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -28,6 +29,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "NumberInput",
     "KeymapEditor",
     "ButtonGroup",
+    "CopyButton",
 ];
 
 /// The host supplies the mounted, revision-checked typed construction context.
@@ -80,6 +82,7 @@ pub(super) struct State {
     transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
     numbers: RefCell<HashMap<Key, Rc<Entry<NumberInput>>>>,
     keymaps: RefCell<HashMap<Key, Rc<Entry<KeymapEditor>>>>,
+    copies: RefCell<HashMap<Key, Rc<Entry<CopyButton>>>>,
 }
 
 impl State {
@@ -106,6 +109,9 @@ impl State {
         self.keymaps
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "KeymapEditor"));
+        self.copies
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "CopyButton"));
     }
 
     pub(super) fn render(
@@ -116,6 +122,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("CopyButton") {
+            return self.render_copy(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("KeymapEditor") {
             return self.render_keymap(node, window, cx, emit);
         }
@@ -209,6 +218,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("CopyButton") {
+            return self.invoke_copy(node, method, args, query, cx);
+        }
         if node.component.as_deref() == Some("KeymapEditor") {
             return self.invoke_keymap(node, method, args, query, cx);
         }
@@ -594,6 +606,180 @@ impl State {
                     editor.set_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
                 }
                 _ => anyhow::bail!("unsupported KeymapEditor command"),
+            }
+            Ok(Value::Null)
+        })
+    }
+}
+
+fn copy_state(state: &CopyState) -> Value {
+    match state {
+        CopyState::Idle => json!({"state":"idle","reason":null}),
+        CopyState::Copied => json!({"state":"copied","reason":null}),
+        CopyState::Failed(reason) => json!({"state":"failed","reason":reason.as_ref()}),
+    }
+}
+
+impl State {
+    fn render_copy(
+        &self,
+        node: &Node,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> AnyElement {
+        let key = (node.instance, node.id.clone());
+        let existing = self.copies.borrow().get(&key).cloned();
+        let entry = existing.unwrap_or_else(|| {
+            let entity = cx.new(|cx| CopyButton::new(node.id.clone(), window, cx));
+            let route = Rc::new(RefCell::new(Route {
+                events: node.events.clone(),
+                emit: emit.clone(),
+                disabled: flag(node, "disabled"),
+            }));
+            let callback = Rc::downgrade(&route);
+            let subscription = cx.subscribe(&entity, move |entity, event: &CopyEvent, cx| {
+                if entity.read(cx).is_disabled() {
+                    return;
+                }
+                let (name, payload) = match event {
+                    CopyEvent::Copied => ("copied", Value::Null),
+                    CopyEvent::Failed(reason) => ("failed", json!(reason.as_ref())),
+                };
+                let target = callback.upgrade().and_then(|route| {
+                    let route = route.borrow();
+                    (!route.disabled)
+                        .then(|| {
+                            route
+                                .events
+                                .get(name)
+                                .map(|action| (action.clone(), route.emit.clone()))
+                        })
+                        .flatten()
+                });
+                if let Some((action, emit)) = target {
+                    emit(&action, payload);
+                }
+            });
+            let entry = Rc::new(Entry {
+                entity,
+                route,
+                props: Default::default(),
+                _subscription: subscription,
+            });
+            self.copies.borrow_mut().insert(key, entry.clone());
+            entry
+        });
+        *entry.route.borrow_mut() = Route {
+            events: node.events.clone(),
+            emit,
+            disabled: flag(node, "disabled"),
+        };
+        if *entry.props.borrow() != node.props {
+            let confirmation = node
+                .props
+                .get("confirmationMs")
+                .and_then(Value::as_u64)
+                .unwrap_or(cx.theme().motion.confirmation_ms);
+            entry.entity.update(cx, |copy, cx| {
+                copy.set_text(text(node, "text"), cx);
+                copy.set_label(
+                    node.props
+                        .get("label")
+                        .and_then(Value::as_str)
+                        .map(|s| s.to_owned().into()),
+                    cx,
+                );
+                copy.set_glyph_only(
+                    node.props
+                        .get("glyphOnly")
+                        .and_then(Value::as_str)
+                        .map(|s| s.to_owned().into()),
+                    cx,
+                );
+                copy.set_variant(
+                    if node.props.contains_key("variant") {
+                        variant(node)
+                    } else {
+                        ButtonVariant::Secondary
+                    },
+                    cx,
+                );
+                copy.set_control_size(size(node), cx);
+                copy.set_confirmation(std::time::Duration::from_millis(confirmation), cx);
+                copy.set_disabled(flag(node, "disabled"), cx);
+            });
+            *entry.props.borrow_mut() = node.props.clone();
+        }
+        entry.entity.clone().into_any_element()
+    }
+
+    fn invoke_copy(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        cx: &mut App,
+    ) -> anyhow::Result<Value> {
+        let entity = self
+            .copies
+            .borrow()
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| entry.entity.clone())
+            .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+        anyhow::ensure!(
+            query || (!flag(node, "disabled") && !entity.read(cx).is_disabled()),
+            "disabled target refuses invocation"
+        );
+        if query {
+            return match method {
+                "state" => Ok(copy_state(entity.read(cx).state())),
+                "is_disabled" => Ok(json!(entity.read(cx).is_disabled())),
+                _ => anyhow::bail!("unsupported CopyButton query"),
+            };
+        }
+        entity.update(cx, |copy, cx| {
+            match method {
+                "copy" => copy.copy(cx),
+                "set_text" => {
+                    copy.set_text(args["text"].as_str().unwrap_or_default().to_owned(), cx)
+                }
+                "set_label" => {
+                    copy.set_label(args["label"].as_str().map(|s| s.to_owned().into()), cx)
+                }
+                "set_glyph_only" => {
+                    copy.set_glyph_only(args["name"].as_str().map(|s| s.to_owned().into()), cx)
+                }
+                "set_confirmation" => copy.set_confirmation(
+                    std::time::Duration::from_millis(
+                        args["confirmation_ms"].as_u64().unwrap_or_default(),
+                    ),
+                    cx,
+                ),
+                "set_disabled" => {
+                    copy.set_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
+                }
+                "set_variant" => copy.set_variant(
+                    match args["variant"].as_str() {
+                        Some("primary") => ButtonVariant::Primary,
+                        Some("ghost") => ButtonVariant::Ghost,
+                        Some("danger") => ButtonVariant::Danger,
+                        Some("link") => ButtonVariant::Link,
+                        _ => ButtonVariant::Secondary,
+                    },
+                    cx,
+                ),
+                "set_control_size" => copy.set_control_size(
+                    match args["size"].as_str() {
+                        Some("xs") => ControlSize::Xs,
+                        Some("sm") => ControlSize::Sm,
+                        Some("lg") => ControlSize::Lg,
+                        _ => ControlSize::Md,
+                    },
+                    cx,
+                ),
+                _ => anyhow::bail!("unsupported CopyButton command"),
             }
             Ok(Value::Null)
         })
