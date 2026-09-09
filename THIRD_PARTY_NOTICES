@@ -465,3 +465,8 @@ was introduced; all existing framework copyright notices remain in force.
 Single-pass accessible text word indexing and bounded bidi-run scanning are
 original GPUI Box work using the existing Unicode dependencies. Existing
 framework notices and the frozen import receipt remain unchanged.
+
+Inherited effect-owner tokens, scoped callback/IME/overlay attribution and
+host-authorized clipboard operations are original GPUI Box modifications.
+No additional third-party source or license was introduced; the frozen
+historical import receipt and upstream notices remain unchanged.

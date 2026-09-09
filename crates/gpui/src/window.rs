@@ -917,11 +917,13 @@ pub(crate) struct TooltipBounds {
 #[derive(Clone)]
 pub(crate) struct TooltipRequest {
     id: TooltipId,
+    effect_owner: Option<crate::EffectOwner>,
     tooltip: AnyTooltip,
 }
 
 pub(crate) struct DeferredDraw {
     current_view: EntityId,
+    effect_owner: Option<crate::EffectOwner>,
     priority: usize,
     parent_node: DispatchNodeId,
     a11y_context: Option<a11y::DeferredA11yContext>,
@@ -1189,6 +1191,7 @@ pub struct Window {
     focus_listeners: SubscriberSet<(), AnyWindowFocusListener>,
     pub(crate) focus_lost_listeners: SubscriberSet<(), AnyObserver>,
     default_prevented: bool,
+    effect_owner: Rc<Cell<Option<crate::EffectOwner>>>,
     remaining_scroll_delta: Option<crate::ScrollDelta>,
     mouse_position: Point<Pixels>,
     mouse_hit_test: HitTest,
@@ -2046,6 +2049,7 @@ impl Window {
         Ok(Window {
             handle,
             invalidator,
+            effect_owner: cx.effect_owner.clone(),
             removed: false,
             platform_window,
             scene_overlay_enabled: Cell::new(false),
@@ -2142,9 +2146,15 @@ impl Window {
 
     pub(crate) fn new_focus_listener(
         &self,
-        value: AnyWindowFocusListener,
+        mut value: AnyWindowFocusListener,
     ) -> (Subscription, impl FnOnce() + use<>) {
-        self.focus_listeners.insert((), value)
+        let owner = self.effect_owner.get();
+        self.focus_listeners.insert(
+            (),
+            Box::new(move |event, window, cx| {
+                cx.with_effect_owner(owner, |cx| value(event, window, cx))
+            }),
+        )
     }
 }
 
@@ -2663,7 +2673,9 @@ impl Window {
 
     /// Schedule the given closure to be run directly after the current frame is rendered.
     pub fn on_next_frame(&self, callback: impl FnOnce(&mut Window, &mut App) + 'static) {
-        RefCell::borrow_mut(&self.next_frame_callbacks).push(Box::new(callback));
+        RefCell::borrow_mut(&self.next_frame_callbacks).push(Box::new(move |window, cx| {
+            cx.with_effect_owner(None, |cx| callback(window, cx));
+        }));
     }
 
     /// Schedule a frame to be drawn on the next animation frame.
@@ -3272,6 +3284,7 @@ impl Window {
     /// presentation pass then shows the contents of the new [`Scene`].
     #[profiling::function]
     pub fn draw(&mut self, cx: &mut App) -> ArenaClearNeeded {
+        let _owner = cx.effect_owner_scope(None);
         // Drain unconditionally so a stale first-invalidation timestamp can't
         // leak into a later frame across enable/disable of frame tracing.
         let frame_dirty = self.invalidator.take_frame_dirty();
@@ -3600,7 +3613,9 @@ impl Window {
         let mut active_drag_element = None;
         let mut tooltip_element = None;
         if let Some(prompt) = self.prompt.take() {
-            let mut element = prompt.view.any_view().into_any_element();
+            let mut element =
+                crate::EffectOwnerElement::optional(prompt.effect_owner, prompt.view.any_view())
+                    .into_any_element();
             let prompt_layout_id = element.request_layout(self, cx);
             self.layout_engine
                 .as_mut()
@@ -3610,7 +3625,11 @@ impl Window {
             prompt_element = Some(element);
             self.prompt = Some(prompt);
         } else if let Some(active_drag) = cx.active_drag.take() {
-            let mut element = active_drag.view.clone().into_any_element();
+            let mut element = crate::EffectOwnerElement::optional(
+                active_drag.effect_owner,
+                active_drag.view.clone(),
+            )
+            .into_any_element();
             let offset = self.mouse_position() - active_drag.cursor_offset;
             element.prepaint_as_root(offset, AvailableSpace::min_size(), self, cx);
             active_drag_element = Some(element);
@@ -3699,7 +3718,12 @@ impl Window {
                 log::error!("Unexpectedly absent TooltipRequest");
                 continue;
             };
-            let mut element = tooltip_request.tooltip.view.clone().into_any_element();
+            let _owner = cx.effect_owner_scope(tooltip_request.effect_owner);
+            let mut element = crate::EffectOwnerElement::optional(
+                tooltip_request.effect_owner,
+                tooltip_request.tooltip.view.clone(),
+            )
+            .into_any_element();
             let mouse_position = tooltip_request.tooltip.mouse_position;
             let tooltip_size = element.layout_as_root(AvailableSpace::min_size(), self, cx);
 
@@ -3785,6 +3809,10 @@ impl Window {
             traversal_order.sort_by_key(|ix| self.next_frame.deferred_draws[*ix].priority);
 
             for deferred_draw_ix in traversal_order {
+                let owner_cell = self.effect_owner.clone();
+                let previous_owner = owner_cell
+                    .replace(self.next_frame.deferred_draws[deferred_draw_ix].effect_owner);
+                let _restore_owner = gpui_util::defer(move || owner_cell.set(previous_owner));
                 let (
                     element,
                     parent_node,
@@ -3858,6 +3886,9 @@ impl Window {
         let mut deferred_draws = mem::take(&mut self.next_frame.deferred_draws);
         for deferred_draw_ix in traversal_order {
             let mut deferred_draw = &mut deferred_draws[deferred_draw_ix];
+            let owner_cell = self.effect_owner.clone();
+            let previous_owner = owner_cell.replace(deferred_draw.effect_owner);
+            let _restore_owner = gpui_util::defer(move || owner_cell.set(previous_owner));
             self.element_id_stack
                 .clone_from(&deferred_draw.element_id_stack);
             self.next_frame
@@ -3939,6 +3970,7 @@ impl Window {
                 .iter()
                 .map(|deferred_draw| DeferredDraw {
                     current_view: deferred_draw.current_view,
+                    effect_owner: deferred_draw.effect_owner,
                     parent_node: reused_subtree.refresh_node_id(deferred_draw.parent_node),
                     a11y_context: deferred_draw.a11y_context.clone(),
                     element_id_stack: deferred_draw.element_id_stack.clone(),
@@ -4179,9 +4211,11 @@ impl Window {
     pub fn set_tooltip(&mut self, tooltip: AnyTooltip) -> TooltipId {
         self.invalidator.debug_assert_prepaint();
         let id = TooltipId(post_inc(&mut self.next_tooltip_id.0));
-        self.next_frame
-            .tooltip_requests
-            .push(Some(TooltipRequest { id, tooltip }));
+        self.next_frame.tooltip_requests.push(Some(TooltipRequest {
+            id,
+            tooltip,
+            effect_owner: self.effect_owner.get(),
+        }));
         id
     }
 
@@ -4823,6 +4857,7 @@ impl Window {
             .expect("required framework invariant must hold");
         self.next_frame.deferred_draws.push(DeferredDraw {
             current_view: self.current_view(),
+            effect_owner: self.effect_owner.get(),
             parent_node,
             a11y_context,
             element_id_stack: self.element_id_stack.clone(),
@@ -5942,10 +5977,18 @@ impl Window {
 
         let rem_size = self.rem_size();
         let scale_factor = self.scale_factor();
+        let owner = self.effect_owner.get();
         self.layout_engine
             .as_mut()
             .expect("required framework invariant must hold")
-            .request_measured_layout(style, rem_size, scale_factor, measure)
+            .request_measured_layout(
+                style,
+                rem_size,
+                scale_factor,
+                move |known, available, window, cx| {
+                    cx.with_effect_owner(owner, |cx| measure(known, available, window, cx))
+                },
+            )
     }
 
     /// Request a leaf with natural content dimensions, such as an image.
@@ -6122,10 +6165,11 @@ impl Window {
         self.invalidator.debug_assert_paint();
 
         if focus_handle.is_focused(self) {
+            let owner = cx.current_effect_owner();
             let cx = self.to_async(cx);
-            self.next_frame
-                .input_handlers
-                .push(Some(PlatformInputHandler::new(cx, Box::new(input_handler))));
+            self.next_frame.input_handlers.push(Some(
+                PlatformInputHandler::new(cx, Box::new(input_handler)).with_effect_owner(owner),
+            ));
         }
     }
 
@@ -6139,11 +6183,11 @@ impl Window {
         mut listener: impl FnMut(&Event, DispatchPhase, &mut Window, &mut App) + 'static,
     ) {
         self.invalidator.debug_assert_paint();
-
+        let owner = self.effect_owner.get();
         self.next_frame.mouse_listeners.push(Some(Box::new(
             move |event: &dyn Any, phase: DispatchPhase, window: &mut Window, cx: &mut App| {
                 if let Some(event) = event.downcast_ref() {
-                    listener(event, phase, window, cx)
+                    cx.with_effect_owner(owner, |cx| listener(event, phase, window, cx))
                 }
             },
         )));
@@ -6162,11 +6206,11 @@ impl Window {
         listener: impl Fn(&Event, DispatchPhase, &mut Window, &mut App) + 'static,
     ) {
         self.invalidator.debug_assert_paint();
-
+        let owner = self.effect_owner.get();
         self.next_frame.dispatch_tree.on_key_event(Rc::new(
             move |event: &dyn Any, phase, window: &mut Window, cx: &mut App| {
                 if let Some(event) = event.downcast_ref::<Event>() {
-                    listener(event, phase, window, cx)
+                    cx.with_effect_owner(owner, |cx| listener(event, phase, window, cx))
                 }
             },
         ));
@@ -6183,10 +6227,10 @@ impl Window {
         listener: impl Fn(&ModifiersChangedEvent, &mut Window, &mut App) + 'static,
     ) {
         self.invalidator.debug_assert_paint();
-
+        let owner = self.effect_owner.get();
         self.next_frame.dispatch_tree.on_modifiers_changed(Rc::new(
             move |event: &ModifiersChangedEvent, window: &mut Window, cx: &mut App| {
-                listener(event, window, cx)
+                cx.with_effect_owner(owner, |cx| listener(event, window, cx))
             },
         ));
     }
@@ -6296,6 +6340,7 @@ impl Window {
     /// Dispatch a mouse, keyboard, or touch event on the window.
     #[profiling::function]
     pub fn dispatch_event(&mut self, event: PlatformInput, cx: &mut App) -> DispatchEventResult {
+        let _owner = cx.effect_owner_scope(None);
         let frame_trace_generation = profiler::frame_trace_generation();
         let dispatch_time = (frame_trace_generation.is_some()
             || cfg!(feature = "input-latency-histogram"))
@@ -6370,6 +6415,7 @@ impl Window {
                     let source_window = self.handle.window_id();
                     if !cx.restore_platform_drag(source_window) && cx.active_drag.is_none() {
                         cx.active_drag = Some(AnyDrag {
+                            effect_owner: None,
                             value: Arc::new(paths.clone()),
                             view: cx.new(|_| paths).into(),
                             cursor_offset: position,
@@ -6424,6 +6470,7 @@ impl Window {
                         #[allow(clippy::arc_with_non_send_sync)]
                         let value = Arc::new(drop.clone());
                         cx.active_drag = Some(AnyDrag {
+                            effect_owner: None,
                             value,
                             view: cx.new(|_| drop).into(),
                             cursor_offset: position,
@@ -6684,7 +6731,8 @@ impl Window {
         else {
             return;
         };
-        let Some(payload) = payload_source(self, cx) else {
+        let owner = cx.active_drag.as_ref().and_then(|drag| drag.effect_owner);
+        let Some(payload) = cx.with_effect_owner(owner, |cx| payload_source(self, cx)) else {
             return;
         };
         if self.platform_window.start_external_drag(&payload)
@@ -7507,10 +7555,13 @@ impl Window {
         listener: impl Fn(&dyn Any, DispatchPhase, &mut Window, &mut App) + 'static,
     ) {
         self.invalidator.debug_assert_paint();
-
-        self.next_frame
-            .dispatch_tree
-            .on_action(action_type, Rc::new(listener));
+        let owner = self.effect_owner.get();
+        self.next_frame.dispatch_tree.on_action(
+            action_type,
+            Rc::new(move |event, phase, window, cx| {
+                cx.with_effect_owner(owner, |cx| listener(event, phase, window, cx))
+            }),
+        );
     }
 
     /// Register a capturing action listener on this node for the next frame if the condition is true.
@@ -7530,9 +7581,7 @@ impl Window {
         self.invalidator.debug_assert_paint();
 
         if condition {
-            self.next_frame
-                .dispatch_tree
-                .on_action(action_type, Rc::new(listener));
+            self.on_action(action_type, listener);
         }
     }
 
@@ -7630,17 +7679,23 @@ impl Window {
         &mut self,
         node_id: accesskit::NodeId,
         action: accesskit::Action,
-        listener: impl FnMut(Option<&accesskit::ActionData>, &mut Window, &mut App) + 'static,
+        mut listener: impl FnMut(Option<&accesskit::ActionData>, &mut Window, &mut App) + 'static,
     ) {
         if !self.a11y.is_active() {
             return;
         }
 
+        let owner = self.effect_owner.get();
         self.a11y
             .action_listeners
             .entry(node_id)
             .or_default()
-            .push((action, Box::new(listener)));
+            .push((
+                action,
+                Box::new(move |data, window, cx| {
+                    cx.with_effect_owner(owner, |cx| listener(data, window, cx))
+                }),
+            ));
     }
 
     pub(crate) fn handle_a11y_action(&mut self, request: accesskit::ActionRequest, cx: &mut App) {

@@ -19,6 +19,7 @@ mod color;
 /// The default colors used by GPUI.
 pub mod colors;
 mod editable_text;
+mod effect_owner;
 mod element;
 mod elements;
 mod executor;
@@ -101,6 +102,7 @@ pub use assets::*;
 pub use color::*;
 pub use ctor::ctor;
 pub use editable_text::*;
+pub use effect_owner::*;
 pub use element::*;
 pub use elements::*;
 pub use executor::*;

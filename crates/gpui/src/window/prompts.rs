@@ -59,6 +59,7 @@ impl PromptHandle {
 
         RenderablePromptHandle {
             view: Box::new(view),
+            effect_owner: cx.current_effect_owner(),
         }
     }
 }
@@ -66,6 +67,7 @@ impl PromptHandle {
 /// A prompt handle capable of being rendered in a window.
 pub struct RenderablePromptHandle {
     pub(crate) view: Box<dyn PromptViewHandle>,
+    pub(crate) effect_owner: Option<crate::EffectOwner>,
 }
 
 /// Use this function in conjunction with [App::set_prompt_builder] to force

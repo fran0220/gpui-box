@@ -37,7 +37,7 @@ impl AppContext for AsyncApp {
     fn new<T: 'static>(&mut self, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Entity<T> {
         let app = self.app();
         let mut app = app.borrow_mut();
-        app.new(build_entity)
+        app.with_effect_owner(None, |app| app.new(build_entity))
     }
 
     fn reserve_entity<T: 'static>(&mut self) -> Reservation<T> {
@@ -53,7 +53,7 @@ impl AppContext for AsyncApp {
     ) -> Entity<T> {
         let app = self.app();
         let mut app = app.borrow_mut();
-        app.insert_entity(reservation, build_entity)
+        app.with_effect_owner(None, |app| app.insert_entity(reservation, build_entity))
     }
 
     fn update_entity<T: 'static, R>(
@@ -63,7 +63,7 @@ impl AppContext for AsyncApp {
     ) -> R {
         let app = self.app();
         let mut app = app.borrow_mut();
-        app.update_entity(handle, update)
+        app.with_effect_owner(None, |app| app.update_entity(handle, update))
     }
 
     fn as_mut<'a, T>(&'a mut self, _handle: &Entity<T>) -> GpuiBorrow<'a, T>
@@ -79,6 +79,7 @@ impl AppContext for AsyncApp {
     {
         let app = self.app();
         let lock = app.borrow();
+        let _owner = lock.effect_owner_scope(None);
         lock.read_entity(handle, callback)
     }
 
@@ -91,7 +92,7 @@ impl AppContext for AsyncApp {
         if lock.quitting {
             bail!("app is quitting");
         }
-        lock.update_window(window, f)
+        lock.with_effect_owner(None, |app| app.update_window(window, f))
     }
 
     fn with_window<R>(
@@ -104,7 +105,7 @@ impl AppContext for AsyncApp {
         if lock.quitting {
             return None;
         }
-        lock.with_window(entity_id, f)
+        lock.with_effect_owner(None, |app| app.with_window(entity_id, f))
     }
 
     fn read_window<T, R>(
@@ -120,6 +121,7 @@ impl AppContext for AsyncApp {
         if lock.quitting {
             bail!("app is quitting");
         }
+        let _owner = lock.effect_owner_scope(None);
         lock.read_window(window, read)
     }
 
@@ -137,7 +139,7 @@ impl AppContext for AsyncApp {
     {
         let app = self.app();
         let mut lock = app.borrow_mut();
-        lock.update(|this| this.read_global(callback))
+        lock.with_effect_owner(None, |app| app.update(|this| this.read_global(callback)))
     }
 }
 
@@ -163,7 +165,7 @@ impl AsyncApp {
     pub fn update<R>(&self, f: impl FnOnce(&mut App) -> R) -> R {
         let app = self.app();
         let mut lock = app.borrow_mut();
-        lock.update(f)
+        lock.with_effect_owner(None, |app| app.update(f))
     }
 
     /// Arrange for the given callback to be invoked whenever the given entity emits an event of a given type.

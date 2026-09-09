@@ -294,6 +294,7 @@ struct ViewElementState {
 
 struct ViewElementCacheKey {
     bounds: Bounds<Pixels>,
+    effect_owner: Option<crate::EffectOwner>,
     content_mask: ContentMask<Pixels>,
     text_style: TextStyle,
     transparent_overlay: bool,
@@ -390,6 +391,7 @@ impl<V: View> Element for ViewElement<V> {
 
                         if let Some(mut element_state) = element_state
                             && element_state.cache_key.bounds == bounds
+                            && element_state.cache_key.effect_owner == cx.current_effect_owner()
                             && element_state.cache_key.content_mask == content_mask
                             && element_state.cache_key.text_style == text_style
                             && element_state.cache_key.transparent_overlay
@@ -433,6 +435,7 @@ impl<V: View> Element for ViewElement<V> {
                                 paint_range: PaintIndex::default()..PaintIndex::default(),
                                 cache_key: ViewElementCacheKey {
                                     bounds,
+                                    effect_owner: cx.current_effect_owner(),
                                     content_mask,
                                     text_style,
                                     transparent_overlay: window.is_painting_transparent_overlay(),

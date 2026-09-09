@@ -698,6 +698,8 @@ enum PlatformOwnedDragState {
 pub struct App {
     pub(crate) this: Weak<AppCell>,
     pub(crate) platform: Rc<dyn Platform>,
+    pub(crate) effect_owner: Rc<Cell<Option<crate::EffectOwner>>>,
+    pub(crate) clipboard_policy: Option<crate::effect_owner::ClipboardPolicy>,
     text_system: Arc<TextSystem>,
 
     pub(crate) actions: Rc<ActionRegistry>,
@@ -810,6 +812,8 @@ impl App {
             app: RefCell::new(App {
                 this: this.clone(),
                 platform: platform.clone(),
+                effect_owner: Default::default(),
+                clipboard_policy: None,
                 text_system,
                 text_rendering_mode: Rc::new(Cell::new(TextRenderingMode::default())),
                 mode: GpuiMode::Production,
@@ -1370,7 +1374,7 @@ impl App {
 
     /// Reads data from the platform clipboard.
     pub fn read_from_clipboard(&self) -> Option<ClipboardItem> {
-        self.platform.read_from_clipboard()
+        self.try_read_from_clipboard().ok().flatten()
     }
 
     /// Sets the text rendering mode for the application.
@@ -1385,21 +1389,21 @@ impl App {
 
     /// Writes data to the platform clipboard.
     pub fn write_to_clipboard(&self, item: ClipboardItem) {
-        self.platform.write_to_clipboard(item)
+        let _ = self.try_write_to_clipboard(item);
     }
 
     /// Reads data from the primary selection buffer.
     /// Only available on Linux.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn read_from_primary(&self) -> Option<ClipboardItem> {
-        self.platform.read_from_primary()
+        self.try_read_from_primary().ok().flatten()
     }
 
     /// Writes data to the primary selection buffer.
     /// Only available on Linux.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn write_to_primary(&self, item: ClipboardItem) {
-        self.platform.write_to_primary(item)
+        let _ = self.try_write_to_primary(item);
     }
 
     /// Reads data from macOS's "Find" pasteboard.
@@ -1409,7 +1413,7 @@ impl App {
     /// <https://developer.apple.com/documentation/appkit/nspasteboard/name-swift.struct/find>
     #[cfg(target_os = "macos")]
     pub fn read_from_find_pasteboard(&self) -> Option<ClipboardItem> {
-        self.platform.read_from_find_pasteboard()
+        self.try_read_from_find_pasteboard().ok().flatten()
     }
 
     /// Writes data to macOS's "Find" pasteboard.
@@ -1419,7 +1423,7 @@ impl App {
     /// <https://developer.apple.com/documentation/appkit/nspasteboard/name-swift.struct/find>
     #[cfg(target_os = "macos")]
     pub fn write_to_find_pasteboard(&self, item: ClipboardItem) {
-        self.platform.write_to_find_pasteboard(item)
+        let _ = self.try_write_to_find_pasteboard(item);
     }
 
     /// Writes credentials to the platform keychain.
@@ -1617,6 +1621,9 @@ impl App {
     /// such as notifying observers, emitting events, etc. Effects can themselves
     /// cause effects, so we continue looping until all effects are processed.
     fn flush_effects(&mut self) {
+        // Deferred notifications must not borrow the owner of whichever
+        // synchronous update happens to drain the queue.
+        let _owner = self.effect_owner_scope(None);
         loop {
             self.release_dropped_entities();
             self.release_dropped_focus_handles();
@@ -2200,6 +2207,7 @@ impl App {
         &mut self,
         listener: impl Fn(&A, &mut Self) + 'static,
     ) -> &mut Self {
+        let owner = self.current_effect_owner();
         self.global_action_listeners
             .entry(TypeId::of::<A>())
             .or_default()
@@ -2208,7 +2216,7 @@ impl App {
                     let action = action
                         .downcast_ref()
                         .expect("required framework invariant must hold");
-                    listener(action, cx)
+                    cx.with_effect_owner(owner, |cx| listener(action, cx))
                 }
             }));
         self
@@ -2922,6 +2930,8 @@ impl<G: Global> DerefMut for GlobalLease<G> {
 /// Contains state associated with an active drag operation, started by dragging an element
 /// within the window or by dragging into the app from the underlying platform.
 pub struct AnyDrag {
+    /// Owner captured at drag creation. OS-originated drags have no owner.
+    pub effect_owner: Option<crate::EffectOwner>,
     /// The view used to render this drag
     pub view: AnyView,
 

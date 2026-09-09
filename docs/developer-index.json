@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2556
+      "symbolCount": 2572
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -3244,7 +3244,7 @@
       "source": "crates/gpui/src/app.rs",
       "summary": "Contains state associated with an active drag operation, started by dragging an element within the window or by dragging into the app from the underlying platform.",
       "documentation": "Contains state associated with an active drag operation, started by dragging an element\nwithin the window or by dragging into the app from the underlying platform.",
-      "signature": "# [doc = \" Contains state associated with an active drag operation, started by dragging an element\"] # [doc = \" within the window or by dragging into the app from the underlying platform.\"] pub struct AnyDrag { # [doc = \" The view used to render this drag\"] pub view : AnyView, # [doc = \" The value of the dragged item, to be dropped\"] pub value : Arc<dyn Any>, # [doc = \" This is used to render the dragged item in the same place\"] # [doc = \" on the original element that the drag was initiated\"] pub cursor_offset : Point<Pixels>, # [doc = \" The cursor style to use while dragging\"] pub cursor_style : Option<CursorStyle>, # [doc = \" Resolves the payload to offer the platform if the drag leaves the window.\"] # [doc = \" Invoked at most once per drag gesture, at promotion time.\"] pub external_payload_source : Option<ExternalDragPayloadSource>, }",
+      "signature": "# [doc = \" Contains state associated with an active drag operation, started by dragging an element\"] # [doc = \" within the window or by dragging into the app from the underlying platform.\"] pub struct AnyDrag { # [doc = \" Owner captured at drag creation. OS-originated drags have no owner.\"] pub effect_owner : Option<crate::EffectOwner>, # [doc = \" The view used to render this drag\"] pub view : AnyView, # [doc = \" The value of the dragged item, to be dropped\"] pub value : Arc<dyn Any>, # [doc = \" This is used to render the dragged item in the same place\"] # [doc = \" on the original element that the drag was initiated\"] pub cursor_offset : Point<Pixels>, # [doc = \" The cursor style to use while dragging\"] pub cursor_style : Option<CursorStyle>, # [doc = \" Resolves the payload to offer the platform if the drag leaves the window.\"] # [doc = \" Invoked at most once per drag gesture, at promotion time.\"] pub external_payload_source : Option<ExternalDragPayloadSource>, }",
       "cfg": []
     },
     {
@@ -3272,7 +3272,7 @@
       "source": "crates/gpui/src/app.rs",
       "summary": "Contains the state of the full application, and passed as a reference to a variety of callbacks. Other [Context] derefs to this type. You need a reference to an `App` to access the state of a [Entity].",
       "documentation": "Contains the state of the full application, and passed as a reference to a variety of callbacks.\nOther [Context] derefs to this type.\nYou need a reference to an `App` to access the state of a [Entity].",
-      "signature": "# [doc = \" Contains the state of the full application, and passed as a reference to a variety of callbacks.\"] # [doc = \" Other [Context] derefs to this type.\"] # [doc = \" You need a reference to an `App` to access the state of a [Entity].\"] pub struct App { pub (crate) this : Weak<AppCell>, pub (crate) platform : Rc<dyn Platform>, text_system : Arc<TextSystem>, pub (crate) actions : Rc<ActionRegistry>, pub (crate) active_drag : Option<AnyDrag>, platform_owned_drag : Option<PlatformOwnedDrag>, pub (crate) background_executor : BackgroundExecutor, pub (crate) foreground_executor : ForegroundExecutor, pub (crate) entities : EntityMap, pub (crate) new_entity_observers : SubscriberSet<TypeId, NewEntityListener>, pub (crate) windows : SlotMap<WindowId, Option<Box<Window>>>, pub (crate) window_handles : FxHashMap<WindowId, AnyWindowHandle>, pub (crate) focus_handles : Arc<FocusMap>, pub (crate) keymap : Rc<RefCell<Keymap>>, pub (crate) keyboard_layout : Box<dyn PlatformKeyboardLayout>, pub (crate) keyboard_mapper : Rc<dyn PlatformKeyboardMapper>, pub (crate) global_action_listeners : TypeIdHashMap<Vec<Rc<dyn Fn (& dyn Any, DispatchPhase, & mut Self)>>>, pending_effects : VecDeque<Effect>, pub (crate) observers : SubscriberSet<EntityId, Handler>, pub (crate) event_listeners : SubscriberSet<EntityId, (TypeId, Listener)>, pub (crate) keystroke_observers : SubscriberSet<(), KeystrokeObserver>, pub (crate) keystroke_interceptors : SubscriberSet<(), KeystrokeObserver>, pub (crate) keyboard_layout_observers : SubscriberSet<(), Handler>, pub (crate) thermal_state_observers : SubscriberSet<(), Handler>, pub (crate) release_listeners : SubscriberSet<EntityId, ReleaseListener>, pub (crate) global_observers : SubscriberSet<TypeId, Handler>, pub (crate) quit_observers : SubscriberSet<(), QuitHandler>, pub (crate) restart_observers : SubscriberSet<(), Handler>, pub (crate) window_closed_observers : SubscriberSet<(), WindowClosedHandler>, # [doc = \" Per-App element arena. This isolates element allocations between different\"] # [doc = \" App instances (important for tests where multiple Apps run concurrently).\"] pub (crate) element_arena : RefCell<Arena>, # [doc = \" Per-App event arena.\"] pub (crate) event_arena : Arena, pub (crate) globals_by_type : TypeIdHashMap<Box<dyn Any>>, pub (crate) loading_assets : FxHashMap<(TypeId, u64), Box<dyn Any>>, asset_source : Arc<dyn AssetSource>, pub (crate) svg_renderer : SvgRenderer, http_client : Arc<dyn HttpClient>, pub (crate) pending_notifications : FxHashSet<EntityId>, pub (crate) pending_global_notifications : TypeIdHashSet, pub (crate) restart_path : Option<PathBuf>, pub (crate) layout_id_buffer : Vec<LayoutId>, pub (crate) propagate_event : bool, pub (crate) prompt_builder : Option<PromptBuilder>, pub (crate) window_invalidators_by_entity : FxHashMap<EntityId, FxHashMap<WindowId, WindowInvalidator>>, pub (crate) tracked_entities : FxHashMap<WindowId, FxHashSet<EntityId>>, pub (crate) current_window_by_entity : FxHashMap<EntityId, WindowId>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_renderer : Option<crate::InspectorRenderer>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_element_registry : InspectorElementRegistry, # [cfg (any (test, feature = \"test-support\", debug_assertions))] pub (crate) name : Option<& 'static str>, pub (crate) text_rendering_mode : Rc<Cell<TextRenderingMode>>, pub (crate) window_update_stack : Vec<WindowId>, pub (crate) mode : GpuiMode, pub (crate) cursor_hide_mode : CursorHideMode, pub (crate) reduce_motion : bool, # [doc = \" Whether the app was created by [`Application::new_inaccessible`]. No\"] # [doc = \" accesskit APIs will be called when this flag is set.\"] pub (crate) accessibility_force_disabled : bool, flushing_effects : bool, pending_updates : usize, quit_mode : QuitMode, quitting : bool, # [cfg (any (test, feature = \"leak-detection\"))] _ref_counts : Arc<RwLock<EntityRefCounts>>, }",
+      "signature": "# [doc = \" Contains the state of the full application, and passed as a reference to a variety of callbacks.\"] # [doc = \" Other [Context] derefs to this type.\"] # [doc = \" You need a reference to an `App` to access the state of a [Entity].\"] pub struct App { pub (crate) this : Weak<AppCell>, pub (crate) platform : Rc<dyn Platform>, pub (crate) effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, pub (crate) clipboard_policy : Option<crate::effect_owner::ClipboardPolicy>, text_system : Arc<TextSystem>, pub (crate) actions : Rc<ActionRegistry>, pub (crate) active_drag : Option<AnyDrag>, platform_owned_drag : Option<PlatformOwnedDrag>, pub (crate) background_executor : BackgroundExecutor, pub (crate) foreground_executor : ForegroundExecutor, pub (crate) entities : EntityMap, pub (crate) new_entity_observers : SubscriberSet<TypeId, NewEntityListener>, pub (crate) windows : SlotMap<WindowId, Option<Box<Window>>>, pub (crate) window_handles : FxHashMap<WindowId, AnyWindowHandle>, pub (crate) focus_handles : Arc<FocusMap>, pub (crate) keymap : Rc<RefCell<Keymap>>, pub (crate) keyboard_layout : Box<dyn PlatformKeyboardLayout>, pub (crate) keyboard_mapper : Rc<dyn PlatformKeyboardMapper>, pub (crate) global_action_listeners : TypeIdHashMap<Vec<Rc<dyn Fn (& dyn Any, DispatchPhase, & mut Self)>>>, pending_effects : VecDeque<Effect>, pub (crate) observers : SubscriberSet<EntityId, Handler>, pub (crate) event_listeners : SubscriberSet<EntityId, (TypeId, Listener)>, pub (crate) keystroke_observers : SubscriberSet<(), KeystrokeObserver>, pub (crate) keystroke_interceptors : SubscriberSet<(), KeystrokeObserver>, pub (crate) keyboard_layout_observers : SubscriberSet<(), Handler>, pub (crate) thermal_state_observers : SubscriberSet<(), Handler>, pub (crate) release_listeners : SubscriberSet<EntityId, ReleaseListener>, pub (crate) global_observers : SubscriberSet<TypeId, Handler>, pub (crate) quit_observers : SubscriberSet<(), QuitHandler>, pub (crate) restart_observers : SubscriberSet<(), Handler>, pub (crate) window_closed_observers : SubscriberSet<(), WindowClosedHandler>, # [doc = \" Per-App element arena. This isolates element allocations between different\"] # [doc = \" App instances (important for tests where multiple Apps run concurrently).\"] pub (crate) element_arena : RefCell<Arena>, # [doc = \" Per-App event arena.\"] pub (crate) event_arena : Arena, pub (crate) globals_by_type : TypeIdHashMap<Box<dyn Any>>, pub (crate) loading_assets : FxHashMap<(TypeId, u64), Box<dyn Any>>, asset_source : Arc<dyn AssetSource>, pub (crate) svg_renderer : SvgRenderer, http_client : Arc<dyn HttpClient>, pub (crate) pending_notifications : FxHashSet<EntityId>, pub (crate) pending_global_notifications : TypeIdHashSet, pub (crate) restart_path : Option<PathBuf>, pub (crate) layout_id_buffer : Vec<LayoutId>, pub (crate) propagate_event : bool, pub (crate) prompt_builder : Option<PromptBuilder>, pub (crate) window_invalidators_by_entity : FxHashMap<EntityId, FxHashMap<WindowId, WindowInvalidator>>, pub (crate) tracked_entities : FxHashMap<WindowId, FxHashSet<EntityId>>, pub (crate) current_window_by_entity : FxHashMap<EntityId, WindowId>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_renderer : Option<crate::InspectorRenderer>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_element_registry : InspectorElementRegistry, # [cfg (any (test, feature = \"test-support\", debug_assertions))] pub (crate) name : Option<& 'static str>, pub (crate) text_rendering_mode : Rc<Cell<TextRenderingMode>>, pub (crate) window_update_stack : Vec<WindowId>, pub (crate) mode : GpuiMode, pub (crate) cursor_hide_mode : CursorHideMode, pub (crate) reduce_motion : bool, # [doc = \" Whether the app was created by [`Application::new_inaccessible`]. No\"] # [doc = \" accesskit APIs will be called when this flag is set.\"] pub (crate) accessibility_force_disabled : bool, flushing_effects : bool, pending_updates : usize, quit_mode : QuitMode, quitting : bool, # [cfg (any (test, feature = \"leak-detection\"))] _ref_counts : Arc<RwLock<EntityRefCounts>>, }",
       "cfg": []
     },
     {
@@ -13490,6 +13490,234 @@
       "cfg": []
     },
     {
+      "id": "gpui::effect_owner::App::current_effect_owner",
+      "name": "current_effect_owner",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "The explicitly scoped owner, never inferred from focus or current view.",
+      "documentation": "The explicitly scoped owner, never inferred from focus or current view.",
+      "signature": "pub fn current_effect_owner (& self) -> Option<EffectOwner>",
+      "cfg": [],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::set_clipboard_policy",
+      "name": "set_clipboard_policy",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Installs host policy. Missing owners fail closed; native gestures do not bypass it. Ordinary apps without policy keep platform behavior.",
+      "documentation": "Installs host policy. Missing owners fail closed; native gestures do\nnot bypass it. Ordinary apps without policy keep platform behavior.",
+      "signature": "pub fn set_clipboard_policy (& mut self, policy : impl Fn (EffectOwner, ClipboardOperation) -> bool + 'static,)",
+      "cfg": [],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_read_from_clipboard",
+      "name": "try_read_from_clipboard",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Reads the clipboard, distinguishing refusal from an empty value.",
+      "documentation": "Reads the clipboard, distinguishing refusal from an empty value.",
+      "signature": "pub fn try_read_from_clipboard (& self) -> Result<Option<ClipboardItem>, ClipboardDenied>",
+      "cfg": [],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_read_from_find_pasteboard",
+      "name": "try_read_from_find_pasteboard",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Reads the find pasteboard, distinguishing refusal from empty.",
+      "documentation": "Reads the find pasteboard, distinguishing refusal from empty.",
+      "signature": "pub fn try_read_from_find_pasteboard (& self) -> Result<Option<ClipboardItem>, ClipboardDenied>",
+      "cfg": [
+        "cfg (target_os = \"macos\")"
+      ],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_read_from_primary",
+      "name": "try_read_from_primary",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Reads primary selection, distinguishing refusal from empty.",
+      "documentation": "Reads primary selection, distinguishing refusal from empty.",
+      "signature": "pub fn try_read_from_primary (& self) -> Result<Option<ClipboardItem>, ClipboardDenied>",
+      "cfg": [
+        "cfg (any (target_os = \"linux\", target_os = \"freebsd\"))"
+      ],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_write_to_clipboard",
+      "name": "try_write_to_clipboard",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Writes only if the current owner's host policy permits the operation.",
+      "documentation": "Writes only if the current owner's host policy permits the operation.",
+      "signature": "pub fn try_write_to_clipboard (& self, item : ClipboardItem) -> Result<(), ClipboardDenied>",
+      "cfg": [],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_write_to_find_pasteboard",
+      "name": "try_write_to_find_pasteboard",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Writes the find pasteboard only after host permission.",
+      "documentation": "Writes the find pasteboard only after host permission.",
+      "signature": "pub fn try_write_to_find_pasteboard (& self, item : ClipboardItem) -> Result<(), ClipboardDenied>",
+      "cfg": [
+        "cfg (target_os = \"macos\")"
+      ],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::try_write_to_primary",
+      "name": "try_write_to_primary",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Writes primary selection only after host permission.",
+      "documentation": "Writes primary selection only after host permission.",
+      "signature": "pub fn try_write_to_primary (& self, item : ClipboardItem) -> Result<(), ClipboardDenied>",
+      "cfg": [
+        "cfg (any (target_os = \"linux\", target_os = \"freebsd\"))"
+      ],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::App::with_effect_owner",
+      "name": "with_effect_owner",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Runs a synchronous scope with an explicit owner (or without authority). Restores the previous context even when the callback unwinds.",
+      "documentation": "Runs a synchronous scope with an explicit owner (or without authority).\nRestores the previous context even when the callback unwinds.",
+      "signature": "pub fn with_effect_owner<R> (& mut self, owner : Option<EffectOwner>, f : impl FnOnce (& mut App) -> R,) -> R",
+      "cfg": [],
+      "target": "App"
+    },
+    {
+      "id": "gpui::effect_owner::ClipboardDenied",
+      "name": "ClipboardDenied",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "A host refused access; distinct from an empty clipboard.",
+      "documentation": "A host refused access; distinct from an empty clipboard.",
+      "signature": "# [doc = \" A host refused access; distinct from an empty clipboard.\"] # [derive (Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)] pub enum ClipboardDenied { # [doc = \" Policy is enabled but no owner was explicitly retained.\"] # [error (\"clipboard operation has no effect owner\")] MissingOwner, # [doc = \" The host refused the owner's operation, including stale identities.\"] # [error (\"clipboard operation denied by host\")] Denied, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::effect_owner::ClipboardOperation",
+      "name": "ClipboardOperation",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "The clipboard effect requested by a native component.",
+      "documentation": "The clipboard effect requested by a native component.",
+      "signature": "# [doc = \" The clipboard effect requested by a native component.\"] # [derive (Clone, Copy, Debug, Eq, PartialEq, Hash)] pub enum ClipboardOperation { # [doc = \" Read the ordinary clipboard.\"] Read, # [doc = \" Write the ordinary clipboard.\"] Write, # [doc = \" Read the primary selection (Linux/FreeBSD).\"] ReadPrimary, # [doc = \" Write the primary selection (Linux/FreeBSD).\"] WritePrimary, # [doc = \" Read the find pasteboard (macOS).\"] ReadFind, # [doc = \" Write the find pasteboard (macOS).\"] WriteFind, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::effect_owner::EffectOwner",
+      "name": "EffectOwner",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Opaque host identity. A fresh token never reuses an earlier generation.",
+      "documentation": "Opaque host identity. A fresh token never reuses an earlier generation.",
+      "signature": "# [doc = \" Opaque host identity. A fresh token never reuses an earlier generation.\"] # [derive (Clone, Copy, Debug, Eq, PartialEq, Hash)] pub struct EffectOwner (u64);",
+      "cfg": []
+    },
+    {
+      "id": "gpui::effect_owner::EffectOwner::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Allocates a fresh identity. Keep it for the lifetime of one host owner.",
+      "documentation": "Allocates a fresh identity. Keep it for the lifetime of one host owner.",
+      "signature": "pub fn new () -> Self",
+      "cfg": [],
+      "target": "EffectOwner"
+    },
+    {
+      "id": "gpui::effect_owner::EffectOwnerElement",
+      "name": "EffectOwnerElement",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "An inherited authority boundary with no layout or semantic identity of its own.",
+      "documentation": "An inherited authority boundary with no layout or semantic identity of its own.",
+      "signature": "# [doc = \" An inherited authority boundary with no layout or semantic identity of its own.\"] pub struct EffectOwnerElement { owner : Option<EffectOwner>, child : AnyElement, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::effect_owner::effect_owner",
+      "name": "effect_owner",
+      "kind": "function",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Attributes a subtree's native effects to the host-supplied opaque owner.",
+      "documentation": "Attributes a subtree's native effects to the host-supplied opaque owner.",
+      "signature": "pub fn effect_owner (owner : EffectOwner, child : impl IntoElement) -> EffectOwnerElement",
+      "cfg": []
+    },
+    {
       "id": "gpui::element::AccessibilityRelationship",
       "name": "AccessibilityRelationship",
       "kind": "enum",
@@ -21601,6 +21829,20 @@
     },
     {
       "id": "gpui::gpui::reexport-13",
+      "name": "effect_owner :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use effect_owner::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-14",
       "name": "element :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21614,7 +21856,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-14",
+      "id": "gpui::gpui::reexport-15",
       "name": "elements :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21628,7 +21870,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-15",
+      "id": "gpui::gpui::reexport-16",
       "name": "executor :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21642,7 +21884,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-16",
+      "id": "gpui::gpui::reexport-17",
       "name": "geometry :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21656,7 +21898,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-17",
+      "id": "gpui::gpui::reexport-18",
       "name": "gestures :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21670,7 +21912,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-18",
+      "id": "gpui::gpui::reexport-19",
       "name": "global :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21681,20 +21923,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use global::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-19",
-      "name": "gpui_macros :: { AppContext , IntoElement , Render , VisualContext , bench , property_test , register_action , test , }",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use gpui_macros::{ AppContext, IntoElement, Render, VisualContext, bench, property_test, register_action, test, };",
       "cfg": []
     },
     {
@@ -21713,6 +21941,20 @@
     },
     {
       "id": "gpui::gpui::reexport-20",
+      "name": "gpui_macros :: { AppContext , IntoElement , Render , VisualContext , bench , property_test , register_action , test , }",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use gpui_macros::{ AppContext, IntoElement, Render, VisualContext, bench, property_test, register_action, test, };",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-21",
       "name": "gpui_shared_string :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21726,7 +21968,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-21",
+      "id": "gpui::gpui::reexport-22",
       "name": "gpui_util :: arc_cow :: ArcCow",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21740,7 +21982,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-22",
+      "id": "gpui::gpui::reexport-23",
       "name": "http_client",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21754,7 +21996,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-23",
+      "id": "gpui::gpui::reexport-24",
       "name": "input :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21768,7 +22010,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-24",
+      "id": "gpui::gpui::reexport-25",
       "name": "inspector :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21782,7 +22024,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-25",
+      "id": "gpui::gpui::reexport-26",
       "name": "interactive :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21796,7 +22038,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-26",
+      "id": "gpui::gpui::reexport-27",
       "name": "keymap :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21810,7 +22052,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-27",
+      "id": "gpui::gpui::reexport-28",
       "name": "luminance :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21824,7 +22066,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-28",
+      "id": "gpui::gpui::reexport-29",
       "name": "particles :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21835,20 +22077,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use particles::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-29",
-      "name": "path_builder :: *",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use path_builder::*;",
       "cfg": []
     },
     {
@@ -21867,6 +22095,20 @@
     },
     {
       "id": "gpui::gpui::reexport-30",
+      "name": "path_builder :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use path_builder::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-31",
       "name": "platform :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21880,7 +22122,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-31",
+      "id": "gpui::gpui::reexport-32",
       "name": "profiler :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21894,7 +22136,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-32",
+      "id": "gpui::gpui::reexport-33",
       "name": "queue :: { PriorityQueueReceiver , PriorityQueueSender }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21910,7 +22152,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-33",
+      "id": "gpui::gpui::reexport-34",
       "name": "refineable :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21924,7 +22166,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-34",
+      "id": "gpui::gpui::reexport-35",
       "name": "renderer_timing :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21938,7 +22180,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-35",
+      "id": "gpui::gpui::reexport-36",
       "name": "scene :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21952,7 +22194,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-36",
+      "id": "gpui::gpui::reexport-37",
       "name": "shared_uri :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21966,7 +22208,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-37",
+      "id": "gpui::gpui::reexport-38",
       "name": "spring :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21980,7 +22222,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-38",
+      "id": "gpui::gpui::reexport-39",
       "name": "style :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21991,20 +22233,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use style::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-39",
-      "name": "styled :: *",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use styled::*;",
       "cfg": []
     },
     {
@@ -22023,6 +22251,20 @@
     },
     {
       "id": "gpui::gpui::reexport-40",
+      "name": "styled :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use styled::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-41",
       "name": "subscription :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22036,7 +22278,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-41",
+      "id": "gpui::gpui::reexport-42",
       "name": "svg_renderer :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22050,7 +22292,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-42",
+      "id": "gpui::gpui::reexport-43",
       "name": "taffy :: { AvailableSpace , LayoutId }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22064,7 +22306,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-43",
+      "id": "gpui::gpui::reexport-44",
       "name": "test :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22080,7 +22322,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-44",
+      "id": "gpui::gpui::reexport-45",
       "name": "text_system :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22094,7 +22336,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-45",
+      "id": "gpui::gpui::reexport-46",
       "name": "util :: { FutureExt , Timeout }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22108,7 +22350,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-46",
+      "id": "gpui::gpui::reexport-47",
       "name": "view :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22122,7 +22364,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-47",
+      "id": "gpui::gpui::reexport-48",
       "name": "window :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22136,7 +22378,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-48",
+      "id": "gpui::gpui::reexport-49",
       "name": "pollster :: block_on",
       "kind": "reexport",
       "package": "gpui-box",
@@ -26135,7 +26377,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [expect (missing_docs)] pub struct PlatformInputHandler { cx : AsyncWindowContext, handler : Box<dyn InputHandler>, }",
+      "signature": "# [expect (missing_docs)] pub struct PlatformInputHandler { cx : AsyncWindowContext, handler : Box<dyn InputHandler>, effect_owner : Option<crate::EffectOwner>, }",
       "cfg": []
     },
     {
@@ -36957,7 +37199,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Holds the state for a specific window.",
       "documentation": "Holds the state for a specific window.",
-      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
+      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
       "cfg": []
     },
     {
@@ -38327,7 +38569,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Register a listener for an accessibility action on a specific node. The listener will be called when a screen reader requests the given action on the node identified by `node_id`.",
       "documentation": "Register a listener for an accessibility action on a specific node.\nThe listener will be called when a screen reader requests the given\naction on the node identified by `node_id`.\n\nRegistration is ignored when accessibility is inactive for the current\nframe. Activating accessibility forces a redraw before actions can be\ndelivered, so retaining listeners from inactive frames is unnecessary.\n\nSee the [accessibility guide](crate::_accessibility) for an overview.",
-      "signature": "pub fn on_a11y_action (& mut self, node_id : accesskit::NodeId, action : accesskit::Action, listener : impl FnMut (Option<& accesskit::ActionData>, & mut Window, & mut App) + 'static,)",
+      "signature": "pub fn on_a11y_action (& mut self, node_id : accesskit::NodeId, action : accesskit::Action, mut listener : impl FnMut (Option<& accesskit::ActionData>, & mut Window, & mut App) + 'static,)",
       "cfg": [],
       "target": "Window"
     },
@@ -40804,7 +41046,7 @@
       "source": "crates/gpui/src/window/prompts.rs",
       "summary": "A prompt handle capable of being rendered in a window.",
       "documentation": "A prompt handle capable of being rendered in a window.",
-      "signature": "# [doc = \" A prompt handle capable of being rendered in a window.\"] pub struct RenderablePromptHandle { pub (crate) view : Box<dyn PromptViewHandle>, }",
+      "signature": "# [doc = \" A prompt handle capable of being rendered in a window.\"] pub struct RenderablePromptHandle { pub (crate) view : Box<dyn PromptViewHandle>, pub (crate) effect_owner : Option<crate::EffectOwner>, }",
       "cfg": []
     },
     {
@@ -147657,6 +147899,24 @@
         "indexed_unicode_offsets_match_platform_rounding",
         "chunk_crossing_graphemes_match_contiguous_clamping",
         "undo_replays_exact_bytes_when_insertion_joined_a_grapheme"
+      ]
+    },
+    "framework_effect_owner": {
+      "contract": "EffectOwner is an opaque host token inherited through all subtree element phases, measured layout, registered mouse/key/action/accessibility/focus callbacks, deferred draws, tooltip timers/window overlays, prompts, drag previews and installed IME handlers. Cached callbacks retain their owner; owner changes invalidate view reuse. Host clipboard policy denies missing owners and never grants implicit gesture exceptions. Legacy APIs enforce the policy; try APIs distinguish refusal from empty clipboard.",
+      "limitations": [
+        "host must map tokens to grants and revoke stale generations",
+        "async and deferred notification work must explicitly retain/re-enter an owner; it never borrows later focus",
+        "without installed host policy plain native apps retain existing clipboard behavior",
+        "write success means authorized platform submission, not readback verification or a display acknowledgement"
+      ],
+      "platform_validation": "Shared callback, cache and IME dispatch tests run on Linux. macOS and Windows native validation requires the on-demand Platforms lane after integration; macOS find pasteboard is cfg-gated. No native event translator or renderer ABI changes.",
+      "tests": [
+        "clipboard_policy_denies_missing_stale_and_legacy_effects",
+        "owner_scopes_restore_on_unwind_and_deferred_work_requires_explicit_retention",
+        "cached_and_deferred_callbacks_retain_nested_owner_and_reparent_safely",
+        "installed_ime_owner_is_not_taken_from_later_focus_or_dispatch",
+        "asynchronous_continuations_require_explicit_owner_reentry",
+        "tooltip_timer_and_window_overlay_preserve_owner"
       ]
     },
     "framework_gestures": {

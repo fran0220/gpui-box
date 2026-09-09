@@ -831,3 +831,16 @@ Accessible text word-boundary indexing and bounded bidi-run scanning are
 original GPUI Box modifications. They retain global Unicode segmentation
 across visual rows and AccessKit run limits; no new external source, platform
 API, or historical import receipt is introduced.
+
+### Inherited effect ownership and host clipboard policy
+
+Opaque `EffectOwner` tokens, the transparent element boundary, callback and
+IME attribution, cache-owner invalidation, overlay retention and fallible
+clipboard operations are original GPUI Box work. Authority is host policy,
+never `KeyContext`, render entity identity, focus or a native gesture. Cached
+dispatch closures carry their registration owner; reparenting forces fresh
+registration. Asynchronous application re-entry and deferred notifications
+start unowned unless the continuation explicitly restores a retained token.
+Clipboard, Linux/FreeBSD primary selection and macOS find pasteboard legacy
+wrappers enforce the same policy. No source was imported; the historical
+receipt, renderer ABI and shared local package authority remain unchanged.

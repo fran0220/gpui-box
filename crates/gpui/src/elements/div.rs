@@ -3098,6 +3098,7 @@ impl Interactivity {
                                         as ExternalDragPayloadSource
                                 });
                             cx.active_drag = Some(AnyDrag {
+                                effect_owner: cx.current_effect_owner(),
                                 view: drag,
                                 value: listener.value,
                                 cursor_offset,
@@ -3993,6 +3994,7 @@ fn handle_tooltip_mouse_move(
             active_tooltip.borrow_mut().take();
         }
         Action::ScheduleShow => {
+            let owner = cx.current_effect_owner();
             let delayed_show_task = window.spawn(cx, {
                 let weak_active_tooltip = Rc::downgrade(active_tooltip);
                 let build_tooltip = build_tooltip.clone();
@@ -4003,6 +4005,7 @@ fn handle_tooltip_mouse_move(
                         return;
                     };
                     cx.update(|window, cx| {
+                        let _owner = cx.effect_owner_scope(owner);
                         let new_tooltip =
                             build_tooltip(window, cx).map(|(view, tooltip_is_hoverable)| {
                                 let weak_active_tooltip = Rc::downgrade(&active_tooltip);
