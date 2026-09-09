@@ -79,6 +79,12 @@ pub enum MarkdownEvent {
         language: Option<SharedString>,
         text: SharedString,
     },
+    /// The owner's clipboard policy refused the code-copy operation.
+    /// A refusal contains no copied payload and is never a success event.
+    CodeCopyRefused {
+        language: Option<SharedString>,
+        reason: gpui::ClipboardDenied,
+    },
     /// The reader asked for the lines [`Markdown::max_lines`] left out.
     MoreRequested { lines: usize },
 }
@@ -1080,6 +1086,23 @@ impl Painter {
         });
         let copy_ident = ident.child("copy");
         let clipboard = text.clone();
+        let failed = keyed::slot::<bool>(
+            &copy_ident.child("refusal").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let refusal = (*failed.borrow()).then(|| {
+            div()
+                .child(cx.strings().text(StringKey::CopyFailed))
+                .text_color(theme.colors.danger)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(copy_ident.child("refusal").semantic_id(), Role::Status)
+                        .text(cx.strings().text(StringKey::CopyFailed))
+                        .invalid(true),
+                )
+        });
+        let on_refusal = self.on_event.clone();
 
         let body = div()
             .column()
@@ -1111,18 +1134,42 @@ impl Painter {
                     .text_color(theme.colors.text_faint)
                     .child(label.clone())
                     .child(
-                        Button::new(copy_ident)
-                            .label(cx.strings().text(StringKey::Copy))
-                            .ghost()
-                            .control_size(gpui_kit_theme::ControlSize::Xs)
-                            .on_click(move |window, cx| {
-                                cx.write_to_clipboard(ClipboardItem::new_string(
-                                    clipboard.to_string(),
-                                ));
-                                if let Some(copied) = &copied {
-                                    copied(window, cx);
-                                }
-                            }),
+                        div()
+                            .row()
+                            .gap_token(&theme, Space::Xs)
+                            .children(refusal)
+                            .child(
+                                Button::new(copy_ident)
+                                    .label(cx.strings().text(StringKey::Copy))
+                                    .ghost()
+                                    .control_size(gpui_kit_theme::ControlSize::Xs)
+                                    .on_click(move |window, cx| {
+                                        let result = cx.try_write_to_clipboard(
+                                            ClipboardItem::new_string(clipboard.to_string()),
+                                        );
+                                        *failed.borrow_mut() = result.is_err();
+                                        match result {
+                                            Ok(()) => {
+                                                if let Some(copied) = &copied {
+                                                    copied(window, cx);
+                                                }
+                                            }
+                                            Err(reason) => {
+                                                if let Some(on_refusal) = &on_refusal {
+                                                    on_refusal(
+                                                        &MarkdownEvent::CodeCopyRefused {
+                                                            language: language.clone(),
+                                                            reason,
+                                                        },
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        window.refresh();
+                                    }),
+                            ),
                     ),
             )
             .child(body);

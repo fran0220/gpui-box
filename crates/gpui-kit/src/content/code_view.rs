@@ -474,15 +474,45 @@ impl RenderOnce for CodeView {
 
         let copy = self.copyable.then(|| {
             let clipboard = source.to_string();
-            Button::new(self.ident.child("copy"))
-                .label(cx.strings().text(StringKey::Copy))
-                .ghost()
-                .control_size(ControlSize::Xs)
-                .semantic_parent(self.ident.semantic_id())
-                .disabled(clipboard.is_empty())
-                .on_click(move |_, cx| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(clipboard.clone()));
-                })
+            let refusal_ident = self.ident.child("copy").child("refusal");
+            let failed = keyed::slot::<bool>(
+                &refusal_ident.semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            );
+            let refusal = (*failed.borrow()).then(|| {
+                let text = cx.strings().text(StringKey::CopyFailed);
+                div()
+                    .child(text.clone())
+                    .text_color(theme.colors.danger)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(refusal_ident.semantic_id(), Role::Status)
+                            .parent(self.ident.semantic_id())
+                            .text(text)
+                            .invalid(true),
+                    )
+            });
+            div()
+                .row()
+                .gap_token(&theme, Space::Xs)
+                .children(refusal)
+                .child(
+                    Button::new(self.ident.child("copy"))
+                        .label(cx.strings().text(StringKey::Copy))
+                        .ghost()
+                        .control_size(ControlSize::Xs)
+                        .semantic_parent(self.ident.semantic_id())
+                        .disabled(clipboard.is_empty())
+                        .on_click(move |window, cx| {
+                            *failed.borrow_mut() = cx
+                                .try_write_to_clipboard(ClipboardItem::new_string(
+                                    clipboard.clone(),
+                                ))
+                                .is_err();
+                            window.refresh();
+                        }),
+                )
         });
 
         let body: AnyElement = if total == 0 {

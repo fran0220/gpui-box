@@ -2239,3 +2239,67 @@ fn background_agent_document_publishes_replacements_and_static_frames_reuse_work
             .any(|node| node.text.as_deref() == Some("Small final"))
     );
 }
+
+#[gpui::test]
+fn cross_block_keyboard_copy_obeys_the_inherited_owner(cx: &mut TestAppContext) {
+    use gpui::{ClipboardItem, ClipboardOperation, EffectOwner, effect_owner};
+    let owner = EffectOwner::new();
+    let inspector = EffectOwner::new();
+    let allowed = Rc::new(std::cell::Cell::new(false));
+    let policy_allowed = allowed.clone();
+    let mut harness = Harness::new(
+        cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            cx.write_to_clipboard(ClipboardItem::new_string("sentinel".into()));
+            cx.set_clipboard_policy(move |requester, operation| {
+                (requester == owner
+                    && operation == ClipboardOperation::Write
+                    && policy_allowed.get())
+                    || (requester == inspector && operation == ClipboardOperation::Read)
+            });
+        },
+        move |_, _| {
+            effect_owner(
+                owner,
+                AgentDocument::new("owned-selection")
+                    .block(AgentDocumentBlock::text("first", "opening text"))
+                    .block(AgentDocumentBlock::markdown("last", "selected tail")),
+            )
+            .into_any_element()
+        },
+    );
+    drag_between_blocks(
+        &mut harness,
+        ("owned-selection.block.first", 0.0),
+        ("owned-selection.block.last", 0.98),
+    );
+    let before = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("cross-block selection");
+    assert_eq!(before.participants, 2);
+    let key = if cfg!(target_os = "macos") {
+        "cmd-c"
+    } else {
+        "ctrl-c"
+    };
+    let read = |harness: &mut Harness| {
+        harness.update(|_, cx| {
+            cx.with_effect_owner(Some(inspector), |cx| cx.try_read_from_clipboard())
+                .expect("inspector read")
+                .and_then(|item| item.text())
+        })
+    };
+    harness.keystrokes(key);
+    assert_eq!(read(&mut harness).as_deref(), Some("sentinel"));
+    assert_eq!(
+        harness
+            .update(|window, _| window.document_selection_text())
+            .expect("denial keeps selection")
+            .text,
+        before.text
+    );
+    allowed.set(true);
+    harness.keystrokes(key);
+    assert_eq!(read(&mut harness), Some(before.text));
+}

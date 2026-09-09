@@ -2827,6 +2827,7 @@
         "LinkClicked",
         "ImageRequested",
         "CodeCopied",
+        "CodeCopyRefused",
         "MoreRequested"
       ],
       "scenes": [
@@ -10638,6 +10639,7 @@
         "LinkClicked",
         "ImageRequested",
         "CodeCopied",
+        "CodeCopyRefused",
         "MoreRequested"
       ],
       "construct": [],

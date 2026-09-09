@@ -181,10 +181,15 @@ Code blocks and prose runs use GPUI's document selection. Pointer dragging can
 cross separately mounted runs and blocks in reading order; reverse selection,
 Copy, Select All, wrapped and bidirectional hit testing, and AccessKit
 selection all operate on grapheme boundaries. Every code block still carries a
-whole-value copy action that puts its exact bytes on the clipboard and reports
-`MarkdownEvent::CodeCopied`; that operation also includes text outside a
-mounted or visible range. Nothing is reflowed, retyped, or re-indented on the
-way.
+whole-value copy action that includes text outside a mounted or visible range.
+`MarkdownEvent::CodeCopied` is emitted only after a successful clipboard write.
+An installed clipboard policy evaluates the inherited effect owner; refusal
+leaves the clipboard unchanged and emits `CodeCopyRefused` without a payload.
+Markdown and CodeView display a persistent, localized “Not copied” status
+until a retry succeeds. A write grant does not require a read grant: these
+controls do not read the clipboard back. Without an installed policy, ordinary
+native clipboard behavior is unchanged. Nothing is reflowed, retyped, or
+re-indented on the way.
 
 Code fences, quotes, tables, code views, diffs, and log streams stay on their
 caller's reading plane. Their type, whitespace, rails, marks, and row rules

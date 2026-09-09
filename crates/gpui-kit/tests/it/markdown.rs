@@ -611,3 +611,90 @@ fn background_markdown_survives_large_small_large_replacements(cx: &mut TestAppC
     assert!(harness.node("async-doc.heading-appended").is_some());
     assert!(harness.node("async-doc.heading-large-latest").is_some());
 }
+
+#[gpui::test]
+fn code_copy_reports_owner_refusal_and_write_only_success(cx: &mut TestAppContext) {
+    use gpui::{ClipboardDenied, ClipboardItem, ClipboardOperation, EffectOwner, effect_owner};
+    let owner = EffectOwner::new();
+    let inspector = EffectOwner::new();
+    let allowed = Rc::new(std::cell::Cell::new(false));
+    let policy_allowed = allowed.clone();
+    let attempts = Rc::new(RefCell::new(Vec::new()));
+    let policy_attempts = attempts.clone();
+    let (events, into) = sink::<MarkdownEvent>();
+    let mut harness = Harness::new(
+        cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            cx.write_to_clipboard(ClipboardItem::new_string("previous clipboard".into()));
+            cx.set_clipboard_policy(move |requester, operation| {
+                policy_attempts.borrow_mut().push((requester, operation));
+                (requester == owner
+                    && operation == ClipboardOperation::Write
+                    && policy_allowed.get())
+                    || (requester == inspector && operation == ClipboardOperation::Read)
+            });
+        },
+        move |_, _| {
+            let into = into.clone();
+            effect_owner(
+                owner,
+                gpui::div()
+                    .child(
+                        Markdown::new("policy-md", "```rust\nfn allowed() {}\n```")
+                            .on_event(move |event, _, _| into.borrow_mut().push(event.clone())),
+                    )
+                    .child(CodeView::from_text("policy-code", "unrelated line")),
+            )
+            .into_any_element()
+        },
+    );
+    harness.click("policy-md.code-rust.copy");
+    harness.click("policy-code.copy");
+    assert_eq!(
+        events.borrow().as_slice(),
+        &[MarkdownEvent::CodeCopyRefused {
+            language: Some("rust".into()),
+            reason: ClipboardDenied::Denied,
+        }]
+    );
+    assert!(
+        harness
+            .node("policy-md.code-rust.copy.refusal")
+            .expect("Markdown refusal")
+            .invalid
+    );
+    assert!(
+        harness
+            .node("policy-code.copy.refusal")
+            .expect("code view refusal")
+            .invalid
+    );
+    assert_eq!(
+        attempts.borrow().as_slice(),
+        &[(owner, ClipboardOperation::Write); 2]
+    );
+    let read = |harness: &mut Harness| {
+        harness.update(|_, cx| {
+            cx.with_effect_owner(Some(inspector), |cx| cx.try_read_from_clipboard())
+                .expect("inspector read is granted")
+                .and_then(|item| item.text())
+        })
+    };
+    assert_eq!(read(&mut harness).as_deref(), Some("previous clipboard"));
+    allowed.set(true);
+    attempts.borrow_mut().clear();
+    harness.click("policy-md.code-rust.copy");
+    assert_eq!(
+        attempts.borrow().as_slice(),
+        &[(owner, ClipboardOperation::Write)]
+    );
+    assert!(
+        matches!(events.borrow().last(), Some(MarkdownEvent::CodeCopied { text, .. }) if text.as_ref() == "fn allowed() {}")
+    );
+    assert!(harness.node("policy-md.code-rust.copy.refusal").is_none());
+    assert_eq!(read(&mut harness).as_deref(), Some("fn allowed() {}"));
+    harness.click("policy-code.copy");
+    assert!(harness.node("policy-code.copy.refusal").is_none());
+    assert_eq!(read(&mut harness).as_deref(), Some("unrelated line"));
+}
