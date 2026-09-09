@@ -40,10 +40,11 @@ mod tests {
     #[test]
     fn resolves_exact_catalog_and_both_weights() {
         for name in IconName::ALL {
-            let regular = resolve(&json!({"key": name.source_name()})).unwrap();
+            let regular = resolve(&json!({"key": name.source_name()})).expect("catalog key");
             assert_eq!(regular.name(), *name);
             assert_eq!(regular.weight(), IconWeight::Regular);
-            let fill = resolve(&json!({"key": name.source_name(), "weight": "fill"})).unwrap();
+            let fill = resolve(&json!({"key": name.source_name(), "weight": "fill"}))
+                .expect("catalog fill key");
             assert_eq!(fill, regular.filled());
             assert_ne!(regular.path(), fill.path());
         }
