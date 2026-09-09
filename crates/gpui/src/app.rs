@@ -700,6 +700,7 @@ pub struct App {
     pub(crate) platform: Rc<dyn Platform>,
     pub(crate) effect_owner: Rc<Cell<Option<crate::EffectOwner>>>,
     pub(crate) clipboard_policy: Option<crate::effect_owner::ClipboardPolicy>,
+    pub(crate) native_menu_revision: Option<crate::NativeMenuSessionId>,
     text_system: Arc<TextSystem>,
 
     pub(crate) actions: Rc<ActionRegistry>,
@@ -814,6 +815,7 @@ impl App {
                 platform: platform.clone(),
                 effect_owner: Default::default(),
                 clipboard_policy: None,
+                native_menu_revision: None,
                 text_system,
                 text_rendering_mode: Rc::new(Cell::new(TextRenderingMode::default())),
                 mode: GpuiMode::Production,

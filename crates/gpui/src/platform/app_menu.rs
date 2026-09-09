@@ -255,6 +255,11 @@ pub enum NativeMenuOutcome {
     Selected,
     /// The menu closed without selecting an action.
     Dismissed,
+    /// The revision was cancelled/replaced. No command was dispatched.
+    Cancelled,
+    /// Presentation or its window/backend disappeared without a valid result.
+    /// This is not a user dismissal.
+    Unavailable,
 }
 
 /// Returned when the current platform cannot present application-provided
@@ -461,6 +466,146 @@ mod tests {
         );
         assert!(!submenu.is_checked());
         assert!(submenu.is_disabled());
+    }
+
+    #[gpui::test]
+    async fn native_context_menu_revision_and_refusal(cx: &mut TestAppContext) {
+        use crate::{NativeMenuError, NativeMenuOutcome};
+        let window = cx.add_window(|_, cx| NativeMenuTarget {
+            focus: cx.focus_handle(),
+            chose: false,
+        });
+        cx.set_native_context_menus_supported(*window, true);
+        let open = |cx: &mut TestAppContext| {
+            window
+                .update(cx, |target, window, cx| {
+                    target.focus.focus(window, cx);
+                    window
+                        .show_context_menu(
+                            Menu::new("Actions").items([crate::MenuItem::action("Choose", Choose)]),
+                            point(px(1.0), px(2.0)),
+                            cx,
+                        )
+                        .unwrap()
+                })
+                .unwrap()
+        };
+        let first = open(cx);
+        let first_id = first.id();
+        cx.select_context_menu_item(*window, &[0]); // command queued but not yet dispatched
+        let second = open(cx);
+        let second_id = second.id();
+        window
+            .update(cx, |_, window, _| {
+                assert!(!window.cancel_context_menu(first_id).unwrap())
+            })
+            .unwrap();
+        assert_eq!(first.await, NativeMenuOutcome::Cancelled);
+        window
+            .update(cx, |target, _, _| assert!(!target.chose))
+            .unwrap();
+        cx.set_native_context_menu_cancel_fails(*window, true);
+        window
+            .update(cx, |_, window, _| {
+                assert!(matches!(
+                    window.cancel_context_menu(second_id),
+                    Err(NativeMenuError::CancellationFailed(_))
+                ))
+            })
+            .unwrap();
+        assert!(cx.pending_context_menu_position(*window).is_some());
+        cx.set_native_context_menu_cancel_fails(*window, false);
+        window
+            .update(cx, |_, window, _| {
+                assert!(window.cancel_context_menu(second_id).unwrap())
+            })
+            .unwrap();
+        assert_eq!(second.await, NativeMenuOutcome::Cancelled);
+        let dismissed = open(cx);
+        cx.dismiss_context_menu(*window);
+        assert_eq!(dismissed.await, NativeMenuOutcome::Dismissed);
+        let removed = open(cx);
+        window
+            .update(cx, |_, window, _| window.remove_window())
+            .unwrap();
+        assert_eq!(removed.await, NativeMenuOutcome::Unavailable);
+    }
+
+    #[gpui::test]
+    async fn native_context_menu_cross_window_replacement(cx: &mut TestAppContext) {
+        use crate::NativeMenuOutcome;
+        let first = cx.add_window(|_, cx| NativeMenuTarget {
+            focus: cx.focus_handle(),
+            chose: false,
+        });
+        let second = cx.add_window(|_, cx| NativeMenuTarget {
+            focus: cx.focus_handle(),
+            chose: false,
+        });
+        cx.set_native_context_menus_supported(*first, true);
+        cx.set_native_context_menus_supported(*second, true);
+        let a = first
+            .update(cx, |_, window, cx| {
+                window
+                    .show_context_menu(Menu::new("A"), point(px(1.0), px(2.0)), cx)
+                    .unwrap()
+            })
+            .unwrap();
+        let id = a.id();
+        let b = second
+            .update(cx, |_, window, cx| {
+                window
+                    .show_context_menu(Menu::new("B"), point(px(3.0), px(4.0)), cx)
+                    .unwrap()
+            })
+            .unwrap();
+        second
+            .update(cx, |_, window, _| {
+                assert!(!window.cancel_context_menu(id).unwrap())
+            })
+            .unwrap();
+        first
+            .update(cx, |_, window, _| {
+                assert!(!window.cancel_context_menu(id).unwrap())
+            })
+            .unwrap();
+        assert_eq!(a.await, NativeMenuOutcome::Cancelled);
+        assert_eq!(
+            cx.pending_context_menu_position(*second),
+            Some(point(px(3.0), px(4.0)))
+        );
+        cx.dismiss_context_menu(*second);
+        assert_eq!(b.await, NativeMenuOutcome::Dismissed);
+
+        // Even a command whose native loop already exited is stale when a
+        // different window opens a newer revision before GPUI dispatches it.
+        let owner = crate::EffectOwner::new();
+        let queued = first
+            .update(cx, |_, window, cx| {
+                cx.with_effect_owner(Some(owner), |cx| {
+                    window
+                        .show_context_menu(
+                            Menu::new("A").items([crate::MenuItem::action("Choose", Choose)]),
+                            point(px(1.0), px(2.0)),
+                            cx,
+                        )
+                        .unwrap()
+                })
+            })
+            .unwrap();
+        assert_eq!(queued.effect_owner(), Some(owner));
+        cx.select_context_menu_item(*first, &[0]);
+        let newer = second
+            .update(cx, |_, window, cx| {
+                assert_eq!(cx.current_effect_owner(), None);
+                window
+                    .show_context_menu(Menu::new("B"), point(px(3.0), px(4.0)), cx)
+                    .unwrap()
+            })
+            .unwrap();
+        assert_eq!(queued.await, NativeMenuOutcome::Cancelled);
+        cx.dismiss_context_menu(*second);
+        assert_eq!(newer.await, NativeMenuOutcome::Dismissed);
     }
 
     #[gpui::test]

@@ -47,7 +47,9 @@ ci_commands = ["cargo run -p xtask -- web check"]
 limitations = ["application context menus use the in-window fallback", "native media playback is unavailable", "threaded COOP/COEP not claimed", "screen-reader announcements not covered"]
 
 [framework_context_menu]
-contract = "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
+contract = "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability."
+tests = ["native_context_menu_revision_and_refusal", "native_context_menu_cross_window_replacement", "native_context_menu_invalidation_waits_for_real_completion", "native_context_menu_transport_loss_is_not_dismissal", "native_context_menu_dispatches_in_the_captured_focus_context"]
+validation = "Shared lifecycle tests run on Linux; native cancellation/replacement/teardown execution requires the dispatched macOS/Windows lanes and is not established by Linux tests."
 
 [framework_intrinsic_layout]
 contract = "Window::request_intrinsic_layout distinguishes natural content dimensions from authored aspect ratio. Assigned axes and size constraints win; only missing axes derive from the natural ratio. Block intrinsic widths, flex/grid stretch, absolute insets and unresolved percentages share one local layout result authority. Ordinary measured text retains the stock leaf algorithm; no Taffy vendor or patch and no renderer ABI change."

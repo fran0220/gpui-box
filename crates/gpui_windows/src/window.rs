@@ -43,6 +43,35 @@ use gpui::*;
 
 pub(crate) struct WindowsWindow(pub Rc<WindowsWindowInner>);
 
+#[derive(Clone)]
+struct WindowsContextMenu {
+    session: PlatformNativeMenuSession,
+    hwnd: HWND,
+    tracking: Rc<Cell<bool>>,
+}
+
+thread_local! {
+    // EndMenu is UI-thread-wide, not HWND-scoped. Never call it based only on
+    // the window that used to own a menu.
+    static CONTEXT_MENU: RefCell<Option<WindowsContextMenu>> = const { RefCell::new(None) };
+}
+
+fn cancel_native_context_menu(
+    id: NativeMenuSessionId,
+    hwnd: HWND,
+) -> Result<bool, NativeMenuError> {
+    let current = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+    let Some(current) = current.filter(|menu| menu.session.id() == id && menu.hwnd == hwnd) else {
+        return Ok(false);
+    };
+    current.session.invalidate();
+    if current.tracking.get() {
+        unsafe { EndMenu() }
+            .map_err(|error| NativeMenuError::CancellationFailed(error.to_string()))?;
+    }
+    Ok(true)
+}
+
 type RequestFrameCallback = Box<dyn FnMut(RequestFrameOptions)>;
 type WindowEventCallback = Box<dyn FnMut(PlatformInput) -> DispatchEventResult>;
 type WindowStatusCallback = Box<dyn FnMut(bool)>;
@@ -108,6 +137,7 @@ pub struct WindowsWindowState {
 
 pub(crate) struct WindowsWindowInner {
     hwnd: HWND,
+    context_menu_closed: Cell<bool>,
     drop_target_helper: IDropTargetHelper,
     pub(crate) state: WindowsWindowState,
     system_settings: WindowsSystemSettings,
@@ -267,6 +297,7 @@ impl WindowsWindowInner {
 
         Ok(Rc::new(Self {
             hwnd,
+            context_menu_closed: Cell::new(false),
             drop_target_helper: context.drop_target_helper.clone(),
             state,
             handle: context.handle,
@@ -601,6 +632,11 @@ pub(crate) fn detach_all_platform_views(window: &WindowsWindowInner) -> bool {
 
 impl Drop for WindowsWindow {
     fn drop(&mut self) {
+        self.0.context_menu_closed.set(true);
+        let current = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+        if let Some(current) = current.filter(|menu| menu.hwnd == self.0.hwnd) {
+            cancel_native_context_menu(current.session.id(), self.0.hwnd).log_err();
+        }
         // A hosted view belongs to whoever created it, so it is handed back
         // before the window that borrowed it goes away.
         self.0.state.platform_view_host.destroy();
@@ -621,24 +657,29 @@ impl Drop for WindowsWindow {
 }
 
 fn run_context_menu(
-    hwnd: HWND,
+    session: &WindowsContextMenu,
     menu: Menu,
     position: Point<Pixels>,
     scale_factor: f32,
-) -> Option<Box<dyn Action>> {
+) -> PlatformNativeMenuOutcome {
     unsafe {
+        let hwnd = session.hwnd;
         let mut actions = Vec::new();
-        let native_menu = build_context_menu(&menu, &mut actions)?;
+        let Some(native_menu) = build_context_menu(&menu, &mut actions) else {
+            return PlatformNativeMenuOutcome::Unavailable;
+        };
         let mut screen_position = POINT {
             x: (position.x.as_f32() * scale_factor).round() as i32,
             y: (position.y.as_f32() * scale_factor).round() as i32,
         };
         if !ClientToScreen(hwnd, &mut screen_position).as_bool() {
             DestroyMenu(native_menu).ok();
-            return None;
+            return PlatformNativeMenuOutcome::Unavailable;
         }
         let _ = SetForegroundWindow(hwnd);
         let flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY;
+        session.tracking.set(true);
+        SetLastError(WIN32_ERROR(0));
         let selected = TrackPopupMenuEx(
             native_menu,
             flags.0,
@@ -647,13 +688,22 @@ fn run_context_menu(
             hwnd,
             None,
         );
+        let error = GetLastError();
+        session.tracking.set(false);
         DestroyMenu(native_menu).ok();
-
+        if selected.0 == 0 {
+            return if error.0 == 0 {
+                PlatformNativeMenuOutcome::Dismissed
+            } else {
+                PlatformNativeMenuOutcome::Unavailable
+            };
+        }
         usize::try_from(selected.0)
             .ok()
             .and_then(|id| id.checked_sub(1))
             .and_then(|index| actions.get(index))
-            .map(|action: &&dyn Action| action.boxed_clone())
+            .map(|action: &&dyn Action| PlatformNativeMenuOutcome::Selected(action.boxed_clone()))
+            .unwrap_or(PlatformNativeMenuOutcome::Unavailable)
     }
 }
 
@@ -767,21 +817,57 @@ impl PlatformWindow for WindowsWindow {
 
     fn show_context_menu(
         &self,
+        id: NativeMenuSessionId,
         menu: Menu,
         position: Point<Pixels>,
-    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
-    {
+    ) -> Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> {
         let hwnd = self.0.hwnd;
+        let previous = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+        if let Some(previous) = &previous {
+            cancel_native_context_menu(previous.session.id(), previous.hwnd)?;
+        }
         let scale_factor = self.scale_factor();
         let executor = self.0.executor.clone();
-        let (sender, receiver) = oneshot::channel();
+        let window = Rc::downgrade(&self.0);
+        let (session, receiver) = PlatformNativeMenuSession::new(id);
+        let native = WindowsContextMenu {
+            session,
+            hwnd,
+            tracking: Rc::new(Cell::new(false)),
+        };
+        CONTEXT_MENU.with(|slot| *slot.borrow_mut() = Some(native.clone()));
         executor
             .spawn(async move {
-                let action = run_context_menu(hwnd, menu, position, scale_factor);
-                sender.send(action).ok();
+                if let Some(previous) = previous {
+                    previous.session.finished().await;
+                }
+                let outcome = if native.session.is_invalidated() {
+                    PlatformNativeMenuOutcome::Cancelled
+                } else if window
+                    .upgrade()
+                    .is_none_or(|window| window.context_menu_closed.get())
+                {
+                    PlatformNativeMenuOutcome::Unavailable
+                } else {
+                    run_context_menu(&native, menu, position, scale_factor)
+                };
+                CONTEXT_MENU.with(|slot| {
+                    if slot
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|current| current.session.id() == id)
+                    {
+                        slot.borrow_mut().take();
+                    }
+                });
+                native.session.complete(outcome);
             })
             .detach();
         Ok(receiver)
+    }
+
+    fn cancel_context_menu(&self, id: NativeMenuSessionId) -> Result<bool, NativeMenuError> {
+        cancel_native_context_menu(id, self.0.hwnd)
     }
 
     fn scale_factor(&self) -> f32 {

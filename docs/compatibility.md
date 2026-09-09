@@ -174,6 +174,33 @@ Linux, browser, headless, and other platforms on Kit's accessible in-window
 `ContextMenu`; `ContextMenuPresentation::InWindow` also lets a host force that
 portable rendering on a native-capable platform.
 
+`Window::show_context_menu` returns an awaitable `NativeMenuSession`, not a
+bare task. Retain `id()` for `Window::cancel_context_menu(id)` and revision
+checks, and retain `effect_owner()` for asynchronous component callbacks.
+Re-enter the captured owner with `App::with_effect_owner`; focus is not effect
+authority. Framework command dispatch checks the latest application revision
+and enters the captured owner independently.
+
+Cancellation immediately invalidates commands, including already queued
+selection, but `Ok(true)` only acknowledges the request. Completion confirms
+tracking has exited. `Cancelled`, `Dismissed`, and `Unavailable` are distinct;
+receiver loss/window destruction is unavailable, never a fake dismissal.
+`NativeMenuError::NotSupported` is the only automatic fallback case.
+`CancellationFailed` preserves the invalidated session for an explicit retry;
+components must report refusal rather than pretending the native UI closed.
+Cancel before changing a presented action snapshot. Each replacement gets a
+fresh identity, and stale identities cannot cancel another owner's menu.
+
+macOS cancels the tracked `NSMenu` with `cancelTracking`; AppKit supplies no
+refusal return value, so loop completion remains the closure evidence.
+Windows guards thread-wide `EndMenu` by session and HWND. Both backends wait
+for the previous tracking loop before starting a replacement, including queued
+replacement chains and cross-window presentations, and invalidate on teardown.
+The shared deterministic lifecycle tests run on Linux. Actual native tracking,
+replacement and cancellation need macOS/Windows execution; a Linux test pass
+does not establish that native behavior. No renderer or baseline changes are
+part of this primitive.
+
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the
 transparent overlay plane uses grayscale antialiasing because RGB subpixel

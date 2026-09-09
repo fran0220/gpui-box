@@ -1,9 +1,10 @@
 use crate::{
     A11yCallbacks, Action, AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds,
-    DevicePixels, DispatchEventResult, GpuSpecs, Menu, MenuItem, NativeMenuNotSupportedError,
-    Pixels, PlatformAtlas, PlatformDisplay, PlatformHeadlessRenderer, PlatformInput,
-    PlatformInputHandler, PlatformWindow, Point, PromptButton, RequestFrameOptions, Scene, Size,
-    TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+    DevicePixels, DispatchEventResult, GpuSpecs, Menu, MenuItem, NativeMenuError,
+    NativeMenuNotSupportedError, NativeMenuSessionId, Pixels, PlatformAtlas, PlatformDisplay,
+    PlatformHeadlessRenderer, PlatformInput, PlatformInputHandler, PlatformNativeMenuOutcome,
+    PlatformNativeMenuSession, PlatformWindow, Point, PromptButton, RequestFrameOptions, Scene,
+    Size, TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
     WindowControlArea, WindowParams,
 };
 use collections::HashMap;
@@ -48,13 +49,14 @@ pub(crate) struct TestWindowState {
     scene_overlay_supported: bool,
     subpixel_rendering_supported: bool,
     native_context_menus_supported: bool,
+    native_context_menu_cancel_fails: bool,
     pending_context_menu: Option<PendingContextMenu>,
 }
 
 struct PendingContextMenu {
     menu: Menu,
     position: Point<Pixels>,
-    result: futures::channel::oneshot::Sender<Option<Box<dyn Action>>>,
+    session: PlatformNativeMenuSession,
 }
 
 #[derive(Clone)]
@@ -117,12 +119,17 @@ impl TestWindow {
             scene_overlay_supported: false,
             subpixel_rendering_supported: false,
             native_context_menus_supported: false,
+            native_context_menu_cancel_fails: false,
             pending_context_menu: None,
         })))
     }
 
     pub(crate) fn set_native_context_menus_supported(&self, supported: bool) {
         self.0.lock().native_context_menus_supported = supported;
+    }
+
+    pub(crate) fn set_native_context_menu_cancel_fails(&self, fails: bool) {
+        self.0.lock().native_context_menu_cancel_fails = fails;
     }
 
     pub(crate) fn pending_context_menu_position(&self) -> Option<Point<Pixels>> {
@@ -141,7 +148,11 @@ impl TestWindow {
             .take()
             .expect("test should have an open native context menu");
         let action = take_action(pending.menu.items, path);
-        pending.result.send(action).ok();
+        pending.session.complete(
+            action
+                .map(PlatformNativeMenuOutcome::Selected)
+                .unwrap_or(PlatformNativeMenuOutcome::Dismissed),
+        );
     }
 
     pub(crate) fn dismiss_context_menu(&self) {
@@ -151,7 +162,9 @@ impl TestWindow {
             .pending_context_menu
             .take()
             .expect("test should have an open native context menu");
-        pending.result.send(None).ok();
+        pending
+            .session
+            .complete(PlatformNativeMenuOutcome::Dismissed);
     }
 
     pub fn simulate_resize(&mut self, size: Size<Pixels>) {
@@ -516,23 +529,66 @@ impl PlatformWindow for TestWindow {
 
     fn show_context_menu(
         &self,
+        id: NativeMenuSessionId,
         menu: Menu,
         position: Point<Pixels>,
     ) -> std::result::Result<
-        futures::channel::oneshot::Receiver<Option<Box<dyn Action>>>,
-        NativeMenuNotSupportedError,
+        futures::channel::oneshot::Receiver<PlatformNativeMenuOutcome>,
+        NativeMenuError,
     > {
-        let mut state = self.0.lock();
-        if !state.native_context_menus_supported {
-            return Err(NativeMenuNotSupportedError);
+        if !self.0.lock().native_context_menus_supported {
+            return Err(NativeMenuNotSupportedError.into());
         }
-        let (result, receiver) = futures::channel::oneshot::channel();
-        state.pending_context_menu = Some(PendingContextMenu {
+        let platform = self
+            .0
+            .lock()
+            .platform
+            .upgrade()
+            .expect("test platform exists");
+        let previous = platform.native_context_menu.borrow().clone();
+        if let Some(previous) = previous {
+            let id = previous
+                .0
+                .lock()
+                .pending_context_menu
+                .as_ref()
+                .map(|menu| menu.session.id());
+            if let Some(id) = id {
+                previous.cancel_context_menu(id)?;
+            }
+        }
+        let (session, receiver) = PlatformNativeMenuSession::new(id);
+        self.0.lock().pending_context_menu = Some(PendingContextMenu {
             menu,
             position,
-            result,
+            session,
         });
+        *platform.native_context_menu.borrow_mut() = Some(self.clone());
         Ok(receiver)
+    }
+
+    fn cancel_context_menu(&self, id: NativeMenuSessionId) -> Result<bool, NativeMenuError> {
+        let mut state = self.0.lock();
+        let Some(pending) = state.pending_context_menu.as_ref() else {
+            return Ok(false);
+        };
+        if pending.session.id() != id {
+            return Ok(false);
+        }
+        pending.session.invalidate();
+        if state.native_context_menu_cancel_fails {
+            return Err(NativeMenuError::CancellationFailed(
+                "test platform refusal".into(),
+            ));
+        }
+        let pending = state
+            .pending_context_menu
+            .take()
+            .expect("matching session exists");
+        pending
+            .session
+            .complete(PlatformNativeMenuOutcome::Cancelled);
+        Ok(true)
     }
 
     fn start_window_move(&self) {

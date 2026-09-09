@@ -1143,6 +1143,9 @@ pub struct Window {
     pub(crate) invalidator: WindowInvalidator,
     pub(crate) removed: bool,
     pub(crate) platform_window: Box<dyn PlatformWindow>,
+    // Keep invalidated identity until completion so refused cancellation can
+    // be retried without granting a stale revision authority to dispatch.
+    native_context_menu: Option<(crate::NativeMenuSessionId, bool)>,
     /// Whether the platform accepted a transparent scene plane above native
     /// child views. This is window state rather than frame state: once native
     /// hosting creates the plane, every later deferred overlay uses it.
@@ -2052,6 +2055,7 @@ impl Window {
             effect_owner: cx.effect_owner.clone(),
             removed: false,
             platform_window,
+            native_context_menu: None,
             scene_overlay_enabled: Cell::new(false),
             painting_transparent_overlay: false,
             display_id,
@@ -2305,6 +2309,9 @@ impl Window {
 
     /// Close this window.
     pub fn remove_window(&mut self) {
+        if let Some((session, _)) = self.native_context_menu {
+            self.cancel_context_menu(session).log_err();
+        }
         self.removed = true;
         if let Some(update) = self.platform_view_registry.detach_all() {
             self.platform_window.update_platform_views(&update);
@@ -2870,37 +2877,81 @@ impl Window {
     ///
     /// The native tracking loop begins after the current GPUI callback has
     /// returned. Selection dispatches the item's [`Action`] through the focus
-    /// context captured here, then resolves the returned task. Dismissal
-    /// resolves without dispatch. Platforms without this capability return
-    /// [`crate::NativeMenuNotSupportedError`], allowing a component to keep
-    /// its in-window menu as the fallback.
+    /// and explicit EffectOwner captured here, then resolves the returned
+    /// session. Each session is a fresh revision: cancel it before changing its
+    /// source actions. Cancelled/replaced revisions cannot dispatch queued
+    /// commands. Only [`crate::NativeMenuError::NotSupported`] permits fallback.
+    /// Native failure/transport loss reports Unavailable, never fake dismissal.
     pub fn show_context_menu(
         &mut self,
         menu: crate::Menu,
         position: Point<Pixels>,
         cx: &mut App,
-    ) -> std::result::Result<Task<crate::NativeMenuOutcome>, crate::NativeMenuNotSupportedError>
-    {
-        let result = self.platform_window.show_context_menu(menu, position)?;
+    ) -> std::result::Result<crate::NativeMenuSession, crate::NativeMenuError> {
+        let id = crate::NativeMenuSessionId::new();
+        let result = self.platform_window.show_context_menu(id, menu, position)?;
+        cx.native_menu_revision = Some(id);
+        self.native_context_menu = Some((id, true));
         let focus_id = self.focused(cx).map(|handle| handle.id);
         let handle = self.handle;
-
-        Ok(cx.spawn(async move |cx| {
-            let action = result.await.ok().flatten();
-            if let Some(action) = action {
-                handle
-                    .update(cx, |_, window, cx| {
-                        let node_id = window.focus_node_id_in_rendered_frame(focus_id);
-                        window.dispatch_action_on_node(node_id, action.as_ref(), cx);
+        let owner = cx.current_effect_owner();
+        let task = cx.spawn(async move |cx| {
+            use crate::{
+                NativeMenuOutcome as Outcome, PlatformNativeMenuOutcome as PlatformOutcome,
+            };
+            let result = result.await.unwrap_or(PlatformOutcome::Unavailable);
+            handle
+                .update(cx, |_, window, cx| {
+                    let Some((current, valid)) = window.native_context_menu else {
+                        return Outcome::Cancelled;
+                    };
+                    if current != id {
+                        return Outcome::Cancelled;
+                    }
+                    window.native_context_menu = None;
+                    if matches!(result, PlatformOutcome::Unavailable) {
+                        return Outcome::Unavailable;
+                    }
+                    if !valid || cx.native_menu_revision != Some(id) {
+                        return Outcome::Cancelled;
+                    }
+                    cx.with_effect_owner(owner, |cx| {
+                        let outcome = match result {
+                            PlatformOutcome::Selected(action) => {
+                                let node_id = window.focus_node_id_in_rendered_frame(focus_id);
+                                window.dispatch_action_on_node(node_id, action.as_ref(), cx);
+                                Outcome::Selected
+                            }
+                            PlatformOutcome::Dismissed => Outcome::Dismissed,
+                            PlatformOutcome::Cancelled => Outcome::Cancelled,
+                            PlatformOutcome::Unavailable => Outcome::Unavailable,
+                        };
                         window.refresh();
+                        outcome
                     })
-                    .log_err();
-                crate::NativeMenuOutcome::Selected
-            } else {
-                handle.update(cx, |_, window, _| window.refresh()).log_err();
-                crate::NativeMenuOutcome::Dismissed
-            }
-        }))
+                })
+                .unwrap_or(Outcome::Unavailable)
+        });
+        Ok(crate::NativeMenuSession { id, owner, task })
+    }
+
+    /// Invalidates this window's matching revision and requests native closure.
+    /// `false` is an ended/stale/different native session; it cannot close a
+    /// newer menu. Matching queued commands are invalidated even then. On
+    /// refusal the revision remains invalidated but can be retried with the
+    /// same identity. Await its completion before claiming native UI closure.
+    pub fn cancel_context_menu(
+        &mut self,
+        session: crate::NativeMenuSessionId,
+    ) -> Result<bool, crate::NativeMenuError> {
+        let Some((current, valid)) = self.native_context_menu.as_mut() else {
+            return Ok(false);
+        };
+        if *current != session {
+            return Ok(false);
+        }
+        *valid = false;
+        self.platform_window.cancel_context_menu(session)
     }
 
     /// Handle window movement for Linux and macOS.

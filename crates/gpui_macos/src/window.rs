@@ -28,12 +28,12 @@ use gpui::{
     Action, AnyWindowHandle, BackgroundExecutor, Bounds, Capslock, CursorStyle,
     ExternalDragPayload, ExternalDropEvent, ExternalPaths, FileDropEvent, ForegroundExecutor,
     KeyDownEvent, Keystroke, Menu, MenuItem, Modifiers, ModifiersChangedEvent, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, NativeMenuNotSupportedError, Pixels,
-    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
-    PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel,
-    RequestFrameOptions, SharedString, Size, SystemWindowTab, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams,
-    flip_bounds_origin_y, platform_view_content_origin, point, px, size,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, NativeMenuError, NativeMenuSessionId, Pixels,
+    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformNativeMenuOutcome,
+    PlatformNativeMenuSession, PlatformViewHandle, PlatformViewHosting, PlatformViewUpdate,
+    PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions, SharedString, Size,
+    SystemWindowTab, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
+    WindowKind, WindowParams, flip_bounds_origin_y, platform_view_content_origin, point, px, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -62,7 +62,7 @@ use parking_lot::Mutex;
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     ffi::{CStr, CString, c_void},
     mem,
     ops::Range,
@@ -79,6 +79,35 @@ use std::{
 
 const WINDOW_STATE_IVAR: &str = "windowState";
 const OVERLAY_INPUT_IVAR: &str = "overlayInputActive";
+
+#[derive(Clone)]
+struct MacContextMenu {
+    session: PlatformNativeMenuSession,
+    view: usize,
+    tracking_menu: Rc<Cell<usize>>,
+}
+
+thread_local! {
+    static CONTEXT_MENU: RefCell<Option<MacContextMenu>> = const { RefCell::new(None) };
+}
+
+fn cancel_native_context_menu(session: NativeMenuSessionId, view: usize) -> bool {
+    let current = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+    let Some(current) = current.filter(|menu| menu.session.id() == session && menu.view == view)
+    else {
+        return false;
+    };
+    current.session.invalidate();
+    let menu = current.tracking_menu.get() as id;
+    if menu != nil {
+        // AppKit has no refusal return value. Completion is only sent after
+        // popUpMenuPositioningItem actually returns; this is a cancel request.
+        unsafe {
+            let _: () = msg_send![menu, cancelTracking];
+        }
+    }
+    true
+}
 
 static mut WINDOW_CLASS: *const Class = ptr::null();
 static mut PANEL_CLASS: *const Class = ptr::null();
@@ -1341,6 +1370,15 @@ fn detach_platform_view(hosted: HostedPlatformView) {
 
 impl Drop for MacWindow {
     fn drop(&mut self) {
+        let view = {
+            let state = self.0.lock();
+            state.closed.store(true, Ordering::Release);
+            state.native_view.as_ptr() as usize
+        };
+        let current = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+        if let Some(current) = current.filter(|menu| menu.view == view) {
+            cancel_native_context_menu(current.session.id(), view);
+        }
         let mut this = self.0.lock();
         for (_, hosted) in this.hosted_platform_views.detach_all() {
             detach_platform_view(hosted);
@@ -1379,11 +1417,12 @@ fn if_window_not_closed(closed: Arc<AtomicBool>, f: impl FnOnce()) {
 }
 
 unsafe fn run_context_menu(
-    native_view: id,
+    session: &MacContextMenu,
     menu: Menu,
     position: Point<Pixels>,
-) -> Option<Box<dyn Action>> {
+) -> PlatformNativeMenuOutcome {
     unsafe {
+        let native_view = session.view as id;
         let pool = NSAutoreleasePool::new(nil);
         let target: id = msg_send![CONTEXT_MENU_TARGET_CLASS, new];
         (*target).set_ivar(CONTEXT_MENU_SELECTION_IVAR, -1_isize);
@@ -1392,12 +1431,14 @@ unsafe fn run_context_menu(
         let native_menu = build_context_menu(&menu, target, &mut actions);
         let frame = NSView::bounds(native_view);
         let location = NSPoint::new(position.x.to_f64(), frame.size.height - position.y.to_f64());
+        session.tracking_menu.set(native_menu as usize);
         let _: BOOL = msg_send![
             native_menu,
             popUpMenuPositioningItem: nil
             atLocation: location
             inView: native_view
         ];
+        session.tracking_menu.set(0);
 
         let selected: NSInteger = *(*target).get_ivar(CONTEXT_MENU_SELECTION_IVAR);
         let action = usize::try_from(selected)
@@ -1407,6 +1448,8 @@ unsafe fn run_context_menu(
         let _: () = msg_send![target, release];
         pool.drain();
         action
+            .map(PlatformNativeMenuOutcome::Selected)
+            .unwrap_or(PlatformNativeMenuOutcome::Dismissed)
     }
 }
 
@@ -1875,25 +1918,62 @@ impl PlatformWindow for MacWindow {
 
     fn show_context_menu(
         &self,
+        id: NativeMenuSessionId,
         menu: Menu,
         position: Point<Pixels>,
-    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
-    {
-        let (executor, native_view) = {
+    ) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> {
+        let (executor, native_view, closed) = {
             let state = self.0.lock();
             (
                 state.foreground_executor.clone(),
                 state.native_view.as_ptr() as usize,
+                state.closed.clone(),
             )
         };
-        let (sender, receiver) = oneshot::channel();
+        let previous = CONTEXT_MENU.with(|slot| slot.borrow().clone());
+        if let Some(previous) = &previous {
+            cancel_native_context_menu(previous.session.id(), previous.view);
+        }
+        let (session, receiver) = PlatformNativeMenuSession::new(id);
+        let native = MacContextMenu {
+            session,
+            view: native_view,
+            tracking_menu: Rc::new(Cell::new(0)),
+        };
+        CONTEXT_MENU.with(|slot| *slot.borrow_mut() = Some(native.clone()));
         executor
             .spawn(async move {
-                let action = unsafe { run_context_menu(native_view as id, menu, position) };
-                sender.send(action).ok();
+                if let Some(previous) = previous {
+                    previous.session.finished().await;
+                }
+                let outcome = if native.session.is_invalidated() {
+                    PlatformNativeMenuOutcome::Cancelled
+                } else if closed.load(Ordering::Acquire) {
+                    PlatformNativeMenuOutcome::Unavailable
+                } else {
+                    unsafe { run_context_menu(&native, menu, position) }
+                };
+                CONTEXT_MENU.with(|slot| {
+                    if slot
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|current| current.session.id() == id)
+                    {
+                        slot.borrow_mut().take();
+                    }
+                });
+                native.session.complete(outcome);
             })
             .detach();
         Ok(receiver)
+    }
+
+    fn cancel_context_menu(
+        &self,
+        session: NativeMenuSessionId,
+    ) -> std::result::Result<bool, NativeMenuError> {
+        let view = self.0.lock().native_view.as_ptr() as usize;
+        Ok(cancel_native_context_menu(session, view))
     }
 
     fn minimize(&self) {

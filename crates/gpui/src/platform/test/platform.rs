@@ -23,6 +23,7 @@ pub(crate) struct TestPlatform {
     pub(crate) foreground_executor: ForegroundExecutor,
 
     pub(crate) active_window: RefCell<Option<TestWindow>>,
+    pub(crate) native_context_menu: RefCell<Option<TestWindow>>,
     active_display: Rc<dyn PlatformDisplay>,
     active_cursor: Mutex<CursorStyle>,
     current_clipboard_item: Mutex<Option<ClipboardItem>>,
@@ -136,6 +137,7 @@ impl TestPlatform {
             active_cursor: Default::default(),
             active_display: Rc::new(TestDisplay::new()),
             active_window: Default::default(),
+            native_context_menu: Default::default(),
             expect_restart: Default::default(),
             current_clipboard_item: Mutex::new(None),
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]

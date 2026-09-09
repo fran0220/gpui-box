@@ -1,6 +1,7 @@
 mod app_menu;
 mod keyboard;
 mod keystroke;
+mod native_menu;
 mod platform_view;
 
 #[cfg(all(target_os = "linux", feature = "wayland"))]
@@ -90,6 +91,7 @@ use uuid::Uuid;
 pub use app_menu::*;
 pub use keyboard::*;
 pub use keystroke::*;
+pub use native_menu::*;
 pub(crate) use platform_view::PlatformViewRegistry;
 pub use platform_view::{
     PlatformViewHandle, PlatformViewHosting, PlatformViewId, PlatformViewPlacement,
@@ -946,20 +948,29 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     }
     fn request_decorations(&self, _decorations: WindowDecorations) {}
     fn show_window_menu(&self, _position: Point<Pixels>) {}
-    /// Presents an application-provided context menu using the operating
-    /// system and resolves with the selected action, or `None` on dismissal.
+    /// Presents one opaque menu revision. Replacements must invalidate the old
+    /// revision and wait for its native tracking loop to exit before starting
+    /// the next, including replacements from another window on this UI thread.
     ///
     /// Implementations must run a blocking native tracking loop only after the
     /// current GPUI call stack has yielded. Coordinates are window-relative
     /// logical pixels. Unsupported platforms return
-    /// [`NativeMenuNotSupportedError`] so the component can render in-window.
+    /// [`NativeMenuError::NotSupported`] so the component can render in-window.
+    /// Failed replacement cancellation is a refusal, not unsupported capability.
     fn show_context_menu(
         &self,
+        _session: NativeMenuSessionId,
         _menu: Menu,
         _position: Point<Pixels>,
-    ) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError>
-    {
-        Err(NativeMenuNotSupportedError)
+    ) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> {
+        Err(NativeMenuNotSupportedError.into())
+    }
+    /// Invalidates only the matching current revision. `true` means a cancel
+    /// request, not completed closure; the result receiver confirms loop exit.
+    /// A stale identity must never call a thread-wide native cancellation API.
+    /// Even a refused cancellation must suppress that revision's late command.
+    fn cancel_context_menu(&self, _session: NativeMenuSessionId) -> Result<bool, NativeMenuError> {
+        Ok(false)
     }
     fn start_window_move(&self) {}
     fn can_start_external_drag(&self) -> bool {

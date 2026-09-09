@@ -485,3 +485,8 @@ GPUI Box modifications using the existing AccessKit dependency and license.
 
 Persistent-snapshot difference scanning uses the existing MIT-licensed Ropey
 dependency through public chunk iterators; the integration is original work.
+
+Native context-menu revision sessions, cancellation/completion gates and
+NSMenu/Win32 cancellation are original GPUI Box framework changes. No new
+third-party source or license was added; all upstream copyright notices and
+the frozen historical import receipt remain intact.

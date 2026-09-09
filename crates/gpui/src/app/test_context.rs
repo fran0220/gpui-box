@@ -413,6 +413,13 @@ impl TestAppContext {
             .set_native_context_menus_supported(supported);
     }
 
+    /// Simulates native cancellation refusal without closing the menu. Its
+    /// revision is still invalidated, so later native commands cannot dispatch.
+    pub fn set_native_context_menu_cancel_fails(&self, window: AnyWindowHandle, fails: bool) {
+        self.test_window(window)
+            .set_native_context_menu_cancel_fails(fails);
+    }
+
     /// Returns the logical window position of the pending native context menu.
     pub fn pending_context_menu_position(&self, window: AnyWindowHandle) -> Option<Point<Pixels>> {
         self.test_window(window).pending_context_menu_position()

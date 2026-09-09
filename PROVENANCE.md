@@ -869,3 +869,11 @@ Borrowed persistent-snapshot difference scanning and lazy Kit change-event
 payloads are original GPUI Box work using Ropey's public chunk iterators.
 Shared immutable byte spans skip comparisons without relying on private tree
 layouts or changing the frozen import receipt.
+
+### Native context-menu revision sessions
+
+Opaque menu identities, completion/cancellation gates, captured effect-owner
+dispatch, and NSMenu/Win32 cancellation are original GPUI Box modifications
+to the locally owned framework. No upstream source or dependency was imported.
+The frozen historical import receipt remains unchanged. Native tracking-loop
+execution evidence must come from macOS/Windows, not shared Linux tests.
