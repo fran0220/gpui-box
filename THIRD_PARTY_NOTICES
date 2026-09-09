@@ -528,3 +528,6 @@ using the existing AccessKit dependency, without importing or forking its code.
 
 Persistent row-index and grapheme representability caches are original GPUI Box
 work using the existing Ropey and Unicode dependencies and their licenses.
+
+Native menu NSRunLoop scheduling and Win32 notification corrections are
+original GPUI Box work. No new third-party code or license was introduced.

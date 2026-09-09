@@ -677,7 +677,11 @@ fn run_context_menu(
             return PlatformNativeMenuOutcome::Unavailable;
         }
         let _ = SetForegroundWindow(hwnd);
-        let flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY;
+        // Keep WM_ENTERMENULOOP/WM_EXITMENULOOP: the window's existing modal
+        // timer drains foreground work while TrackPopupMenuEx blocks. Without
+        // entry notification, cancellation/replacement tasks cannot run.
+        // RETURNCMD alone prevents WM_COMMAND dispatch; the session owns it.
+        let flags = TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD;
         session.tracking.set(true);
         SetLastError(WIN32_ERROR(0));
         let selected = TrackPopupMenuEx(

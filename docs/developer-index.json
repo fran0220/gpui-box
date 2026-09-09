@@ -150860,6 +150860,7 @@
       "contract": "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability.",
       "native_smoke": "cargo run --locked -p gpui-box-platform --features test-support --example native_menu_smoke",
       "native_smoke_contract": "Logged-in macOS/Windows desktop only: observe actual tracking before cancel/replacement, preserve the new menu after stale/wrong-window close and old-owner destruction, await teardown, then open successfully in the surviving window. Unsupported and watchdog expiry fail; no Kit fallback or native selection-input claim.",
+      "native_smoke_evidence": "Platforms run34396298822 at 02468534 failed both native menu watchdogs at initial active cancellation. Main NSRunLoop scheduling on macOS and restored Windows menu-loop notifications are candidates requiring native re-execution; queued replacement cancellation is also checked before invocation.",
       "tests": [
         "native_context_menu_revision_and_refusal",
         "native_context_menu_cross_window_replacement",

@@ -193,9 +193,16 @@ fresh identity, and stale identities cannot cancel another owner's menu.
 
 macOS cancels the tracked `NSMenu` with `cancelTracking`; AppKit supplies no
 refusal return value, so loop completion remains the closure evidence.
+Tracking is scheduled on the main NSRunLoop in common modes after the GCD
+foreground task returns; entering the blocking menu from the serial main
+dispatch queue would starve the very continuations needed to cancel it.
 Windows guards thread-wide `EndMenu` by session and HWND. Both backends wait
 for the previous tracking loop before starting a replacement, including queued
 replacement chains and cross-window presentations, and invalidate on teardown.
+Windows preserves menu-loop notifications so its existing `WM_ENTERMENULOOP`
+timer drains foreground tasks inside `TrackPopupMenuEx`. `TPM_RETURNCMD` still
+keeps command dispatch under the revision session; `TPM_NONOTIFY` would suppress
+the entry notification needed to install the modal timer.
 The shared deterministic lifecycle tests run on Linux. Actual native tracking,
 replacement and cancellation need macOS/Windows execution; a Linux test pass
 does not establish that native behavior. No renderer or baseline changes are
@@ -223,6 +230,15 @@ required. Linux compilation/shared tests do not validate this smoke; native
 execution must be recorded separately. This lifecycle smoke does not inject
 OS selection/escape input or establish native command-selection accessibility;
 queued stale-command and effect-owner invariants retain their shared tests.
+
+Actual [Platforms run 34396298822](https://github.com/fran0220/gpui-box/actions/runs/34396298822)
+at [02468534](https://github.com/fran0220/gpui-box/commit/02468534f3863e1f627559808f55128eb8bc8c4d)
+failed this smoke on both macOS and Windows: each watchdog expired at
+`cancel active native menu`, before observing tracking. The scheduling and
+notification corrections above are candidates awaiting a new native run,
+not established native parity. The smoke also exercises queued replacement
+cancellation before invocation to guard the new run-loop scheduling gap;
+all actual-tracking, cancellation, stale-owner and teardown assertions remain.
 
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the

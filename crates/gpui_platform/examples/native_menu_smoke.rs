@@ -134,6 +134,17 @@ fn main() {
         let other = open_window(cx);
         cx.activate(true);
         cx.spawn(async move |cx| {
+            mark(&phase, "cancel queued replacement before native invocation");
+            let queued = present(first, cx);
+            let queued_id = queued.id();
+            let replacement = present(first, cx);
+            assert_eq!(tracking(first, cx), None);
+            assert!(!cancel(first, queued_id, cx));
+            assert!(cancel(first, replacement.id(), cx));
+            assert_eq!(queued.await, NativeMenuOutcome::Cancelled);
+            assert_eq!(replacement.await, NativeMenuOutcome::Cancelled);
+            assert_eq!(tracking(first, cx), None);
+
             mark(&phase, "cancel active native menu");
             let session = present(first, cx);
             let id = session.id();

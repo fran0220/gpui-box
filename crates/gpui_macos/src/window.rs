@@ -41,6 +41,7 @@ use image::RgbaImage;
 use core_foundation::base::{CFRelease, CFTypeRef};
 use core_foundation_sys::base::CFEqual;
 use core_foundation_sys::number::{CFBooleanGetValue, CFBooleanRef};
+use core_foundation_sys::runloop::{CFRunLoopGetMain, CFRunLoopWakeUp, kCFRunLoopCommonModes};
 use core_graphics::display::{CGDirectDisplayID, CGRect};
 use ctor::ctor;
 use futures::channel::oneshot;
@@ -1946,23 +1947,44 @@ impl PlatformWindow for MacWindow {
                 if let Some(previous) = previous {
                     previous.session.finished().await;
                 }
-                let outcome = if native.session.is_invalidated() {
-                    PlatformNativeMenuOutcome::Cancelled
-                } else if closed.load(Ordering::Acquire) {
-                    PlatformNativeMenuOutcome::Unavailable
-                } else {
-                    unsafe { run_context_menu(&native, menu, position) }
-                };
-                CONTEXT_MENU.with(|slot| {
-                    if slot
-                        .borrow()
-                        .as_ref()
-                        .is_some_and(|current| current.session.id() == id)
-                    {
-                        slot.borrow_mut().take();
-                    }
-                });
-                native.session.complete(outcome);
+                // The foreground executor runs on GCD's serial main queue.
+                // Blocking that queue inside NSMenu prevents timer/cancel
+                // continuations from running even though AppKit pumps events.
+                // Enter tracking from the main run loop after this task has
+                // returned instead. Only this native modal boundary changes;
+                // ordinary foreground dispatch keeps its existing ordering.
+                let menu = Cell::new(Some(menu));
+                let block = ConcreteBlock::new(move || {
+                    let menu = menu.take().expect("run-loop menu block executes once");
+                    // Cancellation/replacement/teardown can happen between
+                    // scheduling the block and its actual run-loop invocation.
+                    let outcome = if native.session.is_invalidated() {
+                        PlatformNativeMenuOutcome::Cancelled
+                    } else if closed.load(Ordering::Acquire) {
+                        PlatformNativeMenuOutcome::Unavailable
+                    } else {
+                        unsafe { run_context_menu(&native, menu, position) }
+                    };
+                    CONTEXT_MENU.with(|slot| {
+                        if slot
+                            .borrow()
+                            .as_ref()
+                            .is_some_and(|current| current.session.id() == id)
+                        {
+                            slot.borrow_mut().take();
+                        }
+                    });
+                    native.session.complete(outcome);
+                })
+                .copy();
+                // The block is created and executed only on the main thread;
+                // NSRunLoop copies it and owns its captures until invocation.
+                unsafe {
+                    let run_loop: id = msg_send![class!(NSRunLoop), mainRunLoop];
+                    let modes = NSArray::arrayWithObject(nil, kCFRunLoopCommonModes as id);
+                    let _: () = msg_send![run_loop, performInModes: modes block: &*block];
+                    CFRunLoopWakeUp(CFRunLoopGetMain());
+                }
             })
             .detach();
         Ok(receiver)

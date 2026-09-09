@@ -933,3 +933,7 @@ The Win32 full-viewport toolkit allocation callback and WebView2 controller
 bounds adapter are original GPUI Box corrections. They keep native child
 position/clipping in the framework and toolkit content allocation in the host;
 no upstream source was copied and the frozen import receipt is unchanged.
+
+Native menu modal-loop scheduling corrections use existing NSRunLoop and
+Win32 notification APIs. They are original GPUI Box modifications, with no
+new imported code, package, or change to the frozen historical receipt.
