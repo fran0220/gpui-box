@@ -199,6 +199,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#303030` | `#303030` |
+| `color.surface.controlHover` | `#333333` | `#333333` |
+| `color.surface.controlPressed` | `#242424` | `#242424` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -308,6 +313,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -1004,6 +1010,11 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#f5f5f8` | `#f5f5f8` |
+| `color.surface.controlHover` | `#fdfdff` | `#fdfdff` |
+| `color.surface.controlPressed` | `#e8e8ed` | `#e8e8ed` |
+| `color.interactive.controlHairline` | `#00000024` | `#00000024` |
+| `color.interactive.controlHighlight` | `#ffffffcc` | `#ffffffcc` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -1113,6 +1124,7 @@ Appearance: `Light`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -1809,6 +1821,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#333446` | `#333446` |
+| `color.surface.controlHover` | `#353648` | `#353648` |
+| `color.surface.controlPressed` | `#2c2d3e` | `#2c2d3e` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -1918,6 +1935,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -2614,6 +2632,11 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#f7f8fc` | `#f7f8fc` |
+| `color.surface.controlHover` | `#ffffff` | `#ffffff` |
+| `color.surface.controlPressed` | `#eff1f5` | `#eff1f5` |
+| `color.interactive.controlHairline` | `#00000024` | `#00000024` |
+| `color.interactive.controlHighlight` | `#ffffffcc` | `#ffffffcc` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -2723,6 +2746,7 @@ Appearance: `Light`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -3419,6 +3443,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#3d4454` | `#3d4454` |
+| `color.surface.controlHover` | `#404757` | `#404757` |
+| `color.surface.controlPressed` | `#363c49` | `#363c49` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -3528,6 +3557,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -4224,6 +4254,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#2f3448` | `#2f3448` |
+| `color.surface.controlHover` | `#32374b` | `#32374b` |
+| `color.surface.controlPressed` | `#292e42` | `#292e42` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -4333,6 +4368,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -5029,6 +5065,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#393533` | `#393533` |
+| `color.surface.controlHover` | `#3b3735` | `#3b3735` |
+| `color.surface.controlPressed` | `#363331` | `#363331` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -5138,6 +5179,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -5834,6 +5876,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#343747` | `#343747` |
+| `color.surface.controlHover` | `#353848` | `#353848` |
+| `color.surface.controlPressed` | `#2f3240` | `#2f3240` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -5943,6 +5990,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -6639,6 +6687,11 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#093844` | `#093844` |
+| `color.surface.controlHover` | `#0b3a46` | `#0b3a46` |
+| `color.surface.controlPressed` | `#05333f` | `#05333f` |
+| `color.interactive.controlHairline` | `#ffffff1a` | `#ffffff1a` |
+| `color.interactive.controlHighlight` | `#ffffff14` | `#ffffff14` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -6748,6 +6801,7 @@ Appearance: `Dark`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |
@@ -7444,6 +7498,11 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.control` | `#fdf6e3` | `#fdf6e3` |
+| `color.surface.controlHover` | `#fffdf6` | `#fffdf6` |
+| `color.surface.controlPressed` | `#f6efdb` | `#f6efdb` |
+| `color.interactive.controlHairline` | `#00000024` | `#00000024` |
+| `color.interactive.controlHighlight` | `#ffffffcc` | `#ffffffcc` |
 | `color.onMediaForeground` | `#ffffff` | `#ffffff` |
 | `color.onMediaBackground` | `#171717` | `#171717` |
 | `color.onMediaHairline` | `#ffffff33` | `#ffffff33` |
@@ -7553,6 +7612,7 @@ Appearance: `Light`.
 
 | Token | Pixels |
 |---|---:|
+| `measure.settingsLabel` | 120 |
 | `measure.readableWidth` | 360 |
 | `measure.dialogWidth` | 360 |
 | `measure.menuMinWidth` | 200 |

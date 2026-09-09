@@ -55,7 +55,7 @@ medium action controls use `Radius::Control`; large controls use capsules.
 | `CopyButton` | view | copied, or failed with a reason | Copies caller-supplied text and confirms truthfully. It never publishes its payload, the confirmation times out and the refusal does not, and what it can and cannot know about the clipboard is stated below |
 | `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. `name` labels both the combobox and its editable query target. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
 | `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
-| `SettingsList`, `SettingsRow`, `SettingsSection` | builder | — | One setting per row: name and description on the left, the caller's control on the right. `SettingsList` filters complete sections through the installed locale matcher, searches visible row copy plus explicit aliases/control vocabulary, preserves familiar order, counts matches, and owns the no-match state. A row managed elsewhere, or belonging to a section which does not apply here, never renders the control at all |
+| `SettingsList`, `SettingsRow`, `SettingsSection` | builder | — | Grouped settings: fixed label column, flexible caller-owned field, trailing description. Section `label_width(Pixels)` defaults to `measure.settingsLabel` (120px); row `label_width(Pixels)` overrides it. Section `child(impl IntoElement)` inserts a full-width block among rows in call order, with shared padding and inset separators. Blocks can hold complete editors or ListRow lists. `SettingsList` preserves its existing row search/count/no-match contract; blocks are included only when the section itself matches. Managed/inapplicable rows never mount their control, and inapplicable sections omit arbitrary blocks |
 | `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |
 | `InlineEdit` | view | edit requested, commit, cancel | Text that becomes a field where it stands. The component never opens itself, never applies a commit, and a refused save keeps what was typed |
 | `KeybindingRecorder` | view | recording started, a captured keystroke, cancelled | Captures the next keystroke instead of acting on it, and reports it in GPUI's own syntax so it goes straight into a keymap. A modifier alone is not a keystroke, escape ends recording rather than being captured, and a conflict is the reason the host found |
@@ -132,6 +132,17 @@ remain attached to one editor rather than a replacement field.
 | `Bubble` | builder | A neutral caller-owned message surface with start/end placement, grouping, max width, safe content, and optional caller-owned actions; it contains no conversation or delivery policy |
 
 ### The card is the container, and there is one of it
+
+For a caption over media, use
+`surface(ident, theme, OverlaySurface::MEDIA_CAPTION) -> GlassSurface`.
+This recipe owns Clear optics, dimmed transmission, Card radius and no shadow.
+The styleable frame supports `.absolute().left_0().right_0().bottom_0()` with
+an internal flex layout: its parent determines width and its contents determine
+height; callers do not need an explicit pixel width or a bare Glass wrapper.
+Clear content inherits light foreground independently of appearance. Prefer
+inherited text or the on-media roles, not text colours captured from an outer
+light theme. Reduced transparency resolves to dark Frosted with light content.
+See the `media-caption` exhibit for both appearances and the reduced state.
 
 A card is a surface that groups content, so it owns the whole vocabulary of
 one: a `media` band flush to its edges, a `CardHeader` with a title, an

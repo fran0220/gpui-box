@@ -534,6 +534,7 @@ pub struct Spacing {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Measures {
+    pub settings_label: f32,
     pub readable_width: f32,
     pub dialog_width: f32,
     pub menu_min_width: f32,
@@ -947,6 +948,7 @@ impl Theme {
                 container_extra_large: _,
                 media_viewer_height: _,
                 // Component geometry: the size of a thing the subtree draws.
+                settings_label,
                 standalone_icon,
                 scrollbar_track,
                 scrollbar_thumb,
@@ -967,6 +969,7 @@ impl Theme {
                 node_progress,
             } = &mut data.measures;
             for value in [
+                settings_label,
                 standalone_icon,
                 scrollbar_track,
                 scrollbar_thumb,
@@ -1173,6 +1176,7 @@ impl Theme {
                 xxl: scale_space(tokens.spacing(Space::Xxl), scale),
             },
             measures: Measures {
+                settings_label: scale_space(tokens.measure.settings_label, scale),
                 readable_width: tokens.measure.readable_width,
                 dialog_width: tokens.measure.dialog_width,
                 menu_min_width: tokens.measure.menu_min_width,

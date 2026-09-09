@@ -4,14 +4,94 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, SharedString, TestAppContext};
+use gpui::{App, IntoElement, ParentElement, SharedString, Styled, TestAppContext, div, px};
 use gpui_kit::prelude::*;
-use gpui_kit_semantics::Role;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 type Calls = Rc<RefCell<Vec<String>>>;
 
 // ------------------------------------------------------------ settings rows
+
+#[gpui::test]
+fn settings_columns_align_and_blocks_keep_their_place(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        div()
+            .w(px(640.0))
+            .child(
+                SettingsSection::new("group", "Fixture")
+                    .label_width(px(120.0))
+                    .row(
+                        SettingsRow::new("short", "Name")
+                            .control(
+                                div()
+                                    .w_full()
+                                    .h(px(20.0))
+                                    .semantic_in(cx, NodeSpec::new("editor", Role::Input)),
+                            )
+                            .description("First annotation"),
+                    )
+                    .child(
+                        Button::new("block")
+                            .label("Custom editor")
+                            .on_click(|_, _| {}),
+                    )
+                    .row(
+                        SettingsRow::new("long", "A much longer label")
+                            .value("B")
+                            .description("Second annotation"),
+                    )
+                    .row(
+                        SettingsRow::new("override", "Local width")
+                            .label_width(px(80.0))
+                            .value("C"),
+                    ),
+            )
+            .into_any_element()
+    });
+    let first = harness.node("short.field").expect("first field").bounds;
+    let second = harness.node("long.field").expect("second field").bounds;
+    let overridden = harness
+        .node("override.field")
+        .expect("override field")
+        .bounds;
+    assert_eq!(first.x, second.x);
+    assert_eq!(first.width, second.width);
+    assert_eq!(
+        harness.node("editor").expect("editor").bounds.width,
+        first.width
+    );
+    assert!(
+        first.width > 100.0,
+        "field column must flex into remaining space"
+    );
+    assert_eq!(first.x - overridden.x, 40.0);
+    assert_eq!(
+        harness.node("short.label").expect("label").bounds.width,
+        120.0
+    );
+    let block = harness.node("block").expect("interleaved block").bounds;
+    assert!(
+        block.y > first.y && block.y < second.y,
+        "row/block order is caller order"
+    );
+}
+
+#[gpui::test]
+fn an_inapplicable_section_does_not_mount_arbitrary_block_controls(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        SettingsSection::new("group", "Fixture")
+            .child(
+                Button::new("block")
+                    .label("Never operable")
+                    .on_click(|_, _| {}),
+            )
+            .dimmed_by("Unavailable here")
+            .into_any_element()
+    });
+    assert!(harness.node("block").is_none());
+    assert!(harness.node("group.dimmed").is_some());
+}
 
 fn switch_row(id: &'static str, label: &'static str, sink: Calls) -> SettingsRow {
     SettingsRow::new(id, label).control(

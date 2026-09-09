@@ -15,12 +15,12 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, InteractiveElement, IntoElement, ParentElement, Pixels, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -73,6 +73,7 @@ impl Withheld {
 pub struct SettingsRow {
     ident: Ident,
     label: SharedString,
+    label_width: Option<Pixels>,
     description: Option<SharedString>,
     badge: Option<SharedString>,
     /// What the setting currently holds, in the caller's words.
@@ -100,6 +101,7 @@ impl SettingsRow {
         Self {
             ident: ident.into(),
             label: label.into(),
+            label_width: None,
             description: None,
             badge: None,
             value: None,
@@ -111,6 +113,12 @@ impl SettingsRow {
 
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Overrides this row's inherited section label-column width.
+    pub fn label_width(mut self, width: Pixels) -> Self {
+        self.label_width = Some(width.max(px(0.0)));
         self
     }
 
@@ -199,23 +207,27 @@ impl SettingsRow {
 
         let names = div()
             .column()
-            .flex_1()
+            .flex_none()
+            .w(self
+                .label_width
+                .unwrap_or(px(theme.measures.settings_label)))
             .min_w_0()
             .gap(px(theme.space(Space::Xxs)))
             .child(
                 foundation_text(theme, TypeScale::Label, self.label.clone())
-                    .row_reading(direction)
-                    .gap_token(theme, Space::Sm)
-                    .children(
-                        self.badge
-                            .clone()
-                            .map(|badge| Badge::new(badge).id(ident.child("badge")).warning()),
+                    .w_full()
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.child("label").semantic_id(), Role::Text)
+                            .parent(ident.semantic_id())
+                            .text(self.label.clone()),
                     ),
             )
-            .children(self.description.clone().map(|description| {
-                foundation_text(theme, TypeScale::Caption, description)
-                    .text_tone(theme, gpui_kit_theme::TextTone::Muted)
-            }));
+            .children(
+                self.badge
+                    .clone()
+                    .map(|badge| Badge::new(badge).id(ident.child("badge")).warning()),
+            );
 
         // A withheld row shows what is set and who set it. The control never
         // reaches the tree, so nothing can be operated by mistake.
@@ -266,10 +278,21 @@ impl SettingsRow {
             .w_full()
             .items_center()
             .gap_token(theme, Space::Md)
-            .px_token(theme, Space::Lg)
-            .py_token(theme, Space::Md)
+            .p_token(theme, Space::Xs)
             .child(names)
-            .child(right)
+            .child(
+                div().flex_1().min_w_0().child(right).semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("field").semantic_id(), Role::Group)
+                        .parent(ident.semantic_id()),
+                ),
+            )
+            .children(self.description.map(|description| {
+                foundation_text(theme, TypeScale::Caption, description)
+                    .flex_1()
+                    .min_w_0()
+                    .text_tone(theme, gpui_kit_theme::TextTone::Muted)
+            }))
             .semantic_in(cx, spec)
             .into_any_element()
     }
@@ -284,6 +307,11 @@ impl RenderOnce for SettingsRow {
 
 type ActionSlot = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
+enum SectionContent {
+    Row(Box<SettingsRow>),
+    Block(AnyElement),
+}
+
 /// A headed group of settings rows.
 #[derive(IntoElement)]
 pub struct SettingsSection {
@@ -291,7 +319,8 @@ pub struct SettingsSection {
     title: SharedString,
     description: Option<SharedString>,
     dimmed: Option<SharedString>,
-    rows: Vec<SettingsRow>,
+    label_width: Option<Pixels>,
+    content: Vec<SectionContent>,
     action: Option<ActionSlot>,
 }
 
@@ -302,7 +331,7 @@ impl std::fmt::Debug for SettingsSection {
             .field("ident", &self.ident)
             .field("title", &self.title)
             .field("dimmed", &self.dimmed)
-            .field("rows", &self.rows.len())
+            .field("rows", &self.row_count())
             .finish()
     }
 }
@@ -314,7 +343,8 @@ impl SettingsSection {
             title: title.into(),
             description: None,
             dimmed: None,
-            rows: Vec::new(),
+            label_width: None,
+            content: Vec::new(),
             action: None,
         }
     }
@@ -335,13 +365,40 @@ impl SettingsSection {
     }
 
     pub fn row(mut self, row: SettingsRow) -> Self {
-        self.rows.push(row);
+        self.content.push(SectionContent::Row(Box::new(row)));
         self
     }
 
     pub fn rows(mut self, rows: impl IntoIterator<Item = SettingsRow>) -> Self {
-        self.rows.extend(rows);
+        self.content.extend(
+            rows.into_iter()
+                .map(|row| SectionContent::Row(Box::new(row))),
+        );
         self
+    }
+
+    /// The shared label width; rows with an explicit width keep their override.
+    /// Defaults to `measure.settingsLabel`, scaled with density and local zoom.
+    pub fn label_width(mut self, width: Pixels) -> Self {
+        self.label_width = Some(width.max(px(0.0)));
+        self
+    }
+
+    /// A full-width block among rows, preserving builder call order. Blocks
+    /// share row padding and inset separators. A dimmed section omits blocks
+    /// because their arbitrary controls cannot be made inapplicable safely.
+    /// SettingsList includes blocks only when the section itself matches.
+    pub fn child(mut self, child: impl IntoElement) -> Self {
+        self.content
+            .push(SectionContent::Block(child.into_any_element()));
+        self
+    }
+
+    fn row_count(&self) -> usize {
+        self.content
+            .iter()
+            .filter(|item| matches!(item, SectionContent::Row(_)))
+            .count()
     }
 
     /// A control in the section heading, such as "Reset to defaults".
@@ -371,12 +428,15 @@ impl SettingsSection {
             .any(|text| matcher.rank(query, text.as_ref()).is_some());
 
         if section_matches {
-            let count = self.rows.len();
+            let count = self.row_count();
             return Some((self, count));
         }
 
-        self.rows.retain(|row| row.matches(query, matcher, cx));
-        let count = self.rows.len();
+        self.content.retain(|item| match item {
+            SectionContent::Row(row) => row.matches(query, matcher, cx),
+            SectionContent::Block(_) => false,
+        });
+        let count = self.row_count();
         (count > 0).then_some((self, count))
     }
 }
@@ -438,16 +498,39 @@ impl RenderOnce for SettingsSection {
                 )
         });
 
-        // Heading, spacing and each row's own padding carry the group.
-        // Permanent rules between every setting would turn a calm
-        // preferences surface into a table.
-        let rows = self.rows.into_iter().map(|row| {
-            let row = match dimmed.clone() {
-                Some(reason) => row.inapplicable(reason),
-                None => row,
+        let label_width = self
+            .label_width
+            .unwrap_or(px(theme.measures.settings_label));
+        let mut content = Vec::new();
+        for item in self.content {
+            let item = match item {
+                SectionContent::Row(row) => {
+                    let mut row = *row;
+                    row.label_width.get_or_insert(label_width);
+                    if let Some(reason) = dimmed.clone() {
+                        row = row.inapplicable(reason);
+                    }
+                    row.render_in(&theme, cx)
+                }
+                SectionContent::Block(block) if dimmed.is_none() => div()
+                    .w_full()
+                    .min_w_0()
+                    .p_token(&theme, Space::Xs)
+                    .child(block)
+                    .into_any_element(),
+                SectionContent::Block(_) => continue,
             };
-            div().w_full().child(row.render_in(&theme, cx))
-        });
+            if !content.is_empty() {
+                content.push(
+                    div()
+                        .w_full()
+                        .px_token(&theme, Space::Xs)
+                        .child(crate::foundation::inset_rule(&theme).w_full())
+                        .into_any_element(),
+                );
+            }
+            content.push(item);
+        }
 
         div()
             .column()
@@ -459,10 +542,14 @@ impl RenderOnce for SettingsSection {
                 div()
                     .column()
                     .w_full()
+                    .surface(&theme, Surface::Raised)
+                    .radius(&theme, Radius::Card)
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.control_hairline)
                     .when(dimmed.is_some(), |element| {
                         element.opacity(theme.opacity.disabled)
                     })
-                    .children(rows),
+                    .children(content),
             )
             .semantic_in(
                 cx,

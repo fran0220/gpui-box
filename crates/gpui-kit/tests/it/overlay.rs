@@ -19,6 +19,38 @@ struct Scene {
 
 type SharedScene = Rc<RefCell<Scene>>;
 
+#[gpui::test]
+fn media_caption_uses_parent_edges_and_content_height(cx: &mut TestAppContext) {
+    for width in [237.0, 413.0] {
+        let mut harness = Harness::new(cx, gpui_kit::install, move |_, cx| {
+            use gpui_kit_theme::ActiveTheme;
+            div()
+                .relative()
+                .w(px(width))
+                .h(px(173.0))
+                .child(
+                    gpui_kit::overlay::surface(
+                        "caption",
+                        cx.theme(),
+                        gpui_kit::overlay::OverlaySurface::MEDIA_CAPTION,
+                    )
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .flex_row()
+                    .child(div().flex_1().h(px(37.0)))
+                    .semantic_in(cx, NodeSpec::new("caption", Role::Group)),
+                )
+                .into_any_element()
+        });
+        let frame = harness.node("caption").expect("caption bounds").bounds;
+        assert_eq!(frame.width, width);
+        assert_eq!(frame.height, 37.0);
+        assert_eq!(frame.y + frame.height, 173.0);
+    }
+}
+
 /// A page with one focusable button behind an overlay holding three stops.
 fn scene(cx: &mut TestAppContext, state: SharedScene) -> Harness {
     Harness::new(cx, gpui_kit::install, move |_window, cx| {

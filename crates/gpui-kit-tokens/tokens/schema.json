@@ -344,6 +344,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "settingsLabel",
         "readableWidth",
         "dialogWidth",
         "menuMinWidth",
@@ -376,6 +377,7 @@
         "nodeProgress"
       ],
       "properties": {
+        "settingsLabel": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "readableWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "dialogWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "menuMinWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },

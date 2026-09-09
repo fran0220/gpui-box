@@ -87,8 +87,8 @@ use navigation::{
     tabs, undo_history, wizard,
 };
 use overlay::{
-    command_palette, context_menu, dialog, drawer, frost, glass, hover_card, kbd, menu, menubar,
-    notification_center, overlay, popover, toast, tooltip,
+    command_palette, context_menu, dialog, drawer, frost, glass, hover_card, kbd, media_caption,
+    menu, menubar, notification_center, overlay, popover, toast, tooltip,
 };
 use structured::{json_view, schema_form};
 
@@ -476,6 +476,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "glass",
             build: glass,
             shows: Shows::Subjects(&["Glass"]),
+        },
+        Scene {
+            name: "media-caption",
+            build: media_caption,
+            shows: Shows::Composition(&["Button"]),
         },
         Scene {
             name: "toolbar",

@@ -396,6 +396,7 @@
     "xxl": 32
   },
   "measure": {
+    "settingsLabel": 120,
     "readableWidth": 360,
     "dialogWidth": 360,
     "menuMinWidth": 200,

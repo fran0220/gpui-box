@@ -676,6 +676,72 @@ fn glass_media() -> Arc<RenderImage> {
         .clone()
 }
 
+/// A constrained media tile owns size; its caption only names edge anchors.
+pub(super) fn media_caption(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let tile = |id: &'static str, reduced: bool| {
+        let material_theme = theme.clone().with_reduce_transparency(reduced);
+        div()
+            .relative()
+            .w_full()
+            .h(px(220.0))
+            .radius(&theme, Radius::Card)
+            .overflow_hidden()
+            .child(
+                gpui::img(glass_media())
+                    .size_full()
+                    .radius(&theme, Radius::Card)
+                    .object_fit(gpui::ObjectFit::Cover),
+            )
+            .child(
+                crate::overlay::surface(
+                    id,
+                    &material_theme,
+                    crate::overlay::OverlaySurface::MEDIA_CAPTION,
+                )
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .flex_row()
+                .items_center()
+                .gap_token(&theme, Space::Md)
+                .p_token(&theme, Space::Md)
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .type_scale(&theme, TypeScale::Label)
+                        .child(if reduced {
+                            "Media fixture · reduced transparency"
+                        } else {
+                            "Media fixture · Clear caption"
+                        }),
+                )
+                .child(
+                    div()
+                        .type_scale(&theme, TypeScale::Caption)
+                        .child("3 projects"),
+                )
+                .child(
+                    Button::new(format!("{id}.new"))
+                        .label("New project")
+                        .ghost()
+                        .on_click(|_, _| {}),
+                ),
+            )
+    };
+    stack(&theme)
+        .w_full()
+        .child(caption(
+            &theme,
+            "Parent-constrained width; caption height follows its content",
+        ))
+        .child(tile("scene.media-caption.clear", false))
+        .child(tile("scene.media-caption.reduced", true))
+        .into_any_element()
+}
+
 pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let label = |title: &'static str, body: &'static str| {

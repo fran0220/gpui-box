@@ -1532,7 +1532,24 @@ pub(super) fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
+struct SceneSettingsInputs(Vec<Entity<TextInput>>);
+impl Global for SceneSettingsInputs {}
+
+pub(super) fn settings(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneSettingsInputs>() {
+        let inputs = [("name", "Fixture assistant"), ("model", "Local model")]
+            .into_iter()
+            .map(|(id, value)| {
+                cx.new(|cx| {
+                    TextInput::new(format!("scene.settings.fields.{id}.input"), window, cx)
+                        .text(value)
+                        .control_size(ControlSize::Sm)
+                })
+            })
+            .collect();
+        cx.set_global(SceneSettingsInputs(inputs));
+    }
+    let fields = cx.global::<SceneSettingsInputs>().0.clone();
     let theme = cx.theme().clone();
     let general = || {
         SettingsSection::new("scene.settings.general", "General")
@@ -1620,6 +1637,30 @@ pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .section(general())
                             .section(sync()),
                     ),
+                ),
+        )
+        .child(
+            SettingsSection::new("scene.settings.fields", "Aligned fields and custom blocks")
+                .description("120px labels; flexible fields; annotations at the reading end")
+                .label_width(px(120.0))
+                .row(
+                    SettingsRow::new("scene.settings.fields.name", "Name")
+                        .control(fields[0].clone())
+                        .description("Visible in the workspace"),
+                )
+                .child(
+                    crate::display::card::ListRow::new()
+                        .id("scene.settings.fields.device")
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Fixture device · connected",
+                        )),
+                )
+                .row(
+                    SettingsRow::new("scene.settings.fields.model", "Model")
+                        .control(fields[1].clone())
+                        .description("Chosen by the caller"),
                 ),
         )
         .into_any_element()

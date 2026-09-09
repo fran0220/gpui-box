@@ -188,6 +188,7 @@ impl TokenDocument {
         }
 
         for (path, value) in [
+            ("measure.settingsLabel", self.measure.settings_label),
             ("measure.readableWidth", self.measure.readable_width),
             ("measure.dialogWidth", self.measure.dialog_width),
             ("measure.menuMinWidth", self.measure.menu_min_width),
@@ -2318,6 +2319,8 @@ pub struct SpacingTokens {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MeasureTokens {
+    /// Shared settings label-column width before host overrides.
+    pub settings_label: f32,
     /// Maximum width for explanatory copy in empty, unavailable and error
     /// states.
     pub readable_width: f32,

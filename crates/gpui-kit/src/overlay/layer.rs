@@ -26,6 +26,8 @@ type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 pub struct OverlaySurface {
     radius: Option<Radius>,
     elevation: Elevation,
+    preset: super::GlassPreset,
+    dimmed: bool,
 }
 
 impl OverlaySurface {
@@ -33,18 +35,35 @@ impl OverlaySurface {
     pub const FLOATING: Self = Self {
         radius: Some(Radius::Card),
         elevation: Elevation::Overlay,
+        preset: super::GlassPreset::Liquid,
+        dimmed: false,
     };
 
     /// A centered decision surface under a modal scrim.
     pub const MODAL: Self = Self {
         radius: Some(Radius::Dialog),
         elevation: Elevation::Modal,
+        preset: super::GlassPreset::Liquid,
+        dimmed: false,
     };
 
     /// A modal plane attached to a window edge, such as a drawer.
     pub const EDGE: Self = Self {
         radius: None,
         elevation: Elevation::Modal,
+        preset: super::GlassPreset::Liquid,
+        dimmed: false,
+    };
+
+    /// A caption over media: Clear optics, dimmed transmission and light
+    /// content, without an elevation shadow. Reduced transparency resolves
+    /// to dark Frosted. Use with `surface(...).absolute().left_0().right_0()
+    /// .bottom_0()`; the parent constrains width and content determines height.
+    pub const MEDIA_CAPTION: Self = Self {
+        radius: Some(Radius::Card),
+        elevation: Elevation::Flat,
+        preset: super::GlassPreset::Clear,
+        dimmed: true,
     };
 }
 
@@ -61,6 +80,8 @@ impl From<Elevation> for OverlaySurface {
                 Radius::Card
             }),
             elevation,
+            preset: super::GlassPreset::Liquid,
+            dimmed: false,
         }
     }
 }
@@ -475,6 +496,8 @@ impl gpui::Element for GlassSurface {
         cx: &mut App,
     ) -> (gpui::LayoutId, AnyElement) {
         let glass = super::Glass::new(self.ident.child("material"))
+            .preset(self.recipe.preset)
+            .dimmed(self.recipe.dimmed)
             .radius_px(
                 self.recipe
                     .radius

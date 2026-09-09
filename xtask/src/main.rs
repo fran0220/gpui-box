@@ -1878,6 +1878,26 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     let color = &tokens.color;
     let sources: Vec<(String, &str)> = vec![
         (
+            "color.surface.control".into(),
+            color.surface.control.as_str(),
+        ),
+        (
+            "color.surface.controlHover".into(),
+            color.surface.control_hover.as_str(),
+        ),
+        (
+            "color.surface.controlPressed".into(),
+            color.surface.control_pressed.as_str(),
+        ),
+        (
+            "color.interactive.controlHairline".into(),
+            color.interactive.control_hairline.as_str(),
+        ),
+        (
+            "color.interactive.controlHighlight".into(),
+            color.interactive.control_highlight.as_str(),
+        ),
+        (
             "color.onMediaForeground".into(),
             color.on_media_foreground.as_str(),
         ),
@@ -2127,6 +2147,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
 
     output.push_str("\n### Measures\n\n| Token | Pixels |\n|---|---:|\n");
     for (name, value) in [
+        ("measure.settingsLabel", tokens.measure.settings_label),
         ("measure.readableWidth", tokens.measure.readable_width),
         ("measure.dialogWidth", tokens.measure.dialog_width),
         ("measure.menuMinWidth", tokens.measure.menu_min_width),
