@@ -9,6 +9,59 @@ fn node(component: &str, id: &str, props: Value, events: Value) -> Node {
     .expect("fixture descriptor")
 }
 
+#[test]
+fn native_descriptors_and_methods_reject_closed_shape_and_relational_errors() {
+    for (component, props) in [
+        (
+            "ColorPicker",
+            json!({"value":{"h":0,"s":1,"l":0.5,"a":1.01}}),
+        ),
+        ("Button", json!({"iconOnly":true})),
+        (
+            "Button",
+            json!({"color":{"palette":"blue","semantic":"info"}}),
+        ),
+        (
+            "IconButton",
+            json!({"icon":{"key":"plus-circle","path":"/tmp/secret"},"accessibleName":"Add"}),
+        ),
+        ("FormField", json!({"label":"Field","validation":"invalid"})),
+        ("FilterBar", json!({"countState":"unavailable"})),
+        ("TransferList", json!({"sourceSelected":[1]})),
+        (
+            "SettingsRow",
+            json!({"label":"Setting","bind":{"signal":1}}),
+        ),
+    ] {
+        assert!(
+            validate_descriptor(&node(component, "invalid", props, json!({}))).is_err(),
+            "{component}"
+        );
+    }
+    assert!(
+        validate_descriptor(&node(
+            "Button",
+            "disabled",
+            json!({"disabled":true}),
+            json!({"click":"action"})
+        ))
+        .is_err()
+    );
+    assert!(
+        super::super::validation::invocation(
+            "TransferList",
+            "set_items",
+            &json!({"source":[]}),
+            false
+        )
+        .is_err()
+    );
+    assert!(
+        super::super::validation::invocation("SearchInput", "value", &json!({"extra":1}), true)
+            .is_err()
+    );
+}
+
 #[gpui::test]
 fn swatch_reports_exact_native_color_and_disabled_does_not_dispatch(cx: &mut TestAppContext) {
     let events = Rc::new(RefCell::new(Vec::new()));
@@ -350,4 +403,170 @@ fn managed_settings_never_construct_the_withheld_slot(cx: &mut TestAppContext) {
     assert!(*builds.borrow() > 0);
     assert!(harness.node("managed").expect("managed row").disabled);
     assert!(harness.node("editable.control").is_some());
+}
+
+#[gpui::test]
+fn transfer_panes_remain_controlled_and_keep_query_across_options(cx: &mut TestAppContext) {
+    let descriptor = Rc::new(RefCell::new(node(
+        "TransferList",
+        "transfer",
+        json!({
+            "source":[{"id":"a","label":"Alpha"},{"id":"b","label":"Beta"},{"id":"locked","label":"Locked","disabled":true}],
+            "target":[{"id":"z","label":"Zeta"}],"sourceSelected":["b"],"targetSelected":["z"]
+        }),
+        json!({"toggleSource":"source","toggleTarget":"target","moveToTarget":"right","moveToSource":"left","queryChange":"query"}),
+    )));
+    let state = Rc::new(KitState::default());
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_state, build_node, output) = (state.clone(), descriptor.clone(), events.clone());
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let node = build_node.borrow();
+        build_state.reconcile(&node, cx);
+        let output = output.clone();
+        build_state.render(
+            &node,
+            BTreeMap::new(),
+            window,
+            cx,
+            Rc::new(move |action, value| output.borrow_mut().push((action.to_owned(), value))),
+        )
+    });
+    for id in [
+        "transfer.source.list.a",
+        "transfer.target.list.z",
+        "transfer.source.list.locked",
+        "transfer.move-to-target",
+        "transfer.move-to-source",
+    ] {
+        harness.click(id);
+    }
+    assert_eq!(
+        *events.borrow(),
+        vec![
+            ("source".into(), json!("a")),
+            ("target".into(), json!("z")),
+            ("right".into(), Value::Null),
+            ("left".into(), Value::Null)
+        ]
+    );
+    assert!(
+        !harness
+            .node("transfer.source.list.a")
+            .expect("source row")
+            .selected
+    );
+    assert!(
+        harness
+            .node("transfer.source.list.b")
+            .expect("selected row")
+            .selected
+    );
+    let entity_id = state.controls_extra.transfers.borrow()[&(0, "transfer".into())]
+        .entity
+        .entity_id();
+    harness.update(|window, cx| {
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_query",
+                &json!({"query":"Beta"}),
+                false,
+                window,
+                cx,
+            )
+            .expect("filter");
+    });
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("sourceLabel".into(), json!("Unassigned"));
+    harness.frame();
+    assert!(harness.node("transfer.source.list.a").is_none());
+    assert!(harness.node("transfer.source.list.b").is_some());
+    assert_eq!(
+        entity_id,
+        state.controls_extra.transfers.borrow()[&(0, "transfer".into())]
+            .entity
+            .entity_id()
+    );
+    harness.update(|window, cx| {
+        for (method, args) in [
+            ("set_query", json!({"query":""})),
+            (
+                "set_items",
+                json!({"source":[{"id":"new","label":"New item"}],"target":[]}),
+            ),
+            ("set_selection", json!({"source":["new"],"target":[]})),
+            ("set_labels", json!({"source":"Pool","target":"Assigned"})),
+            ("set_control_size", json!({"size":"sm"})),
+        ] {
+            assert_eq!(
+                state
+                    .invoke(&descriptor.borrow(), method, &args, false, window, cx)
+                    .expect("native setter"),
+                Value::Null
+            );
+        }
+    });
+    harness.frame();
+    assert!(
+        harness
+            .node("transfer.source.list.new")
+            .expect("new selected item")
+            .selected
+    );
+    assert!(harness.node("transfer.target.list.z").is_none());
+    harness.update(|window, cx| {
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                window,
+                cx,
+            )
+            .expect("disable");
+        assert_eq!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "is_disabled",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .expect("disabled query"),
+            json!(true)
+        );
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "set_query",
+                    &json!({"query":"forbidden"}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+        let replacement = node("Button", "replacement", json!({}), json!({}));
+        state.reconcile(&replacement, cx);
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "is_disabled",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+        *descriptor.borrow_mut() = replacement;
+    });
+    assert!(state.controls_extra.transfers.borrow().is_empty());
 }

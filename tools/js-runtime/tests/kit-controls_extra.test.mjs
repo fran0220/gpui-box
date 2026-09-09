@@ -62,6 +62,16 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.SettingsRow('setting', {label:'Retention',managed:'Policy'}, {}, {control:[]});
+kit.TransferList('transfer', {source:[{id:'alpha',label:'Alpha',disabled:true}],targetSelected:['zeta']}, {toggleSource(id) { const key: string = id; }});
+type TransferMethods = ControlsExtraMethodContracts['TransferList']['invoke'];
+const transferValues: { [K in keyof TransferMethods]: TransferMethods[K]['args'] } = {
+set_query:{query:'Alpha'},set_items:{source:[],target:[]},set_selection:{source:['alpha'],target:['zeta']},set_labels:{source:'Available',target:'Assigned'},set_control_size:{size:'sm'},set_disabled:{disabled:true}
+};
+// @ts-expect-error transfer selections use identities, not positions
+kit.TransferList('bad', {sourceSelected:[0]});
+// @ts-expect-error only the named control slot is accepted
+kit.SettingsRow('bad', {label:'Setting'}, {}, {content:[]});
 type Methods = ControlsExtraMethodContracts['SearchInput']['invoke'];
 const values: { [K in keyof Methods]: Methods[K]['args'] } = {
 set_value:{value:'next'},set_name:{name:'Name'},set_placeholder:{placeholder:'Query'},set_disabled:{disabled:true},set_presentation:{name:null,placeholder:null,size:'lg'}
@@ -86,4 +96,14 @@ kit.SearchInput('bad', {bind:{signal:1}});
     const result = spawnSync(process.execPath, [compiler, '--strict', '--noEmit', path], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stdout + result.stderr);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('transfer methods reject positional IDs, duplicate records and missing pane arguments', () => {
+  const schema = familySchemas.TransferList.props;
+  assert.throws(() => validateValue({ sourceSelected: [0] }, schema));
+  assert.throws(() => validateValue({ source: [{id:'a',label:'A'},{id:'a',label:'Different'}] }, schema));
+  for (const [method, args] of [
+    ['set_query',{query:4}], ['set_items',{source:[]}], ['set_selection',{source:[1],target:[]}],
+    ['set_labels',{source:'A',target:'B',extra:true}], ['set_control_size',{size:'huge'}], ['set_disabled',{disabled:null}],
+  ]) assert.throws(() => validateValue(args, familyMethods.TransferList.invoke[method].args));
 });

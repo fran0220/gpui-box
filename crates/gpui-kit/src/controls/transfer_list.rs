@@ -142,6 +142,56 @@ impl TransferList {
         self
     }
 
+    /// Replaces caller-owned panes without replacing the query editor.
+    pub fn set_items(
+        &mut self,
+        source: Vec<TransferItem>,
+        target: Vec<TransferItem>,
+        cx: &mut Context<Self>,
+    ) {
+        self.source = source;
+        self.target = target;
+        cx.notify();
+    }
+
+    pub fn set_selection(
+        &mut self,
+        source: Vec<SharedString>,
+        target: Vec<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.source_selected = source;
+        self.target_selected = target;
+        cx.notify();
+    }
+
+    pub fn set_labels(
+        &mut self,
+        source: SharedString,
+        target: SharedString,
+        cx: &mut Context<Self>,
+    ) {
+        self.source_label = source;
+        self.target_label = target;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        self.query
+            .update(cx, |query, cx| query.set_disabled(disabled, cx));
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_query(&mut self, query: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.query
             .update(cx, |field, cx| field.set_text_quietly(query.into(), cx));

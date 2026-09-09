@@ -20,10 +20,11 @@ pub(super) const COMPONENTS: &[&str] = &[
     "ToggleGroup",
     "SearchInput",
     "SettingsRow",
+    "TransferList",
 ];
 
-struct SearchEntry {
-    entity: Entity<SearchInput>,
+struct Entry<T: 'static> {
+    entity: Entity<T>,
     route: Rc<RefCell<Route>>,
     props: RefCell<serde_json::Map<String, Value>>,
     _subscription: Subscription,
@@ -31,24 +32,28 @@ struct SearchEntry {
 
 #[derive(Default)]
 pub(super) struct State {
-    searches: RefCell<HashMap<Key, Rc<SearchEntry>>>,
+    searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
+    transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
 }
 
 impl State {
     pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
-        fn visit(node: &Node, live: &mut Vec<Key>) {
-            if node.component.as_deref() == Some("SearchInput") {
-                live.push((node.instance, node.id.clone()));
+        fn visit(node: &Node, live: &mut HashMap<Key, String>) {
+            if let Some(component) = &node.component {
+                live.insert((node.instance, node.id.clone()), component.clone());
             }
             for child in node.children.iter().chain(node.slots.values().flatten()) {
                 visit(child, live);
             }
         }
-        let mut live = Vec::new();
+        let mut live = HashMap::new();
         visit(root, &mut live);
         self.searches
             .borrow_mut()
-            .retain(|key, _| live.contains(key));
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "SearchInput"));
+        self.transfers
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "TransferList"));
     }
 
     pub(super) fn render(
@@ -59,6 +64,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("TransferList") {
+            return self.render_transfer(node, window, cx, emit);
+        }
         if node.component.as_deref() != Some("SearchInput") {
             return render(node, slots, window, cx, emit);
         }
@@ -96,7 +104,7 @@ impl State {
                     emit(&action, payload);
                 }
             });
-            let entry = Rc::new(SearchEntry {
+            let entry = Rc::new(Entry {
                 entity,
                 route,
                 props: Default::default(),
@@ -143,6 +151,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("TransferList") {
+            return self.invoke_transfer(node, method, args, query, cx);
+        }
         if node.component.as_deref() != Some("SearchInput") {
             return invoke(node, method, args, query);
         }
@@ -645,4 +656,181 @@ pub(super) fn settings_row(
         row = row.control(control(window, cx));
     }
     row
+}
+
+fn transfer_items(value: Option<&Value>) -> Vec<TransferItem> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|item| {
+            TransferItem::new(
+                item["id"].as_str().unwrap_or_default().to_owned(),
+                item["label"].as_str().unwrap_or_default().to_owned(),
+            )
+            .disabled(item["disabled"].as_bool().unwrap_or(false))
+        })
+        .collect()
+}
+
+fn strings(value: Option<&Value>) -> Vec<SharedString> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|value| value.to_owned().into())
+        .collect()
+}
+
+impl State {
+    fn render_transfer(
+        &self,
+        node: &Node,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> AnyElement {
+        let key = (node.instance, node.id.clone());
+        let existing = self.transfers.borrow().get(&key).cloned();
+        let entry = existing.unwrap_or_else(|| {
+            let entity = cx.new(|cx| TransferList::new(node.id.clone(), window, cx));
+            let route = Rc::new(RefCell::new(Route {
+                events: node.events.clone(),
+                emit: emit.clone(),
+                disabled: flag(node, "disabled"),
+            }));
+            let callback = Rc::downgrade(&route);
+            let subscription = cx.subscribe(&entity, move |_, event: &TransferListEvent, _| {
+                let (name, payload) = match event {
+                    TransferListEvent::ToggleSource(id) => ("toggleSource", json!(id.as_ref())),
+                    TransferListEvent::ToggleTarget(id) => ("toggleTarget", json!(id.as_ref())),
+                    TransferListEvent::MoveToTarget => ("moveToTarget", Value::Null),
+                    TransferListEvent::MoveToSource => ("moveToSource", Value::Null),
+                    TransferListEvent::QueryChanged(query) => {
+                        ("queryChange", json!(query.as_ref()))
+                    }
+                };
+                let target = callback.upgrade().and_then(|route| {
+                    let route = route.borrow();
+                    (!route.disabled)
+                        .then(|| {
+                            route
+                                .events
+                                .get(name)
+                                .map(|action| (action.clone(), route.emit.clone()))
+                        })
+                        .flatten()
+                });
+                if let Some((action, emit)) = target {
+                    emit(&action, payload);
+                }
+            });
+            let entry = Rc::new(Entry {
+                entity,
+                route,
+                props: Default::default(),
+                _subscription: subscription,
+            });
+            self.transfers.borrow_mut().insert(key, entry.clone());
+            entry
+        });
+        *entry.route.borrow_mut() = Route {
+            events: node.events.clone(),
+            emit,
+            disabled: flag(node, "disabled"),
+        };
+        if *entry.props.borrow() != node.props {
+            entry.entity.update(cx, |list, cx| {
+                list.set_items(
+                    transfer_items(node.props.get("source")),
+                    transfer_items(node.props.get("target")),
+                    cx,
+                );
+                list.set_selection(
+                    strings(node.props.get("sourceSelected")),
+                    strings(node.props.get("targetSelected")),
+                    cx,
+                );
+                list.set_labels(
+                    text(node, "sourceLabel").into(),
+                    text(node, "targetLabel").into(),
+                    cx,
+                );
+                list.set_control_size(size(node), cx);
+                list.set_disabled(flag(node, "disabled"), cx);
+                if node.props.contains_key("query") {
+                    list.set_query(text(node, "query"), cx);
+                }
+            });
+            *entry.props.borrow_mut() = node.props.clone();
+        }
+        entry.entity.clone().into_any_element()
+    }
+
+    fn invoke_transfer(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        cx: &mut App,
+    ) -> anyhow::Result<Value> {
+        let entity = self
+            .transfers
+            .borrow()
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| entry.entity.clone())
+            .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+        anyhow::ensure!(
+            query || (!flag(node, "disabled") && !entity.read(cx).is_disabled()),
+            "disabled target refuses invocation"
+        );
+        if query {
+            anyhow::ensure!(method == "is_disabled", "unsupported TransferList query");
+            return Ok(json!(entity.read(cx).is_disabled()));
+        }
+        entity.update(cx, |list, cx| {
+            match method {
+                "set_query" => {
+                    list.set_query(args["query"].as_str().unwrap_or_default().to_owned(), cx)
+                }
+                "set_items" => list.set_items(
+                    transfer_items(args.get("source")),
+                    transfer_items(args.get("target")),
+                    cx,
+                ),
+                "set_selection" => {
+                    list.set_selection(strings(args.get("source")), strings(args.get("target")), cx)
+                }
+                "set_labels" => list.set_labels(
+                    args["source"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned()
+                        .into(),
+                    args["target"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned()
+                        .into(),
+                    cx,
+                ),
+                "set_control_size" => list.set_control_size(
+                    match args["size"].as_str() {
+                        Some("xs") => ControlSize::Xs,
+                        Some("sm") => ControlSize::Sm,
+                        Some("lg") => ControlSize::Lg,
+                        _ => ControlSize::Md,
+                    },
+                    cx,
+                ),
+                "set_disabled" => {
+                    list.set_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
+                }
+                _ => anyhow::bail!("unsupported TransferList command"),
+            }
+            Ok(Value::Null)
+        })
+    }
 }

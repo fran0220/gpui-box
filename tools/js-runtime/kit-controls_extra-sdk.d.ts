@@ -10,7 +10,9 @@ export type ControlColor = { palette: string; semantic?: never; custom?: never }
 export interface NativeButtonProps extends ControlProps { accessibleName?: string; semanticParent?: string; icon?: BuiltinIconDescriptor; variant?: ButtonStyle; color?: ControlColor; ground?: ControlGround; join?: ButtonJoin; loading?: boolean }
 export interface ToggleItem { id: string; label: string; icon?: BuiltinIconDescriptor; iconOnly?: boolean; disabled?: boolean }
 export interface FilterCondition { id: string; field: string; operator: string; value: string; tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' }
+export interface TransferItem { id: string; label: string; disabled?: boolean }
 export interface ControlsExtraFactories {
+  TransferList(id: string, props?: ControlProps & { source?: TransferItem[]; target?: TransferItem[]; sourceSelected?: string[]; targetSelected?: string[]; sourceLabel?: string; targetLabel?: string; query?: string }, events?: { toggleSource?(id: string): void; toggleTarget?(id: string): void; moveToTarget?(): void; moveToSource?(): void; queryChange?(query: string): void }): KitNode;
   SettingsRow(id: string, props: { label: string; description?: string; labelWidth?: number; badge?: string; value?: string; searchTerms?: string[]; managed?: string }, events?: Record<string, never>, slots?: { control?: SlotNode[] }): KitNode;
   SearchInput(id: string, props?: ControlProps & { name?: string; placeholder?: string; value?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
   Button(id: string, props?: NativeButtonProps & { label?: string; accessibleDescription?: string; iconOnly?: boolean; iconPosition?: 'leading' | 'trailing'; fullWidth?: boolean; checkedState?: boolean }, events?: { click?(): void }): KitNode;
@@ -23,6 +25,17 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 export interface ControlsExtraMethodContracts {
+  TransferList: {
+    invoke: {
+      set_query: { args: { query: string }; result: null };
+      set_items: { args: { source: TransferItem[]; target: TransferItem[] }; result: null };
+      set_selection: { args: { source: string[]; target: string[] }; result: null };
+      set_labels: { args: { source: string; target: string }; result: null };
+      set_control_size: { args: { size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+    };
+    query: { is_disabled: { args: Record<string, never>; result: boolean } };
+  };
   SearchInput: {
     invoke: {
       set_value: { args: { value: string }; result: null };

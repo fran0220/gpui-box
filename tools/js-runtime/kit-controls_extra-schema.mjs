@@ -16,6 +16,7 @@ const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
 const colorChoice = object({ palette: identity, semantic: choice('accent', 'accentStrong', 'danger', 'warning', 'success', 'info'), custom: color });
 const button = { ...common, accessibleName: string, semanticParent: identity, icon: iconSchema, variant: choice(...variant.enum, 'filled', 'light', 'subtle', 'default', 'transparent', 'white'), color: colorChoice, ground, join, loading: boolean };
+const transferItems = array(object({ id: identity, label: string, disabled: boolean }, ['id', 'label']));
 
 export const familyBindings = Object.freeze({
   Toggle: { prop: 'pressed', event: 'press' },
@@ -23,6 +24,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  TransferList: { props: object({ ...common, source: transferItems, target: transferItems, sourceSelected: array(identity), targetSelected: array(identity), sourceLabel: string, targetLabel: string, query: string }), events: { toggleSource: identity, toggleTarget: identity, moveToTarget: choice(null), moveToSource: choice(null), queryChange: string } },
   SettingsRow: { props: object({ label: string, description: string, labelWidth: { type: 'number', min: 0, max: 100000 }, badge: string, value: string, searchTerms: array(string), managed: string }, ['label']), events: {}, slots: ['control'] },
   SearchInput: { props: object({ ...common, name: string, placeholder: string, value: string }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
   Button: { props: object({ ...button, label: string, accessibleDescription: string, iconOnly: boolean, iconPosition: choice('leading', 'trailing'), fullWidth: boolean, checkedState: boolean }), events: { click: choice(null) } },
@@ -35,6 +37,17 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  TransferList: {
+    invoke: {
+      set_query: method({ query: string }, choice(null)),
+      set_items: method({ source: transferItems, target: transferItems }, choice(null)),
+      set_selection: method({ source: array(identity), target: array(identity) }, choice(null)),
+      set_labels: method({ source: string, target: string }, choice(null)),
+      set_control_size: method({ size: common.size }, choice(null)),
+      set_disabled: method({ disabled: boolean }, choice(null)),
+    },
+    query: { is_disabled: method({}, boolean) },
+  },
   SearchInput: {
     invoke: {
       set_value: method({ value: string }, choice(null)), set_name: method({ name: string }, choice(null)), set_placeholder: method({ placeholder: string }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
