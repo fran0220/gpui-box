@@ -270,6 +270,19 @@ impl EditableTextLayout {
         self.text_len == 0
     }
 
+    /// Proves that two layouts share the same logical row index without
+    /// enumerating source lines. False means unknown, not necessarily unequal.
+    /// Viewport changes and line height do not change source row boundaries.
+    pub fn shares_row_index_with(&self, other: &Self) -> bool {
+        match (&self.source, &other.source) {
+            (Some(left), Some(right)) => {
+                left.document.shares_storage_with(&right.document)
+                    && left.projection == right.projection
+            }
+            _ => false,
+        }
+    }
+
     /// The full shaped document height.
     pub fn height(&self) -> Pixels {
         self.line_height * self.total_rows as f32
@@ -740,6 +753,42 @@ impl EditableTextLayout {
 mod tests {
     use super::*;
     use crate::{TestAppContext, TextStyle};
+
+    #[crate::test]
+    fn row_index_identity_ignores_viewport_but_not_edits_or_projection(cx: &mut TestAppContext) {
+        let document = EditSnapshot::new("ab\n界x\nz");
+        let text_system = Arc::new(WindowTextSystem::new(cx.text_system().clone()));
+        let layout = |document: EditSnapshot, visible, omitted: Vec<Range<usize>>| {
+            let projection = EditableLineProjection::new(document.line_count(), omitted)
+                .expect("valid projection");
+            let runs = vec![TextStyle::default().to_run(document.len())];
+            EditableTextLayout::unwrapped_projected(
+                document,
+                text_system.clone(),
+                px(14.0),
+                px(20.0),
+                runs,
+                visible,
+                projection,
+            )
+            .expect("matching source")
+        };
+        let first = layout(document.clone(), 0..1, vec![]);
+        let scrolled = layout(document.clone(), 2..3, vec![]);
+        assert!(first.shares_row_index_with(&scrolled));
+        let folded = layout(document.clone(), 0..1, std::iter::once(1..2).collect());
+        assert!(!first.shares_row_index_with(&folded));
+        let mut edited = document.clone();
+        edited.replace(1..3, "\nb");
+        assert_eq!(edited.len(), document.len());
+        assert_eq!(edited.line_count(), document.line_count());
+        assert!(!document.shares_storage_with(&edited));
+        let changed = layout(edited, 0..1, vec![]);
+        assert!(!first.shares_row_index_with(&changed));
+        assert_eq!(document.materialized_bytes(), 0);
+        assert_eq!(first.shaping_work(), EditableTextWork::default());
+        assert_eq!(scrolled.shaping_work(), EditableTextWork::default());
+    }
 
     #[crate::test]
     fn projected_geometry_skips_hidden_source_for_paint_hit_testing_and_selection(

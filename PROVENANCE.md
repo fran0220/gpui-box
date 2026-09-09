@@ -924,3 +924,7 @@ retention are original GPUI Box work using AccessKit's existing TreeUpdate
 protocol. Complete changed values and relationship names remain available;
 no AccessKit package fork, adapter modification or historical import update
 is introduced. Producer value-copy counters exclude platform backend copies.
+
+Persistent row-index identity and shared-source grapheme representability
+caching are original GPUI Box work. Ropey's public instance comparison is
+used without private storage assumptions, new dependencies or receipt changes.

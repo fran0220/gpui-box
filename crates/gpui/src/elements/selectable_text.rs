@@ -52,6 +52,7 @@ pub struct AccessibleTextCache {
     visible_nodes: collections::FxHashMap<accesskit::NodeId, accesskit::Node>,
     clip: Option<accesskit::Rect>,
     document: Option<EditSnapshot>,
+    representation: Option<(SharedString, bool)>,
     work: AccessibleTextWork,
 }
 
@@ -60,6 +61,9 @@ pub struct AccessibleTextCache {
 /// not claim an allocation bound for the entire AccessKit update.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AccessibleTextWork {
+    /// Bytes inspected by the last explicit representability check. Unchanged
+    /// shared source storage requires zero; a new value is scanned once.
+    pub representability_bytes: usize,
     /// UTF-8 bytes passed to Unicode segmentation and bidi resolution.
     pub segmented_bytes: usize,
     /// Actual persistent-snapshot byte comparisons used to locate the edit.
@@ -73,6 +77,23 @@ pub struct AccessibleTextWork {
 }
 
 impl AccessibleTextCache {
+    /// Caches the complete grapheme representability check by immutable source
+    /// storage. This does not suppress native Value for unrepresentable runs.
+    pub fn is_representable(&mut self, text: &SharedString) -> bool {
+        self.work.representability_bytes = 0;
+        if let Some((previous, result)) = &self.representation
+            && std::ptr::eq(previous.as_ref(), text.as_ref())
+        {
+            return *result;
+        }
+        let result = !text.graphemes(true).any(|grapheme| {
+            self.work.representability_bytes += grapheme.len();
+            grapheme.len() > u8::MAX as usize
+        });
+        self.representation = Some((text.clone(), result));
+        result
+    }
+
     /// Work performed in the last publication, not cumulative totals.
     pub fn work(&self) -> AccessibleTextWork {
         self.work
@@ -536,6 +557,9 @@ fn publish_accessible_text_inner(
         .flatten()
     });
     let mut work = AccessibleTextWork {
+        representability_bytes: cache
+            .as_ref()
+            .map_or(0, |(cache, _)| cache.work.representability_bytes),
         compared_bytes: difference.map_or(0, |difference| difference.compared_bytes),
         segmented_bytes: if reused {
             0
@@ -1073,6 +1097,28 @@ mod tests {
                 Some(text.len())
             );
         }
+    }
+
+    #[test]
+    fn shared_representability_checks_reuse_and_invalidate_at_grapheme_limit() {
+        let mut cache = AccessibleTextCache::default();
+        let large: SharedString = format!("{}tail👩‍💻", "界 alpha אב\n".repeat(10_000)).into();
+        assert!(cache.is_representable(&large));
+        assert_eq!(cache.work().representability_bytes, large.len());
+        assert!(cache.is_representable(&large.clone()));
+        assert_eq!(cache.work().representability_bytes, 0);
+
+        let boundary: SharedString = format!("a{}", "\u{301}".repeat(127)).into();
+        assert_eq!(boundary.len(), 255);
+        assert!(cache.is_representable(&boundary));
+        assert_eq!(cache.work().representability_bytes, 255);
+        let over: SharedString = format!("{boundary}\u{301}").into();
+        assert!(!cache.is_representable(&over));
+        assert_eq!(cache.work().representability_bytes, 257);
+        assert!(!cache.is_representable(&over.clone()));
+        assert_eq!(cache.work().representability_bytes, 0);
+        assert!(cache.is_representable(&boundary));
+        assert_eq!(cache.work().representability_bytes, 255);
     }
 
     #[test]

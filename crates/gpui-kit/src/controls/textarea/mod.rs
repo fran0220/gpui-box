@@ -482,6 +482,9 @@ pub struct TextArea {
     rectangular_anchor: Option<Point<Pixels>>,
     last_layout: Option<EditableTextLayout>,
     last_layout_text: SharedString,
+    last_layout_rows: Arc<[Range<usize>]>,
+    hard_rows: Option<(u64, Arc<[Range<usize>]>)>,
+    row_index_work: usize,
     last_bounds: Option<Bounds<Pixels>>,
     caret_width: Pixels,
     /// Bumped once per layout pass, so a host that resizes the frame around
@@ -549,6 +552,9 @@ impl TextArea {
             rectangular_anchor: None,
             last_layout: None,
             last_layout_text: SharedString::default(),
+            last_layout_rows: Arc::default(),
+            hard_rows: None,
+            row_index_work: 0,
             last_bounds: None,
             caret_width: px(cx.theme().measures.caret_width),
             layout_pass: 0,
@@ -1131,6 +1137,13 @@ impl TextArea {
             .work()
     }
 
+    /// Logical row entries constructed during the latest render/layout pass.
+    /// Unchanged no-wrap rows share storage; this excludes explicit caller
+    /// geometry exports and native child-id metadata.
+    pub fn row_index_work(&self) -> usize {
+        self.row_index_work
+    }
+
     /// What the last layout pass measured, or nothing before the first one.
     pub fn measured(&self) -> Option<Measured> {
         let layout = self.last_layout.as_ref()?;
@@ -1286,7 +1299,7 @@ impl TextArea {
             horizontal_scroll: self.horizontal_scroll_offset,
             vertical_scroll: self.scroll_offset,
             line_height: layout.line_height(),
-            rows: layout.visual_rows(self.edit.text()),
+            rows: self.last_layout_rows.to_vec(),
         })
     }
 
@@ -1363,14 +1376,24 @@ impl TextArea {
         bounds: Bounds<Pixels>,
         caret_width: Pixels,
     ) -> bool {
-        let rows = layout.visual_rows(&text);
-        let changed = self.last_layout_text != text
-            || self.last_bounds != Some(bounds)
-            || self
-                .last_layout
-                .as_ref()
-                .map(|layout| layout.visual_rows(&text))
-                != Some(rows);
+        let same_index = self
+            .last_layout
+            .as_ref()
+            .is_some_and(|previous| layout.shares_row_index_with(previous));
+        let rows_changed = if same_index {
+            false
+        } else {
+            let rows = layout.visual_rows(&text);
+            self.row_index_work += rows.len();
+            if self.last_layout_rows.as_ref() == rows {
+                false
+            } else {
+                self.last_layout_rows = rows.into();
+                true
+            }
+        };
+        let changed =
+            self.last_layout_text != text || self.last_bounds != Some(bounds) || rows_changed;
         self.last_layout = Some(layout);
         self.last_layout_text = text;
         self.last_bounds = Some(bounds);
@@ -1379,22 +1402,30 @@ impl TextArea {
         changed
     }
 
-    fn accessible_rows(&self) -> Vec<Range<usize>> {
+    fn accessible_rows(&mut self) -> Arc<[Range<usize>]> {
         if self.line_projection.is_none()
             && self.last_layout_text == *self.edit.text()
-            && let Some(layout) = &self.last_layout
+            && self.last_layout.is_some()
         {
-            return layout.visual_rows(self.edit.text());
+            return self.last_layout_rows.clone();
         }
         // A stale painted layout withholds geometry, not logical text. Dropping
         // the children for one frame disconnects every native text run, making
         // the next frame republish the complete document and briefly hiding it
         // from assistive technology. Wrapped visual rows arrive after prepaint;
         // current hard rows preserve the same content and selection meanwhile.
+        if let Some((revision, rows)) = &self.hard_rows
+            && *revision == self.revision
+        {
+            return rows.clone();
+        }
         let document = self.document();
-        (0..document.line_count())
+        let rows: Arc<[_]> = (0..document.line_count())
             .filter_map(|line| document.line_range(line))
-            .collect()
+            .collect();
+        self.row_index_work += rows.len();
+        self.hard_rows = Some((self.revision, rows.clone()));
+        rows
     }
 
     /// The range an edit covers when the caller did not name one: whatever an
@@ -2273,6 +2304,7 @@ impl EntityInputHandler for TextArea {
 
 impl Render for TextArea {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.row_index_work = 0;
         if self.disabled && self.focus_handle.is_focused(window) {
             window.blur();
         }
@@ -2291,7 +2323,10 @@ impl Render for TextArea {
         let accessible_snapshot = self.accessible_snapshot.clone();
         let accessible_geometry = self.accessible_geometry.clone();
         let accessible_cache = self.accessible_cache.clone();
-        let selection_representable = text_edit::accessible_text_is_representable(&content);
+        let selection_representable = accessible_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_representable(&content);
         let accessible_rows = self.accessible_rows();
         let accessibility_revision = self.accessibility_revision;
         let entity = cx.entity().clone();

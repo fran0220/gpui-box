@@ -64,6 +64,13 @@ impl EditSnapshot {
         self.rope.len_bytes() == 0
     }
 
+    /// Constant-time identity check for unchanged persistent storage. Equal
+    /// contents constructed independently need not share storage. This does
+    /// not compare or materialize document bytes.
+    pub fn shares_storage_with(&self, other: &Self) -> bool {
+        self.rope.is_instance(&other.rope)
+    }
+
     /// Number of LF-delimited lines, including an empty trailing line.
     pub fn line_count(&self) -> usize {
         self.rope.len_lines()

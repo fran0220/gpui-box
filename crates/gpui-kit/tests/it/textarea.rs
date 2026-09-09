@@ -37,6 +37,11 @@ fn native_static_values_are_retained_and_selection_changes_publish_complete_valu
             assert_eq!(work.debug_clone_bytes, 0, "{work:?}");
             assert_eq!(work.retained_bytes, bytes, "{work:?}");
             assert_eq!(entity.read(cx).accessibility_work().published_runs, 0);
+            assert_eq!(
+                entity.read(cx).accessibility_work().representability_bytes,
+                0
+            );
+            assert_eq!(entity.read(cx).row_index_work(), 0);
             entity.update(cx, |area, cx| area.set_selected_range(0..0, cx));
             window.refresh();
             window.draw(cx).clear(cx);

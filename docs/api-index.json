@@ -5287,6 +5287,7 @@
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
         "accessibility_work() -> gpui::AccessibleTextWork",
+        "row_index_work() -> usize",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
