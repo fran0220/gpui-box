@@ -49,6 +49,30 @@ test('Menu references reuse family contracts, recursive identity checks and fixe
   assert.throws(() => registry.target(menu, 'is_open', {}, 'query'), /not issued/);
 });
 
+test('SearchField uses the family grammar and returns typed nested references', () => {
+  const registry = new NativeReferences();
+  const search = registry.adopt(ref(41, 'SearchField'));
+  const counts = [{state:'unsearched'}, {state:'counting'}, {state:'none'},
+    {state:'known',total:13,current:4}, {state:'tooMany',counted:71}, {state:'unavailable',reason:'Host refused'}];
+  for (const count of counts) {
+    assert.equal(validateReferenceInvocation(search, 'set_count', {count}, 'invoke'), kitMethods.SearchField.invoke.set_count);
+    validateValue(count, validateReferenceInvocation(search, 'count', {}, 'query').result);
+  }
+  assert.throws(() => registry.target(search, 'set_count', {count:{state:'known',total:13}}, 'invoke'));
+  assert.throws(() => registry.target(search, 'set_value', {value:'wrong kind'}, 'invoke'));
+  assert.throws(() => registry.target(search, 'set_query', {text:'wrong mode'}, 'query'));
+  validateReferenceInvocation(search, 'set_match_case', {on:null}, 'invoke');
+  const schema = validateReferenceInvocation(search, 'query_input', {}, 'query').result;
+  validateValue(ref(42, 'TextInput'), schema);
+  assert.throws(() => validateValue(ref(42, 'SearchField'), schema));
+  const input = registry.adopt(ref(42, 'TextInput'));
+  assert.equal(registry.target(input, 'set_value', {value:'Native child fixture'}, 'invoke'), input);
+  validateValue(ref(43), validateReferenceInvocation(search, 'focus_handle', {}, 'query').result);
+  registry.clear();
+  assert.throws(() => registry.target(search, 'query_text', {}, 'query'), /not issued/);
+  assert.throws(() => registry.target(input, 'value', {}, 'query'), /not issued/);
+});
+
 test('closed markers reject unknown kinds and accessors without evaluating callbacks', () => {
   for (const value of [null, ref(0), ref(1, 'Window'), { ...ref(1), extra: true }, { $nativeRef: 'native-01', type: 'FocusHandle' }])
     assert.throws(() => validateNativeRef(value));

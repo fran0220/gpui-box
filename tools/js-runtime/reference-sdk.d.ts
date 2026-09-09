@@ -12,6 +12,7 @@ export interface NativeRef<T extends keyof NativeReferenceContracts = keyof Nati
 export interface NativeReferenceContracts {
   TextInput: KitMethodContracts['TextInput'];
   Menu: KitMethodContracts['Menu'];
+  SearchField: KitMethodContracts['SearchField'];
   FocusHandle: {
     invoke: { focus: { args: Record<string, never>; result: null } };
     query: {

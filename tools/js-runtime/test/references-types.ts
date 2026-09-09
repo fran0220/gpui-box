@@ -3,6 +3,19 @@ declare const gpui: GPUI;
 declare const input: NativeRef<'TextInput'>;
 declare const focus: NativeRef<'FocusHandle'>;
 declare const menu: NativeRef<'Menu'>;
+declare const search: NativeRef<'SearchField'>;
+const searchText: Promise<string> = gpui.query(search, 'query_text');
+const searchInput: Promise<NativeRef<'TextInput'>> = gpui.query(search, 'query_input');
+const searchFocus: Promise<NativeRef<'FocusHandle'>> = gpui.query(search, 'focus_handle');
+gpui.invoke(search, 'set_match_case', { on: null });
+gpui.invoke(search, 'set_count', { count: { state: 'known', total: 13, current: 4 } });
+// @ts-expect-error the borrowed search field is not its nested TextInput
+gpui.invoke(search, 'set_value', { value: 'wrong kind' });
+// @ts-expect-error known counts require current, including explicit null
+gpui.invoke(search, 'set_count', { count: { state: 'known', total: 13 } });
+// @ts-expect-error a TextInput child does not become a SearchField reference
+const wrongSearch: Promise<NativeRef<'SearchField'>> = gpui.query(search, 'query_input');
+void [searchText, searchInput, searchFocus];
 const submenu: Promise<boolean> = gpui.invoke(menu, 'open_submenu', { id: 'more' });
 const menuFocus: Promise<NativeRef<'FocusHandle'>> = gpui.query(menu, 'focus_handle');
 gpui.invoke(menu, 'set_items', { items: [{ kind: 'submenu', id: 'more', label: 'More', items: [{ kind: 'command', id: 'pin', label: 'Pin' }] }] });
