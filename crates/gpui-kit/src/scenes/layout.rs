@@ -599,6 +599,51 @@ pub(super) fn dock_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+#[derive(Default)]
+struct SceneFloatingDock {
+    bounds: Option<gpui::Bounds<f32>>,
+    saved: Option<gpui::Bounds<f32>>,
+}
+impl Global for SceneFloatingDock {}
+
+pub(super) fn dock_floating(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::layout::{DockTreeEvent, FloatingDock};
+    if !cx.has_global::<SceneFloatingDock>() {
+        cx.set_global(SceneFloatingDock::default());
+    }
+    let theme = cx.theme().clone();
+    let bounds = cx
+        .global::<SceneFloatingDock>()
+        .bounds
+        .unwrap_or(gpui::Bounds::new(
+            gpui::point(0.36, 0.18),
+            gpui::size(0.48, 0.58),
+        ));
+    stack(&theme).w(px(850.0))
+        .child(caption(&theme, "Fixture: drag the floating header or resize corner; arrow keys adjust either. Restore uses caller-saved completed gestures."))
+        .child(Button::new("scene.dock-floating.restore").label("Restore saved layout").on_click(|_, cx| {
+            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; cx.refresh_windows();
+        }))
+        .child(div().h(px(500.0)).child(
+            DockTree::new("scene.dock-floating", DockTopology::stack("workspace", ["main"]))
+                .floating([FloatingDock::new(DockStack::new("inspector", ["details"]), bounds).expect("valid fixture")]).expect("unique fixture identities")
+                .panels([
+                    DockPanel::new("main", "Workspace").content(filler(&theme, "Caller-owned background", 15)),
+                    DockPanel::new("details", "Details").content(filler(&theme, "Floating inspector", 7)),
+                ])
+                .on_event(|event, _, cx| {
+                    match event {
+                        DockTreeEvent::FloatingChanged { bounds, finished, .. } => {
+                            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = Some(bounds); if finished { state.saved = Some(bounds); }
+                        }
+                        DockTreeEvent::FloatingCancelled { .. } => { let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; }
+                        _ => {}
+                    }
+                    cx.refresh_windows();
+                })
+        )).into_any_element()
+}
+
 /// A whole application frame: panels in regions, one region collapsed to a
 /// rail, one panel the host refuses, and a status bar under all of it.
 pub(super) fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {

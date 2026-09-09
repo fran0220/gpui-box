@@ -30,7 +30,7 @@ pub use aspect_ratio::{AspectFit, AspectRatio};
 pub use dock::{Dock, DockEvent, DockPanel, DockRegion};
 pub use dock_tree::{
     DockPlacement, DockRecord, DockRecordError, DockRecordKind, DockStack, DockTopology, DockTree,
-    DockTreeEvent,
+    DockTreeEvent, FloatingDock, FloatingDockRecord,
 };
 pub use grid::{Breakpoint, Container, ContainerWidth, Grid, GridColumns, GridItem};
 pub use responsive::{ContainerSize, Responsive};

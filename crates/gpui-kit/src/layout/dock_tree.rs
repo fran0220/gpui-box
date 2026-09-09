@@ -8,12 +8,14 @@
 //! real drop target, so moving its last panel away does not make the place
 //! impossible to restore.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, relative,
+    AnyElement, App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
+    Point, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -127,6 +129,71 @@ impl DockStack {
     }
 }
 
+/// An in-surface floating stack. Bounds are fractions of the dock viewport,
+/// preserved across window-size changes. Tile order is caller-owned z-order.
+/// This does not create operating-system windows.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FloatingDock {
+    stack: DockStack,
+    bounds: Bounds<f32>,
+}
+
+/// Caller-persisted state. Storage and serialization remain host policy.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FloatingDockRecord {
+    pub stack: DockRecord,
+    pub bounds: Bounds<f32>,
+}
+
+impl FloatingDock {
+    pub fn new(stack: DockStack, bounds: Bounds<f32>) -> Result<Self, DockRecordError> {
+        let tile = Self { stack, bounds };
+        Self::from_record(&tile.to_record())
+    }
+
+    pub fn stack(&self) -> &DockStack {
+        &self.stack
+    }
+    pub fn bounds(&self) -> Bounds<f32> {
+        self.bounds
+    }
+
+    pub fn to_record(&self) -> FloatingDockRecord {
+        FloatingDockRecord {
+            stack: DockTopology::Stack(self.stack.clone())
+                .to_records()
+                .remove(0),
+            bounds: self.bounds,
+        }
+    }
+
+    pub fn from_record(record: &FloatingDockRecord) -> Result<Self, DockRecordError> {
+        let b = record.bounds;
+        if ![b.origin.x, b.origin.y, b.size.width, b.size.height]
+            .iter()
+            .all(|v| v.is_finite())
+            || b.origin.x < 0.0
+            || b.origin.y < 0.0
+            || b.origin.x >= 1.0
+            || b.origin.y >= 1.0
+            || b.size.width <= 0.0
+            || b.size.height <= 0.0
+            || b.origin.x + b.size.width > 1.0
+            || b.origin.y + b.size.height > 1.0
+        {
+            return Err(DockRecordError::InvalidFloatingBounds(
+                record.stack.id.clone(),
+            ));
+        }
+        // A valid single record must be a stack, since splits require children.
+        let topology = DockTopology::from_records(std::slice::from_ref(&record.stack))?;
+        Ok(Self {
+            stack: topology.stacks()[0].clone(),
+            bounds: b,
+        })
+    }
+}
+
 /// A recursive arrangement of tab stacks.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DockTopology {
@@ -141,6 +208,21 @@ pub enum DockTopology {
 }
 
 impl DockTopology {
+    /// Restore both surfaces atomically, validating identities across them and
+    /// retaining caller z-order. Kit owns neither storage nor serialization.
+    pub fn restore_with_floating(
+        records: &[DockRecord],
+        floating: &[FloatingDockRecord],
+    ) -> Result<(Self, Vec<FloatingDock>), DockRecordError> {
+        let topology = Self::from_records(records)?;
+        let floating = floating
+            .iter()
+            .map(FloatingDock::from_record)
+            .collect::<Result<Vec<_>, _>>()?;
+        validate_floating(&topology, &floating)?;
+        Ok((topology, floating))
+    }
+
     pub fn stack(
         id: impl Into<SharedString>,
         panels: impl IntoIterator<Item = impl Into<SharedString>>,
@@ -443,6 +525,7 @@ pub enum DockRecordError {
         panel: SharedString,
     },
     Unreachable,
+    InvalidFloatingBounds(SharedString),
 }
 
 impl std::fmt::Display for DockRecordError {
@@ -474,6 +557,10 @@ impl std::fmt::Display for DockRecordError {
                 )
             }
             Self::Unreachable => write!(formatter, "records the root does not reach"),
+            Self::InvalidFloatingBounds(id) => write!(
+                formatter,
+                "floating stack `{id}` has invalid viewport bounds"
+            ),
         }
     }
 }
@@ -503,6 +590,22 @@ impl DockPlacement {
 /// Caller-owned changes requested through [`DockTree`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum DockTreeEvent {
+    /// Request caller-controlled back-to-front reordering.
+    FloatingRaised {
+        stack: SharedString,
+    },
+    /// Normalized geometry; the caller chooses whether to save live changes or
+    /// only completed gestures. Keyboard adjustments finish immediately.
+    FloatingChanged {
+        stack: SharedString,
+        bounds: Bounds<f32>,
+        finished: bool,
+    },
+    /// A gesture was interrupted, not completed. The caller may roll back its
+    /// live geometry to its last persisted record.
+    FloatingCancelled {
+        stack: SharedString,
+    },
     PanelSelected {
         stack: SharedString,
         panel: SharedString,
@@ -532,6 +635,7 @@ pub enum DockTreeEvent {
 pub struct DockTree {
     ident: Ident,
     topology: DockTopology,
+    floating: Vec<FloatingDock>,
     panels: Vec<DockPanel>,
     disabled: bool,
     on_event: Option<EventHandler>,
@@ -554,6 +658,7 @@ impl DockTree {
         Self {
             ident: ident.into(),
             topology,
+            floating: Vec::new(),
             panels: Vec::new(),
             disabled: false,
             on_event: None,
@@ -563,6 +668,18 @@ impl DockTree {
     pub fn panel(mut self, panel: DockPanel) -> Self {
         self.panels.push(panel);
         self
+    }
+
+    /// Floating stacks in back-to-front order, sharing panel and stack identity
+    /// with the docked topology. Invalid identities are rejected atomically.
+    pub fn floating(
+        mut self,
+        tiles: impl IntoIterator<Item = FloatingDock>,
+    ) -> Result<Self, DockRecordError> {
+        let tiles: Vec<_> = tiles.into_iter().collect();
+        validate_floating(&self.topology, &tiles)?;
+        self.floating = tiles;
+        Ok(self)
     }
 
     pub fn panels(mut self, panels: impl IntoIterator<Item = DockPanel>) -> Self {
@@ -596,6 +713,7 @@ impl DockTree {
         self.topology
             .stacks()
             .into_iter()
+            .chain(self.floating.iter().map(|tile| &tile.stack))
             .map(|stack| (self.surface(stack), stack.panels.clone()))
             .collect()
     }
@@ -1070,6 +1188,7 @@ impl Disableable for DockTree {
 
 impl RenderOnce for DockTree {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let measured = crate::layout::measure::cell(&self.ident.semantic_id(), window, cx);
         let mut tree =
             SplitTree::new(self.ident.child("layout")).layout(self.topology.split_layout());
         let mut stacks = Vec::new();
@@ -1091,24 +1210,299 @@ impl RenderOnce for DockTree {
                 }
             });
         }
+        let floating = self
+            .floating
+            .iter()
+            .map(|tile| self.floating_element(tile, measured.clone(), window, cx))
+            .collect::<Vec<_>>();
         div()
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(first) = bounds.first() {
+                    crate::layout::measure::record(&measured, *first, window);
+                }
+            })
             .id(self.ident.element_id())
+            .relative()
             .size_full()
             .overflow_hidden()
             .bg(cx.theme().colors.canvas)
             .child(tree)
+            .children(floating)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group).value(
                     self.topology
                         .stacks()
-                        .iter()
+                        .into_iter()
+                        .chain(self.floating.iter().map(|tile| &tile.stack))
                         .map(|stack| stack.panels.len())
                         .sum::<usize>()
                         .to_string(),
                 ),
             )
     }
+}
+
+impl DockTree {
+    fn floating_element(
+        &self,
+        tile: &FloatingDock,
+        measured: Rc<Cell<Bounds<Pixels>>>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let ident = self.ident.child(format!("floating.{}", tile.stack.id));
+        let actionable = !self.disabled && self.on_event.is_some();
+        let mut frame = div()
+            .relative()
+            .flex()
+            .flex_col()
+            .absolute()
+            .left(relative(tile.bounds.origin.x))
+            .top(relative(tile.bounds.origin.y))
+            .w(relative(tile.bounds.size.width))
+            .h(relative(tile.bounds.size.height))
+            .bg(theme.colors.canvas)
+            .border_1()
+            .border_color(theme.colors.control_hairline)
+            .occlude()
+            .overflow_hidden();
+        if let Some(handler) = self.on_event.clone().filter(|_| actionable) {
+            let stack = tile.stack.id.clone();
+            frame = frame.capture_any_mouse_down(move |event, window, cx| {
+                if event.button == MouseButton::Left {
+                    handler(
+                        DockTreeEvent::FloatingRaised {
+                            stack: stack.clone(),
+                        },
+                        window,
+                        cx,
+                    );
+                }
+            });
+        }
+        for (name, resize, key) in [
+            ("move", false, StringKey::DockMoveFloating),
+            ("resize", true, StringKey::DockResizeFloating),
+        ] {
+            let handle = ident.child(name);
+            let held = crate::foundation::window_state::with_key(
+                &handle.semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+                |state: &mut Rc<Cell<Option<FloatingGesture>>>| state.clone(),
+            );
+            if !actionable {
+                held.set(None);
+            }
+            let mut control = div()
+                .id(handle.element_id())
+                .h(px(theme.control.sm.height))
+                .flex()
+                .items_center()
+                .justify_center()
+                .flex_none()
+                .when(resize, |el| {
+                    el.absolute()
+                        .bottom_0()
+                        .right_0()
+                        .w(px(theme.control.sm.height))
+                })
+                .when(!resize, |el| el.w_full())
+                .bg(theme.colors.canvas)
+                .child(
+                    icon(if resize {
+                        Icon::AltArrowDown
+                    } else {
+                        Icon::DragHandle
+                    })
+                    .size(px(theme.control.sm.icon_size))
+                    .text_color(theme.colors.text_muted),
+                )
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(handle.semantic_id(), Role::Button)
+                        .text(cx.strings().text(key))
+                        .disabled(!actionable),
+                );
+            if let Some(handler) = self.on_event.clone().filter(|_| actionable) {
+                let id = tile.stack.id.clone();
+                let gesture = FloatingGesture {
+                    position: Point::default(),
+                    bounds: tile.bounds,
+                    resize,
+                    min: (tile.stack.min_width, tile.stack.min_height),
+                };
+                let state = held.clone();
+                control = control
+                    .tab_index(0)
+                    .focus_ring(&theme)
+                    .cursor_pointer()
+                    .on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, _, _| {
+                        state.set(Some(FloatingGesture {
+                            position: event.position,
+                            ..gesture
+                        }));
+                        // Let GPUI's default pointer-focus listener run.
+                    });
+                let state = held.clone();
+                let change = handler.clone();
+                let stack = id.clone();
+                let bounds = measured.clone();
+                control = control.on_mouse_move(move |event, window, cx| {
+                    if let Some(gesture) = state.get() {
+                        change(
+                            DockTreeEvent::FloatingChanged {
+                                stack: stack.clone(),
+                                bounds: gesture.request(event.position, bounds.get()),
+                                finished: false,
+                            },
+                            window,
+                            cx,
+                        );
+                        cx.stop_propagation();
+                    }
+                });
+                let state = held.clone();
+                let change = handler.clone();
+                let stack = id.clone();
+                let bounds = measured.clone();
+                control = control.on_mouse_up(MouseButton::Left, move |event, window, cx| {
+                    if let Some(gesture) = state.take() {
+                        change(
+                            DockTreeEvent::FloatingChanged {
+                                stack: stack.clone(),
+                                bounds: gesture.request(event.position, bounds.get()),
+                                finished: true,
+                            },
+                            window,
+                            cx,
+                        );
+                        cx.stop_propagation();
+                    }
+                });
+                let state = held.clone();
+                let change = handler.clone();
+                let stack = id.clone();
+                let bounds = measured.clone();
+                control = control.on_key_down(move |event, window, cx| {
+                    if event.keystroke.key == "escape" {
+                        if state.take().is_some() {
+                            window.release_pointer();
+                            change(
+                                DockTreeEvent::FloatingCancelled {
+                                    stack: stack.clone(),
+                                },
+                                window,
+                                cx,
+                            );
+                            cx.stop_propagation();
+                        }
+                        return;
+                    }
+                    if state.get().is_some() {
+                        return;
+                    }
+                    let (x, y) = match event.keystroke.key.as_str() {
+                        "left" => (-10.0, 0.0),
+                        "right" => (10.0, 0.0),
+                        "up" => (0.0, -10.0),
+                        "down" => (0.0, 10.0),
+                        _ => return,
+                    };
+                    change(
+                        DockTreeEvent::FloatingChanged {
+                            stack: stack.clone(),
+                            bounds: gesture.request(gpui::point(px(x), px(y)), bounds.get()),
+                            finished: true,
+                        },
+                        window,
+                        cx,
+                    );
+                    cx.stop_propagation();
+                });
+                control =
+                    control.child(crate::interaction::on_pointer_cancel(move |window, cx| {
+                        if held.take().is_some() {
+                            handler(
+                                DockTreeEvent::FloatingCancelled { stack: id.clone() },
+                                window,
+                                cx,
+                            );
+                        }
+                    }));
+            }
+            frame = frame.child(control);
+            if !resize {
+                frame = frame.child(div().flex_1().min_h_0().child(self.stack_element(
+                    &tile.stack,
+                    None,
+                    window,
+                    cx,
+                )));
+            }
+        }
+        frame.into_any_element()
+    }
+}
+
+#[derive(Clone, Copy)]
+struct FloatingGesture {
+    position: Point<Pixels>,
+    bounds: Bounds<f32>,
+    resize: bool,
+    min: (f32, f32),
+}
+
+impl FloatingGesture {
+    fn request(self, position: Point<Pixels>, viewport: Bounds<Pixels>) -> Bounds<f32> {
+        let width = f32::from(viewport.size.width).max(1.0);
+        let height = f32::from(viewport.size.height).max(1.0);
+        let delta = position - self.position;
+        let mut b = self.bounds;
+        if self.resize {
+            let max_w = 1.0 - b.origin.x;
+            let max_h = 1.0 - b.origin.y;
+            b.size.width = (b.size.width + f32::from(delta.x) / width).clamp(
+                (self.min.0 / width).min(max_w).max(f32::MIN_POSITIVE),
+                max_w,
+            );
+            b.size.height = (b.size.height + f32::from(delta.y) / height).clamp(
+                (self.min.1 / height).min(max_h).max(f32::MIN_POSITIVE),
+                max_h,
+            );
+        } else {
+            b.origin.x = (b.origin.x + f32::from(delta.x) / width).clamp(0.0, 1.0 - b.size.width);
+            b.origin.y = (b.origin.y + f32::from(delta.y) / height).clamp(0.0, 1.0 - b.size.height);
+        }
+        b
+    }
+}
+
+fn validate_floating(
+    topology: &DockTopology,
+    floating: &[FloatingDock],
+) -> Result<(), DockRecordError> {
+    let records = topology.to_records();
+    DockTopology::from_records(&records)?;
+    let mut ids: HashSet<_> = records.iter().map(|record| record.id.clone()).collect();
+    let mut panels: HashSet<_> = topology
+        .stacks()
+        .iter()
+        .flat_map(|stack| stack.panels.iter().cloned())
+        .collect();
+    for tile in floating {
+        if !ids.insert(tile.stack.id.clone()) {
+            return Err(DockRecordError::DuplicateId(tile.stack.id.clone()));
+        }
+        for panel in &tile.stack.panels {
+            if !panels.insert(panel.clone()) {
+                return Err(DockRecordError::DuplicatePanel(panel.clone()));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn before_in(panels: &[SharedString], position: &DropPosition) -> Option<SharedString> {

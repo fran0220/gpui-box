@@ -1123,7 +1123,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4309
+      "symbolCount": 4318
     },
     {
       "name": "gpui-box-kit-assets",
@@ -83765,7 +83765,7 @@
       "source": "crates/gpui-kit/src/layout/dock_tree.rs",
       "summary": "Why persisted dock records do not form one valid topology.",
       "documentation": "Why persisted dock records do not form one valid topology.",
-      "signature": "# [doc = \" Why persisted dock records do not form one valid topology.\"] # [derive (Debug, Clone, PartialEq)] pub enum DockRecordError { NoRoot, ManyRoots (Vec<SharedString>), DuplicateId (SharedString), MissingParent { id : SharedString, parent : SharedString, }, WrongChildCount { id : SharedString, found : usize, }, StackWithChildren (SharedString), SplitWithPanels (SharedString), DuplicatePanel (SharedString), MissingActive { stack : SharedString, panel : SharedString, }, Unreachable, }",
+      "signature": "# [doc = \" Why persisted dock records do not form one valid topology.\"] # [derive (Debug, Clone, PartialEq)] pub enum DockRecordError { NoRoot, ManyRoots (Vec<SharedString>), DuplicateId (SharedString), MissingParent { id : SharedString, parent : SharedString, }, WrongChildCount { id : SharedString, found : usize, }, StackWithChildren (SharedString), SplitWithPanels (SharedString), DuplicatePanel (SharedString), MissingActive { stack : SharedString, panel : SharedString, }, Unreachable, InvalidFloatingBounds (SharedString), }",
       "cfg": []
     },
     {
@@ -84036,6 +84036,21 @@
       "target": "DockTopology"
     },
     {
+      "id": "gpui_kit::layout::dock_tree::DockTopology::restore_with_floating",
+      "name": "restore_with_floating",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "Restore both surfaces atomically, validating identities across them and retaining caller z-order. Kit owns neither storage nor serialization.",
+      "documentation": "Restore both surfaces atomically, validating identities across them and\nretaining caller z-order. Kit owns neither storage nor serialization.",
+      "signature": "pub fn restore_with_floating (records : & [DockRecord], floating : & [FloatingDockRecord],) -> Result<(Self, Vec<FloatingDock>), DockRecordError>",
+      "cfg": [],
+      "target": "DockTopology"
+    },
+    {
       "id": "gpui_kit::layout::dock_tree::DockTopology::split",
       "name": "split",
       "kind": "method",
@@ -84136,8 +84151,23 @@
       "source": "crates/gpui-kit/src/layout/dock_tree.rs",
       "summary": "Draws a recursive [`DockTopology`] without owning it.",
       "documentation": "Draws a recursive [`DockTopology`] without owning it.",
-      "signature": "# [doc = \" Draws a recursive [`DockTopology`] without owning it.\"] # [derive (IntoElement)] pub struct DockTree { ident : Ident, topology : DockTopology, panels : Vec<DockPanel>, disabled : bool, on_event : Option<EventHandler>, }",
+      "signature": "# [doc = \" Draws a recursive [`DockTopology`] without owning it.\"] # [derive (IntoElement)] pub struct DockTree { ident : Ident, topology : DockTopology, floating : Vec<FloatingDock>, panels : Vec<DockPanel>, disabled : bool, on_event : Option<EventHandler>, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::DockTree::floating",
+      "name": "floating",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "Floating stacks in back-to-front order, sharing panel and stack identity with the docked topology. Invalid identities are rejected atomically.",
+      "documentation": "Floating stacks in back-to-front order, sharing panel and stack identity\nwith the docked topology. Invalid identities are rejected atomically.",
+      "signature": "pub fn floating (mut self, tiles : impl IntoIterator<Item = FloatingDock>,) -> Result<Self, DockRecordError>",
+      "cfg": [],
+      "target": "DockTree"
     },
     {
       "id": "gpui_kit::layout::dock_tree::DockTree::new",
@@ -84210,7 +84240,110 @@
       "source": "crates/gpui-kit/src/layout/dock_tree.rs",
       "summary": "Caller-owned changes requested through [`DockTree`].",
       "documentation": "Caller-owned changes requested through [`DockTree`].",
-      "signature": "# [doc = \" Caller-owned changes requested through [`DockTree`].\"] # [derive (Debug, Clone, PartialEq)] pub enum DockTreeEvent { PanelSelected { stack : SharedString, panel : SharedString, }, PanelMoved { panel : SharedString, to_stack : SharedString, before : Option<SharedString>, }, PanelSplit { panel : SharedString, target_stack : SharedString, placement : DockPlacement, }, SplitResized { split : SharedString, ratio : f32, }, StackCollapsed { stack : SharedString, collapsed : bool, }, }",
+      "signature": "# [doc = \" Caller-owned changes requested through [`DockTree`].\"] # [derive (Debug, Clone, PartialEq)] pub enum DockTreeEvent { # [doc = \" Request caller-controlled back-to-front reordering.\"] FloatingRaised { stack : SharedString, }, # [doc = \" Normalized geometry; the caller chooses whether to save live changes or\"] # [doc = \" only completed gestures. Keyboard adjustments finish immediately.\"] FloatingChanged { stack : SharedString, bounds : Bounds<f32>, finished : bool, }, # [doc = \" A gesture was interrupted, not completed. The caller may roll back its\"] # [doc = \" live geometry to its last persisted record.\"] FloatingCancelled { stack : SharedString, }, PanelSelected { stack : SharedString, panel : SharedString, }, PanelMoved { panel : SharedString, to_stack : SharedString, before : Option<SharedString>, }, PanelSplit { panel : SharedString, target_stack : SharedString, placement : DockPlacement, }, SplitResized { split : SharedString, ratio : f32, }, StackCollapsed { stack : SharedString, collapsed : bool, }, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock",
+      "name": "FloatingDock",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "An in-surface floating stack. Bounds are fractions of the dock viewport, preserved across window-size changes. Tile order is caller-owned z-order. This does not create operating-system windows.",
+      "documentation": "An in-surface floating stack. Bounds are fractions of the dock viewport,\npreserved across window-size changes. Tile order is caller-owned z-order.\nThis does not create operating-system windows.",
+      "signature": "# [doc = \" An in-surface floating stack. Bounds are fractions of the dock viewport,\"] # [doc = \" preserved across window-size changes. Tile order is caller-owned z-order.\"] # [doc = \" This does not create operating-system windows.\"] # [derive (Debug, Clone, PartialEq)] pub struct FloatingDock { stack : DockStack, bounds : Bounds<f32>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock::bounds",
+      "name": "bounds",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn bounds (& self) -> Bounds<f32>",
+      "cfg": [],
+      "target": "FloatingDock"
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock::from_record",
+      "name": "from_record",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn from_record (record : & FloatingDockRecord) -> Result<Self, DockRecordError>",
+      "cfg": [],
+      "target": "FloatingDock"
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (stack : DockStack, bounds : Bounds<f32>) -> Result<Self, DockRecordError>",
+      "cfg": [],
+      "target": "FloatingDock"
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock::stack",
+      "name": "stack",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn stack (& self) -> & DockStack",
+      "cfg": [],
+      "target": "FloatingDock"
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDock::to_record",
+      "name": "to_record",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn to_record (& self) -> FloatingDockRecord",
+      "cfg": [],
+      "target": "FloatingDock"
+    },
+    {
+      "id": "gpui_kit::layout::dock_tree::FloatingDockRecord",
+      "name": "FloatingDockRecord",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "layout::dock_tree",
+      "path": "gpui_kit::layout::dock_tree",
+      "source": "crates/gpui-kit/src/layout/dock_tree.rs",
+      "summary": "Caller-persisted state. Storage and serialization remain host policy.",
+      "documentation": "Caller-persisted state. Storage and serialization remain host policy.",
+      "signature": "# [doc = \" Caller-persisted state. Storage and serialization remain host policy.\"] # [derive (Debug, Clone, PartialEq)] pub struct FloatingDockRecord { pub stack : DockRecord, pub bounds : Bounds<f32>, }",
       "cfg": []
     },
     {
@@ -84593,7 +84726,7 @@
     },
     {
       "id": "gpui_kit::layout::reexport-3",
-      "name": "dock_tree :: { DockPlacement , DockRecord , DockRecordError , DockRecordKind , DockStack , DockTopology , DockTree , DockTreeEvent , }",
+      "name": "dock_tree :: { DockPlacement , DockRecord , DockRecordError , DockRecordKind , DockStack , DockTopology , DockTree , DockTreeEvent , FloatingDock , FloatingDockRecord , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
       "crate": "gpui_kit",
@@ -84602,7 +84735,7 @@
       "source": "crates/gpui-kit/src/layout/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use dock_tree::{ DockPlacement, DockRecord, DockRecordError, DockRecordKind, DockStack, DockTopology, DockTree, DockTreeEvent, };",
+      "signature": "pub use dock_tree::{ DockPlacement, DockRecord, DockRecordError, DockRecordKind, DockStack, DockTopology, DockTree, DockTreeEvent, FloatingDock, FloatingDockRecord, };",
       "cfg": []
     },
     {
@@ -122687,6 +122820,7 @@
       ],
       "options": [
         "panel(panel: DockPanel) -> Self",
+        "floating(tiles: impl IntoIterator<Item = FloatingDock>) -> Result<Self, DockRecordError>",
         "panels(panels: impl IntoIterator<Item = DockPanel>) -> Self",
         "on_event(handler: impl Fn(DockTreeEvent, &mut Window, &mut App) + 'static) -> Self"
       ],
@@ -122694,6 +122828,9 @@
       "queries": [],
       "slots": [],
       "reports": [
+        "FloatingRaised",
+        "FloatingChanged",
+        "FloatingCancelled",
         "PanelSelected",
         "PanelMoved",
         "PanelSplit",
@@ -122701,7 +122838,8 @@
         "StackCollapsed"
       ],
       "scenes": [
-        "dock-tree"
+        "dock-tree",
+        "dock-floating"
       ]
     },
     {
@@ -129045,7 +129183,8 @@
         "SplitWithPanels",
         "DuplicatePanel",
         "MissingActive",
-        "Unreachable"
+        "Unreachable",
+        "InvalidFloatingBounds"
       ],
       "construct": [],
       "options": [],
@@ -129116,6 +129255,7 @@
         "Split"
       ],
       "construct": [
+        "restore_with_floating(records: &[DockRecord], floating: &[FloatingDockRecord]) -> Result<(Self, Vec<FloatingDock>), DockRecordError>",
         "stack(id: impl Into<SharedString>, panels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "split(id: impl Into<SharedString>, axis: SplitAxis, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
         "horizontal(id: impl Into<SharedString>, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
@@ -129137,6 +129277,9 @@
       "path": "gpui_kit::layout::DockTreeEvent",
       "summary": "Caller-owned changes requested through DockTree.",
       "variants": [
+        "FloatingRaised",
+        "FloatingChanged",
+        "FloatingCancelled",
         "PanelSelected",
         "PanelMoved",
         "PanelSplit",
@@ -130243,6 +130386,33 @@
       "name": "Flipped",
       "path": "gpui_kit::motion::Flipped",
       "summary": "An element painted at an offset from where layout put it, and optionally at a size on its way to the size layout would give it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "FloatingDock",
+      "path": "gpui_kit::layout::FloatingDock",
+      "summary": "An in-surface floating stack. Bounds are fractions of the dock viewport, preserved across window-size changes. Tile order is caller-owned z-order. This does not create operating-system windows.",
+      "variants": [],
+      "construct": [
+        "new(stack: DockStack, bounds: Bounds<f32>) -> Result<Self, DockRecordError>",
+        "from_record(record: &FloatingDockRecord) -> Result<Self, DockRecordError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "stack() -> &DockStack",
+        "bounds() -> Bounds<f32>",
+        "to_record() -> FloatingDockRecord"
+      ]
+    },
+    {
+      "name": "FloatingDockRecord",
+      "path": "gpui_kit::layout::FloatingDockRecord",
+      "summary": "Caller-persisted state. Storage and serialization remain host policy.",
       "variants": [],
       "construct": [],
       "options": [],
@@ -145002,6 +145172,12 @@
       "anchor": "wide-grids-are-measured-on-both-axes"
     },
     {
+      "id": "performance-testing-mounted-markdown-and-editable-documents",
+      "title": "Mounted Markdown and editable documents",
+      "guide": "performance-testing",
+      "anchor": "mounted-markdown-and-editable-documents"
+    },
+    {
       "id": "performance-testing-what-is-counted",
       "title": "What is counted",
       "guide": "performance-testing",
@@ -146450,6 +146626,18 @@
         "DockTree"
       ],
       "example": "fn dock_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let topology = DockTopology::vertical(\n        \"root\",\n        0.78,\n        DockTopology::horizontal(\n            \"workspace\",\n            0.28,\n            DockTopology::Stack(DockStack::new(\"source\", [\"files\", \"search\"]).active(\"files\")),\n            DockTopology::horizontal(\n                \"editing\",\n                0.9,\n                DockTopology::stack(\"editor\", [\"main\"]),\n                DockTopology::Stack(DockStack::new(\"outline\", [\"symbols\"]).collapsed(true)),\n            ),\n        ),\n        DockTopology::stack(\"terminal\", std::iter::empty::<&str>()),\n    );\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(\n            &theme,\n            \"recursive caller topology; tab groups, empty destinations, rails, and split dividers share existing primitives\",\n        ))\n        .child(\n            div()\n                .h(px(600.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    DockTree::new(\"scene.dock-tree\", topology)\n                        .panels([\n                            DockPanel::new(\"files\", \"Files\")\n                                .icon(Icon::Folder)\n                                .content(filler(&theme, \"Workspace\", 12)),\n                            DockPanel::new(\"search\", \"Search\")\n                                .icon(Icon::Magnifier)\n                                .badge(\"12\"),\n                            DockPanel::new(\"main\", \"main.rs\")\n                                .icon(Icon::Document)\n                                .content(filler(&theme, \"fn main()\", 15)),\n                            DockPanel::new(\"symbols\", \"Outline\").icon(Icon::List),\n                        ])\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "dock-floating",
+      "capture": "cargo run -p xtask -- headless capture dock-floating",
+      "kind": "exhibit",
+      "subjects": [
+        "DockTree"
+      ],
+      "uses": [
+        "DockTree"
+      ],
+      "example": "fn dock_floating(_window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::layout::{DockTreeEvent, FloatingDock};\n    if !cx.has_global::<SceneFloatingDock>() {\n        cx.set_global(SceneFloatingDock::default());\n    }\n    let theme = cx.theme().clone();\n    let bounds = cx\n        .global::<SceneFloatingDock>()\n        .bounds\n        .unwrap_or(gpui::Bounds::new(\n            gpui::point(0.36, 0.18),\n            gpui::size(0.48, 0.58),\n        ));\n    stack(&theme).w(px(850.0))\n        .child(caption(&theme, \"Fixture: drag the floating header or resize corner; arrow keys adjust either. Restore uses caller-saved completed gestures.\"))\n        .child(Button::new(\"scene.dock-floating.restore\").label(\"Restore saved layout\").on_click(|_, cx| {\n            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; cx.refresh_windows();\n        }))\n        .child(div().h(px(500.0)).child(\n            DockTree::new(\"scene.dock-floating\", DockTopology::stack(\"workspace\", [\"main\"]))\n                .floating([FloatingDock::new(DockStack::new(\"inspector\", [\"details\"]), bounds).expect(\"valid fixture\")]).expect(\"unique fixture identities\")\n                .panels([\n                    DockPanel::new(\"main\", \"Workspace\").content(filler(&theme, \"Caller-owned background\", 15)),\n                    DockPanel::new(\"details\", \"Details\").content(filler(&theme, \"Floating inspector\", 7)),\n                ])\n                .on_event(|event, _, cx| {\n                    match event {\n                        DockTreeEvent::FloatingChanged { bounds, finished, .. } => {\n                            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = Some(bounds); if finished { state.saved = Some(bounds); }\n                        }\n                        DockTreeEvent::FloatingCancelled { .. } => { let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; }\n                        _ => {}\n                    }\n                    cx.refresh_windows();\n                })\n        )).into_any_element()\n}"
     },
     {
       "name": "ide-shell",

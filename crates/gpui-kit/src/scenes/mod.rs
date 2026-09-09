@@ -77,8 +77,9 @@ use display::{
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
 use layout::{
-    aspect_ratio, container, desktop_titlebar, dock_tree, grid, ide_shell, responsive, scroll_area,
-    scroll_edge_effect, scroll_fade, scroll_shadow, split_pane, split_tree, toolbar,
+    aspect_ratio, container, desktop_titlebar, dock_floating, dock_tree, grid, ide_shell,
+    responsive, scroll_area, scroll_edge_effect, scroll_fade, scroll_shadow, split_pane,
+    split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
@@ -604,6 +605,11 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "dock-tree",
             build: dock_tree,
+            shows: Shows::Subjects(&["DockTree"]),
+        },
+        Scene {
+            name: "dock-floating",
+            build: dock_floating,
             shows: Shows::Subjects(&["DockTree"]),
         },
         Scene {

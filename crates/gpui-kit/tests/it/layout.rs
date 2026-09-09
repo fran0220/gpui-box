@@ -567,3 +567,119 @@ fn a_region_that_hides_nothing_says_no_edge_fades(cx: &mut TestAppContext) {
     // end — so it is published rather than left to be inferred from pixels.
     assert_eq!(region.value.as_deref(), Some("none"));
 }
+
+#[test]
+fn floating_records_preserve_geometry_and_reject_cross_surface_aliases() {
+    use gpui_kit::layout::{DockRecordError, FloatingDock};
+    let docked = DockTopology::stack("root", ["main"]);
+    let bounds = gpui::Bounds::new(gpui::point(0.13, 0.27), gpui::size(0.61, 0.42));
+    let tile = FloatingDock::new(DockStack::new("float", ["tools"]).active("tools"), bounds)
+        .expect("valid tile");
+    let restored = DockTopology::restore_with_floating(&docked.to_records(), &[tile.to_record()])
+        .expect("valid records");
+    assert_eq!(restored, (docked.clone(), vec![tile.clone()]));
+    let duplicate = FloatingDock::new(DockStack::new("other", ["main"]), bounds)
+        .expect("valid standalone tile");
+    assert!(matches!(
+        DockTopology::restore_with_floating(&docked.to_records(), &[duplicate.to_record()]),
+        Err(DockRecordError::DuplicatePanel(_))
+    ));
+    let duplicate = FloatingDock::new(DockStack::new("root", ["other"]), bounds)
+        .expect("valid standalone tile");
+    assert!(matches!(
+        DockTopology::restore_with_floating(&docked.to_records(), &[duplicate.to_record()]),
+        Err(DockRecordError::DuplicateId(_))
+    ));
+    for x in [-0.1, 0.9, 1.0, f32::NAN, f32::INFINITY] {
+        let mut record = tile.to_record();
+        record.bounds.origin.x = x;
+        assert!(matches!(
+            FloatingDock::from_record(&record),
+            Err(DockRecordError::InvalidFloatingBounds(_))
+        ));
+    }
+}
+
+#[gpui::test]
+fn floating_moves_are_caller_owned_bounded_and_completed_on_release(cx: &mut TestAppContext) {
+    use gpui_kit::layout::{DockTreeEvent, FloatingDock};
+    let (calls, sink) = recorder();
+    let disabled = Rc::new(std::cell::Cell::new(false));
+    let frozen = disabled.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .w(px(800.0))
+            .h(px(400.0))
+            .child(
+                DockTree::new("floating-test", DockTopology::stack("root", ["main"]))
+                    .disabled(frozen.get())
+                    .floating([FloatingDock::new(
+                        DockStack::new("tools", ["details"]),
+                        gpui::Bounds::new(gpui::point(0.2, 0.1), gpui::size(0.5, 0.6)),
+                    )
+                    .expect("valid tile")])
+                    .expect("unique topology")
+                    .panels([
+                        DockPanel::new("main", "Main"),
+                        DockPanel::new("details", "Details"),
+                    ])
+                    .on_event(move |event, _, _| sink.borrow_mut().push(event)),
+            )
+            .into_any_element()
+    });
+    settle(&mut harness);
+    harness.drag_start("floating-test.floating.tools.move");
+    // drag_start crosses the framework's four-pixel drag threshold.
+    let start = harness.pointer() - gpui::point(px(4.0), px(4.0));
+    harness.drag_to(start + gpui::point(px(80.0), px(40.0)));
+    assert!(calls.borrow().iter().any(|event| matches!(event, DockTreeEvent::FloatingChanged { bounds, finished: false, .. } if (bounds.origin.x - 0.3).abs() < 0.001 && (bounds.origin.y - 0.2).abs() < 0.001)));
+    harness.drag_to(start + gpui::point(px(1600.0), px(-800.0)));
+    harness.drop_here();
+    assert!(
+        matches!(calls.borrow().last(), Some(DockTreeEvent::FloatingChanged { bounds, finished: true, .. }) if bounds.origin.x == 0.5 && bounds.origin.y == 0.0)
+    );
+    let unchanged = harness
+        .node("floating-test.floating.tools.move")
+        .expect("move handle")
+        .bounds;
+    assert!(
+        (unchanged.x - 160.0).abs() < 2.0,
+        "caller ignored requests, so tile must not move"
+    );
+    calls.borrow_mut().clear();
+    harness.click("floating-test.floating.tools.move");
+    harness.keystrokes("right");
+    assert!(
+        matches!(calls.borrow().last(), Some(DockTreeEvent::FloatingChanged { bounds, finished: true, .. }) if (bounds.origin.x - 0.2125).abs() < 0.0001)
+    );
+    calls.borrow_mut().clear();
+    harness.drag_start("floating-test.floating.tools.resize");
+    harness.drag_to(gpui::point(px(-1000.0), px(-1000.0)));
+    harness.drop_here();
+    assert!(
+        matches!(calls.borrow().last(), Some(DockTreeEvent::FloatingChanged { bounds, finished: true, .. }) if bounds.size.width == 0.2 && bounds.size.height == 0.4)
+    );
+    calls.borrow_mut().clear();
+    harness.drag_start("floating-test.floating.tools.move");
+    harness.cancel_drag();
+    assert!(matches!(
+        calls.borrow().last(),
+        Some(DockTreeEvent::FloatingCancelled { .. })
+    ));
+    harness.drop_here();
+    assert!(
+        !calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, DockTreeEvent::FloatingChanged { finished: true, .. }))
+    );
+    disabled.set(true);
+    harness.update(|_, cx| cx.refresh_windows());
+    settle(&mut harness);
+    calls.borrow_mut().clear();
+    harness.drag_start("floating-test.floating.tools.move");
+    harness.drop_here();
+    harness.keystrokes("right");
+    assert!(calls.borrow().is_empty());
+}

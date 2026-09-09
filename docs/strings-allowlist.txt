@@ -270,6 +270,7 @@ empty array
 empty object
 end before start
 false
+floating stack `{id}` has invalid viewport bounds
 game fraction must be between 0 and 1
 game fraction must be finite
 glTF

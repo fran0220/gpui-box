@@ -1777,6 +1777,7 @@
       ],
       "options": [
         "panel(panel: DockPanel) -> Self",
+        "floating(tiles: impl IntoIterator<Item = FloatingDock>) -> Result<Self, DockRecordError>",
         "panels(panels: impl IntoIterator<Item = DockPanel>) -> Self",
         "on_event(handler: impl Fn(DockTreeEvent, &mut Window, &mut App) + 'static) -> Self"
       ],
@@ -1784,6 +1785,9 @@
       "queries": [],
       "slots": [],
       "reports": [
+        "FloatingRaised",
+        "FloatingChanged",
+        "FloatingCancelled",
         "PanelSelected",
         "PanelMoved",
         "PanelSplit",
@@ -1791,7 +1795,8 @@
         "StackCollapsed"
       ],
       "scenes": [
-        "dock-tree"
+        "dock-tree",
+        "dock-floating"
       ]
     },
     {
@@ -8135,7 +8140,8 @@
         "SplitWithPanels",
         "DuplicatePanel",
         "MissingActive",
-        "Unreachable"
+        "Unreachable",
+        "InvalidFloatingBounds"
       ],
       "construct": [],
       "options": [],
@@ -8206,6 +8212,7 @@
         "Split"
       ],
       "construct": [
+        "restore_with_floating(records: &[DockRecord], floating: &[FloatingDockRecord]) -> Result<(Self, Vec<FloatingDock>), DockRecordError>",
         "stack(id: impl Into<SharedString>, panels: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "split(id: impl Into<SharedString>, axis: SplitAxis, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
         "horizontal(id: impl Into<SharedString>, ratio: f32, start: DockTopology, end: DockTopology) -> Self",
@@ -8227,6 +8234,9 @@
       "path": "gpui_kit::layout::DockTreeEvent",
       "summary": "Caller-owned changes requested through DockTree.",
       "variants": [
+        "FloatingRaised",
+        "FloatingChanged",
+        "FloatingCancelled",
         "PanelSelected",
         "PanelMoved",
         "PanelSplit",
@@ -9333,6 +9343,33 @@
       "name": "Flipped",
       "path": "gpui_kit::motion::Flipped",
       "summary": "An element painted at an offset from where layout put it, and optionally at a size on its way to the size layout would give it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "FloatingDock",
+      "path": "gpui_kit::layout::FloatingDock",
+      "summary": "An in-surface floating stack. Bounds are fractions of the dock viewport, preserved across window-size changes. Tile order is caller-owned z-order. This does not create operating-system windows.",
+      "variants": [],
+      "construct": [
+        "new(stack: DockStack, bounds: Bounds<f32>) -> Result<Self, DockRecordError>",
+        "from_record(record: &FloatingDockRecord) -> Result<Self, DockRecordError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "stack() -> &DockStack",
+        "bounds() -> Bounds<f32>",
+        "to_record() -> FloatingDockRecord"
+      ]
+    },
+    {
+      "name": "FloatingDockRecord",
+      "path": "gpui_kit::layout::FloatingDockRecord",
+      "summary": "Caller-persisted state. Storage and serialization remain host policy.",
       "variants": [],
       "construct": [],
       "options": [],
@@ -16224,6 +16261,18 @@
         "DockTree"
       ],
       "example": "fn dock_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let topology = DockTopology::vertical(\n        \"root\",\n        0.78,\n        DockTopology::horizontal(\n            \"workspace\",\n            0.28,\n            DockTopology::Stack(DockStack::new(\"source\", [\"files\", \"search\"]).active(\"files\")),\n            DockTopology::horizontal(\n                \"editing\",\n                0.9,\n                DockTopology::stack(\"editor\", [\"main\"]),\n                DockTopology::Stack(DockStack::new(\"outline\", [\"symbols\"]).collapsed(true)),\n            ),\n        ),\n        DockTopology::stack(\"terminal\", std::iter::empty::<&str>()),\n    );\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(\n            &theme,\n            \"recursive caller topology; tab groups, empty destinations, rails, and split dividers share existing primitives\",\n        ))\n        .child(\n            div()\n                .h(px(600.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    DockTree::new(\"scene.dock-tree\", topology)\n                        .panels([\n                            DockPanel::new(\"files\", \"Files\")\n                                .icon(Icon::Folder)\n                                .content(filler(&theme, \"Workspace\", 12)),\n                            DockPanel::new(\"search\", \"Search\")\n                                .icon(Icon::Magnifier)\n                                .badge(\"12\"),\n                            DockPanel::new(\"main\", \"main.rs\")\n                                .icon(Icon::Document)\n                                .content(filler(&theme, \"fn main()\", 15)),\n                            DockPanel::new(\"symbols\", \"Outline\").icon(Icon::List),\n                        ])\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "dock-floating",
+      "capture": "cargo run -p xtask -- headless capture dock-floating",
+      "kind": "exhibit",
+      "subjects": [
+        "DockTree"
+      ],
+      "uses": [
+        "DockTree"
+      ],
+      "example": "fn dock_floating(_window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::layout::{DockTreeEvent, FloatingDock};\n    if !cx.has_global::<SceneFloatingDock>() {\n        cx.set_global(SceneFloatingDock::default());\n    }\n    let theme = cx.theme().clone();\n    let bounds = cx\n        .global::<SceneFloatingDock>()\n        .bounds\n        .unwrap_or(gpui::Bounds::new(\n            gpui::point(0.36, 0.18),\n            gpui::size(0.48, 0.58),\n        ));\n    stack(&theme).w(px(850.0))\n        .child(caption(&theme, \"Fixture: drag the floating header or resize corner; arrow keys adjust either. Restore uses caller-saved completed gestures.\"))\n        .child(Button::new(\"scene.dock-floating.restore\").label(\"Restore saved layout\").on_click(|_, cx| {\n            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; cx.refresh_windows();\n        }))\n        .child(div().h(px(500.0)).child(\n            DockTree::new(\"scene.dock-floating\", DockTopology::stack(\"workspace\", [\"main\"]))\n                .floating([FloatingDock::new(DockStack::new(\"inspector\", [\"details\"]), bounds).expect(\"valid fixture\")]).expect(\"unique fixture identities\")\n                .panels([\n                    DockPanel::new(\"main\", \"Workspace\").content(filler(&theme, \"Caller-owned background\", 15)),\n                    DockPanel::new(\"details\", \"Details\").content(filler(&theme, \"Floating inspector\", 7)),\n                ])\n                .on_event(|event, _, cx| {\n                    match event {\n                        DockTreeEvent::FloatingChanged { bounds, finished, .. } => {\n                            let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = Some(bounds); if finished { state.saved = Some(bounds); }\n                        }\n                        DockTreeEvent::FloatingCancelled { .. } => { let state = cx.global_mut::<SceneFloatingDock>(); state.bounds = state.saved; }\n                        _ => {}\n                    }\n                    cx.refresh_windows();\n                })\n        )).into_any_element()\n}"
     },
     {
       "name": "ide-shell",
