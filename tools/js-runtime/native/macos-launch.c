@@ -19,8 +19,14 @@ static int limit(int resource, rlim_t amount) {
     struct rlimit value = { amount, amount };
     return setrlimit(resource, &value);
 }
-static int status_code(int status) {
-    return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+static int status_code(const char *role, pid_t pid, int status) {
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) :
+        WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 125;
+    /* The supervisor is outside Seatbelt, so a pre-main dyld abort cannot
+     * silence this diagnostic even if the payload's stderr is unavailable. */
+    if (code != 0) fprintf(stderr, "macos-launch: %s pid=%d exit=%d signal=%d\n",
+        role, pid, code, WIFSIGNALED(status) ? WTERMSIG(status) : 0);
+    return code;
 }
 static int same_process(pid_t pid, const struct proc_bsdinfo *identity) {
     struct proc_bsdinfo current;
@@ -51,11 +57,14 @@ int main(int argc, char **argv) {
             int maxfd = getdtablesize();
             for (int fd = 3; fd < maxfd; fd++) close(fd);
             if (limit(RLIMIT_CPU, 30) || limit(RLIMIT_FSIZE, 1048576) ||
-                limit(RLIMIT_NOFILE, 64) || limit(RLIMIT_CORE, 0)) _exit(125);
+                limit(RLIMIT_NOFILE, 64) || limit(RLIMIT_CORE, 0)) {
+                perror("macos-launch: setrlimit"); _exit(125);
+            }
             char **args = calloc((size_t)argc + 3, sizeof(char *));
             if (!args) _exit(125);
             args[0] = "/usr/bin/sandbox-exec"; args[1] = "-p"; args[2] = argv[1];
             for (int i = 2; i < argc; i++) args[i + 1] = argv[i];
+            fprintf(stderr, "macos-launch: worker pid=%d entering sandbox-exec\n", getpid());
             execv(args[0], args);
             perror("sandbox-exec"); _exit(125);
         }
@@ -73,14 +82,23 @@ int main(int argc, char **argv) {
         int status;
         for (;;) {
             pid_t result = waitpid(worker, &status, WNOHANG);
-            if (result == worker) _exit(status_code(status));
+            if (result == worker) _exit(status_code("worker", worker, status));
             if (result < 0 && errno != EINTR) _exit(125);
             struct rusage_info_v4 usage = {0};
-            if (stopping || getppid() != owner ||
-                proc_pid_rusage(worker, RUSAGE_INFO_V4, (rusage_info_t *)&usage) != 0 ||
+            int measured = proc_pid_rusage(worker, RUSAGE_INFO_V4, (rusage_info_t *)&usage);
+            int measurement_error = measured ? errno : 0;
+            if (measured && waitpid(worker, &status, WNOHANG) == worker)
+                _exit(status_code("worker", worker, status));
+            if (stopping || getppid() != owner || measured ||
                 usage.ri_phys_footprint > 256ULL * 1024 * 1024) {
                 kill(worker, SIGKILL);
                 while (waitpid(worker, &status, 0) < 0 && errno == EINTR) {}
+                /* Reap before writing diagnostics: if the host died, stderr
+                 * may have no reader and logging itself can raise SIGPIPE. */
+                fprintf(stderr, "macos-launch: watchdog pid=%d reason=%s footprint=%llu errno=%d\n",
+                    worker, stopping ? "signal" : getppid() != owner ? "owner-death" :
+                    measured ? "measurement-failed" : "footprint-limit",
+                    (unsigned long long)usage.ri_phys_footprint, measurement_error);
                 _exit(137);
             }
             usleep(25000);
@@ -100,7 +118,7 @@ int main(int argc, char **argv) {
         pid_t result = waitpid(watcher, &status, WNOHANG);
         if (result == watcher) {
             if (same_process(worker, &identity)) kill(worker, SIGKILL);
-            return status_code(status);
+            return status_code("watcher", watcher, status);
         }
         if (result < 0 && errno != EINTR) return 125;
         if (stopping || getppid() != parent) {

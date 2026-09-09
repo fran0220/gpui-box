@@ -22,10 +22,20 @@ export async function macosSandbox(root, runtimeRoot, { executable = process.exe
     (allow signal (target self))
     (allow sysctl-read)
     (allow file-read-metadata)
+    ; dyld/libignition opens the root directory during cache discovery. This
+    ; literal permits that directory only, NOT reads of its descendants.
+    (allow file-read-data (literal "/"))
     (allow file-read* (subpath ${literal(root)}) (subpath ${literal(runtimeRoot)})
       (literal ${literal(binary)}) (subpath "/System/Library") (subpath "/usr/lib")
+      (subpath "/System/Cryptexes/OS/System/Library/dyld")
+      (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld")
       (subpath "/private/var/db/dyld") (subpath "/usr/share/zoneinfo")
       (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom"))
+    (allow file-map-executable (literal ${literal(binary)})
+      (subpath "/System/Library") (subpath "/usr/lib")
+      (subpath "/System/Cryptexes/OS/System/Library/dyld")
+      (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld")
+      (subpath "/private/var/db/dyld"))
     (allow file-write-data (literal "/dev/null"))
     (allow mach-lookup (global-name "com.apple.system.logger"))`;
   return { execPath: launcher, execArgv: [profile, binary, ...(node ? ['--max-old-space-size=64', '--permission', `--allow-fs-read=${root}`, `--allow-fs-read=${runtimeRoot}`, '--disable-proto=throw'] : [])], stdio: ['pipe', 'pipe', 'pipe'] };
