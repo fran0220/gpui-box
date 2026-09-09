@@ -1,4 +1,4 @@
-import type { ControlProps, KitNode, SlotNode, SelectOption } from './kit-sdk.js';
+import type { ControlProps, KitNode, SlotNode, SelectOption, KitMethodContracts } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
 import type { MenuItemDescriptor } from './kit-overlay-sdk.js';
 import type { NativeRef } from './reference-sdk.js';
@@ -20,10 +20,23 @@ export interface ToggleItem { id: string; label: string; icon?: BuiltinIconDescr
 export interface FilterCondition { id: string; field: string; operator: string; value: string; tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' }
 export interface TransferItem { id: string; label: string; disabled?: boolean }
 export interface CascaderOption {id:string;label:string;disabled?:boolean;children?:{state:'idle'|'loading'|'empty'}|{state:'unavailable'|'error';reason:string}|{state:'ready';value:CascaderOption[]}}
+export interface ByteRange {start:number;end:number}
+export interface TextSelection {range:ByteRange;reversed:boolean}
+export interface TextEdit {revision:number;replaced:ByteRange;inserted:string}
+export interface TextSnapshot {revision:number;text:string}
+export interface TextBounds {x:number;y:number;width:number;height:number}
+export interface PasteRefusal {state:'unavailable';kind:'images'|'paths';reason:string}
+export interface TextAreaProps extends ControlProps {placeholder?:string;value?:string;frame?:'own'|'host';wrap?:'soft'|'none';required?:boolean;invalid?:boolean;readOnly?:boolean;rows?:number;maxRows?:number;autosize?:{min:number;max:number};enter?:'opens'|'submits';maxLength?:number;arrowsClaimed?:boolean;completionClaimed?:boolean}
+export interface TextAreaEvents {change?(text:string):void;edited?(edit:TextEdit):void;submit?():void;cancel?():void;pasteRefused?(refusal:PasteRefusal):void;moveUp?():void;moveDown?():void;acceptCompletion?():void;dismissCompletion?():void;indentRequested?():void;outdentRequested?():void;selectionChanged?(range:ByteRange):void;geometryChanged?():void;focus?():void;blur?():void}
+export type EditorServiceRequest = NonNullable<KitMethodContracts['Editor']['invoke']['request_service']['result']>;
+export interface EditorProps {disabled?:boolean;readOnly?:boolean;label?:string;value?:string;rows?:number;lineNumbers?:boolean;languageServices?:boolean}
+export interface EditorEvents {changed?(text:string):void;edited?(edit:TextEdit):void;selectionChanged?(range:ByteRange):void;foldChanged?(event:{id:string;collapsed:boolean}):void;pasteRefused?(refusal:PasteRefusal):void;submitted?():void;cancelled?():void;focused?():void;blurred?():void;serviceRequested?(request:EditorServiceRequest):void;serviceAccepted?(id:string):void;definitionRequested?(event:{target:string;range:ByteRange}):void;codeActionRequested?(id:string):void}
 export interface KeymapBinding { id: string; keystroke: string; conflict?: string; provenance?: string }
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  Editor(id:string,props?:EditorProps,events?:EditorEvents):KitNode;
+  TextArea(id:string,props?:TextAreaProps,events?:TextAreaEvents):KitNode;
   Cascader(id:string,props?:ControlProps & {options?:CascaderOption[];selected?:string;name?:string;placeholder?:string},events?:{selected?(id:string):void;expanded?(id:string):void;retry?(id:string):void;opened?():void;closed?():void}):KitNode;
   Combobox(id:string,props?:ControlProps & {name?:string;placeholder?:string;invalid?:boolean;options?:SelectOption[];selected?:string;query?:string;allowCustom?:boolean},events?:{queryChanged?(text:string):void;selected?(id:string):void;custom?(text:string):void;opened?():void;closed?():void}):KitNode;
   MultiSelect(id:string,props?:ControlProps & {name?:string;placeholder?:string;invalid?:boolean;options?:SelectOption[];selected?:string[];clearable?:boolean},events?:{queryChanged?(text:string):void;toggled?(id:string):void;removed?(id:string):void;cleared?():void;opened?():void;closed?():void}):KitNode;
@@ -81,6 +94,11 @@ interface OptionCommands {
 }
 interface SelectionQueries extends FocusQueries {is_disabled:SelectionQuery<boolean>}
 export interface ControlsExtraMethodContracts {
+  Editor: KitMethodContracts['Editor'];
+  TextArea:{invoke:{
+    set_value:SelectionCommand<{value:string}>;insert:SelectionCommand<{text:string}>;replace_range:{args:{range:ByteRange;text:string};result:ByteRange|null};replace_ranges:{args:{edits:{range:ByteRange;text:string}[]};result:boolean};set_selected_range:SelectionCommand<{range:ByteRange}>;set_selections:{args:{selections:TextSelection[]};result:boolean};select_rectangle:{args:{anchor:{x:number;y:number};focus:{x:number;y:number}};result:boolean};
+    set_placeholder:SelectionCommand<{placeholder:string}>;set_frame:SelectionCommand<{frame:'own'|'host'}>;set_wrap:SelectionCommand<{wrap:'soft'|'none'}>;set_enter:SelectionCommand<{enter:'opens'|'submits'}>;set_rows:SelectionCommand<{rows:number}>;set_max_rows:SelectionCommand<{max_rows:number|null}>;set_autosize:SelectionCommand<{rows:{min:number;max:number}|null}>;set_max_length:SelectionCommand<{max_length:number|null}>;set_disabled:SelectionCommand<{disabled:boolean}>;set_read_only:SelectionCommand<{read_only:boolean}>;set_invalid:SelectionCommand<{invalid:boolean}>;set_required:SelectionCommand<{required:boolean}>;set_arrows_claimed:SelectionCommand<{claimed:boolean}>;set_completion_claimed:SelectionCommand<{claimed:boolean}>;set_control_size:SelectionCommand<{size:'xs'|'sm'|'md'|'lg'}>;focus:SelectionCommand<Record<string,never>>;
+  };query:FocusQueries & {value:SelectionQuery<string>;snapshot:SelectionQuery<TextSnapshot>;revision:SelectionQuery<number>;is_empty:SelectionQuery<boolean>;is_disabled:SelectionQuery<boolean>;is_read_only:SelectionQuery<boolean>;wrap_mode:SelectionQuery<'soft'|'none'>;selected_range:SelectionQuery<ByteRange>;cursor_offset:SelectionQuery<number>;cursor_row:SelectionQuery<number>;arrows_claimed:SelectionQuery<boolean>;completion_claimed:SelectionQuery<boolean>;selections:SelectionQuery<TextSelection[]>;bounds_for_range:{args:{range:ByteRange};result:TextBounds[]|null};bounds_for_position:{args:{offset:number};result:TextBounds|null};caret_bounds:SelectionQuery<TextBounds|null>;measured:SelectionQuery<{text:number;height:number;wrapped:number;pass:number}|null>;horizontal_scroll_offset:SelectionQuery<number>}};
   Cascader:{invoke:Omit<SelectionCommands,'set_invalid'> & {set_options:SelectionCommand<{options:CascaderOption[]}>;set_selected:SelectionCommand<{selected:string|null}>;set_name:SelectionCommand<{name:string}>;open:SelectionCommand<Record<string,never>>;close:SelectionCommand<Record<string,never>>};query:SelectionQueries & {is_open:SelectionQuery<boolean>;selected_id:SelectionQuery<string|null>;open_path:SelectionQuery<string[]>}};
   Combobox:{invoke:SelectionCommands & OptionCommands & {set_selected:SelectionCommand<{selected:string|null}>;set_query:SelectionCommand<{text:string}>;set_allow_custom:SelectionCommand<{allow:boolean}>;open:SelectionCommand<Record<string,never>>;toggle:SelectionCommand<Record<string,never>>};query:SelectionQueries & {query_input:SelectionQuery<NativeRef<'TextInput'>>;is_open:SelectionQuery<boolean>;query_text:SelectionQuery<string>;selected_id:SelectionQuery<string|null>;selected_option:SelectionQuery<{id:string;label:string;disabled:boolean;description:string|null;group:string|null}|null>}};
   MultiSelect:{invoke:SelectionCommands & OptionCommands & {set_selected:SelectionCommand<{selected:string[]}>;set_clearable:SelectionCommand<{clearable:boolean}>;open:SelectionCommand<Record<string,never>>};query:SelectionQueries & {query_input:SelectionQuery<NativeRef<'TextInput'>>;is_open:SelectionQuery<boolean>;selected_ids:SelectionQuery<string[]>}};

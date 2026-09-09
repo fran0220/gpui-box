@@ -8,6 +8,27 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('native editors distinguish full snapshots, entity getters and revision paired responses',()=>{
+  for(const component of ['Editor','TextArea']){
+    validateValue({revision:2,text:'AλZ'},familyMethods[component].query.snapshot.result);
+    assert.throws(()=>validateValue({revision:2},familyMethods[component].query.snapshot.result));
+    assert.throws(()=>validateValue({revision:2,text:'AλZ',type:'TextArea'},familyMethods[component].query.snapshot.result));
+  }
+  validateValue({$nativeRef:'native-1',type:'TextArea'},familyMethods.Editor.query.text_area.result);
+  assert.throws(()=>validateValue({revision:2,text:'AλZ'},familyMethods.Editor.query.text_area.result));
+  for(const state of ['idle','loading','empty'])validateValue({request:1,result:{state}},familyMethods.Editor.invoke.set_service_result.args);
+  for(const state of ['error','unavailable']){
+    validateValue({request:1,result:{state,reason:'Refused'}},familyMethods.Editor.invoke.set_service_result.args);
+    assert.throws(()=>validateValue({request:1,result:{state}},familyMethods.Editor.invoke.set_service_result.args));
+  }
+  validateValue({request:1,result:{state:'refreshing',value:{kind:'hover',range:{start:1,end:3},contents:'Caller text'}}},familyMethods.Editor.invoke.set_service_result.args);
+  assert.throws(()=>validateValue({request:1,result:{state:'ready'}},familyMethods.Editor.invoke.set_service_result.args));
+  validateValue({max_length:null},familyMethods.TextArea.invoke.set_max_length.args);
+  assert.throws(()=>validateValue({max_length:-1},familyMethods.TextArea.invoke.set_max_length.args));
+  validateValue({state:'unavailable',kind:'paths',reason:'Not authorized'},familySchemas.TextArea.events.pasteRefused);
+  assert.throws(()=>validateValue({state:'unavailable',kind:'paths',reason:'Not authorized',paths:['/private']},familySchemas.TextArea.events.pasteRefused));
+});
+
 test('cascader keeps all branch states closed and rejects duplicate tree identities',()=>{
   for(const children of [{state:'idle'},{state:'loading'},{state:'empty'},{state:'unavailable',reason:'Refused'},{state:'error',reason:'Failed'},{state:'ready',value:[{id:'leaf',label:'Leaf'}]}]){
     const props={options:[{id:'root',label:'Root',children}]};
@@ -252,6 +273,14 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.TextArea('area',{wrap:'none',autosize:{min:2,max:5}},{edited(edit){const inserted:string=edit.inserted;},change(text){const full:string=text;}});
+kit.Editor('editor',{languageServices:true},{serviceRequested(request){const full:string=request.document;}});
+// @ts-expect-error snapshots contain complete text, not merely revision metadata
+const incomplete:ControlsExtraMethodContracts['Editor']['query']['snapshot']['result']={revision:2};
+// @ts-expect-error no invented parser capability
+kit.Editor('bad',{syntax:'typescript'});
+// @ts-expect-error no raw host paths on paste refusal
+kit.TextArea('bad',{}, {pasteRefused(event:{paths:string[]}) {}});
 kit.Cascader('cascade',{options:[{id:'root',label:'Root',children:{state:'unavailable',reason:'Refused'}}]},{expanded(id){const key:string=id;}});
 // @ts-expect-error unavailable branch requires an explicit reason
 kit.Cascader('bad',{options:[{id:'root',label:'Root',children:{state:'unavailable'}}]});
