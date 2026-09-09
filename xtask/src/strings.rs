@@ -51,12 +51,13 @@ use anyhow::{Result, bail};
 
 /// Sources whose literals are not component copy.
 ///
-/// - `strings.rs` is the catalogue: the English lives there by definition.
+/// - `strings.rs` and `strings/packs.rs` are the catalogue and its exhaustive
+///   built-in translations, not component-owned copy.
 /// - `scenes/` is fixture content for the gallery and the capture task.
 /// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
-const EXEMPT: &[&str] = &["strings.rs", "datetime/fixture.rs"];
+const EXEMPT: &[&str] = &["strings.rs", "strings/packs.rs", "datetime/fixture.rs"];
 
 /// Directories whose literals are not component copy either.
 const EXEMPT_TREES: &[&str] = &["scenes/"];

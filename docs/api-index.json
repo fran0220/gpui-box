@@ -14768,6 +14768,22 @@
       ]
     },
     {
+      "name": "TranslationPack",
+      "path": "gpui_kit::strings::TranslationPack",
+      "summary": "Complete, bundled translations of Kit-owned labels. Caller content is never translated. Install pack.strings() with cx.set_global, then apply any application-specific overrides through the existing Strings interface. Number/date adapters, search matching and layout direction stay caller-owned.",
+      "variants": [
+        "English",
+        "SimplifiedChinese"
+      ],
+      "construct": [],
+      "options": [
+        "text(key: StringKey) -> &'static str",
+        "strings() -> Strings"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "TransportDuration",
       "path": "gpui_kit::content::TransportDuration",
       "summary": "How long the media runs, as far as the host knows.",
@@ -16218,6 +16234,17 @@
         "SettingsList"
       ],
       "example": "fn settings_page(window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let search = window.use_keyed_state(\"scene.settings-page.search\", cx, |window, cx| {\n        SearchInput::new(\"scene.settings-page.query\", window, cx).placeholder(\"Search settings\")\n    });\n    let category = window.use_keyed_state(\"scene.settings-page.category\", cx, |_, _| {\n        SharedString::from(\"all\")\n    });\n    let selected = category.read(cx).clone();\n    let query = search.read(cx).value(cx);\n    let general = SettingsSection::new(\"scene.settings-page.general\", \"General\")\n        .label_width(px(150.0))\n        .row(SettingsRow::new(\"scene.settings-page.autosave\", \"Automatic save\").value(\"On\"))\n        .row(\n            SettingsRow::new(\"scene.settings-page.telemetry\", \"Usage reporting\")\n                .value(\"Off\")\n                .managed(\"fixture administrator\"),\n        );\n    let appearance = SettingsSection::new(\"scene.settings-page.appearance\", \"Appearance\")\n        .label_width(px(150.0))\n        .row(SettingsRow::new(\"scene.settings-page.theme\", \"Theme\").value(\"Studio\"))\n        .row(SettingsRow::new(\"scene.settings-page.density\", \"Density\").value(\"Comfortable\"));\n    let sections = match selected.as_ref() {\n        \"general\" => vec![general],\n        \"appearance\" => vec![appearance],\n        _ => vec![general, appearance],\n    };\n    let header_search = search.clone();\n    stack(&theme).w(px(840.0))\n        .child(caption(&theme, \"Fixture settings page: category navigation and search remain available when there are no matches\"))\n        .child(SettingsList::new(\"scene.settings-page.list\").query(query).sections(sections)\n            .slot(\"header\", move |_, cx| {\n                let theme = cx.theme();\n                div().column().gap_token(theme, Space::Sm)\n                    .child(crate::foundation::text(theme, TypeScale::Title, \"Settings\"))\n                    .child(header_search.clone()).into_any_element()\n            })\n            .slot(\"sidebar\", move |_, _| {\n                let category = category.clone();\n                Sidebar::new(\"scene.settings-page.categories\")\n                    .section(SidebarSection::new(\"sections\").items([\n                        SidebarItem::new(\"all\", \"All settings\"), SidebarItem::new(\"general\", \"General\"),\n                        SidebarItem::new(\"appearance\", \"Appearance\")]))\n                    .active(selected.clone()).on_select(move |id, _, cx| category.update(cx, |value, cx| {\n                        *value = id; cx.notify();\n                    })).into_any_element()\n            })\n            .slot(\"footer\", move |_, _| {\n                let search = search.clone();\n                Button::new(\"scene.settings-page.reset\").label(\"Reset search\")\n                    .on_click(move |_, cx| search.update(cx, |search, cx| search.set_value(\"\", cx)))\n                    .into_any_element()\n            }))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "translation-packs",
+      "capture": "cargo run -p xtask -- headless capture translation-packs",
+      "kind": "composition",
+      "subjects": [],
+      "uses": [
+        "Card",
+        "Button"
+      ],
+      "example": "fn translation_packs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::strings::TranslationPack;\n    use gpui_kit_semantics::{NodeSpec, Role, Semantic};\n    let theme = cx.theme().clone();\n    let mut columns = row(&theme).items_start();\n    for &pack in TranslationPack::ALL {\n        let strings = pack.strings();\n        let prefix = format!(\"scene.translations.{}\", pack.language_tag());\n        let mut card = Card::new()\n            .id(prefix.clone())\n            .padding(Space::Md)\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Title,\n                pack.language_tag(),\n            ))\n            .child(\n                Button::new(format!(\"{prefix}.copy\"))\n                    .label(strings.text(StringKey::Copy))\n                    .disabled(true),\n            );\n        for (key, values) in [\n            (StringKey::SettingsManagedBy, &[\"fixture administrator\"][..]),\n            (StringKey::GridSelectionCounts, &[\"2\", \"7\", \"19\"][..]),\n            (StringKey::AttachmentReady, &[][..]),\n            (StringKey::AttachmentProcessing, &[][..]),\n            (StringKey::BrowserEmpty, &[][..]),\n            (StringKey::BrowserUnavailable, &[][..]),\n            (StringKey::CopyFailedDetail, &[][..]),\n            (StringKey::ApprovalAlwaysPath, &[\"/work\"][..]),\n            (StringKey::RangeInverted, &[\"2026-09-01\", \"2026-09-09\"][..]),\n        ] {\n            let text = strings.format(key, values);\n            card = card.child(\n                div()\n                    .py_token(&theme, Space::Xs)\n                    .child(crate::foundation::text(\n                        &theme,\n                        TypeScale::Body,\n                        text.clone(),\n                    ))\n                    .semantic_in(\n                        cx,\n                        NodeSpec::new(format!(\"{prefix}.{}\", key.name()), Role::Text).text(text),\n                    ),\n            );\n        }\n        columns = columns.child(div().w(px(390.0)).child(card));\n    }\n    stack(&theme).w(px(840.0))\n        .child(caption(&theme, \"Built-in vocabulary fixture: disabled action previews, distinct states, and reordered template arguments. Caller data is not translated.\"))\n        .child(columns).into_any_element()\n}"
     },
     {
       "name": "detail",

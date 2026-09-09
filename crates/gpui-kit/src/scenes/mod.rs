@@ -60,7 +60,8 @@ use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
     dropzone, editor, editor_multicursor, filter_bar, find_replace, form, inline_edit, input,
     keybinding, keymap_editor, mention_input, multi_select, rich_text_editor, search_field,
-    search_input, settings, settings_page, textarea, toggle, transfer_list, upload_list,
+    search_input, settings, settings_page, textarea, toggle, transfer_list, translation_packs,
+    upload_list,
 };
 use data::{
     data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, image_list, kanban,
@@ -581,6 +582,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "settings-page",
             build: settings_page,
             shows: Shows::Subjects(&["SettingsList"]),
+        },
+        Scene {
+            name: "translation-packs",
+            build: translation_packs,
+            shows: Shows::Composition(&["Card", "Button"]),
         },
         Scene {
             name: "detail",

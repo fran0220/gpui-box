@@ -13,6 +13,53 @@ type Calls = Rc<RefCell<Vec<String>>>;
 
 // ------------------------------------------------------------ settings rows
 
+#[gpui::test]
+fn builtin_packs_reach_component_defaults_without_translating_caller_data(cx: &mut TestAppContext) {
+    use gpui_kit::strings::TranslationPack;
+    for (pack, expected) in [
+        (TranslationPack::English, "No settings match this search"),
+        (TranslationPack::SimplifiedChinese, "没有与搜索匹配的设置"),
+    ] {
+        let mut harness = Harness::new(
+            cx,
+            move |cx| {
+                gpui_kit::install(cx);
+                cx.set_global(pack.strings());
+            },
+            |_, _| {
+                SettingsList::new("localized-settings")
+                    .query("no-match")
+                    .section(
+                        SettingsSection::new("general", "General")
+                            .row(SettingsRow::new("sound", "Sound").value("On")),
+                    )
+                    .slot("header", |_, _| {
+                        Button::new("host-title")
+                            .label("Caller-owned title")
+                            .into_any_element()
+                    })
+                    .into_any_element()
+            },
+        );
+        assert_eq!(
+            harness
+                .node("localized-settings.empty")
+                .expect("empty state")
+                .text
+                .as_deref(),
+            Some(expected)
+        );
+        assert_eq!(
+            harness
+                .node("host-title")
+                .expect("caller label")
+                .text
+                .as_deref(),
+            Some("Caller-owned title")
+        );
+    }
+}
+
 #[cfg(feature = "fixtures")]
 #[gpui::test]
 fn settings_page_exhibit_sidebar_and_results_never_overlap(cx: &mut TestAppContext) {

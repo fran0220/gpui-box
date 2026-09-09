@@ -28,6 +28,21 @@
 //! # }
 //! ```
 //!
+//! # Built-in packs
+//!
+//! English and Simplified Chinese cover the entire catalogue. A pack is a
+//! starting catalogue, not a locale detector; caller overrides work as before.
+//! Clearing an override still restores the original English default.
+//!
+//! ```no_run
+//! # fn configure(cx: &mut gpui::App) {
+//! use gpui_kit::strings::{TranslationPack, StringKey};
+//! let mut strings = TranslationPack::SimplifiedChinese.strings();
+//! strings.set(StringKey::Copy, "复制内容");
+//! cx.set_global(strings);
+//! # }
+//! ```
+//!
 //! # What is not here
 //!
 //! Numbers, dates, quantities, and search ranking are not translated here.
@@ -41,6 +56,9 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 use gpui::{App, BorrowAppContext, Global, SharedString};
+
+mod packs;
+pub use packs::TranslationPack;
 
 /// Declares every key once: the variant, the stable name a host and a test
 /// use to address it, and the English a host gets for free.

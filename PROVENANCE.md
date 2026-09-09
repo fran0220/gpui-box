@@ -854,3 +854,13 @@ Retained synthetic accessibility leaves, revision-keyed text publication, and
 incrementally retained debug trees are original GPUI Box work using AccessKit's
 existing node-level TreeUpdate contract. No new dependency or upstream source
 was imported; local package authority and historical receipts remain intact.
+
+### Built-in UI translation packs
+
+`crates/gpui-kit/src/strings/packs.rs` contains original Simplified Chinese
+translations authored for GPUI Box's existing English `StringKey` catalogue.
+No external translation catalogue, translation-service output, or upstream
+locale file was imported. English remains the existing source vocabulary;
+the exhaustive translated match and placeholder tests keep both packs current.
+Number/date adapters, text direction, and caller content are not translated by
+these packs. Font sources and their notices remain unchanged.

@@ -2,6 +2,60 @@
 
 use super::support::*;
 
+pub(super) fn translation_packs(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::strings::TranslationPack;
+    use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+    let theme = cx.theme().clone();
+    let mut columns = row(&theme).items_start();
+    for &pack in TranslationPack::ALL {
+        let strings = pack.strings();
+        let prefix = format!("scene.translations.{}", pack.language_tag());
+        let mut card = Card::new()
+            .id(prefix.clone())
+            .padding(Space::Md)
+            .child(crate::foundation::text(
+                &theme,
+                TypeScale::Title,
+                pack.language_tag(),
+            ))
+            .child(
+                Button::new(format!("{prefix}.copy"))
+                    .label(strings.text(StringKey::Copy))
+                    .disabled(true),
+            );
+        for (key, values) in [
+            (StringKey::SettingsManagedBy, &["fixture administrator"][..]),
+            (StringKey::GridSelectionCounts, &["2", "7", "19"][..]),
+            (StringKey::AttachmentReady, &[][..]),
+            (StringKey::AttachmentProcessing, &[][..]),
+            (StringKey::BrowserEmpty, &[][..]),
+            (StringKey::BrowserUnavailable, &[][..]),
+            (StringKey::CopyFailedDetail, &[][..]),
+            (StringKey::ApprovalAlwaysPath, &["/work"][..]),
+            (StringKey::RangeInverted, &["2026-09-01", "2026-09-09"][..]),
+        ] {
+            let text = strings.format(key, values);
+            card = card.child(
+                div()
+                    .py_token(&theme, Space::Xs)
+                    .child(crate::foundation::text(
+                        &theme,
+                        TypeScale::Body,
+                        text.clone(),
+                    ))
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(format!("{prefix}.{}", key.name()), Role::Text).text(text),
+                    ),
+            );
+        }
+        columns = columns.child(div().w(px(390.0)).child(card));
+    }
+    stack(&theme).w(px(840.0))
+        .child(caption(&theme, "Built-in vocabulary fixture: disabled action previews, distinct states, and reordered template arguments. Caller data is not translated."))
+        .child(columns).into_any_element()
+}
+
 pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
