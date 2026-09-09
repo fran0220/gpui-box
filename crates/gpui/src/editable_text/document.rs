@@ -183,7 +183,10 @@ mod tests {
         let mut doc = EditSnapshot::new("a\r\nβ界\nlast\n");
         let old = doc.clone();
         doc.replace(3..8, "😀\nx");
-        assert_eq!(doc.slice(0..doc.len()).unwrap(), "a\r\n😀\nx\nlast\n");
+        assert_eq!(
+            doc.slice(0..doc.len()).as_deref(),
+            Some("a\r\n😀\nx\nlast\n")
+        );
         assert_eq!(doc.line_count(), 5);
         assert_eq!(doc.line_range(1), Some(3..8));
         assert_eq!(doc.line_range(2), Some(8..10));
@@ -226,7 +229,10 @@ mod tests {
     fn large_file_edits_do_not_materialize_document_and_lines_stay_indexed() {
         let text = "let asymmetric = '界';\n".repeat(200_000);
         let mut doc = EditSnapshot::new(&text);
-        let last = doc.line_range(199_999).unwrap().start;
+        let last = doc
+            .line_range(199_999)
+            .expect("last content line exists")
+            .start;
         for _ in 0..1_000 {
             doc.replace(last..last, "x");
             doc.replace(last..last + 1, "");
