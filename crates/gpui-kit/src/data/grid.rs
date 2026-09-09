@@ -27,6 +27,14 @@
 //! the two axes never synchronize independent lists or write each other's
 //! offsets.
 //!
+//! Unpinned columns outside the horizontal viewport become width-only gaps.
+//! [`GridRow::cells_with`] avoids building their values; eager [`GridRow::cell`]
+//! remains compatible but cannot recover work already done by the caller.
+//! Pinned columns, the active editor/navigation cell in a mounted row, and at
+//! most two keyboard entry headers per omitted run stay mounted. Column
+//! descriptors and prefix widths are metadata proportional to column count;
+//! cell construction and element layout are bounded by the viewport.
+//!
 //! **It does not measure a column to its content.** A double click on a
 //! resize handle reports a fit request and stops: the grid can only measure
 //! the rows it drew, and a width fitted to fourteen of twelve thousand rows is
@@ -80,6 +88,7 @@ const GUTTER: f32 = 28.0;
 const MARK: f32 = 14.0;
 
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> GridRow>;
+type RenderCell = Rc<dyn Fn(&SharedString, &mut Window, &mut App) -> Cell>;
 type RenderDetail = Rc<dyn Fn(SharedString, &mut Window, &mut App) -> AnyElement>;
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(&SelectionChange, &mut Window, &mut App)>;
@@ -266,6 +275,7 @@ pub struct GridRow {
     text: Option<SharedString>,
     disabled: bool,
     cells: Vec<(SharedString, Cell)>,
+    render_cell: Option<RenderCell>,
     hierarchy: Option<HierarchyRow>,
 }
 
@@ -295,12 +305,24 @@ impl GridRow {
             text: None,
             disabled: false,
             cells: Vec::new(),
+            render_cell: None,
             hierarchy: None,
         }
     }
 
     pub fn cell(mut self, key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self {
         self.cells.push((key.into(), cell.into()));
+        self
+    }
+
+    /// Builds a cell only when its column is mounted, or explicitly requested
+    /// by range copy. Eager `.cell` entries override this provider. Use this
+    /// for wide datasets: filtering cannot undo work done by eager callers.
+    pub fn cells_with(
+        mut self,
+        render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static,
+    ) -> Self {
+        self.render_cell = Some(Rc::new(render));
         self
     }
 
@@ -325,16 +347,25 @@ impl GridRow {
         self
     }
 
-    fn take(&mut self, key: &SharedString) -> Option<Cell> {
-        let position = self.cells.iter().position(|(name, _)| name == key)?;
-        Some(self.cells.remove(position).1)
+    fn take(&mut self, key: &SharedString, window: &mut Window, cx: &mut App) -> Option<Cell> {
+        if let Some(position) = self.cells.iter().position(|(name, _)| name == key) {
+            return Some(self.cells.remove(position).1);
+        }
+        self.render_cell
+            .as_ref()
+            .map(|render| render(key, window, cx))
     }
 
-    fn cell_text(&self, key: &SharedString) -> SharedString {
+    fn cell_text(&self, key: &SharedString, window: &mut Window, cx: &mut App) -> SharedString {
         self.cells
             .iter()
             .find(|(name, _)| name == key)
-            .and_then(|(_, cell)| cell.text.clone())
+            .map(|(_, cell)| cell.text.clone().unwrap_or_default())
+            .or_else(|| {
+                self.render_cell
+                    .as_ref()
+                    .map(|render| render(key, window, cx).text.unwrap_or_default())
+            })
             .unwrap_or_default()
     }
 }
@@ -481,7 +512,7 @@ pub enum GridLines {
     Rows,
 }
 
-/// A grid that renders only the rows its viewport holds.
+/// A grid that virtualizes rows and columns over caller-owned data.
 #[derive(IntoElement)]
 pub struct DataGrid {
     ident: Ident,
@@ -500,6 +531,7 @@ pub struct DataGrid {
     detail_rows: usize,
     editing: Option<EditingCell>,
     row_height: Option<f32>,
+    reveal: Option<(usize, SharedString)>,
     visible_rows: Option<usize>,
     size: ControlSize,
     disabled: bool,
@@ -565,6 +597,7 @@ impl DataGrid {
             detail_rows: 2,
             editing: None,
             row_height: None,
+            reveal: None,
             visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
@@ -691,6 +724,14 @@ impl DataGrid {
     /// the rows it does not show.
     pub fn visible_rows(mut self, rows: usize) -> Self {
         self.visible_rows = Some(rows);
+        self
+    }
+
+    /// Reveals a caller-addressed row and column with nearest-edge scrolling.
+    /// A changed request runs once; omitting it rearms the same target. This
+    /// does not select, edit, or focus the cell. Invalid addresses do nothing.
+    pub fn scroll_to_cell(mut self, row: usize, column: impl Into<SharedString>) -> Self {
+        self.reveal = Some((row, column.into()));
         self
     }
 
@@ -897,6 +938,161 @@ pub(crate) fn slot_of(index: usize, expanded: &[usize], detail_rows: usize) -> u
 
 // -- per-identity state -------------------------------------------------------
 
+/// Logical (reading-order) coordinates shared by every grid band. Prefix
+/// widths permit binary-search clipping and a single spacer per omitted run.
+#[derive(Default)]
+struct ColumnViewport {
+    prefix: Vec<f32>,
+    visible: Range<usize>,
+    scrolling: bool,
+    pinned: usize,
+}
+
+enum ColumnSlot<'a> {
+    Cell(usize, &'a GridColumn),
+    Gap(f32),
+}
+
+impl ColumnViewport {
+    fn new(columns: &[GridColumn], width: f32, offset: f32, leading: f32) -> Self {
+        let mut prefix = Vec::with_capacity(columns.len() + 1);
+        prefix.push(0.0);
+        for column in columns {
+            let width = match column.width {
+                ColumnWidth::Fixed(width) => width,
+                ColumnWidth::Flex(_) => column.min_width,
+            };
+            prefix.push(prefix.last().copied().unwrap_or_default() + width);
+        }
+        let start = prefix
+            .partition_point(|x| *x + leading <= offset)
+            .saturating_sub(1)
+            .min(columns.len());
+        let end = prefix
+            .partition_point(|x| *x + leading < offset + width)
+            .min(columns.len());
+        Self {
+            prefix,
+            visible: start..end.max(start),
+            scrolling: false,
+            pinned: columns.partition_point(|column| column.pinned),
+        }
+    }
+
+    fn section<E: Styled>(
+        &self,
+        element: E,
+        columns: &[GridColumn],
+        range: Range<usize>,
+        extra: f32,
+    ) -> E {
+        if self.scrolling {
+            element
+                .w(px(self.prefix[range.end] - self.prefix[range.start] + extra))
+                .flex_none()
+                .row()
+                .h_full()
+                .items_center()
+        } else {
+            section_frame(element, &columns[range], extra)
+        }
+    }
+
+    fn slots<'a>(&self, columns: &'a [GridColumn], start: usize) -> Vec<ColumnSlot<'a>> {
+        let first = self.visible.start.max(start).min(columns.len());
+        let last = self.visible.end.max(first).min(columns.len());
+        let mut slots = Vec::with_capacity(last - first + 2);
+        if first > start {
+            slots.push(ColumnSlot::Gap(self.prefix[first] - self.prefix[start]));
+        }
+        slots.extend((first..last).map(|index| ColumnSlot::Cell(index, &columns[index])));
+        if last < columns.len() {
+            slots.push(ColumnSlot::Gap(
+                self.prefix[columns.len()] - self.prefix[last],
+            ));
+        }
+        slots
+    }
+
+    /// Keep the two keyboard entry points of each omitted header run. Tab
+    /// reveals its first actionable header; reverse Tab reveals its last.
+    /// These are real controls at real bounds, not replacement row cells.
+    fn header_slots<'a>(
+        &self,
+        columns: &'a [GridColumn],
+        start: usize,
+        actionable: bool,
+    ) -> Vec<ColumnSlot<'a>> {
+        if !actionable {
+            return self.slots(columns, start);
+        }
+        let first = self.visible.start.max(start).min(columns.len());
+        let last = self.visible.end.max(first).min(columns.len());
+        let mut indices: Vec<_> = (first..last).collect();
+        for range in [start..first, last..columns.len()] {
+            let mut interactive = range.filter(|index| columns[*index].sortable);
+            if let Some(first) = interactive.next() {
+                indices.push(first);
+            }
+            if let Some(last) = interactive.next_back() {
+                indices.push(last);
+            }
+        }
+        indices.sort_unstable();
+        let mut slots = Vec::with_capacity(indices.len() + 5);
+        let mut consumed = start;
+        for index in indices {
+            if index > consumed {
+                slots.push(ColumnSlot::Gap(self.prefix[index] - self.prefix[consumed]));
+            }
+            slots.push(ColumnSlot::Cell(index, &columns[index]));
+            consumed = index + 1;
+        }
+        if consumed < columns.len() {
+            slots.push(ColumnSlot::Gap(
+                self.prefix[columns.len()] - self.prefix[consumed],
+            ));
+        }
+        slots
+    }
+
+    fn row_slots<'a>(
+        &self,
+        columns: &'a [GridColumn],
+        start: usize,
+        retained: Option<usize>,
+    ) -> Vec<ColumnSlot<'a>> {
+        let Some(retained) =
+            retained.filter(|index| *index >= start && !self.visible.contains(index))
+        else {
+            return self.slots(columns, start);
+        };
+        let first = self.visible.start.max(start).min(columns.len());
+        let last = self.visible.end.max(first).min(columns.len());
+        let mut indices: Vec<_> = (first..last).chain(std::iter::once(retained)).collect();
+        indices.sort_unstable();
+        let mut slots = Vec::with_capacity(indices.len() + 3);
+        let mut consumed = start;
+        for index in indices {
+            if index > consumed {
+                slots.push(ColumnSlot::Gap(self.prefix[index] - self.prefix[consumed]));
+            }
+            slots.push(ColumnSlot::Cell(index, &columns[index]));
+            consumed = index + 1;
+        }
+        if consumed < columns.len() {
+            slots.push(ColumnSlot::Gap(
+                self.prefix[columns.len()] - self.prefix[consumed],
+            ));
+        }
+        slots
+    }
+}
+
+fn column_gap(width: f32) -> gpui::Div {
+    div().w(px(width)).h_full().flex_none()
+}
+
 /// What a grid remembers between two frames.
 ///
 /// A `RenderOnce` builder is rebuilt every frame and cannot carry anything, so
@@ -906,6 +1102,14 @@ pub(crate) fn slot_of(index: usize, expanded: &[usize], detail_rows: usize) -> u
 /// [`crate::layout::measure`] uses for measurements.
 #[derive(Default)]
 struct Memory {
+    columns: RefCell<ColumnViewport>,
+    reveal: RefCell<Option<(usize, SharedString)>>,
+    pending_cell: RefCell<Option<(usize, SharedString)>>,
+    focus_cell: RefCell<Option<(SharedString, SharedString)>>,
+    pending_header: RefCell<Option<SharedString>>,
+    focus_header: RefCell<Option<SharedString>>,
+    header_navigation: RefCell<Rc<Vec<SharedString>>>,
+    navigation_focus: RefCell<Option<gpui::FocusHandle>>,
     /// The shared horizontal viewport for header, rows, and summary.
     horizontal: ScrollHandle,
     /// The current painted width reserved by the frozen group, including its
@@ -956,7 +1160,7 @@ impl RenderOnce for DataGrid {
         let row_height = self.row_height.unwrap_or(metrics.height);
         let ident = self.ident.clone();
         let state = memory(&ident.semantic_id(), window, cx);
-        let columns: Vec<GridColumn> = self.ordered_columns().into_iter().cloned().collect();
+        let mut columns: Vec<GridColumn> = self.ordered_columns().into_iter().cloned().collect();
         if columns.iter().all(|column| !column.pinned) {
             state.pinned_width.set(px(0.0));
         }
@@ -972,7 +1176,132 @@ impl RenderOnce for DataGrid {
             ));
             state.direction.set(Some(direction));
         }
+        let content_width = grid_min_width(
+            &columns,
+            self.selection_mode,
+            !self.hierarchy && self.on_expand.is_some(),
+            &theme,
+        );
+        let measured_width = f32::from(state.horizontal.bounds().size.width);
+        let viewport_width = if measured_width > 0.0 {
+            measured_width
+        } else {
+            f32::from(window.viewport_size().width)
+        };
+        let max_offset = (content_width - viewport_width).max(0.0);
+        if max_offset > 0.0 {
+            // No surplus exists on a scrolling surface. Resolve flexible
+            // floors once so omitted cells cannot change flex distribution.
+            for column in &mut columns {
+                if matches!(column.width, ColumnWidth::Flex(_)) {
+                    column.width = ColumnWidth::Fixed(column.min_width);
+                }
+            }
+        }
+        let physical_offset = (-f32::from(state.horizontal.offset().x)).clamp(0.0, max_offset);
+        let mut offset = if direction.is_rtl() {
+            max_offset - physical_offset
+        } else {
+            physical_offset
+        };
+        let pinned = columns.iter().take_while(|column| column.pinned).count();
+        let leading = theme.space(Space::Sm)
+            + GUTTER
+                * (usize::from(self.selection_mode == SelectionMode::Multiple)
+                    + usize::from(!self.hierarchy && self.on_expand.is_some()))
+                    as f32
+            + if pinned > 0 {
+                theme.space(Space::Sm)
+            } else {
+                0.0
+            };
+        let mut geometry = ColumnViewport::new(&columns, viewport_width, offset, leading);
         let expanded = self.expanded_indices();
+        let mut reveal = state.pending_cell.borrow_mut().take();
+        let focus = reveal.is_some();
+        let header_target = state.pending_header.borrow_mut().take();
+        *state.header_navigation.borrow_mut() = Rc::new(
+            columns
+                .iter()
+                .filter(|column| column.sortable)
+                .map(|column| column.key.clone())
+                .collect(),
+        );
+        if let Some(key) = &header_target {
+            reveal = Some((0, key.clone()));
+            *state.focus_header.borrow_mut() = Some(key.clone());
+            state.focus_cell.borrow_mut().take();
+            let handle = state
+                .navigation_focus
+                .borrow_mut()
+                .get_or_insert_with(|| cx.focus_handle())
+                .clone();
+            window.focus(&handle, cx);
+        }
+        if *state.reveal.borrow() != self.reveal {
+            if measured_width > 0.0 {
+                *state.reveal.borrow_mut() = self.reveal.clone();
+            }
+            reveal = reveal.or_else(|| self.reveal.clone());
+        }
+        if let Some(edit) = &self.editing
+            && state.edit_target.borrow().as_ref() != Some(&edit.target())
+            && let Some(index) =
+                (0..self.count).find(|index| (self.render_row)(*index, window, cx).id == edit.row)
+        {
+            reveal = Some((index, edit.column.clone()));
+        }
+        if let Some((row, key)) = reveal
+            && (header_target.is_some() || row < self.count)
+            && let Some(column) = columns.iter().position(|column| column.key == key)
+        {
+            if focus {
+                let row = (self.render_row)(row, window, cx);
+                *state.focus_cell.borrow_mut() = Some((row.id, key));
+                state.focus_header.borrow_mut().take();
+                let handle = state
+                    .navigation_focus
+                    .borrow_mut()
+                    .get_or_insert_with(|| cx.focus_handle())
+                    .clone();
+                window.focus(&handle, cx);
+            }
+            if header_target.is_none() {
+                state.scroll.scroll_to_item(
+                    slot_of(row, &expanded, self.detail_rows),
+                    ScrollStrategy::Nearest,
+                );
+            }
+            if column >= pinned {
+                let held = if pinned > 0 {
+                    geometry.prefix[pinned] + leading
+                } else {
+                    0.0
+                };
+                let left = geometry.prefix[column] + leading;
+                let right = geometry.prefix[column + 1] + leading;
+                if left < offset + held {
+                    offset = left - held;
+                } else if right > offset + viewport_width {
+                    offset = (right - viewport_width).min(left - held);
+                }
+                offset = offset.clamp(0.0, max_offset);
+                state.horizontal.set_offset(point(
+                    px(-if direction.is_rtl() {
+                        max_offset - offset
+                    } else {
+                        offset
+                    }),
+                    px(0.0),
+                ));
+                geometry = ColumnViewport::new(&columns, viewport_width, offset, leading);
+            }
+        }
+        if content_width <= viewport_width {
+            geometry.visible = 0..columns.len();
+        }
+        geometry.scrolling = max_offset > 0.0;
+        *state.columns.borrow_mut() = geometry;
         let detail_rows = self.detail_rows;
         let slots = slot_count(self.count, &expanded, detail_rows);
         let drawn: Drawn = Rc::new(RefCell::new(HashMap::new()));
@@ -989,7 +1318,7 @@ impl RenderOnce for DataGrid {
             window,
             cx,
         );
-        let footer = self.footer_row(&theme, row_height, &columns, cx);
+        let footer = self.footer_row(&theme, row_height, &columns, &state, cx);
         let vacancy = self.empty.take();
         let body = self.body(
             &theme,
@@ -1005,12 +1334,6 @@ impl RenderOnce for DataGrid {
             cx,
         );
 
-        let content_width = grid_min_width(
-            &columns,
-            self.selection_mode,
-            !self.hierarchy && self.on_expand.is_some(),
-            &theme,
-        );
         let content = div()
             .column()
             .w_full()
@@ -1020,6 +1343,16 @@ impl RenderOnce for DataGrid {
             .child(body)
             .children(footer);
         let viewport = div()
+            .on_children_prepainted({
+                let state = Rc::clone(&state);
+                move |_, window, _| {
+                    if (f32::from(state.horizontal.bounds().size.width) - viewport_width).abs()
+                        > 0.5
+                    {
+                        window.refresh();
+                    }
+                }
+            })
             .id(ident.child("horizontal").element_id())
             .w_full()
             .min_w_0()
@@ -1186,7 +1519,7 @@ impl DataGrid {
         let groups = if self.groups.is_empty() {
             None
         } else {
-            Some(self.group_row(theme, height, columns, cx))
+            Some(self.group_row(theme, height, columns, state, cx))
         };
         let direction = cx.layout_direction();
         let pinned = columns.iter().filter(|column| column.pinned).count();
@@ -1216,7 +1549,17 @@ impl DataGrid {
             if has_disclosure {
                 header = header.child(div().w(px(GUTTER)).flex_none());
             }
-            for (index, column) in columns.iter().enumerate() {
+            for slot in state.columns.borrow().header_slots(
+                columns,
+                0,
+                self.on_sort.is_some() && !self.disabled,
+            ) {
+                let ColumnSlot::Cell(index, column) = slot else {
+                    if let ColumnSlot::Gap(width) = slot {
+                        header = header.child(column_gap(width));
+                    }
+                    continue;
+                };
                 header = header.child(
                     self.header_cell(theme, height, column, index, state, reorder, window, cx),
                 );
@@ -1258,17 +1601,20 @@ impl DataGrid {
 
             let mut moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
                 .row_reading(direction);
-            for (offset, column) in columns[pinned..].iter().enumerate() {
-                moving = moving.child(self.header_cell(
-                    theme,
-                    height,
-                    column,
-                    pinned + offset,
-                    state,
-                    reorder,
-                    window,
-                    cx,
-                ));
+            for slot in state.columns.borrow().header_slots(
+                columns,
+                pinned,
+                self.on_sort.is_some() && !self.disabled,
+            ) {
+                let ColumnSlot::Cell(index, column) = slot else {
+                    if let ColumnSlot::Gap(width) = slot {
+                        moving = moving.child(column_gap(width));
+                    }
+                    continue;
+                };
+                moving = moving.child(
+                    self.header_cell(theme, height, column, index, state, reorder, window, cx),
+                );
             }
             moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
 
@@ -1294,6 +1640,7 @@ impl DataGrid {
         theme: &Theme,
         height: f32,
         columns: &[GridColumn],
+        state: &Rc<Memory>,
         cx: &mut App,
     ) -> AnyElement {
         let direction = cx.layout_direction();
@@ -1314,7 +1661,7 @@ impl DataGrid {
                 row = row.child(div().w(px(GUTTER)).flex_none());
             }
             return row
-                .children(self.group_cells(theme, columns, cx))
+                .children(self.visible_group_cells(theme, columns, 0, state, cx))
                 .into_any_element();
         }
 
@@ -1338,12 +1685,74 @@ impl DataGrid {
 
         let moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
             .row_reading(direction)
-            .children(self.group_cells(theme, &columns[pinned..], cx))
+            .children(self.visible_group_cells(theme, columns, pinned, state, cx))
             .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
 
         row.child(sticky(sticky_edge(direction), held))
             .child(moving)
             .into_any_element()
+    }
+
+    fn visible_group_cells(
+        &self,
+        theme: &Theme,
+        columns: &[GridColumn],
+        start: usize,
+        state: &Memory,
+        cx: &mut App,
+    ) -> Vec<AnyElement> {
+        let geometry = state.columns.borrow();
+        let mut first = geometry.visible.start.max(start).min(columns.len());
+        let mut last = geometry.visible.end.max(first).min(columns.len());
+        // A visible group is one element spanning its complete contiguous
+        // run. Clipping its descriptor range would move its centered label
+        // whenever one member entered or left the viewport.
+        if first < last {
+            if let Some((group, mut offset)) = self.groups.iter().find_map(|group| {
+                group
+                    .keys
+                    .iter()
+                    .position(|key| *key == columns[first].key)
+                    .map(|offset| (group, offset))
+            }) {
+                while first > start
+                    && offset > 0
+                    && columns[first - 1].key == group.keys[offset - 1]
+                {
+                    first -= 1;
+                    offset -= 1;
+                }
+            }
+            if let Some((group, mut offset)) = self.groups.iter().find_map(|group| {
+                group
+                    .keys
+                    .iter()
+                    .position(|key| *key == columns[last - 1].key)
+                    .map(|offset| (group, offset + 1))
+            }) {
+                while last < columns.len()
+                    && offset < group.keys.len()
+                    && columns[last].key == group.keys[offset]
+                {
+                    last += 1;
+                    offset += 1;
+                }
+            }
+        }
+        let mut cells = Vec::new();
+        if first > start {
+            cells.push(
+                column_gap(geometry.prefix[first] - geometry.prefix[start]).into_any_element(),
+            );
+        }
+        cells.extend(self.group_cells(theme, &columns[first..last], cx));
+        if last < columns.len() {
+            cells.push(
+                column_gap(geometry.prefix[columns.len()] - geometry.prefix[last])
+                    .into_any_element(),
+            );
+        }
+        cells
     }
 
     /// Group labels for one contiguous section of the ordered columns.
@@ -1415,6 +1824,7 @@ impl DataGrid {
         theme: &Theme,
         height: f32,
         columns: &[GridColumn],
+        state: &Rc<Memory>,
         cx: &mut App,
     ) -> Option<AnyElement> {
         if self.footer.is_empty() {
@@ -1443,12 +1853,25 @@ impl DataGrid {
         // A row of bare numbers under a table says nothing about what they
         // are, so the first column the caller left empty carries the name of
         // the row itself.
-        let mut named = self
+        let named = self
             .footer
             .iter()
             .any(|(key, _)| columns.first().is_some_and(|column| &column.key == key));
+        let label_key = if named {
+            None
+        } else {
+            columns
+                .iter()
+                .find(|column| {
+                    self.footer
+                        .iter()
+                        .find(|(key, _)| key == &column.key)
+                        .is_none_or(|(_, value)| value.is_empty())
+                })
+                .map(|column| &column.key)
+        };
 
-        let mut cell_for = |column: &GridColumn| {
+        let cell_for = |column: &GridColumn| {
             let mut value = self
                 .footer
                 .iter()
@@ -1456,10 +1879,9 @@ impl DataGrid {
                 .map(|(_, value)| value.clone())
                 .unwrap_or_default();
             let mut label = false;
-            if value.is_empty() && !named {
+            if Some(&column.key) == label_key {
                 value = cx.strings().text(StringKey::GridSummary);
                 label = true;
-                named = true;
             }
             let cell = self.ident.child("summary").child(column.key.as_ref());
             column_frame(div().id(cell.element_id()), column, theme)
@@ -1487,8 +1909,11 @@ impl DataGrid {
             if has_disclosure {
                 row = row.child(div().w(px(GUTTER)).flex_none());
             }
-            for column in columns {
-                row = row.child(cell_for(column));
+            for slot in state.columns.borrow().slots(columns, 0) {
+                row = match slot {
+                    ColumnSlot::Cell(_, column) => row.child(cell_for(column)),
+                    ColumnSlot::Gap(width) => row.child(column_gap(width)),
+                };
             }
         } else {
             let gutter_count = usize::from(self.selection_mode == SelectionMode::Multiple)
@@ -1512,8 +1937,11 @@ impl DataGrid {
 
             let mut moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
                 .row_reading(direction);
-            for column in &columns[pinned..] {
-                moving = moving.child(cell_for(column));
+            for slot in state.columns.borrow().slots(columns, pinned) {
+                moving = match slot {
+                    ColumnSlot::Cell(_, column) => moving.child(cell_for(column)),
+                    ColumnSlot::Gap(width) => moving.child(column_gap(width)),
+                };
             }
             moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
             row = row
@@ -1723,6 +2151,39 @@ impl DataGrid {
             }));
 
         if let (true, Some(handler)) = (sortable, self.on_sort.clone()) {
+            let navigating = Rc::clone(state);
+            let navigation = state.header_navigation.borrow().clone();
+            let own = column.key.clone();
+            let focus = state
+                .navigation_focus
+                .borrow()
+                .clone()
+                .filter(|_| state.focus_header.borrow().as_ref() == Some(&column.key));
+            cell = cell
+                .when_some(focus, |cell, focus| cell.track_focus(&focus))
+                .on_key_down(move |event, window, cx| {
+                    if event.keystroke.key.as_str() != "tab" {
+                        return;
+                    }
+                    let current = navigating
+                        .pending_header
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| own.clone());
+                    let Some(index) = navigation.iter().position(|key| *key == current) else {
+                        return;
+                    };
+                    let next = if event.keystroke.modifiers.shift {
+                        index.checked_sub(1)
+                    } else {
+                        (index + 1 < navigation.len()).then_some(index + 1)
+                    };
+                    if let Some(next) = next {
+                        *navigating.pending_header.borrow_mut() = Some(navigation[next].clone());
+                        window.refresh();
+                        cx.stop_propagation();
+                    }
+                });
             let key = column.key.clone();
             let next = direction.map_or(SortDirection::Ascending, SortDirection::reversed);
             let clicked = key.clone();
@@ -1782,10 +2243,21 @@ impl DataGrid {
         };
         let cell = cell.semantic_in(cx, spec);
 
-        // A column that moved slides from where it was; the layout already
-        // put it where the caller says it belongs.
-        let handle = flip(ident.child("slide").semantic_id(), window, cx);
-        cell.flip(&handle, window, cx).into_any_element()
+        // A virtualized surface changes its child set while scrolling. Keep
+        // those headers on the exact body geometry, without a position tween.
+        if draggable.is_some() && state.horizontal.max_offset().x == px(0.0) {
+            let handle = flip(
+                ident
+                    .child("slide")
+                    .child(if cx.is_rtl() { "rtl" } else { "ltr" })
+                    .semantic_id(),
+                window,
+                cx,
+            );
+            cell.flip(&handle, window, cx).into_any_element()
+        } else {
+            cell.into_any_element()
+        }
     }
 
     /// The grab area on a column's trailing edge.
@@ -1813,7 +2285,10 @@ impl DataGrid {
             .id(ident.element_id())
             .absolute()
             .top_0()
-            .right(px(-RESIZE_HANDLE / 2.0))
+            .when(cx.is_rtl(), |handle| handle.left(px(-RESIZE_HANDLE / 2.0)))
+            .when(!cx.is_rtl(), |handle| {
+                handle.right(px(-RESIZE_HANDLE / 2.0))
+            })
             .w(px(RESIZE_HANDLE))
             .h(px(height))
             .flex()
@@ -1909,8 +2384,14 @@ impl DataGrid {
         };
         let edges: HashMap<SharedString, MeasuredEdge> = columns
             .iter()
-            .filter(|column| column.resizable)
-            .map(|column| {
+            .enumerate()
+            .filter(|(index, column)| {
+                column.resizable
+                    && (column.pinned
+                        || state.columns.borrow().visible.contains(index)
+                        || state.resizing.borrow().as_ref() == Some(&column.key))
+            })
+            .map(|(_, column)| {
                 let ident = self.ident.child("header").child(column.key.as_ref());
                 (
                     column.key.clone(),
@@ -1939,8 +2420,12 @@ impl DataGrid {
             let Some((bounds, min_width)) = edges.get(&key) else {
                 return;
             };
-            let left = f32::from(bounds.get().left());
-            let width = (f32::from(event.position.x) - left).max(*min_width);
+            let width = if cx.is_rtl() {
+                f32::from(bounds.get().right() - event.position.x)
+            } else {
+                f32::from(event.position.x - bounds.get().left())
+            }
+            .max(*min_width);
             handler(key, width, window, cx);
         })
     }
@@ -2136,7 +2621,24 @@ impl DataGrid {
             window,
             cx,
         );
+        let mut next = None;
+        let mut next_editable = vec![None; columns.len()];
+        for (index, column) in columns.iter().enumerate().rev() {
+            next_editable[index] = next.clone();
+            if column.editable {
+                next = Some(column.key.clone());
+            }
+        }
         let context = Rc::new(RowContext {
+            render_row: Rc::clone(&self.render_row),
+            next_editable,
+            navigation: Rc::new(
+                columns
+                    .iter()
+                    .map(|column| (column.key.clone(), column.editable))
+                    .collect(),
+            ),
+            count: self.count,
             lines: self.lines,
             selected: self.selected.clone(),
             selection_mode: self.selection_mode,
@@ -2173,6 +2675,7 @@ impl DataGrid {
                                 detail_rows,
                                 &columns,
                                 row,
+                                index,
                                 open,
                                 render_detail.as_ref(),
                                 &context,
@@ -2278,6 +2781,10 @@ impl DataGrid {
 
 /// Everything a row needs that does not come from the row itself.
 struct RowContext {
+    render_row: RenderRow,
+    next_editable: Vec<Option<SharedString>>,
+    navigation: Rc<Vec<(SharedString, bool)>>,
+    count: usize,
     lines: GridLines,
     selected: BTreeSet<SharedString>,
     selection_mode: SelectionMode,
@@ -2303,6 +2810,7 @@ fn row_element(
     detail_rows: usize,
     columns: &[GridColumn],
     mut row: GridRow,
+    row_index: usize,
     open: bool,
     render_detail: Option<&RenderDetail>,
     context: &RowContext,
@@ -2316,8 +2824,24 @@ fn row_element(
         && context.selection_mode != SelectionMode::None
         && context.on_select.is_some();
     let direction = cx.layout_direction();
-    let pinned = columns.iter().filter(|column| column.pinned).count();
+    let pinned = context.state.columns.borrow().pinned;
     let hover_group = ident.child("hover").semantic_id();
+    let retained = context
+        .editing
+        .as_ref()
+        .filter(|edit| edit.row == row.id)
+        .map(|edit| &edit.column)
+        .cloned()
+        .or_else(|| {
+            context
+                .state
+                .focus_cell
+                .borrow()
+                .as_ref()
+                .filter(|(id, _)| id == &row.id)
+                .map(|(_, key)| key.clone())
+        })
+        .and_then(|key| columns.iter().position(|column| column.key == key));
 
     let mut element = div()
         .id(ident.element_id())
@@ -2361,17 +2885,26 @@ fn row_element(
         {
             element = element.child(disclosure(&ident, theme, &row, open, expand, cx));
         }
-        for (position, column) in columns.iter().enumerate() {
+        for slot in context
+            .state
+            .columns
+            .borrow()
+            .row_slots(columns, 0, retained)
+        {
+            let ColumnSlot::Cell(position, column) = slot else {
+                if let ColumnSlot::Gap(width) = slot {
+                    element = element.child(column_gap(width));
+                }
+                continue;
+            };
             // Tab leaves an open cell for the next editable column in the same
             // row. A row whose editable columns are exhausted simply commits:
             // the row after it may not have been drawn, and the grid will not
             // build a row nobody asked to see in order to guess where a caret
             // should go.
-            let next = columns
-                .iter()
-                .skip(position + 1)
-                .find(|next| next.editable)
-                .map(|next| (row.id.clone(), next.key.clone()));
+            let next = context.next_editable[position]
+                .clone()
+                .map(|key| (row.id.clone(), key));
             element = element.child(cell_element(
                 &ident,
                 theme,
@@ -2379,7 +2912,7 @@ fn row_element(
                 column,
                 &mut row,
                 next,
-                position == 0,
+                (row_index, position),
                 context,
                 window,
                 cx,
@@ -2391,19 +2924,22 @@ fn row_element(
             + usize::from(has_disclosure);
         let held_extra =
             theme.space(Space::Sm) + gutter_count as f32 * GUTTER + theme.space(Space::Sm);
-        let mut held = section_frame(div(), &columns[..pinned], held_extra)
+        let mut held = context
+            .state
+            .columns
+            .borrow()
+            .section(div(), columns, 0..pinned, held_extra)
             .relative()
             .row_reading(direction)
             .bg(if selected {
-                theme.colors.selected
+                theme.washed_surface(Surface::Panel, theme.colors.selected)
             } else {
                 theme.colors.panel
             })
             .when(selectable && !selected, |element| {
-                let hover = theme.colors.hover;
+                let hover = theme.washed_surface(Surface::Panel, theme.colors.hover);
                 element.group_hover(hover_group, move |style| style.bg(hover))
             })
-            .selected_fill(theme, selected)
             .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
         if context.selection_mode == SelectionMode::Multiple {
             held = held.child(row_mark(theme, selected));
@@ -2416,11 +2952,9 @@ fn row_element(
             held = held.child(div().w(px(GUTTER)).flex_none());
         }
         for (position, column) in columns[..pinned].iter().enumerate() {
-            let next = columns
-                .iter()
-                .skip(position + 1)
-                .find(|next| next.editable)
-                .map(|next| (row.id.clone(), next.key.clone()));
+            let next = context.next_editable[position]
+                .clone()
+                .map(|key| (row.id.clone(), key));
             held = held.child(cell_element(
                 &ident,
                 theme,
@@ -2428,7 +2962,7 @@ fn row_element(
                 column,
                 &mut row,
                 next,
-                position == 0,
+                (row_index, position),
                 context,
                 window,
                 cx,
@@ -2436,17 +2970,43 @@ fn row_element(
         }
         held = held.child(pinned_edge(theme, direction));
 
-        let mut moving =
-            section_frame(div(), &columns[pinned..], theme.space(Space::Sm)).row_reading(direction);
-        for (offset, column) in columns[pinned..].iter().enumerate() {
-            let position = pinned + offset;
-            let next = columns
-                .iter()
-                .skip(position + 1)
-                .find(|next| next.editable)
-                .map(|next| (row.id.clone(), next.key.clone()));
+        let mut moving = context
+            .state
+            .columns
+            .borrow()
+            .section(
+                div(),
+                columns,
+                pinned..columns.len(),
+                theme.space(Space::Sm),
+            )
+            .row_reading(direction);
+        for slot in context
+            .state
+            .columns
+            .borrow()
+            .row_slots(columns, pinned, retained)
+        {
+            let ColumnSlot::Cell(position, column) = slot else {
+                if let ColumnSlot::Gap(width) = slot {
+                    moving = moving.child(column_gap(width));
+                }
+                continue;
+            };
+            let next = context.next_editable[position]
+                .clone()
+                .map(|key| (row.id.clone(), key));
             moving = moving.child(cell_element(
-                &ident, theme, height, column, &mut row, next, false, context, window, cx,
+                &ident,
+                theme,
+                height,
+                column,
+                &mut row,
+                next,
+                (row_index, position),
+                context,
+                window,
+                cx,
             ));
         }
         moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
@@ -2668,12 +3228,12 @@ fn cell_element(
     column: &GridColumn,
     row: &mut GridRow,
     next: Option<(SharedString, SharedString)>,
-    logical_start: bool,
+    address: (usize, usize),
     context: &RowContext,
-    _window: &mut Window,
+    window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
-    let cell = row.take(&column.key);
+    let cell = row.take(&column.key, window, cx);
     let editing = context
         .editing
         .as_ref()
@@ -2686,11 +3246,19 @@ fn cell_element(
 
     // A treegrid's rendered columns are structural gridcells, not optional
     // diagnostic detail. DataGrid retains its opt-in publication policy.
-    let published =
-        context.hierarchy || cell.as_ref().is_some_and(|cell| cell.published) || editable;
+    let targeted = context
+        .state
+        .focus_cell
+        .borrow()
+        .as_ref()
+        .is_some_and(|(id, key)| id == &row.id && key == &column.key);
+    let published = context.hierarchy
+        || cell.as_ref().is_some_and(|cell| cell.published)
+        || editable
+        || targeted;
     let text = cell.as_ref().and_then(|cell| cell.text.clone());
     let mut content = cell.map(|cell| cell.content.into_element(theme, row.disabled));
-    if logical_start && context.hierarchy {
+    if address.1 == 0 && context.hierarchy {
         let hierarchy = row.hierarchy.clone();
         let direction = cx.layout_direction();
         let mut leading = div()
@@ -2751,6 +3319,55 @@ fn cell_element(
         .overflow_hidden()
         .when(in_range, |element| range_cell(element, theme))
         .children(content);
+
+    if (editable || ranged || targeted) && !context.disabled && !row.disabled {
+        let state = Rc::clone(&context.state);
+        let navigation = Rc::clone(&context.navigation);
+        let render_row = Rc::clone(&context.render_row);
+        let count = context.count;
+        let direction = context.direction;
+        let focus = state.navigation_focus.borrow().clone().filter(|_| targeted);
+        frame = frame
+            .tab_index(0)
+            .when_some(focus, |frame, focus| frame.track_focus(&focus))
+            .on_key_down(move |event, window, cx| {
+                let key = event.keystroke.key.as_str();
+                let (row, column) = address;
+                let destination = match key {
+                    "up" => row.checked_sub(1).map(|row| (row, column)),
+                    "down" => (row + 1 < count).then_some((row + 1, column)),
+                    "home" => Some((row, 0)),
+                    "end" => navigation.len().checked_sub(1).map(|column| (row, column)),
+                    "tab" => {
+                        let target = if event.keystroke.modifiers.shift {
+                            (0..column).rev().find(|index| navigation[*index].1)
+                        } else {
+                            (column + 1..navigation.len()).find(|index| navigation[*index].1)
+                        };
+                        target.map(|column| (row, column))
+                    }
+                    _ => match direction.arrow_step(key) {
+                        Some(-1) => column.checked_sub(1).map(|column| (row, column)),
+                        Some(1) => (column + 1 < navigation.len()).then_some((row, column + 1)),
+                        _ => None,
+                    },
+                };
+                if let Some((mut row, column)) = destination {
+                    if row != address.0 {
+                        let step = if row < address.0 { -1 } else { 1 };
+                        let Some((reachable, _)) =
+                            reachable(&render_row, row, step, count, window, cx)
+                        else {
+                            return;
+                        };
+                        row = reachable;
+                    }
+                    *state.pending_cell.borrow_mut() = Some((row, navigation[column].0.clone()));
+                    window.refresh();
+                    cx.stop_propagation();
+                }
+            });
+    }
 
     if let (true, Some(request)) = (editable, context.on_edit_request.clone()) {
         let row_id = row.id.clone();
@@ -3446,7 +4063,7 @@ fn range_tsv(
     for row in &rows[first..=last] {
         let cells: Vec<String> = columns[left..=right]
             .iter()
-            .map(|column| tsv_escape(row.cell_text(column.key()).as_ref()))
+            .map(|column| tsv_escape(row.cell_text(column.key(), window, cx).as_ref()))
             .collect();
         lines.push(cells.join("\t"));
     }

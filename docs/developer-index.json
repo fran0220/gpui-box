@@ -1105,7 +1105,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4265
+      "symbolCount": 4267
     },
     {
       "name": "gpui-box-kit-assets",
@@ -67426,9 +67426,9 @@
       "module": "data::grid",
       "path": "gpui_kit::data::grid",
       "source": "crates/gpui-kit/src/data/grid.rs",
-      "summary": "A grid that renders only the rows its viewport holds.",
-      "documentation": "A grid that renders only the rows its viewport holds.",
-      "signature": "# [doc = \" A grid that renders only the rows its viewport holds.\"] # [derive (IntoElement)] pub struct DataGrid { ident : Ident, count : usize, total : Option<usize>, render_row : RenderRow, render_detail : Option<RenderDetail>, columns : Vec<GridColumn>, groups : Vec<ColumnGroup>, footer : Vec<(SharedString, SharedString)>, lines : GridLines, sort : Option<(SharedString, SortDirection)>, selection_mode : SelectionMode, selected : BTreeSet<SharedString>, expanded : Vec<Expanded>, detail_rows : usize, editing : Option<EditingCell>, row_height : Option<f32>, visible_rows : Option<usize>, size : ControlSize, disabled : bool, loading : bool, failure : Option<SharedString>, empty : Option<EmptyState>, slots : Slots, on_sort : Option<SortHandler>, on_select : Option<SelectHandler>, on_resize : Option<ResizeHandler>, on_fit : Option<FitHandler>, on_reorder : Option<ReorderHandler>, on_expand : Option<ExpandHandler>, on_edit_request : Option<EditRequestHandler>, on_edit : Option<EditHandler>, range : Option<CellRange>, on_range_change : Option<RangeHandler>, on_copy : Option<CopyHandler>, hierarchy : bool, }",
+      "summary": "A grid that virtualizes rows and columns over caller-owned data.",
+      "documentation": "A grid that virtualizes rows and columns over caller-owned data.",
+      "signature": "# [doc = \" A grid that virtualizes rows and columns over caller-owned data.\"] # [derive (IntoElement)] pub struct DataGrid { ident : Ident, count : usize, total : Option<usize>, render_row : RenderRow, render_detail : Option<RenderDetail>, columns : Vec<GridColumn>, groups : Vec<ColumnGroup>, footer : Vec<(SharedString, SharedString)>, lines : GridLines, sort : Option<(SharedString, SortDirection)>, selection_mode : SelectionMode, selected : BTreeSet<SharedString>, expanded : Vec<Expanded>, detail_rows : usize, editing : Option<EditingCell>, row_height : Option<f32>, reveal : Option<(usize, SharedString)>, visible_rows : Option<usize>, size : ControlSize, disabled : bool, loading : bool, failure : Option<SharedString>, empty : Option<EmptyState>, slots : Slots, on_sort : Option<SortHandler>, on_select : Option<SelectHandler>, on_resize : Option<ResizeHandler>, on_fit : Option<FitHandler>, on_reorder : Option<ReorderHandler>, on_expand : Option<ExpandHandler>, on_edit_request : Option<EditRequestHandler>, on_edit : Option<EditHandler>, range : Option<CellRange>, on_range_change : Option<RangeHandler>, on_copy : Option<CopyHandler>, hierarchy : bool, }",
       "cfg": []
     },
     {
@@ -67818,6 +67818,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn row_height (mut self, height : f32) -> Self",
+      "cfg": [],
+      "target": "DataGrid"
+    },
+    {
+      "id": "gpui_kit::data::grid::DataGrid::scroll_to_cell",
+      "name": "scroll_to_cell",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::grid",
+      "path": "gpui_kit::data::grid",
+      "source": "crates/gpui-kit/src/data/grid.rs",
+      "summary": "Reveals a caller-addressed row and column with nearest-edge scrolling. A changed request runs once; omitting it rearms the same target. This does not select, edit, or focus the cell. Invalid addresses do nothing.",
+      "documentation": "Reveals a caller-addressed row and column with nearest-edge scrolling.\nA changed request runs once; omitting it rearms the same target. This\ndoes not select, edit, or focus the cell. Invalid addresses do nothing.",
+      "signature": "pub fn scroll_to_cell (mut self, row : usize, column : impl Into<SharedString>) -> Self",
       "cfg": [],
       "target": "DataGrid"
     },
@@ -68231,7 +68246,7 @@
       "source": "crates/gpui-kit/src/data/grid.rs",
       "summary": "One row, built on demand, keyed by the identity the row already has.",
       "documentation": "One row, built on demand, keyed by the identity the row already has.",
-      "signature": "# [doc = \" One row, built on demand, keyed by the identity the row already has.\"] pub struct GridRow { id : SharedString, text : Option<SharedString>, disabled : bool, cells : Vec<(SharedString, Cell)>, hierarchy : Option<HierarchyRow>, }",
+      "signature": "# [doc = \" One row, built on demand, keyed by the identity the row already has.\"] pub struct GridRow { id : SharedString, text : Option<SharedString>, disabled : bool, cells : Vec<(SharedString, Cell)>, render_cell : Option<RenderCell>, hierarchy : Option<HierarchyRow>, }",
       "cfg": []
     },
     {
@@ -68246,6 +68261,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn cell (mut self, key : impl Into<SharedString>, cell : impl Into<Cell>) -> Self",
+      "cfg": [],
+      "target": "GridRow"
+    },
+    {
+      "id": "gpui_kit::data::grid::GridRow::cells_with",
+      "name": "cells_with",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::grid",
+      "path": "gpui_kit::data::grid",
+      "source": "crates/gpui-kit/src/data/grid.rs",
+      "summary": "Builds a cell only when its column is mounted, or explicitly requested by range copy. Eager `.cell` entries override this provider. Use this for wide datasets: filtering cannot undo work done by eager callers.",
+      "documentation": "Builds a cell only when its column is mounted, or explicitly requested\nby range copy. Eager `.cell` entries override this provider. Use this\nfor wide datasets: filtering cannot undo work done by eager callers.",
+      "signature": "pub fn cells_with (mut self, render : impl Fn (& SharedString, & mut Window, & mut App) -> Cell + 'static,) -> Self",
       "cfg": [],
       "target": "GridRow"
     },
@@ -121120,7 +121150,7 @@
       "kind": "builder",
       "path": "gpui_kit::data::DataGrid",
       "source": "crates/gpui-kit/src/data/grid.rs",
-      "summary": "A grid that renders only the rows its viewport holds.",
+      "summary": "A grid that virtualizes rows and columns over caller-owned data.",
       "construct": [
         "new(ident: impl Into<Ident>, count: usize, render_row: impl Fn(usize, &mut Window, &mut App) -> GridRow + 'static) -> Self"
       ],
@@ -121142,6 +121172,7 @@
         "editing(cell: Option<EditingCell>) -> Self",
         "row_height(height: f32) -> Self",
         "visible_rows(rows: usize) -> Self",
+        "scroll_to_cell(row: usize, column: impl Into<SharedString>) -> Self",
         "loading(loading: bool) -> Self",
         "failure(failure: impl Into<SharedString>) -> Self",
         "empty(empty: EmptyState) -> Self",
@@ -129294,6 +129325,7 @@
       ],
       "options": [
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
+        "cells_with(render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
       ],

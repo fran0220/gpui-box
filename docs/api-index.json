@@ -1426,7 +1426,7 @@
       "kind": "builder",
       "path": "gpui_kit::data::DataGrid",
       "source": "crates/gpui-kit/src/data/grid.rs",
-      "summary": "A grid that renders only the rows its viewport holds.",
+      "summary": "A grid that virtualizes rows and columns over caller-owned data.",
       "construct": [
         "new(ident: impl Into<Ident>, count: usize, render_row: impl Fn(usize, &mut Window, &mut App) -> GridRow + 'static) -> Self"
       ],
@@ -1448,6 +1448,7 @@
         "editing(cell: Option<EditingCell>) -> Self",
         "row_height(height: f32) -> Self",
         "visible_rows(rows: usize) -> Self",
+        "scroll_to_cell(row: usize, column: impl Into<SharedString>) -> Self",
         "loading(loading: bool) -> Self",
         "failure(failure: impl Into<SharedString>) -> Self",
         "empty(empty: EmptyState) -> Self",
@@ -9600,6 +9601,7 @@
       ],
       "options": [
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
+        "cells_with(render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
       ],

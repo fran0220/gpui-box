@@ -498,9 +498,7 @@ fn a_wide_grid_scrolls_as_one_surface_and_freezes_its_pinned_group(cx: &mut Test
     let moving_cell_before = harness
         .bounds("wide-grid.row-0.status")
         .expect("moving body cell");
-    let summary_before = harness
-        .bounds("wide-grid.summary.updated")
-        .expect("moving summary cell");
+    assert!(harness.bounds("wide-grid.summary.updated").is_none());
     let at = harness.point_in("wide-grid");
     harness.context().simulate_event(ScrollWheelEvent {
         position: at,
@@ -537,7 +535,14 @@ fn a_wide_grid_scrolls_as_one_surface_and_freezes_its_pinned_group(cx: &mut Test
         moving_cell_after.origin.x - moving_cell_before.origin.x,
         shift
     );
-    assert_eq!(summary_after.origin.x - summary_before.origin.x, shift);
+    assert_eq!(
+        summary_after.origin.x,
+        harness
+            .bounds("wide-grid.header.updated")
+            .expect("revealed summary header")
+            .origin
+            .x
+    );
 }
 
 #[gpui::test]
@@ -638,17 +643,14 @@ fn a_frozen_group_holds_the_right_reading_edge_in_rtl(cx: &mut TestAppContext) {
     let owner_before = harness
         .bounds("rtl-grid.header.owner")
         .expect("first moving RTL header");
-    let updated_before = harness
-        .bounds("rtl-grid.header.updated")
-        .expect("last moving RTL header");
+    assert!(harness.bounds("rtl-grid.header.updated").is_none());
     assert!(
         pinned_before.right() <= grid.right(),
         "pinned {pinned_before:?}, grid {grid:?}"
     );
     assert!(
         pinned_before.right() > moving_before.right(),
-        "pinned {pinned_before:?}, owner {owner_before:?}, status {moving_before:?}, updated \
-         {updated_before:?}, grid {grid:?}"
+        "pinned {pinned_before:?}, owner {owner_before:?}, status {moving_before:?}, grid {grid:?}"
     );
 
     let at = harness.point_in("rtl-grid");
@@ -1055,4 +1057,268 @@ fn a_double_click_on_a_column_edge_asks_for_a_fit_and_measures_nothing(cx: &mut 
         vec!["duration".to_string()],
         "the grid cannot measure the rows it never drew, so it reports the request"
     );
+}
+
+#[gpui::test]
+fn thousands_of_variable_columns_build_only_the_viewport_and_reveal_both_axes(
+    cx: &mut TestAppContext,
+) {
+    let calls = Rc::new(std::cell::Cell::new(0));
+    let target = Rc::new(std::cell::Cell::new(0));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let calls = Rc::clone(&calls);
+        let target = Rc::clone(&target);
+        move |_, _| {
+            let calls = Rc::clone(&calls);
+            let target = target.get();
+            div()
+                .w(px(870.0))
+                .child(
+                    DataGrid::new("wide-lazy", 10_000, move |row, _, _| {
+                        let calls = Rc::clone(&calls);
+                        GridRow::new(format!("record-{row}")).cells_with(move |key, _, _| {
+                            calls.set(calls.get() + 1);
+                            Cell::new(format!("{row}/{key}"))
+                                .text(format!("{row}/{key}"))
+                                .published(true)
+                        })
+                    })
+                    .columns((0..2_000).map(|index| {
+                        let column =
+                            GridColumn::new(format!("field-{index}"), format!("Field {index}"))
+                                .pinned(index == 0)
+                                .editable(true);
+                        if index % 5 == 0 {
+                            column.flex(2.0).min_width(150.0)
+                        } else {
+                            column.fixed(130.0 + (index % 7) as f32 * 23.0)
+                        }
+                    }))
+                    .footer_cell("field-1503", "Total 1503")
+                    .row_height(31.5)
+                    .visible_rows(6)
+                    .scroll_to_cell(
+                        if target == 0 { 0 } else { 7_503 },
+                        format!("field-{target}"),
+                    ),
+                )
+                .into_any_element()
+        }
+    });
+    calls.set(0);
+    harness.frame();
+    assert!(calls.get() < 100, "lazy cells built: {}", calls.get());
+    assert!(harness.bounds("wide-lazy.header.field-1503").is_none());
+    let frozen = harness
+        .bounds("wide-lazy.header.field-0")
+        .expect("pinned header");
+    target.set(1503);
+    harness.frame();
+    harness.frame();
+    let header = harness
+        .bounds("wide-lazy.header.field-1503")
+        .expect("revealed header");
+    let body = harness
+        .bounds("wide-lazy.record-7503.field-1503")
+        .expect("revealed body cell");
+    let footer = harness
+        .bounds("wide-lazy.summary.field-1503")
+        .expect("revealed summary");
+    let grid = harness.bounds("wide-lazy").expect("grid viewport");
+    assert_eq!(header.origin.x, body.origin.x);
+    assert_eq!(header.size.width, body.size.width);
+    assert_eq!(header.origin.x, footer.origin.x);
+    assert!(
+        header.left() >= frozen.right(),
+        "{header:?}, frozen {frozen:?}"
+    );
+    assert!(header.right() <= grid.right(), "{header:?}, grid {grid:?}");
+    assert_eq!(
+        harness
+            .bounds("wide-lazy.header.field-0")
+            .expect("retained pinned header")
+            .origin
+            .x,
+        frozen.origin.x
+    );
+    assert!(harness.bounds("wide-lazy.header.field-20").is_none());
+    calls.set(0);
+    harness.frame();
+    assert!(
+        calls.get() < 100,
+        "scrolled lazy cells built: {}",
+        calls.get()
+    );
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
+    target.set(1504);
+    harness.frame();
+    harness.frame();
+    let header = harness
+        .bounds("wide-lazy.header.field-1504")
+        .expect("RTL revealed header");
+    let body = harness
+        .bounds("wide-lazy.record-7503.field-1504")
+        .expect("RTL revealed body cell");
+    let frozen = harness
+        .bounds("wide-lazy.header.field-0")
+        .expect("RTL pinned header");
+    assert_eq!(header.origin.x, body.origin.x);
+    assert!(
+        header.right() <= frozen.left(),
+        "{header:?}, frozen {frozen:?}"
+    );
+    assert!(header.left() >= grid.left(), "{header:?}, grid {grid:?}");
+}
+
+#[gpui::test]
+fn keyboard_navigation_mounts_offscreen_cells_instead_of_skipping_them(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(480.0))
+            .child(
+                DataGrid::new("nav-wide", 100, |row, _, _| {
+                    GridRow::new(format!("r-{row}")).cells_with(move |key, _, _| {
+                        Cell::new(format!("{row}/{key}")).published(true)
+                    })
+                })
+                .columns((0..1_000).map(|index| {
+                    GridColumn::new(format!("c-{index}"), "Field")
+                        .fixed(200.0)
+                        .editable(true)
+                }))
+                .visible_rows(3),
+            )
+            .into_any_element()
+    });
+    harness.update(|window, cx| window.focus_next(cx));
+    harness.keystrokes("end");
+    assert!(harness.bounds("nav-wide.r-0.c-999").is_some());
+    assert!(
+        harness
+            .node("nav-wide.r-0.c-999")
+            .expect("End target")
+            .focused
+    );
+    assert!(harness.bounds("nav-wide.r-0.c-1").is_none());
+    harness.keystrokes("left");
+    assert!(harness.bounds("nav-wide.r-0.c-998").is_some());
+    assert!(
+        harness
+            .node("nav-wide.r-0.c-998")
+            .expect("previous column")
+            .focused
+    );
+    harness.keystrokes("home");
+    assert!(harness.bounds("nav-wide.r-0.c-0").is_some());
+    harness.keystrokes("down down down down");
+    assert!(harness.bounds("nav-wide.r-4.c-0").is_some());
+    assert!(
+        harness
+            .node("nav-wide.r-4.c-0")
+            .expect("revealed row")
+            .focused
+    );
+}
+
+#[gpui::test]
+fn header_tab_order_crosses_an_unmounted_run_without_skipping_columns(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(480.0))
+            .child(
+                DataGrid::new("header-wide", 1, |_, _, _| GridRow::new("row"))
+                    .columns((0..1_000).map(|index| {
+                        GridColumn::new(format!("c-{index}"), "Field")
+                            .fixed(200.0)
+                            .sortable(index >= 10)
+                    }))
+                    .on_sort(|_, _, _, _| {})
+                    .visible_rows(1),
+            )
+            .into_any_element()
+    });
+    harness.update(|window, cx| window.focus_next(cx));
+    assert!(
+        harness
+            .node("header-wide.header.c-10")
+            .expect("first sortable header")
+            .focused
+    );
+    harness.keystrokes("tab tab tab tab");
+    assert!(
+        harness
+            .node("header-wide.header.c-14")
+            .expect("fourth Tab target")
+            .focused
+    );
+    harness.keystrokes("shift-tab");
+    assert!(
+        harness
+            .node("header-wide.header.c-13")
+            .expect("reverse Tab target")
+            .focused
+    );
+    let header = harness
+        .bounds("header-wide.header.c-13")
+        .expect("focused header");
+    let grid = harness.bounds("header-wide").expect("viewport");
+    assert!(header.left() >= grid.left() && header.right() <= grid.right());
+}
+
+#[gpui::test]
+fn lazy_edit_tab_reveals_the_next_editable_column_and_copy_reads_offscreen_values(
+    cx: &mut TestAppContext,
+) {
+    let editing = Rc::new(RefCell::new(Some(EditingCell::new("r-0", "c-0", "seed"))));
+    let copied = Rc::new(RefCell::new(String::new()));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let editing = Rc::clone(&editing);
+        let copied = Rc::clone(&copied);
+        move |_, _| {
+            let accepted = Rc::clone(&editing);
+            let copied = Rc::clone(&copied);
+            div()
+                .w(px(480.0))
+                .child(
+                    DataGrid::new("edit-wide", 3, |row, _, _| {
+                        GridRow::new(format!("r-{row}"))
+                            .cell("c-997", Cell::new("override").text("override"))
+                            .cells_with(move |key, _, _| {
+                                Cell::new(format!("{row}/{key}")).text(format!("{row}/{key}"))
+                            })
+                    })
+                    .columns((0..1_000).map(|index| {
+                        GridColumn::new(format!("c-{index}"), "Field")
+                            .fixed(200.0)
+                            .editable(index == 0 || index == 999)
+                    }))
+                    .editing(editing.borrow().clone())
+                    .visible_rows(3)
+                    .on_edit(move |intent, _, _| {
+                        assert_eq!(intent.outcome, EditOutcome::Commit);
+                        assert_eq!(intent.next, Some(("r-0".into(), "c-999".into())));
+                        *accepted.borrow_mut() = Some(EditingCell::new("r-0", "c-999", "next"));
+                    })
+                    .range(Some(CellRange::new("r-1", "c-998", "r-0", "c-997")))
+                    .on_copy(move |text, _, _| *copied.borrow_mut() = text.to_string()),
+                )
+                .into_any_element()
+        }
+    });
+    harness.keystrokes("tab");
+    assert!(harness.bounds("edit-wide.header.c-999").is_some());
+    assert_eq!(
+        harness
+            .node("edit-wide.edit")
+            .expect("moved editor")
+            .value
+            .as_deref(),
+        Some("next")
+    );
+    // Leave the input: copy here is a grid action, not the input's own copy.
+    *editing.borrow_mut() = None;
+    harness.frame();
+    harness.click("edit-wide.r-0.c-999");
+    harness.keystrokes("ctrl-c");
+    assert_eq!(&*copied.borrow(), "override\t0/c-998\noverride\t1/c-998");
 }

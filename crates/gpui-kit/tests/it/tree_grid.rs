@@ -237,9 +237,7 @@ fn a_wide_tree_grid_keeps_hierarchy_context_frozen_while_fields_scroll(cx: &mut 
         owner_header_before.origin.x, owner_cell_before.origin.x,
         "the hierarchy disclosure lives inside its cell and must not offset the header"
     );
-    let field_before = harness
-        .bounds("wide-tree-grid.header.status")
-        .expect("moving field");
+    assert!(harness.bounds("wide-tree-grid.header.status").is_none());
     let at = harness.point_in("wide-tree-grid");
     harness.context().simulate_event(ScrollWheelEvent {
         position: at,
@@ -256,5 +254,13 @@ fn a_wide_tree_grid_keeps_hierarchy_context_frozen_while_fields_scroll(cx: &mut 
         .bounds("wide-tree-grid.header.status")
         .expect("moving field after scroll");
     assert_eq!(hierarchy_after.origin.x, hierarchy_before.origin.x);
-    assert!(field_after.origin.x < field_before.origin.x - px(240.0));
+    assert_eq!(
+        field_after.origin.x,
+        harness
+            .bounds("wide-tree-grid.node-0.status")
+            .expect("revealed tree cell")
+            .origin
+            .x
+    );
+    assert!(field_after.origin.x < owner_header_before.right());
 }
