@@ -972,6 +972,13 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn cancel_context_menu(&self, _session: NativeMenuSessionId) -> Result<bool, NativeMenuError> {
         Ok(false)
     }
+    /// Observes a menu only while inside the actual native tracking call.
+    /// Queued menus and test-platform simulations must return `None`. This is
+    /// instrumentation for native loop smoke tests, not presentation state.
+    #[cfg(any(test, feature = "test-support"))]
+    fn native_context_menu_tracking(&self) -> Option<NativeMenuSessionId> {
+        None
+    }
     fn start_window_move(&self) {}
     fn can_start_external_drag(&self) -> bool {
         false

@@ -201,6 +201,29 @@ replacement and cancellation need macOS/Windows execution; a Linux test pass
 does not establish that native behavior. No renderer or baseline changes are
 part of this primitive.
 
+On a logged-in macOS/Windows desktop, run:
+
+```sh
+cargo run --locked -p gpui-box-platform --features test-support --example native_menu_smoke
+```
+
+This smoke opens actual OS menus and observes the backend inside
+`NSMenu`/`TrackPopupMenuEx` before cancelling. It checks completed cancellation,
+same-window and cross-window replacement, stale/wrong-owner cancellation,
+destruction of a stale owner without closing the new menu, destruction during
+active tracking, and successful presentation after teardown. The observation
+API is test-support-only; simulated/queued menus cannot supply that evidence.
+Every replacement must really enter native tracking, and every cancelled
+session must complete with the specified outcome. An independent 45-second
+watchdog fails on a blocked modal loop or shutdown, reporting the last phase.
+Unsupported capability is a failure, not a skipped test or Kit fallback.
+Capture both output streams as `target/native-menu-smoke.log` in each native
+Platforms lane. Exit zero plus the final `native-menu-smoke: PASS` line is
+required. Linux compilation/shared tests do not validate this smoke; native
+execution must be recorded separately. This lifecycle smoke does not inject
+OS selection/escape input or establish native command-selection accessibility;
+queued stale-command and effect-owner invariants retain their shared tests.
+
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the
 transparent overlay plane uses grayscale antialiasing because RGB subpixel

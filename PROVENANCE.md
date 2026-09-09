@@ -887,3 +887,8 @@ Incremental accessible paragraph publication, shared run payloads, and indexed
 run-local native selection conversion are original GPUI Box work using the
 existing Ropey, Unicode and AccessKit dependencies. No external source port,
 adapter fork or historical receipt change is involved.
+
+The native-menu lifecycle smoke and test-support tracking observation are
+original GPUI Box work. They observe the existing NSMenu/Win32 call boundary
+without introducing another implementation, imported source, or dependency.
+The frozen historical import receipt remains unchanged.

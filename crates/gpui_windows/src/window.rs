@@ -870,6 +870,16 @@ impl PlatformWindow for WindowsWindow {
         cancel_native_context_menu(id, self.0.hwnd)
     }
 
+    #[cfg(feature = "test-support")]
+    fn native_context_menu_tracking(&self) -> Option<NativeMenuSessionId> {
+        CONTEXT_MENU.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .filter(|menu| menu.hwnd == self.0.hwnd && menu.tracking.get())
+                .map(|menu| menu.session.id())
+        })
+    }
+
     fn scale_factor(&self) -> f32 {
         self.state.scale_factor.get()
     }

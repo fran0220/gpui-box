@@ -492,6 +492,11 @@ mod tests {
         };
         let first = open(cx);
         let first_id = first.id();
+        window
+            .update(cx, |_, window, _| {
+                assert_eq!(window.native_context_menu_tracking(), None);
+            })
+            .expect("simulated open menu is observable but not native tracking evidence");
         cx.select_context_menu_item(*window, &[0]); // command queued but not yet dispatched
         let second = open(cx);
         let second_id = second.id();

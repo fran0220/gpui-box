@@ -2954,6 +2954,16 @@ impl Window {
         self.platform_window.cancel_context_menu(session)
     }
 
+    /// Observes the current revision only while inside its native OS menu
+    /// tracking call. Queued presentations and simulated menus return `None`;
+    /// a replaced revision may still be leaving its loop when this is `None`.
+    /// Only native smoke tests should use this; await session completion to
+    /// determine closure in application code.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn native_context_menu_tracking(&self) -> Option<crate::NativeMenuSessionId> {
+        self.platform_window.native_context_menu_tracking()
+    }
+
     /// Handle window movement for Linux and macOS.
     /// Tells the compositor to take control of window movement (Wayland and X11)
     ///

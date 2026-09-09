@@ -1976,6 +1976,17 @@ impl PlatformWindow for MacWindow {
         Ok(cancel_native_context_menu(session, view))
     }
 
+    #[cfg(feature = "test-support")]
+    fn native_context_menu_tracking(&self) -> Option<NativeMenuSessionId> {
+        let view = self.0.lock().native_view.as_ptr() as usize;
+        CONTEXT_MENU.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .filter(|menu| menu.view == view && menu.tracking_menu.get() != 0)
+                .map(|menu| menu.session.id())
+        })
+    }
+
     fn minimize(&self) {
         let window = self.0.lock().native_window;
         unsafe {

@@ -16,6 +16,10 @@ workspace = true
 name = "gpui_platform"
 path = "src/gpui_platform.rs"
 
+[[example]]
+name = "native_menu_smoke"
+required-features = ["native-platform", "test-support"]
+
 [features]
 # `font-kit` is a default because a native window without it silently renders
 # no text at all: `MacPlatform` falls back to `NoopTextSystem`. Deterministic

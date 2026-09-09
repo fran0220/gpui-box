@@ -498,3 +498,7 @@ the frozen historical import receipt remain intact.
 Incremental accessible paragraph updates and run-local selection indexing are
 original GPUI Box changes, using the existing Unicode and AccessKit licenses.
 No additional third-party code or dependency was imported.
+
+Native-menu tracking-loop smoke and test-only observation are original GPUI
+Box work using the existing platform APIs. No third-party source or license
+was added; upstream notices and the frozen import receipt remain intact.
