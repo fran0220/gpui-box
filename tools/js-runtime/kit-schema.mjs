@@ -3,6 +3,16 @@ import { familySchemas as controlsSchemas, familyMethods as controlsMethods, val
 import { familySchemas as navigationSchemas, familyMethods as navigationMethods, validateFamilyProps as validateNavigation } from './kit-navigation_extra-schema.mjs';
 import { familySchemas as layoutSchemas, familyMethods as layoutMethods, validateFamilyProps as validateLayout } from './kit-layout_extra-schema.mjs';
 import { familySchemas as dateSchemas, familyMethods as dateMethods, validateFamilyProps as validateDataFamily } from './kit-datetime-schema.mjs';
+import { familySchemas as displaySchemas, familyMethods as displayMethods, validateFamilyProps as validateDisplay } from './kit-display-schema.mjs';
+import { familySchemas as chartsSchemas, familyMethods as chartsMethods, validateFamilyProps as validateCharts } from './kit-charts-schema.mjs';
+import { familySchemas as agentSchemas, familyMethods as agentMethods, validateProps as validateAgent } from './kit-agent-schema.mjs';
+import { familySchemas as gameSchemas, familyMethods as gameMethods, validateProps as validateGame } from './kit-game-effects-schema.mjs';
+import { familySchemas as canvasSchemas, familyMethods as canvasMethods, validateCanvasProps } from './kit-canvas-schema.mjs';
+import { familySchemas as overlaySchemas, familyMethods as overlayMethods, validateOverlayProps } from './kit-overlay-schema.mjs';
+import { familySchemas as contentSchemas, familyMethods as contentMethods, validateDescriptor as validateContent } from './kit-content-schema.mjs';
+import { familySchemas as mediaSchemas, familyMethods as mediaMethods, validateDescriptor as validateMedia } from './kit-media-schema.mjs';
+import { familySchemas as dataSchemas, familyMethods as dataMethods, validateFamilyProps as validateDataViews } from './kit-data-schema.mjs';
+import { familySchemas as structuredSchemas, familyMethods as structuredMethods, validateFamilyProps as validateStructured } from './kit-structured-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { type: 'string', min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -19,6 +29,8 @@ const selectOption = object({ ...selectionItem.fields, description: string, grou
 
 export const kitSchemas = Object.freeze({
   ...controlsSchemas, ...navigationSchemas, ...layoutSchemas, ...dateSchemas,
+  ...displaySchemas, ...chartsSchemas, ...agentSchemas, ...gameSchemas, ...canvasSchemas,
+  ...overlaySchemas, ...contentSchemas, ...mediaSchemas, ...dataSchemas, ...structuredSchemas,
   Checkbox: { props: object({ ...labeled, checked: choice(true, false, null) }), events: { change: boolean } },
   Radio: { props: object({ ...labeled, selected: boolean }), events: { select: choice(null) } },
   Switch: { props: object({ ...labeled, name: string, on: boolean, invalid: boolean }), events: { change: boolean } },
@@ -188,6 +200,14 @@ export function validateKitProps(component, id, props) {
   if (Object.hasOwn(navigationSchemas, component)) validateNavigation(component, props);
   if (Object.hasOwn(layoutSchemas, component)) validateLayout(component, props);
   if (Object.hasOwn(dateSchemas, component)) validateDataFamily(component, props);
+  if (Object.hasOwn(displaySchemas, component)) validateDisplay(component, props);
+  if (Object.hasOwn(chartsSchemas, component)) validateCharts(component, props);
+  if (Object.hasOwn(agentSchemas, component)) validateAgent(component, props);
+  if (Object.hasOwn(gameSchemas, component)) validateGame(component, props);
+  if (Object.hasOwn(canvasSchemas, component)) validateCanvasProps(component, props);
+  if (Object.hasOwn(overlaySchemas, component)) validateOverlayProps(component, props);
+  if (Object.hasOwn(dataSchemas, component)) validateDataViews(component, props);
+  if (Object.hasOwn(structuredSchemas, component)) validateStructured(component, props);
   if (component === 'Slider') {
     const { min = 0, max = 1, value = min, high } = props;
     if (min >= max || value < min || value > max || (high !== undefined && (high < value || high > max))) throw new TypeError('Slider: invalid range');
@@ -207,6 +227,8 @@ export function validateKitProps(component, id, props) {
 // The tree validator owns recursive slots, semantic-id uniqueness and aggregate budgets.
 export function validateKitSlots(component, props, slots) {
   validateSlots(kitSchemas[component], props, slots);
+  if (Object.hasOwn(contentSchemas, component)) validateContent({ component, props, slots });
+  if (Object.hasOwn(mediaSchemas, component)) validateMedia({ component, props, slots });
 }
 
 export function validateSlots(schema, props, slots) {
@@ -260,6 +282,8 @@ export function validateKitDescriptor(node) {
 const method = (fields, result = choice(null)) => ({ args: object(fields, Object.keys(fields)), result });
 export const kitMethods = Object.freeze({
   ...controlsMethods, ...navigationMethods, ...layoutMethods, ...dateMethods,
+  ...displayMethods, ...chartsMethods, ...agentMethods, ...gameMethods, ...canvasMethods,
+  ...overlayMethods, ...contentMethods, ...mediaMethods, ...dataMethods, ...structuredMethods,
   TextInput: {
     invoke: {
       set_name: method({ name: string }), set_placeholder: method({ placeholder: string }),

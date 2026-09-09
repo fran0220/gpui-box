@@ -44,8 +44,8 @@ test('merged family factories validate required data, relational rules and typed
   assert.throws(() => validateInvocation('DateInput', 'calendar', {}, 'query'), /Unsupported/);
   assert.throws(() => validateInvocation('Calendar', 'adapter', {}, 'query'), /Unsupported/);
   assert.equal(validateInvocation('DateInput', 'calendar_snapshot', {}, 'query'), kitMethods.DateInput.query.calendar_snapshot);
-  assert.equal(Object.keys(kitSchemas).length, 51);
-  assert.equal(Object.keys(kit).length, 51);
+  assert.equal(Object.keys(kitSchemas).length, 177);
+  assert.equal(Object.keys(kit).length, 177);
 });
 
 test('disabled controls register no callable handlers', () => {
@@ -167,7 +167,7 @@ kit.ScrollArea('scroll', {}, {}, {start:[]});
 // @ts-expect-error radio does not have the switch option
 kit.Radio('radio', {on:true});
 // @ts-expect-error unsupported catalog names are not callable
-kit.NodeGraph('graph');
+kit.NumberInput('number');
 // @ts-expect-error numeric text is not accepted
 kit.TextInput('input', {text:4});
 // @ts-expect-error change is boolean rather than arbitrary event data
