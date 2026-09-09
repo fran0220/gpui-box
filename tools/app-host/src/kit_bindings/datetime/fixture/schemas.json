@@ -1,0 +1,1235 @@
+{
+  "Calendar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "integer": true,
+            "min": -9007199254740991,
+            "max": 9007199254740991
+          },
+          "max": 4096
+        },
+        "multi": {
+          "type": "boolean"
+        },
+        "month": {
+          "type": "number",
+          "integer": true,
+          "min": -9007199254740991,
+          "max": 9007199254740991
+        },
+        "range": {
+          "type": "object",
+          "fields": {
+            "start": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991
+            },
+            "end": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            }
+          },
+          "required": [
+            "start"
+          ],
+          "nullable": true
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "day": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              }
+            },
+            "required": [
+              "day",
+              "label"
+            ]
+          },
+          "max": 4096
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "pick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "monthShown": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "hover": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991,
+        "nullable": true
+      }
+    },
+    "slots": [
+      "empty"
+    ]
+  },
+  "DateInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "integer": true,
+          "min": -9007199254740991,
+          "max": 9007199254740991,
+          "nullable": true
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "change": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "unparsable": {
+        "type": "object",
+        "fields": {
+          "text": {
+            "type": "string",
+            "max": 16384
+          },
+          "message": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "open": {
+        "enum": [
+          null
+        ]
+      },
+      "close": {
+        "enum": [
+          null
+        ]
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "RangePicker": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "range": {
+          "type": "object",
+          "fields": {
+            "start": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991
+            },
+            "end": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            }
+          },
+          "required": [
+            "start"
+          ],
+          "nullable": true
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "day": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              }
+            },
+            "required": [
+              "day",
+              "label"
+            ]
+          },
+          "max": 4096
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "startPick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "endPick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      }
+    }
+  },
+  "TimeInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "value": {
+          "type": "object",
+          "fields": {
+            "hour": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99
+            },
+            "minute": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99
+            },
+            "second": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99,
+              "nullable": true
+            },
+            "meridiem": {
+              "enum": [
+                0,
+                1,
+                null
+              ]
+            }
+          },
+          "required": [
+            "hour",
+            "minute"
+          ]
+        },
+        "seconds": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "change": {
+        "type": "object",
+        "fields": {
+          "hour": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99
+          },
+          "minute": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99
+          },
+          "second": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99,
+            "nullable": true
+          },
+          "meridiem": {
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          }
+        },
+        "required": [
+          "hour",
+          "minute"
+        ]
+      }
+    }
+  }
+}

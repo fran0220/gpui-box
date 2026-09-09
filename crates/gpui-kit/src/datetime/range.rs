@@ -198,6 +198,10 @@ impl RangePicker {
         cx.notify();
     }
 
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled == disabled {
             return;

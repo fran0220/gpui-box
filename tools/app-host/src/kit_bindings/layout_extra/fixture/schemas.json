@@ -1,0 +1,1815 @@
+{
+  "AspectRatio": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "ratio": {
+          "type": "number",
+          "min": 0.0001,
+          "max": 1000000
+        },
+        "fit": {
+          "enum": [
+            "width",
+            "height"
+          ]
+        }
+      },
+      "required": [
+        "ratio"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "Container": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "width": {
+          "enum": [
+            "full",
+            "readable",
+            "dialog",
+            "custom"
+          ]
+        },
+        "customWidth": {
+          "type": "number",
+          "min": 0.0001,
+          "max": 1000000
+        },
+        "padding": {
+          "enum": [
+            "xxs",
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "Grid": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "columns": {
+          "type": "number",
+          "min": 1,
+          "max": 65535,
+          "integer": true
+        },
+        "columnsAt": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "breakpoint": {
+                "enum": [
+                  "small",
+                  "medium",
+                  "large",
+                  "extraLarge"
+                ]
+              },
+              "columns": {
+                "type": "number",
+                "min": 1,
+                "max": 65535,
+                "integer": true
+              }
+            },
+            "required": [
+              "breakpoint",
+              "columns"
+            ]
+          },
+          "max": 4
+        },
+        "gap": {
+          "enum": [
+            "xxs",
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "span": {
+                "type": "number",
+                "min": 1,
+                "max": 65535,
+                "integer": true
+              },
+              "spanAt": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "breakpoint": {
+                      "enum": [
+                        "small",
+                        "medium",
+                        "large",
+                        "extraLarge"
+                      ]
+                    },
+                    "span": {
+                      "type": "number",
+                      "min": 1,
+                      "max": 65535,
+                      "integer": true
+                    }
+                  },
+                  "required": [
+                    "breakpoint",
+                    "span"
+                  ]
+                },
+                "max": 4
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slotIds": "items"
+  },
+  "Responsive": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "threshold": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "fill": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "threshold"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "unmeasured",
+      "narrow",
+      "wide"
+    ]
+  },
+  "ScrollFade": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "top": {
+          "type": "boolean"
+        },
+        "bottom": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "boolean"
+        },
+        "right": {
+          "type": "boolean"
+        },
+        "band": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "fitHeight": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "ScrollEdgeEffect": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "top": {
+          "type": "boolean"
+        },
+        "bottom": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "boolean"
+        },
+        "right": {
+          "type": "boolean"
+        },
+        "band": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "blur": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "kind": {
+          "enum": [
+            "soft",
+            "hard"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "SplitTree": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "parent": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "minWidth": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "minHeight": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "rail": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "kind": {
+                "enum": [
+                  "pane",
+                  "horizontal",
+                  "vertical"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": [
+        "records"
+      ]
+    },
+    "events": {
+      "change": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "ratio"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "ratio"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "collapsed"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "side": {
+                "enum": [
+                  "start",
+                  "end"
+                ]
+              },
+              "pane": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "side",
+              "pane"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "records"
+  },
+  "DockTree": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "parent": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "minWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "minHeight": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "rail": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "enum": [
+                      "stack"
+                    ]
+                  },
+                  "panels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "min": 1,
+                      "max": 256
+                    },
+                    "max": 1024
+                  },
+                  "active": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "parent": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "minWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "minHeight": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "rail": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "enum": [
+                      "horizontal",
+                      "vertical"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ]
+              }
+            ]
+          },
+          "max": 1024
+        },
+        "floating": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "stack": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "parent": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "ratio": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "minWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "minHeight": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "rail": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "collapsed": {
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "enum": [
+                          "stack"
+                        ]
+                      },
+                      "panels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "min": 1,
+                          "max": 256
+                        },
+                        "max": 1024
+                      },
+                      "active": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "parent": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "ratio": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "minWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "minHeight": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "rail": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "collapsed": {
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  }
+                ]
+              },
+              "bounds": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              }
+            },
+            "required": [
+              "stack",
+              "bounds"
+            ]
+          },
+          "max": 1024
+        },
+        "panels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "unavailable": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": [
+        "records"
+      ]
+    },
+    "events": {
+      "event": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingRaised"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingCancelled"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingChanged"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "bounds": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              },
+              "finished": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "bounds",
+              "finished"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSelected"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "panel"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelMoved"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "toStack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "before": {
+                "type": "string",
+                "min": 1,
+                "max": 256,
+                "nullable": true
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "toStack",
+              "before"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSplit"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "targetStack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "placement": {
+                "enum": [
+                  "left",
+                  "right",
+                  "top",
+                  "bottom"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "targetStack",
+              "placement"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "splitResized"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "ratio"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "stackCollapsed"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "collapsed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "collapsed"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "panels"
+  },
+  "Dock": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "panels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "unavailable": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "region"
+            ]
+          },
+          "max": 1024
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "active": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "share": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "minSize": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 4
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "event": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSelected"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "panel"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelMoved"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "toRegion": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "before": {
+                "type": "string",
+                "min": 1,
+                "max": 256,
+                "nullable": true
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "toRegion",
+              "before"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "regionCollapsed"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "collapsed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "collapsed"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "regionResized"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "ratio"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "panels"
+  },
+  "Toolbar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "spacer": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "shortcut": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "group"
+            ]
+          },
+          "max": 1024
+        },
+        "overflow": {
+          "type": "boolean"
+        },
+        "overflowAfter": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000,
+          "integer": true
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "overflowSelect": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    },
+    "slotIds": "items"
+  },
+  "DesktopTitlebar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "title": {
+          "type": "string",
+          "max": 16384
+        },
+        "subtitle": {
+          "type": "string",
+          "max": 16384
+        },
+        "buttons": {
+          "type": "object",
+          "fields": {
+            "left": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "minimize",
+                  "maximize",
+                  "close"
+                ]
+              },
+              "max": 3
+            },
+            "right": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "minimize",
+                  "maximize",
+                  "close"
+                ]
+              },
+              "max": 3
+            }
+          },
+          "required": []
+        },
+        "controls": {
+          "type": "object",
+          "fields": {
+            "fullscreen": {
+              "type": "boolean"
+            },
+            "maximize": {
+              "type": "boolean"
+            },
+            "minimize": {
+              "type": "boolean"
+            },
+            "windowMenu": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "fullscreen",
+            "maximize",
+            "minimize",
+            "windowMenu"
+          ]
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "events": {
+      "event": {
+        "enum": [
+          "minimize",
+          "toggleMaximize",
+          "close"
+        ]
+      }
+    },
+    "slots": [
+      "left",
+      "right"
+    ]
+  },
+  "StatusBar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "enum": [
+                  "start",
+                  "centre",
+                  "end"
+                ]
+              },
+              "kind": {
+                "enum": [
+                  "text",
+                  "state",
+                  "progress",
+                  "action",
+                  "element"
+                ]
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "stale": {
+                "type": "boolean"
+              },
+              "stateName": {
+                "type": "string",
+                "max": 16384
+              },
+              "fraction": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "count": {
+                "type": "object",
+                "fields": {
+                  "done": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000,
+                    "integer": true
+                  },
+                  "total": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000,
+                    "integer": true
+                  }
+                },
+                "required": [
+                  "done",
+                  "total"
+                ]
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "click": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    },
+    "slotIds": "items"
+  }
+}

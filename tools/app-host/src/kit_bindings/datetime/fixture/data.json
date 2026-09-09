@@ -1,0 +1,23 @@
+{
+  "today": 11,
+  "weekdays": ["One", "Two", "Three"],
+  "months": [
+    {"month":90,"label":"First","weeks":[[{"day":11},{"day":17},{"day":31,"adjacent":true}]]},
+    {"month":4,"label":"Second","weeks":[[{"day":17,"adjacent":true},{"day":31},{"day":null}]]}
+  ],
+  "days": [
+    {"day":11,"month":90,"label":"A","formatted":"first A","aliases":["alpha"]},
+    {"day":17,"month":90,"label":"B","formatted":"first B","blocked":"maintenance"},
+    {"day":31,"month":4,"label":"C","formatted":"second C"}
+  ],
+  "parseError": "unknown spelling",
+  "unknownDay": "outside supplied data",
+  "completeRange": true,
+  "clock": {
+    "hourMin":0,"hourMax":3,"minuteMax":4,"secondMax":2,
+    "hours":["zero","one","two","three"],
+    "minutes":["00","01","02","03","04"],
+    "seconds":["a","b","c"],
+    "separator":"·","meridiemSeparator":" "
+  }
+}

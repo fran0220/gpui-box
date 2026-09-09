@@ -132,6 +132,18 @@ impl DateInput {
         self
     }
 
+    /// Reconfigures validation without replacing the live editor or popover.
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        cx.notify();
+    }
+
+    /// Reconfigures density without replacing the live editor or popover.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
     pub fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
         self
@@ -159,6 +171,10 @@ impl DateInput {
                 .update(cx, |calendar, cx| calendar.set_selection(vec![day], cx));
         }
         cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {

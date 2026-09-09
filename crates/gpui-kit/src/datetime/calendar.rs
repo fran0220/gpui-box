@@ -165,6 +165,23 @@ impl Calendar {
         self
     }
 
+    /// Changes selection presentation without replacing focus or navigation.
+    pub fn set_multi(&mut self, multi: bool, cx: &mut Context<Self>) {
+        self.multi = multi;
+        cx.notify();
+    }
+
+    /// Clears transient navigation after the caller replaces its calendar data.
+    /// Focus and caller-owned selection are preserved.
+    pub fn reset_navigation(&mut self, cx: &mut Context<Self>) {
+        self.cursor = None;
+        self.hovered = None;
+        self.month = None;
+        self.requested_month = None;
+        self.day_idents.borrow_mut().clear();
+        cx.notify();
+    }
+
     /// The month to open on, for a calendar whose host knows where it wants
     /// to start but has nothing selected and no today.
     pub fn month(mut self, month: MonthKey) -> Self {
@@ -210,6 +227,10 @@ impl Calendar {
         }
         self.range = range;
         cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {

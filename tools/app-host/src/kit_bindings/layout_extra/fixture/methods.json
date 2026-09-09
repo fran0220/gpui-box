@@ -1,0 +1,37 @@
+{
+  "AspectRatio": {
+    "invoke": {},
+    "query": {
+      "ratio": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "min": 0.0001,
+          "max": 1000000
+        }
+      }
+    }
+  },
+  "Toolbar": {
+    "invoke": {},
+    "query": {
+      "item_count": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "min": 0,
+          "max": 1024,
+          "integer": true
+        }
+      }
+    }
+  }
+}

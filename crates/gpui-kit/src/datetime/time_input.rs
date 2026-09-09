@@ -142,6 +142,29 @@ impl TimeInput {
         cx.notify();
     }
 
+    /// Changes segment visibility while retaining the value and focus.
+    pub fn set_seconds(&mut self, seconds: bool, cx: &mut Context<Self>) {
+        self.seconds = seconds;
+        if seconds && self.value.second.is_none() {
+            self.value.second = Some(0);
+        }
+        if !seconds && self.active == Segment::Second {
+            self.active = Segment::Minute;
+            self.typed.clear();
+        }
+        cx.notify();
+    }
+
+    /// Changes density without resetting the active segment or typed digits.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         cx.notify();
