@@ -175,3 +175,42 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   The framework scrolling owner now owns inherited effect/clipboard context;
   native clipboard gestures must not silently bypass an owner's capability
   denial. Existing verified CopyButton success still requires readback.
+
+### Second combined source checkpoint
+
+- Integrated global accessibility text indexing, background Markdown parsing,
+  retained segmented document plans, cross-stream performance fixtures,
+  selective icon resources, floating Dock stacks, and the Settings overlap fix.
+- The exact combined source passed `CARGO_INCREMENTAL=0 cargo run -p xtask --
+  gate full`: 324 Linux images match in 443.91 seconds; workspace tests,
+  Clippy, generated catalogs, wasm32 compilation, rustdoc and all 49 performance
+  reports passed. The eager 10,000-item negative detector still refuses its
+  unbounded fixture; no performance budgets were relaxed.
+- At both 1,000 and 10,000 history blocks, Markdown static redraw constructs
+  zero new plans, a new 21-byte message constructs one, and the next 21-byte
+  tail append constructs two. Caller metadata iteration and full accessibility
+  publication still scale with document size: these are not bounded-total-work
+  claims. Retained accessibility publication remains active editor work.
+- Settings had a real overlap despite the first checkpoint's inspected image:
+  a 240px Sidebar was allocated only 160px. The corrected exhibit allocates
+  its intrinsic width; Sidebar spans x16..256 and content starts x272.
+  Default and dark no-match images were inspected again with no overlap.
+  The floating Dock image was also inspected; it deliberately shows one
+  floating inspector over the main workspace, not detached OS windows.
+- First native Platforms run 34370021007 passed native macOS but failed image
+  comparisons and the Windows UIA menu watchdog. Old Settings Metal/WARP
+  images must not be accepted. Windows baseline drift is under independent
+  artifact/history review. A separate UIA capture fix preserves timeout
+  diagnostics; it does not establish that native menu behavior is fixed.
+- The first hosted deployment failed before activation because publication
+  depended on stale macOS images. Publication now selects the Linux daily
+  authority consistently for copying and fingerprinting, publishes explicit
+  image-source metadata, and rejects missing scene/theme images. Browser
+  inspection passed in both site themes: the NavStack live surface and static
+  preview fit, and both Linux-derived images loaded. Native Chromium 2x was
+  required because CDP-only DPR emulation reported contradictory device-pixel
+  sizes; CSS width 920, backing width 1840 and DPR 2 then agreed. Successful
+  deployment remains separate release evidence.
+- Effect-owner, clipboard, multicursor and runtime candidates remain outside
+  this frozen checkpoint. Full native JS bindings, OS sandbox execution and
+  the runtime owner's live-window black client area remain unresolved.
