@@ -176,6 +176,7 @@ fn build(root: &Path) -> Result<String> {
     collect(&source_root, &mut files)?;
     files.sort();
 
+    let mut sources = Vec::new();
     for file in &files {
         let relative = file
             .strip_prefix(root)
@@ -187,7 +188,21 @@ fn build(root: &Path) -> Result<String> {
         }
         let module = module_of(&relative);
         let source = strip(&fs::read_to_string(file)?);
-        read_source(&source, &module, &relative, &mut items, &mut events);
+        sources.push((source, module, relative));
+    }
+    // Rust permits inherent/trait impls in a child file which sorts before its
+    // declaration. Register all public owners before attaching any methods.
+    for declarations in [true, false] {
+        for (source, module, relative) in &sources {
+            read_source_pass(
+                source,
+                module,
+                relative,
+                &mut items,
+                &mut events,
+                declarations,
+            );
+        }
     }
 
     let scenes = read_scenes(&scene_source(&source_root)?, &items, root)?;
@@ -331,12 +346,26 @@ fn strip(source: &str) -> String {
     out
 }
 
+#[cfg(test)]
 fn read_source(
     source: &str,
     module: &str,
     relative: &str,
     items: &mut BTreeMap<String, Item>,
     events: &mut BTreeMap<String, Vec<String>>,
+) {
+    for declarations in [true, false] {
+        read_source_pass(source, module, relative, items, events, declarations);
+    }
+}
+
+fn read_source_pass(
+    source: &str,
+    module: &str,
+    relative: &str,
+    items: &mut BTreeMap<String, Item>,
+    events: &mut BTreeMap<String, Vec<String>>,
+    declarations: bool,
 ) {
     let lines: Vec<&str> = source.lines().collect();
     let mut docs: Vec<String> = Vec::new();
@@ -361,7 +390,7 @@ fn read_source(
             continue;
         }
 
-        if let Some(name) = declared(line, "pub struct ") {
+        if declarations && let Some(name) = declared(line, "pub struct ") {
             let entry = items.entry(name.clone()).or_default();
             entry.name = name;
             entry.module = module.to_string();
@@ -376,7 +405,7 @@ fn read_source(
             continue;
         }
 
-        if let Some(name) = declared(line, "pub enum ") {
+        if declarations && let Some(name) = declared(line, "pub enum ") {
             let (variants, next) = read_variants(&lines, at);
             if let Some(owner) = name.strip_suffix("Event") {
                 events.insert(owner.to_string(), variants.clone());
@@ -393,24 +422,15 @@ fn read_source(
             continue;
         }
 
-        if let Some(name) = rendered(line) {
+        if !declarations && let Some(name) = rendered(line) {
             // `impl Render for X` says X is mounted as an entity. It says
             // nothing about whether a caller can name X, and a view a
             // component spawns for itself — a drag ghost, a tooltip's own
             // view — is an implementation detail. Publishing one invites a
             // caller to write a type that is not in scope for them, which is
             // the single failure this index exists to prevent.
-            let reachable = items.contains_key(&name)
-                || source.contains(&format!("pub struct {name}"))
-                || source.contains(&format!("pub enum {name}"));
-            if reachable {
-                let entry = items.entry(name.clone()).or_default();
-                entry.name = name;
+            if let Some(entry) = items.get_mut(&name) {
                 entry.kind = Kind::View;
-                if entry.module.is_empty() {
-                    entry.module = module.to_string();
-                    entry.source = relative.to_string();
-                }
             }
             docs.clear();
             derives.clear();
@@ -418,10 +438,10 @@ fn read_source(
             continue;
         }
 
-        if let Some(name) = inherent(line) {
+        if !declarations && let Some(name) = inherent(line) {
             let functions = read_impl(&lines, at);
             // An inherent impl does not make a private declaration public.
-            // Only attach methods to a declaration already indexed above.
+            // Only attach methods to a public owner from the declaration pass.
             if let Some(entry) = items.get_mut(&name) {
                 for signature in functions {
                     let how = receiver(&signature);
@@ -440,7 +460,7 @@ fn read_source(
             continue;
         }
 
-        if let Some(name) = implemented(line, "Slotted") {
+        if !declarations && let Some(name) = implemented(line, "Slotted") {
             let slots = read_slots(&lines, at);
             if let Some(entry) = items.get_mut(&name) {
                 entry.slots = slots;
@@ -1186,6 +1206,70 @@ impl Render for Select {
 
     /// A caller needs to know whether a call chains, needs a `Context`, or
     /// only answers, and that is exactly what the receiver says.
+    #[test]
+    fn child_impls_attach_once_regardless_of_declaration_file_order() {
+        let child = strip(
+            "impl Editor {\n    pub fn set_service(&mut self, id: u64) {}\n    pub fn ready(&self) -> bool { true }\n}\nimpl Render for Editor {}\nimpl Internal {\n    pub fn hidden(&self) {}\n}\n",
+        );
+        let owner = strip(
+            "/// Public editor summary.\npub struct Editor;\nstruct Internal;\nimpl Editor {\n    pub fn new() -> Self { todo!() }\n}\n",
+        );
+        for sources in [
+            [(&child, "editor/services.rs"), (&owner, "editor.rs")],
+            [(&owner, "editor.rs"), (&child, "editor/services.rs")],
+        ] {
+            let mut items = BTreeMap::new();
+            let mut events = BTreeMap::new();
+            for declarations in [true, false] {
+                for (source, path) in sources {
+                    read_source_pass(
+                        source,
+                        "controls",
+                        path,
+                        &mut items,
+                        &mut events,
+                        declarations,
+                    );
+                }
+            }
+            let editor = &items["Editor"];
+            assert_eq!(editor.commands, ["set_service(id: u64)"]);
+            assert_eq!(editor.queries, ["ready() -> bool"]);
+            assert_eq!(editor.constructors, ["new() -> Self"]);
+            assert_eq!(editor.source, "editor.rs");
+            assert_eq!(editor.summary, "Public editor summary.");
+            assert_eq!(editor.kind, Kind::View);
+            assert!(!items.contains_key("Internal"));
+        }
+    }
+
+    #[test]
+    fn generated_editor_catalog_contains_cross_file_service_and_fold_signatures() {
+        let index: serde_json::Value =
+            serde_json::from_str(&build(&crate::root()).expect("generated index"))
+                .expect("index JSON");
+        let editor = index["components"]
+            .as_array()
+            .expect("components")
+            .iter()
+            .find(|item| item["name"] == "Editor")
+            .expect("Editor");
+        let commands = editor["commands"].as_array().expect("commands");
+        for signature in [
+            "set_folds(revision: u64, mut folds: Vec<EditorFold>, cx: &mut Context<Self>) -> bool",
+            "set_service_result(request: u64, mut result: AsyncValue<EditorServiceResult, SharedString>, cx: &mut Context<Self>) -> bool",
+        ] {
+            assert_eq!(
+                commands
+                    .iter()
+                    .filter(|command| command.as_str() == Some(signature))
+                    .count(),
+                1,
+                "{signature}"
+            );
+        }
+    }
+
     #[test]
     fn methods_are_sorted_by_what_the_caller_has_to_hold() {
         let source = strip(
