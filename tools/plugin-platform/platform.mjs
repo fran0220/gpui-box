@@ -114,6 +114,14 @@ export async function bundleDirectory(root, manifest) {
   return validateBundle({ manifest, files, sha256: createHash('sha256').update(data).digest('hex') });
 }
 
+/** Immutable in-memory receipt bytes; no file paths become resource authority. */
+export function bundleResources(bundle) {
+  validateBundle(bundle);
+  return (bundle.manifest.assets ?? []).map(asset => validateResourceRegistration({
+    key: asset.key, mime: asset.mime, data: Buffer.from(bundleFileBytes(bundle.files[asset.path])).toString('base64'),
+  }));
+}
+
 /** Offline, single-writer plugin store. Installing bytes never executes them. */
 export class PluginPlatform extends EventEmitter {
   constructor(root) { super(); this.root = resolve(root); this.active = new Map(); this.mutations = Promise.resolve(); }
@@ -188,7 +196,9 @@ export class PluginPlatform extends EventEmitter {
     if (!trusted && (!sandbox || sandbox !== nativeBackend)) throw new Error('Untrusted execution unavailable: explicit code trust or a native OS sandbox required');
     const registry = await this.registry();
     version ??= registry[id]?.current;
-    const { manifest } = await this.receipt(id, version);
+    const receipt = await this.receipt(id, version);
+    const { manifest } = receipt;
+    const assets = bundleResources(receipt);
     const previousRegistry = structuredClone(registry);
     if (!this.active.has(id) && this.active.size >= 8) throw new Error('At most 8 plugins may be active');
     for (const [dependency, expected] of Object.entries(manifest.dependencies)) {
@@ -206,6 +216,7 @@ export class PluginPlatform extends EventEmitter {
     session.on('fault', message => this.emit('diagnostic', { id, ...message }));
     let activated = false;
     session.on('render', message => { if (activated) this.emit('render', { id, ...message }); });
+    session.on('assets', () => { if (this.active.get(id)?.session === session) this.emit('assets', { id }); });
     session.on('invoke', request => {
       if (activated && this.listenerCount('invoke')) this.emit('invoke', { plugin: id, request });
       else session.finishNative(request.id, request.revision, null, 'Native invocation unavailable during activation or without a native host');
@@ -247,6 +258,7 @@ export class PluginPlatform extends EventEmitter {
       if (session.tree) this.emit('render', { id, kind: 'render', generation: session.generation, revision: session.revision, tree: session.tree });
       if (old) await old.session.stop();
       this.emit('changed');
+      void session.activatePackagedResources(assets);
       return session;
     } catch (error) { await session.stop(); throw error; }
   }

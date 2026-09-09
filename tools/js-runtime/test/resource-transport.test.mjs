@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { Session } from '../session.mjs';
+import { nativeBackend } from '../sandbox.mjs';
 import { readFrames, encodeFrame } from '../wire.mjs';
 import { validateResourceRegistration } from '../resource-schema.mjs';
 import { validateManifest, bundleDirectory } from '../../plugin-platform/platform.mjs';
@@ -21,7 +22,7 @@ async function worker(t, requested = ['resources']) {
       catch (error) { console.log(error.message); }
     });
   `);
-  const session = new Session({ root, entry: 'app.mjs', sandbox: 'linux', requested });
+  const session = new Session({ root, entry: 'app.mjs', sandbox: nativeBackend, requested });
   t.after(async () => { await session.stop(); await rm(root, { recursive: true, force: true }); });
   const ready = event(session, 'ready'); await session.start(); await ready;
   return session;
@@ -80,6 +81,29 @@ test('four native registrations are bounded and disposal cancels all', async t =
   await session.stop(); await Promise.all(pending);
   assert.equal(session.resourceRequests.size, 0);
   assert.equal(session.finishResource(1, session.generation, { key: 'pixels' }), false);
+});
+
+test('packaged activation disposal and revoke-between-reply-and-continuation retain no stale work', async t => {
+  const session=await worker(t);
+  session.decide('resources',true);
+  session.on('register-resource', request=>{
+    session.finishResource(request.id,request.generation,{key:request.registration.key});
+    session.decide('resources',false);
+    session.decide('resources',true);
+  });
+  assert.equal(await session.activatePackagedResources([registration]),false);
+  assert.equal(session.registeredAssets.size,0,'resolved old epoch cannot mark new epoch ready');
+  session.removeAllListeners('register-resource');
+  session.on('register-resource',()=>{});
+  const pending=session.activatePackagedResources();
+  await Promise.resolve();await Promise.resolve();
+  await session.stop();
+  assert.equal(await pending,false);
+  assert.equal(session.resourceRequests.size,0);
+  assert.equal(session.operations.size,0);
+  assert.equal(session.permissionWaiters.size,0);
+  assert.equal(session.packagedResources.length,0);
+  assert.equal(await session.activatePackagedResources([registration]),false);
 });
 
 test('asset declarations are closed, consent-required and copied by validated directory bundle', async t => {

@@ -65,6 +65,7 @@ try {
       await mkdir(dirname(resolve(destination, 'app', path)), { recursive: true });
       await writeFile(resolve(destination, 'app', path), bundleFileBytes(content));
     }
+    await writeFile(resolve(destination, 'app/.gpui-bundle.json'), JSON.stringify(bundle), { flag: 'wx', mode: 0o600 });
     await mkdir(resolve(destination, 'tools/app-host'), { recursive: true });
     await cp(host, resolve(destination, process.platform === 'win32' ? 'gpui-box-app-host.exe' : 'gpui-box-app-host'));
     for (const dir of ['js-runtime', 'plugin-platform']) await cp(resolve(here, '..', dir), resolve(destination, 'tools', dir), { recursive: true });

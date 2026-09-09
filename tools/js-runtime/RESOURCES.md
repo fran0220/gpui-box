@@ -78,6 +78,22 @@ Opening/reading checks inode, size and timestamps, and Linux checks the actual
 opened `/proc/self/fd` path before reading bytes. Files are snapshotted, not retained
 as paths or open handles.
 
+`gpui-app build` writes `.gpui-bundle.json` alongside the packaged app. Runtime
+activation validates that bounded byte receipt and its exact manifest/digest;
+it never rereads declared asset paths from a mutable development directory.
+Installed plugins use their validated installation receipt in the same way.
+An app declaring assets without a build receipt is refused with a rebuild
+instruction. Build-time snapshotting still requires the approved tree described
+below; a digest is integrity checking, not publisher authentication.
+
+After the app/plugin has committed a mounted generation, Session asks for the
+separate resources permission and serially registers those byte snapshots.
+The host shows Awaiting permission, Registering, Ready or an explicit Unavailable
+reason. Retry retains successfully registered keys after a partial failure;
+Revoke resources clears the grant, pending registrations and remembered keys.
+Reload/replacement has a fresh generation and never inherits consent. Corrupt
+replacement receipts retain the previous verified app and resources.
+
 The caller must supply an approved immutable package tree, not a concurrently
 mutable adversary directory. Portable Node has no directory-relative `openat`
 primitive; native macOS/Windows adversarial mutation-race protection has not been
@@ -127,5 +143,17 @@ the content adapter directly with a closed image reference. Resource transport,
 authorization, native storage, image resolution and real generation teardown are
 not mocked. The test is explicit/ignored by default because it requires a working
 native OS sandbox and the independently delivered runtime/content integrations.
-It does not establish binary package assembly or automatic packaged-asset
-activation; those remain the runtime/package owner's integration work.
+The separate packaged activation test exercises actual CLI directory assembly,
+the packaged runner and the central JS ImageViewer descriptor route:
+
+```sh
+cargo test -p gpui-box-app-host --all-features packaged_assets_activate_only_after_consent_and_revoke_on_reload -- --ignored --nocapture
+```
+
+It removes the raw asset file after building, proving runtime uses the receipt
+bytes; denial registers nothing, approval displays exact native fixture pixels,
+revocation removes them, and reload requests new consent. A corrupt receipt
+fails reload while preserving the last verified image. Captures are written to
+`.amp/in/artifacts/packaged-assets-*.png`. It packages the test executable as the
+host payload but runs the real Host in-process; it does not claim to launch that
+copied executable as a signed installer or verify native Windows/macOS packaging.

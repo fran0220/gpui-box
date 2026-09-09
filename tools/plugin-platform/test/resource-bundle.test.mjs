@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { bundleDirectory, bundleFileBytes, validateBundle, PluginPlatform } from '../platform.mjs';
 import { RESOURCE_LIMITS, rgbaResource } from '../../js-runtime/resource-schema.mjs';
+import { nativeBackend } from '../../js-runtime/sandbox.mjs';
 
 const asset = (key = 'opaque', path = 'assets/data.bin', mime = 'application/octet-stream') => ({ key, path, mime });
 const manifest = (assets = []) => ({ schema: 1, id: 'binary-test', version: '1.0.0', entry: 'main.mjs', permissions: ['resources'], dependencies: {}, contributes: { commands: [], panels: [], keymaps: [] }, assets });
@@ -19,6 +20,53 @@ async function directory(t) {
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
+
+test('installed package activation asks after commit, retries only missing assets and revokes on replacement', async t => {
+  const root=await mkdtemp(resolve(tmpdir(),'resource-activation-')), p=new PluginPlatform(root);
+  t.after(async()=>{await p.close();await rm(root,{recursive:true,force:true});});
+  const data={manifest:manifest([asset('first'),asset('second')]),files:{'main.mjs':"gpui.mount(()=>gpui.text('root','Mounted package'));",'assets/data.bin':binary([0,255,17,129])}};
+  await p.install({...data,sha256:createHash('sha256').update(JSON.stringify(data)).digest('hex')});
+  let allow=false, failSecond=true;
+  const requests=[];
+  p.on('permission',({id,capability,generation})=>{
+    const session=p.active.get(id)?.session;
+    assert.equal(session?.generation,generation,'consent only after committed ownership');
+    session.decide(capability,allow);
+  });
+  p.on('register-resource',({plugin,request})=>{
+    const session=p.active.get(plugin).session;
+    assert.equal(session.grants.has('resources'),true);
+    requests.push(request.registration);
+    session.finishResource(request.id,request.generation,{key:request.registration.key},failSecond&&request.registration.key==='second'?'Native host refused second':undefined);
+  });
+  const first=await p.enable('binary-test',{sandbox:nativeBackend});
+  await first.assetActivation;
+  assert.match(first.assetStatus,/^Unavailable:/);
+  assert.deepEqual(requests,[],'denial performs no native registration');
+  allow=true;
+  assert.equal(await first.activatePackagedResources(),false);
+  assert.deepEqual(requests.map(r=>r.key),['first','second']);
+  assert.equal(first.registeredAssets.has('first'),true,'partial failure keeps verified first asset');
+  failSecond=false;
+  assert.equal(await first.activatePackagedResources(),true);
+  assert.deepEqual(requests.map(r=>r.key),['first','second','second']);
+  assert.equal(requests[0].data,Buffer.from([0,255,17,129]).toString('base64'));
+  first.decide('resources',false);
+  assert.equal(first.registeredAssets.size,0);
+  assert.equal(await first.activatePackagedResources(),true);
+  assert.deepEqual(requests.slice(-2).map(r=>r.key),['first','second']);
+  const replacement=await p.enable('binary-test',{sandbox:nativeBackend});
+  assert.equal(first.closed,true);
+  assert.equal(first.packagedResources.length,0);
+  assert.equal(first.registeredAssets.size,0);
+  await replacement.assetActivation;
+  assert.equal(replacement.assetStatus,'Ready');
+  assert.notEqual(replacement.generation,first.generation);
+  await p.disable('binary-test');
+  assert.equal(replacement.operations.size,0);
+  assert.equal(replacement.resourceRequests.size,0);
+  assert.equal(replacement.packagedResources.length,0);
+});
 
 test('asymmetric RGBA and opaque bytes survive directory, JSON digest, install and receipt', async t => {
   const root = await directory(t), store = await directory(t);

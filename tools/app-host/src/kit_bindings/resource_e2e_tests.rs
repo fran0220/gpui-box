@@ -5,6 +5,203 @@ use crate::*;
 use gpui::{EffectOwner, HeadlessAppContext};
 use std::{path::PathBuf, rc::Rc, sync::Arc, time::Instant};
 
+#[test]
+#[ignore = "requires native renderer and real OS-isolated worker"]
+fn packaged_assets_activate_only_after_consent_and_revoke_on_reload() -> Result<()> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = std::env::temp_dir().join(format!("gpui-packaged-assets-{}", std::process::id()));
+    std::fs::create_dir_all(&temp)?;
+    let manifest = json!({"schema":1,"id":"packaged-fixture","version":"1.0.0","entry":"main.mjs","permissions":["resources"],"dependencies":{},"contributes":{"commands":[],"keymaps":[],"panels":[]},"assets":[{"key":"pixels","path":"pixels.rgba","mime":"image/x.gpui-rgba8"}]});
+    std::fs::write(temp.join("app.json"), serde_json::to_vec(&manifest)?)?;
+    std::fs::write(
+        temp.join("main.mjs"),
+        "gpui.mount(()=>gpui.kit.ImageViewer('image',{height:110,frames:[{id:'pixels',label:'Explicit packaged fixture',state:'ready',width:32,height:16,resource:{key:'pixels'}}]}));",
+    )?;
+    let mut pixels = Vec::new();
+    pixels.extend(32_u32.to_le_bytes());
+    pixels.extend(16_u32.to_le_bytes());
+    for index in 0..32 * 16 {
+        pixels.extend(if index % 32 < 16 {
+            [211, 31, 47, 255]
+        } else {
+            [17, 73, 199, 255]
+        });
+    }
+    std::fs::write(temp.join("pixels.rgba"), pixels)?;
+    let package = temp.with_extension("package");
+    let build =
+        std::process::Command::new(std::env::var("GPUI_NODE").unwrap_or_else(|_| "node".into()))
+            .arg(root.join("cli.mjs"))
+            .arg("build")
+            .arg(&temp)
+            .arg(&package)
+            .arg("--host")
+            .arg(std::env::current_exe()?)
+            .output()?;
+    ensure!(
+        build.status.success(),
+        "real package build: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    // Runtime must use the verified byte receipt, not mutable asset paths.
+    std::fs::remove_file(package.join("app/pixels.rgba"))?;
+    let bridge = Bridge::start(vec![
+        package
+            .join("tools/app-host/runner.mjs")
+            .display()
+            .to_string(),
+        package.join("app").display().to_string(),
+        "--data-dir".into(),
+        temp.join("data").display().to_string(),
+    ])?;
+    let mut cx = HeadlessAppContext::with_platform(
+        gpui_platform::test_text_system("Geist"),
+        Arc::new(gpui_kit::assets::Assets),
+        gpui_platform::current_headless_renderer,
+    );
+    cx.update(gpui_kit::install);
+    let _armed = cx.update(|cx| SemanticCoordinator::global(cx).arm());
+    let host = cx.open_window(size(px(980.), px(760.)), |window, cx| {
+        cx.new(|cx| {
+            let focus = cx.focus_handle();
+            window.focus(&focus, cx);
+            let clipboard = clipboard::Policy::install(bridge.outgoing.clone(), cx);
+            let resource_store = resources::Resources::install(cx);
+            cx.on_release(|host: &mut Host, cx| {
+                host.clipboard.release(cx);
+                host.resource_store.clear(cx);
+            })
+            .detach();
+            Host {
+                bridge,
+                frame: None,
+                rendered_revision: Default::default(),
+                error: None,
+                focus,
+                kit: Default::default(),
+                clipboard,
+                resource_store,
+                references: Default::default(),
+                deferred: Default::default(),
+            }
+        })
+    })?;
+    let mut registrations = 0;
+    let deny = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Deny"
+    })?;
+    assert_eq!(registrations, 0, "declared assets do not bypass consent");
+    act(&mut cx, host, &deny)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.text.starts_with("Packaged assets: Unavailable:")
+    })?;
+    assert_eq!(registrations, 0, "denial registers no bytes");
+    let artifacts = root.join("../../.amp/in/artifacts");
+    std::fs::create_dir_all(&artifacts)?;
+    cx.capture_screenshot(host.into())?
+        .save(artifacts.join("packaged-assets-denied.png"))?;
+    let retry = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Retry packaged assets" && !node.disabled
+    })?;
+    act(&mut cx, host, &retry)?;
+    let allow = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Allow for this session"
+    })?;
+    act(&mut cx, host, &allow)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Packaged assets: Ready"
+    })?;
+    assert_eq!(registrations, 1);
+    let rendered = cx.capture_screenshot(host.into())?;
+    assert!(rendered.pixels().any(|p| p.0 == [211, 31, 47, 255]));
+    assert!(rendered.pixels().any(|p| p.0 == [17, 73, 199, 255]));
+    rendered.save(artifacts.join("packaged-assets-ready.png"))?;
+    let image = wait(&mut cx, host, &mut registrations, |node| {
+        node.component.as_deref() == Some("ImageViewer")
+    })?;
+    let revoke = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Revoke resources" && !node.disabled
+    })?;
+    act(&mut cx, host, &revoke)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.text.starts_with("Packaged assets: Unavailable:")
+    })?;
+    let revoked = cx.capture_screenshot(host.into())?;
+    assert!(
+        !revoked
+            .pixels()
+            .any(|p| p.0 == [211, 31, 47, 255] || p.0 == [17, 73, 199, 255])
+    );
+    revoked.save(artifacts.join("packaged-assets-revoked.png"))?;
+    let retry = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Retry packaged assets" && !node.disabled
+    })?;
+    act(&mut cx, host, &retry)?;
+    let allow = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Allow for this session"
+    })?;
+    act(&mut cx, host, &allow)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Packaged assets: Ready"
+    })?;
+    assert_eq!(
+        registrations, 2,
+        "revoked native bucket accepts fresh registration"
+    );
+    let receipt_path = package.join("app/.gpui-bundle.json");
+    let receipt = std::fs::read(&receipt_path)?;
+    let mut corrupt: Value = serde_json::from_slice(&receipt)?;
+    corrupt["sha256"] = json!("0".repeat(64));
+    std::fs::write(&receipt_path, serde_json::to_vec(&corrupt)?)?;
+    let reload = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Reload app"
+    })?;
+    act(&mut cx, host, &reload)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.id == "host.error" && node.text.contains("integrity")
+    })?;
+    assert_eq!(registrations, 2, "invalid receipt never registers");
+    assert!(
+        cx.capture_screenshot(host.into())?
+            .pixels()
+            .any(|p| p.0 == [211, 31, 47, 255]),
+        "failed reload keeps last verified image"
+    );
+    std::fs::write(&receipt_path, receipt)?;
+    let reload = wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Reload app"
+    })?;
+    act(&mut cx, host, &reload)?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.component.as_deref() == Some("ImageViewer") && node.instance != image.instance
+    })?;
+    wait(&mut cx, host, &mut registrations, |node| {
+        node.text == "Allow for this session"
+    })?;
+    assert_eq!(registrations, 2, "reload cannot inherit consent");
+    let reloaded = cx.capture_screenshot(host.into())?;
+    assert!(
+        !reloaded
+            .pixels()
+            .any(|p| p.0 == [211, 31, 47, 255] || p.0 == [17, 73, 199, 255])
+    );
+    reloaded.save(artifacts.join("packaged-assets-reloaded.png"))?;
+    let semantics = cx
+        .update(|cx| SemanticCoordinator::global(cx).snapshot(host.window_id()))
+        .context("reloaded image semantics")?;
+    assert!(
+        semantics
+            .nodes
+            .iter()
+            .any(|node| node.role == Role::Image && node.value.as_deref() == Some("unavailable"))
+    );
+    cx.update_window(host.into(), |_, window, _| window.remove_window())?;
+    drop(cx);
+    std::fs::remove_dir_all(temp)?;
+    std::fs::remove_dir_all(package)?;
+    Ok(())
+}
+
 fn find(node: &Node, predicate: &impl Fn(&Node) -> bool) -> Option<Node> {
     if predicate(node) {
         return Some(node.clone());

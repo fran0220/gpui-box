@@ -1,11 +1,11 @@
-import { readFile, mkdir } from 'node:fs/promises';
-import { watch } from 'node:fs';
+import { readFile, mkdir, open } from 'node:fs/promises';
+import { watch, constants } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { Session } from '../js-runtime/session.mjs';
 import { readFrames, encodeFrame, MAX_MESSAGE, validatePayload } from '../js-runtime/wire.mjs';
-import { PluginPlatform, validateManifest } from '../plugin-platform/platform.mjs';
+import { PluginPlatform, validateManifest, bundleResources } from '../plugin-platform/platform.mjs';
 import { startDebug } from './debug.mjs';
 import { nativeBackend } from '../js-runtime/sandbox.mjs';
 import { DropBridge } from './drop-bridge.mjs';
@@ -86,6 +86,7 @@ function render() {
   const children = [text('host.title', 'GPUI Box · Native JavaScript app'), text('host.status', status)];
   if (error) children.push(text('host.error', `Error (last verified view retained): ${error.slice(0, 2000)}`));
   children.push(button('host.reload', 'Reload app', () => reload()));
+  if (app?.assetStatus) children.push(...assetControls('host.app.assets', app));
   if (appFrame && app) children.push(copyTree(appFrame.tree, 'app', app, appFrame));
   for (const [key, permission] of permissions) {
     const supported = ['storage', 'fs.read', 'clipboard.read', 'clipboard.write', 'resources'].includes(permission.capability);
@@ -109,6 +110,7 @@ function render() {
       controls.push(button(`${base}.disable`, 'Disable', () => platform.disable(plugin.id), !active));
       controls.push(button(`${base}.rollback`, 'Rollback to previous version', () => platform.rollback(plugin.id, { sandbox: nativeBackend })));
       if (active) {
+        if (active.session.assetStatus) controls.push(...assetControls(`${base}.assets`, active.session));
         for (const command of active.manifest.contributes.commands) controls.push(button(`${base}.command.${command.id}`, command.title, () => platform.command(plugin.id, command.id)));
         const frame = panels.get(plugin.id);
         for (const panel of active.manifest.contributes.panels) {
@@ -138,6 +140,11 @@ function render() {
   revision++;
   dropBridge.reconcile();
   output({ kind: 'render', generation: 0, revision, tree, clipboard, resources });
+}
+function assetControls(id, session) {
+  return [text(`${id}.status`, `Packaged assets: ${session.assetStatus}`),
+    button(`${id}.retry`, 'Retry packaged assets', () => session.activatePackagedResources(), session.closed || !session.assetStatus.startsWith('Unavailable:')),
+    button(`${id}.revoke`, 'Revoke resources', () => { session.decide('resources', false); render(); }, session.closed || !session.grants.has('resources'))];
 }
 function prompt(owner, session, capability) {
   const key = `${session.generation}.${capability}`;
@@ -196,6 +203,7 @@ platform.on('register-resource', ({ plugin, request }) => {
   if (session?.generation === request.generation) registerResource(session, request);
 });
 platform.on('render', frame => { panels.set(frame.id, frame); render(); });
+platform.on('assets', render);
 platform.on('permission', ({ id, capability, generation }) => {
   const session = platform.active.get(id)?.session;
   if (session?.generation === generation) prompt(id, session, capability);
@@ -207,6 +215,26 @@ async function reload() {
   let candidate;
   try {
     const manifest = validateManifest(JSON.parse(await readFile(resolve(root, 'app.json'), 'utf8')));
+    // Activation consumes the build's byte receipt, not paths in a mutable
+    // development tree. Rebuild to change assets; editing source does not grant IO.
+    let assets = [];
+    if (manifest.assets?.length) {
+      const receipt = await open(resolve(root, '.gpui-bundle.json'), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0)).catch(() => { throw new Error('Packaged assets require a byte receipt; run gpui-app build'); });
+      try {
+        if (!(await receipt.stat()).isFile()) throw new Error('Package receipt must be a regular file');
+        const bytes = Buffer.alloc(5 * 1024 * 1024 + 1);
+        let length = 0;
+        while (length < bytes.length) {
+          const { bytesRead } = await receipt.read(bytes, length, bytes.length - length, length);
+          if (!bytesRead) break;
+          length += bytesRead;
+        }
+        if (length === bytes.length) throw new Error('Package receipt exceeds limit');
+        const bundle = JSON.parse(bytes.subarray(0, length).toString('utf8'));
+        if (JSON.stringify(bundle.manifest) !== JSON.stringify(manifest)) throw new Error('Package manifest changed; rebuild assets');
+        assets = bundleResources(bundle);
+      } finally { await receipt.close(); }
+    }
     candidate = new Session({ root, entry: manifest.entry, trusted: flag('--trust-local'), sandbox, debug: flag('--debug'),
       requested: manifest.permissions, storageRoot: resolve(data, 'storage') });
     let frame;
@@ -216,6 +244,7 @@ async function reload() {
     candidate.on('log', message => process.stderr.write(`[app ${candidate.generation}] ${message.message}\n`));
     candidate.on('invoke', request => invokeNative(candidate, request));
     candidate.on('register-resource', request => registerResource(candidate, request));
+    candidate.on('assets', () => { if (app === candidate) render(); });
     candidate.on('permission', ({ capability }) => prompt(manifest.id, candidate, capability));
     candidate.on('exit', ({ expected }) => {
       clearPermissions(candidate);
@@ -234,6 +263,7 @@ async function reload() {
     status = `${manifest.id}@${manifest.version} · ${sandbox ? `${sandbox} OS boundary${sandbox === 'linux' ? '' : ' (native validation pending)'}` : 'trusted local process'} · generation ${app.generation}`;
     error = ''; render();
     if (old) { clearPermissions(old); await old.stop(); }
+    void candidate.activatePackagedResources(assets);
   } catch (failure) { diagnose(failure.message); clearPermissions(candidate); await candidate?.stop(); }
   finally { busy = false; if (pendingReload && !closing) { pendingReload = false; void reload(); } }
 }

@@ -46,6 +46,10 @@ export class Session extends EventEmitter {
     this.resourceRequests = new Map();
     this.resourceSequence = 0;
     this.resourceInflight = new Set();
+    this.packagedResources = [];
+    this.registeredAssets = new Set();
+    this.assetStatus = '';
+    this.assetEpoch = 0;
   }
   start() {
     if (this.starting || this.child || this.closed) return Promise.reject(new Error('Session cannot be started twice'));
@@ -151,6 +155,39 @@ export class Session extends EventEmitter {
     return true;
   }
   command(command) { this.send({ kind: 'command', command }); }
+  // The app/plugin owner calls this only AFTER committing the mounted session.
+  // Inputs are validated package byte snapshots, never guest-supplied paths.
+  activatePackagedResources(registrations) {
+    if (this.assetActivation) return this.assetActivation;
+    if (this.closed) return Promise.resolve(false);
+    if (registrations) this.packagedResources = registrations.map(value => Object.freeze({ ...validateResourceRegistration(value) }));
+    if (!this.packagedResources.length) return Promise.resolve(true);
+    const epoch = this.assetEpoch;
+    const operation = Promise.resolve().then(async () => {
+      try {
+        if (this.closed) throw new Error('Asset activation cancelled');
+        this.assetStatus = 'Awaiting permission'; this.emit('assets');
+        await this.permitted('resources');
+        this.assetStatus = 'Registering'; this.emit('assets');
+        for (const registration of this.packagedResources) {
+          if (this.closed || epoch !== this.assetEpoch || !this.grants.has('resources')) throw new Error('Asset activation cancelled');
+          if (this.registeredAssets.has(registration.key)) continue;
+          await this.registerResource(registration);
+          if (this.closed || epoch !== this.assetEpoch || !this.grants.has('resources')) throw new Error('Asset activation cancelled');
+          this.registeredAssets.add(registration.key);
+        }
+        this.assetStatus = 'Ready';
+        return true;
+      } catch (error) {
+        this.assetStatus = `Unavailable: ${String(error.message).slice(0, 1024)}`;
+        return false;
+      } finally { if (!this.closed) this.emit('assets'); }
+    });
+    this.assetActivation = operation;
+    this.operations.add(operation);
+    operation.finally(() => { this.operations.delete(operation); if (this.assetActivation === operation) this.assetActivation = undefined; }).catch(() => {});
+    return operation;
+  }
   registerResource(registration) {
     validateResourceRegistration(registration);
     if (this.closed || !this.tree || !this.grants.has('resources')) throw new Error('Resource registration requires a mounted, permitted session');
@@ -254,6 +291,12 @@ export class Session extends EventEmitter {
   decide(capability, allow) {
     if (!this.options.requested.includes(capability)) return;
     if (allow) this.grants.add(capability); else this.grants.delete(capability);
+    if (capability === 'resources' && !allow) {
+      this.assetEpoch++;
+      this.registeredAssets.clear();
+      for (const id of this.resourceRequests.keys()) this.finishResource(id, this.generation, null, 'Resource permission revoked');
+      if (this.packagedResources.length) { this.assetStatus = 'Unavailable: Resource permission denied'; this.emit('assets'); }
+    }
     this.permissionWaiters.get(capability)?.(allow);
     this.permissionWaiters.delete(capability);
   }
@@ -385,6 +428,9 @@ export class Session extends EventEmitter {
     throw new Error(`Unsupported capability: ${capability}`);
   }
   cancelRequests() {
+    this.assetEpoch++;
+    this.packagedResources = [];
+    this.registeredAssets.clear();
     for (const id of this.resourceRequests.keys()) this.finishResource(id, this.generation, null, 'Session disposed');
     this.cancelNative('Session disposed');
     this.cancelPredicates('Predicate cancelled: session disposed');
