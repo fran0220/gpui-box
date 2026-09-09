@@ -198,6 +198,31 @@ impl Select {
         self
     }
 
+    /// Changes the placeholder without disturbing the open menu. `None`
+    /// restores the current locale's built-in placeholder.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        if self.placeholder != placeholder {
+            self.placeholder = placeholder;
+            cx.notify();
+        }
+    }
+
+    /// Changes the clear affordance without clearing the caller's selection.
+    pub fn set_clearable(&mut self, clearable: bool, cx: &mut Context<Self>) {
+        if self.clearable != clearable {
+            self.clearable = clearable;
+            cx.notify();
+        }
+    }
+
+    /// Changes control metrics without replacing focus or open-menu state.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        if self.size != size {
+            self.size = size;
+            cx.notify();
+        }
+    }
+
     fn clear(&mut self, cx: &mut Context<Self>) {
         if self.disabled || !self.clearable || self.selected.is_none() {
             return;
@@ -752,5 +777,54 @@ impl Render for Select {
             .into_any_element();
 
         popover::anchored_slot(placement, hang, trigger, menu)
+    }
+}
+
+#[cfg(test)]
+mod retained_options_tests {
+    use super::*;
+    use gpui::{AppContext as _, TestAppContext};
+    use gpui_kit_testkit::harness::Harness;
+    use std::cell::RefCell;
+
+    #[gpui::test]
+    fn options_keep_open_focus_selection_and_locale_default(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        Select::new("retained.select", window, cx)
+                            .options([
+                                SelectOption::new("alpha", "Alpha"),
+                                SelectOption::new("beta", "Beta"),
+                            ])
+                            .selected("beta")
+                    })
+                })
+                .clone()
+                .into_any_element()
+        });
+        harness.click("retained.select");
+        let entity = slot.borrow().clone().expect("select built");
+        harness.update(|window, cx| {
+            entity.update(cx, |select, cx| {
+                assert!(select.is_open());
+                let active = select.active;
+                let default = select.resolved_placeholder(cx);
+                select.set_placeholder(Some("Pick one".into()), cx);
+                assert_eq!(select.resolved_placeholder(cx).as_ref(), "Pick one");
+                select.set_clearable(true, cx);
+                select.set_control_size(ControlSize::Sm, cx);
+                select.set_placeholder(None, cx);
+                assert_eq!(select.resolved_placeholder(cx), default);
+                assert!(select.is_open());
+                assert!(select.focus_handle.is_focused(window));
+                assert_eq!(select.selected_id().map(AsRef::as_ref), Some("beta"));
+                assert_eq!(select.active, active);
+            })
+        });
     }
 }

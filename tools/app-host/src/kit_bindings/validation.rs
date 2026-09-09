@@ -1,0 +1,162 @@
+//! Same declarative contracts as JS, embedded so native validation never loads
+//! executable code or follows paths supplied by a descriptor.
+use super::super::Node;
+use anyhow::{Result, bail, ensure};
+use serde_json::Value;
+use std::{collections::HashSet, sync::LazyLock};
+
+static SCHEMAS: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("schemas.json")).expect("generated Kit schemas")
+});
+
+fn validate(value: &Value, schema: &Value) -> Result<()> {
+    if value.is_null() && schema["nullable"] == true {
+        return Ok(());
+    }
+    if let Some(choices) = schema["enum"].as_array() {
+        ensure!(choices.contains(value), "invalid enum value");
+        return Ok(());
+    }
+    match schema["type"].as_str().unwrap_or_default() {
+        "string" => {
+            let text = value
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("expected string"))?;
+            let length = text.encode_utf16().count() as u64;
+            ensure!(
+                length >= schema["min"].as_u64().unwrap_or(0)
+                    && length <= schema["max"].as_u64().unwrap_or(u64::MAX),
+                "string exceeds limits"
+            );
+        }
+        "boolean" => ensure!(value.is_boolean(), "expected boolean"),
+        "number" => {
+            let number = value
+                .as_f64()
+                .ok_or_else(|| anyhow::anyhow!("expected number"))?;
+            ensure!(
+                number.is_finite()
+                    && number >= schema["min"].as_f64().unwrap_or(f64::MIN)
+                    && number <= schema["max"].as_f64().unwrap_or(f64::MAX),
+                "number exceeds limits"
+            );
+            ensure!(
+                schema["integer"] != true || number.fract() == 0.,
+                "expected integer"
+            );
+        }
+        "object" => {
+            let object = value
+                .as_object()
+                .ok_or_else(|| anyhow::anyhow!("expected object"))?;
+            let fields = schema["fields"].as_object().expect("schema fields");
+            for (key, value) in object {
+                validate(
+                    value,
+                    fields
+                        .get(key)
+                        .ok_or_else(|| anyhow::anyhow!("unknown property: {key}"))?,
+                )?;
+            }
+            for key in schema["required"].as_array().expect("required fields") {
+                ensure!(
+                    object.contains_key(key.as_str().expect("required key")),
+                    "missing required property"
+                );
+            }
+        }
+        "array" => {
+            let items = value
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("expected array"))?;
+            ensure!(
+                items.len() as u64 <= schema["max"].as_u64().expect("array max"),
+                "array exceeds limits"
+            );
+            let mut ids = HashSet::new();
+            for item in items {
+                validate(item, &schema["items"])?;
+                if schema["items"]["fields"].get("id").is_some() {
+                    ensure!(
+                        ids.insert(item["id"].as_str().expect("validated identity")),
+                        "duplicate item identity"
+                    );
+                }
+            }
+        }
+        _ => bail!("unsupported schema"),
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
+    let component = node.component.as_deref().unwrap_or_default();
+    let schema = SCHEMAS
+        .get(component)
+        .ok_or_else(|| anyhow::anyhow!("unsupported Kit component"))?;
+    validate(&Value::Object(node.props.clone()), &schema["props"])?;
+    ensure!(node.slots.is_empty(), "component has no slots");
+    for (event, action) in &node.events {
+        ensure!(schema["events"].get(event).is_some(), "unknown Kit event");
+        ensure!(
+            !action.is_empty() && action.len() <= 512,
+            "invalid Kit action"
+        );
+    }
+    ensure!(
+        node.props.get("disabled") != Some(&Value::Bool(true)) || node.events.is_empty(),
+        "disabled control has actions"
+    );
+    if component == "Slider" {
+        let min = node.props.get("min").and_then(Value::as_f64).unwrap_or(0.);
+        let max = node.props.get("max").and_then(Value::as_f64).unwrap_or(1.);
+        let value = node
+            .props
+            .get("value")
+            .and_then(Value::as_f64)
+            .unwrap_or(min);
+        ensure!(
+            min < max && value >= min && value <= max,
+            "invalid slider range"
+        );
+        if let Some(high) = node.props.get("high").and_then(Value::as_f64) {
+            ensure!(high >= value && high <= max, "invalid upper slider value");
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn native_contract_rejects_unknown_properties_and_asymmetric_ranges() {
+        let node = |props| {
+            serde_json::from_value::<Node>(
+                json!({"kind":"kit","id":"range","component":"Slider","props":props}),
+            )
+            .expect("fixture node")
+        };
+        assert!(
+            validate_descriptor(&node(json!({"min":-10,"max":20,"value":-3,"high":17}))).is_ok()
+        );
+        assert!(
+            validate_descriptor(&node(json!({"min":-10,"max":20,"value":-3,"high":-4}))).is_err()
+        );
+        assert!(validate_descriptor(&node(json!({"source":"/etc/passwd"}))).is_err());
+        assert!(validate_descriptor(&node(json!({"disabled":"false"}))).is_err());
+    }
+
+    #[test]
+    fn embedded_schemas_exactly_match_native_registration() {
+        let names: HashSet<_> = SCHEMAS
+            .as_object()
+            .expect("schema map")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(names, super::super::COMPONENTS.iter().copied().collect());
+    }
+}

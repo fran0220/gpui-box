@@ -4365,6 +4365,9 @@
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_clearable(clearable: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
@@ -5220,11 +5223,16 @@
       ],
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_secret(secret: bool, cx: &mut Context<Self>)",
+        "set_max_length(max_length: Option<usize>, cx: &mut Context<Self>)",
+        "set_bare(bare: bool, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_text_quietly(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [

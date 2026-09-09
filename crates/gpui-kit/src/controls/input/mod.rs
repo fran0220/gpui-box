@@ -363,6 +363,31 @@ impl TextInput {
         self
     }
 
+    /// Changes sensitivity without replacing the editor, caret, or focus.
+    /// Enabling sensitivity irreversibly discards undo history. Disabling it
+    /// is an explicit declassification, not the password reveal operation.
+    pub fn set_secret(&mut self, secret: bool, cx: &mut Context<Self>) {
+        if self.secret == secret {
+            return;
+        }
+        self.secret = secret;
+        self.visually_masked = secret;
+        if secret {
+            self.edit.forbid_history();
+        }
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        *self
+            .accessible_snapshot
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = None;
+        *self
+            .accessible_geometry
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = None;
+        self.last_layout = None;
+        cx.notify();
+    }
+
     /// Changes only what is painted for a sensitive field.
     ///
     /// This is crate-private because a caller should choose a public
@@ -400,6 +425,22 @@ impl TextInput {
         self.max_length = Some(max_length);
         self.edit.rules_mut().max_length = Some(max_length);
         self
+    }
+
+    /// Changes the UTF-8 byte limit for subsequent edits; `None` removes it.
+    /// Existing text, selection, and composition are not truncated or reset.
+    pub fn set_max_length(&mut self, max_length: Option<usize>, cx: &mut Context<Self>) {
+        self.max_length = max_length;
+        self.edit.rules_mut().max_length = max_length;
+        cx.notify();
+    }
+
+    /// Changes whether a composing control supplies the frame.
+    pub fn set_bare(&mut self, bare: bool, cx: &mut Context<Self>) {
+        if self.bare != bare {
+            self.bare = bare;
+            cx.notify();
+        }
     }
 
     pub fn value(&self) -> &SharedString {
@@ -497,12 +538,14 @@ impl TextInput {
         cx.notify();
     }
 
-    pub(crate) fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+    /// Changes required semantics without replacing the editor.
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
         self.required = required;
         cx.notify();
     }
 
-    pub(crate) fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+    /// Changes control metrics while retaining text, selection, and focus.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
         if self.size != size {
             self.size = size;
             cx.notify();
@@ -1390,5 +1433,91 @@ impl Render for TextInput {
             .h(px(metrics.height))
             .child(TextElement::new(cx.entity()))
             .semantic_in(cx, spec)
+    }
+}
+
+#[cfg(test)]
+mod retained_options_tests {
+    use super::*;
+    use gpui::{AppContext as _, TestAppContext};
+    use gpui_kit_testkit::harness::Harness;
+    use std::{cell::RefCell, rc::Rc};
+
+    #[gpui::test]
+    fn options_retain_caret_and_secret_changes_revoke_exports(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| cx.new(|cx| TextInput::new("retained.input", window, cx)))
+                .clone()
+                .into_any_element()
+        });
+        harness.click("retained.input");
+        harness.keystrokes("a b c");
+        let entity = slot.borrow().clone().expect("input built");
+        harness.update(|window, cx| {
+            entity.update(cx, |input, cx| {
+                let caret = input.cursor_offset();
+                input.set_required(true, cx);
+                input.set_bare(true, cx);
+                input.set_control_size(ControlSize::Lg, cx);
+                input.set_max_length(Some(3), cx);
+                assert_eq!(input.cursor_offset(), caret);
+                assert!(input.focus_handle.is_focused(window));
+            })
+        });
+        harness.keystrokes("d");
+        harness.update(|_, cx| assert_eq!(entity.read(cx).value().as_ref(), "abc"));
+        harness.update(|_, cx| entity.update(cx, |input, cx| input.set_max_length(None, cx)));
+        harness.keystrokes("d");
+        harness.update(|window, cx| {
+            entity.update(cx, |input, cx| {
+                assert_eq!(input.value().as_ref(), "abcd");
+                input.set_secret(true, cx);
+                assert_eq!(input.display_text().as_ref(), "••••");
+                assert!(
+                    input
+                        .accessible_snapshot
+                        .lock()
+                        .expect("snapshot lock")
+                        .is_none()
+                );
+                assert!(
+                    input
+                        .accessible_geometry
+                        .lock()
+                        .expect("geometry lock")
+                        .is_none()
+                );
+                input.select_all(&SelectAll, window, cx);
+                cx.write_to_clipboard(ClipboardItem::new_string("sentinel".into()));
+                input.copy(&Copy, window, cx);
+                assert_eq!(
+                    cx.read_from_clipboard()
+                        .expect("sentinel clipboard")
+                        .text()
+                        .as_deref(),
+                    Some("sentinel")
+                );
+                assert!(!input.edit.undo());
+            })
+        });
+        assert_eq!(
+            harness
+                .node("retained.input")
+                .expect("input semantics")
+                .value
+                .as_deref(),
+            Some("[REDACTED]")
+        );
+        harness.update(|_, cx| {
+            entity.update(cx, |input, cx| {
+                input.set_secret(false, cx);
+                assert_eq!(input.display_text().as_ref(), "abcd");
+                assert!(!input.edit.undo());
+            })
+        });
     }
 }
