@@ -15,7 +15,7 @@ async function fixture(t) {
 const asset = (key = 'data', path = 'assets/data.bin') => ({ key, path, mime: 'application/octet-stream' });
 
 test('manifest is closed and wholly rejected before filesystem access', async () => {
-  for (const path of ['../escape', '/etc/passwd', 'https://example.com/x', 'a\\b', 'a//b', 'a/./b', 'a/../b', 'a\0b', 'C:/x']) assert.throws(() => validateAssetDeclarations([asset('x', path)]));
+  for (const path of ['../escape', '/etc/passwd', 'https://example.com/x', 'a\\b', 'a//b', 'a/./b', 'a/../b', 'a\0b', 'C:/x', 'assets/CON', 'assets/NUL.bin', '.hidden/x', 'assets/trailing.', 'a'.repeat(241)]) assert.throws(() => validateAssetDeclarations([asset('x', path)]));
   for (const declarations of [[asset(), asset()], [{ ...asset(), url: 'file:///x' }], [{ ...asset(), mime: 'image/png' }], Array.from({ length: 33 }, (_, i) => asset(`x${i}`))]) {
     await assert.rejects(loadPackagedResources('/does-not-exist', declarations), error => !error.code);
   }

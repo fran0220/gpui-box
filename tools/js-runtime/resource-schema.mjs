@@ -23,7 +23,7 @@ export function validateAssetDeclarations(assets) {
     if (keys.has(asset.key)) throw new Error('Duplicate asset key');
     keys.add(asset.key);
     if (![RGBA, 'application/octet-stream'].includes(asset.mime)) throw new Error('Unsupported resource MIME');
-    if (typeof asset.path !== 'string' || asset.path.length > 512 || !/^[A-Za-z0-9_.\/-]+$/.test(asset.path) || asset.path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('Invalid package asset path');
+    if (typeof asset.path !== 'string' || asset.path.length > 240 || !/^[A-Za-z0-9_.\/-]+$/.test(asset.path) || asset.path.split('/').some(part => !part || part.startsWith('.') || part.endsWith('.') || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) throw new Error('Invalid package asset path');
   }
   return assets;
 }
