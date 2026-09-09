@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2587
+      "symbolCount": 2607
     },
     {
       "name": "gpui-box-app-host",
@@ -1216,7 +1216,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4389
+      "symbolCount": 4433
     },
     {
       "name": "gpui-box-kit-assets",
@@ -2129,6 +2129,13 @@
           "alias": "anyhow",
           "package": "anyhow",
           "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "base64",
+          "package": "base64",
+          "kind": "dev",
           "optional": false,
           "features": []
         },
@@ -3365,7 +3372,7 @@
       "source": "crates/gpui/src/app.rs",
       "summary": "Contains the state of the full application, and passed as a reference to a variety of callbacks. Other [Context] derefs to this type. You need a reference to an `App` to access the state of a [Entity].",
       "documentation": "Contains the state of the full application, and passed as a reference to a variety of callbacks.\nOther [Context] derefs to this type.\nYou need a reference to an `App` to access the state of a [Entity].",
-      "signature": "# [doc = \" Contains the state of the full application, and passed as a reference to a variety of callbacks.\"] # [doc = \" Other [Context] derefs to this type.\"] # [doc = \" You need a reference to an `App` to access the state of a [Entity].\"] pub struct App { pub (crate) this : Weak<AppCell>, pub (crate) platform : Rc<dyn Platform>, pub (crate) effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, pub (crate) clipboard_policy : Option<crate::effect_owner::ClipboardPolicy>, text_system : Arc<TextSystem>, pub (crate) actions : Rc<ActionRegistry>, pub (crate) active_drag : Option<AnyDrag>, platform_owned_drag : Option<PlatformOwnedDrag>, pub (crate) background_executor : BackgroundExecutor, pub (crate) foreground_executor : ForegroundExecutor, pub (crate) entities : EntityMap, pub (crate) new_entity_observers : SubscriberSet<TypeId, NewEntityListener>, pub (crate) windows : SlotMap<WindowId, Option<Box<Window>>>, pub (crate) window_handles : FxHashMap<WindowId, AnyWindowHandle>, pub (crate) focus_handles : Arc<FocusMap>, pub (crate) keymap : Rc<RefCell<Keymap>>, pub (crate) keyboard_layout : Box<dyn PlatformKeyboardLayout>, pub (crate) keyboard_mapper : Rc<dyn PlatformKeyboardMapper>, pub (crate) global_action_listeners : TypeIdHashMap<Vec<Rc<dyn Fn (& dyn Any, DispatchPhase, & mut Self)>>>, pending_effects : VecDeque<Effect>, pub (crate) observers : SubscriberSet<EntityId, Handler>, pub (crate) event_listeners : SubscriberSet<EntityId, (TypeId, Listener)>, pub (crate) keystroke_observers : SubscriberSet<(), KeystrokeObserver>, pub (crate) keystroke_interceptors : SubscriberSet<(), KeystrokeObserver>, pub (crate) keyboard_layout_observers : SubscriberSet<(), Handler>, pub (crate) thermal_state_observers : SubscriberSet<(), Handler>, pub (crate) release_listeners : SubscriberSet<EntityId, ReleaseListener>, pub (crate) global_observers : SubscriberSet<TypeId, Handler>, pub (crate) quit_observers : SubscriberSet<(), QuitHandler>, pub (crate) restart_observers : SubscriberSet<(), Handler>, pub (crate) window_closed_observers : SubscriberSet<(), WindowClosedHandler>, # [doc = \" Per-App element arena. This isolates element allocations between different\"] # [doc = \" App instances (important for tests where multiple Apps run concurrently).\"] pub (crate) element_arena : RefCell<Arena>, # [doc = \" Per-App event arena.\"] pub (crate) event_arena : Arena, pub (crate) globals_by_type : TypeIdHashMap<Box<dyn Any>>, pub (crate) loading_assets : FxHashMap<(TypeId, u64), Box<dyn Any>>, asset_source : Arc<dyn AssetSource>, pub (crate) svg_renderer : SvgRenderer, http_client : Arc<dyn HttpClient>, pub (crate) pending_notifications : FxHashSet<EntityId>, pub (crate) pending_global_notifications : TypeIdHashSet, pub (crate) restart_path : Option<PathBuf>, pub (crate) layout_id_buffer : Vec<LayoutId>, pub (crate) propagate_event : bool, pub (crate) prompt_builder : Option<PromptBuilder>, pub (crate) window_invalidators_by_entity : FxHashMap<EntityId, FxHashMap<WindowId, WindowInvalidator>>, pub (crate) tracked_entities : FxHashMap<WindowId, FxHashSet<EntityId>>, pub (crate) current_window_by_entity : FxHashMap<EntityId, WindowId>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_renderer : Option<crate::InspectorRenderer>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_element_registry : InspectorElementRegistry, # [cfg (any (test, feature = \"test-support\", debug_assertions))] pub (crate) name : Option<& 'static str>, pub (crate) text_rendering_mode : Rc<Cell<TextRenderingMode>>, pub (crate) window_update_stack : Vec<WindowId>, pub (crate) mode : GpuiMode, pub (crate) cursor_hide_mode : CursorHideMode, pub (crate) reduce_motion : bool, # [doc = \" Whether the app was created by [`Application::new_inaccessible`]. No\"] # [doc = \" accesskit APIs will be called when this flag is set.\"] pub (crate) accessibility_force_disabled : bool, flushing_effects : bool, pending_updates : usize, quit_mode : QuitMode, quitting : bool, # [cfg (any (test, feature = \"leak-detection\"))] _ref_counts : Arc<RwLock<EntityRefCounts>>, }",
+      "signature": "# [doc = \" Contains the state of the full application, and passed as a reference to a variety of callbacks.\"] # [doc = \" Other [Context] derefs to this type.\"] # [doc = \" You need a reference to an `App` to access the state of a [Entity].\"] pub struct App { pub (crate) this : Weak<AppCell>, pub (crate) platform : Rc<dyn Platform>, pub (crate) effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, pub (crate) clipboard_policy : Option<crate::effect_owner::ClipboardPolicy>, pub (crate) native_menu_revision : Option<crate::NativeMenuSessionId>, text_system : Arc<TextSystem>, pub (crate) actions : Rc<ActionRegistry>, pub (crate) active_drag : Option<AnyDrag>, platform_owned_drag : Option<PlatformOwnedDrag>, pub (crate) background_executor : BackgroundExecutor, pub (crate) foreground_executor : ForegroundExecutor, pub (crate) entities : EntityMap, pub (crate) new_entity_observers : SubscriberSet<TypeId, NewEntityListener>, pub (crate) windows : SlotMap<WindowId, Option<Box<Window>>>, pub (crate) window_handles : FxHashMap<WindowId, AnyWindowHandle>, pub (crate) focus_handles : Arc<FocusMap>, pub (crate) keymap : Rc<RefCell<Keymap>>, pub (crate) keyboard_layout : Box<dyn PlatformKeyboardLayout>, pub (crate) keyboard_mapper : Rc<dyn PlatformKeyboardMapper>, pub (crate) global_action_listeners : TypeIdHashMap<Vec<Rc<dyn Fn (& dyn Any, DispatchPhase, & mut Self)>>>, pending_effects : VecDeque<Effect>, pub (crate) observers : SubscriberSet<EntityId, Handler>, pub (crate) event_listeners : SubscriberSet<EntityId, (TypeId, Listener)>, pub (crate) keystroke_observers : SubscriberSet<(), KeystrokeObserver>, pub (crate) keystroke_interceptors : SubscriberSet<(), KeystrokeObserver>, pub (crate) keyboard_layout_observers : SubscriberSet<(), Handler>, pub (crate) thermal_state_observers : SubscriberSet<(), Handler>, pub (crate) release_listeners : SubscriberSet<EntityId, ReleaseListener>, pub (crate) global_observers : SubscriberSet<TypeId, Handler>, pub (crate) quit_observers : SubscriberSet<(), QuitHandler>, pub (crate) restart_observers : SubscriberSet<(), Handler>, pub (crate) window_closed_observers : SubscriberSet<(), WindowClosedHandler>, # [doc = \" Per-App element arena. This isolates element allocations between different\"] # [doc = \" App instances (important for tests where multiple Apps run concurrently).\"] pub (crate) element_arena : RefCell<Arena>, # [doc = \" Per-App event arena.\"] pub (crate) event_arena : Arena, pub (crate) globals_by_type : TypeIdHashMap<Box<dyn Any>>, pub (crate) loading_assets : FxHashMap<(TypeId, u64), Box<dyn Any>>, asset_source : Arc<dyn AssetSource>, pub (crate) svg_renderer : SvgRenderer, http_client : Arc<dyn HttpClient>, pub (crate) pending_notifications : FxHashSet<EntityId>, pub (crate) pending_global_notifications : TypeIdHashSet, pub (crate) restart_path : Option<PathBuf>, pub (crate) layout_id_buffer : Vec<LayoutId>, pub (crate) propagate_event : bool, pub (crate) prompt_builder : Option<PromptBuilder>, pub (crate) window_invalidators_by_entity : FxHashMap<EntityId, FxHashMap<WindowId, WindowInvalidator>>, pub (crate) tracked_entities : FxHashMap<WindowId, FxHashSet<EntityId>>, pub (crate) current_window_by_entity : FxHashMap<EntityId, WindowId>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_renderer : Option<crate::InspectorRenderer>, # [cfg (any (feature = \"inspector\", debug_assertions))] pub (crate) inspector_element_registry : InspectorElementRegistry, # [cfg (any (test, feature = \"test-support\", debug_assertions))] pub (crate) name : Option<& 'static str>, pub (crate) text_rendering_mode : Rc<Cell<TextRenderingMode>>, pub (crate) window_update_stack : Vec<WindowId>, pub (crate) mode : GpuiMode, pub (crate) cursor_hide_mode : CursorHideMode, pub (crate) reduce_motion : bool, # [doc = \" Whether the app was created by [`Application::new_inaccessible`]. No\"] # [doc = \" accesskit APIs will be called when this flag is set.\"] pub (crate) accessibility_force_disabled : bool, flushing_effects : bool, pending_updates : usize, quit_mode : QuitMode, quitting : bool, # [cfg (any (test, feature = \"leak-detection\"))] _ref_counts : Arc<RwLock<EntityRefCounts>>, }",
       "cfg": []
     },
     {
@@ -9870,6 +9877,21 @@
       "cfg": [
         "cfg (any (test, feature = \"test-support\"))"
       ],
+      "target": "TestAppContext"
+    },
+    {
+      "id": "gpui::app::test_context::TestAppContext::set_native_context_menu_cancel_fails",
+      "name": "set_native_context_menu_cancel_fails",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "app::test_context",
+      "path": "gpui::app::test_context",
+      "source": "crates/gpui/src/app/test_context.rs",
+      "summary": "Simulates native cancellation refusal without closing the menu. Its revision is still invalidated, so later native commands cannot dispatch.",
+      "documentation": "Simulates native cancellation refusal without closing the menu. Its\nrevision is still invalidated, so later native commands cannot dispatch.",
+      "signature": "pub fn set_native_context_menu_cancel_fails (& self, window : AnyWindowHandle, fails : bool)",
+      "cfg": [],
       "target": "TestAppContext"
     },
     {
@@ -17931,7 +17953,7 @@
       "source": "crates/gpui/src/elements/selectable_text.rs",
       "summary": "Revision-keyed logical text publication. Offscreen unchanged leaves are retained in AccessKit; visible and previously visible leaves refresh their geometry. Own one cache per text surface, never share it between windows.",
       "documentation": "Revision-keyed logical text publication. Offscreen unchanged leaves are\nretained in AccessKit; visible and previously visible leaves refresh their\ngeometry. Own one cache per text surface, never share it between windows.",
-      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Range<usize>, }",
+      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Range<usize>, document : Option<EditSnapshot>, work : AccessibleTextWork, }",
       "cfg": []
     },
     {
@@ -17948,6 +17970,50 @@
       "signature": "pub fn publish (& mut self, builder : & mut A11ySubtreeBuilder, text : & str, anchor : usize, focus : usize, direction : accesskit::TextDirection, rows : & [Range<usize>], revision : u64, visible : Range<usize>, scale : f32, geometry : impl Fn (Range<usize>) -> Vec<Bounds<Pixels>>,) -> Option<PublishedAccessibleText>",
       "cfg": [],
       "target": "AccessibleTextCache"
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache::publish_document",
+      "name": "publish_document",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Publishes a persistent document, resegmenting only changed LF-delimited paragraphs when rows and direction outside the edit remain unchanged. LF is a Unicode bidi/word reset boundary; arbitrary visual rows are not. Source snapshots and run metadata remain complete, including offscreen paragraphs. Native actions are still checked against the exact revision.",
+      "documentation": "Publishes a persistent document, resegmenting only changed LF-delimited\nparagraphs when rows and direction outside the edit remain unchanged.\nLF is a Unicode bidi/word reset boundary; arbitrary visual rows are not.\nSource snapshots and run metadata remain complete, including offscreen\nparagraphs. Native actions are still checked against the exact revision.",
+      "signature": "pub fn publish_document (& mut self, builder : & mut A11ySubtreeBuilder, document : & EditSnapshot, anchor : usize, focus : usize, direction : accesskit::TextDirection, rows : & [Range<usize>], revision : u64, visible : Range<usize>, scale : f32, geometry : impl Fn (Range<usize>) -> Vec<Bounds<Pixels>>,) -> Option<PublishedAccessibleText>",
+      "cfg": [],
+      "target": "AccessibleTextCache"
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache::work",
+      "name": "work",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Work performed in the last publication, not cumulative totals.",
+      "documentation": "Work performed in the last publication, not cumulative totals.",
+      "signature": "pub fn work (& self) -> AccessibleTextWork",
+      "cfg": [],
+      "target": "AccessibleTextCache"
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextWork",
+      "name": "AccessibleTextWork",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Actual text work in the most recent accessible publication. Metadata and parent child-id lists are separate, still linear work; these counters do not claim an allocation bound for the entire AccessKit update.",
+      "documentation": "Actual text work in the most recent accessible publication. Metadata and\nparent child-id lists are separate, still linear work; these counters do\nnot claim an allocation bound for the entire AccessKit update.",
+      "signature": "# [doc = \" Actual text work in the most recent accessible publication. Metadata and\"] # [doc = \" parent child-id lists are separate, still linear work; these counters do\"] # [doc = \" not claim an allocation bound for the entire AccessKit update.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct AccessibleTextWork { # [doc = \" UTF-8 bytes passed to Unicode segmentation and bidi resolution.\"] pub segmented_bytes : usize, # [doc = \" Actual persistent-snapshot byte comparisons used to locate the edit.\"] pub compared_bytes : usize, # [doc = \" TextRun payloads transmitted in this update.\"] pub published_runs : usize, # [doc = \" UTF-8 value bytes transmitted in TextRun payloads.\"] pub published_text_bytes : usize, # [doc = \" Existing TextRuns connected without retransmitting their payloads.\"] pub retained_runs : usize, }",
+      "cfg": []
     },
     {
       "id": "gpui::elements::selectable_text::PublishedAccessibleText",
@@ -27020,7 +27086,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents an application-provided context menu using the operating\"] # [doc = \" system and resolves with the selected action, or `None` on dismissal.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuNotSupportedError`] so the component can render in-window.\"] fn show_context_menu (& self, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<Option<Box<dyn Action>>>, NativeMenuNotSupportedError> { Err (NativeMenuNotSupportedError) } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that the text input state has changed\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } }",
+      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents one opaque menu revision. Replacements must invalidate the old\"] # [doc = \" revision and wait for its native tracking loop to exit before starting\"] # [doc = \" the next, including replacements from another window on this UI thread.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuError::NotSupported`] so the component can render in-window.\"] # [doc = \" Failed replacement cancellation is a refusal, not unsupported capability.\"] fn show_context_menu (& self, _session : NativeMenuSessionId, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> { Err (NativeMenuNotSupportedError . into ()) } # [doc = \" Invalidates only the matching current revision. `true` means a cancel\"] # [doc = \" request, not completed closure; the result receiver confirms loop exit.\"] # [doc = \" A stale identity must never call a thread-wide native cancellation API.\"] # [doc = \" Even a refused cancellation must suppress that revision's late command.\"] fn cancel_context_menu (& self, _session : NativeMenuSessionId) -> Result<bool, NativeMenuError> { Ok (false) } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that the text input state has changed\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } }",
       "cfg": []
     },
     {
@@ -27990,7 +28056,7 @@
       "source": "crates/gpui/src/platform/app_menu.rs",
       "summary": "How a platform-native context menu finished.",
       "documentation": "How a platform-native context menu finished.\n\nThe selected action is dispatched through the focus context that was\nactive when the menu opened before [`Selected`](Self::Selected) is\nreported.",
-      "signature": "# [doc = \" How a platform-native context menu finished.\"] # [doc = \"\"] # [doc = \" The selected action is dispatched through the focus context that was\"] # [doc = \" active when the menu opened before [`Selected`](Self::Selected) is\"] # [doc = \" reported.\"] # [derive (Copy, Clone, Debug, Eq, PartialEq)] pub enum NativeMenuOutcome { # [doc = \" The user selected an enabled action.\"] Selected, # [doc = \" The menu closed without selecting an action.\"] Dismissed, }",
+      "signature": "# [doc = \" How a platform-native context menu finished.\"] # [doc = \"\"] # [doc = \" The selected action is dispatched through the focus context that was\"] # [doc = \" active when the menu opened before [`Selected`](Self::Selected) is\"] # [doc = \" reported.\"] # [derive (Copy, Clone, Debug, Eq, PartialEq)] pub enum NativeMenuOutcome { # [doc = \" The user selected an enabled action.\"] Selected, # [doc = \" The menu closed without selecting an action.\"] Dismissed, # [doc = \" The revision was cancelled/replaced. No command was dispatched.\"] Cancelled, # [doc = \" Presentation or its window/backend disappeared without a valid result.\"] # [doc = \" This is not a user dismissal.\"] Unavailable, }",
       "cfg": []
     },
     {
@@ -28785,6 +28851,211 @@
       "cfg": []
     },
     {
+      "id": "gpui::platform::native_menu::NativeMenuError",
+      "name": "NativeMenuError",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Native capability/refusal errors. Only `NotSupported` permits an automatic in-window fallback; cancellation failure can leave an old native menu open.",
+      "documentation": "Native capability/refusal errors. Only `NotSupported` permits an automatic\nin-window fallback; cancellation failure can leave an old native menu open.",
+      "signature": "# [doc = \" Native capability/refusal errors. Only `NotSupported` permits an automatic\"] # [doc = \" in-window fallback; cancellation failure can leave an old native menu open.\"] # [derive (Debug, thiserror::Error)] pub enum NativeMenuError { # [doc = \" This platform does not present application context menus natively.\"] # [error (transparent)] NotSupported (# [from] NativeMenuNotSupportedError), # [doc = \" The OS refused to end an existing tracking loop. Its command is already\"] # [doc = \" invalidated, but its UI must not be reported as closed.\"] # [error (\"native context-menu cancellation failed: {0}\")] CancellationFailed (String), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::native_menu::NativeMenuSession",
+      "name": "NativeMenuSession",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Awaitable native menu presentation. Retain `id()` for cancellation/revision checks and `effect_owner()` when installing an asynchronous completion callback. Re-enter that owner with `App::with_effect_owner` inside callbacks; awaiting a future does not grant ambient authority to its caller.",
+      "documentation": "Awaitable native menu presentation. Retain `id()` for cancellation/revision\nchecks and `effect_owner()` when installing an asynchronous completion\ncallback. Re-enter that owner with `App::with_effect_owner` inside callbacks;\nawaiting a future does not grant ambient authority to its caller.",
+      "signature": "# [doc = \" Awaitable native menu presentation. Retain `id()` for cancellation/revision\"] # [doc = \" checks and `effect_owner()` when installing an asynchronous completion\"] # [doc = \" callback. Re-enter that owner with `App::with_effect_owner` inside callbacks;\"] # [doc = \" awaiting a future does not grant ambient authority to its caller.\"] pub struct NativeMenuSession { pub (crate) id : NativeMenuSessionId, pub (crate) owner : Option<EffectOwner>, pub (crate) task : Task<NativeMenuOutcome>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::native_menu::NativeMenuSession::detach",
+      "name": "detach",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Allows dispatch/completion to run without awaiting its result.",
+      "documentation": "Allows dispatch/completion to run without awaiting its result.",
+      "signature": "pub fn detach (self)",
+      "cfg": [],
+      "target": "NativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::NativeMenuSession::effect_owner",
+      "name": "effect_owner",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Explicit effect authority captured at presentation, never from focus.",
+      "documentation": "Explicit effect authority captured at presentation, never from focus.",
+      "signature": "pub fn effect_owner (& self) -> Option<EffectOwner>",
+      "cfg": [],
+      "target": "NativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::NativeMenuSession::id",
+      "name": "id",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "The revision that `Window::cancel_context_menu` can invalidate.",
+      "documentation": "The revision that `Window::cancel_context_menu` can invalidate.",
+      "signature": "pub fn id (& self) -> NativeMenuSessionId",
+      "cfg": [],
+      "target": "NativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::NativeMenuSessionId",
+      "name": "NativeMenuSessionId",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Opaque identity for one native menu revision, unique across windows/owners.",
+      "documentation": "Opaque identity for one native menu revision, unique across windows/owners.",
+      "signature": "# [doc = \" Opaque identity for one native menu revision, unique across windows/owners.\"] # [derive (Clone, Copy, Debug, Eq, PartialEq, Hash)] pub struct NativeMenuSessionId (u64);",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuOutcome",
+      "name": "PlatformNativeMenuOutcome",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Backend result, distinct from unsupported presentation and transport loss.",
+      "documentation": "Backend result, distinct from unsupported presentation and transport loss.",
+      "signature": "# [doc = \" Backend result, distinct from unsupported presentation and transport loss.\"] pub enum PlatformNativeMenuOutcome { # [doc = \" An enabled native command was chosen.\"] Selected (Box<dyn Action>), # [doc = \" Tracking ended without choosing a command.\"] Dismissed, # [doc = \" Tracking ended after the revision was invalidated.\"] Cancelled, # [doc = \" Presentation failed; this is not user dismissal.\"] Unavailable, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession",
+      "name": "PlatformNativeMenuSession",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Shared foreground-only lifecycle gate for native backend implementations. Replacements invalidate the old gate and await `finished()` before entering another modal native loop. A cancelled pending presentation must still wait for its predecessor before finishing, preserving the replacement chain.",
+      "documentation": "Shared foreground-only lifecycle gate for native backend implementations.\nReplacements invalidate the old gate and await `finished()` before entering\nanother modal native loop. A cancelled pending presentation must still wait\nfor its predecessor before finishing, preserving the replacement chain.",
+      "signature": "# [doc = \" Shared foreground-only lifecycle gate for native backend implementations.\"] # [doc = \" Replacements invalidate the old gate and await `finished()` before entering\"] # [doc = \" another modal native loop. A cancelled pending presentation must still wait\"] # [doc = \" for its predecessor before finishing, preserving the replacement chain.\"] # [derive (Clone)] pub struct PlatformNativeMenuSession { id : NativeMenuSessionId, state : Rc<PlatformNativeMenuState>, finished : Shared<oneshot::Receiver<()>>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::complete",
+      "name": "complete",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Called only after tracking exits, or before tracking when presentation is cancelled/unavailable. Repeated/late completion cannot send twice.",
+      "documentation": "Called only after tracking exits, or before tracking when presentation\nis cancelled/unavailable. Repeated/late completion cannot send twice.",
+      "signature": "pub fn complete (& self, outcome : PlatformNativeMenuOutcome)",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::finished",
+      "name": "finished",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Waits until tracking has ended (or its backend has disappeared).",
+      "documentation": "Waits until tracking has ended (or its backend has disappeared).",
+      "signature": "pub async fn finished (& self)",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::id",
+      "name": "id",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "The identity to compare before calling a native cancellation API.",
+      "documentation": "The identity to compare before calling a native cancellation API.",
+      "signature": "pub fn id (& self) -> NativeMenuSessionId",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::invalidate",
+      "name": "invalidate",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Prevents any late command from this presentation from being delivered. This does not claim that its native UI has closed.",
+      "documentation": "Prevents any late command from this presentation from being delivered.\nThis does not claim that its native UI has closed.",
+      "signature": "pub fn invalidate (& self)",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::is_invalidated",
+      "name": "is_invalidated",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Whether the presentation must not begin tracking or deliver a command.",
+      "documentation": "Whether the presentation must not begin tracking or deliver a command.",
+      "signature": "pub fn is_invalidated (& self) -> bool",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
+      "id": "gpui::platform::native_menu::PlatformNativeMenuSession::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform::native_menu",
+      "path": "gpui::platform::native_menu",
+      "source": "crates/gpui/src/platform/native_menu.rs",
+      "summary": "Creates one tracking lifetime for the Window-issued identity.",
+      "documentation": "Creates one tracking lifetime for the Window-issued identity.",
+      "signature": "pub fn new (id : NativeMenuSessionId) -> (Self, oneshot::Receiver<PlatformNativeMenuOutcome>)",
+      "cfg": [],
+      "target": "PlatformNativeMenuSession"
+    },
+    {
       "id": "gpui::platform::platform_view::PlatformViewHosting",
       "name": "PlatformViewHosting",
       "kind": "struct",
@@ -29219,6 +29490,20 @@
     },
     {
       "id": "gpui::platform::reexport-5",
+      "name": "native_menu :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "platform",
+      "path": "gpui::platform",
+      "source": "crates/gpui/src/platform.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use native_menu::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::platform::reexport-6",
       "name": "platform_view :: { PlatformViewHandle , PlatformViewHosting , PlatformViewId , PlatformViewPlacement , PlatformViewUpdate , flip_bounds_origin_y , platform_view_content_origin , platform_view_physical_bounds , snap_platform_view_bounds , }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -29232,7 +29517,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::platform::reexport-6",
+      "id": "gpui::platform::reexport-7",
       "name": "test :: { TestDispatcher , TestScreenCaptureSource , TestScreenCaptureStream }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -29248,7 +29533,7 @@
       ]
     },
     {
-      "id": "gpui::platform::reexport-7",
+      "id": "gpui::platform::reexport-8",
       "name": "threaded_dispatcher :: ThreadedDispatcher",
       "kind": "reexport",
       "package": "gpui-box",
@@ -29264,7 +29549,7 @@
       ]
     },
     {
-      "id": "gpui::platform::reexport-8",
+      "id": "gpui::platform::reexport-9",
       "name": "visual_test :: VisualTestPlatform",
       "kind": "reexport",
       "package": "gpui-box",
@@ -37500,7 +37785,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Holds the state for a specific window.",
       "documentation": "Holds the state for a specific window.",
-      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
+      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, native_context_menu : Option<(crate::NativeMenuSessionId, bool)>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
       "cfg": []
     },
     {
@@ -37650,6 +37935,21 @@
       "summary": "Notify the window that its bounds have changed.",
       "documentation": "Notify the window that its bounds have changed.\n\nThis updates internal state like `viewport_size` and `scale_factor` from\nthe platform window, then notifies observers. Normally called automatically\nby the platform's resize callback, but exposed publicly for test infrastructure.",
       "signature": "pub fn bounds_changed (& mut self, cx : & mut App)",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::cancel_context_menu",
+      "name": "cancel_context_menu",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Invalidates this window's matching revision and requests native closure. `false` is an ended/stale/different native session; it cannot close a newer menu. Matching queued commands are invalidated even then. On refusal the revision remains invalidated but can be retried with the same identity. Await its completion before claiming native UI closure.",
+      "documentation": "Invalidates this window's matching revision and requests native closure.\n`false` is an ended/stale/different native session; it cannot close a\nnewer menu. Matching queued commands are invalidated even then. On\nrefusal the revision remains invalidated but can be retried with the\nsame identity. Await its completion before claiming native UI closure.",
+      "signature": "pub fn cancel_context_menu (& mut self, session : crate::NativeMenuSessionId,) -> Result<bool, crate::NativeMenuError>",
       "cfg": [],
       "target": "Window"
     },
@@ -40113,8 +40413,8 @@
       "path": "gpui::window",
       "source": "crates/gpui/src/window.rs",
       "summary": "Presents `menu` as an operating-system context menu at a position in this window's logical coordinate space.",
-      "documentation": "Presents `menu` as an operating-system context menu at a position in\nthis window's logical coordinate space.\n\nThe native tracking loop begins after the current GPUI callback has\nreturned. Selection dispatches the item's [`Action`] through the focus\ncontext captured here, then resolves the returned task. Dismissal\nresolves without dispatch. Platforms without this capability return\n[`crate::NativeMenuNotSupportedError`], allowing a component to keep\nits in-window menu as the fallback.",
-      "signature": "pub fn show_context_menu (& mut self, menu : crate::Menu, position : Point<Pixels>, cx : & mut App,) -> std::result::Result<Task<crate::NativeMenuOutcome>, crate::NativeMenuNotSupportedError>",
+      "documentation": "Presents `menu` as an operating-system context menu at a position in\nthis window's logical coordinate space.\n\nThe native tracking loop begins after the current GPUI callback has\nreturned. Selection dispatches the item's [`Action`] through the focus\nand explicit EffectOwner captured here, then resolves the returned\nsession. Each session is a fresh revision: cancel it before changing its\nsource actions. Cancelled/replaced revisions cannot dispatch queued\ncommands. Only [`crate::NativeMenuError::NotSupported`] permits fallback.\nNative failure/transport loss reports Unavailable, never fake dismissal.",
+      "signature": "pub fn show_context_menu (& mut self, menu : crate::Menu, position : Point<Pixels>, cx : & mut App,) -> std::result::Result<crate::NativeMenuSession, crate::NativeMenuError>",
       "cfg": [],
       "target": "Window"
     },
@@ -65818,6 +66118,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::accessibility_work",
+      "name": "accessibility_work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Text segmentation and payload work of the last native accessibility publication, separate from shaping and full-frame allocation costs.",
+      "documentation": "Text segmentation and payload work of the last native accessibility\npublication, separate from shaping and full-frame allocation costs.",
+      "signature": "pub fn accessibility_work (& self) -> gpui::AccessibleTextWork",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::arrows_claimed",
       "name": "arrows_claimed",
       "kind": "method",
@@ -70476,7 +70791,7 @@
       "source": "crates/gpui-kit/src/data/list.rs",
       "summary": "A list that renders only the rows its viewport holds.",
       "documentation": "A list that renders only the rows its viewport holds.",
-      "signature": "# [doc = \" A list that renders only the rows its viewport holds.\"] # [derive (IntoElement)] pub struct List { ident : Ident, count : usize, render_row : RenderRow, selected : Option<SharedString>, row_height : Option<f32>, # [doc = \" Whether a row is as tall as its content rather than as tall as a slot.\"] flowing : bool, # [doc = \" The rows in order, when the caller named them. See [`List::keys`].\"] keys : Option<Vec<SharedString>>, revisions : Option<Vec<u64>>, # [doc = \" Where a flowing list rests when its content does not fill it.\"] alignment : ListAlignment, visible_rows : Option<usize>, # [doc = \" Whether the list takes the height of whatever holds it.\"] fills : bool, # [doc = \" Whether the rows fade in as one wave when the list itself arrives.\"] arriving : bool, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, }",
+      "signature": "# [doc = \" A list that renders only the rows its viewport holds.\"] # [derive (IntoElement)] pub struct List { ident : Ident, count : usize, render_row : RenderRow, selected : Option<SharedString>, row_height : Option<f32>, # [doc = \" Whether a row is as tall as its content rather than as tall as a slot.\"] flowing : bool, # [doc = \" The rows in order, when the caller named them. See [`List::keys`].\"] keys : Option<Vec<SharedString>>, revisions : Option<Vec<u64>>, # [doc = \" Where a flowing list rests when its content does not fill it.\"] alignment : ListAlignment, visible_rows : Option<usize>, # [doc = \" Whether the list takes the height of whatever holds it.\"] fills : bool, # [doc = \" Whether the rows fade in as one wave when the list itself arrives.\"] arriving : bool, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, deferred_acceptance : Option<(dnd::DeferredDrop, u64)>, on_reorder : Option<ReorderHandler>, }",
       "cfg": []
     },
     {
@@ -70521,6 +70836,21 @@
       "summary": "Fades the rows in as one short wave when the list itself arrives, the way a menu's rows arrive.",
       "documentation": "Fades the rows in as one short wave when the list itself arrives, the\nway a menu's rows arrive.\n\nOff by default, because a row scrolled into a viewport is the same row\nthat was always there — so a virtualized window ([`List::fills`],\n[`List::visible_rows`]) ignores this rather than claim rows are\narriving every time the viewport moves, and so does a reorderable\nlist, whose rows are already moving for a better reason. Opacity only,\nexactly as menu rows arrive: no published box moves.",
       "signature": "pub fn arriving (mut self) -> Self",
+      "cfg": [],
+      "target": "List"
+    },
+    {
+      "id": "gpui_kit::data::list::List::deferred_acceptance",
+      "name": "deferred_acceptance",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::list",
+      "path": "gpui_kit::data::list",
+      "source": "crates/gpui-kit/src/data/list.rs",
+      "summary": "Defers release acceptance without holding the drag. Supply stable `keys` and advance `revision` whenever data or policy changes. The controller's live validator also checks caller-owned source state.",
+      "documentation": "Defers release acceptance without holding the drag. Supply stable\n`keys` and advance `revision` whenever data or policy changes. The\ncontroller's live validator also checks caller-owned source state.",
+      "signature": "pub fn deferred_acceptance (mut self, controller : dnd::DeferredDrop, revision : u64) -> Self",
       "cfg": [],
       "target": "List"
     },
@@ -71652,7 +71982,7 @@
       "source": "crates/gpui-kit/src/data/tree.rs",
       "summary": "A disclosure hierarchy.",
       "documentation": "A disclosure hierarchy.",
-      "signature": "# [doc = \" A disclosure hierarchy.\"] # [derive (IntoElement)] pub struct Tree { ident : Ident, nodes : Vec<TreeNode>, expanded : Vec<SharedString>, selected : Option<SharedString>, visible_rows : Option<usize>, size : ControlSize, disabled : bool, loading : bool, failure : Option<SharedString>, empty : Option<EmptyState>, slots : Slots, on_toggle : Option<ToggleHandler>, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, on_move : Option<MoveHandler>, }",
+      "signature": "# [doc = \" A disclosure hierarchy.\"] # [derive (IntoElement)] pub struct Tree { ident : Ident, nodes : Vec<TreeNode>, expanded : Vec<SharedString>, selected : Option<SharedString>, visible_rows : Option<usize>, size : ControlSize, disabled : bool, loading : bool, failure : Option<SharedString>, empty : Option<EmptyState>, slots : Slots, on_toggle : Option<ToggleHandler>, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, deferred_acceptance : Option<(dnd::DeferredDrop, u64)>, on_move : Option<MoveHandler>, }",
       "cfg": []
     },
     {
@@ -71667,6 +71997,21 @@
       "summary": "Whether this tree takes a payload, and where.",
       "documentation": "Whether this tree takes a payload, and where.\n\nStructural impossibilities are refused before this is consulted: a node\ncannot be moved inside itself or below one of its own descendants,\nbecause the descendant travels with it. Everything else — which kinds\nof node may hold which — is policy, and policy is the caller's.",
       "signature": "pub fn accepts (mut self, predicate : impl Fn (& DragItem, & DropPosition) -> bool + 'static,) -> Self",
+      "cfg": [],
+      "target": "Tree"
+    },
+    {
+      "id": "gpui_kit::data::tree::Tree::deferred_acceptance",
+      "name": "deferred_acceptance",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::tree",
+      "path": "gpui_kit::data::tree",
+      "source": "crates/gpui-kit/src/data/tree.rs",
+      "summary": "Defers release acceptance through the shared bounded decision lifecycle. Advance revision when data or policy changes. Structural and live caller validation run again before a move is reported.",
+      "documentation": "Defers release acceptance through the shared bounded decision lifecycle.\nAdvance revision when data or policy changes. Structural and live\ncaller validation run again before a move is reported.",
+      "signature": "pub fn deferred_acceptance (mut self, controller : dnd::DeferredDrop, revision : u64) -> Self",
       "cfg": [],
       "target": "Tree"
     },
@@ -84266,6 +84611,110 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop",
+      "name": "DeferredDrop",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "Retained, nonblocking acceptance shared by List and Tabs.",
+      "documentation": "Retained, nonblocking acceptance shared by List and Tabs.\n\nKeep one controller per mounted surface. The required validator checks\ncaller-owned payload/source/target identity and current data/owner grants;\nit must consult live data, not a request-time snapshot. Native mount,\nrevision, deadline and synchronous acceptance are also checked at commit.\nA same-revision render preserves a request; changing the revision or\nremoving the surface invalidates it. `revoke` permanently closes an owner.\nNo OS drag or pointer capture is held while a reply is pending.",
+      "signature": "# [doc = \" Retained, nonblocking acceptance shared by List and Tabs.\"] # [doc = \"\"] # [doc = \" Keep one controller per mounted surface. The required validator checks\"] # [doc = \" caller-owned payload/source/target identity and current data/owner grants;\"] # [doc = \" it must consult live data, not a request-time snapshot. Native mount,\"] # [doc = \" revision, deadline and synchronous acceptance are also checked at commit.\"] # [doc = \" A same-revision render preserves a request; changing the revision or\"] # [doc = \" removing the surface invalidates it. `revoke` permanently closes an owner.\"] # [doc = \" No OS drag or pointer capture is held while a reply is pending.\"] # [derive (Clone)] pub struct DeferredDrop (Rc<DeferredInner>);",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::cancel",
+      "name": "cancel",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn cancel (& self, window : & mut Window, cx : & mut App)",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (timeout : Duration, validate : impl Fn (& DropIntent, & mut Window, & mut App) -> bool + 'static, on_event : impl Fn (& DropDecisionEvent, & mut Window, & mut App) + 'static,) -> Self",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::request",
+      "name": "request",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "Submits an explicit candidate through the same path as pointer release. Keyboard reorder affordances may call this; it never mutates data.",
+      "documentation": "Submits an explicit candidate through the same path as pointer release.\nKeyboard reorder affordances may call this; it never mutates data.",
+      "signature": "pub fn request (& self, intent : DropIntent, window : & mut Window, cx : & mut App,) -> Option<DropRequestId>",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::resolve",
+      "name": "resolve",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "Resolves once. Stale, duplicate, foreign-window and Pending replies do not commit. Accepted still runs the live validator and current policy.",
+      "documentation": "Resolves once. Stale, duplicate, foreign-window and Pending replies do\nnot commit. Accepted still runs the live validator and current policy.",
+      "signature": "pub fn resolve (& self, id : DropRequestId, decision : DropDecision, window : & mut Window, cx : & mut App,) -> bool",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::revoke",
+      "name": "revoke",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn revoke (& self, window : & mut Window, cx : & mut App)",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DeferredDrop::status",
+      "name": "status",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn status (& self) -> Option<(DropRequest, DropDecision)>",
+      "cfg": [],
+      "target": "DeferredDrop"
+    },
+    {
       "id": "gpui_kit::interaction::dnd::DragItem",
       "name": "DragItem",
       "kind": "struct",
@@ -84339,6 +84788,34 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::interaction::dnd::DropDecision",
+      "name": "DropDecision",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Clone, Copy, Debug, PartialEq, Eq)] pub enum DropDecision { Pending, Accepted, Refused (DropRefusal), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DropDecisionEvent",
+      "name": "DropDecisionEvent",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "Every request has at most one terminal event, including cancellation.",
+      "documentation": "Every request has at most one terminal event, including cancellation.",
+      "signature": "# [doc = \" Every request has at most one terminal event, including cancellation.\"] # [derive (Clone, Debug, PartialEq)] pub enum DropDecisionEvent { Requested (Box<DropRequest>), Finished { id : DropRequestId, decision : DropDecision, }, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::interaction::dnd::DropIntent",
       "name": "DropIntent",
       "kind": "struct",
@@ -84395,6 +84872,63 @@
       "signature": "pub fn verb (& self) -> & 'static str",
       "cfg": [],
       "target": "DropPosition"
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DropRefusal",
+      "name": "DropRefusal",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Clone, Copy, Debug, PartialEq, Eq)] pub enum DropRefusal { Policy, Stale, Cancelled, TimedOut, Superseded, Revoked, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DropRequest",
+      "name": "DropRequest",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "A released candidate, not a committed reorder. Replies must name its id.",
+      "documentation": "A released candidate, not a committed reorder. Replies must name its id.",
+      "signature": "# [doc = \" A released candidate, not a committed reorder. Replies must name its id.\"] # [derive (Clone, Debug, PartialEq)] pub struct DropRequest { pub id : DropRequestId, pub surface : SharedString, pub revision : u64, pub owner : Option<gpui::EffectOwner>, pub intent : DropIntent, pub timeout : Duration, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DropRequestId",
+      "name": "DropRequestId",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "A single-use, process-local request identity, safe to carry as protocol data.",
+      "documentation": "A single-use, process-local request identity, safe to carry as protocol data.",
+      "signature": "# [doc = \" A single-use, process-local request identity, safe to carry as protocol data.\"] # [derive (Clone, Copy, Debug, PartialEq, Eq, Hash)] pub struct DropRequestId (u64);",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::interaction::dnd::DropRequestId::get",
+      "name": "get",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "interaction::dnd",
+      "path": "gpui_kit::interaction::dnd",
+      "source": "crates/gpui-kit/src/interaction/dnd.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn get (self) -> u64",
+      "cfg": [],
+      "target": "DropRequestId"
     },
     {
       "id": "gpui_kit::interaction::dnd::FILE_KIND",
@@ -96541,7 +97075,7 @@
       "source": "crates/gpui-kit/src/navigation/tabs.rs",
       "summary": "A row of tabs. The strip publishes one [`Role::Tab`] node per tab.",
       "documentation": "A row of tabs. The strip publishes one [`Role::Tab`] node per tab.",
-      "signature": "# [doc = \" A row of tabs. The strip publishes one [`Role::Tab`] node per tab.\"] # [derive (IntoElement)] pub struct Tabs { ident : Ident, tabs : Vec<TabItem>, selected : Option<SharedString>, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, on_close : Option<CloseHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, overflow : Overflow, overflow_menu : Option<Entity<Menu>>, capsules : bool, }",
+      "signature": "# [doc = \" A row of tabs. The strip publishes one [`Role::Tab`] node per tab.\"] # [derive (IntoElement)] pub struct Tabs { ident : Ident, tabs : Vec<TabItem>, selected : Option<SharedString>, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, on_close : Option<CloseHandler>, reorderable : bool, accepts : Option<Accepts>, deferred_acceptance : Option<(dnd::DeferredDrop, u64)>, on_reorder : Option<ReorderHandler>, overflow : Overflow, overflow_menu : Option<Entity<Menu>>, capsules : bool, }",
       "cfg": []
     },
     {
@@ -96571,6 +97105,21 @@
       "summary": "Draw each tab as its own Regular Liquid pill.",
       "documentation": "Draw each tab as its own Regular Liquid pill.\n\nA document strip stays a row of selected fills. A strip of named\nplaces — projects, spaces — is a row of capsules: every item has an\nmaterial-owned blurred face. The current item's [`TabItem::tint`]\nis a translucent selected fill, not a second opaque surface.\nOverflow, scrolling, reorder and the keyboard stay what they were.",
       "signature": "pub fn capsules (mut self) -> Self",
+      "cfg": [],
+      "target": "Tabs"
+    },
+    {
+      "id": "gpui_kit::navigation::tabs::Tabs::deferred_acceptance",
+      "name": "deferred_acceptance",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::tabs",
+      "path": "gpui_kit::navigation::tabs",
+      "source": "crates/gpui-kit/src/navigation/tabs.rs",
+      "summary": "Defers release acceptance without holding the drag. Advance revision whenever caller-owned data or policy changes; the live validator checks current source identity and owner grants again before committing.",
+      "documentation": "Defers release acceptance without holding the drag. Advance revision\nwhenever caller-owned data or policy changes; the live validator checks\ncurrent source identity and owner grants again before committing.",
+      "signature": "pub fn deferred_acceptance (mut self, controller : dnd::DeferredDrop, revision : u64) -> Self",
       "cfg": [],
       "target": "Tabs"
     },
@@ -97990,6 +98539,66 @@
       "target": "Drawer"
     },
     {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_content",
+      "name": "set_content",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_content (& mut self, body : Option<Body>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_description",
+      "name": "set_description",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_description (& mut self, description : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_dismissable",
+      "name": "set_dismissable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_dismissable (& mut self, dismissable : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_edge",
+      "name": "set_edge",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "Moves the existing drawer without replacing its focus trap or presence.",
+      "documentation": "Moves the existing drawer without replacing its focus trap or presence.",
+      "signature": "pub fn set_edge (& mut self, edge : Edge, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
       "id": "gpui_kit::overlay::drawer::Drawer::set_focus_stops",
       "name": "set_focus_stops",
       "kind": "method",
@@ -98001,6 +98610,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_focus_stops (& mut self, stops : impl IntoIterator<Item = FocusHandle>, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_footer",
+      "name": "set_footer",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_footer (& mut self, footer : Option<Body>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Drawer"
+    },
+    {
+      "id": "gpui_kit::overlay::drawer::Drawer::set_resizable",
+      "name": "set_resizable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::drawer",
+      "path": "gpui_kit::overlay::drawer",
+      "source": "crates/gpui-kit/src/overlay/drawer.rs",
+      "summary": "Revoking resize also cancels a drag preview; no resize is committed.",
+      "documentation": "Revoking resize also cancels a drag preview; no resize is committed.",
+      "signature": "pub fn set_resizable (& mut self, resizable : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Drawer"
     },
@@ -99152,6 +99791,111 @@
       "target": "HoverCard"
     },
     {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_content",
+      "name": "set_content",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_content (& mut self, content : Option<Content>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_grace",
+      "name": "set_grace",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "A changed grace restarts a pending departure without moving focus.",
+      "documentation": "A changed grace restarts a pending departure without moving focus.",
+      "signature": "pub fn set_grace (& mut self, grace : Duration, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_hang",
+      "name": "set_hang",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_hang (& mut self, hang : Hang, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_name",
+      "name": "set_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_name (& mut self, name : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_open_delay",
+      "name": "set_open_delay",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "A changed delay restarts a pending opening, not an already open card.",
+      "documentation": "A changed delay restarts a pending opening, not an already open card.",
+      "signature": "pub fn set_open_delay (& mut self, delay : Duration, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_placement",
+      "name": "set_placement",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_placement (& mut self, placement : Placement, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
+      "id": "gpui_kit::overlay::hover_card::HoverCard::set_trigger",
+      "name": "set_trigger",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::hover_card",
+      "path": "gpui_kit::overlay::hover_card",
+      "source": "crates/gpui-kit/src/overlay/hover_card.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_trigger (& mut self, trigger : Option<Content>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "HoverCard"
+    },
+    {
       "id": "gpui_kit::overlay::hover_card::HoverCard::trigger",
       "name": "trigger",
       "kind": "method",
@@ -99616,7 +100360,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "The same menu, opened at the pointer over a region rather than from a trigger.",
       "documentation": "The same menu, opened at the pointer over a region rather than from a\ntrigger.",
-      "signature": "# [doc = \" The same menu, opened at the pointer over a region rather than from a\"] # [doc = \" trigger.\"] pub struct ContextMenu { ident : Ident, focus_handle : FocusHandle, name : SharedString, target : Option<SharedString>, items : Vec<MenuItem>, content : Option<Content>, presentation : ContextMenuPresentation, open : bool, native_open : bool, position : Point<Pixels>, pending_focus : bool, state : MenuState, trap : FocusTrap, }",
+      "signature": "# [doc = \" The same menu, opened at the pointer over a region rather than from a\"] # [doc = \" trigger.\"] pub struct ContextMenu { ident : Ident, focus_handle : FocusHandle, name : SharedString, target : Option<SharedString>, items : Vec<MenuItem>, content : Option<Content>, presentation : ContextMenuPresentation, open : bool, native_open : bool, native_session : Option<NativeMenuSessionId>, native_reopen : bool, native_dismiss_requested : bool, position : Point<Pixels>, pending_focus : bool, state : MenuState, trap : FocusTrap, }",
       "cfg": []
     },
     {
@@ -99630,7 +100374,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn close (& mut self, window : & mut Window, cx : & mut Context<Self>)",
+      "signature": "pub fn close (& mut self, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99660,7 +100404,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn dismiss (& mut self, window : & mut Window, cx : & mut Context<Self>)",
+      "signature": "pub fn dismiss (& mut self, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99720,7 +100464,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn new (ident : impl Into<Ident>, _window : & mut Window, cx : & mut Context<Self>) -> Self",
+      "signature": "pub fn new (ident : impl Into<Ident>, window : & mut Window, cx : & mut Context<Self>) -> Self",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99735,7 +100479,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "Opens at a window position. Reports the target and nothing else: what is selected stays the host's answer.",
       "documentation": "Opens at a window position. Reports the target and nothing else: what\nis selected stays the host's answer.",
-      "signature": "pub fn open_at (& mut self, position : Point<Pixels>, window : & mut Window, cx : & mut Context<Self>,)",
+      "signature": "pub fn open_at (& mut self, position : Point<Pixels>, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99770,6 +100514,21 @@
       "target": "ContextMenu"
     },
     {
+      "id": "gpui_kit::overlay::menu::ContextMenu::set_content",
+      "name": "set_content",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_content (& mut self, content : Option<Content>, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
+      "cfg": [],
+      "target": "ContextMenu"
+    },
+    {
       "id": "gpui_kit::overlay::menu::ContextMenu::set_items",
       "name": "set_items",
       "kind": "method",
@@ -99780,7 +100539,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn set_items (& mut self, items : Vec<MenuItem>, cx : & mut Context<Self>)",
+      "signature": "pub fn set_items (& mut self, items : Vec<MenuItem>, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99795,7 +100554,37 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn set_name (& mut self, name : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "signature": "pub fn set_name (& mut self, name : impl Into<SharedString>, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
+      "cfg": [],
+      "target": "ContextMenu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::ContextMenu::set_presentation",
+      "name": "set_presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "Sets the presentation used the next time the surface opens.",
+      "documentation": "Sets the presentation used the next time the surface opens.",
+      "signature": "pub fn set_presentation (& mut self, presentation : ContextMenuPresentation, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
+      "cfg": [],
+      "target": "ContextMenu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::ContextMenu::set_target",
+      "name": "set_target",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_target (& mut self, target : Option<SharedString>, window : & mut Window, cx : & mut Context<Self>,) -> Result<(), NativeMenuError>",
       "cfg": [],
       "target": "ContextMenu"
     },
@@ -99825,7 +100614,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "What a context menu reports.",
       "documentation": "What a context menu reports.",
-      "signature": "# [doc = \" What a context menu reports.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum ContextMenuEvent { # [doc = \" The region was right-clicked. The payload names what was pointed at;\"] # [doc = \" the host decides what that means for its selection, because opening a\"] # [doc = \" menu is not choosing anything.\"] Opened (SharedString), Invoked (SharedString), Dismissed, Closed, }",
+      "signature": "# [doc = \" What a context menu reports.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum ContextMenuEvent { # [doc = \" The region was right-clicked. The payload names what was pointed at;\"] # [doc = \" the host decides what that means for its selection, because opening a\"] # [doc = \" menu is not choosing anything.\"] Opened (SharedString), Invoked (SharedString), Dismissed, Closed, # [doc = \" Native presentation or cancellation was refused; this is not dismissal.\"] Unavailable (SharedString), }",
       "cfg": []
     },
     {
@@ -100007,6 +100796,21 @@
       "target": "Menu"
     },
     {
+      "id": "gpui_kit::overlay::menu::Menu::set_hang",
+      "name": "set_hang",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_hang (& mut self, hang : Hang, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menu"
+    },
+    {
       "id": "gpui_kit::overlay::menu::Menu::set_items",
       "name": "set_items",
       "kind": "method",
@@ -100018,6 +100822,66 @@
       "summary": "Replaces the items from the host side, dropping a cursor that pointed into what is no longer offered.",
       "documentation": "Replaces the items from the host side, dropping a cursor that pointed\ninto what is no longer offered.",
       "signature": "pub fn set_items (& mut self, items : Vec<MenuItem>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::Menu::set_placement",
+      "name": "set_placement",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_placement (& mut self, placement : Placement, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::Menu::set_trigger",
+      "name": "set_trigger",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_trigger (& mut self, label : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::Menu::set_trigger_icon",
+      "name": "set_trigger_icon",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_trigger_icon (& mut self, icon : Option<Icon>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menu"
+    },
+    {
+      "id": "gpui_kit::overlay::menu::Menu::set_trigger_join",
+      "name": "set_trigger_join",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menu",
+      "path": "gpui_kit::overlay::menu",
+      "source": "crates/gpui-kit/src/overlay/menu.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_trigger_join (& mut self, join : ButtonJoin, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Menu"
     },
@@ -100469,6 +101333,21 @@
       "target": "Menubar"
     },
     {
+      "id": "gpui_kit::overlay::menubar::Menubar::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::menubar",
+      "path": "gpui_kit::overlay::menubar",
+      "source": "crates/gpui-kit/src/overlay/menubar.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Menubar"
+    },
+    {
       "id": "gpui_kit::overlay::menubar::Menubar::set_menus",
       "name": "set_menus",
       "kind": "method",
@@ -100477,8 +101356,8 @@
       "module": "overlay::menubar",
       "path": "gpui_kit::overlay::menubar",
       "source": "crates/gpui-kit/src/overlay/menubar.rs",
-      "summary": "Replaces the titles, closing anything that was open.",
-      "documentation": "Replaces the titles, closing anything that was open.",
+      "summary": "Reconciles by menu identity. A still-offered menu retains its native entity, open state and focus; removing or disabling it closes it first.",
+      "documentation": "Reconciles by menu identity. A still-offered menu retains its native\nentity, open state and focus; removing or disabling it closes it first.",
       "signature": "pub fn set_menus (& mut self, menus : Vec<MenubarMenu>, window : & mut Window, cx : & mut Context<Self>,)",
       "cfg": [],
       "target": "Menubar"
@@ -100926,6 +101805,36 @@
       "summary": "Files a notification without showing a toast of it.",
       "documentation": "Files a notification without showing a toast of it.\n\nA repeat of an id already held replaces it, the way a repeated toast\nrefreshes rather than stacking: one identity is one notification.",
       "signature": "pub fn record (& mut self, notification : Notification, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NotificationCenter"
+    },
+    {
+      "id": "gpui_kit::overlay::notification_center::NotificationCenter::set_capacity",
+      "name": "set_capacity",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::notification_center",
+      "path": "gpui_kit::overlay::notification_center",
+      "source": "crates/gpui-kit/src/overlay/notification_center.rs",
+      "summary": "Applies the same oldest-first retention as `record`, preserving read state and the truthful lower-bound unread count after any eviction.",
+      "documentation": "Applies the same oldest-first retention as `record`, preserving read\nstate and the truthful lower-bound unread count after any eviction.",
+      "signature": "pub fn set_capacity (& mut self, capacity : usize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NotificationCenter"
+    },
+    {
+      "id": "gpui_kit::overlay::notification_center::NotificationCenter::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::notification_center",
+      "path": "gpui_kit::overlay::notification_center",
+      "source": "crates/gpui-kit/src/overlay/notification_center.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "NotificationCenter"
     },
@@ -102939,6 +103848,51 @@
       "summary": "Window edges already occupied by host chrome, in addition to the layer's own breathing room.",
       "documentation": "Window edges already occupied by host chrome, in addition to the\nlayer's own breathing room.",
       "signature": "pub fn reserved_edges (mut self, edges : impl Into<Edges<Pixels>>) -> Self",
+      "cfg": [],
+      "target": "ToastLayer"
+    },
+    {
+      "id": "gpui_kit::overlay::toast::ToastLayer::set_capacity",
+      "name": "set_capacity",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::toast",
+      "path": "gpui_kit::overlay::toast",
+      "source": "crates/gpui-kit/src/overlay/toast.rs",
+      "summary": "Shrinking capacity starts the usual exit for excess evictable toasts; it does not reset the timers of the ones that remain.",
+      "documentation": "Shrinking capacity starts the usual exit for excess evictable toasts;\nit does not reset the timers of the ones that remain.",
+      "signature": "pub fn set_capacity (& mut self, capacity : usize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ToastLayer"
+    },
+    {
+      "id": "gpui_kit::overlay::toast::ToastLayer::set_corner",
+      "name": "set_corner",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::toast",
+      "path": "gpui_kit::overlay::toast",
+      "source": "crates/gpui-kit/src/overlay/toast.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_corner (& mut self, corner : ToastCorner, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "ToastLayer"
+    },
+    {
+      "id": "gpui_kit::overlay::toast::ToastLayer::set_reserved_edges",
+      "name": "set_reserved_edges",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::toast",
+      "path": "gpui_kit::overlay::toast",
+      "source": "crates/gpui-kit/src/overlay/toast.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_reserved_edges (& mut self, edges : impl Into<Edges<Pixels>>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "ToastLayer"
     },
@@ -116525,7 +117479,7 @@
       "source": "crates/gpui-webview/src/native.rs",
       "summary": "A UI-thread-only, caller-owned browser. The handle retains its engine until GPUI has detached the last painted view. Never move it between GPUI windows.",
       "documentation": "A UI-thread-only, caller-owned browser. The handle retains its engine until\nGPUI has detached the last painted view. Never move it between GPUI windows.",
-      "signature": "# [doc = \" A UI-thread-only, caller-owned browser. The handle retains its engine until\"] # [doc = \" GPUI has detached the last painted view. Never move it between GPUI windows.\"] pub struct BrowserHost { engine : Rc<Engine>, handle : PlatformViewHandle, events : EventInbox, sender : EventSender, navigation : NavigationPolicy, }",
+      "signature": "# [doc = \" A UI-thread-only, caller-owned browser. The handle retains its engine until\"] # [doc = \" GPUI has detached the last painted view. Never move it between GPUI windows.\"] pub struct BrowserHost { engine : Rc<Engine>, handle : PlatformViewHandle, events : EventInbox, sender : EventSender, navigation : NavigationPolicy, # [cfg (target_os = \"windows\")] pending_html : Rc<std::cell::RefCell<crate::PendingHtmlNavigation>>, }",
       "cfg": []
     },
     {
@@ -124021,7 +124975,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "The same menu, opened at the pointer over a region rather than from a trigger.",
       "construct": [
-        "new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
         "menu(items: impl IntoIterator<Item = MenuItem>) -> Self",
@@ -124031,11 +124985,14 @@
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
       ],
       "commands": [
-        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
-        "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
-        "open_at(position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>)",
-        "close(window: &mut Window, cx: &mut Context<Self>)",
-        "dismiss(window: &mut Window, cx: &mut Context<Self>)"
+        "set_name(name: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_presentation(presentation: ContextMenuPresentation, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_target(target: Option<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_content(content: Option<Content>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_items(items: Vec<MenuItem>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "open_at(position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "close(window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "dismiss(window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>"
       ],
       "queries": [
         "is_open() -> bool",
@@ -124046,7 +125003,8 @@
         "Opened",
         "Invoked",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "Unavailable"
       ],
       "scenes": [
         "context-menu"
@@ -124486,6 +125444,12 @@
         "set_size(size: f32, cx: &mut Context<Self>)",
         "set_focus_stops(stops: impl IntoIterator<Item = FocusHandle>, cx: &mut Context<Self>)",
         "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_edge(edge: Edge, cx: &mut Context<Self>)",
+        "set_description(description: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_content(body: Option<Body>, cx: &mut Context<Self>)",
+        "set_footer(footer: Option<Body>, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+        "set_resizable(resizable: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "dismiss(window: &mut Window, cx: &mut Context<Self>)",
@@ -125018,6 +125982,13 @@
         "grace(grace: Duration) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger(trigger: Option<Content>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Content>, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
+        "set_open_delay(delay: Duration, cx: &mut Context<Self>)",
+        "set_grace(grace: Duration, cx: &mut Context<Self>)",
         "open(cx: &mut Context<Self>)",
         "close(cx: &mut Context<Self>)",
         "dismiss(window: &mut Window, cx: &mut Context<Self>)"
@@ -125384,6 +126355,7 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_reorder(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -125584,6 +126556,11 @@
       "commands": [
         "set_trigger_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_trigger_style(variant: ButtonVariant, size: ControlSize, cx: &mut Context<Self>)",
+        "set_trigger(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_trigger_join(join: ButtonJoin, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
         "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "open_submenu(id: &str, window: &mut Window, cx: &mut Context<Self>) -> bool",
@@ -125620,6 +126597,7 @@
       ],
       "commands": [
         "set_menus(menus: Vec<MenubarMenu>, window: &mut Window, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(id: &str, window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)"
       ],
@@ -125908,6 +126886,8 @@
         "capacity(capacity: usize) -> Self"
       ],
       "commands": [
+        "set_capacity(capacity: usize, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "show(notification: Notification, window: &Window, cx: &mut Context<Self>) -> bool",
         "record(notification: Notification, cx: &mut Context<Self>)",
         "mark_read(id: &str, cx: &mut Context<Self>) -> bool",
@@ -127695,6 +128675,7 @@
         "overflow_menu(menu: Entity<Menu>) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_reorder(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -127864,6 +128845,7 @@
         "bounds_for_position(offset: usize) -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
+        "accessibility_work() -> gpui::AccessibleTextWork",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
@@ -128041,6 +129023,9 @@
         "reserved_edges(edges: impl Into<Edges<Pixels>>) -> Self"
       ],
       "commands": [
+        "set_corner(corner: ToastCorner, cx: &mut Context<Self>)",
+        "set_capacity(capacity: usize, cx: &mut Context<Self>)",
+        "set_reserved_edges(edges: impl Into<Edges<Pixels>>, cx: &mut Context<Self>)",
         "push(toast: Toast, cx: &mut Context<Self>)",
         "dismiss(ident: &str, cx: &mut Context<Self>) -> bool",
         "clear(cx: &mut Context<Self>)"
@@ -128314,6 +129299,7 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
+        "deferred_acceptance(controller: dnd::DeferredDrop, revision: u64) -> Self",
         "on_move(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self",
         "loading(loading: bool) -> Self",
         "failure(failure: impl Into<SharedString>) -> Self",
@@ -130197,7 +131183,8 @@
         "Opened",
         "Invoked",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "Unavailable"
       ],
       "construct": [],
       "options": [],
@@ -130380,6 +131367,24 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "DeferredDrop",
+      "path": "gpui_kit::interaction::DeferredDrop",
+      "summary": "Retained, nonblocking acceptance shared by List and Tabs.",
+      "variants": [],
+      "construct": [
+        "new(timeout: Duration, validate: impl Fn(&DropIntent, &mut Window, &mut App) -> bool + 'static, on_event: impl Fn(&DropDecisionEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "status() -> Option<(DropRequest, DropDecision)>",
+        "cancel(window: &mut Window, cx: &mut App)",
+        "revoke(window: &mut Window, cx: &mut App)",
+        "resolve(id: DropRequestId, decision: DropDecision, window: &mut Window, cx: &mut App) -> bool",
+        "request(intent: DropIntent, window: &mut Window, cx: &mut App) -> Option<DropRequestId>"
+      ]
     },
     {
       "name": "DeliveryState",
@@ -131182,6 +132187,33 @@
       "queries": []
     },
     {
+      "name": "DropDecision",
+      "path": "gpui_kit::interaction::DropDecision",
+      "summary": "",
+      "variants": [
+        "Pending",
+        "Accepted",
+        "Refused"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropDecisionEvent",
+      "path": "gpui_kit::interaction::DropDecisionEvent",
+      "summary": "Every request has at most one terminal event, including cancellation.",
+      "variants": [
+        "Requested",
+        "Finished"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DropIntent",
       "path": "gpui_kit::interaction::DropIntent",
       "summary": "One drop, as it is reported to the host.",
@@ -131207,6 +132239,45 @@
         "anchor() -> &SharedString",
         "verb() -> &'static str"
       ]
+    },
+    {
+      "name": "DropRefusal",
+      "path": "gpui_kit::interaction::DropRefusal",
+      "summary": "",
+      "variants": [
+        "Policy",
+        "Stale",
+        "Cancelled",
+        "TimedOut",
+        "Superseded",
+        "Revoked"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropRequest",
+      "path": "gpui_kit::interaction::DropRequest",
+      "summary": "A released candidate, not a committed reorder. Replies must name its id.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DropRequestId",
+      "path": "gpui_kit::interaction::DropRequestId",
+      "summary": "A single-use, process-local request identity, safe to carry as protocol data.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "get() -> u64"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DropzoneState",
@@ -146740,6 +147811,12 @@
       "anchor": "refusals"
     },
     {
+      "id": "interaction-deferred-acceptance-keeps-a-released-candidate-not-the-drag",
+      "title": "Deferred acceptance keeps a released candidate, not the drag",
+      "guide": "interaction",
+      "anchor": "deferred-acceptance-keeps-a-released-candidate-not-the-drag"
+    },
+    {
       "id": "interaction-cancelling",
       "title": "Cancelling",
       "guide": "interaction",
@@ -148304,6 +149381,19 @@
       "example": "fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let carried = fixture_record(4);\n    let anchor = fixture_record(1);\n    // A capture cannot photograph a gesture, so the drag is placed by hand.\n    // Staging fixes the ghost, the indicator, and the open slot, and takes the\n    // pointer and the spring out of the picture.\n    dnd::stage(\n        StagedDrag::new(DragItem::new(\n            \"scene.drag.records\",\n            carried.0.clone(),\n            carried.1.clone(),\n        ))\n        .landing(\n            \"scene.drag.records\",\n            DropPosition::Before(anchor.0.clone()),\n            Some(1),\n            true,\n        ),\n        cx,\n    );\n\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            SharedString::from(format!(\"{} moving before {}\", carried.1, anchor.1)),\n        ))\n        .child(\n            div()\n                .relative()\n                .child(\n                    div()\n                        .surface(&theme, Surface::Panel)\n                        .radius(&theme, Radius::Card)\n                        .py_token(&theme, Space::Xs)\n                        .overflow_hidden()\n                        .child(\n                            List::new(\"scene.drag.records\", 6, |index, _, _| {\n                                let (id, label) = fixture_record(index);\n                                ListItem::new(id, label.clone()).text(label)\n                            })\n                            // A row slides without its layout slot moving, so the\n                            // viewport is one row taller than the rows it holds and\n                            // the open slot has somewhere to be.\n                            .visible_rows(7)\n                            .reorderable(true)\n                            .on_select(|_, _, _| {})\n                            .on_reorder(|_, _, _| {}),\n                        ),\n                )\n                // The ghost is what the pointer is holding, and the pointer is\n                // beside the rows rather than on top of them: staged over a\n                // row it would cut the label it is meant to be leaving.\n                .children(\n                    dnd::staged_ghost(cx)\n                        .map(|ghost| div().absolute().left(px(248.0)).top(px(52.0)).child(ghost)),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "deferred-drop",
+      "capture": "cargo run -p xtask -- headless capture deferred-drop",
+      "kind": "composition",
+      "subjects": [],
+      "uses": [
+        "List",
+        "Tabs",
+        "Tree",
+        "Button"
+      ],
+      "example": "fn deferred_drop(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::interaction::dnd::{DeferredDrop, DropDecision, DropRefusal};\n    let theme = cx.theme().clone();\n    let mut content = stack(&theme).w(px(660.0)).child(caption(\n        &theme,\n        \"Fixture: request a move, then approve or refuse it. The host keeps its order.\",\n    ));\n    for (kind, surface) in [\n        (0, \"scene.deferred.list\"),\n        (1, \"scene.deferred.tabs\"),\n        (2, \"scene.deferred.tree\"),\n    ] {\n        let slot = crate::motion::keyed::slot::<Option<DeferredDrop>>(\n            &surface.into(),\n            window.window_handle().window_id(),\n            cx,\n        );\n        let controller = slot\n            .borrow_mut()\n            .get_or_insert_with(|| {\n                DeferredDrop::new(\n                    Duration::from_secs(30),\n                    |intent, _, _| intent.item.id == \"gamma\" && intent.position.anchor() == \"alpha\",\n                    |_, _, _| {},\n                )\n            })\n            .clone();\n        let request = controller.clone();\n        let approve = controller.clone();\n        let refuse = controller.clone();\n        let rows = [\"alpha\", \"beta\", \"gamma\"];\n        let element = match kind {\n            0 => List::new(surface, rows.len(), move |index, _, _| {\n                ListItem::new(rows[index], rows[index]).text(rows[index])\n            })\n            .keys(rows)\n            .reorderable(true)\n            .deferred_acceptance(controller, 1)\n            .on_reorder(|_, _, _| {})\n            .into_any_element(),\n            1 => Tabs::new(surface)\n                .tabs(rows.map(|id| TabItem::new(id, id)))\n                .reorderable(true)\n                .deferred_acceptance(controller, 1)\n                .on_reorder(|_, _, _| {})\n                .into_any_element(),\n            _ => Tree::new(surface)\n                .nodes(rows.map(|id| TreeNode::new(id, id)))\n                .reorderable(true)\n                .deferred_acceptance(controller, 1)\n                .on_move(|_, _, _| {})\n                .into_any_element(),\n        };\n        content = content\n            .child(caption(&theme, surface))\n            .child(element)\n            .child(\n                row(&theme)\n                    .child(\n                        Button::new(format!(\"{surface}.request\"))\n                            .label(\"Request move\")\n                            .on_click(move |window, cx| {\n                                request.request(\n                                    DropIntent {\n                                        item: DragItem::new(surface, \"gamma\", \"gamma\"),\n                                        position: DropPosition::Before(\"alpha\".into()),\n                                        velocity: crate::motion::Velocity::ZERO,\n                                    },\n                                    window,\n                                    cx,\n                                );\n                            }),\n                    )\n                    .child(\n                        Button::new(format!(\"{surface}.approve\"))\n                            .label(\"Approve\")\n                            .on_click(move |window, cx| {\n                                if let Some((request, _)) = approve.status() {\n                                    approve.resolve(request.id, DropDecision::Accepted, window, cx);\n                                }\n                            }),\n                    )\n                    .child(\n                        Button::new(format!(\"{surface}.refuse\"))\n                            .label(\"Refuse\")\n                            .on_click(move |window, cx| {\n                                if let Some((request, _)) = refuse.status() {\n                                    refuse.resolve(\n                                        request.id,\n                                        DropDecision::Refused(DropRefusal::Policy),\n                                        window,\n                                        cx,\n                                    );\n                                }\n                            }),\n                    ),\n            );\n    }\n    content.into_any_element()\n}"
+    },
+    {
       "name": "drag-tree",
       "capture": "cargo run -p xtask -- headless capture drag-tree",
       "kind": "exhibit",
@@ -149476,7 +150566,15 @@
       "resolved_element_focus": "InteractiveElement::on_focus_resolved observes the exact explicit or framework-generated handle after subtree prepaint; non-focusable elements report no handle, and Kit diagnostics use this authority without changing AccessKit focus."
     },
     "framework_context_menu": {
-      "contract": "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
+      "contract": "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability.",
+      "tests": [
+        "native_context_menu_revision_and_refusal",
+        "native_context_menu_cross_window_replacement",
+        "native_context_menu_invalidation_waits_for_real_completion",
+        "native_context_menu_transport_loss_is_not_dismissal",
+        "native_context_menu_dispatches_in_the_captured_focus_context"
+      ],
+      "validation": "Shared lifecycle tests run on Linux; native cancellation/replacement/teardown execution requires the dispatched macOS/Windows lanes and is not established by Linux tests."
     },
     "framework_editable_document": {
       "contract": "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping traverses borrowed rope chunks; exact history byte deltas are never re-clamped. No-wrap EditableTextLayout shapes visible lines and exact on-demand geometry through WindowTextSystem; selection painting is bounded independently of logical range queries.",

@@ -30,6 +30,7 @@ use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::popover::{self, MenuKey};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// The leading slot every row reserves, so labels line up whether or not the
 /// row carries a check or an icon.
@@ -1383,7 +1384,7 @@ impl ContextMenu {
         }
         if outcome == NativeMenuOutcome::Unavailable {
             cx.emit(ContextMenuEvent::Unavailable(
-                "native menu unavailable".into(),
+                cx.strings().text(StringKey::ContextMenuUnavailable),
             ));
         }
         cx.emit(ContextMenuEvent::Closed);

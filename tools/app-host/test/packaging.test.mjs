@@ -13,12 +13,14 @@ test('directory packaging executes its launcher with relocated arguments and nat
   const app = resolve(dir, 'app'), out = resolve(dir, 'package with spaces');
   execFileSync(process.execPath, [cli, 'init', app]);
   const host = resolve(dir, 'argument-recorder');
+  const sandbox = resolve(dir, 'sandbox fixture');
   // This executable checks generated launcher relocation, not native rendering.
   await writeFile(host, '#!/bin/sh\nprintf "%s\\n" "$GPUI_SANDBOX_LAUNCHER" "$@"\n', { mode: 0o755 });
-  execFileSync(process.execPath, [cli, 'build', app, out, '--host', host, '--sandbox-launcher', '/bin/true']);
+  await writeFile(sandbox, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  execFileSync(process.execPath, [cli, 'build', app, out, '--host', host, '--sandbox-launcher', sandbox]);
   const lines = execFileSync(resolve(out, 'run.sh'), ['--data-dir', resolve(dir, 'data with spaces')], { encoding: 'utf8' }).trim().split('\n');
   assert.deepEqual(lines, [resolve(out, 'runtime/gpui-sandbox-launch'), resolve(out, 'tools/app-host/runner.mjs'), resolve(out, 'app'), '--data-dir', resolve(dir, 'data with spaces')]);
-  assert.deepEqual(await readFile(resolve(out, 'runtime/gpui-sandbox-launch')), await readFile('/bin/true'));
+  assert.deepEqual(await readFile(resolve(out, 'runtime/gpui-sandbox-launch')), await readFile(sandbox));
   assert.equal(JSON.parse(await readFile(resolve(out, 'build-info.json'), 'utf8')).runtimeBundled, false);
   assert.throws(() => execFileSync(process.execPath, [cli, 'build', app, out, '--host', host], { stdio: 'pipe' }), /Command failed/);
 });

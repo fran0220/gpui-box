@@ -170,13 +170,20 @@ mod tests {
     fn native_context_menu_invalidation_waits_for_real_completion() {
         let (session, mut receiver) = PlatformNativeMenuSession::new(NativeMenuSessionId::new());
         session.invalidate();
-        assert!(receiver.try_recv().unwrap().is_none());
+        assert!(
+            receiver
+                .try_recv()
+                .expect("invalidation should retain the completion sender")
+                .is_none()
+        );
         assert!(session.finished().now_or_never().is_none());
         session.complete(PlatformNativeMenuOutcome::Selected(Box::new(
             crate::NoAction,
         )));
         assert!(matches!(
-            receiver.try_recv().unwrap(),
+            receiver
+                .try_recv()
+                .expect("completion should deliver the invalidated outcome"),
             Some(PlatformNativeMenuOutcome::Cancelled)
         ));
         assert!(session.finished().now_or_never().is_some());

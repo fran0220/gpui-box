@@ -41,6 +41,7 @@ fn floating_events_keep_live_finished_and_cancelled_distinct() {
     );
 }
 
+#[cfg(feature = "capture")]
 fn descriptor(component: &str, props: Value) -> Node {
     serde_json::from_value(json!({"kind":"kit","id":"layout","component":component,"props":props,"events":{"event":"event","click":"click","overflowSelect":"select"}})).unwrap()
 }

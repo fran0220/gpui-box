@@ -597,6 +597,7 @@ fn chinese(key: StringKey) -> &'static str {
         RichTextBullet => "•",
         RichTextOrderedMarker => "{0}.",
         DrawerResize => "调整抽屉大小",
+        ContextMenuUnavailable => "原生菜单不可用",
         SparklineCurrent => "当前：{0}",
         SparklineMinimum => "最小：{0}",
         SparklineMaximum => "最大：{0}",

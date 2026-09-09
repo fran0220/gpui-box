@@ -1369,7 +1369,7 @@
       "source": "crates/gpui-kit/src/overlay/menu.rs",
       "summary": "The same menu, opened at the pointer over a region rather than from a trigger.",
       "construct": [
-        "new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
         "menu(items: impl IntoIterator<Item = MenuItem>) -> Self",
@@ -1379,11 +1379,14 @@
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
       ],
       "commands": [
-        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
-        "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
-        "open_at(position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>)",
-        "close(window: &mut Window, cx: &mut Context<Self>)",
-        "dismiss(window: &mut Window, cx: &mut Context<Self>)"
+        "set_name(name: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_presentation(presentation: ContextMenuPresentation, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_target(target: Option<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_content(content: Option<Content>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "set_items(items: Vec<MenuItem>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "open_at(position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "close(window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>",
+        "dismiss(window: &mut Window, cx: &mut Context<Self>) -> Result<(), NativeMenuError>"
       ],
       "queries": [
         "is_open() -> bool",
@@ -1394,7 +1397,8 @@
         "Opened",
         "Invoked",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "Unavailable"
       ],
       "scenes": [
         "context-menu"
@@ -1834,6 +1838,12 @@
         "set_size(size: f32, cx: &mut Context<Self>)",
         "set_focus_stops(stops: impl IntoIterator<Item = FocusHandle>, cx: &mut Context<Self>)",
         "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_edge(edge: Edge, cx: &mut Context<Self>)",
+        "set_description(description: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_content(body: Option<Body>, cx: &mut Context<Self>)",
+        "set_footer(footer: Option<Body>, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+        "set_resizable(resizable: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "dismiss(window: &mut Window, cx: &mut Context<Self>)",
@@ -2366,6 +2376,13 @@
         "grace(grace: Duration) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger(trigger: Option<Content>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Content>, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
+        "set_open_delay(delay: Duration, cx: &mut Context<Self>)",
+        "set_grace(grace: Duration, cx: &mut Context<Self>)",
         "open(cx: &mut Context<Self>)",
         "close(cx: &mut Context<Self>)",
         "dismiss(window: &mut Window, cx: &mut Context<Self>)"
@@ -2933,6 +2950,11 @@
       "commands": [
         "set_trigger_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_trigger_style(variant: ButtonVariant, size: ControlSize, cx: &mut Context<Self>)",
+        "set_trigger(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_trigger_join(join: ButtonJoin, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
         "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "open_submenu(id: &str, window: &mut Window, cx: &mut Context<Self>) -> bool",
@@ -2969,6 +2991,7 @@
       ],
       "commands": [
         "set_menus(menus: Vec<MenubarMenu>, window: &mut Window, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(id: &str, window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)"
       ],
@@ -3257,6 +3280,8 @@
         "capacity(capacity: usize) -> Self"
       ],
       "commands": [
+        "set_capacity(capacity: usize, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "show(notification: Notification, window: &Window, cx: &mut Context<Self>) -> bool",
         "record(notification: Notification, cx: &mut Context<Self>)",
         "mark_read(id: &str, cx: &mut Context<Self>) -> bool",
@@ -5392,6 +5417,9 @@
         "reserved_edges(edges: impl Into<Edges<Pixels>>) -> Self"
       ],
       "commands": [
+        "set_corner(corner: ToastCorner, cx: &mut Context<Self>)",
+        "set_capacity(capacity: usize, cx: &mut Context<Self>)",
+        "set_reserved_edges(edges: impl Into<Edges<Pixels>>, cx: &mut Context<Self>)",
         "push(toast: Toast, cx: &mut Context<Self>)",
         "dismiss(ident: &str, cx: &mut Context<Self>) -> bool",
         "clear(cx: &mut Context<Self>)"
@@ -7549,7 +7577,8 @@
         "Opened",
         "Invoked",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "Unavailable"
       ],
       "construct": [],
       "options": [],

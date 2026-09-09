@@ -214,3 +214,43 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
 - Effect-owner, clipboard, multicursor and runtime candidates remain outside
   this frozen checkpoint. Full native JS bindings, OS sandbox execution and
   the runtime owner's live-window black client area remain unresolved.
+
+### Third published checkpoint and fourth-stage integration
+
+- Published and deployed source `f0f1a1ee1d965587de681f659bc24a5f0c7d2d39`
+  passed the combined Linux full gate: 330 images across 165 scenes. Hosted
+  verification matched 32 packages, 8,126 symbols, 200 components and 10 tools.
+- The fourth stage integrates DnD, native-menu session lifetimes, incremental
+  editor accessibility, platform sandbox/WebView candidates, and the frozen
+  51-component partial JS binding catalog. Native references, typed/deferred
+  construction, full family coverage and safe untrusted Cinematic decoding
+  are not complete. A production dotLottie decoder exists; its missing
+  pre-parse and per-frame work/cancellation budgets prevent untrusted use.
+- The merged JavaScript suite passed 86 tests with 15 explicit platform skips.
+  Generated binding coverage was then refreshed and its check passed. The
+  first combined full gate passed both workspace test modes but rejected 23
+  new native-menu test `unwrap()` calls in workspace Clippy. They now use
+  diagnostic `expect()` calls without removing assertions or relaxing lints;
+  the repeated strict workspace Clippy passed. The frozen full-gate retry
+  passed, including 332 matching Linux images in 443.52 seconds, wasm32,
+  rustdoc and all unchanged performance ratchets. The real isolated-worker
+  Host click also reported `Move right refused by fixture host; sets unchanged`;
+  its inspected image retained the source/target sets and disabled controls.
+- Native image acceptance is exclusively from Platforms run 34385663795 at
+  the published source above: 24 Metal and 181 WARP changed/new frames. The
+  renderer owner inspected all 205 candidates; the coordinator additionally
+  inspected Settings pages on both platforms, Metal editor-services and the
+  Windows grid. The acceptance script copied exactly these 205 paths, and
+  every SHA256 matched the audit manifest. Old rejected Settings frames were
+  not reused. This does not validate subsequent DnD or native-menu changes.
+- That native run passed macOS workspace tests; Windows workspace tests also
+  passed, then WebView authored-HTML navigation failed before UIA could run.
+  The imported navigation fix still needs native execution. Windows sandbox
+  probes failed at CreateProcessW with error 2 before payload execution;
+  per-instance profile provisioning and detached-process launch are candidate
+  fixes, not a proven containment result. The independent session teardown
+  fix addresses the replacement worker's leaked cwd and bounds shutdown.
+- Runtime received a validation-only parent bundle containing the 51 partial
+  bindings and both Windows/session candidates. Its full reference, resource,
+  typed-slot and lifecycle integration must be tested on the resulting merged
+  tree. No fourth-stage deployment or cross-platform success is claimed here.

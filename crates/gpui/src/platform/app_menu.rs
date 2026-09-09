@@ -486,9 +486,9 @@ mod tests {
                             point(px(1.0), px(2.0)),
                             cx,
                         )
-                        .unwrap()
+                        .expect("test platform should open the native menu")
                 })
-                .unwrap()
+                .expect("test window should remain open")
         };
         let first = open(cx);
         let first_id = first.id();
@@ -497,13 +497,17 @@ mod tests {
         let second_id = second.id();
         window
             .update(cx, |_, window, _| {
-                assert!(!window.cancel_context_menu(first_id).unwrap())
+                assert!(
+                    !window
+                        .cancel_context_menu(first_id)
+                        .expect("stale cancellation should not fail")
+                )
             })
-            .unwrap();
+            .expect("test window should remain open");
         assert_eq!(first.await, NativeMenuOutcome::Cancelled);
         window
             .update(cx, |target, _, _| assert!(!target.chose))
-            .unwrap();
+            .expect("test window should remain open");
         cx.set_native_context_menu_cancel_fails(*window, true);
         window
             .update(cx, |_, window, _| {
@@ -512,14 +516,18 @@ mod tests {
                     Err(NativeMenuError::CancellationFailed(_))
                 ))
             })
-            .unwrap();
+            .expect("test window should remain open");
         assert!(cx.pending_context_menu_position(*window).is_some());
         cx.set_native_context_menu_cancel_fails(*window, false);
         window
             .update(cx, |_, window, _| {
-                assert!(window.cancel_context_menu(second_id).unwrap())
+                assert!(
+                    window
+                        .cancel_context_menu(second_id)
+                        .expect("active cancellation should succeed after refusal clears")
+                )
             })
-            .unwrap();
+            .expect("test window should remain open");
         assert_eq!(second.await, NativeMenuOutcome::Cancelled);
         let dismissed = open(cx);
         cx.dismiss_context_menu(*window);
@@ -527,7 +535,7 @@ mod tests {
         let removed = open(cx);
         window
             .update(cx, |_, window, _| window.remove_window())
-            .unwrap();
+            .expect("test window should exist before removal");
         assert_eq!(removed.await, NativeMenuOutcome::Unavailable);
     }
 
@@ -548,27 +556,35 @@ mod tests {
             .update(cx, |_, window, cx| {
                 window
                     .show_context_menu(Menu::new("A"), point(px(1.0), px(2.0)), cx)
-                    .unwrap()
+                    .expect("first window should open its native menu")
             })
-            .unwrap();
+            .expect("first test window should remain open");
         let id = a.id();
         let b = second
             .update(cx, |_, window, cx| {
                 window
                     .show_context_menu(Menu::new("B"), point(px(3.0), px(4.0)), cx)
-                    .unwrap()
+                    .expect("second window should open its native menu")
             })
-            .unwrap();
+            .expect("second test window should remain open");
         second
             .update(cx, |_, window, _| {
-                assert!(!window.cancel_context_menu(id).unwrap())
+                assert!(
+                    !window
+                        .cancel_context_menu(id)
+                        .expect("other-window cancellation should not fail")
+                )
             })
-            .unwrap();
+            .expect("second test window should remain open");
         first
             .update(cx, |_, window, _| {
-                assert!(!window.cancel_context_menu(id).unwrap())
+                assert!(
+                    !window
+                        .cancel_context_menu(id)
+                        .expect("replaced-menu cancellation should not fail")
+                )
             })
-            .unwrap();
+            .expect("first test window should remain open");
         assert_eq!(a.await, NativeMenuOutcome::Cancelled);
         assert_eq!(
             cx.pending_context_menu_position(*second),
@@ -589,10 +605,10 @@ mod tests {
                             point(px(1.0), px(2.0)),
                             cx,
                         )
-                        .unwrap()
+                        .expect("owned native menu should open")
                 })
             })
-            .unwrap();
+            .expect("first test window should remain open");
         assert_eq!(queued.effect_owner(), Some(owner));
         cx.select_context_menu_item(*first, &[0]);
         let newer = second
@@ -600,9 +616,9 @@ mod tests {
                 assert_eq!(cx.current_effect_owner(), None);
                 window
                     .show_context_menu(Menu::new("B"), point(px(3.0), px(4.0)), cx)
-                    .unwrap()
+                    .expect("replacement native menu should open")
             })
-            .unwrap();
+            .expect("second test window should remain open");
         assert_eq!(queued.await, NativeMenuOutcome::Cancelled);
         cx.dismiss_context_menu(*second);
         assert_eq!(newer.await, NativeMenuOutcome::Dismissed);

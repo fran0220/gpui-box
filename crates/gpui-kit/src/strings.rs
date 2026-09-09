@@ -840,6 +840,7 @@ string_keys! {
     RichTextBullet => "rich-text.bullet", "•";
     RichTextOrderedMarker => "rich-text.ordered-marker", "{0}.";
     DrawerResize => "drawer.resize", "Resize drawer";
+    ContextMenuUnavailable => "context-menu.unavailable", "Native menu unavailable";
     SparklineEmpty => "sparkline.empty", "No readings";
     SparklineUnavailable => "sparkline.unavailable", "Reading unavailable";
     SparklineError => "sparkline.error", "Could not load reading";
