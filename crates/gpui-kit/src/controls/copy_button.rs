@@ -214,6 +214,55 @@ impl CopyButton {
         &self.state
     }
 
+    /// Replaces the label, or restores the localized default with `None`.
+    pub fn set_label(&mut self, label: Option<SharedString>, cx: &mut Context<Self>) {
+        self.label = label;
+        cx.notify();
+    }
+
+    /// Enables a named glyph-only button, or restores labeled mode with `None`.
+    pub fn set_glyph_only(&mut self, name: Option<SharedString>, cx: &mut Context<Self>) {
+        self.glyph_only = name.is_some();
+        self.name = name;
+        cx.notify();
+    }
+
+    pub fn set_variant(&mut self, variant: ButtonVariant, cx: &mut Context<Self>) {
+        self.variant = variant;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    /// Sets the duration for future copies without restarting an active confirmation.
+    pub fn set_confirmation(&mut self, confirmation: Duration, cx: &mut Context<Self>) {
+        self.confirmation = confirmation;
+        cx.notify();
+    }
+
+    /// Replaces the native host copier without changing the last outcome.
+    pub fn set_copier(
+        &mut self,
+        copier: impl Fn(&str, &mut App) -> Result<(), SharedString> + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.copier = Some(Rc::new(copier));
+        cx.notify();
+    }
+
+    /// Restores owner-checked platform write and readback for future copies.
+    pub fn clear_copier(&mut self, cx: &mut Context<Self>) {
+        self.copier = None;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         cx.notify();
@@ -413,6 +462,70 @@ mod clipboard_policy_tests {
     use gpui::{AppContext as _, ClipboardOperation, EffectOwner, TestAppContext, effect_owner};
     use gpui_kit_testkit::harness::Harness;
     use std::cell::{Cell, RefCell};
+
+    #[gpui::test]
+    fn retained_configuration_preserves_outcome_and_active_timer(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            let button = build
+                .borrow_mut()
+                .get_or_insert_with(|| cx.new(|cx| CopyButton::new("retained.copy", window, cx)))
+                .clone();
+            div().child(button).into_any_element()
+        });
+        harness.snapshot();
+        let button = slot.borrow().clone().expect("mounted");
+        harness.update(|_, cx| {
+            button.update(cx, |button, cx| {
+                button.set_copier(|_, _| Ok(()), cx);
+                button.set_confirmation(Duration::from_millis(200), cx);
+                button.copy(cx);
+            });
+        });
+        harness.frame();
+        harness.update(|_, cx| {
+            cx.with_effect_owner(Some(EffectOwner::new()), |cx| {
+            button.update(cx, |button, cx| {
+                let remaining = button.remaining;
+                let tick = button.last_tick;
+                assert!(tick.is_some());
+                button.set_label(Some("Export".into()), cx);
+                button.set_glyph_only(Some("Export text".into()), cx);
+                button.set_variant(ButtonVariant::Primary, cx);
+                button.set_control_size(ControlSize::Sm, cx);
+                button.set_confirmation(Duration::from_secs(3), cx);
+                assert!(button.state().is_copied());
+                assert_eq!(button.remaining, remaining);
+                assert_eq!(button.last_tick, tick);
+                assert_eq!(button.button_label(cx).as_ref(), "Export");
+                assert!(button.glyph_only);
+                button.set_label(None, cx);
+                button.set_glyph_only(None, cx);
+                assert_eq!(button.button_label(cx), cx.strings().text(StringKey::Copy));
+                assert!(!button.glyph_only);
+                assert!(button.name.is_none());
+                button.copy(cx);
+                assert_eq!(button.remaining, Some(Duration::from_secs(3)));
+                button.set_copier(|_, _| Err("Refused".into()), cx);
+                button.copy(cx);
+                button.set_confirmation(Duration::ZERO, cx);
+                button.set_label(Some("Again".into()), cx);
+                button.clear_copier(cx);
+                assert_eq!(button.state(), &CopyState::Failed("Refused".into()));
+                assert!(button.remaining.is_none());
+                cx.set_clipboard_policy(|_, _| false);
+                button.copy(cx);
+                assert!(matches!(button.state(), CopyState::Failed(reason) if reason.as_ref() == "clipboard operation denied by host"));
+                button.set_copier(|_, _| panic!("disabled copy invoked host"), cx);
+                button.set_disabled(true, cx);
+                assert!(button.is_disabled());
+                button.copy(cx);
+                assert!(button.state().is_failed());
+            });
+            });
+        });
+    }
 
     #[gpui::test]
     fn verification_distinguishes_denied_write_denied_read_and_success(cx: &mut TestAppContext) {

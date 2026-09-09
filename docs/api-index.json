@@ -1423,11 +1423,19 @@
       ],
       "commands": [
         "set_text(text: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_glyph_only(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_variant(variant: ButtonVariant, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_confirmation(confirmation: Duration, cx: &mut Context<Self>)",
+        "set_copier(copier: impl Fn(&str, &mut App) -> Result<(), SharedString> + 'static, cx: &mut Context<Self>)",
+        "clear_copier(cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "copy(cx: &mut Context<Self>)"
       ],
       "queries": [
-        "state() -> &CopyState"
+        "state() -> &CopyState",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [],
