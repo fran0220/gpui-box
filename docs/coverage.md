@@ -8,16 +8,6 @@ fact, a locale fact, a transport, or a platform chrome the OS already
 owns. `docs/components.md` describes the components themselves; this file
 exists so a gap is a recorded decision rather than an oversight.
 
-## Media-caption image sizing correction
-
-The generic intrinsic leaf contract now keeps the `media-caption` image at
-its assigned 880×220 size instead of expanding it to 880×264 and clipping
-away the bottom corners. The 480×220 and 880×220 Metal pixel regression
-checks all four corners; Kit adds no mask or component-specific workaround.
-See “Intrinsic image sizing is separate from object fitting” below for the
-layout contract and the rejected alternatives. Linux's previously accepted
-defect frames must be revalidated on its real WGPU adapter after this change.
-
 A component counts as covered only when it has all four of: a public builder or
 view, a scene in `gpui_kit::scenes`, behaviour tests driven through simulated
 input, and an entry in `docs/components.md`.
@@ -1187,6 +1177,8 @@ not accepted approximations. A zero-size asset has no natural ratio.
 
 The cross-platform headless pixel regression uses 480×220 and 880×220 Cover
 cards with rounded images and a bottom Clear caption. It checks all four
-corners against the outside ground. `cinematic-effects` additionally reviews
+corners against the outside ground, and passes on both Metal and Linux WGPU
+real adapters. Kit adds no mask or component-specific sizing workaround.
+`cinematic-effects` additionally reviews
 Contain: a 240×140 frame in a 372×154 slot remains centered at 264×154 rather
 than forcing the slot to the image's intrinsic ratio.
