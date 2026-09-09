@@ -1070,18 +1070,73 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(caption(
             &theme,
-            "Budget fallback: admitted optics become opaque cards, never holes",
+            "Focused: one inward report edge — Regular, Clear + dimmed, Frosted, reduced",
+        ))
+        .child(
+            row(&theme).children(
+                [
+                    ("regular", GlassPreset::Liquid, false, "Regular"),
+                    ("clear", GlassPreset::Clear, false, "Clear + dimmed"),
+                    ("frosted", GlassPreset::Frosted, false, "Frosted"),
+                    ("reduced", GlassPreset::Clear, true, "Reduced"),
+                ]
+                .into_iter()
+                .map(|(name, preset, reduced, title)| {
+                    div()
+                        .relative()
+                        .w(px(210.0))
+                        .h(px(96.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .child(
+                            gpui::img(glass_media())
+                                .size_full()
+                                .object_fit(gpui::ObjectFit::Cover),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .left(px(12.0))
+                                .right(px(12.0))
+                                .top(px(24.0))
+                                .child(crate::foundation::ThemeOverlay::theme(
+                                    theme.clone().with_reduce_transparency(reduced),
+                                    Glass::new(format!("scene.glass.focused.{name}"))
+                                        .preset(preset)
+                                        .dimmed(preset == GlassPreset::Clear)
+                                        .focused(true)
+                                        .radius(Radius::Pill)
+                                        .child(
+                                            div()
+                                                .w_full()
+                                                .h(px(40.0))
+                                                .flex()
+                                                .items_center()
+                                                .justify_center()
+                                                .type_scale(&theme, TypeScale::Label)
+                                                .child(title),
+                                        ),
+                                )),
+                        )
+                }),
+            ),
+        )
+        .child(caption(
+            &theme,
+            "Budget fallback: opaque cards, never holes — R keeps its focus report",
         ))
         .child(div().flex().gap(px(4.0)).children(('A'..='R').map(|name| {
-            Glass::new(format!("scene.glass.budget.{name}")).child(
-                div()
-                    .w(px(38.0))
-                    .h(px(30.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(name.to_string()),
-            )
+            Glass::new(format!("scene.glass.budget.{name}"))
+                .focused(name == 'R')
+                .child(
+                    div()
+                        .w(px(38.0))
+                        .h(px(30.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(name.to_string()),
+                )
         })))
         .child(caption(
             &theme,

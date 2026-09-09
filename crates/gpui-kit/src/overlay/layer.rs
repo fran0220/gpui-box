@@ -409,6 +409,7 @@ pub fn surface(
         ident: ident.clone(),
         recipe,
         theme: theme.clone(),
+        focused: false,
         inner: div()
             .id(ident.element_id())
             .column()
@@ -424,10 +425,18 @@ pub struct GlassSurface {
     ident: Ident,
     recipe: OverlaySurface,
     theme: Theme,
+    focused: bool,
     inner: Stateful<Div>,
 }
 
 impl GlassSurface {
+    /// Report focus inside the material edge, replacing its hairline.
+    /// This forwards [`super::Glass::focused`]; do not add a focus halo.
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
+        self
+    }
+
     /// Preserve the material wrapper while assigning the content identity.
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
         self.inner.interactivity().element_id = Some(id.into());
@@ -498,6 +507,7 @@ impl gpui::Element for GlassSurface {
         let glass = super::Glass::new(self.ident.child("material"))
             .preset(self.recipe.preset)
             .dimmed(self.recipe.dimmed)
+            .focused(self.focused)
             .radius_px(
                 self.recipe
                     .radius

@@ -819,6 +819,24 @@ is in `docs/interaction.md`.
 | `Kbd` | builder | Platform-specific keystroke caps |
 | `popover` | helpers | Anchoring, menu rows, cursor movement, type-ahead, filtering, and key classification |
 
+### Glass reports focus inside its material
+
+`Glass::focused(bool)` and the `GlassSurface::focused(bool)` builder returned
+by `overlay::surface` report caller-owned focus. They do not acquire focus or
+install keyboard handlers. The `interactive.focus` colour paints an inward
+edge at `effect.focusRingWidth`, after content and along the same fitted
+rounded rectangle as the glass. It replaces the optical hairline, adds no
+halo, and changes no layout, clipping or hit target.
+
+The report is identical for Regular, Clear (including dimmed), Frosted,
+reduce-transparency and admission-budget fallback. Opaque content controls
+continue to use `Theme::focus_ring_on`; glass callers use `.focused(focused)`
+instead of wrapping the material in that halo. Do not apply both treatments.
+The `glass` exhibit shows focused pills in both themes, reduced transparency,
+and the rejected budget surface R. The headless pixel test checks the inward
+edge after child painting, its token width, rounded corners and absence of
+an external halo, including both Glass and GlassSurface paths.
+
 ### What a copy button can honestly claim
 
 `gpui::App::write_to_clipboard` returns `()`. There is no `Result`, no error,

@@ -255,6 +255,7 @@ pub struct Glass {
     adaptive: bool,
     adaptive_appearance: bool,
     dimmed: bool,
+    focused: bool,
     tint: Option<Hsla>,
     edge_mask: Option<(GlassEdge, f32)>,
     child: Option<AnyElement>,
@@ -280,6 +281,7 @@ impl std::fmt::Debug for Glass {
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
             .field("dimmed", &self.dimmed)
+            .field("focused", &self.focused)
             .field("tint", &self.tint)
             .field("edge_mask", &self.edge_mask)
             .field("has_child", &self.child.is_some())
@@ -306,6 +308,7 @@ impl Glass {
             adaptive: false,
             adaptive_appearance: false,
             dimmed: false,
+            focused: false,
             tint: None,
             edge_mask: None,
             child: None,
@@ -316,6 +319,15 @@ impl Glass {
     /// Which surface colour Frosted lays over the backdrop.
     pub fn surface(mut self, surface: Surface) -> Self {
         self.surface = surface;
+        self
+    }
+
+    /// Report caller-owned focus with `interactive.focus` inside this surface's
+    /// fitted rounded edge, at `effect.focusRingWidth`. Replaces the optical
+    /// hairline; does not install a focus handler or add an external halo.
+    /// Use this instead of applying `Theme::focus_ring_on` to glass.
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
         self
     }
 
@@ -489,6 +501,9 @@ impl Glass {
             material.edge_mask_edge = edge.as_f32();
             material.edge_mask_band = px(band);
         }
+        if self.focused {
+            material.hairline = Pixels::ZERO;
+        }
         material
     }
 }
@@ -598,6 +613,9 @@ impl RenderOnce for Glass {
         let fill = tone.opacity(alpha);
         let fallback = Some(tone.opacity(1.0));
         let translucent = alpha < 1.0;
+        let focus_report = self
+            .focused
+            .then_some((theme.colors.focus, px(theme.effects.focus_ring_width)));
 
         let mut surface = self
             .frame
@@ -657,6 +675,7 @@ impl RenderOnce for Glass {
                     lobes: LobeSource::Surface,
                     translucent,
                     fallback,
+                    focus_report,
                     measured: Some(measured),
                     child: stateful.into_any_element(),
                 },
@@ -674,6 +693,7 @@ impl RenderOnce for Glass {
                 lobes: LobeSource::Surface,
                 translucent,
                 fallback,
+                focus_report,
                 measured: Some(measured),
                 child: surface.into_any_element(),
             },
@@ -995,6 +1015,7 @@ impl RenderOnce for GlassGroup {
                     .then_some(theme.effects.glass_dimming),
                 translucent,
                 fallback,
+                focus_report: None,
                 measured: Some(measured),
                 child,
             },
@@ -1204,6 +1225,8 @@ pub(crate) struct BackdropLayer {
     pub(crate) radius: Pixels,
     pub(crate) dimming: Option<f32>,
     pub(crate) material: GlassMaterial<Pixels>,
+    /// Drawn after content, including opaque and budget-refused fallbacks.
+    focus_report: Option<(Hsla, Pixels)>,
     bevel: Option<ResponsiveBevel>,
     pub(crate) lobes: LobeSource,
     pub(crate) translucent: bool,
@@ -1264,8 +1287,20 @@ impl Element for BackdropLayer {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if !self.translucent {
+        // Use the same fitted shape for optics and the inward report border.
+        let corner_radii = Corners::all(self.radius).clamp_radii_for_quad_size(bounds.size);
+        let mut paint_content = |window: &mut Window, cx: &mut App| {
             self.child.paint(window, cx);
+            if let Some((color, width)) = self.focus_report {
+                window.paint_quad(
+                    gpui::outline(bounds, color, gpui::BorderStyle::default())
+                        .corner_radii(corner_radii)
+                        .border_widths(width),
+                );
+            }
+        };
+        if !self.translucent {
+            paint_content(window, cx);
             return;
         }
         let collected;
@@ -1287,13 +1322,12 @@ impl Element for BackdropLayer {
             material.transmission_gain *= 1.0 - alpha.clamp(0.0, 1.0);
         }
         if !material.needs_backdrop() {
-            self.child.paint(window, cx);
+            paint_content(window, cx);
             return;
         }
         // Match the styled child's fitted radii. Theme Pill is deliberately
         // oversized; raw paint APIs preserve such radii rather than fitting
         // them, so passing it through would discard both dimming and optics.
-        let corner_radii = Corners::all(self.radius).clamp_radii_for_quad_size(bounds.size);
         window.paint_layer(bounds, |window| {
             if let Some(fallback) = self.fallback {
                 window.paint_backdrop_glass_with_fallback(
@@ -1306,7 +1340,7 @@ impl Element for BackdropLayer {
             } else {
                 window.paint_backdrop_glass(bounds, corner_radii, material, lobes);
             }
-            self.child.paint(window, cx);
+            paint_content(window, cx);
         });
     }
 }
@@ -1351,6 +1385,41 @@ mod tests {
             GlassMaterial::frosted(px(theme.effects.glass_frost_blur))
         );
         assert!(GlassPreset::Frosted.material(&theme).is_flat());
+    }
+
+    #[test]
+    fn focused_replaces_only_the_hairline_in_every_material() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            for reduced in [false, true] {
+                let theme = theme.clone().with_reduce_transparency(reduced);
+                for preset in [
+                    GlassPreset::Clear,
+                    GlassPreset::Liquid,
+                    GlassPreset::Frosted,
+                    GlassPreset::Lens,
+                ] {
+                    let ordinary = Glass::new("test.focus").preset(preset).material(&theme);
+                    let mut expected = ordinary;
+                    expected.hairline = Pixels::ZERO;
+                    assert_eq!(
+                        Glass::new("test.focus")
+                            .preset(preset)
+                            .focused(true)
+                            .dimmed(true)
+                            .material(&theme),
+                        expected
+                    );
+                    assert_eq!(
+                        Glass::new("test.focus")
+                            .preset(preset)
+                            .focused(true)
+                            .focused(false)
+                            .material(&theme),
+                        ordinary
+                    );
+                }
+            }
+        }
     }
 
     #[test]

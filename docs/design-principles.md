@@ -30,7 +30,10 @@ Every line in the library has one of four meanings:
 - a **report** — focus, invalidity, a drop target, a refusal. These are state
   marks in the colour of the thing being reported. Fields use paint-only
   halos; a border-based report reserves its width while resting. Becoming
-  invalid must not reflow the row;
+  invalid must not reflow the row. Glass uses a paint-only inward report edge
+  in `interactive.focus`, replacing its optical hairline rather than adding
+  a halo outside the material. `Glass::focused` and `GlassSurface::focused`
+  own that report; do not combine them with `Theme::focus_ring_on`;
 - **control definition** — an in-content editable or actionable surface has a
   quiet `interactive.controlHairline`, an opaque `surface.control` fill one
   tonal step from its container, and a one-pixel top inset highlight from

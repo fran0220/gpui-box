@@ -481,6 +481,118 @@ mod imp {
         use image::{Rgba, RgbaImage};
 
         #[test]
+        fn glass_focus_is_an_inner_report_even_after_budget_refusal() -> Result<()> {
+            use gpui::rgb;
+            use gpui_kit::foundation::ThemeOverlay;
+            use gpui_kit::overlay::{OverlaySurface, surface};
+            use gpui_kit::prelude::{Glass, GlassPreset};
+            use gpui_kit_theme::{Elevation, Radius};
+
+            const COUNT: usize = gpui::MAX_BACKDROP_GLASS_SURFACES_PER_FRAME + 12;
+            struct FocusHost;
+            impl Render for FocusHost {
+                fn render(
+                    &mut self,
+                    window: &mut Window,
+                    cx: &mut Context<Self>,
+                ) -> impl IntoElement {
+                    SemanticCoordinator::global(cx).begin_frame(window);
+                    div()
+                        .size_full()
+                        .bg(rgb(0x181818))
+                        .children((0..COUNT).map(|slot| {
+                            let theme = Theme::studio_dark()
+                                .modify(|theme| {
+                                    theme.colors.focus = rgb(0xff0088).into();
+                                    theme.effects.focus_ring_width = 4.;
+                                })
+                                .with_reduce_transparency(slot % 4 == 3);
+                            let preset = match slot % 4 {
+                                0 => GlassPreset::Liquid,
+                                1 | 3 => GlassPreset::Clear,
+                                _ => GlassPreset::Frosted,
+                            };
+                            // Deliberately paint over the top edge: the report
+                            // must be painted after this child.
+                            let content = div().relative().w(px(120.)).h(px(48.)).child(
+                                div()
+                                    .absolute()
+                                    .left(px(40.))
+                                    .top_0()
+                                    .w(px(40.))
+                                    .h(px(8.))
+                                    .bg(rgb(0x00ff00)),
+                            );
+                            let ident = format!("test.focus.slot.{slot}");
+                            let pane = if slot == 1 {
+                                surface(ident, &theme, OverlaySurface::MEDIA_CAPTION)
+                                    .focused(true)
+                                    .child(content)
+                                    .into_any_element()
+                            } else {
+                                ThemeOverlay::theme(
+                                    theme,
+                                    Glass::new(ident)
+                                        .preset(preset)
+                                        .dimmed(true)
+                                        .focused(true)
+                                        .radius(Radius::Pill)
+                                        .elevation(Elevation::Flat)
+                                        .child(content),
+                                )
+                                .into_any_element()
+                            };
+                            div()
+                                .absolute()
+                                .left(px(12. + (slot % 7) as f32 * 144.))
+                                .top(px(12. + (slot / 7) as f32 * 72.))
+                                .child(pane)
+                        }))
+                }
+            }
+            let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                "Geist",
+            ));
+            let mut cx = HeadlessAppContext::with_platform(
+                text_system,
+                Arc::new(gpui_kit::assets::Assets),
+                gpui_platform::current_headless_renderer,
+            );
+            cx.update(|cx| {
+                gpui_kit::install(cx);
+                cx.set_reduce_motion(true);
+                activate_theme("studio-dark", cx);
+            });
+            let window: AnyWindowHandle = cx
+                .open_window(size(px(1020.), px(310.)), |_, cx| cx.new(|_| FocusHost))?
+                .into();
+            let frame = settled_image(&mut cx, window)?;
+            frame.save(repo_root().join("target/headless-glass-focus.png"))?;
+            let scale = frame.width() as f32 / 1020.;
+            let sample = |x: f32, y: f32| *frame.get_pixel((x * scale) as u32, (y * scale) as u32);
+            for slot in 0..COUNT {
+                let x = 12. + (slot % 7) as f32 * 144.;
+                let y = 12. + (slot / 7) as f32 * 72.;
+                assert_eq!(
+                    sample(x + 60., y + 3.),
+                    Rgba([255, 0, 136, 255]),
+                    "slot {slot}: token-width report after child"
+                );
+                assert_eq!(
+                    sample(x + 60., y - 2.),
+                    Rgba([24, 24, 24, 255]),
+                    "slot {slot}: no external halo"
+                );
+                assert_eq!(
+                    sample(x, y),
+                    Rgba([24, 24, 24, 255]),
+                    "slot {slot}: fitted rounded corner"
+                );
+            }
+            Ok(())
+        }
+
+        #[test]
         fn cover_image_rounds_all_corners_in_a_clipped_media_card() -> Result<()> {
             use gpui::{DevicePixels, ObjectFit, RenderImage, img, rgb};
             use gpui_kit::prelude::{Glass, GlassPreset};
