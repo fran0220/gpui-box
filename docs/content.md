@@ -113,10 +113,15 @@ AgentDocument for very long rendered documents.
 `MarkdownStream::work` counts parser passes, bytes submitted to those passes
 (including boundary discovery, fallback and mending), and source-buffer writes.
 It does not measure CPU time or syntax-tree allocation. `AgentDocument::work`
-also reports input comparisons and rows planned by the actual mounted virtual
-document. Static reconciliation is linear in caller blocks and does not rebuild
-the flattened plan; copying key/revision vectors into List and GPUI layout are
-outside those counters. A never-mounted row still has no selection geometry;
+also reports input comparisons and row records constructed by the actual
+mounted virtual document. Static reconciliation is linear in caller blocks.
+Changed documents retain immutable per-caller-block segments and unchanged row
+records inside them, rather than reconstructing a flattened history. A new
+one-paragraph message constructs one row; adding a second paragraph constructs
+two (the old last row changes spacing/streaming metadata, and the new tail is
+new). Source-key strings are retained with the rows. Changed input still walks
+metadata and copies key/revision vectors into List; those operations and GPUI
+layout are outside the row-construction counter. A never-mounted row still has no selection geometry;
 virtualization does not promise a complete copy of unseen content.
 
 ### A link states where it goes, and this crate opens nothing

@@ -412,7 +412,7 @@ impl AgentDocument {
             cx,
         );
         let plans = plans.borrow();
-        for (index, row) in plans.plan.rows.iter().enumerate() {
+        for (index, row) in plans.plan.rows().enumerate() {
             if plans.inputs[row.block].id.as_ref() == block {
                 crate::data::viewport::remeasure_rows(
                     &ident.child("blocks"),
@@ -623,7 +623,7 @@ impl RenderOnce for AgentDocument {
                     // had learned.
                     let keys = plan.keys.clone();
                     let revisions = plan.revisions.clone();
-                    let count = plan.rows.len();
+                    let count = plan.keys.len();
                     let listed = Rc::clone(&blocks);
                     let rows_plan = Rc::clone(&plan);
                     let list_ident = ident.child("blocks");
@@ -631,7 +631,7 @@ impl RenderOnce for AgentDocument {
                     let on_event = self.on_event.clone();
                     let markdown_options = self.markdown_options.clone();
                     List::new(list_ident, count, move |index, window, cx| {
-                        let row = &rows_plan.rows[index];
+                        let row = rows_plan.row(index).expect("listed row");
                         let block = &listed[row.block];
                         let theme = cx.theme().clone();
                         // A row carries the space that follows it, because a
@@ -642,13 +642,12 @@ impl RenderOnce for AgentDocument {
                         let after = match &row.part {
                             Some(part) if !part.last => Space::Md,
                             _ => rows_plan
-                                .rows
-                                .get(index + 1)
+                                .row(index + 1)
                                 .map(|next| block_space(block.kind, listed[next.block].kind))
                                 .unwrap_or(Space::Lg),
                         };
                         ListItem::new(
-                            row.key(&listed),
+                            row.key.clone(),
                             div()
                                 .w_full()
                                 .pb(gpui::px(theme.space(after)))
@@ -749,23 +748,10 @@ impl Part {
 #[derive(Debug, Clone)]
 struct PlannedRow {
     block: usize,
+    /// Stable source-offset identity, allocated only when this row is made.
+    key: SharedString,
     /// `None` when the row is the whole block.
     part: Option<Part>,
-}
-
-impl PlannedRow {
-    /// What the list matches this row by across frames.
-    ///
-    /// A part is matched by where it sits in its block rather than by what it
-    /// says: a paragraph whose text grew is the same paragraph, and the row
-    /// that has to re-measure is that one alone.
-    fn key(&self, blocks: &[AgentDocumentBlock]) -> SharedString {
-        let id = &blocks[self.block].id;
-        match &self.part {
-            Some(part) => SharedString::from(format!("{id}#{}", part.name())),
-            None => id.clone(),
-        }
-    }
 }
 
 /// Which rows a virtualized document is drawn as.
@@ -786,6 +772,7 @@ struct RowPlans {
     plan: Rc<RowPlan>,
     input_checks: usize,
     planned_rows: usize,
+    invalidated: bool,
 }
 
 struct PlanInput {
@@ -828,9 +815,31 @@ impl PlanInput {
 
 #[derive(Default)]
 struct RowPlan {
-    rows: Vec<PlannedRow>,
+    // A changed tail replaces only its segment and changed row records.
+    // Old List render closures retain their immutable segments safely.
+    segments: Vec<Rc<Vec<Rc<PlannedRow>>>>,
+    ends: Vec<usize>,
     keys: Vec<SharedString>,
     revisions: Vec<u64>,
+}
+
+impl RowPlan {
+    fn row(&self, index: usize) -> Option<&PlannedRow> {
+        let segment = self.ends.partition_point(|end| *end <= index);
+        let start = segment
+            .checked_sub(1)
+            .map_or(0, |previous| self.ends[previous]);
+        self.segments
+            .get(segment)?
+            .get(index - start)
+            .map(Rc::as_ref)
+    }
+
+    fn rows(&self) -> impl Iterator<Item = &PlannedRow> {
+        self.segments
+            .iter()
+            .flat_map(|segment| segment.iter().map(Rc::as_ref))
+    }
 }
 
 #[derive(Default)]
@@ -986,21 +995,22 @@ impl RowPlans {
                 let background = background.borrow();
                 pending |= background.pending();
                 if plan.background_generation != Some(background.generation) {
-                    self.inputs.clear();
+                    self.invalidated = true;
                 }
             } else if let Some(plan) = self.markdown.get_mut(&block.id)
                 && plan.background.take().is_some()
             {
                 plan.source = None;
                 plan.background_generation = None;
-                self.inputs.clear();
+                self.invalidated = true;
             }
         }
         pending
     }
 
     fn read(&mut self, blocks: &[AgentDocumentBlock]) -> Rc<RowPlan> {
-        if self.inputs.len() == blocks.len()
+        if !self.invalidated
+            && self.inputs.len() == blocks.len()
             && self.inputs.iter().zip(blocks).all(|(input, block)| {
                 self.input_checks += 1;
                 input.matches(block)
@@ -1011,8 +1021,8 @@ impl RowPlans {
         let identities: std::collections::HashSet<_> =
             blocks.iter().map(|block| &block.id).collect();
         self.markdown.retain(|id, _| identities.contains(id));
-        self.inputs = blocks.iter().map(PlanInput::from_block).collect();
-        let mut plan = Vec::with_capacity(blocks.len());
+        let mut plan = RowPlan::default();
+        let mut total = 0;
         for (index, block) in blocks.iter().enumerate() {
             let parts = match &block.body {
                 AgentBlockBody::Markdown(source) => {
@@ -1022,35 +1032,71 @@ impl RowPlans {
                 }
                 _ => None,
             };
-            match parts {
-                Some(parts) => {
-                    for part in parts {
-                        plan.push(PlannedRow {
-                            block: index,
-                            part: Some(part.clone()),
-                        });
-                    }
+            let count = parts.map_or(1, Vec::len);
+            let old = self.plan.segments.get(index).filter(|_| {
+                self.inputs
+                    .get(index)
+                    .is_some_and(|input| input.id == block.id)
+            });
+            let same = |row: &PlannedRow, part: Option<&Part>| match (&row.part, part) {
+                (None, None) => true,
+                (Some(old), Some(new)) => {
+                    old.index == new.index
+                        && old.last == new.last
+                        && old.range == new.range
+                        && old.revision == new.revision
+                        && Rc::ptr_eq(&old.document, &new.document)
                 }
-                _ => plan.push(PlannedRow {
-                    block: index,
-                    part: None,
-                }),
-            }
+                _ => false,
+            };
+            let segment = if let Some(old) = old.filter(|old| {
+                old.len() == count
+                    && old
+                        .iter()
+                        .enumerate()
+                        .all(|(index, row)| same(row, parts.map(|parts| &parts[index])))
+            }) {
+                old.clone()
+            } else {
+                Rc::new(
+                    (0..count)
+                        .map(|part_index| {
+                            let part = parts.map(|parts| &parts[part_index]);
+                            if let Some(old) = old
+                                .and_then(|old| old.get(part_index))
+                                .filter(|row| same(row, part))
+                            {
+                                return old.clone();
+                            }
+                            self.planned_rows += 1;
+                            let key = part.map_or_else(
+                                || block.id.clone(),
+                                |part| SharedString::from(format!("{}#{}", block.id, part.name())),
+                            );
+                            Rc::new(PlannedRow {
+                                block: index,
+                                key,
+                                part: part.cloned(),
+                            })
+                        })
+                        .collect(),
+                )
+            };
+            total += segment.len();
+            plan.ends.push(total);
+            plan.segments.push(segment);
         }
-        self.planned_rows += plan.len();
-        let keys = plan.iter().map(|row| row.key(blocks)).collect();
+        let keys = plan.rows().map(|row| row.key.clone()).collect();
         let revisions = plan
-            .iter()
-            .enumerate()
-            .map(|(index, row)| {
+            .rows()
+            .zip(plan.rows().skip(1).map(Some).chain(std::iter::once(None)))
+            .map(|(row, next)| {
                 use std::hash::{Hash, Hasher};
                 let block = &blocks[row.block];
                 let mut revision = std::collections::hash_map::DefaultHasher::new();
                 block.kind.hash(&mut revision);
                 if row.part.as_ref().is_none_or(|part| part.last) {
-                    plan.get(index + 1)
-                        .map(|next| blocks[next.block].kind)
-                        .hash(&mut revision);
+                    next.map(|next| blocks[next.block].kind).hash(&mut revision);
                 }
                 row.part
                     .as_ref()
@@ -1064,11 +1110,11 @@ impl RowPlans {
                 revision.finish()
             })
             .collect();
-        self.plan = Rc::new(RowPlan {
-            rows: plan,
-            keys,
-            revisions,
-        });
+        plan.keys = keys;
+        plan.revisions = revisions;
+        self.inputs = blocks.iter().map(PlanInput::from_block).collect();
+        self.invalidated = false;
+        self.plan = Rc::new(plan);
         self.plan.clone()
     }
 }
@@ -1305,7 +1351,7 @@ mod tests {
         blocks.pop();
         let next = plans.read(&blocks);
         assert_eq!(plans.markdown.len(), 9_999);
-        assert_eq!(next.rows.len(), 9_999);
+        assert_eq!(next.keys.len(), 9_999);
         assert_eq!(first.keys[0], next.keys[0]);
         assert_eq!(first.revisions[0], next.revisions[0]);
     }
@@ -1322,6 +1368,108 @@ mod tests {
         assert_eq!(first.keys, next.keys);
         assert_eq!(first.revisions[..2], next.revisions[..2]);
         assert_ne!(first.revisions[2], next.revisions[2]);
+        assert!(Rc::ptr_eq(&first.segments[0][0], &next.segments[0][0]));
+        assert!(Rc::ptr_eq(&first.segments[0][1], &next.segments[0][1]));
+        assert!(!Rc::ptr_eq(&first.segments[0][2], &next.segments[0][2]));
+        assert_eq!(
+            plans.planned_rows, 4,
+            "three initial rows and one changed tail"
+        );
+    }
+
+    #[test]
+    fn appended_messages_retain_history_segments_and_only_construct_affected_rows() {
+        const DELTA: &str = "Streamed **delta**.\n\n";
+        for history in [1000, 10000] {
+            let mut blocks: Vec<_> = (0..history)
+                .map(|index| {
+                    AgentDocumentBlock::markdown(
+                        format!("history-{index}"),
+                        format!("History {index}."),
+                    )
+                })
+                .collect();
+            let mut plans = RowPlans::default();
+            let first = plans.read(&blocks);
+            blocks.push(AgentDocumentBlock::markdown("tail", DELTA).streaming(true));
+            let appended = plans.read(&blocks);
+            assert_eq!(plans.planned_rows, history + 1);
+            for (before, after) in first.segments.iter().zip(&appended.segments) {
+                assert!(
+                    Rc::ptr_eq(before, after),
+                    "history segment must not be rebuilt"
+                );
+            }
+            let work = plans.markdown["tail"].reader.work();
+            assert_eq!(work.parser_passes, 1);
+            assert_eq!(work.parsed_bytes, DELTA.len());
+            assert_eq!(work.copied_bytes, DELTA.len());
+            blocks[history] = AgentDocumentBlock::markdown("tail", DELTA.repeat(2)).streaming(true);
+            let streamed = plans.read(&blocks);
+            assert_eq!(
+                plans.planned_rows,
+                history + 3,
+                "only the old last row and new tail are constructed"
+            );
+            for (before, after) in appended
+                .segments
+                .iter()
+                .take(history)
+                .zip(&streamed.segments)
+            {
+                assert!(Rc::ptr_eq(before, after));
+            }
+            assert_eq!(streamed.keys.len(), history + 2);
+            assert_eq!(
+                streamed
+                    .row(history)
+                    .expect("first tail")
+                    .part
+                    .as_ref()
+                    .expect("Markdown part")
+                    .index,
+                0
+            );
+            assert_eq!(
+                streamed
+                    .row(history + 1)
+                    .expect("second tail")
+                    .part
+                    .as_ref()
+                    .expect("Markdown part")
+                    .index,
+                1
+            );
+            assert!(streamed.row(history + 2).is_none());
+        }
+    }
+
+    #[test]
+    fn segmented_lookup_skips_empty_documents_and_reconciles_reorder() {
+        let mut plans = RowPlans::default();
+        let blocks = [
+            AgentDocumentBlock::markdown("empty", ""),
+            AgentDocumentBlock::text("one", "one"),
+            AgentDocumentBlock::markdown("blank", "\n"),
+            AgentDocumentBlock::markdown("two", "Two.\n\nTail."),
+        ];
+        let first = plans.read(&blocks);
+        assert_eq!(first.rows().count(), 3);
+        assert_eq!(first.row(0).expect("one").block, 1);
+        assert_eq!(first.row(1).expect("two first").block, 3);
+        assert_eq!(first.row(2).expect("two last").block, 3);
+        assert!(first.row(3).is_none());
+        let [empty, one, _, two] = blocks;
+        let next = plans.read(&[two, empty, one]);
+        assert_eq!(
+            next.keys,
+            vec![
+                first.keys[1].clone(),
+                first.keys[2].clone(),
+                first.keys[0].clone()
+            ]
+        );
+        assert_eq!(next.row(2).expect("moved one").block, 2);
     }
 
     #[test]
