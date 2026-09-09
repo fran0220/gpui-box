@@ -98,6 +98,19 @@ static void profile_root(const wchar_t *name, wchar_t *path) {
 /* Native adversarial probe: no Node permission model can mask OS failures. */
 int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 3);
+    if (!wcscmp(argv[1], L"--connect-control")) {
+        WSADATA wsa;
+        CHECK(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
+        SOCKET connection = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        CHECK(connection != INVALID_SOCKET);
+        struct sockaddr_in address = {0};
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        address.sin_port = htons((u_short)_wtoi(argv[2]));
+        CHECK(connect(connection, (struct sockaddr *)&address, sizeof(address)) == 0);
+        closesocket(connection); WSACleanup();
+        puts("native TCP positive control connected"); return 0;
+    }
     if (!wcscmp(argv[1], L"--profile-exists")) {
         wchar_t folder[PATH_CAP];
         profile_root(argv[2], folder);
@@ -146,6 +159,7 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(container && GetTokenInformation(token, TokenAppContainerSid, container, size, &size));
     LPWSTR package_sid = NULL, profile_folder = NULL;
     CHECK(ConvertSidToStringSidW(container->TokenAppContainer, &package_sid));
+    fprintf(stderr, "Windows sandbox probe: pid=%lu packageSID=%ls tcp=127.0.0.1:%ls\n", GetCurrentProcessId(), package_sid, argv[1]);
     CHECK(SUCCEEDED(GetAppContainerFolderPath(package_sid, &profile_folder)));
     const wchar_t *environment_keys[] = {L"LOCALAPPDATA", L"TEMP", L"TMP"};
     for (int i = 0; i < 3; i++) {
@@ -196,6 +210,12 @@ int wmain(int argc, wchar_t **argv) {
     PROCESS_INFORMATION process = {0};
     CHECK(!CreateProcessW(self, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &process));
     CHECK(!CreateProcessW(self, NULL, NULL, NULL, FALSE, CREATE_BREAKAWAY_FROM_JOB, NULL, NULL, &startup, &process));
+    // Run independent handle assertions before the network probe, so a
+    // blocked connection's timeout cannot hide their native result.
+    for (uintptr_t handle = 4; handle < 65536; handle += 4) {
+        CHECK(GetFileType((HANDLE)handle) != FILE_TYPE_DISK);
+    }
+    fputs("Windows sandbox probe: filesystem, spawn, inherited-handle assertions passed\n", stderr);
     // A listener is established by the test parent: refusal is not a closed port.
     WSADATA wsa;
     CHECK(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
@@ -206,7 +226,9 @@ int wmain(int argc, wchar_t **argv) {
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     address.sin_port = htons((u_short)_wtoi(argv[1]));
     CHECK(connect(socketHandle, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR);
-    CHECK(WSAGetLastError() == WSAEACCES);
+    int connect_error = WSAGetLastError();
+    fprintf(stderr, "Windows sandbox probe: TCP result=%d destination=127.0.0.1:%ls\n", connect_error, argv[1]);
+    CHECK(connect_error == WSAEACCES); // timeout alone is not policy-drop evidence
     closesocket(socketHandle);
     socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     CHECK(socketHandle != INVALID_SOCKET);
@@ -216,12 +238,6 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(WSAGetLastError() == WSAEACCES);
     closesocket(socketHandle);
     WSACleanup();
-    // The parent passes an inherited sentinel as fd 3 to the launcher; it must
-    // not survive the launcher's explicit three-handle allowlist.
-    // Enumerate handles and reject any inherited disk handle (stdio are pipes).
-    for (uintptr_t handle = 4; handle < 65536; handle += 4) {
-        CHECK(GetFileType((HANDLE)handle) != FILE_TYPE_DISK);
-    }
     puts("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"networkDenied\":true,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}");
     return 0;
 }

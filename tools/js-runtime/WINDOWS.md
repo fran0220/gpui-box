@@ -44,7 +44,7 @@ host's `--sandbox-launcher` option. The probe is test-only.
 ## Launch and per-instance ownership
 
 `await windowsSandbox(root, runtimeRoot, { executable, node, launcher })`
-returns `{ execPath, execArgv, stdio: ['pipe','pipe','pipe'], cleanup }`.
+returns `{ execPath, execArgv, stdio: ['pipe','pipe','pipe'], detached: true, cleanup }`.
 Defaults are `process.execPath`, `true`, and `GPUI_SANDBOX_LAUNCHER`.
 It copies ordinary package/runtime files and the executable to one unique
 temporary directory. Links/junctions and other special entries are rejected.
@@ -114,6 +114,11 @@ The job handle is private to the helper, so killing the helper also kills its
 worker, including during startup. The helper waits on both the worker and the
 host process; host death also closes the job and kills the worker. Any failed
 security API aborts launch with exit code 125; there is no unrestricted fallback.
+The host must pass `config.detached` to its spawn of the **trusted helper**,
+without unref or changing pipes. Node 26.5.1 otherwise assigns that helper to
+its own kill-on-close Job and forcibly kills it on host death, preventing
+profile cleanup. Detached skips that libuv assignment; the helper still watches
+the parent and the untrusted worker still joins the atomic sandbox Job.
 
 The session **must call `cleanup()` after the child `close` event**, including
 launch failure, and before resolving stop/exit. Do not call it from `afterSpawn`.
@@ -203,6 +208,25 @@ actual CPU exhaustion, argument/path mapping, environment clearing, real Node
 TypeScript worker and isolated inspector execution, junction rejection,
 unchanged source ACLs, host/helper-death teardown and deferred directory cleanup.
 Passing skipped tests on Linux does not establish Windows parity.
+
+Run [34415773540](https://github.com/fran0220/gpui-box/actions/runs/34415773540)
+at [101cffd3](https://github.com/fran0220/gpui-box/commit/101cffd3134a0a8d41b9b5445897dfe6567b9f47)
+proved exact environment paths and ACCESS_DENIED writes, host filesystem/ACL
+denial, and normal/breakaway spawn denial. TCP loopback returned 10060, so UDP
+and inherited-handle assertions were not reached; the raw probe remained red.
+The native probe now runs handle assertions first and logs package SID, PID,
+destination port and exact Winsock error. An unsandboxed native positive control
+must connect to the same listener, with exactly one host-observed connection.
+The network assertion still requires WSAEACCES: timeout alone is not accepted.
+
+The Windows workflow captures WFP events with `netsh wfp capture start keywords=19`
+and stops in `finally`, retaining CAB and extracted evidence under
+`runtime-native-windows/wfp`. This is diagnostic capture only, not firewall,
+capability or loopback-exemption configuration. Correlate the logged package SID
+and port with CLASSIFY_DROP and its filter before attributing a timeout to
+AppContainer policy. Documentation describing receive-layer loopback drops is
+not evidence that this specific run hit one. Capture and detached cleanup still
+require native execution; neither is verified by Linux compilation.
 
 API references: [AppContainer launch](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer),
 [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),

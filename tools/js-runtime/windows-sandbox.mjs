@@ -70,6 +70,9 @@ export async function windowsSandbox(root, runtimeRoot, {
         ] : []),
       ],
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Only the trusted parent watcher leaves libuv's kill-on-host-exit job.
+      // Its untrusted worker remains atomically enrolled in the sandbox job.
+      detached: true,
       cleanup,
     };
   } catch (error) {

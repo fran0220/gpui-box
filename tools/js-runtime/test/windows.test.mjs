@@ -29,7 +29,7 @@ async function fixture(t) {
 }
 
 function launch(t, config, args, extra = {}) {
-  const child = spawn(config.execPath, [...config.execArgv, ...args], { stdio: config.stdio, ...extra });
+  const child = spawn(config.execPath, [...config.execArgv, ...args], { stdio: config.stdio, detached: config.detached ?? false, ...extra });
   let stdout = '', stderr = '';
   child.stdout.on('data', chunk => stdout += chunk);
   child.stderr.on('data', chunk => stderr += chunk);
@@ -98,9 +98,13 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   const originals = [root, minimalRuntime, secret, process.env.GPUI_WINDOWS_SANDBOX_PROBE,
     process.env.LOCALAPPDATA, join(process.env.LOCALAPPDATA, 'Packages')];
   const originalAcls = originals.map(acl);
-  const server = createServer(socket => { socket.destroy(); assert.fail('sandbox reached host listener'); });
+  let connections = 0;
+  const server = createServer(socket => { connections++; socket.destroy(); });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => server.close(resolve)));
+  const control = launch(t, { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] }, ['--connect-control', String(server.address().port)]);
+  assert.equal((await control.closed)[0], 0, control.output().stderr);
+  await waitUntil(() => connections === 1, 'native positive-control connection was not observed');
   const sentinel = await open(secret, 'r');
   t.after(() => sentinel.close());
   const config = await windowsSandbox(root, minimalRuntime, { executable: process.env.GPUI_WINDOWS_SANDBOX_PROBE, node: false });
@@ -109,6 +113,7 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
     env: { ...process.env, GPUI_TEST_SECRET: 'must-not-inherit' },
   });
   const [code] = await run.closed;
+  assert.equal(connections, 1, 'sandbox reached the proven-live host listener');
   assert.deepEqual(originals.map(acl), originalAcls, 'source and host profile-parent ACLs must remain unchanged');
   assert.equal(code, 0, run.output().stderr);
   assert.deepEqual(JSON.parse(run.output().stdout), {
@@ -210,7 +215,8 @@ test('host death terminates the helper and worker without their cooperation', na
     import { spawn } from 'node:child_process';
     const option = ${option.toString()};
     const config = await windowsSandbox(${JSON.stringify(root)}, ${JSON.stringify(minimalRuntime)});
-    const helper = spawn(config.execPath, [...config.execArgv, '-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: config.stdio });
+    assert.equal(config.detached, true, 'trusted watcher must survive the host libuv job');
+    const helper = spawn(config.execPath, [...config.execArgv, '-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: config.stdio, detached: config.detached });
     console.log(JSON.stringify({ helper: helper.pid, instance: option(config, '--instance'), profile: option(config, '--profile') }));
     helper.stdout.pipe(process.stdout); helper.stderr.pipe(process.stderr);
     helper.on('error', error => { console.error(error.message); process.exit(125); });
