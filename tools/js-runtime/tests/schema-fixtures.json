@@ -123,6 +123,16 @@
       "schema": { "slotIds": "rows" },
       "props": { "rows": [{ "id": "alpha" }] },
       "cases": [["alpha", true], ["alpha:content", false], ["missing", false]]
+    },
+    {
+      "schema": { "slotPaths": ["entries", "groups.entries"], "slots": ["toolbar"] },
+      "props": { "entries": [{ "id": "direct" }], "groups": [{ "id": "groupA", "entries": [{ "id": "nestedA" }, { "id": "nestedB" }] }, { "id": "groupB", "entries": [{ "id": "nestedC" }] }, { "id": "empty" }] },
+      "cases": [["direct", true], ["nestedA", true], ["nestedB", true], ["nestedC", true], ["toolbar", true], ["groupA", false], ["empty", false], ["missing", false], ["nestedA:content", false]]
+    },
+    {
+      "schema": { "slotIds": "rows", "slotPaths": ["group.entries"], "slotSuffixes": ["content", "thumbnail"] },
+      "props": { "rows": [{ "id": "row" }], "group": { "entries": [{ "id": "nested" }] } },
+      "cases": [["row:content", true], ["nested:content", true], ["nested:thumbnail", true], ["nested", false], ["nested:unknown", false]]
     }
   ]
 }

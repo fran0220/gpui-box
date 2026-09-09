@@ -327,15 +327,46 @@ fn validate_slots(schema: &Value, node: &Node) -> Result<()> {
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    if let Some(property) = schema["slotIds"].as_str() {
-        for id in node
-            .props
-            .get(property)
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|item| item["id"].as_str())
+    let mut paths = schema["slotIds"].as_str().into_iter().collect::<Vec<_>>();
+    if let Some(additional) = schema.get("slotPaths") {
+        for path in additional
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("invalid slot paths"))?
         {
+            paths.push(
+                path.as_str()
+                    .ok_or_else(|| anyhow::anyhow!("invalid slot path"))?,
+            );
+        }
+    }
+    for path in paths {
+        let fields = path.split('.').collect::<Vec<_>>();
+        ensure!(
+            fields.len() <= 32 && fields.iter().all(|field| definition_name(field)),
+            "invalid slot path"
+        );
+        let mut values = node
+            .props
+            .get(fields[0])
+            .into_iter()
+            .flat_map(|value| {
+                value
+                    .as_array()
+                    .map_or(std::slice::from_ref(value), Vec::as_slice)
+            })
+            .collect::<Vec<_>>();
+        for field in fields.iter().skip(1) {
+            values = values
+                .into_iter()
+                .filter_map(|value| value.get(*field))
+                .flat_map(|value| {
+                    value
+                        .as_array()
+                        .map_or(std::slice::from_ref(value), Vec::as_slice)
+                })
+                .collect();
+        }
+        for id in values.into_iter().filter_map(|item| item["id"].as_str()) {
             if let Some(suffixes) = schema["slotSuffixes"].as_array() {
                 for suffix in suffixes.iter().filter_map(Value::as_str) {
                     slots.insert(format!("{id}:{suffix}"));

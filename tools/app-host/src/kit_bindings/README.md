@@ -116,3 +116,11 @@ schemas still use `schemaType(schema)`; `generateKitMethodTypes` emits named
 definitions automatically when args/results need them. TypeScript describes
 the structural union; exact-one overlap, depth and budgets remain runtime
 checks. Family relational/topology validation runs after structural validation.
+
+Dynamic slots may declare `slotPaths: ['entries', 'groups.entries']`. Each dot
+selects an own property and arrays are flattened at that step; only the final
+items' `id` values become slot names. Missing branches add nothing. Static slots
+and existing `slotIds` remain additive; `slotSuffixes` applies to either source.
+Paths use local identifier segments (at most 32), never indices, wildcards,
+prototype traversal, executable selectors, or filesystem paths. Props are
+structurally validated before this slot lookup; JS rejects accessor traversal.

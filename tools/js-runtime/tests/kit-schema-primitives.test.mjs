@@ -72,6 +72,10 @@ test('suffix-qualified dynamic slots match native parity cases and reject access
   }
   let reads = 0;
   assert.throws(() => validateSlots(fixtures.slots[0].schema, fixtures.slots[0].props, { get 'alpha:content'() { reads++; return []; } }), /slots/);
+  assert.throws(() => validateSlots({ slotPaths: ['groups.entries'] }, { groups: [{ get entries() { reads++; return []; } }] }, {}), /accessor/);
+  const inherited = Object.create({ entries: [{ id: 'inherited' }] });
+  assert.throws(() => validateSlots({ slotPaths: ['groups.entries'] }, { groups: [inherited] }, { inherited: [] }), /slots/);
+  assert.throws(() => validateSlots({ slotPaths: ['groups..entries'] }, {}, {}), /slot path/);
   assert.equal(reads, 0);
 });
 

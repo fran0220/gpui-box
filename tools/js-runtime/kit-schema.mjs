@@ -202,10 +202,33 @@ export function validateKitSlots(component, props, slots) {
 
 export function validateSlots(schema, props, slots) {
   if (!slots || Object.getPrototypeOf(slots) !== Object.prototype) throw new TypeError('Expected slots object');
+  if (schema.slotPaths !== undefined && !Array.isArray(schema.slotPaths)) throw new TypeError('slots: invalid slot paths');
   const allowed = new Set(schema.slots ?? []);
-  if (schema.slotIds) for (const item of props[schema.slotIds] ?? []) {
-    if (schema.slotSuffixes) for (const suffix of schema.slotSuffixes) allowed.add(`${item.id}:${suffix}`);
-    else allowed.add(item.id);
+  const own = (value, key) => {
+    if (!value || typeof value !== 'object') return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor && !Object.hasOwn(descriptor, 'value')) throw new TypeError('slots: accessor not permitted');
+    return descriptor?.value;
+  };
+  for (const path of [...(schema.slotIds ? [schema.slotIds] : []), ...(schema.slotPaths ?? [])]) {
+    const fields = typeof path === 'string' ? path.split('.') : [];
+    if (!fields.length || fields.length > 32 || fields.some(field => !definitionName.test(field))) throw new TypeError('slots: invalid slot path');
+    let values = [props];
+    for (const field of fields) {
+      const next = [];
+      for (const value of values) {
+        const child = own(value, field);
+        if (Array.isArray(child)) for (let index = 0; index < child.length; index++) next.push(own(child, String(index)));
+        else if (child !== undefined) next.push(child);
+      }
+      values = next;
+    }
+    for (const item of values) {
+      const id = own(item, 'id');
+      if (typeof id !== 'string') continue;
+      if (schema.slotSuffixes) for (const suffix of schema.slotSuffixes) allowed.add(`${id}:${suffix}`);
+      else allowed.add(id);
+    }
   }
   for (const name of Reflect.ownKeys(slots)) {
     const value = Object.getOwnPropertyDescriptor(slots, name)?.value;
