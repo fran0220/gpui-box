@@ -191,6 +191,13 @@ impl Cascader {
     pub fn selected_id(&self) -> Option<&SharedString> {
         self.selected.as_ref()
     }
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
     pub fn is_open(&self) -> bool {
         self.open
     }

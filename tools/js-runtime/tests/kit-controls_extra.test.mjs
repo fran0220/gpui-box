@@ -8,6 +8,15 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('cascader keeps all branch states closed and rejects duplicate tree identities',()=>{
+  for(const children of [{state:'idle'},{state:'loading'},{state:'empty'},{state:'unavailable',reason:'Refused'},{state:'error',reason:'Failed'},{state:'ready',value:[{id:'leaf',label:'Leaf'}]}]){
+    const props={options:[{id:'root',label:'Root',children}]};
+    validateValue(props,familySchemas.Cascader.props);validateFamilyProps('Cascader',props);validateValue(props,familyMethods.Cascader.invoke.set_options.args);
+  }
+  for(const children of [{state:'ready'},{state:'loading',value:[]},{state:'unavailable'},{state:'error',value:[]}])assert.throws(()=>validateValue({options:[{id:'root',label:'Root',children}]},familySchemas.Cascader.props));
+  assert.throws(()=>validateFamilyProps('Cascader',{options:[{id:'root',label:'Root',children:{state:'ready',value:[{id:'root',label:'Duplicate'}]}}]}));
+});
+
 test('selection controls reuse full option metadata and exact native intent contracts',()=>{
   const options=[{id:'a',label:'Alpha',description:'First',group:'Letters',disabled:true},{id:'b',label:'Beta'}];
   for(const component of ['Combobox','MultiSelect']){
@@ -243,6 +252,9 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.Cascader('cascade',{options:[{id:'root',label:'Root',children:{state:'unavailable',reason:'Refused'}}]},{expanded(id){const key:string=id;}});
+// @ts-expect-error unavailable branch requires an explicit reason
+kit.Cascader('bad',{options:[{id:'root',label:'Root',children:{state:'unavailable'}}]});
 kit.Combobox('combo',{options:[{id:'a',label:'Alpha',description:'First',group:'Letters'}],allowCustom:true},{custom(text){const value:string=text;}});
 kit.MultiSelect('multi',{selected:['a']},{toggled(id){const value:string=id;}});
 kit.TagInput('tags',{tags:['a'],collapseAt:1},{moved(event){const index:number=event.from;}});

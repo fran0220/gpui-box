@@ -42,6 +42,8 @@ const selectionCommands = {
 };
 const optionCommands = {set_options:method({options:array(selectOptionSchema)},choice(null)),set_name:method({name:string},choice(null))};
 const selectionQueries = {is_disabled:method({},boolean),focus_handle:focusQuery};
+const cascaderDefs={CascaderOption:object({id:identity,label:string,disabled:boolean,children:{oneOf:[object({state:choice('idle','loading','empty')},['state']),object({state:choice('unavailable','error'),reason:string},['state','reason']),object({state:choice('ready'),value:array({$ref:'CascaderOption'})},['state','value'])]}},['id','label'])};
+const cascaderOptions=array({$ref:'CascaderOption'});
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -61,6 +63,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  Cascader:{props:{$defs:cascaderDefs,...object({...common,name:string,placeholder:string,selected:identity,options:cascaderOptions})},events:{selected:identity,expanded:identity,retry:identity,opened:choice(null),closed:choice(null)}},
   Combobox:{props:object({...selectionProps,name:string,options:array(selectOptionSchema),selected:identity,query:string,allowCustom:boolean}),events:{queryChanged:string,selected:identity,custom:string,opened:choice(null),closed:choice(null)}},
   MultiSelect:{props:object({...selectionProps,name:string,options:array(selectOptionSchema),selected:array(identity),clearable:boolean}),events:{queryChanged:string,toggled:identity,removed:identity,cleared:choice(null),opened:choice(null),closed:choice(null)}},
   TagInput:{props:object({...selectionProps,tags:array(identity),max:integer,collapseAt:integer,reorderable:boolean}),events:{added:string,removed:string,duplicate:string,refused:string,editRequested:string,moved:object({from:integer,to:integer},['from','to'])}},
@@ -90,6 +93,7 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  Cascader:{invoke:{set_options:{args:{$defs:cascaderDefs,...object({options:cascaderOptions},['options'])},result:choice(null)},set_selected:method({selected:{...identity,nullable:true}},choice(null)),set_name:method({name:string},choice(null)),set_placeholder:selectionCommands.set_placeholder,set_disabled:selectionCommands.set_disabled,set_control_size:selectionCommands.set_control_size,open:method({},choice(null)),close:method({},choice(null))},query:{...selectionQueries,is_open:method({},boolean),selected_id:method({},{...identity,nullable:true}),open_path:method({},array(identity))}},
   Combobox:{invoke:{...selectionCommands,...optionCommands,set_selected:method({selected:{...identity,nullable:true}},choice(null)),set_query:method({text:string},choice(null)),set_allow_custom:method({allow:boolean},choice(null)),open:method({},choice(null)),toggle:method({},choice(null))},query:{...selectionQueries,query_input:textInputQuery,is_open:method({},boolean),query_text:method({},string),selected_id:method({},{...identity,nullable:true}),selected_option:method({},{...object({...selectOptionSchema.fields,description:{...string,nullable:true},group:{...string,nullable:true}},Object.keys(selectOptionSchema.fields)),nullable:true})}},
   MultiSelect:{invoke:{...selectionCommands,...optionCommands,set_selected:method({selected:array(identity)},choice(null)),set_clearable:method({clearable:boolean},choice(null)),open:method({},choice(null))},query:{...selectionQueries,query_input:textInputQuery,selected_ids:method({},array(identity)),is_open:method({},boolean)}},
   TagInput:{invoke:{...selectionCommands,set_tags:method({tags:array(identity)},choice(null)),set_max:method({max:{...integer,nullable:true}},choice(null)),set_collapse_at:method({visible:{...integer,nullable:true}},choice(null)),set_reorderable:method({reorderable:boolean},choice(null))},query:{...selectionQueries,field:textInputQuery,current:method({},array(identity)),targeted:method({},{...string,nullable:true}),refusal:method({},{...string,nullable:true})}},
@@ -178,6 +182,11 @@ export const familyMethods = Object.freeze({
 
 // Called after closed-shape validation, in both worker and native host.
 export function validateFamilyProps(component, props) {
+  if(component==='Cascader') {
+    const ids=new Set();
+    const visit=options=>{for(const option of options??[]){if(ids.has(option.id))throw new TypeError('duplicate Cascader identity');ids.add(option.id);if(option.children?.state==='ready')visit(option.children.value);}};
+    visit(props.options);
+  }
   if (component === 'SplitButton') validateMenuItems(props.items ?? []);
   if (['Button', 'IconButton'].includes(component) && props.color && Object.keys(props.color).length !== 1) throw new TypeError('color requires exactly one source');
   if (props.iconOnly && (!props.icon || !props.accessibleName)) throw new TypeError('iconOnly requires icon and accessibleName');
