@@ -25,7 +25,7 @@ use gpui_kit_theme::{
 use web_time::Instant;
 
 use crate::agent::model::AgentSnapshot;
-use crate::agent::presentation::{AgentActivityLine, AgentAvatar};
+use crate::agent::presentation::{AgentActivityLine, AgentAvatar, PresentationImage};
 use crate::content::{CodeBlock, CodeSpan, ImageRequest, Markdown, MarkdownEvent, MessageBody};
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
@@ -400,7 +400,7 @@ pub struct PersonaPortrait {
     agent: AgentSnapshot,
     expression: PersonaExpression,
     voice: Option<VoiceSample>,
-    image: Option<SharedString>,
+    image: Option<PresentationImage>,
     tint: Option<Hsla>,
     effect: Option<EffectPlan>,
     sample_at: Option<Duration>,
@@ -434,7 +434,13 @@ impl PersonaPortrait {
 
     /// A host-resolved resource path or URI. This component performs no fetch.
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved portrait art and preserves custom loading policy.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -483,7 +489,7 @@ impl RenderOnce for PersonaPortrait {
             .size(self.size - 12.0)
             .parent(self.ident.clone());
         if let Some(image) = self.image {
-            avatar = avatar.image(image);
+            avatar = avatar.image_source(image.0);
         }
         if let Some(tint) = self.tint {
             avatar = avatar.tint(tint);
@@ -720,7 +726,7 @@ pub struct PersonaDialogue {
     turn: DialogueTurn,
     expression: PersonaExpression,
     voice: Option<VoiceSample>,
-    image: Option<SharedString>,
+    image: Option<PresentationImage>,
     tint: Option<Hsla>,
     on_event: Option<DialogueHandler>,
     image_source: Option<DialogueImage>,
@@ -766,7 +772,13 @@ impl PersonaDialogue {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved portrait art without converting it to a URI.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -818,7 +830,7 @@ impl RenderOnce for PersonaDialogue {
             portrait = portrait.voice(voice);
         }
         if let Some(image) = self.image {
-            portrait = portrait.image(image);
+            portrait = portrait.image_source(image.0);
         }
         if let Some(tint) = self.tint {
             portrait = portrait.tint(tint);

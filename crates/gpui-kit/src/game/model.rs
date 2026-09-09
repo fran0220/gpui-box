@@ -6,6 +6,7 @@ use std::fmt;
 use gpui::{Hsla, SharedString};
 use gpui_kit_assets::Icon;
 
+use crate::agent::presentation::PresentationImage;
 use crate::agent::{AgentId, AgentSnapshot, PersonaExpression};
 
 macro_rules! identity {
@@ -153,7 +154,7 @@ impl PartyGauge {
 pub struct PartyMember {
     pub(crate) agent: AgentSnapshot,
     pub(crate) expression: PersonaExpression,
-    pub(crate) image: Option<SharedString>,
+    pub(crate) image: Option<PresentationImage>,
     pub(crate) tint: Option<Hsla>,
     pub(crate) gauges: Vec<PartyGauge>,
 }
@@ -175,7 +176,13 @@ impl PartyMember {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved art, retaining any custom loader's access checks.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -597,7 +604,7 @@ pub struct RewardItem {
     pub(crate) detail: Option<SharedString>,
     pub(crate) quantity: usize,
     pub(crate) icon: Option<Icon>,
-    pub(crate) image: Option<SharedString>,
+    pub(crate) image: Option<PresentationImage>,
 }
 
 impl RewardItem {
@@ -628,7 +635,13 @@ impl RewardItem {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved reward art without inferring a resource location.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 

@@ -36,6 +36,30 @@ use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 type ActionHandler = Rc<dyn Fn(AgentUiAction, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(AgentId, bool, &mut Window, &mut App)>;
 
+/// Snapshot art compares resource values or the identity of opaque image providers.
+/// Debug output never prints a provider or resource location.
+#[derive(Clone)]
+pub(crate) struct PresentationImage(pub gpui::ImageSource);
+
+impl std::fmt::Debug for PresentationImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PresentationImage")
+    }
+}
+
+impl PartialEq for PresentationImage {
+    fn eq(&self, other: &Self) -> bool {
+        use gpui::ImageSource;
+        match (&self.0, &other.0) {
+            (ImageSource::Resource(a), ImageSource::Resource(b)) => a == b,
+            (ImageSource::Render(a), ImageSource::Render(b)) => std::sync::Arc::ptr_eq(a, b),
+            (ImageSource::Image(a), ImageSource::Image(b)) => std::sync::Arc::ptr_eq(a, b),
+            (ImageSource::Custom(a), ImageSource::Custom(b)) => std::sync::Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
 /// Optional caller-owned art for an agent identity.
 ///
 /// Execution and presence never come from this value. Changing a portrait or
@@ -43,7 +67,7 @@ type ToggleHandler = Rc<dyn Fn(AgentId, bool, &mut Window, &mut App)>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentAppearance {
     id: AgentId,
-    image: Option<SharedString>,
+    image: Option<PresentationImage>,
     tint: Option<Hsla>,
 }
 
@@ -57,7 +81,13 @@ impl AgentAppearance {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved art, preserving custom loader lifetime and policy.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -158,7 +188,7 @@ fn issue_key(issue: &AgentModelIssue) -> String {
 pub struct AgentAvatar {
     ident: Ident,
     agent: AgentSnapshot,
-    image: Option<SharedString>,
+    image: Option<PresentationImage>,
     tint: Option<Hsla>,
     size: f32,
     mark_inset: f32,
@@ -193,7 +223,13 @@ impl AgentAvatar {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved art without converting a loader into a path.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -227,7 +263,7 @@ impl RenderOnce for AgentAvatar {
 
         let mut avatar = Avatar::new(self.agent.descriptor.name.clone()).size(self.size - 4.0);
         if let Some(image) = self.image {
-            avatar = avatar.image(image);
+            avatar = avatar.image_source(image.0);
         }
         if let Some(tint) = self.tint {
             avatar = avatar.tint(tint);
@@ -400,7 +436,7 @@ pub struct AgentCard {
     ident: Ident,
     agent: AgentSnapshot,
     task_label: Option<SharedString>,
-    image: Option<SharedString>,
+    image: Option<PresentationImage>,
     tint: Option<Hsla>,
     selected: bool,
     on_action: Option<ActionHandler>,
@@ -437,7 +473,13 @@ impl AgentCard {
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
-        self.image = Some(image.into());
+        self.image = Some(PresentationImage(image.into().into()));
+        self
+    }
+
+    /// Uses caller-resolved art, including revocable custom sources.
+    pub fn image_source(mut self, image: gpui::ImageSource) -> Self {
+        self.image = Some(PresentationImage(image));
         self
     }
 
@@ -470,7 +512,7 @@ impl RenderOnce for AgentCard {
             .size(40.0)
             .parent(self.ident.clone());
         if let Some(image) = self.image {
-            avatar = avatar.image(image);
+            avatar = avatar.image_source(image.0);
         }
         if let Some(tint) = self.tint {
             avatar = avatar.tint(tint);
@@ -698,7 +740,7 @@ fn roster_row(
         .size(36.0)
         .parent(ident.clone());
     if let Some(image) = appearance.and_then(|appearance| appearance.image.clone()) {
-        avatar = avatar.image(image);
+        avatar = avatar.image_source(image.0);
     }
     if let Some(tint) = appearance.and_then(|appearance| appearance.tint) {
         avatar = avatar.tint(tint);
@@ -812,7 +854,7 @@ impl RenderOnce for AgentGroup {
                     .mark_inset(if index + 1 < visible { overlap } else { 0.0 })
                     .parent(self.ident.clone());
             if let Some(image) = appearance.and_then(|appearance| appearance.image.clone()) {
-                avatar = avatar.image(image);
+                avatar = avatar.image_source(image.0);
             }
             if let Some(tint) = appearance.and_then(|appearance| appearance.tint) {
                 avatar = avatar.tint(tint);
@@ -1385,5 +1427,22 @@ mod tests {
                 "tests".into()
             )))
         );
+    }
+
+    #[test]
+    fn image_sources_preserve_provider_identity_and_redact_debug() {
+        let source = gpui::ImageSource::Custom(std::sync::Arc::new(|_, _| None));
+        let first = AgentAppearance::new("agent").image_source(source.clone());
+        let same = AgentAppearance::new("agent").image_source(source);
+        let different = AgentAppearance::new("agent")
+            .image_source(gpui::ImageSource::Custom(std::sync::Arc::new(|_, _| None)));
+        assert_eq!(first, same);
+        assert_ne!(first, different);
+        let replaced = first.image("private/location.png");
+        assert_eq!(
+            replaced,
+            AgentAppearance::new("agent").image("private/location.png")
+        );
+        assert!(!format!("{replaced:?}").contains("private/location"));
     }
 }

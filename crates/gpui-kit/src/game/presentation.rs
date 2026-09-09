@@ -142,7 +142,7 @@ fn party_member(
         .expression(member.expression)
         .size(54.0);
     if let Some(image) = member.image {
-        portrait = portrait.image(image);
+        portrait = portrait.image_source(image.0);
     }
     if let Some(tint) = member.tint {
         portrait = portrait.tint(tint);
@@ -1113,7 +1113,7 @@ fn reward_item(
         .rounded_full()
         .overflow_hidden()
         .bg(theme.colors.sunken)
-        .children(item.image.map(|image| gpui::img(image).size_full()))
+        .children(item.image.map(|image| gpui::img(image.0).size_full()))
         .children(item.icon.or(fallback_icon).map(|icon| {
             glyph(icon)
                 .size(px(20.0))
