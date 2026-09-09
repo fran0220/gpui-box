@@ -113,7 +113,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
-            div().w(px(860.0)).h(px(470.0)).child(
+            div().w(px(860.0)).h(px(340.0)).child(
                 NodeGraph::new("scene.graph")
                     .viewport(viewport)
                     .zoom_range(0.55, 1.8)
@@ -419,6 +419,23 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ]),
             ),
         )
+        .child(caption(&theme, "node typography · 1× and 0.5× · four-line bilingual notes"))
+        .child(div().row().gap(px(theme.spacing.lg)).children(
+            [("full", 1.0), ("half", 0.5)].map(|(name, zoom)| {
+                GraphNode::new(format!("scene.graph.typography.{name}"), "Prompt · 提示词")
+                    .width(280.0)
+                    .display_at(zoom, None)
+                    .color("teal")
+                    .kind("text")
+                    .port(GraphPort::input("context", "Context · 上下文"))
+                    .note("A quiet room at dusk.\n黄昏时分，安静的房间。\nKeep the window light soft.\n让窗边光线保持柔和。\nThis fifth line is clipped.\n第六行仍保留在语义描述中。")
+                    .metrics([
+                        NodeMetric::new("Model", "Studio").labelled(),
+                        NodeMetric::new("比例", "16:9").labelled(),
+                        NodeMetric::new("Seed", "118"),
+                    ])
+            }),
+        ))
         .into_any_element()
 }
 

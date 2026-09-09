@@ -388,6 +388,8 @@ enum Progress {
 pub struct NodeMetric {
     pub label: SharedString,
     pub value: SharedString,
+    /// Whether the label is also visible beside the value.
+    pub labelled: bool,
 }
 
 impl NodeMetric {
@@ -395,7 +397,14 @@ impl NodeMetric {
         Self {
             label: label.into(),
             value: value.into(),
+            labelled: false,
         }
+    }
+
+    /// Shows a muted label beside the normal-colour value.
+    pub fn labelled(mut self) -> Self {
+        self.labelled = true;
+        self
     }
 }
 
@@ -466,6 +475,8 @@ pub struct GraphNode {
     icon: Option<Icon>,
     thumbnail: Option<AnyElement>,
     thumbnail_ratio: f32,
+    note: Option<SharedString>,
+    note_lines: usize,
     /// What the step is doing now, for a step that is doing something.
     action: Option<SharedString>,
     state: NodeState,
@@ -515,6 +526,8 @@ impl GraphNode {
             icon: None,
             thumbnail: None,
             thumbnail_ratio: DEFAULT_THUMBNAIL_RATIO,
+            note: None,
+            note_lines: 4,
             action: None,
             state: NodeState::default(),
             category: None,
@@ -611,9 +624,9 @@ impl GraphNode {
         self
     }
 
-    /// One figure the step reports. The value is what the card shows; the
-    /// label names it on hover and in the semantic tree, so a card carrying
-    /// three figures is three numbers wide rather than three sentences.
+    /// One bare figure the step reports. The value is visible; the label
+    /// names it on hover and in the semantic tree. For facts that need a
+    /// visible name, pass a [`NodeMetric::labelled`] figure to [`Self::metrics`].
     pub fn metric(
         mut self,
         label: impl Into<SharedString>,
@@ -625,6 +638,20 @@ impl GraphNode {
 
     pub fn metrics(mut self, metrics: impl IntoIterator<Item = NodeMetric>) -> Self {
         self.metrics.extend(metrics);
+        self
+    }
+
+    /// A muted, wrapping text body, omitted in compact mode. The semantic
+    /// description retains the full caller-supplied, display-safe text.
+    pub fn note(mut self, text: impl Into<SharedString>) -> Self {
+        self.note = Some(text.into());
+        self
+    }
+
+    /// Maximum visible note lines (four by default); zero is treated as one.
+    /// GPUI shapes and ellipsizes the text rather than cropping characters.
+    pub fn note_lines(mut self, n: usize) -> Self {
+        self.note_lines = n.max(1);
         self
     }
 
@@ -820,7 +847,14 @@ impl GraphNode {
         let mut widths: Vec<f32> = self
             .metrics
             .iter()
-            .map(|metric| text_advance(&metric.value, size))
+            .map(|metric| {
+                text_advance(&metric.value, size)
+                    + if metric.labelled {
+                        text_advance(&metric.label, size) + theme.spacing.xs
+                    } else {
+                        0.0
+                    }
+            })
             .collect();
         if let Some(diff) = self.diff.filter(|diff| !diff.is_empty()) {
             let counted =
@@ -869,6 +903,19 @@ impl GraphNode {
         }
         if self.action.is_some() && self.state.is_busy() {
             rows.push(theme.typography.caption.line_height);
+        }
+        if let Some(note) = &self.note {
+            let available = (self.width - theme.spacing.sm * 4.0).max(1.0);
+            let lines = note
+                .split('\n')
+                .map(|line| {
+                    (text_advance(line, theme.typography.caption.size) / available)
+                        .ceil()
+                        .max(1.0) as usize
+                })
+                .sum::<usize>()
+                .min(self.note_lines);
+            rows.push(theme.typography.caption.line_height * lines as f32 + theme.spacing.sm * 2.0);
         }
         // The figure strip wraps, so a card carrying three figures on a narrow
         // node is two rows tall. An estimate that always answered one row
@@ -1455,10 +1502,8 @@ impl RenderOnce for GraphNode {
                     .child(action)
             });
 
-        // The figures are values; each one's name is help and semantics. A
-        // card carrying three figures is three numbers wide rather than
-        // three sentences, and the reader who wants to know which is which
-        // reaches for one.
+        // Bare figures keep their names in help and semantics; labelled
+        // figures show them beside the value. Wrap each fact as one unit.
         let mut figures: Vec<AnyElement> = self
             .metrics
             .iter()
@@ -1466,7 +1511,21 @@ impl RenderOnce for GraphNode {
                 let figure_ident = self.ident.child("metric").child(metric.label.clone());
                 div()
                     .id(figure_ident.element_id())
-                    .text_color(theme.colors.text_muted)
+                    .row()
+                    .flex_none()
+                    .gap(px(metrics.gap))
+                    .text_color(if metric.labelled {
+                        theme.colors.text
+                    } else {
+                        theme.colors.text_muted
+                    })
+                    .when(metric.labelled, |row| {
+                        row.child(
+                            div()
+                                .text_color(theme.colors.text_muted)
+                                .child(metric.label.clone()),
+                        )
+                    })
                     .child(metric.value.clone())
                     .tip(figure_ident.clone(), metric.label.clone())
                     .semantic_in(
@@ -1517,13 +1576,44 @@ impl RenderOnce for GraphNode {
                 .flex_none()
                 .aspect_ratio(self.thumbnail_ratio)
                 .overflow_hidden()
-                .rounded(px(theme.radius(Radius::Control) * self.display_zoom))
-                .child(thumbnail)
+                .rounded(px(theme.radius(Radius::Control) * metrics.scale))
+                .child(ThemeOverlay::new(
+                    move |theme| theme.clone().scaled(metrics.scale),
+                    thumbnail,
+                ))
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("thumbnail").semantic_id(), Role::Image)
                         .parent(node_id.clone())
                         .text(self.title.clone()),
+                )
+        });
+
+        let note = (!self.compact).then_some(self.note).flatten().map(|text| {
+            div()
+                .w_full()
+                .p(px(metrics.padding))
+                .rounded(px(theme.radius(Radius::Control) * metrics.scale))
+                .bg(theme.color_wash(
+                    identity.map_or(paint.mark, |color| color.text),
+                    SemanticWash::Faint,
+                ))
+                .text_size(px(metrics.caption_size))
+                .line_height(px(metrics.caption_height))
+                .font_weight(FontWeight(theme.typography.caption.weight))
+                .text_color(theme.colors.text_muted)
+                .child(
+                    div()
+                        .w_full()
+                        .line_clamp(self.note_lines)
+                        .text_ellipsis()
+                        .child(text.clone()),
+                )
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("note").semantic_id(), Role::Text)
+                        .parent(node_id.clone())
+                        .description(text),
                 )
         });
 
@@ -1562,7 +1652,11 @@ impl RenderOnce for GraphNode {
         // nothing but a name has no body at all: an empty padded box below the
         // title would claim there is content that failed to arrive.
         let body = (!self.compact
-            && (thumbnail.is_some() || action.is_some() || strip.is_some() || content.is_some()))
+            && (thumbnail.is_some()
+                || action.is_some()
+                || note.is_some()
+                || strip.is_some()
+                || content.is_some()))
         .then(|| {
             div()
                 .w_full()
@@ -1571,6 +1665,7 @@ impl RenderOnce for GraphNode {
                 .p(px(metrics.padding))
                 .children(thumbnail)
                 .children(action)
+                .children(note)
                 .children(strip)
                 .children(content)
         });
@@ -2068,6 +2163,53 @@ mod tests {
             .thumbnail_ratio(1.0)
             .measured_height(&theme);
         assert!(square > thumbnail);
+    }
+
+    #[test]
+    fn notes_estimate_wrapping_clamping_and_compact_geometry() {
+        let theme = theme();
+        let plain = GraphNode::new("plain", "Plain").measured_height(&theme);
+        let short = GraphNode::new("note", "Note").note("短句");
+        assert_eq!(short.note_lines, 4);
+        assert_eq!(
+            short.measured_height(&theme) - plain,
+            theme.spacing.sm * 4.0 + theme.typography.caption.line_height
+        );
+        let long = || GraphNode::new("note", "Note").note("one\n二\nthree\n四\nfive\n六");
+        assert_eq!(
+            long().measured_height(&theme) - short.measured_height(&theme),
+            theme.typography.caption.line_height * 3.0
+        );
+        assert_eq!(
+            long().note_lines(0).measured_height(&theme),
+            short.measured_height(&theme)
+        );
+        assert_eq!(long().compact(true).measured_height(&theme), plain);
+        let wide = || {
+            GraphNode::new("wrap", "Wrap")
+                .note("这是一个没有空格且应当换行的长句子，测试真实文字区域。")
+        };
+        assert!(
+            wide().width(120.0).measured_height(&theme)
+                > wide().width(500.0).measured_height(&theme)
+        );
+    }
+
+    #[test]
+    fn labelled_figures_include_label_width_and_gap_in_geometry() {
+        let theme = theme();
+        let metric = NodeMetric::new("模型名称", "A");
+        assert!(!metric.labelled);
+        let bare = GraphNode::new("bare", "Bare")
+            .metrics([metric.clone()])
+            .figure_widths(&theme)[0];
+        let labelled = GraphNode::new("labelled", "Labelled")
+            .metrics([metric.labelled()])
+            .figure_widths(&theme)[0];
+        assert_eq!(
+            labelled - bare,
+            theme.typography.caption.size * 4.0 + theme.spacing.xs
+        );
     }
 
     /// The strip wraps, so the box edges are routed into has to know that a

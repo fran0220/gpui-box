@@ -738,6 +738,147 @@ fn wheel_zoom_is_ignored_while_a_node_gesture_is_active(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn node_notes_clamp_real_lines_preserve_full_semantics_and_scale(cx: &mut TestAppContext) {
+    const TEXT: &str = "One line\n第二行\nThird line\n第四行\nFifth hidden line\n第六行";
+    let expected = Rc::new(Cell::new(0.0));
+    let measured = expected.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, cx| {
+        let theme = cx.theme();
+        measured.set(theme.typography.caption.line_height * 4.0 + theme.spacing.sm * 2.0);
+        div()
+            .flex()
+            .children(
+                [("full", 1.0), ("half", 0.5), ("compact", 0.3)].map(|(id, zoom)| {
+                    div().w(px(320.0)).h(px(320.0)).child(
+                        NodeGraph::new(format!("graph-{id}"))
+                            .zoom_range(0.2, 2.0)
+                            .viewport(GraphViewport::new(point(0.0, 0.0), zoom))
+                            .node(GraphNode::new(id, "Note").width(260.0).note(TEXT), 0.0, 0.0),
+                    )
+                }),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let full = harness.node("full.note").expect("full note");
+    assert_eq!(full.role, Role::Text);
+    assert_eq!(full.description.as_deref(), Some(TEXT));
+    let full = harness.bounds("full.note").expect("full note bounds");
+    let half = harness.bounds("half.note").expect("half note bounds");
+    assert!(
+        (f32::from(full.size.height) - expected.get()).abs() < 1.0,
+        "four shaped lines plus padding: {full:?}, expected {}",
+        expected.get()
+    );
+    assert!((f32::from(full.size.height) - f32::from(half.size.height) * 2.0).abs() < 1.0);
+    assert!((f32::from(full.size.width) - f32::from(half.size.width) * 2.0).abs() < 1.0);
+    assert!(harness.node("compact.note").is_none());
+}
+
+#[derive(gpui::IntoElement)]
+struct NodeThemeProbe(&'static str);
+
+impl gpui::RenderOnce for NodeThemeProbe {
+    fn render(self, _: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
+        let theme = cx.theme();
+        div()
+            .w(px(theme.spacing.lg))
+            .h(px(theme.typography.caption.line_height))
+            .semantic_in(cx, NodeSpec::new(self.0, Role::Text))
+    }
+}
+
+#[gpui::test]
+fn node_note_height_follows_wrapping_and_the_requested_line_limit(cx: &mut TestAppContext) {
+    let line_height = Rc::new(Cell::new(0.0));
+    let expected = line_height.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, cx| {
+        expected.set(cx.theme().typography.caption.line_height);
+        div().flex().children([
+            GraphNode::new("short", "Short").width(160.0).note("短句"),
+            GraphNode::new("wrapped", "Wrapped").width(160.0)
+                .note("这是一段没有空格的中文说明，用来检查文字自动换行后仍然只有两行可见，完整内容不被裁剪。")
+                .note_lines(2),
+            GraphNode::new("explicit", "Explicit").width(160.0)
+                .note("First\n第二行\nThird").note_lines(2),
+        ]).into_any_element()
+    });
+    harness.frame();
+    let short = harness
+        .bounds("short.note")
+        .expect("short note bounds")
+        .size
+        .height;
+    let wrapped = harness
+        .bounds("wrapped.note")
+        .expect("wrapped note bounds")
+        .size
+        .height;
+    let explicit = harness
+        .bounds("explicit.note")
+        .expect("explicit note bounds")
+        .size
+        .height;
+    assert_eq!(wrapped, explicit);
+    assert_eq!(f32::from(wrapped - short), line_height.get());
+}
+
+#[gpui::test]
+fn node_thumbnail_and_content_read_the_same_scaled_theme(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .flex()
+            .children(
+                [
+                    ("full", "full-thumb", "full-body", 1.0),
+                    ("half", "half-thumb", "half-body", 0.5),
+                ]
+                .map(|(id, thumb, body, zoom)| {
+                    div().w(px(320.0)).h(px(320.0)).child(
+                        NodeGraph::new(format!("graph-{id}"))
+                            .viewport(GraphViewport::new(point(0.0, 0.0), zoom))
+                            .node(
+                                GraphNode::new(id, "Preview")
+                                    .thumbnail(NodeThemeProbe(thumb))
+                                    .child(NodeThemeProbe(body)),
+                                0.0,
+                                0.0,
+                            ),
+                    )
+                }),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let full = harness
+        .bounds("full-thumb")
+        .expect("full thumbnail bounds")
+        .size;
+    let half = harness
+        .bounds("half-thumb")
+        .expect("half thumbnail bounds")
+        .size;
+    assert_eq!(
+        full,
+        harness
+            .bounds("full-body")
+            .expect("full content bounds")
+            .size
+    );
+    assert_eq!(
+        half,
+        harness
+            .bounds("half-body")
+            .expect("half content bounds")
+            .size
+    );
+    assert_eq!(full.width, half.width * 2.0);
+    assert_eq!(full.height, half.height * 2.0);
+}
+
+#[gpui::test]
 fn composite_port_ids_remain_distinct_for_delimiter_like_business_ids(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         div()

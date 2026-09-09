@@ -978,6 +978,35 @@ semantic group in Inspect and Arrange modes; Edit changes that same stable
 target into the disconnect action rather than making topology disappear from
 non-editable semantic trees.
 
+GraphNode has four typography levels: the title uses label size with strong
+weight, while the muted kind uses caption size on the same label-height header
+line; ports use caption type in their own rows; `note(text)` uses muted caption
+type inside a Faint wash of the node colour, Control rounding, and body padding;
+the metric strip uses caption type with `spacing.sm` between figures. Header and
+port rows and body sections use `spacing.xs` gaps. Every size and explicit line
+height scales with the node zoom. `NodeMetric::new(label, value)` stays bare;
+`.labelled()` shows a muted label, a `spacing.xs` gap, and a normal-colour value.
+The strip wraps whole figures, including their visible labels. External
+`NodeMetric` struct literals must supply the new `labelled: bool` field;
+constructor callers keep the existing bare appearance.
+
+Notes grow with their shaped text up to four lines by default; `note_lines(n)`
+changes the limit (zero means one). GPUI line clamping supplies the ellipsis,
+including for bilingual text, while the `node-id.note` Text semantic description
+keeps the full display-safe caller text. Compact nodes omit the body entirely.
+Before prepaint, graph geometry estimates wrapped note rows including both inset
+layers; actual measured geometry replaces this estimate.
+
+Both thumbnail and content slots install `ThemeOverlay(theme.scaled(zoom))`.
+This scales tokens read by descendants during rendering, not arbitrary pixel
+styles already built by the caller, nor image pixels or inherited text styles.
+A descendant that reads `cx.theme().radius(Radius::Control)` inside that overlay
+must use that radius directly, without multiplying by viewport zoom again. A raw
+image built outside the overlay with a captured unscaled radius still needs its
+explicit zoom multiplication (or can rely on the thumbnail slot's own scaled
+Control-radius clipping). Moving that image into a render-time theme-reading
+component is what makes removing the caller multiplier correct.
+
 ### A refusal is not an absence and not an error
 
 `ToolCallState` is five states, not a flag beside a result: `PendingApproval`,
