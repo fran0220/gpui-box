@@ -77,6 +77,13 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Run native Windows UI Automation smoke
         run: cargo run -p xtask --locked -- accessibility check
+      - name: Preserve native Windows UI Automation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-windows-uia
+          path: target/accessibility/windows
+          if-no-files-found: ignore
       - name: Check deterministic component performance budgets
         run: cargo run -p xtask --locked -- performance check
       - name: Compile Direct3D release shaders

@@ -3,9 +3,9 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
 use std::thread;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
@@ -388,7 +388,8 @@ fn accessibility_check() -> Result<()> {
 #[cfg(target_os = "windows")]
 fn windows_uia_check(pid: u32, mode: &str) -> Result<String> {
     let script = root().join("tools/accessibility/windows-smoke.ps1");
-    let mut child = Command::new("powershell.exe")
+    let mut command = Command::new("powershell.exe");
+    command
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -399,32 +400,60 @@ fn windows_uia_check(pid: u32, mode: &str) -> Result<String> {
         .arg(script)
         .arg("-TargetProcessId")
         .arg(pid.to_string())
-        .args(["-Mode", mode])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .args(["-Mode", mode]);
+    collect_windows_uia_check(
+        command,
+        mode,
+        Duration::from_secs(30),
+        &root().join("target/accessibility/windows"),
+    )
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn collect_windows_uia_check(
+    mut command: Command,
+    mode: &str,
+    timeout: Duration,
+    directory: &Path,
+) -> Result<String> {
+    // Do not wait for exit with undrained pipes: PowerShell's error record can
+    // fill stderr and block the very exit we are waiting for. Files also let
+    // a timeout retain diagnostics without waiting for pipe EOF from a helper
+    // descendant, and leave evidence for the native workflow artifact.
+    fs::create_dir_all(directory).context("create the Windows UIA log directory")?;
+    let stdout_path = directory.join(format!("{mode}.stdout.log"));
+    let stderr_path = directory.join(format!("{mode}.stderr.log"));
+    let mut child = command
+        .stdout(fs::File::create(&stdout_path)?)
+        .stderr(fs::File::create(&stderr_path)?)
         .spawn()
         .with_context(|| format!("launch the bounded native Windows UIA {mode} check"))?;
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + timeout;
+    let mut timed_out = false;
     while child.try_wait()?.is_none() {
         if Instant::now() >= deadline {
             child
                 .kill()
                 .context("stop the timed-out native UIA check")?;
-            let _ = child.wait();
-            bail!("native Windows UIA {mode} check timed out after 30 seconds");
+            timed_out = true;
+            break;
         }
         thread::sleep(Duration::from_millis(50));
     }
-    let output = child
-        .wait_with_output()
-        .context("reap the native Windows UIA check")?;
-    if !output.status.success() {
+    let status = child.wait().context("reap the native Windows UIA check")?;
+    let stdout = String::from_utf8_lossy(&fs::read(&stdout_path)?).into_owned();
+    let stderr = String::from_utf8_lossy(&fs::read(&stderr_path)?).into_owned();
+    if timed_out {
         bail!(
-            "native Windows UIA {mode} check failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
+            "native Windows UIA {mode} check timed out after {timeout:?}\nstdout:\n{stdout}\nstderr:\n{stderr}"
         );
     }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    if !status.success() {
+        bail!(
+            "native Windows UIA {mode} check failed ({status})\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        );
+    }
+    Ok(stdout)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -2671,6 +2700,76 @@ fn root() -> PathBuf {
         .parent()
         .expect("xtask lives under the repository root")
         .to_path_buf()
+}
+
+#[cfg(test)]
+mod windows_uia_tests {
+    use super::{Command, Duration, collect_windows_uia_check};
+    use std::io::Write;
+
+    fn probe(mode: &str, timeout: Duration) -> anyhow::Result<String> {
+        let directory =
+            std::env::temp_dir().join(format!("gpui-uia-{}-{mode}", std::process::id()));
+        let mut command = Command::new(std::env::current_exe()?);
+        command
+            .args(["--exact", "windows_uia_tests::probe_process", "--nocapture"])
+            .env("GPUI_UIA_PROBE_TEST", mode);
+        let result = collect_windows_uia_check(command, "menu", timeout, &directory);
+        assert!(directory.join("menu.stdout.log").is_file());
+        assert!(directory.join("menu.stderr.log").is_file());
+        std::fs::remove_dir_all(directory)?;
+        result
+    }
+
+    // A real subprocess, so these checks exercise kernel pipe backpressure.
+    #[test]
+    fn probe_process() {
+        let Ok(mode) = std::env::var("GPUI_UIA_PROBE_TEST") else {
+            return;
+        };
+        if mode == "flood" {
+            std::io::stdout()
+                .write_all(&vec![b'o'; 256 * 1024])
+                .expect("write the probe stdout payload");
+            std::io::stderr()
+                .write_all(&vec![b'e'; 256 * 1024])
+                .expect("write the probe stderr payload");
+            eprintln!("menu-focus-failure-end");
+            std::process::exit(17);
+        }
+        eprintln!("menu-phase-before-block");
+        if mode == "timeout" {
+            std::thread::sleep(Duration::from_secs(60));
+        }
+        println!("Run actions|Copy link|focused|invoked|closed");
+        std::process::exit(0);
+    }
+
+    #[test]
+    fn large_probe_failure_is_drained_without_becoming_a_timeout() {
+        let error = probe("flood", Duration::from_secs(3))
+            .expect_err("the probe must preserve its failure status")
+            .to_string();
+        assert!(error.contains("check failed"), "{error}");
+        assert!(error.contains("menu-focus-failure-end"));
+        assert!(!error.contains("timed out"));
+    }
+
+    #[test]
+    fn timeout_keeps_the_last_probe_diagnostic() {
+        let error = probe("timeout", Duration::from_secs(1))
+            .expect_err("the watchdog must terminate the blocked probe")
+            .to_string();
+        assert!(error.contains("timed out"), "{error}");
+        assert!(error.contains("menu-phase-before-block"), "{error}");
+    }
+
+    #[test]
+    fn successful_probe_keeps_its_behavior_verdict() {
+        let output = probe("success", Duration::from_secs(3)).expect("the probe should succeed");
+        assert!(output.contains("Run actions|Copy link|focused|invoked|closed"));
+        assert!(!output.contains("menu-phase-before-block"));
+    }
 }
 
 #[cfg(test)]

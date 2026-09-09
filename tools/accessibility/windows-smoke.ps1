@@ -155,7 +155,9 @@ function Activate-Target {
     }
 }
 
+[Console]::Error.WriteLine("UIA ${Mode}: activating target process $TargetProcessId")
 Activate-Target
+[Console]::Error.WriteLine("UIA ${Mode}: target activated")
 
 switch ($Mode) {
     "editable" {
@@ -220,7 +222,9 @@ switch ($Mode) {
     }
 
     "menu" {
+        [Console]::Error.WriteLine("UIA menu: finding Run actions")
         $menu = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions"
+        [Console]::Error.WriteLine("UIA menu: waiting for Copy link and global focus to agree")
         # Host focus arrives through WM_SETFOCUS and the AccessKit focus event
         # after Activate-Target returns, so read until they agree.
         $menuFocusAgrees = {
@@ -235,6 +239,7 @@ switch ($Mode) {
         $deadline = [DateTime]::UtcNow.AddSeconds(15)
         while (-not (& $menuFocusAgrees)) {
             if ([DateTime]::UtcNow -ge $deadline) {
+                [Console]::Error.WriteLine("UIA menu: focus agreement failed; collecting Win32/UIA state")
                 $report = @()
                 $report += [GpuiBox.Accessibility.NativeWindow]::Describe($TargetProcessId)
                 $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
@@ -259,11 +264,14 @@ switch ($Mode) {
             }
             Start-Sleep -Milliseconds 100
         }
+        [Console]::Error.WriteLine("UIA menu: focus agreed; acquiring Copy link InvokePattern")
         $copyLink = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link"
         $invoke = [System.Windows.Automation.InvokePattern](
             Pattern -Element $copyLink -Pattern ([System.Windows.Automation.InvokePattern]::Pattern)
         )
+        [Console]::Error.WriteLine("UIA menu: invoking Copy link")
         $invoke.Invoke()
+        [Console]::Error.WriteLine("UIA menu: invoke returned; waiting for Run actions dismissal")
         Wait-Until -Failure "Run actions UIA Menu remained after invoking Copy link" -Predicate {
             return @(Find-All -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions").Count -eq 0
         }
