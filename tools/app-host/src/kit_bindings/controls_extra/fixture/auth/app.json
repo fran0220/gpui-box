@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "controls-auth-fixture",
+  "version": "1.0.0",
+  "entry": "main.mjs",
+  "permissions": [],
+  "dependencies": {},
+  "contributes": { "commands": [], "keymaps": [], "panels": [] }
+}

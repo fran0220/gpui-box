@@ -8,6 +8,19 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('sensitive controls reject invented authority and close their value/slot contracts', () => {
+  for (const kind of ['PasswordInput','OneTimeCodeInput']) {
+    validateValue({value:'fixture',readOnly:true},familySchemas[kind].props);
+    assert.throws(() => validateValue({secret:false},familySchemas[kind].props));
+    assert.throws(() => validateValue({provider:'remote'},familySchemas[kind].props));
+    validateValue({name:null},familyMethods[kind].invoke.set_name.args);
+    assert.throws(() => validateValue({readOnly:true},familyMethods[kind].invoke.set_read_only.args));
+  }
+  for (const slots of [0,13,1.5]) assert.throws(() => validateValue({slots},familySchemas.OneTimeCodeInput.props));
+  validateValue({slots:12},familyMethods.OneTimeCodeInput.invoke.set_slots.args);
+  assert.equal(familyMethods.PasswordInput.invoke.reveal,undefined);
+});
+
 test('keybinding recorder methods separate recording from caller binding and nullable options', () => {
   const methods = familyMethods.KeybindingRecorder;
   for (const [name, key] of [['set_label','label'],['set_placeholder','placeholder'],['set_binding','binding'],['set_conflict','reason']]) {
@@ -200,6 +213,12 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.PasswordInput('password', {placeholder:'Fixture',readOnly:true}, {change(value) { const text:string = value; }});
+kit.OneTimeCodeInput('code', {slots:6}, {submit() {}});
+// @ts-expect-error native sensitive controls cannot be made non-secret
+kit.PasswordInput('bad', {secret:false});
+// @ts-expect-error one-time codes do not expose an invented complete event
+kit.OneTimeCodeInput('bad', {}, {complete() {}});
 kit.KeybindingRecorder('recorder', {allowEscape:true,binding:'ctrl-k'}, {captured(value) { const key: string = value; }});
 // @ts-expect-error recording is native transient state, not a controlled prop
 kit.KeybindingRecorder('bad', {recording:true});

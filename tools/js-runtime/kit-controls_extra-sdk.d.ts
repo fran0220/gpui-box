@@ -6,7 +6,8 @@ export type NativeKitButtonNode = Omit<KitNode, 'component'> & { component: 'But
 export type NativeSettingsRowNode = Omit<KitNode, 'component'> & { component: 'SettingsRow' };
 export type NativeSettingsSectionNode = Omit<KitNode, 'component'> & { component: 'SettingsSection' };
 export interface KitColor { h: number; s: number; l: number; a: number }
-export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[]; NumberInput: number }
+export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[]; NumberInput: number; PasswordInput: string; OneTimeCodeInput: string }
+export interface SensitiveInputProps extends ControlProps { name?: string; value?: string; required?: boolean; invalid?: boolean; readOnly?: boolean }
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 export type ButtonStyle = ButtonVariant | 'filled' | 'light' | 'subtle' | 'default' | 'transparent' | 'white';
 export type ControlGround = 'backdrop' | 'canvas' | 'sunken' | 'panel' | 'raised' | 'overlay';
@@ -20,6 +21,8 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  PasswordInput(id: string, props?: SensitiveInputProps & { placeholder?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
+  OneTimeCodeInput(id: string, props?: SensitiveInputProps & { slots?: number }, events?: { change?(value: string): void; submit?(): void }): KitNode;
   KeybindingRecorder(id: string, props?: ControlProps & { label?: string; placeholder?: string; binding?: string; conflict?: string; allowEscape?: boolean }, events?: { started?(): void; captured?(keystroke: string): void; cancelled?(): void }): KitNode;
   InlineEdit(id: string, props?: ControlProps & { value?: string; placeholder?: string; editing?: boolean; multiline?: boolean; rows?: number; failure?: string }, events?: { edit?(): void; commit?(value: string): void; cancel?(): void }): KitNode;
   SplitButton(id: string, props?: ControlProps & { label?: string; icon?: BuiltinIconDescriptor; variant?: ButtonVariant; menuName?: string; defaultDisabled?: boolean; items?: MenuItemDescriptor[] }, events?: { click?(): void; open?(): void; close?(): void; dismiss?(): void; invoked?(id: string): void }): KitNode;
@@ -42,7 +45,28 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 interface FocusQueries { focus_handle: { args: Record<string, never>; result: NativeRef<'FocusHandle'> } }
+interface SensitiveInputCommands {
+  set_value: { args: { value: string }; result: null };
+  set_name: { args: { name: string | null }; result: null };
+  set_required: { args: { required: boolean }; result: null };
+  set_invalid: { args: { invalid: boolean }; result: null };
+  set_read_only: { args: { read_only: boolean }; result: null };
+  set_disabled: { args: { disabled: boolean }; result: null };
+  set_control_size: { args: { size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+}
+interface SensitiveInputQueries extends FocusQueries {
+  value: { args: Record<string, never>; result: string };
+  is_disabled: { args: Record<string, never>; result: boolean };
+}
 export interface ControlsExtraMethodContracts {
+  PasswordInput: {
+    invoke: SensitiveInputCommands & { set_placeholder: { args: { placeholder: string | null }; result: null } };
+    query: SensitiveInputQueries & { is_revealed: { args: Record<string, never>; result: boolean }; selected_range: { args: Record<string, never>; result: {start:number;end:number} } };
+  };
+  OneTimeCodeInput: {
+    invoke: SensitiveInputCommands & { set_slots: { args: { slots: number }; result: null } };
+    query: SensitiveInputQueries & { len: { args: Record<string, never>; result: number }; slot_count: { args: Record<string, never>; result: number }; is_empty: { args: Record<string, never>; result: boolean }; is_complete: { args: Record<string, never>; result: boolean } };
+  };
   KeybindingRecorder: {
     invoke: {
       start: { args: Record<string, never>; result: null };

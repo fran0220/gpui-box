@@ -17,6 +17,14 @@ const confirmation = { type: 'number', integer: true, min: 0, max: 60000 };
 const step = { ...number, min: Number.MIN_VALUE };
 const method = (fields, result) => ({ args: object(fields, Object.keys(fields)), result });
 const focusQuery = method({}, object({ $nativeRef: identity, type: choice('FocusHandle') }, ['$nativeRef', 'type']));
+const authProps = { ...common, name: string, value: string, required: boolean, invalid: boolean, readOnly: boolean };
+const authCommands = {
+  set_value: method({ value: string }, choice(null)), set_name: method({ name: { ...string, nullable: true } }, choice(null)),
+  set_required: method({ required: boolean }, choice(null)), set_invalid: method({ invalid: boolean }, choice(null)),
+  set_read_only: method({ read_only: boolean }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
+  set_control_size: method({ size: common.size }, choice(null)),
+};
+const authQueries = { focus_handle: focusQuery, value: method({}, string), is_disabled: method({}, boolean) };
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -28,12 +36,16 @@ const keymapCommand = object({ id: identity, label: string, context: string, def
 const keymapResult = object({ ...keymapCommand.fields, context: { ...string, nullable: true }, refusal: { ...string, nullable: true }, bindings: array(object({ ...keymapBinding.fields, conflict: { ...string, nullable: true }, provenance: { ...string, nullable: true } }, Object.keys(keymapBinding.fields))) }, Object.keys(keymapCommand.fields));
 
 export const familyBindings = Object.freeze({
+  PasswordInput: { prop: 'value', event: 'change' },
+  OneTimeCodeInput: { prop: 'value', event: 'change' },
   NumberInput: { prop: 'value', event: 'change' },
   Toggle: { prop: 'pressed', event: 'press' },
   ToggleGroup: { prop: 'pressed', event: 'change', project: 'pressed' },
 });
 
 export const familySchemas = Object.freeze({
+  PasswordInput: { props: object({ ...authProps, placeholder: string }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
+  OneTimeCodeInput: { props: object({ ...authProps, slots: { ...integer, min: 1, max: 12 } }), events: { change: string, submit: choice(null) } },
   KeybindingRecorder: { props: object({ ...common, label: string, placeholder: string, binding: string, conflict: string, allowEscape: boolean }), events: { started: choice(null), captured: string, cancelled: choice(null) } },
   InlineEdit: { props: object({ ...common, value: string, placeholder: string, editing: boolean, multiline: boolean, rows: { ...integer, min: 1, max: 1024 }, failure: string }), events: { edit: choice(null), commit: string, cancel: choice(null) } },
   SplitButton: { props: object({ ...common, label: string, icon: iconSchema, variant, menuName: string, defaultDisabled: boolean, items: menuItemsSchema }), events: { click: choice(null), open: choice(null), close: choice(null), dismiss: choice(null), invoked: identity } },
@@ -56,6 +68,8 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  PasswordInput: { invoke: { ...authCommands, set_placeholder: method({ placeholder: { ...string, nullable: true } }, choice(null)) }, query: { ...authQueries, is_revealed: method({}, boolean), selected_range: method({}, object({start:integer,end:integer},['start','end'])) } },
+  OneTimeCodeInput: { invoke: { ...authCommands, set_slots: method({ slots: { ...integer, min:1, max:12 } }, choice(null)) }, query: { ...authQueries, len: method({}, integer), is_empty: method({},boolean), is_complete: method({},boolean), slot_count: method({},integer) } },
   KeybindingRecorder: {
     invoke: {
       start: method({}, choice(null)), cancel: method({}, choice(null)),

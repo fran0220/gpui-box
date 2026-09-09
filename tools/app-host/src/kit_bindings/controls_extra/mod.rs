@@ -2,6 +2,7 @@
 //! Slot factories are invoked only after releasing retained-state borrows.
 use super::*;
 use gpui::{Hsla, ParentElement};
+use gpui_kit::controls::auth::{OneTimeCodeInput, PasswordInput};
 use gpui_kit::controls::button::{ButtonJoin, ButtonStyle, IconPosition};
 use gpui_kit::controls::copy_button::{CopyButton, CopyEvent, CopyState};
 use gpui_kit::controls::keybinding_recorder::KeybindingRecorder;
@@ -15,6 +16,7 @@ use gpui_kit::state::ValidationState;
 use gpui_kit::strings::{ActiveStrings, StringKey};
 use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 
+mod auth;
 mod recorder;
 
 #[cfg(all(test, feature = "capture"))]
@@ -41,6 +43,8 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SplitButton",
     "InlineEdit",
     "KeybindingRecorder",
+    "PasswordInput",
+    "OneTimeCodeInput",
 ];
 
 pub(super) fn settings_section(
@@ -179,6 +183,8 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    passwords: RefCell<HashMap<Key, Rc<Entry<PasswordInput>>>>,
+    codes: RefCell<HashMap<Key, Rc<Entry<OneTimeCodeInput>>>>,
     recorders: RefCell<HashMap<Key, Rc<Entry<KeybindingRecorder>>>>,
     searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
     transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
@@ -192,6 +198,16 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "PasswordInput" => self
+                .passwords
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "OneTimeCodeInput" => self
+                .codes
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
             "KeybindingRecorder" => self
                 .recorders
                 .borrow()
@@ -265,7 +281,13 @@ impl State {
         if method != "focus_handle"
             || !matches!(
                 component,
-                "SearchInput" | "NumberInput" | "CopyButton" | "SplitButton" | "KeybindingRecorder"
+                "SearchInput"
+                    | "NumberInput"
+                    | "CopyButton"
+                    | "SplitButton"
+                    | "KeybindingRecorder"
+                    | "PasswordInput"
+                    | "OneTimeCodeInput"
             )
         {
             return None;
@@ -274,6 +296,14 @@ impl State {
             let schema = super::validation::invocation(component, method, args, true)?;
             let key = (node.instance, node.id.clone());
             let result = match component {
+                "PasswordInput" => {
+                    focus_reference(&self.passwords, &key, cx, refs, |control, _| {
+                        !control.is_disabled()
+                    })
+                }
+                "OneTimeCodeInput" => focus_reference(&self.codes, &key, cx, refs, |control, _| {
+                    !control.is_disabled()
+                }),
                 "KeybindingRecorder" => {
                     focus_reference(&self.recorders, &key, cx, refs, |control, _| {
                         !control.is_disabled()
@@ -309,6 +339,12 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.passwords
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "PasswordInput"));
+        self.codes
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "OneTimeCodeInput"));
         self.recorders.borrow_mut().retain(|key, _| {
             live.get(key)
                 .is_some_and(|kind| kind == "KeybindingRecorder")
@@ -341,6 +377,12 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("PasswordInput") {
+            return self.render_password(node, window, cx, emit);
+        }
+        if node.component.as_deref() == Some("OneTimeCodeInput") {
+            return self.render_code(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("KeybindingRecorder") {
             return self.render_recorder(node, window, cx, emit);
         }
@@ -443,6 +485,12 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("PasswordInput") {
+            return self.invoke_password(node, method, args, query, cx);
+        }
+        if node.component.as_deref() == Some("OneTimeCodeInput") {
+            return self.invoke_code(node, method, args, query, cx);
+        }
         if node.component.as_deref() == Some("KeybindingRecorder") {
             return self.invoke_recorder(node, method, args, query, _window, cx);
         }

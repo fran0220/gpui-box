@@ -177,6 +177,41 @@ impl PasswordInput {
         self.field.read(cx).selected_range()
     }
 
+    /// `None` removes the name without replacing the sensitive editor.
+    pub fn set_name(&mut self, name: Option<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.clone();
+        self.field
+            .update(cx, |field, cx| field.set_name(name.unwrap_or_default(), cx));
+        cx.notify();
+    }
+
+    /// `None` restores the native empty placeholder.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder.clone();
+        self.field.update(cx, |field, cx| {
+            field.set_placeholder(placeholder.unwrap_or_default(), cx)
+        });
+        cx.notify();
+    }
+
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        self.field
+            .update(cx, |field, cx| field.set_required(required, cx));
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        self.field
+            .update(cx, |field, cx| field.set_control_size(size, cx));
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.seeded = true;
         self.field
@@ -489,6 +524,40 @@ impl OneTimeCodeInput {
 
     pub fn slot_count(&self) -> usize {
         self.slots
+    }
+
+    /// `None` removes the accessible name without replacing the sensitive editor.
+    pub fn set_name(&mut self, name: Option<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.clone();
+        self.field
+            .update(cx, |field, cx| field.set_name(name.unwrap_or_default(), cx));
+        cx.notify();
+    }
+
+    /// Changes the visual slots and future input limit. Existing text is retained.
+    pub fn set_slots(&mut self, slots: usize, cx: &mut Context<Self>) {
+        self.slots = slots.clamp(MIN_CODE_SLOTS, MAX_CODE_SLOTS);
+        self.field
+            .update(cx, |field, cx| field.set_sensitive_slots(self.slots, cx));
+        cx.notify();
+    }
+
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        self.field
+            .update(cx, |field, cx| field.set_required(required, cx));
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        self.field
+            .update(cx, |field, cx| field.set_control_size(size, cx));
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
