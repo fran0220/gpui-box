@@ -11,6 +11,7 @@ export interface NativeRef<T extends keyof NativeReferenceContracts = keyof Nati
 }
 export interface NativeReferenceContracts {
   TextInput: KitMethodContracts['TextInput'];
+  Menu: KitMethodContracts['Menu'];
   FocusHandle: {
     invoke: { focus: { args: Record<string, never>; result: null } };
     query: {
@@ -21,6 +22,6 @@ export interface NativeReferenceContracts {
   };
 }
 type Args<S> = S extends { args: infer A } ? {} extends A ? [args?: A] : [args: A] : never;
-type Result<S> = S extends { result: infer R } ? R : never;
+type Result<S> = S extends { result: infer R } ? R extends { $nativeRef: string; type: infer T extends keyof NativeReferenceContracts } ? NativeRef<T> : R : never;
 export type NativeInvoke = <T extends keyof NativeReferenceContracts, M extends keyof NativeReferenceContracts[NoInfer<T>]['invoke']>(target: NativeRef<T>, method: M, ...args: Args<NativeReferenceContracts[T]['invoke'][M]>) => Promise<Result<NativeReferenceContracts[T]['invoke'][M]>>;
 export type NativeQuery = <T extends keyof NativeReferenceContracts, M extends keyof NativeReferenceContracts[NoInfer<T>]['query']>(target: NativeRef<T>, method: M, ...args: Args<NativeReferenceContracts[T]['query'][M]>) => Promise<Result<NativeReferenceContracts[T]['query'][M]>>;

@@ -2,6 +2,7 @@
 // This worker-side identity check is not authority: native dispatch independently
 // revalidates the issuing worker, current mount, parent and weak target.
 import { validateInvocation } from './kit-schema.mjs';
+import { validateMenuItems } from './kit-overlay-schema.mjs';
 import { validatePayload } from './wire.mjs';
 
 export function validateNativeRef(value) {
@@ -10,7 +11,7 @@ export function validateNativeRef(value) {
   if (Reflect.ownKeys(fields).length !== 2 || !fields.$nativeRef || !fields.type ||
       !Object.hasOwn(fields.$nativeRef, 'value') || !Object.hasOwn(fields.type, 'value') ||
       typeof fields.$nativeRef.value !== 'string' || !/^native-[1-9][0-9]{0,19}$/.test(fields.$nativeRef.value) ||
-      !['TextInput', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
+      !['TextInput', 'Menu', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
   return value;
 }
 
@@ -19,7 +20,11 @@ export function validateReferenceInvocation(reference, method, args, mode) {
   validatePayload(args);
   if (!['invoke', 'query'].includes(mode)) throw new Error('Invalid native reference mode');
   if (method === '$release' && mode === 'invoke' && args && typeof args === 'object' && !Array.isArray(args) && !Object.keys(args).length) return { result: { enum: [null] } };
-  if (reference.type === 'TextInput') return validateInvocation('TextInput', method, args, mode);
+  if (reference.type !== 'FocusHandle') {
+    const contract = validateInvocation(reference.type, method, args, mode);
+    if (reference.type === 'Menu' && method === 'set_items') validateMenuItems(args.items);
+    return contract;
+  }
   if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length)
     throw new Error('Focus arguments must be an empty object');
   if (!(mode === 'invoke' ? method === 'focus' : ['is_focused', 'contains_focused', 'within_focused'].includes(method)))

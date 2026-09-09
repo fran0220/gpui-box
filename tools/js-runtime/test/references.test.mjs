@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NativeReferences, validateNativeRef, validateReferenceInvocation } from '../references.mjs';
+import { kitMethods, validateValue } from '../kit-schema.mjs';
 
 const ref = (id, type = 'FocusHandle') => ({ $nativeRef: `native-${id}`, type });
 test('references require issued identity, retain same-worker identity, and release explicitly', () => {
@@ -25,6 +26,27 @@ test('reference kind fixes method schemas and command/query modes', () => {
   for (const [method, args, mode] of [['focus', {}, 'query'], ['is_focused', {}, 'invoke'], ['focus', { extra: 1 }, 'invoke'], ['focus', {}, 'unknown']])
     assert.throws(() => validateReferenceInvocation(ref(1), method, args, mode));
   assert.throws(() => validateReferenceInvocation(ref(2, 'TextInput'), 'set_text_quietly', { value: 3 }, 'invoke'));
+});
+
+test('Menu references reuse family contracts, recursive identity checks and fixed methods', () => {
+  const registry = new NativeReferences();
+  const menu = registry.adopt(ref(5, 'Menu'));
+  const args = { items: [{ kind: 'submenu', id: 'more', label: 'More', items: [{ kind: 'command', id: 'pin', label: 'Pin' }] }] };
+  assert.equal(validateReferenceInvocation(menu, 'set_items', args, 'invoke'), kitMethods.Menu.invoke.set_items);
+  assert.equal(registry.target(menu, 'open_submenu', { id: 'more' }, 'invoke'), menu);
+  assert.throws(() => registry.target(menu, 'set_value', { value: 'wrong kind' }, 'invoke'));
+  assert.throws(() => registry.target(menu, 'open', {}, 'query'));
+  assert.throws(() => registry.target(menu, 'set_items', { items: [{ ...args.items[0], id: 'pin' }] }, 'invoke'), /duplicate identity/);
+  assert.throws(() => registry.target(menu, 'set_items', { items: [{ ...args.items[0], extra: true }] }, 'invoke'));
+  const result = validateReferenceInvocation(menu, 'open_submenu', { id: 'missing' }, 'invoke').result;
+  validateValue(false, result);
+  validateValue(true, result);
+  assert.throws(() => validateValue('true', result));
+  const focusSchema = validateReferenceInvocation(menu, 'focus_handle', {}, 'query').result;
+  validateValue(ref(6), focusSchema);
+  assert.throws(() => validateValue(ref(6, 'Menu'), focusSchema));
+  registry.release(menu);
+  assert.throws(() => registry.target(menu, 'is_open', {}, 'query'), /not issued/);
 });
 
 test('closed markers reject unknown kinds and accessors without evaluating callbacks', () => {
