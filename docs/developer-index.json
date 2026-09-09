@@ -76861,7 +76861,7 @@
       "source": "crates/gpui-kit/src/display/plot.rs",
       "summary": "Invalid graph or normalized layout constraints. Layout never silently drops a flow or fabricates a value for an invalid input.",
       "documentation": "Invalid graph or normalized layout constraints. Layout never silently\ndrops a flow or fabricates a value for an invalid input.",
-      "signature": "# [doc = \" Invalid graph or normalized layout constraints. Layout never silently\"] # [doc = \" drops a flow or fabricates a value for an invalid input.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum SankeyLayoutError { InvalidDimensions, DuplicateNode (SharedString), DuplicateLink (SharedString), MissingEndpoint (SharedString), InvalidWeight (SharedString), WeightCount, Cycle, InsufficientHeight, }",
+      "signature": "# [doc = \" Invalid graph or normalized layout constraints. Layout never silently\"] # [doc = \" drops a flow or fabricates a value for an invalid input.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum SankeyLayoutError { InvalidDimensions, DuplicateNode (SharedString), DuplicateLink (SharedString), MissingEndpoint (SharedString), InvalidWeight (SharedString), WeightCount, Cycle, InsufficientHeight, # [doc = \" Positive flow would require a scale larger than finite f64 can hold.\"] UnrepresentableScale, }",
       "cfg": []
     },
     {
@@ -132647,7 +132647,8 @@
         "InvalidWeight",
         "WeightCount",
         "Cycle",
-        "InsufficientHeight"
+        "InsufficientHeight",
+        "UnrepresentableScale"
       ],
       "construct": [],
       "options": [],

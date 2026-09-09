@@ -885,6 +885,8 @@ pub enum SankeyLayoutError {
     WeightCount,
     Cycle,
     InsufficientHeight,
+    /// Positive flow would require a scale larger than finite f64 can hold.
+    UnrepresentableScale,
 }
 
 impl SankeyData {
@@ -1023,6 +1025,9 @@ impl SankeyData {
             }
         }
         if !scale.is_finite() {
+            if values.iter().any(|&value| value > 0.0) {
+                return Err(SankeyLayoutError::UnrepresentableScale);
+            }
             scale = 0.0;
         }
         for (column_index, column) in columns.iter().enumerate() {
@@ -1391,5 +1396,29 @@ mod tests {
             .expect("zero flow remains zero");
         assert_eq!(scale, 0.0);
         assert!(zero.nodes.iter().all(|node| node.bounds.size.height == 0.0));
+    }
+
+    #[test]
+    fn sankey_positive_subnormal_flow_is_not_erased_as_zero() {
+        assert_eq!(
+            flow_graph().layout(&[1e-320; 3], 0.1, 0.1, SankeyAlignment::Left),
+            Err(SankeyLayoutError::UnrepresentableScale)
+        );
+        for magnitude in [0.0, 1e-308, 1.0, 1e307] {
+            let (data, scale) = flow_graph()
+                .layout(&[magnitude; 3], 0.1, 0.1, SankeyAlignment::Left)
+                .expect("representable finite scale");
+            assert!(scale.is_finite());
+            if magnitude == 0.0 {
+                assert_eq!(scale, 0.0);
+                assert!(data.links.iter().all(|link| link.start_width == 0.0));
+            } else {
+                assert!(scale > 0.0);
+                // Column a and column b+d both carry two units; 0.1 gap in
+                // b+d leaves 0.9 for two equal ribbons at any magnitude.
+                assert!((data.links[0].start_width - 0.45).abs() < 1e-6);
+                assert!(data.links.iter().all(|link| link.start_width.is_finite()));
+            }
+        }
     }
 }

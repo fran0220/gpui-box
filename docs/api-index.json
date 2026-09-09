@@ -12983,7 +12983,8 @@
         "InvalidWeight",
         "WeightCount",
         "Cycle",
-        "InsufficientHeight"
+        "InsufficientHeight",
+        "UnrepresentableScale"
       ],
       "construct": [],
       "options": [],
