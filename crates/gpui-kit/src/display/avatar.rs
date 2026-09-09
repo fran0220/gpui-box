@@ -1,8 +1,8 @@
 //! A small identity mark.
 
 use gpui::{
-    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, StyledImage, Window,
+    div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, SemanticWash, Theme, TypeScale};
@@ -212,7 +212,32 @@ impl RenderOnce for Avatar {
             .when_some(lettering, |element, size| element.text_size(px(size)))
             .text_color(foreground)
             .when_some(self.image.clone(), |element, source| {
-                element.child(gpui::img(source).size(px(self.size)))
+                let ident = self
+                    .ident
+                    .as_ref()
+                    .map(|ident| ident.child("image-unavailable"));
+                element.child(
+                    gpui::img(source)
+                        .size(px(self.size))
+                        .with_fallback(move || {
+                            let glyph = gpui_kit_assets::Icon::Danger;
+                            let icon = match &ident {
+                                Some(ident) => crate::display::icon::Icon::named(
+                                    ident.clone(),
+                                    glyph,
+                                    "Image unavailable",
+                                ),
+                                None => crate::display::icon::Icon::new(glyph),
+                            };
+                            div()
+                                .size_full()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .child(icon.warning())
+                                .into_any_element()
+                        }),
+                )
             })
             .when(self.image.is_none() && lettering.is_some(), |element| {
                 element.child(initials.clone())
