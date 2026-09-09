@@ -50,23 +50,42 @@ fn pump(cx: &mut HeadlessAppContext, handle: gpui::WindowHandle<Host>) -> Result
     Ok(received)
 }
 
+fn contains_text(node: &Node, expected: &str) -> bool {
+    node.text == expected
+        || node
+            .children
+            .iter()
+            .chain(node.slots.values().flatten())
+            .any(|child| contains_text(child, expected))
+}
+
+fn mounted_app(node: &Node) -> bool {
+    (node.instance != 0 && node.id.starts_with("app."))
+        || node
+            .children
+            .iter()
+            .chain(node.slots.values().flatten())
+            .any(mounted_app)
+}
+
 pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
     let mut frame = None;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
-        let next = bridge.incoming.recv_timeout(Duration::from_secs(1))??;
-        let ready = !next.tree.text.contains("Loading");
-        frame = Some(next);
-        if ready {
-            // Drain startup/activation frames before reviewing the retained tree.
-            std::thread::sleep(Duration::from_millis(500));
-            while let Ok(next) = bridge.incoming.try_recv() {
-                frame = Some(next?);
-            }
+        let next = match bridge.incoming.recv_timeout(Duration::from_millis(100)) {
+            Ok(next) => next?,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(error) => return Err(error.into()),
+        };
+        if mounted_app(&next.tree) {
+            frame = Some(next);
             break;
         }
     }
-    ensure!(frame.is_some(), "runtime did not render");
+    ensure!(
+        frame.is_some(),
+        "runtime did not mount an app within capture deadline"
+    );
     let mut cx = HeadlessAppContext::with_platform(
         gpui_platform::test_text_system("Geist"),
         Arc::new(gpui_kit::assets::Assets),
@@ -97,6 +116,27 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
     for _ in 0..3 {
         cx.run_until_parked();
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))?;
+    }
+    if let Ok(expected) = std::env::var("GPUI_CAPTURE_READY_TEXT") {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            pump(&mut cx, handle)?;
+            let ready = cx.update(|cx| {
+                handle.update(cx, |host, _, _| {
+                    host.frame
+                        .as_ref()
+                        .is_some_and(|frame| contains_text(&frame.tree, &expected))
+                })
+            })?;
+            if ready {
+                break;
+            }
+            ensure!(
+                Instant::now() < deadline,
+                "capture did not reach expected ready text"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
     cx.capture_screenshot(window)?.save(Path::new(path))?;
     // Optional actual native mouse event, useful for both template state and
@@ -191,18 +231,10 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                     "native click produced no runtime frame"
                 );
                 if let Ok(expected) = std::env::var("GPUI_CAPTURE_EXPECT") {
-                    fn contains(node: &Node, expected: &str) -> bool {
-                        node.text == expected
-                            || node
-                                .children
-                                .iter()
-                                .chain(node.slots.values().flatten())
-                                .any(|child| contains(child, expected))
-                    }
                     ensure!(
                         host.frame
                             .as_ref()
-                            .is_some_and(|frame| contains(&frame.tree, &expected)),
+                            .is_some_and(|frame| contains_text(&frame.tree, &expected)),
                         "native input did not produce expected text"
                     );
                     println!("Native input verified: {expected}");
@@ -224,6 +256,16 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loading_column_is_not_a_mounted_app_and_ready_text_reaches_slots() {
+        let loading: Node = serde_json::from_value(json!({"kind":"column","id":"host.root","children":[{"kind":"text","id":"host.status","text":"Loading app…"}]})).expect("loading frame");
+        assert!(!mounted_app(&loading));
+        let ready: Node = serde_json::from_value(json!({"kind":"column","id":"host.root","children":[{"kind":"kit","component":"Accordion","id":"app.section.g1.m1","instance":1,"slots":{"body":[{"kind":"text","id":"app.ready.g1.m2","instance":1,"text":"Fixture ready"}]}}]})).expect("mounted fixture");
+        assert!(mounted_app(&ready));
+        assert!(contains_text(&ready, "Fixture ready"));
+        assert!(!contains_text(&ready, "Missing fixture"));
+    }
 
     #[test]
     fn native_input_coordinates_are_finite_bounded_and_exact_arity() {

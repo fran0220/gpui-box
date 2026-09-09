@@ -121,6 +121,11 @@ views, stale callbacks, permission denial, isolated plugins, command/keymap rout
 upgrade failure/rollback and cleanup. The Linux syscall probe bypasses JS entirely.
 See the runtime and plugin READMEs for the threat model and incomplete scope.
 
+Capture waits for an actual mounted app, not a fixed startup sleep. For async
+fixture data, set `GPUI_CAPTURE_READY_TEXT='exact fixture text'`; it waits up to
+ten seconds with native requests still being serviced before writing the image.
+Missing readiness fails explicitly instead of saving a loading shell as success.
+
 For native drag review, set `GPUI_CAPTURE_DRAG=x1,y1,x2,y2` instead of
 `GPUI_CAPTURE_CLICK`. Coordinates must be finite and inside the 980×760 viewport;
 the drag must travel at least 16 pixels. The harness dispatches left-button down,
