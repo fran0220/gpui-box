@@ -1,5 +1,6 @@
 // Only implemented native surfaces are advertised. All values are data-only.
 import { iconSchema } from './kit-icon-schema.mjs';
+import { menuItemsSchema, validateMenuItems } from './kit-overlay-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { ...string, min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -32,6 +33,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  SplitButton: { props: object({ ...common, label: string, icon: iconSchema, variant, menuName: string, defaultDisabled: boolean, items: menuItemsSchema }), events: { click: choice(null), open: choice(null), close: choice(null), dismiss: choice(null), invoked: identity } },
   SettingsList: { props: object({ query: string }), events: {}, slots: ['sections', 'empty', 'header', 'sidebar', 'footer'] },
   SettingsSection: { props: object({ title: string, description: string, dimmedBy: string, labelWidth: { type: 'number', min: 0, max: 100000 } }, ['title']), events: {}, slots: ['rows', 'content', 'action'] },
   CopyButton: { props: object({ ...common, text: string, label: string, glyphOnly: identity, variant, confirmationMs: confirmation }), events: { copied: choice(null), failed: string } },
@@ -51,6 +53,16 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  SplitButton: {
+    invoke: {
+      open_menu: method({}, choice(null)), set_label: method({ label: string }, choice(null)),
+      set_icon: method({ icon: { ...iconSchema, nullable: true } }, choice(null)),
+      set_variant: method({ variant }, choice(null)), set_control_size: method({ size: common.size }, choice(null)),
+      set_default_disabled: method({ disabled: boolean }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
+      set_items: method({ items: menuItemsSchema }, choice(null)), set_menu_name: method({ name: string }, choice(null)),
+    },
+    query: { is_open: method({}, boolean), is_disabled: method({}, boolean) },
+  },
   CopyButton: {
     invoke: {
       copy: method({}, choice(null)), set_text: method({ text: string }, choice(null)),
@@ -102,6 +114,7 @@ export const familyMethods = Object.freeze({
 
 // Called after closed-shape validation, in both worker and native host.
 export function validateFamilyProps(component, props) {
+  if (component === 'SplitButton') validateMenuItems(props.items ?? []);
   if (['Button', 'IconButton'].includes(component) && props.color && Object.keys(props.color).length !== 1) throw new TypeError('color requires exactly one source');
   if (props.iconOnly && (!props.icon || !props.accessibleName)) throw new TypeError('iconOnly requires icon and accessibleName');
   if (component === 'ToggleGroup') for (const item of props.items ?? []) {

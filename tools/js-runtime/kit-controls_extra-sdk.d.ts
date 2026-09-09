@@ -1,5 +1,6 @@
 import type { ControlProps, KitNode, SlotNode } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
+import type { MenuItemDescriptor } from './kit-overlay-sdk.js';
 export type NativeKitButtonNode = Omit<KitNode, 'component'> & { component: 'Button' };
 export type NativeSettingsRowNode = Omit<KitNode, 'component'> & { component: 'SettingsRow' };
 export type NativeSettingsSectionNode = Omit<KitNode, 'component'> & { component: 'SettingsSection' };
@@ -18,6 +19,7 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  SplitButton(id: string, props?: ControlProps & { label?: string; icon?: BuiltinIconDescriptor; variant?: ButtonVariant; menuName?: string; defaultDisabled?: boolean; items?: MenuItemDescriptor[] }, events?: { click?(): void; open?(): void; close?(): void; dismiss?(): void; invoked?(id: string): void }): KitNode;
   SettingsList(id: string, props?: { query?: string }, events?: Record<string, never>, slots?: { sections?: NativeSettingsSectionNode[]; empty?: SlotNode[]; header?: SlotNode[]; sidebar?: SlotNode[]; footer?: SlotNode[] }): KitNode;
   SettingsSection(id: string, props: { title: string; description?: string; dimmedBy?: string; labelWidth?: number }, events?: Record<string, never>, slots?: { rows?: NativeSettingsRowNode[]; content?: SlotNode[]; action?: SlotNode[] }): NativeSettingsSectionNode;
   CopyButton(id: string, props?: ControlProps & { text?: string; label?: string; glyphOnly?: string; variant?: ButtonVariant; confirmationMs?: number }, events?: { copied?(): void; failed?(reason: string): void }): KitNode;
@@ -37,6 +39,23 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 export interface ControlsExtraMethodContracts {
+  SplitButton: {
+    invoke: {
+      open_menu: { args: Record<string, never>; result: null };
+      set_label: { args: { label: string }; result: null };
+      set_icon: { args: { icon: BuiltinIconDescriptor | null }; result: null };
+      set_variant: { args: { variant: ButtonVariant }; result: null };
+      set_control_size: { args: { size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+      set_default_disabled: { args: { disabled: boolean }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+      set_items: { args: { items: MenuItemDescriptor[] }; result: null };
+      set_menu_name: { args: { name: string }; result: null };
+    };
+    query: {
+      is_open: { args: Record<string, never>; result: boolean };
+      is_disabled: { args: Record<string, never>; result: boolean };
+    };
+  };
   CopyButton: {
     invoke: {
       copy: { args: Record<string, never>; result: null };

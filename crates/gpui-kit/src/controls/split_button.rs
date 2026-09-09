@@ -127,6 +127,61 @@ impl SplitButton {
         self
     }
 
+    /// Updates the default action without replacing its focus or retained menu.
+    pub fn set_label(&mut self, label: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.label = label.into();
+        cx.notify();
+    }
+
+    pub fn set_icon(&mut self, icon: Option<Icon>, cx: &mut Context<Self>) {
+        self.icon = icon;
+        cx.notify();
+    }
+
+    pub fn set_variant(&mut self, variant: ButtonVariant, cx: &mut Context<Self>) {
+        self.variant = variant;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn set_default_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.default_disabled = disabled;
+        cx.notify();
+    }
+
+    pub fn set_items(&mut self, items: Vec<MenuItem>, cx: &mut Context<Self>) {
+        self.menu.update(cx, |menu, cx| menu.set_items(items, cx));
+        cx.notify();
+    }
+
+    pub fn set_menu_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.menu
+            .update(cx, |menu, cx| menu.set_trigger_name(name, cx));
+        cx.notify();
+    }
+
+    pub fn set_on_click(
+        &mut self,
+        handler: impl Fn(&mut Window, &mut App) + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.on_click = Some(Rc::new(handler));
+        cx.notify();
+    }
+
+    pub fn clear_on_click(&mut self, cx: &mut Context<Self>) {
+        self.on_click = None;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn menu(&self) -> &Entity<Menu> {
         &self.menu
     }
@@ -189,9 +244,10 @@ impl Render for SplitButton {
             .disabled(refused)
             .track_focus(&self.focus_handle)
             .when_some(self.icon, |button, glyph| button.icon(glyph))
-            .when_some(self.on_click.clone(), |button, handler| {
-                button.on_click(move |window, cx| handler(window, cx))
-            });
+            .when_some(
+                self.on_click.clone().filter(|_| !refused),
+                |button, handler| button.on_click(move |window, cx| handler(window, cx)),
+            );
 
         let arrow = if self.disabled {
             // A refused control still shows both of its targets, so what is

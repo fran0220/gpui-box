@@ -3,6 +3,169 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn split_adapter_routes_native_menu_intents_and_preserves_cursor_on_paint(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let descriptor = Rc::new(RefCell::new(node(
+        "SplitButton",
+        "split-adapter",
+        json!({"label":"Save","items":[
+            {"kind":"command","id":"locked","label":"Locked","disabled":true},
+            {"kind":"check","id":"pin","label":"Pin","checked":true}
+        ]}),
+        json!({"click":"default","open":"open","close":"close","dismiss":"dismiss","invoked":"item"}),
+    )));
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_state, build_node, output) = (state.clone(), descriptor.clone(), events.clone());
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let node = build_node.borrow();
+        build_state.reconcile(&node, cx);
+        let output = output.clone();
+        build_state.render(
+            &node,
+            BTreeMap::new(),
+            window,
+            cx,
+            Rc::new(move |action, payload| output.borrow_mut().push((action.to_owned(), payload))),
+        )
+    });
+    let entity = state.controls_extra.splits.borrow()[&(0, "split-adapter".into())]
+        .entity
+        .clone();
+    harness.click("split-adapter.action");
+    assert_eq!(events.borrow()[0], ("default".into(), Value::Null));
+    harness.click("split-adapter.menu.trigger");
+    harness.keystrokes("down");
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("variant".into(), json!("primary"));
+    harness.update(|_, cx| cx.refresh_windows());
+    harness.keystrokes("enter");
+    assert!(
+        events.borrow().contains(&("item".into(), json!("pin"))),
+        "paint must preserve active native menu item"
+    );
+    assert!(!events.borrow().contains(&("item".into(), json!("locked"))));
+    harness.update(|window,cx| {
+        assert_eq!(state.invoke(&descriptor.borrow(),"is_open",&json!({}),true,window,cx).expect("closed query"),json!(false));
+        for (method,args) in [
+            ("set_label",json!({"label":"Store"})),("set_icon",json!({"icon":{"key":"plus-circle","weight":"fill"}})),
+            ("set_icon",json!({"icon":null})),("set_variant",json!({"variant":"ghost"})),("set_control_size",json!({"size":"lg"})),
+            ("set_default_disabled",json!({"disabled":true})),("set_menu_name",json!({"name":"Alternatives"})),
+            ("set_items",json!({"items":[{"kind":"command","id":"export","label":"Export"}]})),("open_menu",json!({})),
+        ] { assert_eq!(state.invoke(&descriptor.borrow(),method,&args,false,window,cx).expect(method),Value::Null); }
+        assert_eq!(state.controls_extra.splits.borrow()[&(0,"split-adapter".into())].entity.entity_id(),entity.entity_id());
+        assert_eq!(state.invoke(&descriptor.borrow(),"is_open",&json!({}),true,window,cx).expect("open query"),json!(true));
+        assert!(state.invoke(&descriptor.borrow(),"set_items",&json!({"items":[{"kind":"command","id":"same","label":"A"},{"kind":"command","id":"same","label":"B"}]}),false,window,cx).is_err());
+        state.invoke(&descriptor.borrow(),"set_disabled",&json!({"disabled":true}),false,window,cx).expect("disable");
+        assert_eq!(state.invoke(&descriptor.borrow(),"is_disabled",&json!({}),true,window,cx).expect("disabled query"),json!(true));
+        assert!(state.invoke(&descriptor.borrow(),"open_menu",&json!({}),false,window,cx).is_err());
+    });
+    let emitted = events.borrow().len();
+    harness.click("split-adapter.action");
+    harness.click("split-adapter.menu.trigger");
+    assert_eq!(events.borrow().len(), emitted);
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("disabled".into(), json!(false));
+    descriptor.borrow_mut().events.remove("click");
+    harness.update(|_, cx| cx.refresh_windows());
+    harness.click("split-adapter.action");
+    assert_eq!(
+        events.borrow().len(),
+        emitted,
+        "removed callback must not remain installed"
+    );
+    *descriptor.borrow_mut() = node("Button", "replacement", json!({}), json!({}));
+    harness.update(|_, cx| {
+        state.reconcile(&descriptor.borrow(), cx);
+        cx.refresh_windows();
+    });
+    assert!(state.controls_extra.splits.borrow().is_empty());
+}
+
+#[gpui::test]
+fn split_retained_options_preserve_menu_and_default_action_refusal(cx: &mut TestAppContext) {
+    use gpui::Focusable;
+    use gpui_kit::{controls::split_button::SplitButton, overlay::MenuItem};
+    use std::cell::Cell;
+    let clicked = Rc::new(Cell::new(0));
+    let callback = clicked.clone();
+    let mounted = Rc::new(RefCell::new(None::<Entity<SplitButton>>));
+    let render = mounted.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let callback = callback.clone();
+        render
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    SplitButton::new("split", window, cx)
+                        .label("Save")
+                        .items([MenuItem::command("other", "Save elsewhere")], cx)
+                        .on_click(move |_, _| callback.set(callback.get() + 1))
+                })
+            })
+            .clone()
+            .into_any_element()
+    });
+    let entity = mounted
+        .borrow()
+        .as_ref()
+        .expect("mounted split button")
+        .clone();
+    let (menu_id, focus) = harness.update(|_, cx| {
+        (
+            entity.read(cx).menu().entity_id(),
+            entity.read(cx).focus_handle(cx),
+        )
+    });
+    harness.click("split.action");
+    assert_eq!(clicked.get(), 1);
+    harness.update(|window, cx| {
+        entity.update(cx, |split, cx| {
+            split.open_menu(window, cx);
+            split.set_label("Store", cx);
+            split.set_icon(Some(gpui_kit::assets::Icon::Check), cx);
+            split.set_icon(None, cx);
+            split.set_variant(ButtonVariant::Primary, cx);
+            split.set_control_size(ControlSize::Lg, cx);
+            split.set_default_disabled(true, cx);
+            split.set_menu_name("Other save actions", cx);
+            assert!(split.is_open(cx));
+            assert_eq!(split.menu().entity_id(), menu_id);
+            assert_eq!(split.focus_handle(cx), focus);
+        })
+    });
+    harness.click("split.action");
+    assert_eq!(clicked.get(), 1, "default refusal does not invoke");
+    harness.update(|window, cx| {
+        entity.update(cx, |split, cx| {
+            split.set_items(vec![MenuItem::command("export", "Export")], cx);
+            assert_eq!(split.menu().entity_id(), menu_id);
+            split.set_disabled(true, window, cx);
+            assert!(split.is_disabled());
+            assert!(!split.is_open(cx));
+            split.open_menu(window, cx);
+            assert!(!split.is_open(cx));
+            split.set_disabled(false, window, cx);
+            split.set_default_disabled(false, cx);
+            split.clear_on_click(cx);
+        })
+    });
+    harness.click("split.action");
+    assert_eq!(clicked.get(), 1, "cleared handler cannot run");
+    let callback = clicked.clone();
+    harness.update(|_, cx| {
+        entity.update(cx, |split, cx| {
+            split.set_on_click(move |_, _| callback.set(callback.get() + 10), cx)
+        })
+    });
+    harness.click("split.action");
+    assert_eq!(clicked.get(), 11);
+}
+
+#[gpui::test]
 fn settings_nested_slots_filter_and_refusals_preserve_child_events(cx: &mut TestAppContext) {
     use std::{cell::Cell, sync::mpsc};
     let descriptor: Node = serde_json::from_value(json!({

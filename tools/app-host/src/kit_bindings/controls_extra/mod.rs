@@ -8,7 +8,10 @@ use gpui_kit::controls::keymap_editor::{
     KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
 };
 use gpui_kit::controls::number_input::{NumberInput, NumberInputEvent};
+use gpui_kit::controls::split_button::SplitButton;
+use gpui_kit::overlay::MenuEvent;
 use gpui_kit::state::ValidationState;
+use gpui_kit::strings::{ActiveStrings, StringKey};
 use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 
 #[cfg(all(test, feature = "capture"))]
@@ -32,6 +35,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "CopyButton",
     "SettingsSection",
     "SettingsList",
+    "SplitButton",
 ];
 
 pub(super) fn settings_section(
@@ -153,6 +157,7 @@ pub(super) struct State {
     numbers: RefCell<HashMap<Key, Rc<Entry<NumberInput>>>>,
     keymaps: RefCell<HashMap<Key, Rc<Entry<KeymapEditor>>>>,
     copies: RefCell<HashMap<Key, Rc<Entry<CopyButton>>>>,
+    splits: RefCell<HashMap<Key, Rc<Entry<SplitButton>>>>,
 }
 
 impl State {
@@ -182,6 +187,9 @@ impl State {
         self.copies
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "CopyButton"));
+        self.splits
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "SplitButton"));
     }
 
     pub(super) fn render(
@@ -192,6 +200,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("SplitButton") {
+            return self.render_split(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("CopyButton") {
             return self.render_copy(node, window, cx, emit);
         }
@@ -288,6 +299,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("SplitButton") {
+            return self.invoke_split(node, method, args, query, _window, cx);
+        }
         if node.component.as_deref() == Some("CopyButton") {
             return self.invoke_copy(node, method, args, query, cx);
         }
@@ -682,6 +696,221 @@ impl State {
     }
 }
 
+impl State {
+    fn render_split(
+        &self,
+        node: &Node,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> AnyElement {
+        let key = (node.instance, node.id.clone());
+        let existing = self.splits.borrow().get(&key).cloned();
+        let entry = existing.unwrap_or_else(|| {
+            let entity = cx.new(|cx| SplitButton::new(node.id.clone(), window, cx));
+            let route = Rc::new(RefCell::new(Route {
+                events: BTreeMap::new(),
+                emit: emit.clone(),
+                disabled: false,
+            }));
+            let callback = Rc::downgrade(&route);
+            let parent = entity.downgrade();
+            let menu = entity.read(cx).menu().clone();
+            let subscription = cx.subscribe(&menu, move |_, event: &MenuEvent, cx| {
+                if parent
+                    .upgrade()
+                    .is_none_or(|parent| parent.read(cx).is_disabled())
+                {
+                    return;
+                }
+                let (name, payload) = match event {
+                    MenuEvent::Opened => ("open", Value::Null),
+                    MenuEvent::Closed => ("close", Value::Null),
+                    MenuEvent::Dismissed => ("dismiss", Value::Null),
+                    MenuEvent::Invoked(id) => ("invoked", json!(id.as_ref())),
+                };
+                let target = callback.upgrade().and_then(|route| {
+                    let route = route.borrow();
+                    (!route.disabled)
+                        .then(|| {
+                            route
+                                .events
+                                .get(name)
+                                .map(|action| (action.clone(), route.emit.clone()))
+                        })
+                        .flatten()
+                });
+                if let Some((action, emit)) = target {
+                    emit(&action, payload);
+                }
+            });
+            let entry = Rc::new(Entry {
+                entity,
+                route,
+                props: Default::default(),
+                _subscription: subscription,
+            });
+            self.splits.borrow_mut().insert(key, entry.clone());
+            entry
+        });
+        let handler_changed =
+            entry.route.borrow().events.contains_key("click") != node.events.contains_key("click");
+        *entry.route.borrow_mut() = Route {
+            events: node.events.clone(),
+            emit,
+            disabled: flag(node, "disabled"),
+        };
+        if handler_changed {
+            let callback = Rc::downgrade(&entry.route);
+            entry.entity.update(cx, |split, cx| {
+                if node.events.contains_key("click") {
+                    split.set_on_click(
+                        move |_, _| {
+                            let target = callback.upgrade().and_then(|route| {
+                                let route = route.borrow();
+                                (!route.disabled)
+                                    .then(|| {
+                                        route
+                                            .events
+                                            .get("click")
+                                            .map(|action| (action.clone(), route.emit.clone()))
+                                    })
+                                    .flatten()
+                            });
+                            if let Some((action, emit)) = target {
+                                emit(&action, Value::Null);
+                            }
+                        },
+                        cx,
+                    );
+                } else {
+                    split.clear_on_click(cx);
+                }
+            });
+        }
+        if *entry.props.borrow() != node.props {
+            let items_changed = entry.props.borrow().get("items") != node.props.get("items");
+            let menu_name = node
+                .props
+                .get("menuName")
+                .and_then(Value::as_str)
+                .map(|s| SharedString::from(s.to_owned()))
+                .unwrap_or_else(|| cx.strings().text(StringKey::MoreActions));
+            entry.entity.update(cx, |split, cx| {
+                split.set_label(text(node, "label"), cx);
+                split.set_icon(
+                    node.props
+                        .get("icon")
+                        .map(|icon| super::icon::resolve(icon).expect("validated builtin icon")),
+                    cx,
+                );
+                split.set_variant(
+                    if node.props.contains_key("variant") {
+                        variant(node)
+                    } else {
+                        ButtonVariant::Secondary
+                    },
+                    cx,
+                );
+                split.set_control_size(size(node), cx);
+                split.set_default_disabled(flag(node, "defaultDisabled"), cx);
+                split.set_disabled(flag(node, "disabled"), window, cx);
+                split.set_menu_name(menu_name, cx);
+                if items_changed {
+                    split.set_items(
+                        super::overlay_extra::menu_items(
+                            node.props.get("items").unwrap_or(&Value::Null),
+                        ),
+                        cx,
+                    );
+                }
+            });
+            *entry.props.borrow_mut() = node.props.clone();
+        }
+        entry.entity.clone().into_any_element()
+    }
+
+    fn invoke_split(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> anyhow::Result<Value> {
+        let entity = self
+            .splits
+            .borrow()
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| entry.entity.clone())
+            .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+        anyhow::ensure!(
+            query || (!flag(node, "disabled") && !entity.read(cx).is_disabled()),
+            "disabled target refuses invocation"
+        );
+        if query {
+            return match method {
+                "is_open" => Ok(json!(entity.read(cx).is_open(cx))),
+                "is_disabled" => Ok(json!(entity.read(cx).is_disabled())),
+                _ => anyhow::bail!("unsupported SplitButton query"),
+            };
+        }
+        if method == "set_items" {
+            super::overlay_extra::validate_menu_items(&args["items"])?;
+        }
+        entity.update(cx, |split, cx| {
+            match method {
+                "open_menu" => split.open_menu(window, cx),
+                "set_label" => {
+                    split.set_label(args["label"].as_str().unwrap_or_default().to_owned(), cx)
+                }
+                "set_icon" => split.set_icon(
+                    if args["icon"].is_null() {
+                        None
+                    } else {
+                        Some(super::icon::resolve(&args["icon"])?)
+                    },
+                    cx,
+                ),
+                "set_variant" => split.set_variant(
+                    match args["variant"].as_str() {
+                        Some("primary") => ButtonVariant::Primary,
+                        Some("ghost") => ButtonVariant::Ghost,
+                        Some("danger") => ButtonVariant::Danger,
+                        Some("link") => ButtonVariant::Link,
+                        _ => ButtonVariant::Secondary,
+                    },
+                    cx,
+                ),
+                "set_control_size" => split.set_control_size(
+                    match args["size"].as_str() {
+                        Some("xs") => ControlSize::Xs,
+                        Some("sm") => ControlSize::Sm,
+                        Some("lg") => ControlSize::Lg,
+                        _ => ControlSize::Md,
+                    },
+                    cx,
+                ),
+                "set_default_disabled" => {
+                    split.set_default_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
+                }
+                "set_disabled" => {
+                    split.set_disabled(args["disabled"].as_bool().unwrap_or(false), window, cx)
+                }
+                "set_items" => {
+                    split.set_items(super::overlay_extra::menu_items(&args["items"]), cx)
+                }
+                "set_menu_name" => {
+                    split.set_menu_name(args["name"].as_str().unwrap_or_default().to_owned(), cx)
+                }
+                _ => anyhow::bail!("unsupported SplitButton command"),
+            }
+            Ok(Value::Null)
+        })
+    }
+}
+
 fn copy_state(state: &CopyState) -> Value {
     match state {
         CopyState::Idle => json!({"state":"idle","reason":null}),
@@ -858,6 +1087,9 @@ impl State {
 
 /// Relational checks supplement the shared closed shape grammar.
 pub(super) fn validate(node: &Node) -> anyhow::Result<()> {
+    if node.component.as_deref() == Some("SplitButton") {
+        super::overlay_extra::validate_menu_items(node.props.get("items").unwrap_or(&Value::Null))?;
+    }
     if let Some(value) = node.props.get("color")
         && matches!(node.component.as_deref(), Some("Button" | "IconButton"))
     {

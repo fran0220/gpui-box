@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('split buttons reuse closed recursive menu items and exact named methods', () => {
+  const item = {kind:'check',id:'pin',label:'Pin',checked:true};
+  validateValue({items:[{kind:'submenu',id:'more',label:'More',items:[item]}]},familySchemas.SplitButton.props);
+  for (const items of [[{...item,checked:undefined}],[{...item,callback:'execute'}],[{kind:'separator',id:'separator',label:'Not allowed'}]]) {
+    assert.throws(() => validateValue({items},familySchemas.SplitButton.props));
+  }
+  assert.throws(() => validateFamilyProps('SplitButton',{items:[{kind:'submenu',id:'pin',label:'More',items:[item]}]}));
+  for (const [method,args] of [['set_icon',{icon:{key:'plus-circle',path:'/tmp/icon'}}],['set_menu_name',{menuName:'More'}],['open_menu',{items:[]}],['set_default_disabled',{disabled:null}]]) {
+    assert.throws(() => validateValue(args,familyMethods.SplitButton.invoke[method].args));
+  }
+});
+
 test('settings constructors require explicit titles and reject invented mutable methods', () => {
   validateValue({title:'Storage',labelWidth:160,dimmedBy:'Policy'},familySchemas.SettingsSection.props);
   for (const props of [{}, {title:'Storage',labelWidth:-1}, {title:'Storage',dimmedBy:true}, {title:'Storage',onChange:'callback'}]) {
@@ -96,6 +108,15 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.SplitButton('split', {items:[{kind:'check',id:'pin',label:'Pin',checked:true}],defaultDisabled:true}, {invoked(id) { const value: string = id; }});
+type SplitMethods = ControlsExtraMethodContracts['SplitButton']['invoke'];
+const splitValues: { [K in keyof SplitMethods]: SplitMethods[K]['args'] } = {
+open_menu:{},set_label:{label:'Store'},set_icon:{icon:null},set_variant:{variant:'ghost'},set_control_size:{size:'lg'},set_default_disabled:{disabled:true},set_disabled:{disabled:true},set_items:{items:[]},set_menu_name:{name:'Alternatives'}
+};
+// @ts-expect-error checked native menu items require their state
+kit.SplitButton('bad', {items:[{kind:'check',id:'pin',label:'Pin'}]});
+// @ts-expect-error command methods are snake_case with exact named arguments
+const splitBad: SplitMethods['set_menu_name']['args'] = {menuName:'Wrong'};
 kit.SettingsList('settings', {query:'quota'}, {}, {sections:[kit.SettingsSection('section', {title:'Storage'}, {}, {rows:[kit.SettingsRow('row', {label:'Capacity'}, {}, {control:[kit.Button('change',{label:'Change'})]})]})],header:[],empty:[],sidebar:[],footer:[]});
 // @ts-expect-error sections require native section builders, not ordinary rows
 kit.SettingsList('bad', {}, {}, {sections:[kit.SettingsRow('row',{label:'Wrong'})]});
