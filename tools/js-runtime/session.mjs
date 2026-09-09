@@ -74,6 +74,9 @@ export class Session extends EventEmitter {
       isolated ? '/runtime/worker.mjs' : resolve(runtimeRoot, 'worker.mjs'),
       isolated ? `/app/${this.options.entry}` : entry, String(this.generation), this.options.debug ? 'debug' : 'run'], {
       cwd: root, env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' }, stdio: isolation.stdio,
+      // Only the trusted sandbox factory may detach its cleanup supervisor.
+      // Keep stdio and close/reap ownership; this never unrefs the child.
+      detached: isolation.detached ?? false,
     });
     const child = this.child;
     let lastHeartbeat = Date.now();
