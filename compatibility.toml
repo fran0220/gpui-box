@@ -138,3 +138,12 @@ contract = "EffectOwner is an opaque host token inherited through all subtree el
 tests = ["clipboard_policy_denies_missing_stale_and_legacy_effects", "owner_scopes_restore_on_unwind_and_deferred_work_requires_explicit_retention", "cached_and_deferred_callbacks_retain_nested_owner_and_reparent_safely", "installed_ime_owner_is_not_taken_from_later_focus_or_dispatch", "asynchronous_continuations_require_explicit_owner_reentry", "tooltip_timer_and_window_overlay_preserve_owner"]
 limitations = ["host must map tokens to grants and revoke stale generations", "async and deferred notification work must explicitly retain/re-enter an owner; it never borrows later focus", "without installed host policy plain native apps retain existing clipboard behavior", "write success means authorized platform submission, not readback verification or a display acknowledgement"]
 platform_validation = "Shared callback, cache and IME dispatch tests run on Linux. macOS and Windows native validation requires the on-demand Platforms lane after integration; macOS find pasteboard is cfg-gated. No native event translator or renderer ABI changes."
+
+[framework_typed_scopes_and_scroll_axes]
+contract = "EffectScoped<T> retains the child's EffectOwner through typed map operations until element rendering. From<T> inherits ambient ownership. Vertical Div/UniformList no longer project pure horizontal wheel input into row scrolling; diagonal residuals preserve independent axes."
+tests = ["unscoped_typed_children_inherit_but_owned_siblings_keep_their_scope", "cached_and_deferred_callbacks_retain_nested_owner_and_reparent_safely", "horizontal_wheel_bypasses_tall_uniform_list"]
+platform_validation = "Shared native input/owner tests and Linux full gate; macOS and Windows require the parent's integrated Platforms lane. No native translator or renderer changes."
+
+[kit_owner_keyed_state]
+contract = "All typed keyed registries partition by exact EffectOwner, window and key. release_owner_state drops only the owner's registry entries synchronously, regardless of key spelling, and permanently rejects recache. Unowned native state retains prior behavior."
+limitations = ["host must use true mount tokens and preserve typed child scopes; worker principals/grants are separate host policy", "release drops registry references, not arbitrary externally retained Rc/Entity handles", "retired-token tombstones remain for the App lifetime to reject late continuations", "window-wide modal coordination, weak toast routing and effect budgeting are not keyed mount caches"]

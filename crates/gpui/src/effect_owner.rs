@@ -35,6 +35,60 @@ impl Default for EffectOwner {
     }
 }
 
+/// A typed child whose owner survives container transformations until render.
+///
+/// Containers retain this wrapper instead of erasing a child into an element
+/// early. Transform a child's options with `map`; inspect them with `as_ref`.
+/// Plain values converted with `From` inherit the eventual parent's context.
+#[derive(Clone, Debug)]
+pub struct EffectScoped<T> {
+    owner: Option<EffectOwner>,
+    value: T,
+}
+
+impl<T> EffectScoped<T> {
+    /// Attributes the child's eventual element lifecycle to this mount owner.
+    pub fn new(owner: EffectOwner, value: T) -> Self {
+        Self {
+            owner: Some(owner),
+            value,
+        }
+    }
+
+    /// Transforms a typed value without discarding its scope.
+    pub fn map<U>(self, transform: impl FnOnce(T) -> U) -> EffectScoped<U> {
+        EffectScoped {
+            owner: self.owner,
+            value: transform(self.value),
+        }
+    }
+}
+
+impl<T> AsRef<T> for EffectScoped<T> {
+    /// Inspects child options without consuming the retained scope.
+    fn as_ref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> From<T> for EffectScoped<T> {
+    fn from(value: T) -> Self {
+        Self { owner: None, value }
+    }
+}
+
+impl<T: IntoElement> IntoElement for EffectScoped<T> {
+    type Element = AnyElement;
+
+    fn into_element(self) -> Self::Element {
+        match self.owner {
+            Some(owner) => effect_owner(owner, self.value).into_any_element(),
+            // Unscoped is inheritance, not an explicit authority reset.
+            None => self.value.into_any_element(),
+        }
+    }
+}
+
 /// The clipboard effect requested by a native component.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum ClipboardOperation {
@@ -384,7 +438,8 @@ mod tests {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             let seen = self.seen.clone();
             let style = StyleRefinement::default().size(px(100.));
-            let child = self.probe.clone().cached(style);
+            let child = EffectScoped::new(self.inner.get(), self.probe.clone())
+                .map(|probe| probe.cached(style));
             let child = if self.overlay {
                 deferred(child).into_any_element()
             } else {
@@ -397,9 +452,63 @@ mod tests {
                     .on_mouse_down(MouseButton::Left, move |_, _, cx| {
                         seen.borrow_mut().push(cx.current_effect_owner())
                     })
-                    .child(effect_owner(self.inner.get(), child)),
+                    .child(EffectScoped::from(child)),
             )
         }
+    }
+
+    #[gpui::test]
+    fn unscoped_typed_children_inherit_but_owned_siblings_keep_their_scope(
+        cx: &mut TestAppContext,
+    ) {
+        struct TypedRoot(
+            EffectOwner,
+            EffectOwner,
+            Rc<RefCell<Vec<Option<EffectOwner>>>>,
+        );
+        impl Render for TypedRoot {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let make = || {
+                    let seen = self.2.clone();
+                    div()
+                        .w(px(30.))
+                        .h(px(30.))
+                        .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                            seen.borrow_mut().push(cx.current_effect_owner())
+                        })
+                };
+                let children: Vec<EffectScoped<gpui::Div>> =
+                    vec![EffectScoped::new(self.1, make()), make().into()];
+                effect_owner(
+                    self.0,
+                    div().flex().children(
+                        children
+                            .into_iter()
+                            .map(|child| child.map(|value| value.flex_none())),
+                    ),
+                )
+            }
+        }
+        let outer = EffectOwner::new();
+        let child = EffectOwner::new();
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let cx = cx.add_empty_window();
+        cx.draw(
+            point(px(0.), px(0.)),
+            crate::size(px(60.), px(30.)),
+            |_, cx| {
+                cx.new(|_| TypedRoot(outer, child, seen.clone()))
+                    .into_any_element()
+            },
+        );
+        for x in [5., 35.] {
+            cx.simulate_event(MouseDownEvent {
+                button: MouseButton::Left,
+                position: point(px(x), px(5.)),
+                ..Default::default()
+            });
+        }
+        assert_eq!(&*seen.borrow(), &[Some(child), Some(outer)]);
     }
 
     #[gpui::test]

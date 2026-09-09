@@ -892,3 +892,14 @@ The native-menu lifecycle smoke and test-support tracking observation are
 original GPUI Box work. They observe the existing NSMenu/Win32 call boundary
 without introducing another implementation, imported source, or dependency.
 The frozen historical import receipt remains unchanged.
+
+### Typed owner scopes and directional wheel routing
+
+`EffectScoped<T>` preserves typed child ownership through option transforms
+until the existing full-lifecycle element boundary renders it. The removal
+of horizontal-to-vertical wheel projection preserves independent axes in
+nested tall row and column viewports. Both are original GPUI Box framework
+changes; no renderer ABI, native event translator, imported source, package
+authority or frozen historical receipt changed. Kit's exact-owner keyed
+registry retirement and explicitly retained follow/glide continuations are
+original component infrastructure over those primitives.

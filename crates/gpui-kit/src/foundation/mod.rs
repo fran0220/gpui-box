@@ -24,6 +24,7 @@ pub use slot::{SlotRender, Slots, Slotted};
 pub(crate) use styled_ext::inset_rule;
 pub use styled_ext::{CardVariant, FocusRing, Hoverable, SelectedFill, StyledExt, rule, text};
 pub use theme_overlay::ThemeOverlay;
+pub use window_state::{owner_state_is_live, release_owner_state};
 
 pub use gpui_kit_theme::{
     ActiveTheme, ColorChoice, ControlSize, Density, Elevation, Layer, ThemeRegistry, Variant,

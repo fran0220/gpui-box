@@ -410,29 +410,32 @@ fn listen(ident: &Ident, state: &ListState) {
         // has let go.
         let ident = ident.clone();
         let window_id = window.window_handle().window_id();
+        let owner = cx.current_effect_owner();
         cx.defer(move |cx| {
-            let Some(state) = flow_state(&ident, window_id, cx) else {
-                return;
-            };
-            let distance = distance_from_end(&state);
-            let changed = with_follower(&ident, window_id, cx, |follower| {
-                follower.distance = distance;
-                let was = follower.pinned;
-                if scroll_delta < 0.0 {
-                    follower.pinned = false;
-                    follower.chase.reset();
-                    follower.ticked = None;
-                    follower.settled = None;
-                } else if !follower.pinned && should_restick(distance, scroll_delta) {
-                    follower.pinned = true;
-                    follower.woken = true;
-                    follower.settled = None;
+            cx.with_effect_owner(owner, |cx| {
+                let Some(state) = flow_state(&ident, window_id, cx) else {
+                    return;
+                };
+                let distance = distance_from_end(&state);
+                let changed = with_follower(&ident, window_id, cx, |follower| {
+                    follower.distance = distance;
+                    let was = follower.pinned;
+                    if scroll_delta < 0.0 {
+                        follower.pinned = false;
+                        follower.chase.reset();
+                        follower.ticked = None;
+                        follower.settled = None;
+                    } else if !follower.pinned && should_restick(distance, scroll_delta) {
+                        follower.pinned = true;
+                        follower.woken = true;
+                        follower.settled = None;
+                    }
+                    was != follower.pinned
+                });
+                if changed {
+                    cx.refresh_windows();
                 }
-                was != follower.pinned
             });
-            if changed {
-                cx.refresh_windows();
-            }
         });
     });
 }
@@ -440,6 +443,66 @@ fn listen(ident: &Ident, state: &ListState) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn owner_is_retained_when_wheel_follow_updates_are_deferred(cx: &mut gpui::TestAppContext) {
+        use gpui::{
+            AppContext, Context, IntoElement, Render, ScrollDelta, ScrollWheelEvent, Styled, div,
+            effect_owner, list, point, size,
+        };
+        struct View(gpui::EffectOwner, ListState);
+        impl Render for View {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                effect_owner(
+                    self.0,
+                    list(self.1.clone(), |_, _, _| {
+                        div().h(px(20.)).into_any_element()
+                    })
+                    .size_full(),
+                )
+            }
+        }
+        let owner = gpui::EffectOwner::new();
+        let ident = Ident::from("owned-follow");
+        let window = cx.add_empty_window();
+        let state = window.update(|window, cx| {
+            crate::install(cx);
+            cx.with_effect_owner(Some(owner), |cx| {
+                let state = crate::data::viewport::list_state(
+                    &ident,
+                    crate::data::viewport::Rows::Counted(30),
+                    None,
+                    gpui::ListAlignment::Top,
+                    px(20.),
+                    window,
+                    cx,
+                );
+                state.scroll_to(gpui::ListOffset {
+                    item_ix: 12,
+                    offset_in_item: px(0.),
+                });
+                listen(&ident, &state);
+                engage_end(&ident, window, cx);
+                state
+            })
+        });
+        window.draw(point(px(0.), px(0.)), size(px(100.), px(60.)), |_, cx| {
+            cx.new(|_| View(owner, state)).into_any_element()
+        });
+        window.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(17.))),
+            ..Default::default()
+        });
+        window.update(|window, cx| {
+            cx.with_effect_owner(Some(owner), |cx| {
+                assert!(
+                    !follows_end(&ident, window, cx),
+                    "wheel release updates the original owner's follower"
+                )
+            })
+        });
+    }
 
     #[test]
     fn a_chase_lands_exactly_on_a_fixed_end_and_stays() {

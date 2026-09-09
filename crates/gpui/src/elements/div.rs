@@ -3473,11 +3473,11 @@ impl Interactivity {
                     };
                     let mut delta_y = match overflow.y {
                         Overflow::Scroll if !delta.y.is_zero() => delta.y,
-                        Overflow::Scroll
-                            if !restrict_scroll_to_axis && overflow.x != Overflow::Scroll =>
-                        {
-                            delta.x
-                        }
+                        // Horizontal input belongs to horizontal ancestors.
+                        // Mapping it to rows steals column scrolling from a
+                        // grid containing a tall vertical list. Unlike the
+                        // vertical-wheel convenience for horizontal strips,
+                        // this conversion has no physical-wheel use case.
                         _ => Pixels::ZERO,
                     };
                     if !allow_concurrent_scroll && !delta_x.is_zero() && !delta_y.is_zero() {
@@ -3499,11 +3499,7 @@ impl Interactivity {
                         } else {
                             consumed.x += moved.x;
                         }
-                        if delta.y.is_zero() && !delta_y.is_zero() {
-                            consumed.x += moved.y;
-                        } else {
-                            consumed.y += moved.y;
-                        }
+                        consumed.y += moved.y;
                         window.consume_scroll_delta(consumed, line_height, cx);
                         cx.notify(current_view);
                     }

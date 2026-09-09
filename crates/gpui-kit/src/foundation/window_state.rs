@@ -6,10 +6,11 @@
 //! every registry under [`WindowId`], ages keyed entries by semantic frame,
 //! and removes the whole window entry when GPUI closes it.
 
+use std::any::TypeId;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use gpui::{App, Global, SharedString, WindowId};
+use gpui::{App, EffectOwner, Global, SharedString, WindowId};
 use gpui_kit_semantics::SemanticCoordinator;
 
 /// How many generations an untouched key survives.
@@ -36,12 +37,67 @@ struct KeyedEntry<T> {
     value: T,
 }
 
-struct KeyedStates<T>(HashMap<SharedString, KeyedEntry<T>>);
+struct KeyedStates<T>(HashMap<Option<EffectOwner>, HashMap<SharedString, KeyedEntry<T>>>);
 
 impl<T> Default for KeyedStates<T> {
     fn default() -> Self {
         Self(HashMap::new())
     }
+}
+
+type ReleaseKeyed = fn(EffectOwner, &mut App) -> usize;
+
+#[derive(Default)]
+struct OwnerStates {
+    release: HashMap<TypeId, ReleaseKeyed>,
+    // Copyable tokens can be retained by arbitrarily late continuations.
+    // Tombstones live for the App lifetime so release cannot be undone.
+    retired: HashSet<EffectOwner>,
+}
+
+impl Global for OwnerStates {}
+
+/// Whether an owner may still retain Kit keyed state. This is cache lifetime,
+/// not permission to perform effects. Native unowned state remains compatible.
+pub fn owner_state_is_live(owner: EffectOwner, cx: &App) -> bool {
+    cx.try_global::<OwnerStates>()
+        .is_none_or(|state| !state.retired.contains(&owner))
+}
+
+/// Immediately drops all typed keyed-registry entries belonging to this exact
+/// owner, across windows, and permanently rejects recreation under its token.
+/// Returns the number of removed keys. No semantic-id parsing is involved.
+///
+/// Hosts use one owner per actual mount, preserve it across ordinary renders,
+/// and retire it on removal. Typed children must preserve `EffectScoped<T>`.
+/// This releases registry references, not arbitrary externally retained Rc or
+/// Entity handles, and does not partition window-wide overlay coordination.
+pub fn release_owner_state(owner: EffectOwner, cx: &mut App) -> usize {
+    if !cx.has_global::<OwnerStates>() {
+        cx.set_global(OwnerStates::default());
+    }
+    let callbacks = {
+        let states = cx.global_mut::<OwnerStates>();
+        states.retired.insert(owner);
+        states.release.values().copied().collect::<Vec<_>>()
+    };
+    callbacks
+        .into_iter()
+        .map(|release| release(owner, cx))
+        .sum()
+}
+
+fn release_keyed<T: 'static>(owner: EffectOwner, cx: &mut App) -> usize {
+    let Some(states) = cx.try_global::<WindowStates<KeyedStates<T>>>() else {
+        return 0;
+    };
+    states
+        .0
+        .borrow_mut()
+        .values_mut()
+        .filter_map(|keys| keys.0.remove(&Some(owner)))
+        .map(|removed| removed.len())
+        .sum()
 }
 
 fn install<T: 'static>(cx: &mut App) {
@@ -104,12 +160,24 @@ pub(crate) fn with_key_retained<T: Default + 'static, R>(
     cx: &mut App,
     update: impl FnOnce(&mut T) -> R,
 ) -> R {
+    let owner = cx.current_effect_owner();
+    if owner.is_some_and(|owner| !owner_state_is_live(owner, cx)) {
+        // Preserve the infallible builder contract without retaining stale
+        // owner data or re-inserting it under the ambient/unowned namespace.
+        return update(&mut T::default());
+    }
+    if !cx.has_global::<OwnerStates>() {
+        cx.set_global(OwnerStates::default());
+    }
+    cx.global_mut::<OwnerStates>()
+        .release
+        .entry(TypeId::of::<T>())
+        .or_insert(release_keyed::<T>);
     let generation = generation(window_id, cx);
     with(window_id, cx, |states: &mut KeyedStates<T>| {
-        states
-            .0
-            .retain(|_, entry| generation.saturating_sub(entry.seen) < entry.grace);
-        let entry = states.0.entry(id.clone()).or_insert_with(|| KeyedEntry {
+        let keys = states.0.entry(owner).or_default();
+        keys.retain(|_, entry| generation.saturating_sub(entry.seen) < entry.grace);
+        let entry = keys.entry(id.clone()).or_insert_with(|| KeyedEntry {
             seen: generation,
             grace,
             value: T::default(),
@@ -127,15 +195,26 @@ pub(crate) fn read_key<T: 'static, R>(
     cx: &App,
     read: impl FnOnce(&T) -> R,
 ) -> Option<R> {
+    let owner = cx.current_effect_owner();
     self::read(window_id, cx, |states: &KeyedStates<T>| {
-        states.0.get(id).map(|entry| read(&entry.value))
+        states
+            .0
+            .get(&owner)?
+            .get(id)
+            .map(|entry| read(&entry.value))
     })
     .flatten()
 }
 
 pub(crate) fn keyed_ids<T: 'static>(window_id: WindowId, cx: &App) -> Vec<SharedString> {
+    let owner = cx.current_effect_owner();
     self::read(window_id, cx, |states: &KeyedStates<T>| {
-        let mut ids: Vec<_> = states.0.keys().cloned().collect();
+        let mut ids: Vec<_> = states
+            .0
+            .get(&owner)
+            .into_iter()
+            .flat_map(|keys| keys.keys().cloned())
+            .collect();
         ids.sort();
         ids
     })
@@ -235,6 +314,99 @@ mod tests {
                 read_key(&key, right.window_id(), cx, |state: &Remembered| state.0),
                 Some(4)
             );
+        });
+    }
+
+    #[gpui::test]
+    fn owner_release_drops_every_typed_composite_key_without_touching_siblings(
+        cx: &mut TestAppContext,
+    ) {
+        use std::rc::Rc;
+        let owner = EffectOwner::new();
+        let sibling = EffectOwner::new();
+        let left = WindowId::from(31);
+        let right = WindowId::from(32);
+        cx.update(|cx| {
+            let composite: SharedString = "effect-particles:unrelated-prefix".into();
+            let removed = cx.with_effect_owner(Some(owner), |cx| {
+                with_key(&composite, left, cx, |state: &mut Rc<()>| {
+                    Rc::downgrade(state)
+                })
+            });
+            let kept = cx.with_effect_owner(Some(sibling), |cx| {
+                with_key(&composite, left, cx, |state: &mut Rc<()>| {
+                    Rc::downgrade(state)
+                })
+            });
+            assert!(
+                !removed.ptr_eq(&kept),
+                "identical composite keys are owner-isolated"
+            );
+            cx.with_effect_owner(Some(owner), |cx| {
+                with_key(
+                    &"cinematic-effect:anything".into(),
+                    right,
+                    cx,
+                    |state: &mut Remembered| state.0 = 19,
+                );
+                with_key(
+                    &"canvas:measurement".into(),
+                    left,
+                    cx,
+                    |state: &mut Vec<u8>| state.push(23),
+                );
+            });
+            assert_eq!(release_owner_state(owner, cx), 3);
+            assert_eq!(release_owner_state(owner, cx), 0, "release is idempotent");
+            assert!(
+                removed.upgrade().is_none(),
+                "registry-only reference dropped immediately"
+            );
+            assert!(kept.upgrade().is_some());
+            cx.with_effect_owner(Some(owner), |cx| {
+                assert!(read_key(&composite, left, cx, |_: &Rc<()>| ()).is_none());
+                let stale = with_key(&composite, left, cx, |state: &mut Rc<()>| {
+                    Rc::downgrade(state)
+                });
+                assert!(
+                    stale.upgrade().is_none(),
+                    "retired access is transient, never recached"
+                );
+                assert!(keyed_ids::<Rc<()>>(left, cx).is_empty());
+            });
+            cx.with_effect_owner(Some(sibling), |cx| {
+                assert_eq!(keyed_ids::<Rc<()>>(left, cx), vec![composite])
+            });
+            assert!(!owner_state_is_live(owner, cx));
+            assert!(owner_state_is_live(sibling, cx));
+        });
+    }
+
+    #[gpui::test]
+    fn a_late_explicit_owner_continuation_cannot_repopulate_released_state(
+        cx: &mut TestAppContext,
+    ) {
+        let owner = EffectOwner::new();
+        let window = WindowId::from(41);
+        cx.update(|cx| {
+            cx.with_effect_owner(Some(owner), |cx| {
+                with_key(&"late".into(), window, cx, |state: &mut Remembered| {
+                    state.0 = 17
+                })
+            });
+            cx.defer(move |cx| {
+                cx.with_effect_owner(Some(owner), |cx| {
+                    with_key(&"late".into(), window, cx, |state: &mut Remembered| {
+                        assert_eq!(state.0, 0);
+                        state.0 = 29;
+                    });
+                    assert!(
+                        read_key(&"late".into(), window, cx, |state: &Remembered| state.0)
+                            .is_none()
+                    );
+                })
+            });
+            assert_eq!(release_owner_state(owner, cx), 1);
         });
     }
 

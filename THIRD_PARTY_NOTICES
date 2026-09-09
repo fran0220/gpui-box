@@ -502,3 +502,7 @@ No additional third-party code or dependency was imported.
 Native-menu tracking-loop smoke and test-only observation are original GPUI
 Box work using the existing platform APIs. No third-party source or license
 was added; upstream notices and the frozen import receipt remain intact.
+
+Typed effect-owner scopes, independent horizontal/vertical wheel consumption,
+and exact-owner Kit keyed-cache retirement are original GPUI Box work. No new
+third-party source or license was introduced; historical notices are intact.

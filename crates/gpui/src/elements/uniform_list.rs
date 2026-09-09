@@ -728,6 +728,53 @@ mod test {
     use crate::TestAppContext;
 
     #[gpui::test]
+    fn horizontal_wheel_bypasses_tall_uniform_list(cx: &mut TestAppContext) {
+        use crate::{
+            Context, Render, ScrollDelta, ScrollHandle, ScrollWheelEvent, UniformListScrollHandle,
+            Window, div, point, prelude::*, px, size, uniform_list,
+        };
+        struct Nested(UniformListScrollHandle, ScrollHandle);
+        impl Render for Nested {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div()
+                    .id("columns")
+                    .size_full()
+                    .overflow_x_scroll()
+                    .track_scroll(&self.1)
+                    .child(
+                        uniform_list("rows", 137, |range, _, _| {
+                            range.map(|_| div().h(px(28.))).collect::<Vec<_>>()
+                        })
+                        .w(px(12000.))
+                        .h(px(140.))
+                        .track_scroll(&self.0),
+                    )
+            }
+        }
+        let cx = cx.add_empty_window();
+        let vertical = UniformListScrollHandle::new();
+        let horizontal = ScrollHandle::new();
+        cx.draw(point(px(0.), px(0.)), size(px(430.), px(140.)), |_, cx| {
+            cx.new(|_| Nested(vertical.clone(), horizontal.clone()))
+                .into_any_element()
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(30.), px(30.)),
+            delta: ScrollDelta::Pixels(point(px(-2400.), px(0.))),
+            ..Default::default()
+        });
+        assert_eq!(vertical.0.borrow().base_handle.offset().y, px(0.));
+        assert_eq!(horizontal.offset().x, px(-2400.));
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(30.), px(30.)),
+            delta: ScrollDelta::Pixels(point(px(-31.), px(-17.))),
+            ..Default::default()
+        });
+        assert_eq!(vertical.0.borrow().base_handle.offset().y, px(-17.));
+        assert_eq!(horizontal.offset().x, px(-2431.));
+    }
+
+    #[gpui::test]
     fn test_scroll_strategy_nearest(cx: &mut TestAppContext) {
         use crate::{
             Context, FocusHandle, ScrollStrategy, UniformListScrollHandle, Window, div, prelude::*,

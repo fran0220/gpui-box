@@ -299,6 +299,7 @@ pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) 
     };
     let glide_spec = navigation.spec();
     let total = glide_spec.total();
+    let owner = cx.current_effect_owner();
     cx.spawn(async move |cx| {
         let mut glide = Glide::new();
         // The executor's clock rather than the wall clock, because they are
@@ -324,15 +325,31 @@ pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) 
             if glide.arrived() {
                 break;
             }
-            cx.update(|cx| step_toward(&state, index, share, &mut height, cx));
+            let live = cx.update(|cx| {
+                if owner.is_some_and(|owner| !window_state::owner_state_is_live(owner, cx)) {
+                    return false;
+                }
+                cx.with_effect_owner(owner, |cx| {
+                    step_toward(&state, index, share, &mut height, cx)
+                });
+                true
+            });
+            if !live {
+                return;
+            }
         }
         // However the travel went, it ends on the row that was asked for.
         cx.update(|cx| {
-            state.scroll_to(ListOffset {
-                item_ix: index,
-                offset_in_item: px(0.0),
+            if owner.is_some_and(|owner| !window_state::owner_state_is_live(owner, cx)) {
+                return;
+            }
+            cx.with_effect_owner(owner, |cx| {
+                state.scroll_to(ListOffset {
+                    item_ix: index,
+                    offset_in_item: px(0.0),
+                });
+                cx.refresh_windows();
             });
-            cx.refresh_windows();
         });
     })
     .detach();
@@ -440,6 +457,40 @@ pub(crate) fn flow_state(ident: &Ident, window_id: WindowId, cx: &App) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn owner_retirement_stops_a_glide_before_its_final_jump(cx: &mut gpui::TestAppContext) {
+        let mut window = cx.add_empty_window().clone();
+        let owner = gpui::EffectOwner::new();
+        let ident = Ident::from("retired-glide");
+        let state = window.update(|window, cx| {
+            crate::install(cx);
+            cx.with_effect_owner(Some(owner), |cx| {
+                let state = list_state(
+                    &ident,
+                    Rows::Counted(50),
+                    None,
+                    ListAlignment::Top,
+                    px(20.),
+                    window,
+                    cx,
+                );
+                glide_to_row(&ident, 43, window, cx);
+                state
+            })
+        });
+        cx.run_until_parked();
+        window.update(|_, cx| {
+            window_state::release_owner_state(owner, cx);
+        });
+        cx.dispatcher.advance_clock(Duration::from_secs(3));
+        cx.run_until_parked();
+        assert_eq!(
+            state.logical_scroll_top().item_ix,
+            0,
+            "retired task must not perform its final scroll"
+        );
+    }
 
     fn keys(names: &[&str]) -> Vec<SharedString> {
         names.iter().map(|name| SharedString::from(*name)).collect()
