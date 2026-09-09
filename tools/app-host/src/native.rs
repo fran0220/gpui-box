@@ -13,6 +13,8 @@ pub(super) struct Invocation {
     worker_revision: u64,
     target: String,
     component: String,
+    #[serde(default)]
+    reference: Option<Value>,
     mode: String,
     method: String,
     args: Value,
@@ -37,6 +39,13 @@ impl Invocation {
             self.args.is_object(),
             "Native method arguments must be a JSON object"
         );
+        if let Some(reference) = &self.reference {
+            ensure!(
+                self.target.is_empty() && self.component.is_empty(),
+                "Reference requests cannot override source identity"
+            );
+            payload(reference)?;
+        }
         payload(&self.args)
     }
 }
@@ -104,29 +113,68 @@ impl Host {
                     .chain(node.slots.values().flatten())
                     .find_map(|child| find(child, id))
             }
-            let node = find(&frame.tree, &request.target).context("Native target not mounted")?;
+            self.references.reconcile(
+                &frame.tree,
+                |node| self.clipboard.owner_of(node),
+                |id| self.kit.native_entity_id(id),
+                cx,
+            );
+            let source = request
+                .reference
+                .as_ref()
+                .map(|reference| self.references.source(reference, request.instance))
+                .transpose()?;
+            let (target, component) = source
+                .as_ref()
+                .map(|(id, component)| (id.as_str(), component.as_deref().unwrap_or_default()))
+                .unwrap_or((&request.target, &request.component));
+            let node = find(&frame.tree, target).context("Native target not mounted")?;
             ensure!(
                 node.kind == Kind::Kit
                     && node.instance == request.instance
-                    && node.component.as_deref() == Some(request.component.as_str()),
+                    && node.component.as_deref() == Some(component),
                 "Native target identity mismatch"
             );
             ensure!(
-                request.mode == "query" || node.props.get("disabled") != Some(&Value::Bool(true)),
+                request.mode == "query"
+                    || request.method == "$release"
+                    || node.props.get("disabled") != Some(&Value::Bool(true)),
                 "Native command refused: target disabled"
             );
             let owner = self
                 .clipboard
-                .owner(node.instance)
+                .owner_of(node)
                 .context("Native owner unavailable")?;
             let result = cx.with_effect_owner(Some(owner), |cx| {
-                self.kit.invoke(
+                if let Some(reference) = &request.reference {
+                    if request.method == "$release" {
+                        ensure!(
+                            request.mode == "invoke"
+                                && request.args.as_object().is_some_and(|args| args.is_empty()),
+                            "Invalid reference release"
+                        );
+                        self.references.release(reference, owner)?;
+                        return Ok(Value::Null);
+                    }
+                    return self.references.invoke(
+                        owner,
+                        reference,
+                        &request.method,
+                        &request.args,
+                        request.mode == "query",
+                        window,
+                        cx,
+                    );
+                }
+                let refs = self.references.registration(node, owner);
+                self.kit.invoke_registered(
                     node,
                     &request.method,
                     &request.args,
                     request.mode == "query",
                     window,
                     cx,
+                    &refs,
                 )
             })?;
             payload(&result)?;

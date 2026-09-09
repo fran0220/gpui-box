@@ -7,7 +7,7 @@ export function validateTree(tree) {
   function visit(node, depth) {
     if (!node || typeof node !== 'object' || Array.isArray(node) || depth > 32 || ++count > 1000)
       throw new Error('Invalid tree or tree limit exceeded');
-    const fields = node.kind === 'kit' ? ['kind', 'component', 'id', 'props', 'slots', 'events'] : ['kind', 'id', 'text', 'disabled', 'action', 'children'];
+    const fields = node.kind === 'kit' ? ['kind', 'component', 'id', 'props', 'slots', 'events', 'predicates'] : ['kind', 'id', 'text', 'disabled', 'action', 'children'];
     if (Object.keys(node).some(key => !fields.includes(key)))
       throw new Error('Unsupported node field');
     if (!['column', 'row', 'text', 'button', 'kit'].includes(node.kind)) throw new Error('Unsupported component');

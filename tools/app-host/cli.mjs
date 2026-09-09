@@ -3,7 +3,7 @@ import { readFile, writeFile, mkdir, cp, chmod, stat, readdir } from 'node:fs/pr
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { PluginPlatform, bundleDirectory } from '../plugin-platform/platform.mjs';
+import { PluginPlatform, bundleDirectory, bundleFileBytes } from '../plugin-platform/platform.mjs';
 import { bundleNode } from './node-distribution.mjs';
 import { evaluateDebug } from './debug.mjs';
 
@@ -61,7 +61,7 @@ try {
     await mkdir(resolve(destination, 'app'));
     for (const [path, content] of Object.entries(bundle.files)) {
       await mkdir(dirname(resolve(destination, 'app', path)), { recursive: true });
-      await writeFile(resolve(destination, 'app', path), content);
+      await writeFile(resolve(destination, 'app', path), bundleFileBytes(content));
     }
     await mkdir(resolve(destination, 'tools/app-host'), { recursive: true });
     await cp(host, resolve(destination, process.platform === 'win32' ? 'gpui-box-app-host.exe' : 'gpui-box-app-host'));

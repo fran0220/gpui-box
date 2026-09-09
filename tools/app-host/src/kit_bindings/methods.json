@@ -1984,6 +1984,32 @@
           "min": 0,
           "max": 1000000
         }
+      },
+      "focus_handle": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "object",
+          "fields": {
+            "$nativeRef": {
+              "type": "string",
+              "min": 8,
+              "max": 27
+            },
+            "type": {
+              "enum": [
+                "FocusHandle"
+              ]
+            }
+          },
+          "required": [
+            "$nativeRef",
+            "type"
+          ]
+        }
       }
     }
   },

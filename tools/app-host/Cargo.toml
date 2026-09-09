@@ -12,6 +12,7 @@ capture = ["gpui_platform/test-support", "dep:gpui-kit-testkit"]
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
 env_logger.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true

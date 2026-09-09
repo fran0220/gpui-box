@@ -4,6 +4,23 @@ use super::*;
 use anyhow::{Result, bail, ensure};
 
 impl KitState {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn invoke_registered(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        window: &mut Window,
+        cx: &mut App,
+        refs: &crate::references::Registration<'_>,
+    ) -> Result<Value> {
+        if query && let Some(result) = self.reference_query(node, method, args, window, cx, refs) {
+            return result;
+        }
+        self.invoke(node, method, args, query, window, cx)
+    }
+
     pub(crate) fn invoke(
         &self,
         node: &Node,
@@ -59,49 +76,12 @@ impl KitState {
             _ => ControlSize::Md,
         };
         let result = match (&entry.control, component, query) {
-            (Control::Input(input), "TextInput", true) => {
-                let input = input.read(cx);
-                match method {
-                    "value" => json!(input.value().as_ref()),
-                    "is_empty" => json!(input.is_empty()),
-                    "is_disabled" => json!(input.is_disabled()),
-                    "is_secret" => json!(input.is_secret()),
-                    "cursor_offset" => json!(input.cursor_offset()),
-                    "selected_range" => {
-                        let range = input.selected_range();
-                        json!({"start":range.start,"end":range.end})
-                    }
-                    _ => bail!("unsupported TextInput query"),
+            (Control::Input(input), "TextInput", query) => {
+                let result = reference_dispatch::text_input_value(input, method, args, query, cx)?;
+                if !query && method == "set_disabled" {
+                    entry.route.borrow_mut().disabled = boolean("disabled");
                 }
-            }
-            (Control::Input(input), "TextInput", false) => {
-                ensure!(
-                    !input.read(cx).is_disabled(),
-                    "disabled native input refuses invocation"
-                );
-                input.update(cx, |input, cx| -> Result<()> {
-                    match method {
-                        "set_name" => input.set_name(string("name"), cx),
-                        "set_placeholder" => input.set_placeholder(string("placeholder"), cx),
-                        "set_value" => input.set_value(string("value"), cx),
-                        "set_text_quietly" => input.set_text_quietly(string("value"), cx),
-                        "set_secret" => input.set_secret(boolean("secret"), cx),
-                        "set_bare" => input.set_bare(boolean("bare"), cx),
-                        "set_max_length" => input
-                            .set_max_length(args["max_length"].as_u64().map(|n| n as usize), cx),
-                        "set_disabled" => {
-                            input.set_disabled(boolean("disabled"), cx);
-                            entry.route.borrow_mut().disabled = boolean("disabled");
-                        }
-                        "set_read_only" => input.set_read_only(boolean("read_only"), cx),
-                        "set_required" => input.set_required(boolean("required"), cx),
-                        "set_invalid" => input.set_invalid(boolean("invalid"), cx),
-                        "set_control_size" => input.set_control_size(control_size(), cx),
-                        _ => bail!("unsupported TextInput command"),
-                    }
-                    Ok(())
-                })?;
-                Value::Null
+                result
             }
             (Control::Select(select), "Select", true) => {
                 let select = select.read(cx);

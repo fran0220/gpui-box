@@ -4,10 +4,12 @@ import { mkdir, readFile, writeFile, rename, rm, readdir, lstat } from 'node:fs/
 import { resolve, dirname } from 'node:path';
 import { Session } from '../js-runtime/session.mjs';
 import { nativeBackend } from '../js-runtime/sandbox.mjs';
+import { RESOURCE_LIMITS, validateAssetDeclarations, validateResourceRegistration } from '../js-runtime/resource-schema.mjs';
+import { loadPackagedResources } from '../js-runtime/resource-package.mjs';
 
 const idPattern = /^[a-z][a-z0-9-]{0,63}$/;
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
-const capabilities = ['fs.read', 'storage', 'network', 'process', 'clipboard.read', 'clipboard.write'];
+const capabilities = ['fs.read', 'storage', 'network', 'process', 'clipboard.read', 'clipboard.write', 'resources'];
 function object(value, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !keys.includes(k))) throw new Error('Invalid manifest fields');
 }
@@ -17,11 +19,16 @@ export function safePath(path) {
   return path;
 }
 export function validateManifest(manifest) {
-  object(manifest, ['schema', 'id', 'version', 'entry', 'permissions', 'dependencies', 'contributes']);
+  object(manifest, ['schema', 'id', 'version', 'entry', 'permissions', 'dependencies', 'contributes', 'assets']);
   if (manifest.schema !== 1 || !idPattern.test(manifest.id ?? '') || !versionPattern.test(manifest.version ?? '')) throw new Error('Invalid manifest identity/version');
   safePath(manifest.entry);
   if (!/\.(mjs|js|ts|mts)$/.test(manifest.entry)) throw new Error('Unsupported entry extension');
   if (!Array.isArray(manifest.permissions) || manifest.permissions.some(p => !capabilities.includes(p)) || new Set(manifest.permissions).size !== manifest.permissions.length) throw new Error('Invalid permissions');
+  if (Object.hasOwn(manifest, 'assets')) {
+    validateAssetDeclarations(manifest.assets);
+    if (!manifest.permissions.includes('resources')) throw new Error('Assets require resources permission');
+    for (const asset of manifest.assets) safePath(asset.path);
+  }
   object(manifest.dependencies, Object.keys(manifest.dependencies ?? {}));
   if (Object.entries(manifest.dependencies).some(([id, version]) => !idPattern.test(id) || id === manifest.id || !versionPattern.test(version))) throw new Error('Dependencies require distinct ids and exact versions');
   object(manifest.contributes, ['commands', 'keymaps', 'panels']);
@@ -43,14 +50,34 @@ export function validateManifest(manifest) {
   }
   return manifest;
 }
+/** Decode a bundle file for writing. Bundle validation supplies declaration/MIME/owner checks. */
+export function bundleFileBytes(content) {
+  if (typeof content === 'string') return content;
+  object(content, ['base64']);
+  if (!Object.hasOwn(content, 'base64')) throw new Error('Missing bundle base64');
+  validateResourceRegistration({ key: 'bundle', mime: 'application/octet-stream', data: content.base64 });
+  return Buffer.from(content.base64, 'base64');
+}
 export function validateBundle(bundle) {
   object(bundle, ['manifest', 'files', 'sha256']);
   validateManifest(bundle.manifest);
   object(bundle.files, Object.keys(bundle.files ?? {}));
   if (Object.keys(bundle.files).length > 256 || !Object.hasOwn(bundle.files, bundle.manifest.entry)) throw new Error('Missing entry or too many files');
+  for (const asset of bundle.manifest.assets ?? []) if (!Object.hasOwn(bundle.files, asset.path)) throw new Error('Missing package asset');
+  const assetPaths = new Set((bundle.manifest.assets ?? []).map(asset => asset.path));
   for (const [path, content] of Object.entries(bundle.files)) {
     safePath(path);
-    if (typeof content !== 'string') throw new Error('Only UTF-8 text files are supported');
+    if (typeof content !== 'string' && (path === bundle.manifest.entry || !assetPaths.has(path))) throw new Error('Binary files require a declared asset and cannot be the source entry');
+    bundleFileBytes(content);
+  }
+  let resourceBytes = 0;
+  for (const asset of bundle.manifest.assets ?? []) {
+    const content = bundle.files[asset.path];
+    if (typeof content === 'string' && Buffer.byteLength(content) > RESOURCE_LIMITS.bytes) throw new Error('Invalid resource bytes');
+    const bytes = Buffer.from(bundleFileBytes(content));
+    validateResourceRegistration({ key: asset.key, mime: asset.mime, data: bytes.toString('base64') });
+    resourceBytes += bytes.length;
+    if (resourceBytes > RESOURCE_LIMITS.ownerBytes) throw new Error('Package resource byte quota exceeded');
   }
   const data = JSON.stringify({ manifest: bundle.manifest, files: bundle.files });
   if (Buffer.byteLength(data) > 4 * 1024 * 1024) throw new Error('Bundle exceeds 4 MiB limit');
@@ -60,6 +87,10 @@ export function validateBundle(bundle) {
 }
 export async function bundleDirectory(root, manifest) {
   validateManifest(manifest);
+  // The caller approves an immutable tree; this is not mutable-tree race safety.
+  const assets = manifest.assets ?? [];
+  const registrations = await loadPackagedResources(root, assets);
+  const packaged = new Map(assets.map((asset, i) => [asset.path, registrations[i].data]));
   const files = {};
   let bytes = 0, count = 0;
   async function visit(path = '') {
@@ -70,9 +101,10 @@ export async function bundleDirectory(root, manifest) {
       if (stat.isSymbolicLink()) throw new Error('Symlinks are not allowed in bundles');
       if (stat.isDirectory()) await visit(relative);
       else if (stat.isFile()) {
+        if (stat.nlink !== 1) throw new Error('Hardlinks are not allowed in bundles');
         bytes += stat.size;
         if (++count > 256 || bytes > 4 * 1024 * 1024) throw new Error('Bundle source exceeds file or byte limit');
-        files[relative] = await readFile(resolve(root, relative), 'utf8');
+        files[relative] = packaged.has(relative) ? { base64: packaged.get(relative) } : await readFile(resolve(root, relative), 'utf8');
       }
       else throw new Error('Only regular files are allowed in bundles');
     }
@@ -121,7 +153,7 @@ export class PluginPlatform extends EventEmitter {
       for (const [path, content] of Object.entries(bundle.files)) {
         const target = resolve(staging, safePath(path));
         await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, content, { flag: 'wx', mode: 0o600 });
+        await writeFile(target, bundleFileBytes(content), { flag: 'wx', mode: 0o600 });
       }
       await writeFile(resolve(staging, '.receipt.json'), JSON.stringify(bundle));
       await rename(staging, destination); // Existing versions are immutable; never overwrite.
@@ -137,7 +169,9 @@ export class PluginPlatform extends EventEmitter {
     if (bundle.manifest.id !== id || bundle.manifest.version !== version) throw new Error('Receipt identity mismatch');
     // Detect accidental edits before trusting installed code. This is integrity, not authenticity.
     for (const [path, content] of Object.entries(bundle.files)) {
-      if (await readFile(resolve(this.root, 'packages', id, version, path), 'utf8') !== content) throw new Error('Installed content changed');
+      const target = resolve(this.root, 'packages', id, version, path);
+      const stat = await lstat(target);
+      if (!stat.isFile() || stat.nlink !== 1 || !(await readFile(target)).equals(Buffer.from(bundleFileBytes(content)))) throw new Error('Installed content changed');
     }
     return bundle;
   }
@@ -175,6 +209,10 @@ export class PluginPlatform extends EventEmitter {
     session.on('invoke', request => {
       if (activated && this.listenerCount('invoke')) this.emit('invoke', { plugin: id, request });
       else session.finishNative(request.id, request.revision, null, 'Native invocation unavailable during activation or without a native host');
+    });
+    session.on('register-resource', request => {
+      if (activated && this.active.get(id)?.session === session && this.listenerCount('register-resource')) this.emit('register-resource', { plugin: id, request });
+      else session.finishResource(request.id, request.generation, null, 'Native resource registration unavailable during activation or without a native host');
     });
     session.on('permission', message => {
       if (activated) this.emit('permission', { id, generation: session.generation, ...message });

@@ -4,7 +4,11 @@ import { validateTree } from './tree.mjs';
 import { readFrames, encodeFrame, validatePayload } from './wire.mjs';
 import { createKitBindings } from './kit-bindings.mjs';
 import { invocationTarget } from './invocation.mjs';
+import { WorkerPredicates } from './predicates.mjs';
+import { NativeReferences, validateReferenceInvocation } from './references.mjs';
+import { validateInvocation, validateValue } from './kit-schema.mjs';
 import inspector from 'node:inspector';
+import { validateResourceRegistration, validateResourceRef } from './resource-schema.mjs';
 
 const generation = Number(process.argv[3]);
 const send = (message) => process.stdout.write(encodeFrame({ ...message, generation }));
@@ -16,7 +20,9 @@ const handlers = new Map();
 const commands = new Map();
 const pending = new Map();
 const nativeCalls = new Map();
+const nativeReferences = new NativeReferences();
 let tree;
+const predicates = new WorkerPredicates(() => ({ tree, revision, disposed }));
 const cleanups = [];
 let debuggerSession;
 const report = (error) => send({ kind: 'error', message: String(error?.stack ?? error).slice(0, 16384) });
@@ -29,19 +35,24 @@ function render() {
   const next = mounted();
   validateTree(next);
   tree = next;
+  predicates.cancel('Predicate cancelled by render revision change');
   for (const call of nativeCalls.values()) call.reject(new Error('Native request cancelled by render revision change'));
   nativeCalls.clear();
   send({ kind: 'render', revision: ++revision, tree });
 }
 async function invoke(target, method, args = {}, mode = 'invoke') {
   if (disposed) throw new Error('Session disposed');
+  const reference = target && Object.hasOwn(target, '$nativeRef');
+  if (reference) nativeReferences.target(target, method, args, mode);
   invocationTarget(tree, target, method, args, mode);
+  const { result } = reference ? validateReferenceInvocation(target, method, args, mode)
+    : validateInvocation(target.component, method, args, mode);
   if (nativeCalls.size >= 32) throw new Error('Native request limit exceeded');
   return new Promise((resolve, reject) => {
     const id = ++sequence;
     const timer = setTimeout(() => { nativeCalls.delete(id); reject(new Error('Native request timed out')); }, 3000);
-    nativeCalls.set(id, { revision, resolve(value) { clearTimeout(timer); resolve(value); }, reject(error) { clearTimeout(timer); reject(error); } });
-    send({ kind: 'invoke', id, revision, target: { id: target.id, component: target.component }, method, args, mode });
+    nativeCalls.set(id, { revision, result, resolve(value) { clearTimeout(timer); resolve(value); }, reject(error) { clearTimeout(timer); reject(error); } });
+    send({ kind: 'invoke', id, revision, target: reference ? target : { id: target.id, component: target.component }, method, args, mode });
   });
 }
 function request(capability, args) {
@@ -56,12 +67,16 @@ function request(capability, args) {
 globalThis.gpui = Object.freeze({
   invoke: (target, method, args) => invoke(target, method, args),
   query: (target, method, args) => invoke(target, method, args, 'query'),
+  releaseReference: async target => {
+    await invoke(target, '$release', {});
+    nativeReferences.release(target);
+  },
   kit: createKitBindings((id, event, handler) => {
     const action = `${id}:${event}`;
     if (handlers.has(action)) throw new Error('Duplicate Kit event identity');
     handlers.set(action, handler);
     return action;
-  }),
+  }, (id, component, name, callback) => predicates.register(id, component, name, callback)),
   mount(view) { mounted = view; render(); },
   state(initial) {
     let value = initial;
@@ -80,6 +95,13 @@ globalThis.gpui = Object.freeze({
     return () => commands.delete(id);
   },
   onDispose(callback) { cleanups.push(callback); },
+  resources: Object.freeze({ async register(registration) {
+    validateResourceRegistration(registration);
+    const key = registration.key;
+    const value = validateResourceRef(await request('resources', registration));
+    if (value.key !== key) throw new Error('Resource response key mismatch');
+    return value;
+  } }),
   fs: Object.freeze({ readText: path => request('fs.read', { path }) }),
   storage: Object.freeze({ get: key => request('storage', { op: 'get', key }), set: (key, value) => request('storage', { op: 'set', key, value }) }),
   network: Object.freeze({ get: url => request('network', { url }) }),
@@ -96,13 +118,28 @@ readFrames(process.stdin, async message => {
       const call = pending.get(message.id);
       pending.delete(message.id);
       if (message.error) call?.reject(new Error(message.error)); else call?.resolve(message.value);
+    } else if (message.kind === 'predicate-request') {
+      try {
+        const value = await predicates.evaluate(message);
+        send({ kind: 'predicate-response', id: message.id, revision: message.revision, value });
+      } catch (error) {
+        send({ kind: 'predicate-response', id: message.id, revision: message.revision, error: String(error.message).slice(0, 2048) });
+      }
+    } else if (message.kind === 'predicate-cancel') {
+      predicates.cancel('Predicate cancelled by native host', message.id);
     } else if (message.kind === 'native-response') {
       const call = nativeCalls.get(message.id);
       if (!call) return;
       nativeCalls.delete(message.id);
       if (message.revision !== call.revision || revision !== call.revision) call.reject(new Error('Stale native response'));
       else if (message.error) call.reject(new Error(message.error));
-      else call.resolve(validatePayload(message.value));
+      else {
+        try {
+          validateValue(message.value, call.result, 'Native result');
+          call.resolve(nativeReferences.adopt(message.value));
+        }
+        catch (error) { call.reject(error); }
+      }
     } else if (message.kind === 'debug-evaluate') {
       if (process.argv[4] !== 'debug') throw new Error('Debugger not enabled');
       if (typeof message.expression !== 'string' || message.expression.length > 16384) throw new Error('Debug request exceeds limit');
@@ -118,6 +155,8 @@ readFrames(process.stdin, async message => {
       pending.clear();
       for (const call of nativeCalls.values()) call.reject(new Error('Session disposed'));
       nativeCalls.clear();
+      nativeReferences.clear();
+      predicates.dispose();
       debuggerSession?.disconnect();
       for (const cleanup of cleanups.reverse()) { try { await cleanup(); } catch (error) { report(error); } }
       send({ kind: 'disposed' });

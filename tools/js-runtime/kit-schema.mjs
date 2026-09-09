@@ -274,6 +274,7 @@ export const kitMethods = Object.freeze({
       value: method({}, string), is_empty: method({}, boolean), is_disabled: method({}, boolean),
       is_secret: method({}, boolean), selected_range: method({}, object({ start: integer, end: integer }, ['start', 'end'])),
       cursor_offset: method({}, integer),
+      focus_handle: method({}, object({ $nativeRef: { type: 'string', min: 8, max: 27 }, type: choice('FocusHandle') }, ['$nativeRef', 'type'])),
     },
   },
   Select: {
@@ -349,7 +350,9 @@ export function generateKitMethodTypes(methods = kitMethods) {
     ...definitions,
     `export interface KitMethodContracts {\n${contracts}\n}`,
     'type MethodArguments<S> = S extends { args: infer A } ? {} extends A ? [args?: A] : [args: A] : never;',
-    'type MethodResult<S> = S extends { result: infer R } ? R : never;',
+    contracts.includes('"$nativeRef"')
+      ? "type MethodResult<S> = S extends { result: infer R } ? R extends { $nativeRef: string; type: infer T extends keyof import('./reference-sdk.js').NativeReferenceContracts } ? import('./reference-sdk.js').NativeRef<T> : R : never;"
+      : 'type MethodResult<S> = S extends { result: infer R } ? R : never;',
     "export type KitInvoke = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['invoke']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['invoke'][M]>) => Promise<MethodResult<KitMethodContracts[C]['invoke'][M]>>;",
     "export type KitQuery = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['query']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['query'][M]>) => Promise<MethodResult<KitMethodContracts[C]['query'][M]>>;",
     '',

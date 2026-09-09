@@ -21,6 +21,8 @@ let app, appFrame, status = 'Loading app…', error = '', revision = 0, callback
 let plugins = [], closing = false, busy = false, pendingReload = false;
 const panels = new Map(), permissions = new Map();
 let nativeTargets = new Map();
+const mounts = new Map();
+let liveMounts = new Set(), mountSequence = 0;
 let watcher, debounce, debugServer, lastView;
 const output = message => {
   if (process.stdout.writableLength > MAX_MESSAGE) { void shutdown(); return; }
@@ -38,7 +40,17 @@ const button = (id, text, callback, disabled = false) => {
   return { kind: 'button', id, text, disabled, ...(!disabled ? { action: id } : {}) };
 };
 function copyTree(node, owner, session, frame) {
-  const id = `${owner}.${node.id}`;
+  const mountKey = `${owner}:${session.generation}:${node.id}`;
+  const type = `${node.kind}:${node.component ?? ''}`;
+  let mount = mounts.get(mountKey);
+  if (!mount || mount.type !== type) {
+    mount = { type, serial: ++mountSequence };
+    mounts.set(mountKey, mount);
+  }
+  liveMounts.add(mountKey);
+  // Kit keyed caches use native semantic identity, not EffectOwner. Distinguish
+  // generations and remounts even during the framework's cache grace period.
+  const id = `${owner}.${node.id}.g${session.generation}.m${mount.serial}`;
   const copied = { ...node, id, instance: session.generation };
   if (node.action && !node.disabled) {
     copied.action = id;
@@ -67,12 +79,13 @@ function render() {
   if (closing) return;
   callbacks = new Map();
   nativeTargets = new Map();
+  liveMounts = new Set();
   const children = [text('host.title', 'GPUI Box · Native JavaScript app'), text('host.status', status)];
   if (error) children.push(text('host.error', `Error (last verified view retained): ${error.slice(0, 2000)}`));
   children.push(button('host.reload', 'Reload app', () => reload()));
   if (appFrame && app) children.push(copyTree(appFrame.tree, 'app', app, appFrame));
   for (const [key, permission] of permissions) {
-    const supported = ['storage', 'fs.read', 'clipboard.read', 'clipboard.write'].includes(permission.capability);
+    const supported = ['storage', 'fs.read', 'clipboard.read', 'clipboard.write', 'resources'].includes(permission.capability);
     children.push(column(`permission.${key}`, [
       text(`permission.${key}.title`, `${permission.owner} requests ${permission.capability}${supported ? ' for this session' : ' — unavailable in this host'}`),
       button(`permission.${key}.allow`, 'Allow for this session', () => decide(key, true), !supported),
@@ -108,13 +121,17 @@ function render() {
   const clipboard = Object.fromEntries([app, ...[...platform.active.values()].map(active => active.session)]
     .filter(session => session && !session.closed)
     .map(session => [session.generation, { read: session.grants.has('clipboard.read'), write: session.grants.has('clipboard.write') }]));
+  const resources = Object.fromEntries([app, ...[...platform.active.values()].map(active => active.session)]
+    .filter(session => session && !session.closed)
+    .map(session => [session.generation, session.grants.has('resources')]));
   const tree = column('host.root', children);
-  const view = JSON.stringify({ tree, clipboard });
+  for (const key of mounts.keys()) if (!liveMounts.has(key)) mounts.delete(key);
+  const view = JSON.stringify({ tree, clipboard, resources });
   // Discovery and consent completion can converge on the same view. Refresh the
   // callback routes, but do not invalidate a visible native frame without change.
   if (view === lastView) return;
   lastView = view;
-  output({ kind: 'render', generation: 0, revision: ++revision, tree, clipboard });
+  output({ kind: 'render', generation: 0, revision: ++revision, tree, clipboard, resources });
 }
 function prompt(owner, session, capability) {
   const key = `${session.generation}.${capability}`;
@@ -127,8 +144,26 @@ function decide(key, allow) {
 function clearPermissions(session) {
   for (const [key, permission] of permissions) if (permission.session === session) permissions.delete(key);
 }
+function registerResource(session, request) {
+  const active = session === app || [...platform.active.values()].some(plugin => plugin.session === session);
+  const mounted = [...liveMounts].some(key => key.split(':')[1] === String(session.generation));
+  if (!active || !mounted || session.closed || !session.grants.has('resources')) {
+    session.finishResource(request.id, request.generation, null, 'Native resource registration requires an active mounted permitted generation');
+    return;
+  }
+  // Commit changed grants to the root frame before dispatching native work.
+  render();
+  output({ kind: 'register-resource', id: request.id, instance: session.generation, revision,
+    deadline: request.deadline, registration: request.registration });
+}
 function invokeNative(session, request) {
   const active = session === app || [...platform.active.values()].some(plugin => plugin.session === session);
+  if (active && !session.closed && Object.hasOwn(request.target, '$nativeRef')) {
+    output({ kind: 'invoke', id: request.id, instance: session.generation, revision,
+      workerRevision: request.revision, target: '', component: '', reference: request.target,
+      mode: request.mode, method: request.method, args: request.args, deadline: request.deadline });
+    return;
+  }
   const targets = nativeTargets.get(`${session.generation}:${request.target.id}`) ?? [];
   if (!active || targets.length !== 1 || targets[0].component !== request.target.component) {
     session.finishNative(request.id, request.revision, null, 'Native target is inactive, invisible, or ambiguous');
@@ -150,6 +185,10 @@ platform.on('invoke', ({ plugin, request }) => {
   const session = platform.active.get(plugin)?.session;
   if (session?.generation === request.generation) invokeNative(session, request);
 });
+platform.on('register-resource', ({ plugin, request }) => {
+  const session = platform.active.get(plugin)?.session;
+  if (session?.generation === request.generation) registerResource(session, request);
+});
 platform.on('render', frame => { panels.set(frame.id, frame); render(); });
 platform.on('permission', ({ id, capability, generation }) => {
   const session = platform.active.get(id)?.session;
@@ -170,6 +209,7 @@ async function reload() {
     candidate.on('fault', message => diagnose(message.message));
     candidate.on('log', message => process.stderr.write(`[app ${candidate.generation}] ${message.message}\n`));
     candidate.on('invoke', request => invokeNative(candidate, request));
+    candidate.on('register-resource', request => registerResource(candidate, request));
     candidate.on('permission', ({ capability }) => prompt(manifest.id, candidate, capability));
     candidate.on('exit', ({ expected }) => {
       clearPermissions(candidate);
@@ -201,6 +241,11 @@ readFrames(process.stdin, message => {
     const callback = callbacks.get(message.action);
     Promise.resolve().then(() => callback?.(validatePayload(message.payload ?? null))).catch(e => diagnose(e.message));
   } else if (message.kind === 'key') platform.key(message.key);
+  else if (message.kind === 'resource-response') {
+    const session = [app, ...[...platform.active.values()].map(active => active.session)]
+      .find(session => session && !session.closed && session.generation === message.instance);
+    session?.finishResource(message.id, message.instance, message.value, message.error);
+  }
   else if (message.kind === 'native-response') {
     const session = [app, ...[...platform.active.values()].map(active => active.session)]
       .find(session => session && !session.closed && session.generation === message.instance);

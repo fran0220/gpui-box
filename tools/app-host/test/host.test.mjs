@@ -7,10 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { readFrames, encodeFrame } from '../../js-runtime/wire.mjs';
+import { debugEndpoint, evaluateDebug } from '../debug.mjs';
 
 const here = fileURLToPath(new URL('..', import.meta.url));
 function find(node, id) {
-  if (node?.id === id) return node;
+  if (node?.id === id || node?.id.replace(/\.g\d+\.m\d+$/, '') === id) return node;
   for (const child of node?.children ?? []) { const match = find(child, id); if (match) return match; }
 }
 async function host(t, dev = false, debug = false) {
@@ -33,7 +34,7 @@ async function host(t, dev = false, debug = false) {
   const send = message => child.stdin.write(encodeFrame(message));
   const click = id => {
     assert.ok(find(latest.tree, id), `missing ${id}`);
-    send({ kind: 'event', generation: 0, revision: latest.revision, action: id });
+    send({ kind: 'event', generation: 0, revision: latest.revision, action: find(latest.tree, id).action ?? id });
   };
   t.after(async () => {
     if (child.exitCode === null) {
@@ -85,10 +86,12 @@ test('developer CLI evaluates inside app through a private socket and shutdown r
   const h = await host(t, false, true);
   const result = JSON.parse(execFileSync(process.execPath, [resolve(here, 'cli.mjs'), 'debug', h.data, '7 + 3'], { encoding: 'utf8' }));
   assert.equal(result.result.value, 10);
-  assert.equal((await stat(resolve(h.data, 'debug/debug.sock'))).mode & 0o777, 0o600);
-  assert.equal((await stat(resolve(h.data, 'debug'))).mode & 0o777, 0o700);
+  if (process.platform !== 'win32') {
+    assert.equal((await stat(debugEndpoint(h.data))).mode & 0o777, 0o600);
+    assert.equal((await stat(resolve(h.data, 'debug'))).mode & 0o777, 0o700);
+  }
   const exit = once(h.child, 'exit'); h.send({ kind: 'close' }); await exit;
-  await assert.rejects(stat(resolve(h.data, 'debug/debug.sock')), { code: 'ENOENT' });
+  await assert.rejects(evaluateDebug(h.data, '7 + 3'));
 });
 
 test('supervisor namespaces Kit events and preserves typed payloads, rejecting stale native frames', async t => {
@@ -139,4 +142,23 @@ test('unchanged native views keep their revision while event routes track worker
   await new Promise(resolve => setTimeout(resolve, 100));
   h.click('app.reveal');
   await h.wait(tree => find(tree, 'app.result')?.text === '2');
+});
+
+test('native cache namespaces stay stable only within one mounted generation and type', async t => {
+  const h = await host(t, true);
+  await writeFile(resolve(h.app, 'main.mts'), `const mode=gpui.state(0); gpui.mount(()=>gpui.column('root',[gpui.button('step','Step',()=>mode.set(mode.get()+1)),gpui.text('mode',String(mode.get())),...(mode.get()===2?[]:[mode.get()===4?gpui.button('cached','Replaced type',()=>{}):gpui.text('cached','Cached')])]));`);
+  await h.wait(tree => find(tree, 'app.mode')?.text === '0');
+  const original = find(h.frame.tree, 'app.cached').id;
+  h.click('app.step'); await h.wait(tree => find(tree, 'app.mode')?.text === '1');
+  assert.equal(find(h.frame.tree, 'app.cached').id, original);
+  h.click('app.step'); await h.wait(tree => find(tree, 'app.mode')?.text === '2');
+  assert.equal(find(h.frame.tree, 'app.cached'), undefined);
+  h.click('app.step'); await h.wait(tree => find(tree, 'app.mode')?.text === '3');
+  const remounted = find(h.frame.tree, 'app.cached').id;
+  assert.notEqual(remounted, original);
+  h.click('app.step'); await h.wait(tree => find(tree, 'app.mode')?.text === '4');
+  const replaced = find(h.frame.tree, 'app.cached').id;
+  assert.notEqual(replaced, remounted);
+  h.click('host.reload'); await h.wait(tree => find(tree, 'app.mode')?.text === '0');
+  assert.notEqual(find(h.frame.tree, 'app.cached').id, original);
 });

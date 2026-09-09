@@ -714,13 +714,17 @@ fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
                         ("TimeInput", "set_value") => json!({"value":{"hour":3,"minute":1,"second":2}}),
                         _ => example(&schema["args"]),
                     };
-                    let result = state.invoke(
+                    let registry = crate::references::Registry::new();
+                    let owner = gpui::EffectOwner::new();
+                    let refs = registry.registration(&descriptor, owner);
+                    let result = state.invoke_registered(
                         &descriptor,
                         method,
                         &args,
                         mode == "query",
                         window,
                         cx,
+                        &refs,
                     );
                     assert!(
                         result.is_ok(),

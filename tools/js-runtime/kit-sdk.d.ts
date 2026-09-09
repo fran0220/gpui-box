@@ -179,6 +179,7 @@ export interface KitMethodContracts {
       is_secret: { args: Record<string, never>; result: boolean };
       selected_range: { args: Record<string, never>; result: { "start": number; "end": number } };
       cursor_offset: { args: Record<string, never>; result: number };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
     };
   };
   Select: {
@@ -236,6 +237,6 @@ export interface KitMethodContracts {
   };
 }
 type MethodArguments<S> = S extends { args: infer A } ? {} extends A ? [args?: A] : [args: A] : never;
-type MethodResult<S> = S extends { result: infer R } ? R : never;
+type MethodResult<S> = S extends { result: infer R } ? R extends { $nativeRef: string; type: infer T extends keyof import('./reference-sdk.js').NativeReferenceContracts } ? import('./reference-sdk.js').NativeRef<T> : R : never;
 export type KitInvoke = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['invoke']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['invoke'][M]>) => Promise<MethodResult<KitMethodContracts[C]['invoke'][M]>>;
 export type KitQuery = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['query']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['query'][M]>) => Promise<MethodResult<KitMethodContracts[C]['query'][M]>>;

@@ -22,6 +22,7 @@ mod layout;
 mod layout_extra;
 mod navigation_extra;
 mod overlays;
+pub(crate) mod reference_dispatch;
 mod validation;
 pub(super) use validation::validate_descriptor;
 
@@ -173,6 +174,19 @@ fn options(value: Option<&Value>) -> Vec<SelectOption> {
 }
 
 impl KitState {
+    pub(super) fn native_entity_id(&self, id: &str) -> Option<gpui::EntityId> {
+        self.retained
+            .borrow()
+            .iter()
+            .find(|((_, key), _)| key == id)
+            .map(|(_, entry)| match &entry.control {
+                Control::Input(entity) => entity.entity_id(),
+                Control::Select(entity) => entity.entity_id(),
+                Control::Popover(entity, _) => entity.entity_id(),
+                Control::Dialog(entity, _) => entity.entity_id(),
+            })
+    }
+
     pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
         self.controls_extra.reconcile(root, _cx);
         self.navigation_extra.reconcile(root, _cx);

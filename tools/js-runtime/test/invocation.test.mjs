@@ -11,6 +11,20 @@ gpui.mount(()=>gpui.column('root',[input,gpui.text('result',result.get())]));
 gpui.command('query',async()=>{try {result.set(await gpui.query(input,'value',{}));}catch(e){result.set(e.message);}});
 gpui.command('wrong',async()=>{try {await gpui.query({id:'input',component:'Select'},'value',{});}catch(e){result.set(e.message);}});
 gpui.command('render',()=>result.set('replacement'));
+gpui.command('contracts',async()=>{
+  const outcomes=[];
+  for(let i=0;i<129;i++) {
+    try { await gpui.query(input,'value',{}); outcomes.push('unexpected'); }
+    catch(e) { if(!e.message.startsWith('Native result')) throw e; }
+  }
+  const focus=await gpui.query(input,'focus_handle',{});
+  for(const operation of [()=>gpui.query(focus,'is_focused',{}),()=>gpui.invoke(input,'set_value',{value:'new'}),()=>gpui.invoke(focus,'focus',{})]) {
+    try {await operation(); outcomes.push('unexpected');} catch(e) {outcomes.push(e.message.startsWith('Native result')?'rejected':e.message);}
+  }
+  outcomes.push(await gpui.query(focus,'is_focused',{}));
+  outcomes.push(await gpui.invoke(input,'set_value',{value:'valid'}));
+  result.set(JSON.stringify(outcomes));
+});
 `;
 async function session(t) {
   const root = await mkdtemp(resolve(tmpdir(), 'gpui-invoke-'));
@@ -67,4 +81,23 @@ test('missing native host is an explicit refusal rather than a fabricated query 
   const s = await session(t);
   s.command('query');
   await rendered(s, 'Native invocation unavailable in this host');
+});
+
+test('worker validates correlated result contracts before adopting references', async t => {
+  const s = await session(t);
+  let invalidRefs = 0, focusQueries = 0, setters = 0;
+  s.on('invoke', request => {
+    let value;
+    if (request.method === 'value') value = { $nativeRef: `native-${++invalidRefs}`, type: 'FocusHandle' };
+    else if (request.method === 'focus_handle') value = { $nativeRef: 'native-1000', type: 'FocusHandle' };
+    else if (request.method === 'is_focused') value = ++focusQueries === 1 ? 'true' : true;
+    else if (request.method === 'set_value') value = ++setters === 1 ? 'wrong command result' : null;
+    else if (request.method === 'focus') value = false;
+    else assert.fail(`unexpected method ${request.method}`);
+    assert.equal(s.finishNative(request.id, request.revision, value), true);
+  });
+  s.command('contracts');
+  await rendered(s, '["rejected","rejected","rejected",true,null]');
+  assert.equal(invalidRefs, 129); // Bad string results must not consume the 128-ref quota.
+  assert.equal(s.nativeRequests.size, 0);
 });

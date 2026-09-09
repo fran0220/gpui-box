@@ -23,8 +23,14 @@ const MAX_FRAME: u64 = 256 * 1024;
 #[cfg(feature = "capture")]
 mod capture;
 mod clipboard;
+mod construction;
 mod kit_bindings;
 mod native;
+mod references;
+mod resource_bridge;
+pub mod resources;
+#[cfg(feature = "capture")]
+mod review_fonts;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -48,6 +54,8 @@ struct Node {
     #[serde(default)]
     events: BTreeMap<String, String>,
     #[serde(default)]
+    predicates: BTreeMap<String, String>,
+    #[serde(default)]
     instance: u64,
 }
 
@@ -70,6 +78,8 @@ struct Frame {
     tree: Node,
     #[serde(default)]
     clipboard: BTreeMap<u64, clipboard::Grants>,
+    #[serde(default)]
+    resources: BTreeMap<u64, bool>,
 }
 
 impl Node {
@@ -129,7 +139,12 @@ impl Node {
 
 enum Incoming {
     Frame(Frame),
+    Request(HostRequest),
+}
+
+enum HostRequest {
     Invoke(native::Invocation),
+    Resource(resource_bridge::ResourceRequest),
 }
 
 fn read_incoming(reader: &mut impl BufRead) -> Result<Option<Incoming>> {
@@ -146,7 +161,12 @@ fn read_incoming(reader: &mut impl BufRead) -> Result<Option<Incoming>> {
     if value.get("kind").and_then(Value::as_str) == Some("invoke") {
         let request: native::Invocation = serde_json::from_value(value)?;
         request.validate()?;
-        return Ok(Some(Incoming::Invoke(request)));
+        return Ok(Some(Incoming::Request(HostRequest::Invoke(request))));
+    }
+    if value.get("kind").and_then(Value::as_str) == Some("register-resource") {
+        let request: resource_bridge::ResourceRequest = serde_json::from_value(value)?;
+        request.validate()?;
+        return Ok(Some(Incoming::Request(HostRequest::Resource(request))));
     }
     let frame: Frame = serde_json::from_value(value)?;
     ensure!(
@@ -162,7 +182,7 @@ fn read_frame(reader: &mut impl BufRead) -> Result<Option<Frame>> {
     match read_incoming(reader)? {
         Some(Incoming::Frame(frame)) => Ok(Some(frame)),
         None => Ok(None),
-        Some(Incoming::Invoke(_)) => bail!("expected render frame"),
+        Some(Incoming::Request(_)) => bail!("expected render frame"),
     }
 }
 
@@ -170,7 +190,7 @@ struct Bridge {
     child: Child,
     outgoing: SyncSender<Value>,
     incoming: Receiver<Result<Frame>>,
-    requests: Receiver<native::Invocation>,
+    requests: Receiver<HostRequest>,
 }
 
 impl Bridge {
@@ -199,7 +219,7 @@ impl Bridge {
             let mut reader = BufReader::new(output);
             loop {
                 match read_incoming(&mut reader) {
-                    Ok(Some(Incoming::Invoke(request))) => {
+                    Ok(Some(Incoming::Request(request))) => {
                         if request_queue.send(request).is_err() {
                             break;
                         }
@@ -253,6 +273,17 @@ struct Host {
     focus: FocusHandle,
     kit: std::rc::Rc<kit_bindings::KitState>,
     clipboard: clipboard::Policy,
+    resource_store: resources::ResourceStore,
+    references: references::Registry,
+}
+
+impl Host {
+    fn handle_request(&mut self, request: HostRequest, window: &mut Window, cx: &mut App) {
+        match request {
+            HostRequest::Invoke(request) => self.invoke_request(request, window, cx),
+            HostRequest::Resource(request) => self.register_resource(request, cx),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -264,6 +295,46 @@ struct NodeRenderer {
 }
 
 impl NodeRenderer {
+    fn build_context(&self, node: &Node, revision: u64) -> construction::NativeBuildContext {
+        construction::NativeBuildContext {
+            deferred: None,
+            typed: construction::TypedSlots::new(self.clone(), node, revision),
+            slots: self.slots(node, revision),
+        }
+    }
+
+    fn slots(&self, node: &Node, revision: u64) -> kit_bindings::KitSlots {
+        node.slots
+            .iter()
+            .map(|(name, children)| {
+                let renderer = self.clone();
+                let children = children.clone();
+                let render: gpui_kit::foundation::SlotRender =
+                    std::rc::Rc::new(move |window, cx| {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .children(
+                                children
+                                    .iter()
+                                    .map(|child| renderer.node(child, revision, window, cx)),
+                            )
+                            .into_any_element()
+                    });
+                (name.clone(), render)
+            })
+            .collect()
+    }
+
+    fn emitter(&self, revision: u64) -> construction::Emit {
+        let outgoing = self.outgoing.clone();
+        std::rc::Rc::new(move |action: &str, payload: Value| {
+            if serde_json::to_vec(&payload).is_ok_and(|bytes| bytes.len() <= 16384) {
+                let _ = outgoing.try_send(json!({"kind":"event", "generation":0, "revision":revision, "action":action, "payload":payload}));
+            }
+        })
+    }
+
     fn node(
         &self,
         node: &Node,
@@ -272,14 +343,16 @@ impl NodeRenderer {
         cx: &mut App,
     ) -> gpui::AnyElement {
         let kit = self.kit.upgrade();
-        let Some(kit) = kit.filter(|_| self.rendered_revision.get() == revision) else {
+        let owner = self.clipboard.owner_of(node);
+        let Some(kit) = kit.filter(|_| {
+            self.rendered_revision.get() == revision && (node.instance == 0 || owner.is_some())
+        }) else {
             return div()
                 .id(SharedString::from(node.id.clone()))
                 .semantic_in(cx, NodeSpec::new(node.id.clone(), Role::Text))
                 .child("Unavailable: native view expired")
                 .into_any_element();
         };
-        let owner = self.clipboard.owner(node.instance);
         cx.with_effect_owner(owner, |cx| {
             let element = self.node_inner(node, revision, &kit, window, cx);
             match owner {
@@ -301,31 +374,8 @@ impl NodeRenderer {
         let id = SharedString::from(node.id.clone());
         match node.kind {
             Kind::Kit => {
-                let mut slots = kit_bindings::KitSlots::new();
-                for (name, children) in &node.slots {
-                    let renderer = self.clone();
-                    let children = children.clone();
-                    slots.insert(
-                        name.clone(),
-                        std::rc::Rc::new(move |window, cx| {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .children(
-                                    children
-                                        .iter()
-                                        .map(|child| renderer.node(child, revision, window, cx)),
-                                )
-                                .into_any_element()
-                        }),
-                    );
-                }
-                let outgoing = self.outgoing.clone();
-                let emit = std::rc::Rc::new(move |action: &str, payload: Value| {
-                    if serde_json::to_vec(&payload).is_ok_and(|bytes| bytes.len() <= 16384) {
-                        let _ = outgoing.try_send(json!({"kind":"event", "generation":0, "revision":revision, "action":action, "payload":payload}));
-                    }
-                });
+                let slots = self.slots(node, revision);
+                let emit = self.emitter(revision);
                 kit.render(node, slots, window, cx, emit)
             }
             Kind::Button => {
@@ -402,8 +452,16 @@ impl Render for Host {
             root = root.child(format!("Host error: {error}"));
         }
         if let Some(frame) = self.frame.clone() {
-            self.clipboard.reconcile(&frame.tree, &frame.clipboard);
+            self.clipboard.reconcile(&frame.tree, &frame.clipboard, cx);
+            self.resource_store
+                .reconcile(&self.clipboard.resource_aliases(&frame.resources), cx);
             self.kit.reconcile(&frame.tree, cx);
+            self.references.reconcile(
+                &frame.tree,
+                |node| self.clipboard.owner_of(node),
+                |id| self.kit.native_entity_id(id),
+                cx,
+            );
             let renderer = NodeRenderer {
                 outgoing: self.bridge.outgoing.clone(),
                 kit: std::rc::Rc::downgrade(&self.kit),
@@ -423,6 +481,7 @@ impl Drop for Host {
     fn drop(&mut self) {
         self.rendered_revision.set(0);
         self.clipboard.revoke();
+        self.references.revoke();
     }
 }
 
@@ -488,7 +547,7 @@ fn main() -> Result<()> {
                                         }) {
                                             while let Ok(request) = host.bridge.requests.try_recv()
                                             {
-                                                host.invoke_request(request, window, cx);
+                                                host.handle_request(request, window, cx);
                                             }
                                         }
                                         if changed {
@@ -503,6 +562,12 @@ fn main() -> Result<()> {
                         })
                         .detach();
                         let clipboard = clipboard::Policy::install(bridge.outgoing.clone(), cx);
+                        let resource_store = resources::Resources::install(cx);
+                        cx.on_release(|host: &mut Host, cx| {
+                            host.clipboard.release(cx);
+                            host.resource_store.clear(cx);
+                        })
+                        .detach();
                         Host {
                             bridge,
                             frame: None,
@@ -511,6 +576,8 @@ fn main() -> Result<()> {
                             focus,
                             kit: Default::default(),
                             clipboard,
+                            resource_store,
+                            references: references::Registry::new(),
                         }
                     })
                 },
@@ -533,6 +600,68 @@ mod tests {
 
     #[cfg(feature = "capture")]
     #[gpui::test]
+    fn native_mount_release_preserves_siblings_and_retires_actual_scroll_cache(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui_kit::layout::{scroll_offset, scroll_to};
+        use gpui_kit_testkit::harness::Harness;
+        let mut tree: Node = serde_json::from_value(json!({
+            "kind":"column", "id":"root", "instance":7,
+            "children":[
+                {"kind":"text", "id":"first", "instance":7},
+                {"kind":"text", "id":"second", "instance":7}
+            ]
+        }))
+        .expect("mount fixture");
+        let mut policy = clipboard::Policy::default();
+        let mut harness = Harness::new(cx, gpui_kit::install, |_, _| div().into_any_element());
+        harness.update(|window, cx| {
+            policy.reconcile(&tree, &BTreeMap::new(), cx);
+            let first_node = tree.children[0].clone();
+            let first = policy.owner_of(&first_node).expect("first mount");
+            let second = policy.owner_of(&tree.children[1]).expect("second mount");
+            assert_ne!(first, second);
+            let aliases = policy.resource_aliases(&BTreeMap::from([(7, true)]));
+            assert_eq!(aliases[&first], aliases[&second]);
+            assert_ne!(first, aliases[&first]);
+            // Deliberately use the SAME native cache key: scope, not strings,
+            // must isolate these actual window_state-backed scroll handles.
+            for (owner, offset) in [(first, 37.0), (second, 19.0)] {
+                cx.with_effect_owner(Some(owner), |cx| {
+                    scroll_to("shared-cache", gpui::point(px(0.0), px(offset)), window, cx);
+                });
+            }
+            policy.reconcile(&tree, &BTreeMap::new(), cx);
+            assert_eq!(policy.owner_of(&first_node), Some(first));
+            cx.with_effect_owner(Some(first), |cx| {
+                assert_eq!(scroll_offset("shared-cache", window, cx).y, px(37.0));
+            });
+            tree.children.remove(0);
+            policy.reconcile(&tree, &BTreeMap::new(), cx);
+            assert!(!gpui_kit::foundation::owner_state_is_live(first, cx));
+            cx.with_effect_owner(Some(first), |cx| {
+                scroll_to("shared-cache", gpui::point(px(0.0), px(99.0)), window, cx);
+                assert_eq!(scroll_offset("shared-cache", window, cx).y, px(0.0));
+            });
+            cx.with_effect_owner(Some(second), |cx| {
+                assert_eq!(scroll_offset("shared-cache", window, cx).y, px(19.0));
+            });
+            tree.children.insert(0, first_node.clone());
+            policy.reconcile(&tree, &BTreeMap::new(), cx);
+            let replacement = policy.owner_of(&first_node).expect("replacement mount");
+            assert_ne!(first, replacement);
+            assert_eq!(policy.owner_of(&tree.children[1]), Some(second));
+            cx.with_effect_owner(Some(replacement), |cx| {
+                assert_eq!(scroll_offset("shared-cache", window, cx).y, px(0.0));
+            });
+            policy.release(cx);
+            assert!(!gpui_kit::foundation::owner_state_is_live(second, cx));
+            assert!(!gpui_kit::foundation::owner_state_is_live(replacement, cx));
+        });
+    }
+
+    #[cfg(feature = "capture")]
+    #[gpui::test]
     fn expired_factory_cannot_resurrect_native_state_or_retain_its_owner(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -542,11 +671,13 @@ mod tests {
         let revision = Rc::new(Cell::new(1));
         let (outgoing, _events) = mpsc::sync_channel(8);
         let node: Node = serde_json::from_value(json!({"kind":"kit","component":"TextInput","id":"input","instance":7,"props":{"text":"fresh"}})).expect("input fixture");
+        let mut clipboard = clipboard::Policy::default();
+        cx.update(|cx| clipboard.reconcile(&node, &BTreeMap::new(), cx));
         let renderer = NodeRenderer {
             outgoing,
             kit: Rc::downgrade(&kit),
             rendered_revision: revision.clone(),
-            clipboard: Default::default(),
+            clipboard,
         };
         let captured = node.clone();
         let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {

@@ -3,6 +3,7 @@ import { kitSchemas, kitMethods } from './kit-schema.mjs';
 
 // Wire snapshots read these native getters, but do not expose their Entity/Rc refs.
 const nativeMethodSources = {
+  TextInput: { focus_handle: 'gpui::window::Focusable::focus_handle' },
   Calendar: { adapter_snapshot: 'adapter' },
   DateInput: { field_snapshot: 'field', calendar_snapshot: 'calendar' },
   RangePicker: { calendar_snapshot: 'calendar' },

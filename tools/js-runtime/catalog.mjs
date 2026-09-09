@@ -5,6 +5,7 @@ import { kitSchemas, kitMethods, generateKitMethodTypes } from './kit-schema.mjs
 
 const root = new URL('../../', import.meta.url);
 const catalog = JSON.parse(await readFile(new URL('docs/api-index.json', root), 'utf8'));
+const developer = JSON.parse(await readFile(new URL('docs/developer-index.json', root), 'utf8'));
 const names = new Set(catalog.components.map(component => component.name));
 for (const name of Object.keys(bindings)) if (!names.has(name)) throw new Error(`Binding has no Kit authority: ${name}`);
 for (const component of catalog.components) {
@@ -12,6 +13,15 @@ for (const component of catalog.components) {
   for (const methods of Object.values(bindings[component.name]?.nativeMethods ?? {})) {
     for (const name of Object.keys(methods)) {
       const nativeName = bindings[component.name].nativeMethodSources?.[name] ?? name;
+      if (nativeName.includes('::')) {
+        // Trait methods are deliberately absent from the inherent API index.
+        // Name their trait authority explicitly; the native dispatcher compiles
+        // the corresponding trait call on the concrete component type.
+        const parts = nativeName.split('::'), method = parts.pop();
+        const trait = developer.symbols.find(symbol => symbol.id === parts.join('::') && symbol.kind === 'trait');
+        if (!trait || !trait.signature.includes(`fn ${method} (`)) throw new Error(`Native binding has no Rust trait authority: ${component.name}.${name}`);
+        continue;
+      }
       if (!signatures.some(signature => signature.startsWith(`${nativeName}(`))) throw new Error(`Native binding has no Rust method authority: ${component.name}.${name}`);
     }
   }

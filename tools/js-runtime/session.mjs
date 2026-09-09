@@ -8,6 +8,8 @@ import { validateTree } from './tree.mjs';
 import { createSandbox, nativeBackend } from './sandbox.mjs';
 import { readFrames, encodeFrame, MAX_MESSAGE, validatePayload } from './wire.mjs';
 import { invocationTarget } from './invocation.mjs';
+import { predicateTarget, PREDICATE_LIMIT, PREDICATE_TIMEOUT } from './predicates.mjs';
+import { validateResourceRegistration, validateResourceRef } from './resource-schema.mjs';
 
 const runtimeRoot = dirname(fileURLToPath(import.meta.url));
 let nextGeneration = 0;
@@ -39,6 +41,11 @@ export class Session extends EventEmitter {
     this.debugSequence = 0;
     this.operations = new Set();
     this.nativeRequests = new Map();
+    this.predicateRequests = new Map();
+    this.predicateSequence = 0;
+    this.resourceRequests = new Map();
+    this.resourceSequence = 0;
+    this.resourceInflight = new Set();
   }
   start() {
     if (this.starting || this.child || this.closed) return Promise.reject(new Error('Session cannot be started twice'));
@@ -112,10 +119,12 @@ export class Session extends EventEmitter {
           validateTree(message.tree);
           if (!Number.isSafeInteger(message.revision) || message.revision <= this.revision) throw new Error('Invalid revision');
           this.cancelNative('Native request cancelled by render revision change');
+          this.cancelPredicates('Predicate cancelled by render revision change');
           this.revision = message.revision;
           this.tree = message.tree;
         }
         if (message.kind === 'invoke') { this.handleNative(message); return; }
+        if (message.kind === 'predicate-response') { this.finishPredicate(message); return; }
         if (message.kind === 'request') { void this.handleRequest(message); return; }
         if (!['render', 'ready', 'log', 'error', 'disposed'].includes(message.kind)) throw new Error('Unknown worker message');
         this.emit(message.kind, message);
@@ -142,6 +151,34 @@ export class Session extends EventEmitter {
     return true;
   }
   command(command) { this.send({ kind: 'command', command }); }
+  registerResource(registration) {
+    validateResourceRegistration(registration);
+    if (this.closed || !this.tree || !this.grants.has('resources')) throw new Error('Resource registration requires a mounted, permitted session');
+    if (this.resourceRequests.size >= 4) throw new Error('Resource request limit exceeded');
+    if (!this.listenerCount('register-resource')) throw new Error('Native resource registration unavailable in this host');
+    const id = ++this.resourceSequence;
+    const deadline = Date.now() + 3000;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => this.finishResource(id, this.generation, null, 'Resource request timed out'), 3000);
+      this.resourceRequests.set(id, { key: registration.key, deadline, timer, resolve, reject });
+      try { this.emit('register-resource', { id, generation: this.generation, registration, deadline }); }
+      catch (error) { this.finishResource(id, this.generation, null, error.message); }
+    });
+  }
+  finishResource(id, generation, value, error) {
+    const pending = this.resourceRequests.get(id);
+    if (!pending || generation !== this.generation) return false;
+    this.resourceRequests.delete(id); clearTimeout(pending.timer);
+    try {
+      if (error) throw new Error(String(error).slice(0, 2048));
+      if (Date.now() >= pending.deadline) throw new Error('Resource request timed out');
+      if (this.closed || !this.grants.has('resources')) throw new Error('Resource request cancelled');
+      validateResourceRef(value);
+      if (value.key !== pending.key) throw new Error('Resource response key mismatch');
+      pending.resolve(value);
+    } catch (failure) { pending.reject(failure); }
+    return true;
+  }
   handleNative(message) {
     const { id, revision, target, method, args, mode } = message;
     const reject = error => this.send({ kind: 'native-response', id, revision, error: error.message.slice(0, 2048) });
@@ -152,7 +189,7 @@ export class Session extends EventEmitter {
       if (!this.listenerCount('invoke')) throw new Error('Native invocation unavailable in this host');
       const timer = setTimeout(() => this.finishNative(id, revision, null, 'Native request timed out'), 3000);
       this.nativeRequests.set(id, { revision, timer });
-      this.emit('invoke', { id, generation: this.generation, revision, target: { id: target.id, component: target.component }, method, args, mode, deadline: Date.now() + 3000 });
+      this.emit('invoke', { id, generation: this.generation, revision, target: Object.hasOwn(target, '$nativeRef') ? target : { id: target.id, component: target.component }, method, args, mode, deadline: Date.now() + 3000 });
     } catch (error) { reject(error); }
   }
   finishNative(id, revision, value, error) {
@@ -166,6 +203,43 @@ export class Session extends EventEmitter {
   }
   cancelNative(error) {
     for (const [id, pending] of this.nativeRequests) this.finishNative(id, pending.revision, null, error);
+  }
+  evaluatePredicate({ target, name, reference, payload, deadline }, signal) {
+    if (this.closed || signal?.aborted) return Promise.reject(new Error('Predicate cancelled'));
+    const now = Date.now();
+    if (!Number.isSafeInteger(deadline) || deadline <= now || deadline > now + PREDICATE_TIMEOUT || this.predicateRequests.size >= PREDICATE_LIMIT)
+      return Promise.reject(new Error('Predicate deadline or capacity exceeded'));
+    try {
+      predicateTarget(this.tree, target, name, reference);
+      validatePayload(payload);
+    } catch (error) { return Promise.reject(error); }
+    const id = ++this.predicateSequence, revision = this.revision;
+    return new Promise((resolve, reject) => {
+      const finish = (message) => {
+        if (!this.predicateRequests.delete(id)) return;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+        try {
+          if (message.error) throw new Error(String(message.error).slice(0, 2048));
+          if (this.closed || this.revision !== revision || message.revision !== revision) throw new Error('Predicate cancelled: stale response');
+          predicateTarget(this.tree, target, name, reference);
+          if (typeof message.value !== 'boolean') throw new Error('Predicate must return a boolean');
+          resolve(message.value);
+        } catch (error) {
+          this.send({ kind: 'predicate-cancel', id });
+          reject(error);
+        }
+      };
+      const cancel = () => finish({ error: 'Predicate cancelled by native host' });
+      const timer = setTimeout(() => finish({ error: 'Predicate deadline expired' }), deadline - now);
+      this.predicateRequests.set(id, finish);
+      signal?.addEventListener('abort', cancel, { once: true });
+      this.send({ kind: 'predicate-request', id, revision, target, name, reference, payload, deadline });
+    });
+  }
+  finishPredicate(message) { this.predicateRequests.get(message.id)?.(message); }
+  cancelPredicates(reason) {
+    for (const finish of this.predicateRequests.values()) finish({ error: reason });
   }
   debugEvaluate(expression) {
     if (!this.options.debug || this.closed) return Promise.reject(new Error('Debug evaluation unavailable'));
@@ -200,12 +274,17 @@ export class Session extends EventEmitter {
     if (!Number.isSafeInteger(id) || this.inflight.has(id) || this.inflight.size >= 64) { this.fail('Invalid or excessive host requests'); return; }
     this.inflight.add(id);
     try {
+      if (capability === 'resources') {
+        validateResourceRegistration(args);
+        if (this.resourceInflight.size >= 4) throw new Error('Resource request limit exceeded');
+        this.resourceInflight.add(id);
+      }
       await this.permitted(capability);
       if (this.closed) throw new Error('Session disposed');
       const value = await this.capability(capability, args);
       this.send({ kind: 'response', id, value });
     } catch (error) { this.send({ kind: 'response', id, error: error.message }); }
-    finally { this.inflight.delete(id); }
+    finally { this.inflight.delete(id); this.resourceInflight.delete(id); }
   }
   capability(capability, args) {
     const operation = this.performCapability(capability, args);
@@ -214,6 +293,7 @@ export class Session extends EventEmitter {
     return operation;
   }
   async performCapability(capability, args) {
+    if (capability === 'resources') return this.registerResource(args);
     if (capability === 'fs.read') {
       const path = await containedFile(this.options.root, args.path);
       const handle = await open(path, 'r');
@@ -305,7 +385,9 @@ export class Session extends EventEmitter {
     throw new Error(`Unsupported capability: ${capability}`);
   }
   cancelRequests() {
+    for (const id of this.resourceRequests.keys()) this.finishResource(id, this.generation, null, 'Session disposed');
     this.cancelNative('Session disposed');
+    this.cancelPredicates('Predicate cancelled: session disposed');
     for (const finish of this.debugRequests.values()) finish({ error: 'Session disposed' });
     this.debugRequests.clear();
     for (const abort of this.aborts) abort.abort();

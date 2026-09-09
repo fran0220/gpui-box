@@ -39,7 +39,7 @@ fn pump(cx: &mut HeadlessAppContext, handle: gpui::WindowHandle<Host>) -> Result
                 .is_some_and(|frame| frame.revision == host.rendered_revision.get())
             {
                 while let Ok(request) = host.bridge.requests.try_recv() {
-                    host.invoke_request(request, window, cx);
+                    host.handle_request(request, window, cx);
                 }
             }
             Ok::<_, anyhow::Error>(())
@@ -86,8 +86,10 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
         frame.is_some(),
         "runtime did not mount an app within capture deadline"
     );
+    let text_system = gpui_platform::test_text_system("Geist");
+    review_fonts::register_emoji_review_font(text_system.as_ref())?;
     let mut cx = HeadlessAppContext::with_platform(
-        gpui_platform::test_text_system("Geist"),
+        text_system,
         Arc::new(gpui_kit::assets::Assets),
         gpui_platform::current_headless_renderer,
     );
@@ -101,6 +103,12 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
             let focus = cx.focus_handle();
             window.focus(&focus, cx);
             let clipboard = clipboard::Policy::install(bridge.outgoing.clone(), cx);
+            let resource_store = resources::Resources::install(cx);
+            cx.on_release(|host: &mut Host, cx| {
+                host.clipboard.release(cx);
+                host.resource_store.clear(cx);
+            })
+            .detach();
             Host {
                 bridge,
                 frame,
@@ -109,6 +117,8 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                 error: None,
                 kit: Default::default(),
                 clipboard,
+                resource_store,
+                references: references::Registry::new(),
             }
         })
     })?;
