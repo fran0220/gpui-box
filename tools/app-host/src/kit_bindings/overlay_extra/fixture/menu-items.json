@@ -1,0 +1,9 @@
+[
+  {"kind":"section","id":"heading","label":"Shared commands"},
+  {"kind":"separator","id":"divider"},
+  {"kind":"submenu","id":"more","label":"More","items":[
+    {"kind":"check","id":"locked","label":"Locked","checked":true,"disabled":true,"destructive":true},
+    {"kind":"check","id":"pin","label":"Pin","checked":true,"shortcut":"ctrl-p","icon":{"key":"plus-circle","weight":"fill"}},
+    {"kind":"command","id":"erase","label":"Erase","destructive":true}
+  ]}
+]

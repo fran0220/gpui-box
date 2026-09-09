@@ -13,7 +13,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 type SlotFactory = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
-fn validate_menu_items(value: &Value) -> Result<()> {
+/// Recursive identity validation after the shared closed MenuItem grammar.
+pub(super) fn validate_menu_items(value: &Value) -> Result<()> {
     fn visit(value: &Value, ids: &mut std::collections::HashSet<String>) -> Result<()> {
         for item in array(value) {
             ensure!(ids.insert(s(item, "id")), "duplicate menu identity");
@@ -175,7 +176,9 @@ fn reserved(v: &Value) -> Edges<gpui::Pixels> {
         left: px(n(v, "left", 0.)),
     }
 }
-fn menu_items(v: &Value) -> Vec<MenuItem> {
+/// Builds native records after closed-schema and recursive identity validation.
+/// Shared by menu-bearing bindings; never substitutes records for an Entity<Menu>.
+pub(super) fn menu_items(v: &Value) -> Vec<MenuItem> {
     array(v)
         .map(|v| {
             let mut item = match v["kind"].as_str() {
@@ -199,6 +202,62 @@ fn menu_items(v: &Value) -> Vec<MenuItem> {
         })
         .collect()
 }
+
+/// The one native Menu data dispatcher, shared by retained nodes and entity refs.
+/// Validates arguments, recursive item identities, and bounded results here.
+/// The host/registry must additionally enforce source lifetime and parent disabled
+/// policy; a Menu cannot infer whether its owning SplitButton is disabled.
+pub(super) fn menu_value(
+    target: &Entity<Menu>,
+    method: &str,
+    args: &Value,
+    query: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> Result<Value> {
+    let schema = super::validation::invocation("Menu", method, args, query)?;
+    let result = if query {
+        let menu = target.read(cx);
+        match method {
+            "is_open" => json!(menu.is_open()),
+            "offered" => json!(menu.offered().iter().map(|item| json!({"id":item.id().as_ref(),"label":item.label().as_ref(),"disabled":item.is_disabled(),"destructive":item.is_destructive()})).collect::<Vec<_>>()),
+            _ => bail!("unsupported Menu query"),
+        }
+    } else {
+        if method == "set_items" {
+            validate_menu_items(&args["items"])?;
+        }
+        target.update(cx, |menu, cx| -> Result<Value> {
+            match method {
+                "open" => menu.open(window, cx),
+                "close" => menu.close(window, cx),
+                "toggle" => menu.toggle(window, cx),
+                "dismiss" => menu.dismiss(window, cx),
+                "open_submenu" => return Ok(json!(menu.open_submenu(&s(args, "id"), window, cx))),
+                "set_items" => menu.set_items(menu_items(&args["items"]), cx),
+                "set_trigger" => menu.set_trigger(s(args, "label"), cx),
+                "set_trigger_name" => menu.set_trigger_name(s(args, "name"), cx),
+                "set_trigger_icon" => menu.set_trigger_icon(
+                    args.get("icon")
+                        .filter(|v| !v.is_null())
+                        .map(|v| super::icon::resolve(v).expect("validated icon")),
+                    cx,
+                ),
+                "set_placement" => menu.set_placement(placement(&args["placement"]), cx),
+                "set_hang" => menu.set_hang(hang(&args["hang"]), cx),
+                "set_trigger_style" => {
+                    menu.set_trigger_style(variant(&args["variant"]), size(&args["size"]), cx)
+                }
+                "set_trigger_join" => menu.set_trigger_join(join(&args["join"]), cx),
+                _ => bail!("unsupported Menu command"),
+            }
+            Ok(Value::Null)
+        })?
+    };
+    super::validation::validate(&result, schema)?;
+    Ok(result)
+}
+
 fn menus(v: &Value) -> Vec<MenubarMenu> {
     array(v)
         .map(|v| {
@@ -788,7 +847,7 @@ impl State {
         window: &mut Window,
         cx: &mut App,
     ) -> Result<Value> {
-        if !query && method == "set_items" {
+        if !query && method == "set_items" && node.component.as_deref() != Some("Menu") {
             validate_menu_items(&args["items"])?;
         }
         if !query && method == "set_menus" {
@@ -887,37 +946,7 @@ impl State {
                 };
                 Ok(Value::Null)
             }),
-            (Control::Menu(e), true) => Ok(match method {
-                "is_open" => json!(e.read(cx).is_open()),
-                "offered" => json!(e.read(cx).offered().iter().map(|item| json!({"id":item.id().as_ref(),"label":item.label().as_ref(),"disabled":item.is_disabled(),"destructive":item.is_destructive()})).collect::<Vec<_>>()),
-                _ => bail!("unsupported Menu query"),
-            }),
-            (Control::Menu(e), false) => command!(e, |v, c| {
-                match method {
-                    "open" => v.open(window, c),
-                    "close" => v.close(window, c),
-                    "toggle" => v.toggle(window, c),
-                    "dismiss" => v.dismiss(window, c),
-                    "open_submenu" => return Ok(json!(v.open_submenu(&s(args, "id"), window, c))),
-                    "set_items" => v.set_items(menu_items(&args["items"]), c),
-                    "set_trigger" => v.set_trigger(s(args, "label"), c),
-                    "set_trigger_name" => v.set_trigger_name(s(args, "name"), c),
-                    "set_trigger_icon" => v.set_trigger_icon(
-                        args.get("icon")
-                            .filter(|v| !v.is_null())
-                            .map(|v| super::icon::resolve(v).expect("validated icon")),
-                        c,
-                    ),
-                    "set_placement" => v.set_placement(placement(&args["placement"]), c),
-                    "set_hang" => v.set_hang(hang(&args["hang"]), c),
-                    "set_trigger_style" => {
-                        v.set_trigger_style(variant(&args["variant"]), size(&args["size"]), c)
-                    }
-                    "set_trigger_join" => v.set_trigger_join(join(&args["join"]), c),
-                    _ => bail!("unsupported Menu command"),
-                };
-                Ok(Value::Null)
-            }),
+            (Control::Menu(e), query) => menu_value(e,method,args,query,window,cx),
             (Control::Context(e), true) => Ok(match method {
                 "is_open" => json!(e.read(cx).is_open()),
                 "position" => {

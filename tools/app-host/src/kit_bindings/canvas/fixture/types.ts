@@ -1,5 +1,10 @@
 import type { CanvasFactories, NodeGraphEvent } from '../../../../../js-runtime/kit-canvas-sdk.js';
-import type { OverlayFactories, OverlayMethodContracts } from '../../../../../js-runtime/kit-overlay-sdk.js';
+import type { OverlayFactories, OverlayMethodContracts, MenuItemDescriptor } from '../../../../../js-runtime/kit-overlay-sdk.js';
+
+const sharedItem: MenuItemDescriptor = { kind: 'submenu', id: 'more', label: 'More', items: [{ kind: 'check', id: 'pin', label: 'Pin', checked: true }] };
+// @ts-expect-error shared menu alternatives reject fields from other variants
+const invalidSharedItem: MenuItemDescriptor = { kind: 'separator', id: 'line', checked: true };
+void [sharedItem, invalidSharedItem];
 
 declare const canvas: CanvasFactories;
 declare const overlay: OverlayFactories;

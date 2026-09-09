@@ -5,7 +5,15 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { Session } from '../session.mjs';
 import { validateValue, validateSlots } from '../kit-schema.mjs';
-import { familySchemas, familyMethods, familyReferenceMethods, validateOverlayProps, generateOverlayTypes } from '../kit-overlay-schema.mjs';
+import { familySchemas, familyMethods, familyReferenceMethods, validateOverlayProps, generateOverlayTypes, menuItemsSchema, validateMenuItems } from '../kit-overlay-schema.mjs';
+
+test('shared menu grammar retains nested native item variants and rejects duplicate identities',()=>{
+  const items=JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/overlay_extra/fixture/menu-items.json',import.meta.url)));
+  validateValue(items,menuItemsSchema);validateMenuItems(items);
+  assert.throws(()=>validateValue([{kind:'command',id:'run',label:'Run',extra:1}],menuItemsSchema));
+  assert.throws(()=>validateMenuItems([...items,{kind:'command',id:'pin',label:'Duplicate nested identity'}]));
+  assert.throws(()=>validateValue([{kind:'submenu',id:'more',label:'More',items:[{kind:'separator',id:'line',checked:true}]}],menuItemsSchema));
+});
 
 test('actual worker revisions revoke pending overlay requests and update slot descriptors',async t=>{
   const session=new Session({root:fileURLToPath(new URL('../../app-host/src/kit_bindings/overlay_extra/fixture/',import.meta.url)),entry:'main.mjs',sandbox:process.platform==='linux'?'linux':undefined,trusted:process.platform!=='linux'});

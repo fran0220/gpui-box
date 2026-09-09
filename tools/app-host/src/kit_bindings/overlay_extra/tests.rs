@@ -97,6 +97,70 @@ fn node(component: &str, props: Value) -> Node {
 }
 
 #[gpui::test]
+fn shared_menu_builder_and_dispatch_preserve_native_recursive_actions(cx: &mut TestAppContext) {
+    let items: Value =
+        serde_json::from_str(include_str!("fixture/menu-items.json")).expect("shared menu fixture");
+    super::super::validation::invocation("Menu", "set_items", &json!({"items":items}), false)
+        .expect("closed MenuItem grammar");
+    validate_menu_items(&items).expect("recursive identities");
+    let state = Rc::new(State::default());
+    let owner = state.clone();
+    let descriptor = node("Menu", json!({"trigger":"Shared","items":items}));
+    let source = descriptor.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let mut h = Harness::new(cx, gpui_kit::install, move |w, c| {
+        let output = output.clone();
+        owner.render(
+            &source,
+            KitSlots::new(),
+            w,
+            c,
+            Rc::new(move |name, value| output.borrow_mut().push((name.to_owned(), value))),
+        )
+    });
+    let menu = h.update(|_, _| {
+        let entries = state.entries.borrow();
+        let Control::Menu(menu) = &entries
+            .get(&(0, "overlay".into()))
+            .expect("retained menu")
+            .control
+        else {
+            panic!()
+        };
+        menu.clone()
+    });
+    h.update(|w,c|{
+        menu_value(&menu,"set_items",&json!({"items":items}),false,w,c).expect("shared setter");
+        assert!(menu_value(&menu,"set_items",&json!({"items":[{"kind":"command","id":"run","label":"Run","extra":1}]}),false,w,c).is_err());
+        assert!(menu_value(&menu,"set_items",&json!({"items":[{"kind":"submenu","id":"same","label":"More","items":[{"kind":"command","id":"same","label":"Duplicate"}]}]}),false,w,c).is_err());
+        assert!(menu_value(&menu,"open",&json!({"unknown":true}),false,w,c).is_err());
+        assert!(menu_value(&menu,"set_items",&json!({"items":[]}),true,w,c).is_err());
+        assert_eq!(menu_value(&menu,"open_submenu",&json!({"id":"more"}),false,w,c).expect("native submenu"),true);
+    });
+    assert!(
+        h.node("overlay.locked")
+            .expect("nested disabled item")
+            .disabled
+    );
+    assert_eq!(
+        h.node("overlay.pin").expect("native checked item").checked,
+        Some(true)
+    );
+    h.click("overlay.locked");
+    assert!(!events.borrow().iter().any(|(name, _)| name == "invoked"));
+    h.keystrokes("enter");
+    assert!(events.borrow().contains(&("invoked".into(), json!("pin"))));
+    h.update(|w, c| {
+        assert_eq!(
+            menu_value(&menu, "is_open", &json!({}), true, w, c)
+                .expect("native closes after action"),
+            false
+        )
+    });
+}
+
+#[gpui::test]
 fn slot_setter_rejects_removed_keys_and_never_replays_the_old_factory(cx: &mut TestAppContext) {
     let state = Rc::new(State::default());
     let owner = state.clone();

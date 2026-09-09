@@ -44,6 +44,17 @@ nominal TypeScript brand can replace it at the central generator boundary.
 
 ## Data adaptations
 
+- Menu-bearing bindings share `overlay_extra::menu_items(&Value)` after closed
+  schema validation and `overlay_extra::validate_menu_items(&Value)` (recursive
+  identity uniqueness). JS exports `menuItemsSchema` and `validateMenuItems`;
+  the latter is a cross-field check, not a replacement for `validateValue`.
+  `overlay_extra::menu_value(&Entity<Menu>, method, args, query, window, cx)`
+  is the shared native data dispatcher and validates arguments, recursive
+  identities, modes and results itself. Retained Menu nodes use it too.
+  Runtime's `reference_dispatch::menu` handles `focus_handle` with Registration
+  and delegates data methods here. SplitButton must register its actual Menu
+  entity with its current-child getter and parent-disabled command guard;
+  queries remain allowed while disabled. Registry owns lifetime checks.
 - Graph node/edge/band arrays adapt repeated native builders. `offset` and
   `zoom` override their corresponding `viewport` fields when both are supplied.
   `fit: null` means Never; a nonnegative integer means Whole(revision).
