@@ -23,7 +23,7 @@ export interface DatetimeMethods {
     };
     query: {
       is_disabled: { args: Record<string, never>; result: boolean };
-      adapter: { args: Record<string, never>; result: { today: number | null; weekdays: Array<string>; clock: { hourMin: number; hourMax: number; minuteMax: number; secondMax: number; meridiem: Array<string> | null } } };
+      adapter_snapshot: { args: Record<string, never>; result: { today: number | null; weekdays: Array<string>; clock: { hourMin: number; hourMax: number; minuteMax: number; secondMax: number; meridiem: Array<string> | null } } };
       selection: { args: Record<string, never>; result: Array<number> };
       cursor: { args: Record<string, never>; result: number | null };
       hovered_day: { args: Record<string, never>; result: number | null };
@@ -43,8 +43,8 @@ export interface DatetimeMethods {
     };
     query: {
       is_disabled: { args: Record<string, never>; result: boolean };
-      field: { args: Record<string, never>; result: { value: string; cursor: number; selection: { start: number; end: number }; disabled: boolean } };
-      calendar: { args: Record<string, never>; result: { selection: Array<number>; cursor: number | null; hoveredDay: number | null; shownMonth: number | null; disabled: boolean } };
+      field_snapshot: { args: Record<string, never>; result: { value: string; cursor: number; selection: { start: number; end: number }; disabled: boolean } };
+      calendar_snapshot: { args: Record<string, never>; result: { selection: Array<number>; cursor: number | null; hoveredDay: number | null; shownMonth: number | null; disabled: boolean } };
       current: { args: Record<string, never>; result: number | null };
       parsed_day: { args: Record<string, never>; result: number | null };
       message: { args: Record<string, never>; result: string | null };
@@ -62,7 +62,7 @@ export interface DatetimeMethods {
     };
     query: {
       is_disabled: { args: Record<string, never>; result: boolean };
-      calendar: { args: Record<string, never>; result: { selection: Array<number>; cursor: number | null; hoveredDay: number | null; shownMonth: number | null; disabled: boolean } };
+      calendar_snapshot: { args: Record<string, never>; result: { selection: Array<number>; cursor: number | null; hoveredDay: number | null; shownMonth: number | null; disabled: boolean } };
       current_range: { args: Record<string, never>; result: { start: number; end?: number | null } | null };
       state: { args: Record<string, never>; result: "unset" | "incomplete" | "complete" | "end before start" };
       blocked: { args: Record<string, never>; result: { kind: "notApplicable" } | { kind: "unchecked" } | { kind: "clear" } | { kind: "blocked"; days: Array<{ day: number; reason: string }> } };

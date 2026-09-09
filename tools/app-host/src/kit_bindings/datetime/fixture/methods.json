@@ -235,7 +235,7 @@
           "type": "boolean"
         }
       },
-      "adapter": {
+      "adapter_snapshot": {
         "args": {
           "type": "object",
           "fields": {},
@@ -522,7 +522,7 @@
           "type": "boolean"
         }
       },
-      "field": {
+      "field_snapshot": {
         "args": {
           "type": "object",
           "fields": {},
@@ -574,7 +574,7 @@
           ]
         }
       },
-      "calendar": {
+      "calendar_snapshot": {
         "args": {
           "type": "object",
           "fields": {},
@@ -835,7 +835,7 @@
           "type": "boolean"
         }
       },
-      "calendar": {
+      "calendar_snapshot": {
         "args": {
           "type": "object",
           "fields": {},

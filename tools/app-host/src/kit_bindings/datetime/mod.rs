@@ -736,7 +736,7 @@ impl State {
                         "cursor" => json!(c.cursor().map(|d| d.0)),
                         "hovered_day" => json!(c.hovered_day().map(|d| d.0)),
                         "shown_month" => json!(c.shown_month().map(|m| m.0)),
-                        "adapter" => {
+                        "adapter_snapshot" => {
                             let adapter = c.adapter();
                             json!({"today":adapter.today().map(|d|d.0),"weekdays":adapter.weekday_labels().iter().map(|s|s.as_ref()).collect::<Vec<_>>(),"clock":clock_json(adapter.clock())})
                         }
@@ -752,8 +752,8 @@ impl State {
                         "is_open" => json!(c.is_open()),
                         "shown_text" => json!(c.shown_text(cx).as_ref()),
                         "is_invalid" => json!(c.is_invalid()),
-                        "calendar" => calendar_json(c.calendar().read(cx)),
-                        "field" => {
+                        "calendar_snapshot" => calendar_json(c.calendar().read(cx)),
+                        "field_snapshot" => {
                             let field = c.field().read(cx);
                             let range = field.selected_range();
                             json!({"value":field.value().as_ref(),"cursor":field.cursor_offset(),"selection":{"start":range.start,"end":range.end},"disabled":field.is_disabled()})
@@ -765,7 +765,7 @@ impl State {
                     let c = e.read(cx);
                     match method {
                         "current_range" => range_json(c.current_range()),
-                        "calendar" => calendar_json(c.calendar().read(cx)),
+                        "calendar_snapshot" => calendar_json(c.calendar().read(cx)),
                         "state" => json!(c.state().name()),
                         "blocked" => match c.blocked() {
                             BlockedReport::NotApplicable => json!({"kind":"notApplicable"}),

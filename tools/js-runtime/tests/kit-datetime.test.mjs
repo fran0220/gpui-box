@@ -5,6 +5,12 @@ import { familySchemas, familyMethods, validateFamilyProps } from '../kit-dateti
 import { validateValue } from '../kit-schema.mjs';
 const data = () => JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/datetime/fixture/data.json', import.meta.url)));
 const check = (component, props) => { validateValue(props, familySchemas[component].props); validateFamilyProps(component, props); };
+test('native reference getters remain unsupported, snapshots have distinct data-query names', () => {
+  for (const [component, method] of [['DateInput', 'field'], ['DateInput', 'calendar'], ['RangePicker', 'calendar'], ['Calendar', 'adapter']]) {
+    assert.equal(Object.hasOwn(familyMethods[component].query, method), false);
+    assert.equal(Object.hasOwn(familyMethods[component].query, `${method}_snapshot`), true);
+  }
+});
 test('finite calendar tables support opaque months and exact caller spellings', () => {
   check('Calendar', { adapter: data(), month: 4, selected: [31, 11], multi: true });
   check('RangePicker', { adapter: data(), range: { start: 31, end: 11 } });

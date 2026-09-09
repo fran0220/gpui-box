@@ -37,3 +37,17 @@ if(blocked.kind==='unchecked') {
 }
 declare const ratio: LayoutExtraMethods['AspectRatio']['query']['ratio']['result'];
 ratio satisfies number;
+// @ts-expect-error native Entity<TextInput> getter is unsupported, not a data query
+type FieldRef = DatetimeMethods['DateInput']['query']['field'];
+// @ts-expect-error native Entity<Calendar> getter is unsupported
+type DateCalendarRef = DatetimeMethods['DateInput']['query']['calendar'];
+// @ts-expect-error native Entity<Calendar> getter is unsupported
+type RangeCalendarRef = DatetimeMethods['RangePicker']['query']['calendar'];
+// @ts-expect-error native Rc<dyn DateAdapter> getter is unsupported
+type AdapterRef = DatetimeMethods['Calendar']['query']['adapter'];
+declare const fieldSnapshot: DatetimeMethods['DateInput']['query']['field_snapshot']['result'];
+fieldSnapshot.value satisfies string;
+declare const calendarSnapshot: DatetimeMethods['RangePicker']['query']['calendar_snapshot']['result'];
+calendarSnapshot.selection satisfies number[];
+declare const adapterSnapshot: DatetimeMethods['Calendar']['query']['adapter_snapshot']['result'];
+adapterSnapshot.weekdays satisfies string[];

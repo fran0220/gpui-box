@@ -53,8 +53,20 @@ through a command (the caller can re-enable through props).
   table. Without it, range coverage is **Unchecked**, not Clear or a checked empty
   result. Dates/months outside the declared domain are refused. Locale/label-only
   updates preserve edits/open state; domain changes reset invalid navigation.
-- `Calendar.adapter`, `DateInput.field` and the `calendar` getters return bounded
-  snapshots of native values, never native handles. They are not handle APIs.
+- Native reference getters are **unsupported**, excluded from the schema/SDK,
+  and refused by native dispatch until the shared owner/generation/mount-guarded
+  opaque typed-ref primitive is integrated. A snapshot is not handle equivalence:
+
+  | Unsupported native getter | Actual native return | Separate data-only query |
+  | --- | --- | --- |
+  | `DateInput.field()` | `&Entity<TextInput>` | `field_snapshot` |
+  | `DateInput.calendar()` | `&Entity<Calendar>` | `calendar_snapshot` |
+  | `RangePicker.calendar()` | `&Entity<Calendar>` | `calendar_snapshot` |
+  | `Calendar.adapter()` | `&SharedDateAdapter` (`Rc<dyn DateAdapter>`) | `adapter_snapshot` |
+
+  No FocusHandle getter is exposed; NavStack focus handles stay internal. Ordinary
+  value getters retain their native names and behavior. These four reference
+  getters must not be counted as complete native surface coverage.
 - `Responsive` offers three slots selected from native measured size; arbitrary
   synchronous JS render callbacks do not cross the worker. Calendar overlays are
   supplied as day-mark records for the same reason.

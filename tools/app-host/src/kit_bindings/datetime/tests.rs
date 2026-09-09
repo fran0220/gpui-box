@@ -60,6 +60,12 @@ fn native_date_commands_queries_retention_and_teardown(cx: &mut gpui::TestAppCon
         let invoke = |h: &mut Harness, name: &str, args: Value, query: bool| {
             h.update(|w, cx| state.invoke(&descriptor, name, &args, query, w, cx))
         };
+        for name in ["field", "calendar", "adapter"] {
+            assert!(
+                invoke(&mut harness, name, json!({}), true).is_err(),
+                "{component}.{name} must not impersonate a native reference with data"
+            );
+        }
         for (method, _) in methods[component]["invoke"].as_object().unwrap() {
             let args = match method.as_str() {
                 "set_disabled" => json!({"disabled":false}),
