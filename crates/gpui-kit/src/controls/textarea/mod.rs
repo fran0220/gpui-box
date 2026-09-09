@@ -703,6 +703,12 @@ impl TextArea {
         self.edit.text()
     }
 
+    /// Persistent current document for indexed line, range, and UTF-16 access.
+    /// Unlike `snapshot`, this does not materialize the whole UTF-8 value.
+    pub fn document(&self) -> gpui::EditSnapshot {
+        self.edit.snapshot()
+    }
+
     /// The current immutable value and the monotonic revision that produced it.
     pub fn snapshot(&self) -> TextAreaSnapshot {
         TextAreaSnapshot {
@@ -921,6 +927,14 @@ impl TextArea {
             .as_ref()
             .map(|layout| layout.row_for_offset(self.cursor_offset()))
             .unwrap_or(0)
+    }
+
+    /// Actual shaped UTF-8 bytes and hard lines in the current layout,
+    /// including offscreen geometry explicitly requested by input/navigation.
+    pub fn shaping_work(&self) -> Option<gpui::EditableTextWork> {
+        self.last_layout
+            .as_ref()
+            .map(|layout| layout.shaping_work())
     }
 
     /// What the last layout pass measured, or nothing before the first one.
@@ -1529,15 +1543,17 @@ impl TextArea {
     }
 
     fn offset_to_utf16(&self, offset: usize) -> usize {
-        text_edit::offset_to_utf16(self.edit.text(), offset)
+        self.edit.snapshot().offset_to_utf16(offset)
     }
 
     fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
-        text_edit::range_to_utf16(self.edit.text(), range)
+        let document = self.edit.snapshot();
+        document.offset_to_utf16(range.start)..document.offset_to_utf16(range.end)
     }
 
     fn range_from_utf16(&self, range_utf16: &Range<usize>) -> Range<usize> {
-        text_edit::range_from_utf16(self.edit.text(), range_utf16)
+        let document = self.edit.snapshot();
+        document.offset_from_utf16(range_utf16.start)..document.offset_from_utf16(range_utf16.end)
     }
 
     fn semantics(&self) -> NodeSpec {
@@ -1606,7 +1622,7 @@ impl EntityInputHandler for TextArea {
     ) -> Option<String> {
         let range = self.range_from_utf16(&range_utf16);
         actual_range.replace(self.range_to_utf16(&range));
-        Some(self.edit.text().get(range)?.to_string())
+        self.edit.snapshot().slice(range)
     }
 
     fn selected_text_range(

@@ -479,3 +479,23 @@ target. `scripts/sync-zed` is an offline verifier for immutable historical
 attribution only. Its source list, filtered refs, and receipts are never
 advanced or rewritten. A deliberate future source port must receive a new,
 independent provenance record rather than reopening the retired import lane.
+
+## Editable layout ownership and lazy source geometry
+
+`EditableTextLayout::painted_lines()` now yields `(Arc<WrappedLine>, Pixels)`
+instead of `(&WrappedLine, Pixels)`. Ordinary `.paint(...)` calls continue to
+work through dereferencing; callers storing a borrowed line must instead
+retain the returned Arc. This is a source-level API change, recorded in the
+generated developer index. Dense and lazy layouts share the same iterator.
+
+`EditableTextLayout::unwrapped` retains a persistent document and shapes only
+painted or explicitly queried hard lines. `bounds_for_range` still computes
+exact logical geometry, including offscreen ranges. Selection rendering must
+use `painted_bounds_for_range` to avoid shaping an entire selected document.
+`text_width` is the maximum measured line width, not a measurement of unseen
+lines. `shaping_work` counts actual submitted UTF-8 bytes and hard lines.
+
+TextArea's new `document()` returns a persistent indexed snapshot;
+`snapshot()` and `value()` retain their contiguous compatibility contracts.
+This preserves caller behavior but does not eliminate their document-wide
+cost. See `docs/coverage.md` for the remaining large-file paths.

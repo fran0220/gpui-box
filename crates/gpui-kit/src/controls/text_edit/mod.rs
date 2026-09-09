@@ -34,16 +34,34 @@ impl AccessibleTextGeometry {
     pub(crate) fn capture(
         source: SharedString,
         scale_factor: f32,
+        bounds_for_range: impl FnMut(Range<usize>) -> Vec<Bounds<Pixels>>,
+    ) -> Self {
+        let len = source.len();
+        Self::capture_ranges(
+            source,
+            scale_factor,
+            std::iter::once(0..len),
+            bounds_for_range,
+        )
+    }
+
+    /// Capture only text eligible to paint. Logical accessibility content is
+    /// still published separately, including offscreen selection positions.
+    pub(crate) fn capture_ranges(
+        source: SharedString,
+        scale_factor: f32,
+        ranges: impl IntoIterator<Item = Range<usize>>,
         mut bounds_for_range: impl FnMut(Range<usize>) -> Vec<Bounds<Pixels>>,
     ) -> Self {
-        let graphemes = source
-            .grapheme_indices(true)
-            .map(|(start, grapheme)| {
+        let mut graphemes = HashMap::new();
+        for range in ranges {
+            for (offset, grapheme) in source[range.clone()].grapheme_indices(true) {
+                let start = range.start + offset;
                 let range = start..start + grapheme.len();
                 let bounds = bounds_for_range(range.clone());
-                ((range.start, range.end), bounds)
-            })
-            .collect();
+                graphemes.insert((range.start, range.end), bounds);
+            }
+        }
         Self {
             source,
             scale_factor,

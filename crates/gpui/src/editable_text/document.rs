@@ -7,6 +7,7 @@ use std::{ops::Range, sync::OnceLock};
 
 use crate::SharedString;
 use ropey::Rope;
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 /// An immutable, cheap-to-clone document revision with indexed hard lines.
 #[derive(Clone, Default)]
@@ -121,13 +122,37 @@ impl EditSnapshot {
         if offset == self.len() {
             return offset;
         }
-        // A hard LF is a grapheme boundary (except CRLF, which remains in
-        // this same line). Scan only that line, preserving arbitrarily long
-        // combining/ZWJ/regional-indicator sequences across rope chunks.
-        let range = self.line_range(self.line_at(offset)).unwrap();
-        let start = range.start;
-        let line = self.slice(range).unwrap();
-        start + super::buffer::floor_grapheme_boundary(&line, offset - start)
+        let offset = self.rope.char_to_byte(self.rope.byte_to_char(offset));
+        let mut cursor = GraphemeCursor::new(offset, self.len(), true);
+        let (mut chunk, mut start, _, _) = self.rope.chunk_at_byte(offset);
+        let mut previous = false;
+        loop {
+            let result = if previous {
+                cursor.prev_boundary(chunk, start)
+            } else {
+                cursor
+                    .is_boundary(chunk, start)
+                    .map(|boundary| boundary.then_some(offset))
+            };
+            match result {
+                Ok(Some(boundary)) => return boundary,
+                Ok(None) if previous => return 0,
+                Ok(None) => previous = true,
+                Err(GraphemeIncomplete::PreContext(end)) => {
+                    let (context, context_start, _, _) = self.rope.chunk_at_byte(end - 1);
+                    cursor.provide_context(&context[..end - context_start], context_start);
+                }
+                Err(GraphemeIncomplete::PrevChunk) => {
+                    (chunk, start, _, _) = self.rope.chunk_at_byte(start - 1);
+                }
+                Err(GraphemeIncomplete::NextChunk) => {
+                    (chunk, start, _, _) = self.rope.chunk_at_byte(start + chunk.len());
+                }
+                Err(GraphemeIncomplete::InvalidOffset) => {
+                    unreachable!("rope chunks contain the cursor")
+                }
+            }
+        }
     }
 }
 
@@ -166,6 +191,34 @@ mod tests {
         assert_eq!(doc.line_range(4), Some(15..15));
         assert_eq!(old.slice(3..8).as_deref(), Some("β界"));
         assert!(doc.slice(4..7).is_none());
+        assert!(doc.contiguous.get().is_none());
+    }
+
+    #[test]
+    fn chunk_cursor_retains_unbounded_grapheme_context_without_copying_lines() {
+        let text = "a".repeat(991) + &"🇺🇳".repeat(300) + "e" + &"\u{301}".repeat(1200) + "👩‍💻z";
+        let doc = EditSnapshot::new(&text);
+        for offset in 980..text.len() {
+            assert_eq!(
+                doc.floor_grapheme(offset),
+                super::super::buffer::floor_grapheme_boundary(&text, offset),
+                "offset {offset}"
+            );
+        }
+        assert!(doc.contiguous.get().is_none());
+    }
+
+    #[test]
+    fn a_large_single_line_does_not_require_copying_the_line_to_edit() {
+        let text = "x".repeat(4_000_000);
+        let mut doc = EditSnapshot::new(&text);
+        for _ in 0..1000 {
+            let at = doc.floor_grapheme(3_900_001);
+            assert_eq!(at, 3_900_001);
+            doc.replace(at..at, "界");
+            doc.replace(at..at + 3, "");
+        }
+        assert_eq!(doc.len(), text.len());
         assert!(doc.contiguous.get().is_none());
     }
 

@@ -117,18 +117,47 @@ impl Element for TextAreaElement {
 
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
-        let lines = window
-            .text_system()
-            .shape_text(
-                display_text,
+        let layout = if wrap == TextAreaWrap::None && !empty {
+            let document = area.document();
+            let height = line_height * document.line_count() as f32;
+            let caret_y = line_height * document.line_at(cursor) as f32;
+            let mut scroll = area
+                .scroll_offset()
+                .max(px(0.0))
+                .min((height - bounds.size.height).max(px(0.0)));
+            if caret_y < scroll {
+                scroll = caret_y;
+            }
+            if caret_y + line_height > scroll + bounds.size.height {
+                scroll = caret_y + line_height - bounds.size.height;
+            }
+            let first = (scroll / line_height).floor() as usize;
+            let last = ((scroll + bounds.size.height) / line_height).ceil() as usize;
+            let layout = EditableTextLayout::unwrapped(
+                document,
+                window.text_system().clone(),
                 font_size,
-                &runs,
-                (wrap == TextAreaWrap::Soft).then_some(bounds.size.width),
-                None,
-            )
-            .map(|lines| lines.into_iter().collect::<Vec<_>>())
-            .unwrap_or_default();
-        let layout = EditableTextLayout::new(source_text.as_ref(), lines, line_height);
+                line_height,
+                runs,
+                first..last,
+            );
+            // Width and painting share these same shaped visible rows.
+            layout.painted_lines().for_each(drop);
+            layout
+        } else {
+            let lines = window
+                .text_system()
+                .shape_text(
+                    display_text,
+                    font_size,
+                    &runs,
+                    (wrap == TextAreaWrap::Soft).then_some(bounds.size.width),
+                    None,
+                )
+                .map(|lines| lines.into_iter().collect::<Vec<_>>())
+                .unwrap_or_default();
+            EditableTextLayout::new(source_text.as_ref(), lines, line_height)
+        };
         // A placeholder never grows the frame: only what was typed does.
         let visible_rows = if empty {
             min_rows
@@ -156,9 +185,10 @@ impl Element for TextAreaElement {
             bounds.left() - horizontal_scroll_offset,
             bounds.top() - scroll_offset,
         );
-        let accessible_geometry = text_edit::AccessibleTextGeometry::capture(
+        let accessible_geometry = text_edit::AccessibleTextGeometry::capture_ranges(
             source_text.clone(),
             window.scale_factor(),
+            layout.painted_source_ranges(),
             |range| {
                 layout.bounds_for_range(range, origin, gpui::TextAlign::Left, bounds.size.width)
             },
@@ -175,7 +205,7 @@ impl Element for TextAreaElement {
         });
 
         let selection = layout
-            .bounds_for_range(selected, origin, gpui::TextAlign::Left, bounds.size.width)
+            .painted_bounds_for_range(selected, origin, gpui::TextAlign::Left, bounds.size.width)
             .into_iter()
             .map(|bounds| fill(bounds, theme.colors.selected))
             .collect();

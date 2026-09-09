@@ -118,6 +118,8 @@ Source: https://crates.io/crates/ropey/1.6.1
 License: MIT
 Scope: persistent editable-text storage and indexed byte/line/UTF-16 conversion.
 Consumed as a registry dependency; no upstream source copied into GPUI Box.
+Rope-chunk Unicode clamping and lazy editable viewport layout are original
+GPUI Box integrations over existing public APIs, with no new source import.
 
 Achromatic glass material (PROVENANCE.md P20): original GPUI Box saturation
 and wash implementation. Apple HIG Materials and WWDC25 session 219 are design

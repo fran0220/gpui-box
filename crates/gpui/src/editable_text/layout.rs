@@ -6,16 +6,24 @@
 //! visual rows, UTF-8 offsets, points, selections, and carets using the same
 //! [`WrappedLine`] values that are painted.
 
-use std::ops::Range;
+use std::{
+    cell::{Cell, RefCell},
+    collections::BTreeMap,
+    ops::Range,
+    sync::Arc,
+};
 
-use crate::{Bounds, Pixels, Point, TextAlign, WrappedLine, point, px, size};
+use crate::{
+    Bounds, EditSnapshot, Pixels, Point, TextAlign, TextRun, WindowTextSystem, WrappedLine, point,
+    px, size,
+};
 
 /// Far enough right to land past the end of any shaped row.
 const PAST_END: Pixels = px(1.0e6);
 
 /// The shaped geometry of one editable UTF-8 document.
 pub struct EditableTextLayout {
-    lines: Vec<WrappedLine>,
+    lines: Vec<Arc<WrappedLine>>,
     /// Where each hard line starts in the source text.
     starts: Vec<usize>,
     /// The first visual row of each hard line.
@@ -23,6 +31,79 @@ pub struct EditableTextLayout {
     total_rows: usize,
     text_len: usize,
     line_height: Pixels,
+    source: Option<SourceLines>,
+}
+
+/// Actual shaping input consumed by one layout, including on-demand geometry.
+/// Bytes count UTF-8 input, not allocation calls or a guessed glyph count.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditableTextWork {
+    /// Number of hard lines actually passed to the shaper.
+    pub shaped_lines: usize,
+    /// Sum of UTF-8 bytes actually passed to the shaper.
+    pub shaped_bytes: usize,
+}
+
+struct SourceLines {
+    document: EditSnapshot,
+    text_system: Arc<WindowTextSystem>,
+    font_size: Pixels,
+    runs: Vec<TextRun>,
+    run_starts: Vec<usize>,
+    visible: Range<usize>,
+    shaped: RefCell<BTreeMap<usize, Arc<WrappedLine>>>,
+    work: Cell<EditableTextWork>,
+}
+
+impl SourceLines {
+    fn line(&self, row: usize) -> Arc<WrappedLine> {
+        if let Some(line) = self.shaped.borrow().get(&row) {
+            return line.clone();
+        }
+        let range = self.document.line_range(row).expect("indexed source row");
+        let mut text = self
+            .document
+            .slice(range.clone())
+            .expect("indexed source range");
+        if text.ends_with('\n') {
+            text.pop();
+        }
+        let end = range.start + text.len();
+        let first = self
+            .run_starts
+            .partition_point(|start| *start <= range.start)
+            .saturating_sub(1);
+        let runs = self
+            .runs
+            .iter()
+            .zip(&self.run_starts)
+            .skip(first)
+            .take_while(|(_, start)| **start < end)
+            .filter_map(|(run, start)| {
+                let len = (start + run.len)
+                    .min(end)
+                    .saturating_sub((*start).max(range.start));
+                (len > 0).then(|| {
+                    let mut run = run.clone();
+                    run.len = len;
+                    run
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut work = self.work.get();
+        work.shaped_lines += 1;
+        work.shaped_bytes += text.len();
+        self.work.set(work);
+        let line = Arc::new(
+            self.text_system
+                .shape_text(text.into(), self.font_size, &runs, None, None)
+                .ok()
+                .and_then(|mut lines| lines.pop())
+                .unwrap_or_default(),
+        );
+        self.shaped.borrow_mut().insert(row, line.clone());
+        line
+    }
 }
 
 impl std::fmt::Debug for EditableTextLayout {
@@ -54,13 +135,81 @@ impl EditableTextLayout {
             row += line.wrap_boundaries().len() + 1;
         }
         Self {
-            lines,
+            lines: lines.into_iter().map(Arc::new).collect(),
             starts,
             rows,
             total_rows: row.max(1),
             text_len: text.len(),
             line_height,
+            source: None,
         }
+    }
+
+    /// No-wrap document layout with indexed hard lines. Only `visible` rows
+    /// paint; geometry queries shape other rows lazily through the same text
+    /// system and style partition, so hit testing and IME never guess widths.
+    /// `painted_bounds_for_range` limits selection painting to visible rows;
+    /// ordinary geometry queries address every offset. Soft wrapping uses `new`.
+    pub fn unwrapped(
+        document: EditSnapshot,
+        text_system: Arc<WindowTextSystem>,
+        font_size: Pixels,
+        line_height: Pixels,
+        runs: Vec<TextRun>,
+        visible: Range<usize>,
+    ) -> Self {
+        let mut start = 0;
+        let run_starts = runs
+            .iter()
+            .map(|run| {
+                let at = start;
+                start += run.len;
+                at
+            })
+            .collect();
+        let total_rows = document.line_count();
+        Self {
+            lines: Vec::new(),
+            starts: Vec::new(),
+            rows: Vec::new(),
+            total_rows,
+            text_len: document.len(),
+            line_height,
+            source: Some(SourceLines {
+                document,
+                text_system,
+                font_size,
+                runs,
+                run_starts,
+                visible: visible.start.min(total_rows)..visible.end.min(total_rows),
+                shaped: RefCell::new(BTreeMap::new()),
+                work: Cell::default(),
+            }),
+        }
+    }
+
+    /// Shaping performed so far by this layout, including on-demand queries.
+    pub fn shaping_work(&self) -> EditableTextWork {
+        self.source
+            .as_ref()
+            .map(|source| source.work.get())
+            .unwrap_or(EditableTextWork {
+                shaped_lines: self.lines.len(),
+                shaped_bytes: self.text_len,
+            })
+    }
+
+    /// Source ranges eligible to paint in this layout. Accessibility geometry
+    /// collectors can skip unpainted text without losing its logical content.
+    pub fn painted_source_ranges(&self) -> Vec<Range<usize>> {
+        if let Some(source) = &self.source {
+            return source
+                .visible
+                .clone()
+                .filter_map(|row| source.document.line_range(row))
+                .collect();
+        }
+        std::iter::once(0..self.text_len).collect()
     }
 
     /// The line height used to shape and paint every visual row.
@@ -88,8 +237,17 @@ impl EditableTextLayout {
         self.line_height * self.total_rows as f32
     }
 
-    /// How wide the widest hard line would be if nothing had wrapped it.
+    /// Width of the widest measured hard line. A lazy no-wrap document reports
+    /// the maximum of visible and explicitly queried lines, not unseen lines.
     pub fn text_width(&self) -> Pixels {
+        if let Some(source) = &self.source {
+            return source
+                .shaped
+                .borrow()
+                .values()
+                .map(|line| line.unwrapped_layout.width)
+                .fold(px(0.0), Pixels::max);
+        }
         self.lines
             .iter()
             .map(|line| line.unwrapped_layout.width)
@@ -97,15 +255,28 @@ impl EditableTextLayout {
     }
 
     /// Where each hard line should be painted relative to the text origin.
-    pub fn painted_lines(&self) -> impl Iterator<Item = (&WrappedLine, Pixels)> {
-        self.lines
-            .iter()
-            .zip(&self.rows)
-            .map(|(line, row)| (line, self.line_height * *row as f32))
+    pub fn painted_lines(&self) -> Box<dyn Iterator<Item = (Arc<WrappedLine>, Pixels)> + '_> {
+        if let Some(source) = &self.source {
+            return Box::new(
+                source
+                    .visible
+                    .clone()
+                    .map(|row| (source.line(row), self.line_height * row as f32)),
+            );
+        }
+        Box::new(
+            self.lines
+                .iter()
+                .zip(&self.rows)
+                .map(|(line, row)| (line.clone(), self.line_height * *row as f32)),
+        )
     }
 
     /// The top-left position of a UTF-8 byte offset relative to the text origin.
     pub fn position_for_offset(&self, offset: usize) -> Point<Pixels> {
+        if self.source.is_some() {
+            return self.position_for_offset_aligned(offset, TextAlign::Left, px(0.0));
+        }
         if self.lines.is_empty() {
             return point(px(0.0), px(0.0));
         }
@@ -130,6 +301,25 @@ impl EditableTextLayout {
         align: TextAlign,
         align_width: Pixels,
     ) -> Point<Pixels> {
+        if let Some(source) = &self.source {
+            let offset = offset.min(self.text_len);
+            let row = source.document.line_at(offset);
+            let start = source
+                .document
+                .line_range(row)
+                .expect("indexed source row")
+                .start;
+            let line = source.line(row);
+            let position = line
+                .position_for_index_aligned(
+                    (offset - start).min(line.len()),
+                    self.line_height,
+                    align,
+                    align_width,
+                )
+                .unwrap_or_default();
+            return point(position.x, position.y + self.line_height * row as f32);
+        }
         if self.lines.is_empty() {
             return point(px(0.0), px(0.0));
         }
@@ -148,6 +338,9 @@ impl EditableTextLayout {
 
     /// The visual row containing a UTF-8 byte offset.
     pub fn row_for_offset(&self, offset: usize) -> usize {
+        if let Some(source) = &self.source {
+            return source.document.line_at(offset);
+        }
         let y = self.position_for_offset(offset).y;
         ((y / self.line_height) as usize).min(self.total_rows - 1)
     }
@@ -180,6 +373,9 @@ impl EditableTextLayout {
 
     /// The offset at an x coordinate on one visual row.
     pub fn offset_at_row(&self, row: usize, x: Pixels) -> usize {
+        if self.source.is_some() {
+            return self.offset_at_row_aligned(row, x, TextAlign::Left, px(0.0));
+        }
         if self.lines.is_empty() {
             return 0;
         }
@@ -206,6 +402,24 @@ impl EditableTextLayout {
         align: TextAlign,
         align_width: Pixels,
     ) -> usize {
+        if let Some(source) = &self.source {
+            let row = row.min(self.total_rows - 1);
+            let start = source
+                .document
+                .line_range(row)
+                .expect("indexed source row")
+                .start;
+            let local = source
+                .line(row)
+                .closest_index_for_position_aligned(
+                    point(x, self.line_height / 2.0),
+                    self.line_height,
+                    align,
+                    align_width,
+                )
+                .unwrap_or_else(|offset| offset);
+            return (start + local).min(self.text_len);
+        }
         if self.lines.is_empty() {
             return 0;
         }
@@ -234,6 +448,11 @@ impl EditableTextLayout {
     /// break as one source character on the preceding row.
     pub fn visual_rows(&self, text: &str) -> Vec<Range<usize>> {
         debug_assert_eq!(text.len(), self.text_len);
+        if let Some(source) = &self.source {
+            return (0..self.total_rows)
+                .filter_map(|row| source.document.line_range(row))
+                .collect();
+        }
         (0..self.total_rows)
             .map(|row| {
                 let mut range = self.row_range(row);
@@ -256,7 +475,36 @@ impl EditableTextLayout {
             .collect()
     }
 
-    /// Painted rectangles occupied by a logical source range.
+    /// Selection rectangles limited to rows eligible to paint. Unlike ordinary
+    /// range geometry, selecting the whole document never shapes hidden rows.
+    pub fn painted_bounds_for_range(
+        &self,
+        mut range: Range<usize>,
+        origin: Point<Pixels>,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Vec<Bounds<Pixels>> {
+        if let Some(source) = &self.source {
+            if source.visible.is_empty() {
+                return Vec::new();
+            }
+            let start = source
+                .document
+                .line_range(source.visible.start)
+                .expect("visible first row")
+                .start;
+            let end = source
+                .document
+                .line_range(source.visible.end - 1)
+                .expect("visible last row")
+                .end;
+            range.start = range.start.max(start);
+            range.end = range.end.min(end);
+        }
+        self.bounds_for_range(range, origin, align, align_width)
+    }
+
+    /// Rectangles occupied by a logical source range, including offscreen rows.
     ///
     /// Wrapped and bidirectional ranges may produce several rectangles. The
     /// returned bounds are relative to `origin` and use the same alignment
@@ -275,6 +523,30 @@ impl EditableTextLayout {
         }
 
         let mut result = Vec::new();
+        if let Some(source) = &self.source {
+            let first = source.document.line_at(start);
+            let last = source.document.line_at(end - 1) + 1;
+            for row in first..last {
+                let line_start = source
+                    .document
+                    .line_range(row)
+                    .expect("indexed source row")
+                    .start;
+                let line = source.line(row);
+                let local_start = start.saturating_sub(line_start).min(line.len());
+                let local_end = end.saturating_sub(line_start).min(line.len());
+                if local_start < local_end {
+                    result.extend(line.bounds_for_range(
+                        local_start..local_end,
+                        point(origin.x, origin.y + self.line_height * row as f32),
+                        self.line_height,
+                        align,
+                        align_width,
+                    ));
+                }
+            }
+            return result;
+        }
         for (index, line) in self.lines.iter().enumerate() {
             let line_start = self.starts[index];
             let line_end = line_start + line.len();
@@ -406,15 +678,109 @@ impl EditableTextLayout {
 
     fn line_for_offset(&self, offset: usize) -> usize {
         self.starts
-            .iter()
-            .rposition(|start| *start <= offset)
-            .unwrap_or(0)
+            .partition_point(|start| *start <= offset)
+            .saturating_sub(1)
     }
 
     fn line_for_row(&self, row: usize) -> usize {
         self.rows
-            .iter()
-            .rposition(|first| *first <= row)
-            .unwrap_or(0)
+            .partition_point(|first| *first <= row)
+            .saturating_sub(1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{TestAppContext, TextStyle};
+
+    #[crate::test]
+    fn source_layout_shapes_viewport_bytes_and_exact_offscreen_queries(cx: &mut TestAppContext) {
+        let row = "let asymmetric = '界';\n";
+        let document = EditSnapshot::new(&row.repeat(200_000));
+        let runs = vec![TextStyle::default().to_run(document.len())];
+        let layout = EditableTextLayout::unwrapped(
+            document.clone(),
+            Arc::new(WindowTextSystem::new(cx.text_system().clone())),
+            px(14.0),
+            px(20.0),
+            runs,
+            150_000..150_012,
+        );
+        assert_eq!(layout.shaping_work(), EditableTextWork::default());
+        assert_eq!(layout.painted_lines().count(), 12);
+        assert_eq!(
+            layout.shaping_work(),
+            EditableTextWork {
+                shaped_lines: 12,
+                shaped_bytes: 12 * (row.len() - 1)
+            }
+        );
+        assert_eq!(layout.height(), px(4_000_020.0));
+        let start = document.line_range(3).expect("fourth row").start;
+        let position = layout.position_for_offset(start + 3);
+        assert_eq!(position.y, px(60.0));
+        assert!(position.x > px(0.0));
+        assert_eq!(layout.offset_for_position(position), start + 3);
+        assert_eq!(layout.shaping_work().shaped_lines, 13);
+        assert_eq!(layout.painted_lines().count(), 12);
+        let selection = layout.painted_bounds_for_range(
+            0..document.len(),
+            point(px(0.0), px(0.0)),
+            TextAlign::Left,
+            px(500.0),
+        );
+        assert!(!selection.is_empty());
+        assert!(selection.iter().all(|bounds| bounds.top() >= px(3_000_000.0) && bounds.bottom() <= px(3_000_240.0)));
+        assert_eq!(
+            layout.shaping_work().shaped_lines,
+            13,
+            "selection only shapes painted rows"
+        );
+    }
+
+    #[crate::test]
+    fn lazy_and_dense_source_geometry_agree_for_unicode_and_style_boundaries(
+        cx: &mut TestAppContext,
+    ) {
+        let text: crate::SharedString = "wide\n界😀z\nאבcd\nlast".into();
+        let system = Arc::new(WindowTextSystem::new(cx.text_system().clone()));
+        let runs = vec![
+            TextStyle::default().to_run(5),
+            TextStyle::default().to_run(text.len() - 5),
+        ];
+        let dense = EditableTextLayout::new(
+            &text,
+            system
+                .shape_text(text.clone(), px(14.0), &runs, None, None)
+                .expect("shape text")
+                .into_vec(),
+            px(20.0),
+        );
+        let lazy = EditableTextLayout::unwrapped(
+            EditSnapshot::new(&text),
+            system,
+            px(14.0),
+            px(20.0),
+            runs,
+            1..3,
+        );
+        for offset in text
+            .char_indices()
+            .map(|(offset, _)| offset)
+            .chain(std::iter::once(text.len()))
+        {
+            assert_eq!(
+                lazy.position_for_offset(offset),
+                dense.position_for_offset(offset),
+                "byte {offset}"
+            );
+        }
+        for row in 0..4 {
+            for x in [px(0.0), px(11.0), px(37.0), px(500.0)] {
+                assert_eq!(lazy.offset_at_row(row, x), dense.offset_at_row(row, x));
+            }
+        }
+        assert_eq!(lazy.visual_rows(&text), dense.visual_rows(&text));
     }
 }

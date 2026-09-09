@@ -217,3 +217,46 @@ fn ordinary_text_areas_keep_their_literal_tab_behavior(cx: &mut TestAppContext) 
         }
     );
 }
+
+#[gpui::test]
+fn source_viewport_shapes_only_visible_rows_after_edits_and_navigation(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "", |editor| editor.rows(4));
+    let text = "let asymmetric = '界';\n".repeat(512) + "tail😀";
+    let expected_len = text.len();
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| entity.update(cx, |editor, cx| editor.set_value(text, cx)));
+    harness.frame();
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.cursor_row(), 512);
+        let work = area.shaping_work().expect("measured layout");
+        assert!(work.shaped_lines <= 5, "{work:?}");
+        assert!(work.shaped_bytes <= 5 * 24, "{work:?}");
+        assert_eq!(area.document().len(), expected_len);
+    });
+    harness.click("source.input");
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-home"
+    } else {
+        "ctrl-home"
+    });
+    harness.keystrokes("down down down down down");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.cursor_row(), 5);
+        assert!(area.shaping_work().expect("layout").shaped_lines <= 5);
+    });
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    });
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.selected_range(), 0..expected_len);
+        assert!(
+            area.shaping_work().expect("layout").shaped_lines <= 5,
+            "select-all must not shape all source rows"
+        );
+    });
+}

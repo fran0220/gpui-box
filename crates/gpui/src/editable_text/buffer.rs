@@ -184,7 +184,7 @@ impl EditBuffer {
         let range = self.clamp(range);
         let insertion = self.fit(&range, text);
 
-        let before = self.text.slice(range.clone()).unwrap();
+        let before = self.text.slice(range.clone()).expect("clamped edit range");
         if before == insertion {
             // Nothing changed, but the caret still lands where the edit
             // pointed, which is what makes a delete over an empty selection
@@ -231,11 +231,17 @@ impl EditBuffer {
 
         self.history.begin_composition(
             range.clone(),
-            &self.text.slice(range.clone()).unwrap(),
+            &self
+                .text
+                .slice(range.clone())
+                .expect("clamped composition range"),
             self.selection_state(),
         );
 
-        let before = self.text.slice(range.clone()).unwrap();
+        let before = self
+            .text
+            .slice(range.clone())
+            .expect("clamped composition range");
         let changed = before != insertion;
         if changed {
             self.text.replace(range.clone(), &insertion);
@@ -267,7 +273,11 @@ impl EditBuffer {
         let composed = self
             .marked
             .clone()
-            .map(|range| self.text.slice(self.clamp(range)).unwrap())
+            .map(|range| {
+                self.text
+                    .slice(self.clamp(range))
+                    .expect("clamped marked range")
+            })
             .unwrap_or_default();
         self.history
             .end_composition(&composed, self.selection_state());

@@ -98,9 +98,9 @@ backdrop_glass_region = "Metal, Direct3D, and WGPU snapshot and process only the
 backdrop_luminance = "A Metal luminance query returns the latest reading published by a completed command buffer and never waits for the GPU; a slow completion may therefore leave the previous completed frame's reading visible for another frame."
 
 [framework_editable_document]
-contract = "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping scans the affected hard line; exact history byte deltas are never re-clamped."
+contract = "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping traverses borrowed rope chunks; exact history byte deltas are never re-clamped. No-wrap EditableTextLayout shapes visible lines and exact on-demand geometry through WindowTextSystem; selection painting is bounded independently of logical range queries."
 tests = ["indexed_lines_survive_asymmetric_edits_and_persistent_snapshots", "large_file_edits_do_not_materialize_document_and_lines_stay_indexed", "indexed_unicode_offsets_match_platform_rounding", "chunk_crossing_graphemes_match_contiguous_clamping", "undo_replays_exact_bytes_when_insertion_joined_a_grapheme"]
-limitations = ["contiguous compatibility callers still copy the whole document", "a single arbitrarily long hard line still requires a line-length grapheme scan", "native macOS and Windows evidence requires the on-demand platform lane"]
+limitations = ["contiguous compatibility callers still copy the whole document", "unbounded Unicode grapheme context may require traversing many chunks without copying them", "soft-wrap layout still shapes the full document", "logical accessibility publication and visual-row enumeration remain document-wide", "no-wrap width reports measured lines rather than unseen lines", "native macOS and Windows evidence requires the on-demand platform lane"]
 
 [release_validation]
 dependency_graph = "cargo run -p xtask -- dependencies check"

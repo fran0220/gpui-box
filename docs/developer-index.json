@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2544
+      "symbolCount": 2549
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -1105,7 +1105,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4260
+      "symbolCount": 4262
     },
     {
       "name": "gpui-box-kit-assets",
@@ -12605,7 +12605,7 @@
       "source": "crates/gpui/src/editable_text/layout.rs",
       "summary": "The shaped geometry of one editable UTF-8 document.",
       "documentation": "The shaped geometry of one editable UTF-8 document.",
-      "signature": "# [doc = \" The shaped geometry of one editable UTF-8 document.\"] pub struct EditableTextLayout { lines : Vec<WrappedLine>, # [doc = \" Where each hard line starts in the source text.\"] starts : Vec<usize>, # [doc = \" The first visual row of each hard line.\"] rows : Vec<usize>, total_rows : usize, text_len : usize, line_height : Pixels, }",
+      "signature": "# [doc = \" The shaped geometry of one editable UTF-8 document.\"] pub struct EditableTextLayout { lines : Vec<Arc<WrappedLine>>, # [doc = \" Where each hard line starts in the source text.\"] starts : Vec<usize>, # [doc = \" The first visual row of each hard line.\"] rows : Vec<usize>, total_rows : usize, text_len : usize, line_height : Pixels, source : Option<SourceLines>, }",
       "cfg": []
     },
     {
@@ -12617,8 +12617,8 @@
       "module": "editable_text::layout",
       "path": "gpui::editable_text::layout",
       "source": "crates/gpui/src/editable_text/layout.rs",
-      "summary": "Painted rectangles occupied by a logical source range.",
-      "documentation": "Painted rectangles occupied by a logical source range.\n\nWrapped and bidirectional ranges may produce several rectangles. The\nreturned bounds are relative to `origin` and use the same alignment\nand width that the caller will pass to [`WrappedLine::paint`].",
+      "summary": "Rectangles occupied by a logical source range, including offscreen rows.",
+      "documentation": "Rectangles occupied by a logical source range, including offscreen rows.\n\nWrapped and bidirectional ranges may produce several rectangles. The\nreturned bounds are relative to `origin` and use the same alignment\nand width that the caller will pass to [`WrappedLine::paint`].",
       "signature": "pub fn bounds_for_range (& self, range : Range<usize>, origin : Point<Pixels>, align : TextAlign, align_width : Pixels,) -> Vec<Bounds<Pixels>>",
       "cfg": [],
       "target": "EditableTextLayout"
@@ -12819,6 +12819,21 @@
       "target": "EditableTextLayout"
     },
     {
+      "id": "gpui::editable_text::layout::EditableTextLayout::painted_bounds_for_range",
+      "name": "painted_bounds_for_range",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Selection rectangles limited to rows eligible to paint. Unlike ordinary range geometry, selecting the whole document never shapes hidden rows.",
+      "documentation": "Selection rectangles limited to rows eligible to paint. Unlike ordinary\nrange geometry, selecting the whole document never shapes hidden rows.",
+      "signature": "pub fn painted_bounds_for_range (& self, mut range : Range<usize>, origin : Point<Pixels>, align : TextAlign, align_width : Pixels,) -> Vec<Bounds<Pixels>>",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
       "id": "gpui::editable_text::layout::EditableTextLayout::painted_lines",
       "name": "painted_lines",
       "kind": "method",
@@ -12829,7 +12844,22 @@
       "source": "crates/gpui/src/editable_text/layout.rs",
       "summary": "Where each hard line should be painted relative to the text origin.",
       "documentation": "Where each hard line should be painted relative to the text origin.",
-      "signature": "pub fn painted_lines (& self) -> impl Iterator<Item = (& WrappedLine, Pixels)>",
+      "signature": "pub fn painted_lines (& self) -> Box<dyn Iterator<Item = (Arc<WrappedLine>, Pixels)> + '_>",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
+      "id": "gpui::editable_text::layout::EditableTextLayout::painted_source_ranges",
+      "name": "painted_source_ranges",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Source ranges eligible to paint in this layout. Accessibility geometry collectors can skip unpainted text without losing its logical content.",
+      "documentation": "Source ranges eligible to paint in this layout. Accessibility geometry\ncollectors can skip unpainted text without losing its logical content.",
+      "signature": "pub fn painted_source_ranges (& self) -> Vec<Range<usize>>",
       "cfg": [],
       "target": "EditableTextLayout"
     },
@@ -12909,6 +12939,21 @@
       "target": "EditableTextLayout"
     },
     {
+      "id": "gpui::editable_text::layout::EditableTextLayout::shaping_work",
+      "name": "shaping_work",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Shaping performed so far by this layout, including on-demand queries.",
+      "documentation": "Shaping performed so far by this layout, including on-demand queries.",
+      "signature": "pub fn shaping_work (& self) -> EditableTextWork",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
       "id": "gpui::editable_text::layout::EditableTextLayout::text_width",
       "name": "text_width",
       "kind": "method",
@@ -12917,8 +12962,8 @@
       "module": "editable_text::layout",
       "path": "gpui::editable_text::layout",
       "source": "crates/gpui/src/editable_text/layout.rs",
-      "summary": "How wide the widest hard line would be if nothing had wrapped it.",
-      "documentation": "How wide the widest hard line would be if nothing had wrapped it.",
+      "summary": "Width of the widest measured hard line. A lazy no-wrap document reports the maximum of visible and explicitly queried lines, not unseen lines.",
+      "documentation": "Width of the widest measured hard line. A lazy no-wrap document reports\nthe maximum of visible and explicitly queried lines, not unseen lines.",
       "signature": "pub fn text_width (& self) -> Pixels",
       "cfg": [],
       "target": "EditableTextLayout"
@@ -12939,6 +12984,21 @@
       "target": "EditableTextLayout"
     },
     {
+      "id": "gpui::editable_text::layout::EditableTextLayout::unwrapped",
+      "name": "unwrapped",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "No-wrap document layout with indexed hard lines. Only `visible` rows paint; geometry queries shape other rows lazily through the same text system and style partition, so hit testing and IME never guess widths. `painted_bounds_for_range` limits selection painting to visible rows; ordinary geometry queries address every offset. Soft wrapping uses `new`.",
+      "documentation": "No-wrap document layout with indexed hard lines. Only `visible` rows\npaint; geometry queries shape other rows lazily through the same text\nsystem and style partition, so hit testing and IME never guess widths.\n`painted_bounds_for_range` limits selection painting to visible rows;\nordinary geometry queries address every offset. Soft wrapping uses `new`.",
+      "signature": "pub fn unwrapped (document : EditSnapshot, text_system : Arc<WindowTextSystem>, font_size : Pixels, line_height : Pixels, runs : Vec<TextRun>, visible : Range<usize>,) -> Self",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
       "id": "gpui::editable_text::layout::EditableTextLayout::visual_rows",
       "name": "visual_rows",
       "kind": "method",
@@ -12952,6 +13012,20 @@
       "signature": "pub fn visual_rows (& self, text : & str) -> Vec<Range<usize>>",
       "cfg": [],
       "target": "EditableTextLayout"
+    },
+    {
+      "id": "gpui::editable_text::layout::EditableTextWork",
+      "name": "EditableTextWork",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Actual shaping input consumed by one layout, including on-demand geometry. Bytes count UTF-8 input, not allocation calls or a guessed glyph count.",
+      "documentation": "Actual shaping input consumed by one layout, including on-demand geometry.\nBytes count UTF-8 input, not allocation calls or a guessed glyph count.",
+      "signature": "# [doc = \" Actual shaping input consumed by one layout, including on-demand geometry.\"] # [doc = \" Bytes count UTF-8 input, not allocation calls or a guessed glyph count.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct EditableTextWork { # [doc = \" Number of hard lines actually passed to the shaper.\"] pub shaped_lines : usize, # [doc = \" Sum of UTF-8 bytes actually passed to the shaper.\"] pub shaped_bytes : usize, }",
+      "cfg": []
     },
     {
       "id": "gpui::editable_text::next_grapheme_boundary",
@@ -13151,7 +13225,7 @@
     },
     {
       "id": "gpui::editable_text::reexport-4",
-      "name": "layout :: EditableTextLayout",
+      "name": "layout :: { EditableTextLayout , EditableTextWork }",
       "kind": "reexport",
       "package": "gpui-box",
       "crate": "gpui",
@@ -13160,7 +13234,7 @@
       "source": "crates/gpui/src/editable_text/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use layout::EditableTextLayout;",
+      "signature": "pub use layout::{ EditableTextLayout, EditableTextWork };",
       "cfg": []
     },
     {
@@ -64359,6 +64433,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::document",
+      "name": "document",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Persistent current document for indexed line, range, and UTF-16 access. Unlike `snapshot`, this does not materialize the whole UTF-8 value.",
+      "documentation": "Persistent current document for indexed line, range, and UTF-16 access.\nUnlike `snapshot`, this does not materialize the whole UTF-8 value.",
+      "signature": "pub fn document (& self) -> gpui::EditSnapshot",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::enter",
       "name": "enter",
       "kind": "method",
@@ -64760,6 +64849,21 @@
       "summary": "Replaces the text from the host side, for example when a form resets.",
       "documentation": "Replaces the text from the host side, for example when a form resets.",
       "signature": "pub fn set_value (& mut self, value : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::shaping_work",
+      "name": "shaping_work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Actual shaped UTF-8 bytes and hard lines in the current layout, including offscreen geometry explicitly requested by input/navigation.",
+      "documentation": "Actual shaped UTF-8 bytes and hard lines in the current layout,\nincluding offscreen geometry explicitly requested by input/navigation.",
+      "signature": "pub fn shaping_work (& self) -> Option<gpui::EditableTextWork>",
       "cfg": [],
       "target": "TextArea"
     },
@@ -124614,6 +124718,7 @@
         "arrows_claimed() -> bool",
         "completion_claimed() -> bool",
         "value() -> &SharedString",
+        "document() -> gpui::EditSnapshot",
         "snapshot() -> TextAreaSnapshot",
         "revision() -> u64",
         "wrap_mode() -> TextAreaWrap",
@@ -124625,6 +124730,7 @@
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
+        "shaping_work() -> Option<gpui::EditableTextWork>",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
@@ -142586,6 +142692,12 @@
       "anchor": "framework-development-contract"
     },
     {
+      "id": "compatibility-editable-layout-ownership-and-lazy-source-geometry",
+      "title": "Editable layout ownership and lazy source geometry",
+      "guide": "compatibility",
+      "anchor": "editable-layout-ownership-and-lazy-source-geometry"
+    },
+    {
       "id": "component-contracts-general-contract",
       "title": "General contract",
       "guide": "component-contracts",
@@ -142836,6 +142948,12 @@
       "title": "Intrinsic image sizing is separate from object fitting",
       "guide": "coverage",
       "anchor": "intrinsic-image-sizing-is-separate-from-object-fitting"
+    },
+    {
+      "id": "coverage-incremental-source-text-foundation",
+      "title": "Incremental source-text foundation",
+      "guide": "coverage",
+      "anchor": "incremental-source-text-foundation"
     },
     {
       "id": "datetime-why-the-seam-is-here",
@@ -145758,10 +145876,13 @@
       "contract": "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
     },
     "framework_editable_document": {
-      "contract": "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping scans the affected hard line; exact history byte deltas are never re-clamped.",
+      "contract": "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping traverses borrowed rope chunks; exact history byte deltas are never re-clamped. No-wrap EditableTextLayout shapes visible lines and exact on-demand geometry through WindowTextSystem; selection painting is bounded independently of logical range queries.",
       "limitations": [
         "contiguous compatibility callers still copy the whole document",
-        "a single arbitrarily long hard line still requires a line-length grapheme scan",
+        "unbounded Unicode grapheme context may require traversing many chunks without copying them",
+        "soft-wrap layout still shapes the full document",
+        "logical accessibility publication and visual-row enumeration remain document-wide",
+        "no-wrap width reports measured lines rather than unseen lines",
         "native macOS and Windows evidence requires the on-demand platform lane"
       ],
       "tests": [

@@ -774,6 +774,11 @@ headless workspaces retain the same local package authority.
 
 `EditBuffer` stores text in Ropey 1.6.1 (MIT), with LF-only line indexing and
 lazy contiguous compatibility snapshots. The byte-coordinate integration,
-line-local grapheme clamping, and exact history replay are original GPUI Box
+rope-chunk grapheme clamping, and exact history replay are original GPUI Box
 work. Ropey is a crates.io dependency, not a source port or synchronization
 lane. The frozen import receipt and local framework authority are unchanged.
+
+No-wrap `EditableTextLayout` uses the local `WindowTextSystem` to shape visible
+hard lines and exact on-demand geometry. Indexed source mapping, bounded
+selection painting, shaping-input counters, and viewport accessibility-cell
+capture are original GPUI Box work. No renderer or shader formats changed.

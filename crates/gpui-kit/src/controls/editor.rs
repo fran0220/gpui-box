@@ -414,10 +414,9 @@ impl Render for Editor {
         let metrics = theme.control.get(ControlSize::Md);
         let focus = self.area.read(cx).focus_handle(cx);
         let focused = focus.is_focused(window);
-        let snapshot = self.area.read(cx).snapshot();
-        let selection = self.area.read(cx).selected_range();
-        let active_line = hard_line_at(&snapshot.text, selection.end);
-        let line_count = snapshot.text.matches('\n').count() + 1;
+        let document = self.area.read(cx).document();
+        let active_line = document.line_at(self.area.read(cx).cursor_offset());
+        let line_count = document.line_count();
         let digits = line_count.to_string().len().max(2);
         let gutter_width = px(metrics.font_size * digits as f32 * 0.65
             + theme.spacing.sm
@@ -425,12 +424,9 @@ impl Render for Editor {
         let line_height = px(theme
             .type_style(gpui_kit_theme::TypeScale::Code)
             .line_height);
-        let scroll = self
-            .area
-            .read(cx)
-            .source_geometry()
-            .map(|geometry| geometry.vertical_scroll)
-            .unwrap_or(px(0.0));
+        let scroll = self.area.read(cx).scroll_offset();
+        let first_line = ((scroll / line_height).floor() as usize).min(line_count - 1);
+        let last_line = (first_line + self.rows + 1).min(line_count);
         let numbers = self.line_numbers.then(|| {
             div()
                 .relative()
@@ -442,10 +438,10 @@ impl Render for Editor {
                 .child(
                     div()
                         .absolute()
-                        .top(-scroll)
+                        .top(line_height * first_line as f32 - scroll)
                         .left(px(0.0))
                         .w_full()
-                        .children((0..line_count).map(|index| {
+                        .children((first_line..last_line).map(|index| {
                             div()
                                 .h(line_height)
                                 .pr(px(theme.spacing.xs))
@@ -488,13 +484,6 @@ impl Render for Editor {
                 NodeSpec::new(self.ident.semantic_id(), Role::Group).text(self.label.clone()),
             )
     }
-}
-
-fn hard_line_at(text: &str, offset: usize) -> usize {
-    text[..offset.min(text.len())]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
 }
 
 fn valid_highlights(snapshot: &TextAreaSnapshot, highlights: &EditorHighlights) -> bool {

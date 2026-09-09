@@ -1182,3 +1182,25 @@ real adapters. Kit adds no mask or component-specific sizing workaround.
 `cinematic-effects` additionally reviews
 Contain: a 240×140 frame in a 372×154 slot remains centered at 264×154 rather
 than forcing the slot to the image's intrinsic ratio.
+
+## Incremental source-text foundation
+
+The shared EditBuffer uses persistent storage and indexed LF lines/UTF-16
+conversion. Grapheme clamping borrows rope chunks, including unbounded
+combining and regional-indicator context. Tests exercise 200,000 source lines
+and a four-million-byte single line without materializing a compatibility
+string on edits. Legacy `text()` still explicitly materializes a whole value.
+
+No-wrap TextArea and Editor shape visible rows, with exact offscreen geometry
+shaped on demand. Whole-document selection paints only visible rows, and
+accessibility cell geometry captures only paintable bytes. Shaping budgets
+measure actual input bytes and lines (`EditableTextWork`), not allocation
+counts. Dense and lazy Unicode/bidi geometry are compared directly.
+
+This is not a claim of bounded total editor frame or edit work: whole-value
+events and semantic values still require contiguous snapshots, logical
+accessibility publication and row enumeration remain document-wide, and
+soft-wrap still uses full-document layout. A very long visible hard line is
+shaped whole. Those remaining paths must be migrated before advertising a
+viewport-bounded large-file editor; multicursor, folding and caller language
+services are not implied by this foundation.

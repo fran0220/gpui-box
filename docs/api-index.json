@@ -5097,6 +5097,7 @@
         "arrows_claimed() -> bool",
         "completion_claimed() -> bool",
         "value() -> &SharedString",
+        "document() -> gpui::EditSnapshot",
         "snapshot() -> TextAreaSnapshot",
         "revision() -> u64",
         "wrap_mode() -> TextAreaWrap",
@@ -5108,6 +5109,7 @@
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
+        "shaping_work() -> Option<gpui::EditableTextWork>",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
