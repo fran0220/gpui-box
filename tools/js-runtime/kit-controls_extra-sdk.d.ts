@@ -35,6 +35,7 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  MentionInput(id:string,props?:{disabled?:boolean;readOnly?:boolean;value?:string;placeholder?:string;rows?:number;suggestions?:KitMethodContracts['MentionInput']['invoke']['set_suggestions']['args']['suggestions']},events?:{changed?(text:string):void;submitted?():void;cancelled?():void;focused?():void;blurred?():void;pasteRefused?(refusal:PasteRefusal):void;queryChanged?(query:{text:string;range:ByteRange}|null):void;accepted?(value:{id:string;range:ByteRange}):void}):KitNode;
   Editor(id:string,props?:EditorProps,events?:EditorEvents):KitNode;
   TextArea(id:string,props?:TextAreaProps,events?:TextAreaEvents):KitNode;
   Cascader(id:string,props?:ControlProps & {options?:CascaderOption[];selected?:string;name?:string;placeholder?:string},events?:{selected?(id:string):void;expanded?(id:string):void;retry?(id:string):void;opened?():void;closed?():void}):KitNode;
@@ -94,6 +95,7 @@ interface OptionCommands {
 }
 interface SelectionQueries extends FocusQueries {is_disabled:SelectionQuery<boolean>}
 export interface ControlsExtraMethodContracts {
+  MentionInput: KitMethodContracts['MentionInput'];
   Editor: KitMethodContracts['Editor'];
   TextArea:{invoke:{
     set_value:SelectionCommand<{value:string}>;insert:SelectionCommand<{text:string}>;replace_range:{args:{range:ByteRange;text:string};result:ByteRange|null};replace_ranges:{args:{edits:{range:ByteRange;text:string}[]};result:boolean};set_selected_range:SelectionCommand<{range:ByteRange}>;set_selections:{args:{selections:TextSelection[]};result:boolean};select_rectangle:{args:{anchor:{x:number;y:number};focus:{x:number;y:number}};result:boolean};

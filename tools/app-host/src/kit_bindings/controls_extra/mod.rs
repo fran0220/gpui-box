@@ -20,6 +20,7 @@ use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 mod auth;
 mod cascader;
 mod editor;
+mod mention;
 mod recorder;
 mod search;
 mod selection;
@@ -59,6 +60,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "Cascader",
     "TextArea",
     "Editor",
+    "MentionInput",
 ];
 
 pub(super) fn settings_section(
@@ -197,6 +199,7 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    mentions: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::mention::MentionInput>>>>,
     editors: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::editor::Editor>>>>,
     text_areas: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::textarea::TextArea>>>>,
     cascaders: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::cascader::Cascader>>>>,
@@ -220,6 +223,11 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "MentionInput" => self
+                .mentions
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
             "Editor" => self
                 .editors
                 .borrow()
@@ -317,6 +325,9 @@ impl State {
         cx: &App,
         refs: &crate::references::Registration<'_>,
     ) -> Option<anyhow::Result<Value>> {
+        if node.component.as_deref() == Some("MentionInput") {
+            return self.mention_reference_query(node, method, args, cx, refs);
+        }
         if node.component.as_deref() == Some("Editor") {
             return self.editor_reference_query(node, method, args, cx, refs);
         }
@@ -424,6 +435,9 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.mentions
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "MentionInput"));
         self.editors
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "Editor"));
@@ -487,6 +501,7 @@ impl State {
         emit: Emit,
     ) -> AnyElement {
         match node.component.as_deref() {
+            Some("MentionInput") => return self.render_mention(node, window, cx, emit),
             Some("Editor") => return self.render_editor(node, window, cx, emit),
             Some("TextArea") => return self.render_text_area(node, window, cx, emit),
             Some("Cascader") => return self.render_cascader(node, window, cx, emit),
@@ -610,6 +625,7 @@ impl State {
         cx: &mut App,
     ) -> anyhow::Result<Value> {
         match node.component.as_deref() {
+            Some("MentionInput") => return self.invoke_mention(node, method, args, query, cx),
             Some("Editor") => return self.invoke_editor(node, method, args, query, _window, cx),
             Some("TextArea") => {
                 return self.invoke_text_area(node, method, args, query, _window, cx);

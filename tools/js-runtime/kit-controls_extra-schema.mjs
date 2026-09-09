@@ -61,6 +61,9 @@ const replacement=object({range:byteRange,text:string},['range','text']);
 const serviceEffect={oneOf:[object({kind:choice('edits'),edits:array(replacement)},['kind','edits']),object({kind:choice('definition'),target:identity,range:byteRange},['kind','target','range']),object({kind:choice('action'),id:identity},['kind','id'])]};
 const serviceValue={oneOf:[object({kind:choice('items'),items:array(object({id:identity,label:string,detail:string,effect:serviceEffect},['id','label','effect']))},['kind','items']),object({kind:choice('hover'),range:byteRange,contents:string},['kind','range','contents'])]};
 const serviceResult={oneOf:[object({state:choice('idle','loading','empty'),attempts:integer},['state']),object({state:choice('ready','refreshing'),value:serviceValue,attempts:integer},['state','value']),object({state:choice('error','unavailable'),reason:string,value:serviceValue,attempts:integer},['state','reason'])]};
+const mentionCandidate=object({id:identity,label:string,description:string,replacement:string,searchTerms:array(string),refusal:string},['id','label']);
+const mentionSuggestions={oneOf:[object({state:choice('idle','loading','empty'),attempts:integer},['state']),object({state:choice('ready','refreshing'),value:array(mentionCandidate),attempts:integer},['state','value']),object({state:choice('error','unavailable'),reason:string,value:array(mentionCandidate),attempts:integer},['state','reason'])]};
+const mentionQuery={...object({text:string,range:byteRange},['text','range']),nullable:true};
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -80,6 +83,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  MentionInput:{props:object({disabled:boolean,readOnly:boolean,value:string,placeholder:string,rows:rowCount,suggestions:mentionSuggestions}),events:{changed:string,submitted:choice(null),cancelled:choice(null),focused:choice(null),blurred:choice(null),pasteRefused:pasteRefusal,queryChanged:mentionQuery,accepted:object({id:identity,range:byteRange},['id','range'])}},
   Editor:{props:object({disabled:boolean,readOnly:boolean,label:string,value:string,rows:rowCount,lineNumbers:boolean,languageServices:boolean}),events:{changed:string,edited:textEdit,selectionChanged:byteRange,foldChanged:object({id:identity,collapsed:boolean},['id','collapsed']),pasteRefused:pasteRefusal,submitted:choice(null),cancelled:choice(null),focused:choice(null),blurred:choice(null),serviceRequested:editorRequest,serviceAccepted:identity,definitionRequested:object({target:identity,range:byteRange},['target','range']),codeActionRequested:identity}},
   TextArea:{props:object(textAreaProps),events:textAreaEvents},
   Cascader:{props:{$defs:cascaderDefs,...object({...common,name:string,placeholder:string,selected:identity,options:cascaderOptions})},events:{selected:identity,expanded:identity,retry:identity,opened:choice(null),closed:choice(null)}},
@@ -112,6 +116,7 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  MentionInput:{invoke:{set_suggestions:method({suggestions:mentionSuggestions},choice(null))},query:{editor:method({},object({$nativeRef:identity,type:choice('TextArea')},['$nativeRef','type'])),active_query:method({},mentionQuery),is_open:method({},boolean)}},
   Editor:{invoke:{
     set_diagnostics:method({revision:integer,diagnostics:array(object({id:identity,range:byteRange,message:string,severity:choice('error','warning','information','hint')},['id','range','message','severity']))},boolean),
     set_semantic_tokens:method({revision:integer,tokens:array(object({range:byteRange,class:choice('keyword','stringLiteral','comment','number','inline','inlineWash','added','addedWash','removed','removedWash')},['range','class']))},boolean),

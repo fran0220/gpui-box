@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('mentions keep retained candidate values on failure and expose only native editor refs',()=>{
+ const candidate={id:'user',label:'Caller fixture',replacement:'@fixture',searchTerms:['alias'],refusal:'Policy'};
+ for(const state of ['ready','refreshing'])validateValue({suggestions:{state,value:[candidate]}},familyMethods.MentionInput.invoke.set_suggestions.args);
+ validateValue({suggestions:{state:'error',reason:'Refresh failed',value:[candidate]}},familySchemas.MentionInput.props);
+ assert.throws(()=>validateValue({suggestions:{state:'unavailable'}},familySchemas.MentionInput.props));
+ assert.throws(()=>validateValue({suggestions:{state:'ready',value:[candidate,candidate]}},familySchemas.MentionInput.props));
+ validateValue({$nativeRef:'native-1',type:'TextArea'},familyMethods.MentionInput.query.editor.result);
+ assert.throws(()=>validateValue({text:'not an entity'},familyMethods.MentionInput.query.editor.result));
+ validateValue('Complete text',familySchemas.MentionInput.events.changed);
+ assert.throws(()=>validateValue({revision:3,text:'snapshot'},familySchemas.MentionInput.events.changed));
+});
+
 test('native editors distinguish full snapshots, entity getters and revision paired responses',()=>{
   for(const component of ['Editor','TextArea']){
     validateValue({revision:2,text:'AλZ'},familyMethods[component].query.snapshot.result);
@@ -275,6 +287,9 @@ kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remov
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
 kit.TextArea('area',{wrap:'none',autosize:{min:2,max:5}},{edited(edit){const inserted:string=edit.inserted;},change(text){const full:string=text;}});
 kit.Editor('editor',{languageServices:true},{serviceRequested(request){const full:string=request.document;}});
+kit.MentionInput('mention',{suggestions:{state:'refreshing',value:[{id:'x',label:'X',replacement:'@x'}]}},{changed(text){const value:string=text;},accepted(event){const id:string=event.id;}});
+// @ts-expect-error native mention change is a complete string, not lazy snapshot metadata
+kit.MentionInput('bad',{}, {changed(value:{revision:number}) {}});
 // @ts-expect-error snapshots contain complete text, not merely revision metadata
 const incomplete:ControlsExtraMethodContracts['Editor']['query']['snapshot']['result']={revision:2};
 // @ts-expect-error no invented parser capability
