@@ -34,7 +34,7 @@ impl Render for ImageReview {
 }
 
 #[test]
-fn native_pixels_stale_factory_and_revoked_atlas() {
+fn native_pixels_stale_mount_factory_and_released_image() {
     let mut cx = HeadlessAppContext::with_platform(
         gpui_platform::test_text_system("Geist"),
         Arc::new(gpui_kit::assets::Assets),
@@ -42,13 +42,15 @@ fn native_pixels_stale_factory_and_revoked_atlas() {
     );
     let owner = EffectOwner::new();
     let other = EffectOwner::new();
+    let principal = EffectOwner::new();
+    let peer = EffectOwner::new();
     let (mut store, reference, source, image) = cx.update(|cx| {
         gpui_kit::install(cx);
         let mut store = Resources::install(cx);
-        store.reconcile(&HashSet::from([owner]), cx);
+        store.reconcile(&HashMap::from([(owner, principal), (peer, principal)]), cx);
         let reference = store
             .register(
-                owner,
+                principal,
                 Registration {
                     key: "pixels".into(),
                     mime: RGBA.into(),
@@ -76,7 +78,7 @@ fn native_pixels_stale_factory_and_revoked_atlas() {
         });
         let image = {
             let state = store.0.borrow();
-            let Asset::Image(image) = &state.owners[&owner]["pixels"].asset else {
+            let Asset::Image(image) = &state.owners[&principal]["pixels"].asset else {
                 panic!("image")
             };
             image.clone()
@@ -128,13 +130,32 @@ fn native_pixels_stale_factory_and_revoked_atlas() {
     });
     // Revoke during a window update: the active window is absent from App.windows.
     cx.update_window(window, |_, window, cx| {
-        store.revoke(owner, cx);
+        store.reconcile(&HashMap::from([(peer, principal)]), cx);
         let ImageSource::Custom(loader) = &loader else {
             unreachable!()
         };
         assert!(cx.with_effect_owner(Some(owner), |cx| {
             loader(window, cx).expect("settled revocation").is_err()
         }));
+        cx.with_effect_owner(Some(peer), |cx| {
+            let source = Resources::image(
+                &ResourceRef {
+                    key: "pixels".into(),
+                },
+                cx,
+            )
+            .expect("same-generation peer image");
+            let ImageSource::Custom(load) = source else {
+                panic!("custom source")
+            };
+            assert_eq!(
+                load(window, cx)
+                    .expect("settled peer")
+                    .expect("authorized peer")
+                    .id,
+                image.id
+            );
+        });
     })
     .expect("revocation during window update");
     cx.run_until_parked();
@@ -149,6 +170,9 @@ fn native_pixels_stale_factory_and_revoked_atlas() {
     .expect("refused draw");
     let refused = cx.capture_screenshot(window).expect("refused capture");
     assert_eq!(refused.get_pixel(20, 50).0, [255, 0, 255, 255]);
+    cx.update_window(window, |_, _, cx| store.revoke(principal, cx))
+        .expect("revoke principal during update");
+    cx.run_until_parked();
     assert_eq!(
         Arc::strong_count(&image),
         1,

@@ -4,8 +4,9 @@
 //! is deliberately uncompressed: eight little-endian dimension bytes followed by
 //! exactly width * height * 4 pixels. Compressed formats are not a fallback.
 //! Registration is synchronous and bounded; there are no concurrent decode jobs.
-//! The runtime must reconcile the *approved* EffectOwners on every lifecycle or
-//! grant change and issue a new EffectOwner for every generation replacement.
+//! The runtime reconciles approved mount-token → generation-principal aliases
+//! on every lifecycle/grant change. Storage/quota belongs to the generation;
+//! every lazy lease additionally belongs to the particular component mount.
 use anyhow::{Result, anyhow, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use gpui::{App, EffectOwner, Global, ImageCacheError, ImageSource, RenderImage, size};
@@ -52,6 +53,11 @@ struct Entry {
 #[derive(Default)]
 struct State {
     owners: HashMap<EffectOwner, HashMap<String, Entry>>,
+    mounts: HashMap<EffectOwner, Mount>,
+}
+struct Mount {
+    principal: EffectOwner,
+    identity: Rc<()>,
 }
 
 /// App contains only a weak view; the Host owns the lifetime via ResourceStore.
@@ -62,6 +68,7 @@ pub struct ResourceStore(Rc<RefCell<State>>);
 impl Drop for ResourceStore {
     fn drop(&mut self) {
         self.0.borrow_mut().owners.clear();
+        self.0.borrow_mut().mounts.clear();
     }
 }
 
@@ -78,22 +85,37 @@ fn validate_key(key: &str) -> Result<()> {
 }
 
 impl ResourceStore {
-    /// Supply only active, resource-authorized owners, never descriptor owners.
-    pub fn reconcile(&mut self, approved: &HashSet<EffectOwner>, cx: &mut App) {
+    /// Active authorized mount → generation principal, supplied only by host.
+    /// Many mounts share one immutable bucket and one generation quota.
+    pub fn reconcile(&mut self, approved: &HashMap<EffectOwner, EffectOwner>, cx: &mut App) {
         let mut state = self.0.borrow_mut();
+        state
+            .mounts
+            .retain(|mount, alias| approved.get(mount) == Some(&alias.principal));
+        for (mount, principal) in approved {
+            state.mounts.entry(*mount).or_insert_with(|| Mount {
+                principal: *principal,
+                identity: Rc::new(()),
+            });
+        }
+        let principals: HashSet<_> = approved.values().copied().collect();
         state.owners.retain(|owner, entries| {
-            if approved.contains(owner) {
+            if principals.contains(owner) {
                 return true;
             }
             evict(entries, cx);
             false
         });
-        for owner in approved {
-            state.owners.entry(*owner).or_default();
+        for owner in principals {
+            state.owners.entry(owner).or_default();
         }
     }
 
     pub fn revoke(&mut self, owner: EffectOwner, cx: &mut App) {
+        self.0
+            .borrow_mut()
+            .mounts
+            .retain(|_, alias| alias.principal != owner);
         if let Some(entries) = self.0.borrow_mut().owners.remove(&owner) {
             evict(&entries, cx);
         }
@@ -105,6 +127,7 @@ impl ResourceStore {
             evict(entries, cx);
         }
         self.0.borrow_mut().owners.clear();
+        self.0.borrow_mut().mounts.clear();
     }
 
     /// Atomic registration: rejection consumes no count/byte quota and may be retried.
@@ -208,6 +231,8 @@ pub struct ResourceBytes(Lease);
 struct Lease {
     state: Weak<RefCell<State>>,
     owner: EffectOwner,
+    principal: EffectOwner,
+    mount_identity: Weak<()>,
     key: String,
     identity: Weak<()>,
 }
@@ -223,9 +248,18 @@ impl Lease {
             .upgrade()
             .ok_or_else(|| anyhow!("resource host disposed"))?;
         let state = state.borrow();
+        let mount = state
+            .mounts
+            .get(&self.owner)
+            .ok_or_else(|| anyhow!("resource mount revoked"))?;
+        ensure!(
+            mount.principal == self.principal
+                && self.mount_identity.ptr_eq(&Rc::downgrade(&mount.identity)),
+            "stale resource mount"
+        );
         let entry = state
             .owners
-            .get(&self.owner)
+            .get(&self.principal)
             .and_then(|entries| entries.get(&self.key))
             .ok_or_else(|| anyhow!("resource revoked or unknown"))?;
         ensure!(
@@ -247,6 +281,11 @@ impl ResourceBytes {
 
 impl Resources {
     pub fn install(cx: &mut App) -> ResourceStore {
+        // Replacing the host view must revoke factories even if the old host's
+        // owner handle has not yet been dropped by the retained entity graph.
+        if let Some(previous) = cx.try_global::<Self>().and_then(|view| view.0.upgrade()) {
+            ResourceStore(previous).clear(cx);
+        }
         let store = ResourceStore(Rc::new(RefCell::new(State::default())));
         cx.set_global(Self(Rc::downgrade(&store.0)));
         store
@@ -265,14 +304,20 @@ impl Resources {
             .upgrade()
             .ok_or_else(|| anyhow!("resource host disposed"))?;
         let state = state.borrow();
+        let mount = state
+            .mounts
+            .get(&owner)
+            .ok_or_else(|| anyhow!("resource mount refused"))?;
         let entry = state
             .owners
-            .get(&owner)
+            .get(&mount.principal)
             .and_then(|entries| entries.get(&reference.key))
             .ok_or_else(|| anyhow!("resource refused or unknown"))?;
         Ok(Lease {
             state: view.0.clone(),
             owner,
+            principal: mount.principal,
+            mount_identity: Rc::downgrade(&mount.identity),
             key: reference.key.clone(),
             identity: Rc::downgrade(&entry.identity),
         })

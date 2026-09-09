@@ -19,6 +19,13 @@ fn pixels() -> Vec<u8> {
 fn store(owner: EffectOwner) -> ResourceStore {
     ResourceStore(Rc::new(RefCell::new(State {
         owners: HashMap::from([(owner, HashMap::new())]),
+        mounts: HashMap::from([(
+            owner,
+            Mount {
+                principal: owner,
+                identity: Rc::new(()),
+            },
+        )]),
     })))
 }
 
@@ -174,7 +181,7 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         let owner = EffectOwner::new();
         let foreign = EffectOwner::new();
         let mut store = Resources::install(cx);
-        store.reconcile(&HashSet::from([owner, foreign]), cx);
+        store.reconcile(&HashMap::from([(owner, owner), (foreign, foreign)]), cx);
         let reference = store
             .register(owner, registration("data", BYTES, &[7, 9]))
             .expect("authorized bytes");
@@ -200,7 +207,7 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
             assert!(Resources::image(&reference, cx).is_err());
         });
         store.revoke(owner, cx);
-        store.reconcile(&HashSet::from([owner]), cx);
+        store.reconcile(&HashMap::from([(owner, owner)]), cx);
         store
             .register(owner, registration("data", BYTES, &[11]))
             .expect("new registration after reauthorization");
@@ -210,7 +217,7 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         let fresh = cx.with_effect_owner(Some(owner), |cx| {
             Resources::bytes(&reference, cx).expect("fresh lease")
         });
-        store.reconcile(&HashSet::from([foreign]), cx);
+        store.reconcile(&HashMap::from([(foreign, foreign)]), cx);
         cx.with_effect_owner(Some(owner), |cx| {
             assert!(fresh.with_bytes(cx, |_| Ok(())).is_err())
         });
@@ -224,5 +231,90 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         cx.with_effect_owner(Some(foreign), |cx| {
             assert!(final_lease.with_bytes(cx, |_| Ok(())).is_err())
         });
+    });
+}
+
+#[cfg(feature = "capture")]
+#[gpui::test]
+fn mount_aliases_share_generation_quota_but_not_lifetime(cx: &mut gpui::TestAppContext) {
+    cx.update(|cx| {
+        let principal = EffectOwner::new();
+        let a = EffectOwner::new();
+        let b = EffectOwner::new();
+        let mut store = Resources::install(cx);
+        store.reconcile(&HashMap::from([(a, principal), (b, principal)]), cx);
+        let reference = store
+            .register(principal, registration("shared", BYTES, &[17, 23]))
+            .expect("principal registration");
+        assert!(
+            store
+                .register(a, registration("not-principal", BYTES, &[1]))
+                .is_err()
+        );
+        let lease_a = cx.with_effect_owner(Some(a), |cx| {
+            Resources::bytes(&reference, cx).expect("mount a")
+        });
+        let lease_b = cx.with_effect_owner(Some(b), |cx| {
+            Resources::bytes(&reference, cx).expect("mount b")
+        });
+        assert_eq!(store.0.borrow().owners.len(), 1);
+        assert_eq!(store.0.borrow().owners[&principal].len(), 1);
+        for index in 1..MAX_OWNER_COUNT {
+            store
+                .register(
+                    principal,
+                    registration(&format!("data{index}"), BYTES, &[1]),
+                )
+                .expect("shared quota");
+        }
+        assert!(
+            store
+                .register(principal, registration("over", BYTES, &[1]))
+                .is_err()
+        );
+        cx.with_effect_owner(Some(b), |cx| {
+            assert!(lease_a.with_bytes(cx, |_| Ok(())).is_err());
+            assert_eq!(
+                lease_b
+                    .with_bytes(cx, |bytes| Ok(bytes.to_vec()))
+                    .expect("peer access"),
+                [17, 23]
+            );
+        });
+        store.reconcile(&HashMap::from([(b, principal)]), cx);
+        cx.with_effect_owner(Some(a), |cx| {
+            assert!(lease_a.with_bytes(cx, |_| Ok(())).is_err())
+        });
+        cx.with_effect_owner(Some(b), |cx| {
+            assert!(lease_b.with_bytes(cx, |_| Ok(())).is_ok())
+        });
+        // Even a reused mount token cannot resurrect its previous lazy lease.
+        store.reconcile(&HashMap::from([(a, principal), (b, principal)]), cx);
+        cx.with_effect_owner(Some(a), |cx| {
+            assert!(lease_a.with_bytes(cx, |_| Ok(())).is_err());
+            assert!(Resources::bytes(&reference, cx).is_ok());
+        });
+        store.revoke(principal, cx);
+        assert!(store.0.borrow().owners.is_empty());
+        assert!(store.0.borrow().mounts.is_empty());
+        cx.with_effect_owner(Some(b), |cx| {
+            assert!(lease_b.with_bytes(cx, |_| Ok(())).is_err())
+        });
+
+        store.reconcile(&HashMap::from([(b, principal)]), cx);
+        store
+            .register(principal, registration("shared", BYTES, &[29]))
+            .expect("reauthorized generation");
+        let replacement_lease = cx.with_effect_owner(Some(b), |cx| {
+            Resources::bytes(&reference, cx).expect("replacement lease")
+        });
+        let _replacement_host = Resources::install(cx);
+        cx.with_effect_owner(Some(b), |cx| {
+            assert!(replacement_lease.with_bytes(cx, |_| Ok(())).is_err())
+        });
+        assert!(
+            store.0.borrow().owners.is_empty(),
+            "host replacement revokes still-retained old host"
+        );
     });
 }
