@@ -1,4 +1,5 @@
 // Explicit adapter contracts, not the catalog. An absent component is unsupported.
+import { selectOptionSchema as selectOption } from './kit-select-option-schema.mjs';
 import { familySchemas as controlsSchemas, familyMethods as controlsMethods, validateFamilyProps as validateControls } from './kit-controls_extra-schema.mjs';
 import { familySchemas as navigationSchemas, familyMethods as navigationMethods, validateFamilyProps as validateNavigation } from './kit-navigation_extra-schema.mjs';
 import { familySchemas as layoutSchemas, familyMethods as layoutMethods, validateFamilyProps as validateLayout } from './kit-layout_extra-schema.mjs';
@@ -25,7 +26,6 @@ const object = (fields, required = []) => ({ type: 'object', fields, required })
 const common = { disabled: boolean, size: choice('xs', 'sm', 'md', 'lg') };
 const labeled = { ...common, label: string, description: string };
 const selectionItem = object({ id: identity, label: string, disabled: boolean }, ['id', 'label']);
-const selectOption = object({ ...selectionItem.fields, description: string, group: string }, ['id', 'label']);
 const dropIntent = object({ id: identity, source: identity, label: string, kind: identity, anchor: identity, position: choice('before', 'after', 'into'), velocity: object({ x: number, y: number }, ['x', 'y']) }, ['id', 'source', 'label', 'kind', 'anchor', 'position', 'velocity']);
 
 export const kitSchemas = Object.freeze({

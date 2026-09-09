@@ -115,7 +115,7 @@ impl KitState {
                             args["id"].as_str().map(|value| value.to_owned().into()),
                             cx,
                         ),
-                        "set_options" => select.set_options(options(args.get("options")), cx),
+                        "set_options" => select.set_options(select_options(args.get("options")), cx),
                         "set_disabled" => {
                             select.set_disabled(boolean("disabled"), cx);
                             entry.route.borrow_mut().disabled = boolean("disabled");

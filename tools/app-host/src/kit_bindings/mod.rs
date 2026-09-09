@@ -159,7 +159,9 @@ fn size(node: &Node) -> ControlSize {
         _ => ControlSize::Md,
     }
 }
-fn options(value: Option<&Value>) -> Vec<SelectOption> {
+/// Builds options after the shared option schema has validated the descriptor.
+/// An absent optional array means no options; this is not an ingress validator.
+pub(super) fn select_options(value: Option<&Value>) -> Vec<SelectOption> {
     value
         .and_then(Value::as_array)
         .into_iter()
@@ -511,7 +513,7 @@ impl KitState {
                     Control::Select(entity) => {
                         entity.update(cx, |select, cx| {
                             if previous_props.get("options") != node.props.get("options") {
-                                select.set_options(options(node.props.get("options")), cx);
+                                select.set_options(select_options(node.props.get("options")), cx);
                             }
                             let selected = node
                                 .props
