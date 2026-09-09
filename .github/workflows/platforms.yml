@@ -135,9 +135,14 @@ jobs:
             $principal = [Security.Principal.WindowsPrincipal]::new($identity)
             if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'WFP evidence requires an elevated runner' }
             # Capture only: do not change firewall rules, capabilities or exemptions.
-            netsh wfp capture start keywords=19 "file=$wfpDirectory/wfpdiag.cab"
-            if ($LASTEXITCODE -ne 0) { throw 'WFP capture start failed' }
-            $wfpStarted = $true
+            # netsh embeds the supplied filename in CAB member paths. An
+            # absolute drive path makes expand.exe produce invalid destinations.
+            Push-Location $wfpDirectory
+            try {
+              netsh wfp capture start keywords=19 file=wfpdiag.cab
+              if ($LASTEXITCODE -ne 0) { throw 'WFP capture start failed' }
+              $wfpStarted = $true
+            } finally { Pop-Location }
             $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
             $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
             if ($LASTEXITCODE -ne 0 -or -not $installation) { throw 'Visual C++ toolchain unavailable' }
@@ -149,21 +154,29 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Node version check failed' }
             npm --prefix tools/app-host ci
             if ($LASTEXITCODE -ne 0) { throw 'Runtime dependencies failed' }
+            # Preserve every suite's failure while still running independent
+            # native probes when a host/debug regression fails first.
             node --test tools/js-runtime/test/debug-cancellation.test.mjs tools/app-host/test/host.test.mjs
-            if ($LASTEXITCODE -ne 0) { throw 'Native Windows evaluator cancellation and Reload checks failed' }
+            $hostResult = $LASTEXITCODE
             node --test tools/js-runtime/test/windows.test.mjs
-            if ($LASTEXITCODE -ne 0) { throw 'Native Windows sandbox checks failed' }
+            $sandboxResult = $LASTEXITCODE
             npm --prefix tools/app-host run check
-            if ($LASTEXITCODE -ne 0) { throw 'Native Windows runtime checks failed' }
+            $runtimeResult = $LASTEXITCODE
+            Write-Output "Native suite exit codes: host=$hostResult sandbox=$sandboxResult runtime=$runtimeResult"
+            if ($hostResult -ne 0 -or $sandboxResult -ne 0 -or $runtimeResult -ne 0) {
+              throw 'Native Windows checks failed; see each suite result above'
+            }
           } finally {
             try {
               if ($wfpStarted) {
-                netsh wfp capture stop
-                if ($LASTEXITCODE -ne 0) { throw 'WFP capture stop failed' }
-                $cab = Join-Path $wfpDirectory 'wfpdiag.cab'
-                if (!(Test-Path $cab)) { throw 'WFP capture produced no CAB' }
-                & expand.exe '-F:*' $cab $wfpDirectory
-                if ($LASTEXITCODE -ne 0) { throw 'WFP evidence extraction failed' }
+                Push-Location $wfpDirectory
+                try {
+                  netsh wfp capture stop
+                  if ($LASTEXITCODE -ne 0) { throw 'WFP capture stop failed' }
+                  if (!(Test-Path 'wfpdiag.cab')) { throw 'WFP capture produced no CAB' }
+                  & expand.exe '-F:*' 'wfpdiag.cab' '.'
+                  if ($LASTEXITCODE -ne 0) { throw 'WFP evidence extraction failed' }
+                } finally { Pop-Location }
               }
             } finally {
               Stop-Transcript
