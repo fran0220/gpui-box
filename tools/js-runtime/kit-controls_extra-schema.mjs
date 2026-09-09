@@ -34,6 +34,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  KeybindingRecorder: { props: object({ ...common, label: string, placeholder: string, binding: string, conflict: string, allowEscape: boolean }), events: { started: choice(null), captured: string, cancelled: choice(null) } },
   InlineEdit: { props: object({ ...common, value: string, placeholder: string, editing: boolean, multiline: boolean, rows: { ...integer, min: 1, max: 1024 }, failure: string }), events: { edit: choice(null), commit: string, cancel: choice(null) } },
   SplitButton: { props: object({ ...common, label: string, icon: iconSchema, variant, menuName: string, defaultDisabled: boolean, items: menuItemsSchema }), events: { click: choice(null), open: choice(null), close: choice(null), dismiss: choice(null), invoked: identity } },
   SettingsList: { props: object({ query: string }), events: {}, slots: ['sections', 'empty', 'header', 'sidebar', 'footer'] },
@@ -55,6 +56,19 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  KeybindingRecorder: {
+    invoke: {
+      start: method({}, choice(null)), cancel: method({}, choice(null)),
+      set_binding: method({ binding: { ...string, nullable: true } }, choice(null)),
+      set_conflict: method({ reason: { ...string, nullable: true } }, choice(null)),
+      set_label: method({ label: { ...string, nullable: true } }, choice(null)),
+      set_placeholder: method({ placeholder: { ...string, nullable: true } }, choice(null)),
+      set_allow_escape: method({ allow: boolean }, choice(null)),
+      set_disabled: method({ disabled: boolean }, choice(null)),
+      set_control_size: method({ size: common.size }, choice(null)),
+    },
+    query: { focus_handle: focusQuery, is_recording: method({}, boolean), current_binding: method({}, { ...string, nullable: true }), is_disabled: method({}, boolean) },
+  },
   SplitButton: {
     invoke: {
       open_menu: method({}, choice(null)), set_label: method({ label: string }, choice(null)),

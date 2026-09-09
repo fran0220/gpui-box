@@ -163,6 +163,43 @@ impl KeybindingRecorder {
         self
     }
 
+    /// Replaces or removes the accessible label without ending recording.
+    pub fn set_label(&mut self, label: Option<SharedString>, cx: &mut Context<Self>) {
+        self.label = label;
+        cx.notify();
+    }
+
+    /// `None` restores the localized unbound placeholder.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder;
+        cx.notify();
+    }
+
+    /// Changes how the next escape is handled, preserving the current session.
+    pub fn set_allow_escape(&mut self, allow: bool, cx: &mut Context<Self>) {
+        self.allow_escape = allow;
+        cx.notify();
+    }
+
+    /// Refuses input and cancels any active recording; reenabling does not start one.
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        if disabled {
+            self.cancel(cx);
+        }
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    /// Updates presentation without replacing the focus handle or recording session.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
     pub fn is_recording(&self) -> bool {
         self.recording
     }

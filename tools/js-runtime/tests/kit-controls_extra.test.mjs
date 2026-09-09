@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('keybinding recorder methods separate recording from caller binding and nullable options', () => {
+  const methods = familyMethods.KeybindingRecorder;
+  for (const [name, key] of [['set_label','label'],['set_placeholder','placeholder'],['set_binding','binding'],['set_conflict','reason']]) {
+    validateValue({[key]:null}, methods.invoke[name].args);
+    assert.throws(() => validateValue({}, methods.invoke[name].args));
+  }
+  assert.throws(() => validateValue({keystroke:'ctrl-k'}, methods.invoke.start.args));
+  validateValue('ctrl-shift-k', familySchemas.KeybindingRecorder.events.captured);
+  assert.throws(() => validateValue({keystroke:'ctrl-k'}, familySchemas.KeybindingRecorder.events.captured));
+  assert.throws(() => validateValue({recording:true}, familySchemas.KeybindingRecorder.props));
+});
+
 test('inline edits have controlled sessions and data-only commit payloads', () => {
   validateValue({value:'Fixture',editing:true,multiline:true,rows:3,failure:'Save refused'}, familySchemas.InlineEdit.props);
   for (const props of [{rows:0},{rows:1.5},{rows:1025},{editing:'true'},{editor:{$nativeRef:'native-1',type:'TextInput'}}]) {
@@ -188,6 +200,10 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.KeybindingRecorder('recorder', {allowEscape:true,binding:'ctrl-k'}, {captured(value) { const key: string = value; }});
+// @ts-expect-error recording is native transient state, not a controlled prop
+kit.KeybindingRecorder('bad', {recording:true});
+const recorderClear: ControlsExtraMethodContracts['KeybindingRecorder']['invoke']['set_label']['args'] = {label:null};
 kit.InlineEdit('inline', {editing:true,multiline:true,rows:3,failure:'Refused'}, {commit(value) { const text: string = value; }});
 // @ts-expect-error commit is complete text, not an entity or snapshot metadata
 kit.InlineEdit('bad', {}, {commit(value:{text:string}) {}});

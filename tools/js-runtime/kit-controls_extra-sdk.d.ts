@@ -20,6 +20,7 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  KeybindingRecorder(id: string, props?: ControlProps & { label?: string; placeholder?: string; binding?: string; conflict?: string; allowEscape?: boolean }, events?: { started?(): void; captured?(keystroke: string): void; cancelled?(): void }): KitNode;
   InlineEdit(id: string, props?: ControlProps & { value?: string; placeholder?: string; editing?: boolean; multiline?: boolean; rows?: number; failure?: string }, events?: { edit?(): void; commit?(value: string): void; cancel?(): void }): KitNode;
   SplitButton(id: string, props?: ControlProps & { label?: string; icon?: BuiltinIconDescriptor; variant?: ButtonVariant; menuName?: string; defaultDisabled?: boolean; items?: MenuItemDescriptor[] }, events?: { click?(): void; open?(): void; close?(): void; dismiss?(): void; invoked?(id: string): void }): KitNode;
   SettingsList(id: string, props?: { query?: string }, events?: Record<string, never>, slots?: { sections?: NativeSettingsSectionNode[]; empty?: SlotNode[]; header?: SlotNode[]; sidebar?: SlotNode[]; footer?: SlotNode[] }): KitNode;
@@ -42,6 +43,24 @@ export interface ControlsExtraFactories {
 }
 interface FocusQueries { focus_handle: { args: Record<string, never>; result: NativeRef<'FocusHandle'> } }
 export interface ControlsExtraMethodContracts {
+  KeybindingRecorder: {
+    invoke: {
+      start: { args: Record<string, never>; result: null };
+      cancel: { args: Record<string, never>; result: null };
+      set_binding: { args: { binding: string | null }; result: null };
+      set_conflict: { args: { reason: string | null }; result: null };
+      set_label: { args: { label: string | null }; result: null };
+      set_placeholder: { args: { placeholder: string | null }; result: null };
+      set_allow_escape: { args: { allow: boolean }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+      set_control_size: { args: { size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
+    };
+    query: FocusQueries & {
+      is_recording: { args: Record<string, never>; result: boolean };
+      current_binding: { args: Record<string, never>; result: string | null };
+      is_disabled: { args: Record<string, never>; result: boolean };
+    };
+  };
   SplitButton: {
     invoke: {
       open_menu: { args: Record<string, never>; result: null };

@@ -4,6 +4,7 @@ use super::*;
 use gpui::{Hsla, ParentElement};
 use gpui_kit::controls::button::{ButtonJoin, ButtonStyle, IconPosition};
 use gpui_kit::controls::copy_button::{CopyButton, CopyEvent, CopyState};
+use gpui_kit::controls::keybinding_recorder::KeybindingRecorder;
 use gpui_kit::controls::keymap_editor::{
     KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
 };
@@ -13,6 +14,8 @@ use gpui_kit::overlay::MenuEvent;
 use gpui_kit::state::ValidationState;
 use gpui_kit::strings::{ActiveStrings, StringKey};
 use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
+
+mod recorder;
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -37,6 +40,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SettingsList",
     "SplitButton",
     "InlineEdit",
+    "KeybindingRecorder",
 ];
 
 pub(super) fn settings_section(
@@ -175,6 +179,7 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    recorders: RefCell<HashMap<Key, Rc<Entry<KeybindingRecorder>>>>,
     searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
     transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
     numbers: RefCell<HashMap<Key, Rc<Entry<NumberInput>>>>,
@@ -187,6 +192,11 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "KeybindingRecorder" => self
+                .recorders
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
             "SearchInput" => self
                 .searches
                 .borrow()
@@ -255,7 +265,7 @@ impl State {
         if method != "focus_handle"
             || !matches!(
                 component,
-                "SearchInput" | "NumberInput" | "CopyButton" | "SplitButton"
+                "SearchInput" | "NumberInput" | "CopyButton" | "SplitButton" | "KeybindingRecorder"
             )
         {
             return None;
@@ -264,6 +274,11 @@ impl State {
             let schema = super::validation::invocation(component, method, args, true)?;
             let key = (node.instance, node.id.clone());
             let result = match component {
+                "KeybindingRecorder" => {
+                    focus_reference(&self.recorders, &key, cx, refs, |control, _| {
+                        !control.is_disabled()
+                    })
+                }
                 "SearchInput" => focus_reference(&self.searches, &key, cx, refs, |control, _| {
                     !control.is_disabled()
                 }),
@@ -294,6 +309,10 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.recorders.borrow_mut().retain(|key, _| {
+            live.get(key)
+                .is_some_and(|kind| kind == "KeybindingRecorder")
+        });
         self.searches
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "SearchInput"));
@@ -322,6 +341,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("KeybindingRecorder") {
+            return self.render_recorder(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("SplitButton") {
             return self.render_split(node, window, cx, emit);
         }
@@ -421,6 +443,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("KeybindingRecorder") {
+            return self.invoke_recorder(node, method, args, query, _window, cx);
+        }
         if node.component.as_deref() == Some("SplitButton") {
             return self.invoke_split(node, method, args, query, _window, cx);
         }
