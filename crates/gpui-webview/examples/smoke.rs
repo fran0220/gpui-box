@@ -66,6 +66,8 @@ fn main() {
             cx.spawn(async move |weak, cx| {
                 let start = Instant::now();
                 let mut phase = 0;
+                let mut page_finished = false;
+                let mut script_ready = false;
                 loop {
                     cx.background_executor().timer(Duration::from_millis(15)).await;
                     let finished = weak.update(cx, |this, cx| {
@@ -77,37 +79,50 @@ fn main() {
                                     assert_eq!(metrics["grid"], "grid");
                                     assert!(metrics["width"].as_u64().expect("viewport width") >= 600);
                                     assert!(metrics["height"].as_u64().expect("viewport height") >= 300);
-                                    this.host.evaluate_script("window.ipc.postMessage('script-evaluated')").expect("evaluate authored script");
+                                    this.host.evaluate_script("window.ipc.postMessage(JSON.stringify({smoke:'script-evaluated',userAgent:navigator.userAgent}))").expect("evaluate authored script");
                                     phase = 1;
                                 }
-                                (1, BrowserEvent::Message { body, .. }) if body == "script-evaluated" => {
-                                    this.host.navigate(&format!("{base}/one")).expect("navigate one"); phase = 2;
-                                }
-                                (2, BrowserEvent::Message { body, .. }) if body == "/one" => {
-                                    this.host.navigate(&format!("{base}/two")).expect("navigate two"); phase = 3;
-                                }
-                                (3, BrowserEvent::Message { body, .. }) if body == "/two" => {
-                                    assert!(this.host.can_go_back().expect("back availability")); this.host.back().expect("go back"); phase = 4;
-                                }
-                                (4, BrowserEvent::Message { body, .. }) if body == "/one" => {
-                                    assert!(this.host.can_go_forward().expect("forward availability")); this.host.forward().expect("go forward"); phase = 5;
-                                }
-                                (5, BrowserEvent::Message { body, .. }) if body == "/two" => {
-                                    this.host.reload().expect("reload"); phase = 6;
-                                }
-                                (6, BrowserEvent::Message { body, .. }) if body == "/two" => {
-                                    let closed = TcpListener::bind("127.0.0.1:0").expect("reserve unavailable endpoint");
-                                    let address = closed.local_addr().expect("reserved address");
-                                    drop(closed);
-                                    this.host.navigate(&format!("http://{address}/")).expect("accept offline navigation command"); phase = 7;
-                                }
+                                (1, BrowserEvent::Message { body, .. }) if body.contains("script-evaluated") => script_ready = true,
+                                (2 | 4, BrowserEvent::Message { body, .. }) if body == "/one" => script_ready = true,
+                                (3 | 5 | 6, BrowserEvent::Message { body, .. }) if body == "/two" => script_ready = true,
+                                (_, BrowserEvent::PageFinished { .. }) => page_finished = true,
                                 (7, BrowserEvent::LoadFailed { .. }) => {
                                     eprintln!("native browser smoke passed: CSS/viewport, IPC, script, navigation, back, forward, reload, native failure, policy refusal");
                                     result.store(true, Ordering::Relaxed);
                                     cx.quit();
                                     return true;
                                 }
+                                (_, BrowserEvent::LoadFailed { .. } | BrowserEvent::ProcessFailed { .. } | BrowserEvent::EventsDropped { .. }) => {
+                                    panic!("unexpected native failure or lost events at phase {phase}");
+                                }
                                 _ => {}
+                            }
+                            // Either callback can arrive first. Do not cancel an in-flight
+                            // load and then mistake its cancellation for the offline test.
+                            if page_finished && script_ready {
+                                page_finished = false;
+                                script_ready = false;
+                                match phase {
+                                    1 => this.host.navigate(&format!("{base}/one")).expect("navigate one"),
+                                    2 => this.host.navigate(&format!("{base}/two")).expect("navigate two"),
+                                    3 => {
+                                        assert!(this.host.can_go_back().expect("back availability"));
+                                        this.host.back().expect("go back");
+                                    }
+                                    4 => {
+                                        assert!(this.host.can_go_forward().expect("forward availability"));
+                                        this.host.forward().expect("go forward");
+                                    }
+                                    5 => this.host.reload().expect("reload"),
+                                    6 => {
+                                        let closed = TcpListener::bind("127.0.0.1:0").expect("reserve unavailable endpoint");
+                                        let address = closed.local_addr().expect("reserved address");
+                                        drop(closed);
+                                        this.host.navigate(&format!("http://{address}/")).expect("accept offline navigation command");
+                                    }
+                                    _ => unreachable!("script readiness outside navigation phases"),
+                                }
+                                phase += 1;
                             }
                         }
                         if start.elapsed() > Duration::from_secs(30) {

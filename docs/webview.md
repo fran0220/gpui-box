@@ -124,6 +124,33 @@ host to validate WK delegate forwarding, WebView2 runtime installation, focus,
 IME, accessibility bounds and native overlays. A Linux Xvfb pass proves none of
 those. Cross-platform source support is not a claim of completed native evidence.
 
+The dispatch-only `Platforms` workflow executes
+`cargo run --locked -p gpui-box-webview --example smoke` in both native jobs:
+WKWebView on `macos-15`, WebView2 on `windows-2025`. It needs a usable native
+desktop/event loop and loopback networking; Windows additionally needs the
+installed WebView2 runtime. Missing or broken runtime/desktop initialization is
+a failure, not a skipped success. No Linux GTK/Xvfb setup belongs in these jobs.
+The in-app deadline is 30 seconds after host creation; the workflow step's
+10-minute timeout also bounds compilation and native initialization hangs.
+Always-upload artifacts `webview-smoke-macos` and `webview-smoke-windows` retain
+combined command output, platform/compiler metadata, engine user agent, phase
+events and failure backtraces (partial logs on timeout). Native execution is
+only certified when that OS's command exits successfully and its log contains
+`native browser smoke passed`; compilation or this workflow wiring alone is
+not evidence. A failure in an earlier job step can prevent smoke execution.
+
+Smoke checks initial DOM CSS-grid/viewport metrics, opt-in IPC and script
+evaluation, HTTP navigation, back/forward, reload, file-URL policy refusal and
+a real closed-loopback-port native load failure. Each successful navigation
+waits for both page-script readiness and native completion, in either order,
+before advancing, avoiding cancellation failures from overlapping loads.
+Unexpected early load/process failures and event loss fail the smoke.
+It does **not** certify rendered pixels, clipping/stacking, dynamic resize/DPI,
+hide/show/detach/destruction, keyboard focus/IME, accessibility, TLS errors,
+process-fault recovery, popup/download/permission callbacks, or hostile iframe
+IPC/security behavior. Those need separate native interaction/fault tests and
+desktop inspection; OS-specific permission-hook limitations above remain.
+
 The Linux orb's inspected native capture shows all three CSS grid cards,
 gradient/rounded corners, authored keyboard input and an untrusted-message
 result. Under this Xvfb session the GPUI GPU surface itself is invisible (the

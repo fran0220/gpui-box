@@ -58,6 +58,26 @@ jobs:
         run: cargo test -p gpui-box-media --all-features --locked
       - name: Run the remaining macOS platform tests
         run: cargo test --workspace --all-features --locked --exclude gpui-box-media
+      - name: Execute native WKWebView browser smoke
+        timeout-minutes: 10
+        shell: bash
+        env:
+          RUST_BACKTRACE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p target/webview-smoke
+          {
+            sw_vers
+            rustc --version
+            cargo run --locked -p gpui-box-webview --example smoke
+          } 2>&1 | tee target/webview-smoke/smoke.log
+      - name: Retain native macOS browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: webview-smoke-macos
+          path: target/webview-smoke/
+          if-no-files-found: warn
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Check deterministic component performance budgets
         run: cargo run -p xtask --locked -- performance check
@@ -74,6 +94,28 @@ jobs:
         run: cargo test -p gpui-box-media --all-features --locked
       - name: Run the remaining Windows platform tests
         run: cargo test --workspace --all-features --locked --exclude gpui-box-media
+      - name: Execute native WebView2 browser smoke
+        timeout-minutes: 10
+        shell: bash
+        env:
+          RUST_BACKTRACE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p target/webview-smoke
+          {
+            uname -a
+            rustc --version
+            # WebView2 runtime creation is part of the test. Missing or broken
+            # runtime is a failure, not a successful compile-only fallback.
+            cargo run --locked -p gpui-box-webview --example smoke
+          } 2>&1 | tee target/webview-smoke/smoke.log
+      - name: Retain native Windows browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: webview-smoke-windows
+          path: target/webview-smoke/
+          if-no-files-found: warn
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Run native Windows UI Automation smoke
         run: cargo run -p xtask --locked -- accessibility check
