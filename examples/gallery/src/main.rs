@@ -2691,6 +2691,7 @@ fn report_markdown(event: &MarkdownEvent, window: &Window, cx: &mut App) {
         }
         MarkdownEvent::ImageRequested { src, .. } => format!("The document referred to {src}"),
         MarkdownEvent::CodeCopied { .. } => "The code block is on the clipboard".to_string(),
+        MarkdownEvent::CodeCopyRefused { reason, .. } => format!("Code was not copied: {reason}"),
         MarkdownEvent::MoreRequested { lines } => format!("{lines} more lines were asked for"),
     };
     toast::push(
