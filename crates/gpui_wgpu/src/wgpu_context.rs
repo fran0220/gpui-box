@@ -147,7 +147,7 @@ impl WgpuContext {
                         )
                     })?;
                 let (device, queue, dual_source_blending, color_texture_format) =
-                    Self::create_device(&adapter).await?;
+                    Self::create_device(&adapter, true).await?;
                 anyhow::Ok((
                     adapter,
                     device,
@@ -268,7 +268,7 @@ impl WgpuContext {
 
         let device_lost = Arc::new(AtomicBool::new(false));
         let (device, queue, dual_source_blending, color_texture_format) =
-            Self::create_device(&adapter).await?;
+            Self::create_device(&adapter, false).await?;
         let last_error = Arc::new(Mutex::new(None));
         Self::install_device_callbacks(&device, &device_lost, &last_error);
         log::info!(
@@ -321,12 +321,20 @@ impl WgpuContext {
 
     async fn create_device(
         adapter: &wgpu::Adapter,
+        headless_timing: bool,
     ) -> anyhow::Result<(wgpu::Device, wgpu::Queue, bool, TextureFormat)> {
         let dual_source_blending = adapter
             .features()
             .contains(wgpu::Features::DUAL_SOURCE_BLENDING);
 
         let mut required_features = wgpu::Features::empty();
+        // Only headless test devices request this optional capability. Actual
+        // query allocation, writes and waits occur only in measure_scene.
+        let timestamps =
+            wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS;
+        if headless_timing && adapter.features().contains(timestamps) {
+            required_features |= timestamps;
+        }
         if dual_source_blending {
             required_features |= wgpu::Features::DUAL_SOURCE_BLENDING;
         } else {
@@ -556,7 +564,7 @@ impl WgpuContext {
         }
 
         let (device, queue, dual_source_blending, color_atlas_texture_format) =
-            Self::create_device(adapter).await?;
+            Self::create_device(adapter, false).await?;
         let error_scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
 
         let test_config = wgpu::SurfaceConfiguration {

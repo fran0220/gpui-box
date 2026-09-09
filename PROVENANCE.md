@@ -816,3 +816,11 @@ integration, not copied Wry source. WKWebView, WebView2 and WebKitGTK retain
 their operating-system/distribution engine authority. Cargo.lock records the
 exact crates.io dependency checksums. No framework Git source, patch override,
 or update to the frozen historical import is introduced.
+
+### Opt-in renderer timing
+
+The headless measurement contract, wgpu encoder timestamp queries and native
+Metal command-buffer timing integration are original GPUI Box work over the
+existing local renderer packages. No source was ported and the frozen import
+receipt is unchanged. Normal rendering remains asynchronous. Completion waits,
+query readback and pixel capture are not GPU execution or display latency.

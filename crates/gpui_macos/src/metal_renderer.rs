@@ -810,6 +810,18 @@ impl MetalRenderer {
     /// inspected.
     #[cfg(any(test, feature = "test-support"))]
     pub fn render_scene(&mut self, scene: &Scene, size: Size<DevicePixels>) -> Result<()> {
+        let command_buffer = self.prepare_headless_frame(scene, size)?;
+        // Ordinary rendering remains asynchronous. Only measure_scene waits.
+        command_buffer.commit();
+        Ok(())
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    fn prepare_headless_frame(
+        &mut self,
+        scene: &Scene,
+        size: Size<DevicePixels>,
+    ) -> Result<metal::CommandBuffer> {
         if size.width.0 <= 0 || size.height.0 <= 0 {
             anyhow::bail!("Invalid size for render_scene: {:?}", size);
         }
@@ -835,12 +847,7 @@ impl MetalRenderer {
             .clone()
             .expect("just ensured the render target exists");
 
-        let command_buffer = self.render_frame(scene, &target_texture, size)?;
-
-        // Commit without waiting, mirroring presentation to a real window where
-        // the CPU doesn't block on the GPU.
-        command_buffer.commit();
-        Ok(())
+        self.render_frame(scene, &target_texture, size)
     }
 
     fn draw_primitives_to_texture(
@@ -2231,6 +2238,7 @@ pub struct SurfaceBounds {
 #[cfg(any(test, feature = "test-support"))]
 pub struct MetalHeadlessRenderer {
     renderer: MetalRenderer,
+    measurement_id: u64,
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -2245,7 +2253,10 @@ impl MetalHeadlessRenderer {
     pub fn new() -> Self {
         let instance_buffer_pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
         let renderer = MetalRenderer::new_headless(instance_buffer_pool);
-        Self { renderer }
+        Self {
+            renderer,
+            measurement_id: 0,
+        }
     }
 }
 
@@ -2261,6 +2272,73 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
 
     fn render_scene(&mut self, scene: &Scene, size: Size<DevicePixels>) -> anyhow::Result<()> {
         self.renderer.render_scene(scene, size)
+    }
+
+    fn timing_identity(&self) -> String {
+        format!("native Metal: {}", self.renderer.device.name())
+    }
+
+    fn measure_scene(
+        &mut self,
+        scene: &Scene,
+        size: Size<DevicePixels>,
+    ) -> anyhow::Result<gpui::RendererFrameTiming> {
+        use std::time::{Duration, Instant};
+        self.measurement_id += 1;
+        let wait = |buffer: &metal::CommandBufferRef| -> anyhow::Result<()> {
+            let started = Instant::now();
+            while !matches!(
+                buffer.status(),
+                metal::MTLCommandBufferStatus::Completed | metal::MTLCommandBufferStatus::Error
+            ) {
+                anyhow::ensure!(
+                    started.elapsed() < Duration::from_secs(30),
+                    "Metal completion timed out"
+                );
+                std::thread::sleep(Duration::from_micros(100));
+            }
+            anyhow::ensure!(
+                buffer.status() == metal::MTLCommandBufferStatus::Completed,
+                "Metal command buffer failed"
+            );
+            Ok(())
+        };
+        let drain = self.renderer.command_queue.new_command_buffer();
+        drain.commit();
+        wait(drain)?;
+        let started = Instant::now();
+        let buffer = self.renderer.prepare_headless_frame(scene, size)?;
+        buffer.commit();
+        let cpu_encode_submit = started.elapsed();
+        let submitted = Instant::now();
+        wait(&buffer)?;
+        let submit_to_completion = submitted.elapsed();
+        // Properties belong to this completed command buffer, never a cached
+        // frame. Older/unsupported APIs have no invented zero-valued metric.
+        let has_start: cocoa::base::BOOL =
+            unsafe { msg_send![buffer.as_ptr(), respondsToSelector: sel!(GPUStartTime)] };
+        let has_end: cocoa::base::BOOL =
+            unsafe { msg_send![buffer.as_ptr(), respondsToSelector: sel!(GPUEndTime)] };
+        let gpu_execution = if has_start == YES && has_end == YES {
+            let start: f64 = unsafe { msg_send![buffer.as_ptr(), GPUStartTime] };
+            let end: f64 = unsafe { msg_send![buffer.as_ptr(), GPUEndTime] };
+            if start == 0.0 && end == 0.0 {
+                gpui::GpuExecutionTime::Unsupported(
+                    "Metal command-buffer GPU clock unavailable".into(),
+                )
+            } else {
+                gpui::GpuExecutionTime::from_timestamps(start, end, 1.0)?
+            }
+        } else {
+            gpui::GpuExecutionTime::Unsupported("Metal GPU timing selectors unavailable".into())
+        };
+        Ok(gpui::RendererFrameTiming {
+            submission_id: self.measurement_id,
+            cpu_encode_submit,
+            submit_to_completion,
+            gpu_execution,
+            timestamp_readback: None,
+        })
     }
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
@@ -2279,6 +2357,35 @@ mod tests {
         Background, BorderStyle, ContentMask, Corners, Edges, GlassMaterial, Hsla, Quad, point,
         size,
     };
+
+    #[test]
+    fn renderer_timing_is_owned_by_each_successful_submission() {
+        use gpui::{GpuExecutionTime, PlatformHeadlessRenderer};
+        let mut renderer = MetalHeadlessRenderer::new();
+        let scene = Scene::default();
+        let extent = size(DevicePixels(64), DevicePixels(32));
+        let first = renderer
+            .measure_scene(&scene, extent)
+            .expect("first render");
+        assert_eq!(first.submission_id, 1);
+        match first.gpu_execution {
+            GpuExecutionTime::Measured(time) => assert!(!time.is_zero()),
+            GpuExecutionTime::Unsupported(reason) => assert!(!reason.is_empty()),
+        }
+        assert!(first.timestamp_readback.is_none());
+        assert!(
+            renderer
+                .measure_scene(&scene, size(DevicePixels(0), DevicePixels(32)))
+                .is_err()
+        );
+        let third = renderer
+            .measure_scene(&scene, extent)
+            .expect("valid after failed attempt");
+        assert_eq!(third.submission_id, 3);
+        renderer
+            .render_scene(&scene, extent)
+            .expect("ordinary render after measurement");
+    }
 
     /// A scene that paints one full-viewport quad of `background` and lays a
     /// probed glass surface over the middle of it.

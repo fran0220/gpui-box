@@ -1868,7 +1868,7 @@ impl WgpuRenderer {
         scene: &Scene,
         size: Size<DevicePixels>,
     ) -> anyhow::Result<image::RgbaImage> {
-        let texture = self.render_scene_to_texture(scene, size)?;
+        let (texture, _) = self.render_scene_to_texture(scene, size, None)?;
         let width = size.width.0 as u32;
         let height = size.height.0 as u32;
         let bytes_per_row = width
@@ -1984,7 +1984,7 @@ impl WgpuRenderer {
         scene: &Scene,
         size: Size<DevicePixels>,
     ) -> anyhow::Result<()> {
-        self.render_scene_to_texture(scene, size).map(drop)
+        self.render_scene_to_texture(scene, size, None).map(drop)
     }
 
     #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
@@ -1992,7 +1992,8 @@ impl WgpuRenderer {
         &mut self,
         scene: &Scene,
         size: Size<DevicePixels>,
-    ) -> anyhow::Result<wgpu::Texture> {
+        timestamps: Option<&wgpu::QuerySet>,
+    ) -> anyhow::Result<(wgpu::Texture, wgpu::SubmissionIndex)> {
         if size.width.0 <= 0 || size.height.0 <= 0 {
             anyhow::bail!("Invalid size for headless rendering: {:?}", size);
         }
@@ -2025,8 +2026,8 @@ impl WgpuRenderer {
         let target_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         self.atlas.before_frame();
-        self.draw_to_view(scene, &target_view, wgpu::Color::BLACK)?;
-        Ok(texture)
+        let submission = self.draw_to_view(scene, &target_view, wgpu::Color::BLACK, timestamps)?;
+        Ok((texture, submission))
     }
 
     pub fn draw(&mut self, scene: &Scene) -> bool {
@@ -2126,7 +2127,7 @@ impl WgpuRenderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        if let Err(error) = self.draw_to_view(scene, &frame_view, wgpu::Color::TRANSPARENT) {
+        if let Err(error) = self.draw_to_view(scene, &frame_view, wgpu::Color::TRANSPARENT, None) {
             log::error!("{error}");
         }
         self.resources().queue.present(frame);
@@ -2138,7 +2139,8 @@ impl WgpuRenderer {
         scene: &Scene,
         target_view: &wgpu::TextureView,
         clear_color: wgpu::Color,
-    ) -> anyhow::Result<()> {
+        timestamps: Option<&wgpu::QuerySet>,
+    ) -> anyhow::Result<wgpu::SubmissionIndex> {
         self.ensure_intermediate_textures();
 
         let gamma_params = GammaParams {
@@ -2188,7 +2190,7 @@ impl WgpuRenderer {
             );
         }
 
-        self.record_frame(scene, target_view, clear_color)
+        self.record_frame(scene, target_view, clear_color, timestamps)
     }
 
     fn record_frame(
@@ -2196,7 +2198,8 @@ impl WgpuRenderer {
         scene: &Scene,
         target_view: &wgpu::TextureView,
         clear_color: wgpu::Color,
-    ) -> Result<()> {
+        timestamps: Option<&wgpu::QuerySet>,
+    ) -> Result<wgpu::SubmissionIndex> {
         let mut instance_offset = 0;
         let instance_bindings = self
             .write_instances(scene, &mut instance_offset)
@@ -2252,6 +2255,9 @@ impl WgpuRenderer {
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("main_encoder"),
                 });
+        if let Some(queries) = timestamps {
+            encoder.write_timestamp(queries, 0);
+        }
         let backdrop_textures = if required_backdrop_passes == 0 {
             None
         } else {
@@ -2528,12 +2534,15 @@ impl WgpuRenderer {
             )?;
         }
 
+        if let Some(queries) = timestamps {
+            encoder.write_timestamp(queries, 1);
+        }
         let resources = self.resources();
         #[cfg(target_family = "wasm")]
         let submission_scope = resources
             .device
             .push_error_scope(wgpu::ErrorFilter::Validation);
-        resources.queue.submit(std::iter::once(encoder.finish()));
+        let submission = resources.queue.submit(std::iter::once(encoder.finish()));
         #[cfg(target_family = "wasm")]
         observe_error_scope(
             submission_scope,
@@ -2567,7 +2576,7 @@ impl WgpuRenderer {
                 mapped,
             });
         }
-        Ok(())
+        Ok(submission)
     }
 
     fn continue_main_pass<'a>(
@@ -3700,6 +3709,7 @@ fn batch_first_order(scene: &Scene, batch: &PrimitiveBatch) -> DrawOrder {
 #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
 pub struct WgpuHeadlessRenderer {
     renderer: WgpuRenderer,
+    measurement_id: u64,
 }
 
 #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
@@ -3714,7 +3724,10 @@ impl WgpuHeadlessRenderer {
         let context = WgpuContext::new_headless()?;
         let atlas = Arc::new(WgpuAtlas::from_context(&context));
         let renderer = WgpuRenderer::new_headless(&context, atlas)?;
-        Ok(Self { renderer })
+        Ok(Self {
+            renderer,
+            measurement_id: 0,
+        })
     }
 }
 
@@ -3730,6 +3743,124 @@ impl gpui::PlatformHeadlessRenderer for WgpuHeadlessRenderer {
 
     fn render_scene(&mut self, scene: &Scene, size: Size<DevicePixels>) -> anyhow::Result<()> {
         self.renderer.render_scene_offscreen(scene, size)
+    }
+
+    fn timing_identity(&self) -> String {
+        format!("wgpu fallback: {:?}", self.renderer.adapter_info)
+    }
+
+    fn measure_scene(
+        &mut self,
+        scene: &Scene,
+        size: Size<DevicePixels>,
+    ) -> anyhow::Result<gpui::RendererFrameTiming> {
+        use std::time::{Duration, Instant};
+        self.measurement_id += 1;
+        let device = self.renderer.resources().device.clone();
+        let queue = self.renderer.resources().queue.clone();
+        let wait = |submission| -> anyhow::Result<()> {
+            device
+                .poll(wgpu::PollType::Wait {
+                    submission_index: Some(submission),
+                    timeout: Some(Duration::from_secs(30)),
+                })
+                .map_err(|error| {
+                    anyhow::anyhow!("renderer measurement completion failed: {error}")
+                })?;
+            Ok(())
+        };
+        // Isolate this attempt from previous queued work. Fresh query storage is
+        // local to the attempt and is dropped on every success/error path.
+        wait(queue.submit([]))?;
+        let queries = device
+            .features()
+            .contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS)
+            .then(|| {
+                device.create_query_set(&wgpu::QuerySetDescriptor {
+                    label: Some("renderer timing"),
+                    ty: wgpu::QueryType::Timestamp,
+                    count: 2,
+                })
+            });
+        let started = Instant::now();
+        let (_target, submission) =
+            self.renderer
+                .render_scene_to_texture(scene, size, queries.as_ref())?;
+        let cpu_encode_submit = started.elapsed();
+        let submitted = Instant::now();
+        wait(submission)?;
+        let submit_to_completion = submitted.elapsed();
+        let (gpu_execution, timestamp_readback) = if let Some(queries) = queries {
+            let readback_started = Instant::now();
+            let resolve = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("timing resolve"),
+                size: 16,
+                usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            });
+            let readback = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("timing readback"),
+                size: 16,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            let mut encoder = device.create_command_encoder(&Default::default());
+            encoder.resolve_query_set(&queries, 0..2, &resolve, 0);
+            encoder.copy_buffer_to_buffer(&resolve, 0, &readback, 0, 16);
+            let resolve_submission = queue.submit([encoder.finish()]);
+            let (sender, receiver) = std::sync::mpsc::channel();
+            readback
+                .slice(..)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = sender.send(result);
+                });
+            wait(resolve_submission)?;
+            receiver.recv_timeout(Duration::from_secs(30))??;
+            let mapped = readback.slice(..).get_mapped_range()?;
+            let start = u64::from_ne_bytes(mapped[0..8].try_into()?);
+            let end = u64::from_ne_bytes(mapped[8..16].try_into()?);
+            // Subtract in integer space before conversion: large absolute ticks
+            // must not erase a short interval through f64 precision loss.
+            anyhow::ensure!(
+                start > 0 && end > start,
+                "missing or unordered GPU timestamps"
+            );
+            let elapsed = gpui::GpuExecutionTime::from_timestamps(
+                1.0,
+                1.0 + (end - start) as f64,
+                queue.get_timestamp_period() as f64 * 1e-9,
+            )?;
+            drop(mapped);
+            readback.unmap();
+            (elapsed, Some(readback_started.elapsed()))
+        } else {
+            (
+                gpui::GpuExecutionTime::Unsupported(
+                    "adapter lacks encoder timestamp queries".into(),
+                ),
+                None,
+            )
+        };
+        anyhow::ensure!(
+            !self.renderer.device_lost(),
+            "device lost during renderer measurement"
+        );
+        if let Some(error) = self
+            .renderer
+            .last_error
+            .lock()
+            .expect("renderer error lock")
+            .take()
+        {
+            anyhow::bail!("renderer measurement failed: {error}");
+        }
+        Ok(gpui::RendererFrameTiming {
+            submission_id: self.measurement_id,
+            cpu_encode_submit,
+            submit_to_completion,
+            gpu_execution,
+            timestamp_readback,
+        })
     }
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
@@ -4037,6 +4168,52 @@ mod tests {
         });
         scene.finish();
         scene
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[test]
+    fn renderer_timing_is_owned_by_each_successful_submission() {
+        use gpui::{GpuExecutionTime, PlatformHeadlessRenderer, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut renderer = WgpuHeadlessRenderer::new().expect("fallback adapter required");
+        let scene = Scene::default();
+        let extent = size(DevicePixels(64), DevicePixels(32));
+        let first = renderer
+            .measure_scene(&scene, extent)
+            .expect("first render");
+        assert_eq!(first.submission_id, 1);
+        match first.gpu_execution {
+            GpuExecutionTime::Measured(time) => {
+                assert!(!time.is_zero());
+                assert!(first.timestamp_readback.is_some());
+            }
+            GpuExecutionTime::Unsupported(reason) => {
+                assert!(!reason.is_empty());
+                assert!(first.timestamp_readback.is_none());
+            }
+        }
+        assert!(
+            renderer
+                .measure_scene(&scene, size(DevicePixels(0), DevicePixels(32)))
+                .is_err()
+        );
+        let third = renderer
+            .measure_scene(&scene, extent)
+            .expect("valid after failed attempt");
+        assert_eq!(third.submission_id, 3);
+        *renderer
+            .renderer
+            .last_error
+            .lock()
+            .expect("renderer error lock") = Some("injected validation failure".into());
+        assert!(renderer.measure_scene(&scene, extent).is_err());
+        let fifth = renderer
+            .measure_scene(&scene, extent)
+            .expect("fresh after validation failure");
+        assert_eq!(fifth.submission_id, 5);
+        renderer
+            .render_scene(&scene, extent)
+            .expect("ordinary render after measurement");
     }
 
     /// The probe reports what was behind the surface: near-white over a white

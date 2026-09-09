@@ -1070,6 +1070,22 @@ pub trait PlatformHeadlessRenderer {
     /// window, but doesn't block on GPU completion or copy pixels back.
     fn render_scene(&mut self, scene: &Scene, size: Size<DevicePixels>) -> Result<()>;
 
+    /// Opt-in, blocking measurement of one offscreen submission. Ordinary rendering
+    /// stays nonblocking. Completion is not presentation, and pixel capture is not
+    /// GPU execution. Unsupported implementations return an error, not zero time.
+    fn measure_scene(
+        &mut self,
+        _scene: &Scene,
+        _size: Size<DevicePixels>,
+    ) -> Result<crate::RendererFrameTiming> {
+        anyhow::bail!("renderer timing is unsupported by this backend")
+    }
+
+    /// Adapter/backend identity for same-host evidence, not a portability promise.
+    fn timing_identity(&self) -> String {
+        "unsupported".into()
+    }
+
     /// Returns the sprite atlas used by this renderer.
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
 

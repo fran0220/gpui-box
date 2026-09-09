@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2552
+      "symbolCount": 2556
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -21925,6 +21925,20 @@
     },
     {
       "id": "gpui::gpui::reexport-34",
+      "name": "renderer_timing :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use renderer_timing::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-35",
       "name": "scene :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21938,7 +21952,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-35",
+      "id": "gpui::gpui::reexport-36",
       "name": "shared_uri :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21952,7 +21966,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-36",
+      "id": "gpui::gpui::reexport-37",
       "name": "spring :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21966,7 +21980,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-37",
+      "id": "gpui::gpui::reexport-38",
       "name": "style :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21980,7 +21994,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-38",
+      "id": "gpui::gpui::reexport-39",
       "name": "styled :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -21991,20 +22005,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use styled::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-39",
-      "name": "subscription :: *",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use subscription::*;",
       "cfg": []
     },
     {
@@ -22023,6 +22023,20 @@
     },
     {
       "id": "gpui::gpui::reexport-40",
+      "name": "subscription :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use subscription::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-41",
       "name": "svg_renderer :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22036,7 +22050,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-41",
+      "id": "gpui::gpui::reexport-42",
       "name": "taffy :: { AvailableSpace , LayoutId }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22050,7 +22064,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-42",
+      "id": "gpui::gpui::reexport-43",
       "name": "test :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22066,7 +22080,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-43",
+      "id": "gpui::gpui::reexport-44",
       "name": "text_system :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22080,7 +22094,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-44",
+      "id": "gpui::gpui::reexport-45",
       "name": "util :: { FutureExt , Timeout }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22094,7 +22108,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-45",
+      "id": "gpui::gpui::reexport-46",
       "name": "view :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22108,7 +22122,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-46",
+      "id": "gpui::gpui::reexport-47",
       "name": "window :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -22122,7 +22136,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-47",
+      "id": "gpui::gpui::reexport-48",
       "name": "pollster :: block_on",
       "kind": "reexport",
       "package": "gpui-box",
@@ -26105,7 +26119,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "A renderer for headless windows that can produce real rendered output.",
       "documentation": "A renderer for headless windows that can produce real rendered output.",
-      "signature": "# [doc = \" A renderer for headless windows that can produce real rendered output.\"] # [cfg (any (test, feature = \"test-support\"))] pub trait PlatformHeadlessRenderer { # [doc = \" Render a scene and return the result as an RGBA image.\"] fn render_scene_to_image (& mut self, scene : & Scene, size : Size<DevicePixels>,) -> Result<RgbaImage>; # [doc = \" Render a scene to an offscreen target without reading the result back.\"] # [doc = \"\"] # [doc = \" This is the headless analogue of presenting a frame: it performs the\"] # [doc = \" same CPU-side scene encoding and GPU submission as drawing to a real\"] # [doc = \" window, but doesn't block on GPU completion or copy pixels back.\"] fn render_scene (& mut self, scene : & Scene, size : Size<DevicePixels>) -> Result<()>; # [doc = \" Returns the sprite atlas used by this renderer.\"] fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; # [doc = \" The luminance this renderer read back for a probe slot, with the same\"] # [doc = \" meaning as [`PlatformWindow::backdrop_luminance`].\"] fn backdrop_luminance (& mut self, _slot : u32) -> Option<f32> { None } }",
+      "signature": "# [doc = \" A renderer for headless windows that can produce real rendered output.\"] # [cfg (any (test, feature = \"test-support\"))] pub trait PlatformHeadlessRenderer { # [doc = \" Render a scene and return the result as an RGBA image.\"] fn render_scene_to_image (& mut self, scene : & Scene, size : Size<DevicePixels>,) -> Result<RgbaImage>; # [doc = \" Render a scene to an offscreen target without reading the result back.\"] # [doc = \"\"] # [doc = \" This is the headless analogue of presenting a frame: it performs the\"] # [doc = \" same CPU-side scene encoding and GPU submission as drawing to a real\"] # [doc = \" window, but doesn't block on GPU completion or copy pixels back.\"] fn render_scene (& mut self, scene : & Scene, size : Size<DevicePixels>) -> Result<()>; # [doc = \" Opt-in, blocking measurement of one offscreen submission. Ordinary rendering\"] # [doc = \" stays nonblocking. Completion is not presentation, and pixel capture is not\"] # [doc = \" GPU execution. Unsupported implementations return an error, not zero time.\"] fn measure_scene (& mut self, _scene : & Scene, _size : Size<DevicePixels>,) -> Result<crate::RendererFrameTiming> { anyhow::bail ! (\"renderer timing is unsupported by this backend\") } # [doc = \" Adapter/backend identity for same-host evidence, not a portability promise.\"] fn timing_identity (& self) -> String { \"unsupported\" . into () } # [doc = \" Returns the sprite atlas used by this renderer.\"] fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; # [doc = \" The luminance this renderer read back for a probe slot, with the same\"] # [doc = \" meaning as [`PlatformWindow::backdrop_luminance`].\"] fn backdrop_luminance (& mut self, _slot : u32) -> Option<f32> { None } }",
       "cfg": [
         "cfg (any (test, feature = \"test-support\"))"
       ]
@@ -30896,6 +30910,49 @@
       "summary": "",
       "documentation": "",
       "signature": "# [doc (hidden)] pub struct TryIter<T> { receiver : PriorityQueueReceiver<T>, ended : bool, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::renderer_timing::GpuExecutionTime",
+      "name": "GpuExecutionTime",
+      "kind": "enum",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "renderer_timing",
+      "path": "gpui::renderer_timing",
+      "source": "crates/gpui/src/renderer_timing.rs",
+      "summary": "GPU clock evidence, never a CPU completion or pixel-readback duration.",
+      "documentation": "GPU clock evidence, never a CPU completion or pixel-readback duration.",
+      "signature": "# [doc = \" GPU clock evidence, never a CPU completion or pixel-readback duration.\"] # [derive (Clone, Debug)] pub enum GpuExecutionTime { # [doc = \" This adapter/API cannot provide usable execution timestamps.\"] Unsupported (String), # [doc = \" Elapsed GPU time between commands bracketing the scene's render commands.\"] Measured (Duration), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::renderer_timing::GpuExecutionTime::from_timestamps",
+      "name": "from_timestamps",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "renderer_timing",
+      "path": "gpui::renderer_timing",
+      "source": "crates/gpui/src/renderer_timing.rs",
+      "summary": "Validate a completed submission's timestamps. Callers must supply fresh, submission-owned storage, not a cached result from an earlier frame.",
+      "documentation": "Validate a completed submission's timestamps. Callers must supply fresh,\nsubmission-owned storage, not a cached result from an earlier frame.",
+      "signature": "pub fn from_timestamps (start : f64, end : f64, seconds_per_tick : f64) -> anyhow::Result<Self>",
+      "cfg": [],
+      "target": "GpuExecutionTime"
+    },
+    {
+      "id": "gpui::renderer_timing::RendererFrameTiming",
+      "name": "RendererFrameTiming",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "renderer_timing",
+      "path": "gpui::renderer_timing",
+      "source": "crates/gpui/src/renderer_timing.rs",
+      "summary": "One synchronously measured headless render attempt. IDs increase per renderer; a failed attempt returns an error, never the previous attempt's measurement.",
+      "documentation": "One synchronously measured headless render attempt. IDs increase per renderer;\na failed attempt returns an error, never the previous attempt's measurement.",
+      "signature": "# [doc = \" One synchronously measured headless render attempt. IDs increase per renderer;\"] # [doc = \" a failed attempt returns an error, never the previous attempt's measurement.\"] # [derive (Clone, Debug)] pub struct RendererFrameTiming { # [doc = \" Monotonically increasing measurement attempt ID, local to this renderer.\"] pub submission_id : u64, # [doc = \" CPU target preparation, encoding and submission; not GPU time.\"] pub cpu_encode_submit : Duration, # [doc = \" CPU wall time from submit returning until completion is observed. Includes\"] # [doc = \" scheduling/poll overhead; not GPU execution and not presentation latency.\"] pub submit_to_completion : Duration, # [doc = \" Execution-clock evidence or an explicit unsupported capability reason.\"] pub gpu_execution : GpuExecutionTime, # [doc = \" GPU query resolve/copy, mapping and CPU extraction after render completion.\"] # [doc = \" Absent when no timestamp query readback is performed.\"] pub timestamp_readback : Option<Duration>, }",
       "cfg": []
     },
     {
@@ -112528,7 +112585,7 @@
       "source": "crates/gpui_macos/src/metal_renderer.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [cfg (any (test, feature = \"test-support\"))] pub struct MetalHeadlessRenderer { renderer : MetalRenderer, }",
+      "signature": "# [cfg (any (test, feature = \"test-support\"))] pub struct MetalHeadlessRenderer { renderer : MetalRenderer, measurement_id : u64, }",
       "cfg": [
         "cfg (any (test, feature = \"test-support\"))"
       ]
@@ -115419,7 +115476,7 @@
       "source": "crates/gpui_wgpu/src/wgpu_renderer.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [cfg (all (not (target_family = \"wasm\"), any (test, feature = \"test-support\")))] pub struct WgpuHeadlessRenderer { renderer : WgpuRenderer, }",
+      "signature": "# [cfg (all (not (target_family = \"wasm\"), any (test, feature = \"test-support\")))] pub struct WgpuHeadlessRenderer { renderer : WgpuRenderer, measurement_id : u64, }",
       "cfg": [
         "cfg (all (not (target_family = \"wasm\"), any (test, feature = \"test-support\")))"
       ]
@@ -147531,6 +147588,22 @@
       "requires_recorded_platform_evidence": true
     },
     "release_version": "0.1.2",
+    "renderer_timing": {
+      "backends": [
+        "wgpu Linux software Vulkan",
+        "wgpu Windows WARP",
+        "native Metal command-buffer timestamps"
+      ],
+      "contract": "Opt-in headless measurement separates CPU encoding/submission, CPU-observed completion, GPU execution-clock evidence, and query readback. FrameTimingMonitor input-to-submission remains a CPU boundary. Normal rendering does not wait.",
+      "excluded": [
+        "native Windows Direct3D renderer timing",
+        "compositor and display presentation latency",
+        "cross-host comparisons",
+        "pixel readback as GPU execution",
+        "complete application or component performance coverage"
+      ],
+      "validation": "Run renderer_timing_is_owned_by_each_successful_submission on the native backend and the renderer-timing harness on each native host; Linux results do not prove Metal or WARP."
+    },
     "repository": "https://github.com/fran0220/gpui-box",
     "rust_version": "1.97",
     "schema": 1,

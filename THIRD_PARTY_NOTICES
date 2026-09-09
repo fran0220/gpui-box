@@ -142,6 +142,12 @@ Scope: crates.io API dependency for WKWebView, WebView2 and WebKitGTK browser
 construction and events. GPUI Box host glue is original; no Wry source copied.
 The dependency distribution contains LICENSE-MIT and LICENSE-APACHE.
 
+Opt-in renderer timing
+---------------------
+Original GPUI Box integration using the existing wgpu and Metal public APIs.
+No additional third-party source import or dependency is introduced. Existing
+renderer licenses and the historical import receipt remain unchanged.
+
 Achromatic glass material (PROVENANCE.md P20): original GPUI Box saturation
 and wash implementation. Apple HIG Materials and WWDC25 session 219 are design
 references only; no Apple source was copied and no additional license applies.

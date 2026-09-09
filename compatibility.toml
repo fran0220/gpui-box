@@ -122,3 +122,9 @@ limitations = ["synchronous parsing", "parser internal work is not measured by b
 [framework_x11_platform_view]
 contract = "Linux X11 (including XWayland) hosts caller-owned native child XIDs in rectangular clip windows; full viewport allocation, physical-pixel resize, native input crop, paint-order stacking and detach/lifetime restoration are supported. Native Wayland, GPU transforms, rounded masks and X11 GPUI scene overlays above native children are not supported."
 commands = ["xvfb-run -a cargo test -p gpui-box-linux x11_native_children -- --ignored", "cargo test -p gpui-box platform_view --features test-support"]
+
+[renderer_timing]
+contract = "Opt-in headless measurement separates CPU encoding/submission, CPU-observed completion, GPU execution-clock evidence, and query readback. FrameTimingMonitor input-to-submission remains a CPU boundary. Normal rendering does not wait."
+backends = ["wgpu Linux software Vulkan", "wgpu Windows WARP", "native Metal command-buffer timestamps"]
+excluded = ["native Windows Direct3D renderer timing", "compositor and display presentation latency", "cross-host comparisons", "pixel readback as GPU execution", "complete application or component performance coverage"]
+validation = "Run renderer_timing_is_owned_by_each_successful_submission on the native backend and the renderer-timing harness on each native host; Linux results do not prove Metal or WARP."
