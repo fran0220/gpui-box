@@ -1,5 +1,23 @@
 import type { GPUI, NativeRef } from '../sdk.js';
 declare const gpui: GPUI;
+declare const rich: NativeRef<'RichTextEditSession'>;
+const richEditor = gpui.kit.RichTextEditor('rich', {document:{blocks:[{id:'a',text:'AλZ'}]}});
+const richSession: Promise<NativeRef<'RichTextEditSession'>> = gpui.query(richEditor, 'session');
+const richDocument = gpui.query(rich, 'document');
+richDocument.then(document => {
+  const bold: boolean = document.blocks[0].styles[0].style.bold;
+  const alignment: 'start' | 'center' | 'end' = document.blocks[0].paragraph.alignment;
+  void [bold, alignment];
+});
+const richUndo: Promise<boolean> = gpui.query(rich, 'can_undo');
+// @ts-expect-error mutation must use the editor's allocator, never the session
+gpui.invoke(rich, 'apply', {intent:{kind:'undo'}});
+// @ts-expect-error even argument-free mutation is unavailable
+gpui.invoke(rich, 'forbid_history');
+// @ts-expect-error an editor-only query is not a session operation
+gpui.query(rich, 'is_disabled');
+gpui.releaseReference(rich);
+void [richSession, richUndo];
 declare const area: NativeRef<'TextArea'>;
 const areaSnapshot: Promise<{revision: number; text: string}> = gpui.query(area, 'snapshot');
 const areaFocus: Promise<NativeRef<'FocusHandle'>> = gpui.query(area, 'focus_handle');

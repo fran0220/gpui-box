@@ -10,6 +10,10 @@ export interface NativeRef<T extends keyof NativeReferenceContracts = keyof Nati
   readonly [issuedNativeReference]: T;
 }
 export interface NativeReferenceContracts {
+  RichTextEditSession: {
+    invoke: Record<never, never>;
+    query: Pick<KitMethodContracts['RichTextEditor']['query'], 'document' | 'selection' | 'pending_style' | 'marked_range' | 'can_undo' | 'can_redo'>;
+  };
   TextArea: KitMethodContracts['TextArea'];
   TextInput: KitMethodContracts['TextInput'];
   Menu: KitMethodContracts['Menu'];

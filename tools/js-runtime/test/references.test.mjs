@@ -2,8 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NativeReferences, validateNativeRef, validateReferenceInvocation } from '../references.mjs';
 import { kitMethods, validateValue } from '../kit-schema.mjs';
+import { richSessionMethods } from '../kit-rich-text-schema.mjs';
 
 const ref = (id, type = 'FocusHandle') => ({ $nativeRef: `native-${id}`, type });
+test('rich session references are read-only and preserve complete styled documents', () => {
+  const registry = new NativeReferences(), session = registry.adopt(ref(61, 'RichTextEditSession'));
+  validateValue(session, kitMethods.RichTextEditor.query.session.result);
+  for (const method of ['document', 'selection', 'pending_style', 'marked_range', 'can_undo', 'can_redo']) {
+    assert.equal(validateReferenceInvocation(session, method, {}, 'query'), richSessionMethods.query[method]);
+  }
+  for (const method of ['apply', 'replace_document', 'forbid_history', 'document']) {
+    assert.throws(() => registry.target(session, method, {}, 'invoke'), /read-only/);
+  }
+  for (const method of ['is_disabled', 'toString', '__proto__']) {
+    assert.throws(() => registry.target(session, method, {}, 'query'), /read-only/);
+  }
+  assert.throws(() => registry.target(session, 'document', {extra:true}, 'query'));
+  const style = {bold:true,italic:false,underline:true,strike:false,code:false,link:null};
+  const doc = {blocks:[{id:'empty',text:'',styles:[{range:{start:0,end:0},style}],paragraph:{alignment:'end',list:{kind:'ordered',depth:2}}}]};
+  const result = validateReferenceInvocation(session, 'document', {}, 'query').result;
+  validateValue(doc, result);
+  assert.deepEqual(registry.adopt(doc), doc);
+  assert.throws(() => validateValue({blocks:[{id:'empty',text:''}]}, result));
+  assert.throws(() => validateValue({blocks:[{...doc.blocks[0],styles:[{range:{start:0,end:0},style:{bold:true}}]}]}, result));
+  assert.deepEqual(validateReferenceInvocation(session, '$release', {}, 'invoke').result, {enum:[null]});
+  registry.clear();
+  assert.throws(() => registry.target(session, 'document', {}, 'query'), /not issued/);
+});
+
 test('TextArea references reuse frozen methods and full snapshots without an Editor kind', () => {
   const registry = new NativeReferences();
   const area = registry.adopt({ child: ref(51, 'TextArea') }).child;

@@ -1,7 +1,8 @@
 // Native references are issued by the host, never constructed by the SDK user.
 // This worker-side identity check is not authority: native dispatch independently
 // revalidates the issuing worker, current mount, parent and weak target.
-import { validateInvocation } from './kit-schema.mjs';
+import { validateInvocation, validateValue } from './kit-schema.mjs';
+import { richSessionMethods } from './kit-rich-text-schema.mjs';
 import { validateMenuItems } from './kit-overlay-schema.mjs';
 import { validatePayload } from './wire.mjs';
 
@@ -11,7 +12,7 @@ export function validateNativeRef(value) {
   if (Reflect.ownKeys(fields).length !== 2 || !fields.$nativeRef || !fields.type ||
       !Object.hasOwn(fields.$nativeRef, 'value') || !Object.hasOwn(fields.type, 'value') ||
       typeof fields.$nativeRef.value !== 'string' || !/^native-[1-9][0-9]{0,19}$/.test(fields.$nativeRef.value) ||
-      !['TextInput', 'TextArea', 'Menu', 'SearchField', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
+      !['TextInput', 'TextArea', 'Menu', 'SearchField', 'RichTextEditSession', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
   return value;
 }
 
@@ -20,6 +21,12 @@ export function validateReferenceInvocation(reference, method, args, mode) {
   validatePayload(args);
   if (!['invoke', 'query'].includes(mode)) throw new Error('Invalid native reference mode');
   if (method === '$release' && mode === 'invoke' && args && typeof args === 'object' && !Array.isArray(args) && !Object.keys(args).length) return { result: { enum: [null] } };
+  if (reference.type === 'RichTextEditSession') {
+    if (mode !== 'query' || !Object.hasOwn(richSessionMethods.query, method)) throw new Error('Unsupported read-only rich text session operation');
+    const contract = richSessionMethods.query[method];
+    validateValue(args, contract.args);
+    return contract;
+  }
   if (reference.type !== 'FocusHandle') {
     const contract = validateInvocation(reference.type, method, args, mode);
     if (reference.type === 'Menu' && method === 'set_items') validateMenuItems(args.items);
