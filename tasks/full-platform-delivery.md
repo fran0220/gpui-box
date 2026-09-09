@@ -254,3 +254,36 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   bindings and both Windows/session candidates. Its full reference, resource,
   typed-slot and lifecycle integration must be tested on the resulting merged
   tree. No fourth-stage deployment or cross-platform success is claimed here.
+
+### Folding and native-menu verification checkpoint
+
+- Integrated revision-tagged nested editor folding and its source-row
+  projection, then fixed the API generator to discover declarations before
+  attaching cross-file implementations. The regenerated index includes
+  `Editor::set_folds` and `set_service_result`; missing signatures are no
+  longer hidden by source-file ordering.
+- The new combined `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full`
+  passed: 334 matching Linux images in 447.26 seconds, workspace tests,
+  strict Clippy, generated checks, wasm32, rustdoc and performance ratchets.
+  The combined runtime/plugin/app-host JavaScript check passed 86 tests with
+  15 platform skips and current catalog metadata. Both folding themes were
+  inspected; the exhibit intentionally has one editor, not a second preview.
+- Both native lanes now execute the real native-menu tracking smoke even if
+  a preceding browser/accessibility check fails (unless the job is cancelled).
+  It must exit successfully and emit its complete PASS marker. Its OS-thread
+  watchdog distinguishes a hung modal loop from successful cancellation;
+  simulated menus do not report real native tracking. Native execution is
+  still required before claiming platform lifecycle support.
+- Fresh 49-case measurements on the earlier 51-adapter validation checkpoint
+  retain significant source-sized costs: Editor static-frame requested bytes
+  grow from 827,047 at 1,000 lines to 4,401,384 at 10,000 lines. Bounded
+  accessibility leaf publication is not bounded total traversal or allocation.
+  This measurement does not include folding or soft-wrap.
+- AccessKit 0.24.1 additionally deep-copies whole-node properties and performs
+  full-text comparisons/conversions in native adapters. TextRun-backed
+  selection alone does not require a parent Value, but removing that Value
+  with stock AccessKit loses macOS AXValue and Windows ValuePattern behavior.
+  An Arc-only change would not remove adapter work or text-edit materialization.
+  No local AccessKit authority/fork is approved by this checkpoint; accessible
+  content and platform behavior must remain intact during independent GPUI
+  cache and soft-wrap optimization.

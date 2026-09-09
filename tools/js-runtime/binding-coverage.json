@@ -2989,6 +2989,7 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, text: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> Self"
         ],
         "options": [
+          "language_services(enabled: bool) -> Self",
           "rows(rows: usize) -> Self",
           "line_numbers(visible: bool) -> Self",
           "read_only(read_only: bool) -> Self",
@@ -2997,6 +2998,14 @@
           "syntax(syntax: EditorSyntax) -> Self"
         ],
         "commands": [
+          "set_folds(revision: u64, mut folds: Vec<EditorFold>, cx: &mut Context<Self>) -> bool",
+          "set_fold_collapsed(id: &str, collapsed: bool, cx: &mut Context<Self>) -> bool",
+          "request_service(kind: EditorServiceKind, position: usize, cx: &mut Context<Self>) -> Option<EditorServiceRequest>",
+          "set_service_result(request: u64, mut result: AsyncValue<EditorServiceResult, SharedString>, cx: &mut Context<Self>) -> bool",
+          "dismiss_service(cx: &mut Context<Self>)",
+          "accept_service_item(id: &str, cx: &mut Context<Self>) -> bool",
+          "set_diagnostics(revision: u64, diagnostics: Vec<EditorDiagnostic>, cx: &mut Context<Self>) -> bool",
+          "set_semantic_tokens(revision: u64, mut tokens: Vec<EditorSemanticToken>, cx: &mut Context<Self>) -> bool",
           "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
           "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
           "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
@@ -3004,6 +3013,7 @@
           "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
         ],
         "queries": [
+          "is_fold_collapsed(id: &str) -> bool",
           "syntax_state() -> Option<&EditorSyntax>",
           "text_area() -> &Entity<TextArea>",
           "snapshot(cx: &App) -> TextAreaSnapshot",

@@ -175,6 +175,23 @@ jobs:
       - name: Check deterministic component performance budgets
         run: cargo run -p xtask --locked -- performance check
 
+      - name: Exercise native macOS menu tracking lifetimes
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          cargo run --locked -p gpui-box-platform --features test-support --example native_menu_smoke 2>&1 | tee target/native-menu-smoke.log
+          grep -Fx 'native-menu-smoke: PASS cancel, replacement, stale close, cross-window isolation, teardown' target/native-menu-smoke.log
+      - name: Retain native macOS menu tracking diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-menu-smoke-macos
+          path: target/native-menu-smoke.log
+          if-no-files-found: warn
+
   native-windows:
     if: inputs.windows
     runs-on: windows-2025
@@ -223,6 +240,22 @@ jobs:
         run: cargo run -p xtask --locked -- performance check
       - name: Compile Direct3D release shaders
         run: cargo check -p gpui-box-windows --release --locked
+      - name: Exercise native Windows menu tracking lifetimes
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          cargo run --locked -p gpui-box-platform --features test-support --example native_menu_smoke 2>&1 | tee target/native-menu-smoke.log
+          grep -Fx 'native-menu-smoke: PASS cancel, replacement, stale close, cross-window isolation, teardown' target/native-menu-smoke.log
+      - name: Retain native Windows menu tracking diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-menu-smoke-windows
+          path: target/native-menu-smoke.log
+          if-no-files-found: warn
 
   headless-macos:
     if: inputs.macos

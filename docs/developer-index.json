@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2607
+      "symbolCount": 2618
     },
     {
       "name": "gpui-box-app-host",
@@ -1216,7 +1216,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4433
+      "symbolCount": 4438
     },
     {
       "name": "gpui-box-kit-assets",
@@ -13384,6 +13384,21 @@
       "target": "EditableTextLayout"
     },
     {
+      "id": "gpui::editable_text::layout::EditableTextLayout::unwrapped_projected",
+      "name": "unwrapped_projected",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "No-wrap geometry with omitted complete source lines. `visible` indexes projected rows, not source lines. Painting, hit testing, selections and IME share this mapping; omitted positions map to the preceding displayed row's end, or the first row's start when no predecessor exists. Returns None for a projection of a different source line count.",
+      "documentation": "No-wrap geometry with omitted complete source lines. `visible` indexes\nprojected rows, not source lines. Painting, hit testing, selections and\nIME share this mapping; omitted positions map to the preceding displayed\nrow's end, or the first row's start when no predecessor exists. Returns\nNone for a projection of a different source line count.",
+      "signature": "pub fn unwrapped_projected (document : EditSnapshot, text_system : Arc<WindowTextSystem>, font_size : Pixels, line_height : Pixels, runs : Vec<TextRun>, visible : Range<usize>, projection : EditableLineProjection,) -> Option<Self>",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
       "id": "gpui::editable_text::layout::EditableTextLayout::visual_rows",
       "name": "visual_rows",
       "kind": "method",
@@ -13539,6 +13554,110 @@
       "cfg": []
     },
     {
+      "id": "gpui::editable_text::projection::EditableLineProjection",
+      "name": "EditableLineProjection",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "An immutable source-line ↔ displayed-row mapping. Omitted source remains in the document; this changes geometry, never editing coordinates or text.",
+      "documentation": "An immutable source-line ↔ displayed-row mapping. Omitted source remains\nin the document; this changes geometry, never editing coordinates or text.",
+      "signature": "# [doc = \" An immutable source-line ↔ displayed-row mapping. Omitted source remains\"] # [doc = \" in the document; this changes geometry, never editing coordinates or text.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditableLineProjection { source_lines : usize, rows : usize, spans : Arc<[Span]>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::contains",
+      "name": "contains",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Whether a source line has its own displayed row.",
+      "documentation": "Whether a source line has its own displayed row.",
+      "signature": "pub fn contains (& self, line : usize) -> bool",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Builds an identity or omitted-line projection. Ranges are zero-based, half-open source-line indices. Overlap/nesting is unioned. Invalid bounds, an empty document line index, or hiding every line are refused.",
+      "documentation": "Builds an identity or omitted-line projection. Ranges are zero-based,\nhalf-open source-line indices. Overlap/nesting is unioned. Invalid\nbounds, an empty document line index, or hiding every line are refused.",
+      "signature": "pub fn new (source_lines : usize, omitted : impl IntoIterator<Item = Range<usize>>,) -> Option<Self>",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::row",
+      "name": "row",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Displayed row for a source line. Omitted lines map to the preceding displayed row, or row zero when the omitted range precedes all content.",
+      "documentation": "Displayed row for a source line. Omitted lines map to the preceding\ndisplayed row, or row zero when the omitted range precedes all content.",
+      "signature": "pub fn row (& self, line : usize) -> usize",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::rows",
+      "name": "rows",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Number of displayed hard rows after omissions.",
+      "documentation": "Number of displayed hard rows after omissions.",
+      "signature": "pub fn rows (& self) -> usize",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::source_line",
+      "name": "source_line",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Source line for a displayed row, clamped at the last displayed row.",
+      "documentation": "Source line for a displayed row, clamped at the last displayed row.",
+      "signature": "pub fn source_line (& self, row : usize) -> usize",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
+      "id": "gpui::editable_text::projection::EditableLineProjection::source_lines",
+      "name": "source_lines",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::projection",
+      "path": "gpui::editable_text::projection",
+      "source": "crates/gpui/src/editable_text/projection.rs",
+      "summary": "Number of source hard lines, including an empty final line.",
+      "documentation": "Number of source hard lines, including an empty final line.",
+      "signature": "pub fn source_lines (& self) -> usize",
+      "cfg": [],
+      "target": "EditableLineProjection"
+    },
+    {
       "id": "gpui::editable_text::range_from_utf16",
       "name": "range_from_utf16",
       "kind": "function",
@@ -13624,6 +13743,20 @@
     },
     {
       "id": "gpui::editable_text::reexport-5",
+      "name": "projection :: EditableLineProjection",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text",
+      "path": "gpui::editable_text",
+      "source": "crates/gpui/src/editable_text/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use projection::EditableLineProjection;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::reexport-6",
       "name": "style_runs :: { EditableStyleRun , EditableStyleRuns }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -17953,7 +18086,7 @@
       "source": "crates/gpui/src/elements/selectable_text.rs",
       "summary": "Revision-keyed logical text publication. Offscreen unchanged leaves are retained in AccessKit; visible and previously visible leaves refresh their geometry. Own one cache per text surface, never share it between windows.",
       "documentation": "Revision-keyed logical text publication. Offscreen unchanged leaves are\nretained in AccessKit; visible and previously visible leaves refresh their\ngeometry. Own one cache per text surface, never share it between windows.",
-      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Range<usize>, document : Option<EditSnapshot>, work : AccessibleTextWork, }",
+      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Vec<Range<usize>>, document : Option<EditSnapshot>, work : AccessibleTextWork, }",
       "cfg": []
     },
     {
@@ -17983,6 +18116,21 @@
       "summary": "Publishes a persistent document, resegmenting only changed LF-delimited paragraphs when rows and direction outside the edit remain unchanged. LF is a Unicode bidi/word reset boundary; arbitrary visual rows are not. Source snapshots and run metadata remain complete, including offscreen paragraphs. Native actions are still checked against the exact revision.",
       "documentation": "Publishes a persistent document, resegmenting only changed LF-delimited\nparagraphs when rows and direction outside the edit remain unchanged.\nLF is a Unicode bidi/word reset boundary; arbitrary visual rows are not.\nSource snapshots and run metadata remain complete, including offscreen\nparagraphs. Native actions are still checked against the exact revision.",
       "signature": "pub fn publish_document (& mut self, builder : & mut A11ySubtreeBuilder, document : & EditSnapshot, anchor : usize, focus : usize, direction : accesskit::TextDirection, rows : & [Range<usize>], revision : u64, visible : Range<usize>, scale : f32, geometry : impl Fn (Range<usize>) -> Vec<Bounds<Pixels>>,) -> Option<PublishedAccessibleText>",
+      "cfg": [],
+      "target": "AccessibleTextCache"
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache::publish_document_regions",
+      "name": "publish_document_regions",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Publishes disjoint painted regions without treating omitted source gaps as visible. Logical text remains complete, including folded paragraphs.",
+      "documentation": "Publishes disjoint painted regions without treating omitted source gaps\nas visible. Logical text remains complete, including folded paragraphs.",
+      "signature": "pub fn publish_document_regions (& mut self, builder : & mut A11ySubtreeBuilder, document : & EditSnapshot, anchor : usize, focus : usize, direction : accesskit::TextDirection, rows : & [Range<usize>], revision : u64, visible : Vec<Range<usize>>, scale : f32, geometry : impl Fn (Range<usize>) -> Vec<Bounds<Pixels>>,) -> Option<PublishedAccessibleText>",
       "cfg": [],
       "target": "AccessibleTextCache"
     },
@@ -27086,7 +27234,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents one opaque menu revision. Replacements must invalidate the old\"] # [doc = \" revision and wait for its native tracking loop to exit before starting\"] # [doc = \" the next, including replacements from another window on this UI thread.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuError::NotSupported`] so the component can render in-window.\"] # [doc = \" Failed replacement cancellation is a refusal, not unsupported capability.\"] fn show_context_menu (& self, _session : NativeMenuSessionId, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> { Err (NativeMenuNotSupportedError . into ()) } # [doc = \" Invalidates only the matching current revision. `true` means a cancel\"] # [doc = \" request, not completed closure; the result receiver confirms loop exit.\"] # [doc = \" A stale identity must never call a thread-wide native cancellation API.\"] # [doc = \" Even a refused cancellation must suppress that revision's late command.\"] fn cancel_context_menu (& self, _session : NativeMenuSessionId) -> Result<bool, NativeMenuError> { Ok (false) } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that the text input state has changed\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } }",
+      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents one opaque menu revision. Replacements must invalidate the old\"] # [doc = \" revision and wait for its native tracking loop to exit before starting\"] # [doc = \" the next, including replacements from another window on this UI thread.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuError::NotSupported`] so the component can render in-window.\"] # [doc = \" Failed replacement cancellation is a refusal, not unsupported capability.\"] fn show_context_menu (& self, _session : NativeMenuSessionId, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> { Err (NativeMenuNotSupportedError . into ()) } # [doc = \" Invalidates only the matching current revision. `true` means a cancel\"] # [doc = \" request, not completed closure; the result receiver confirms loop exit.\"] # [doc = \" A stale identity must never call a thread-wide native cancellation API.\"] # [doc = \" Even a refused cancellation must suppress that revision's late command.\"] fn cancel_context_menu (& self, _session : NativeMenuSessionId) -> Result<bool, NativeMenuError> { Ok (false) } # [doc = \" Observes a menu only while inside the actual native tracking call.\"] # [doc = \" Queued menus and test-platform simulations must return `None`. This is\"] # [doc = \" instrumentation for native loop smoke tests, not presentation state.\"] # [cfg (any (test, feature = \"test-support\"))] fn native_context_menu_tracking (& self) -> Option<NativeMenuSessionId> { None } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that the text input state has changed\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } }",
       "cfg": []
     },
     {
@@ -39082,6 +39230,23 @@
       "documentation": "Moves the tab to a new containing window.\nThis is macOS specific.",
       "signature": "pub fn move_tab_to_new_window (& self)",
       "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::native_context_menu_tracking",
+      "name": "native_context_menu_tracking",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Observes the current revision only while inside its native OS menu tracking call. Queued presentations and simulated menus return `None`; a replaced revision may still be leaving its loop when this is `None`. Only native smoke tests should use this; await session completion to determine closure in application code.",
+      "documentation": "Observes the current revision only while inside its native OS menu\ntracking call. Queued presentations and simulated menus return `None`;\na replaced revision may still be leaving its loop when this is `None`.\nOnly native smoke tests should use this; await session completion to\ndetermine closure in application code.",
+      "signature": "pub fn native_context_menu_tracking (& self) -> Option<crate::NativeMenuSessionId>",
+      "cfg": [
+        "cfg (any (test, feature = \"test-support\"))"
+      ],
       "target": "Window"
     },
     {
@@ -59469,7 +59634,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "Plain source editing with caller-owned language policy.",
       "documentation": "Plain source editing with caller-owned language policy.",
-      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, services_enabled : bool, next_service_request : u64, service_popup : Option<services::ServicePopup>, hover_position : Option<(u64, usize)>, diagnostics : Option<(u64, Vec<EditorDiagnostic>)>, semantic_tokens : Option<(u64, Vec<EditorSemanticToken>)>, # [cfg (feature = \"syntax\")] syntax : Option<EditorSyntax>, _subscription : Subscription, }",
+      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, services_enabled : bool, next_service_request : u64, service_popup : Option<services::ServicePopup>, hover_position : Option<(u64, usize)>, diagnostics : Option<(u64, Vec<EditorDiagnostic>)>, semantic_tokens : Option<(u64, Vec<EditorSemanticToken>)>, folds : Vec<EditorFold>, collapsed_folds : std::collections::HashSet<SharedString>, # [cfg (feature = \"syntax\")] syntax : Option<EditorSyntax>, _subscription : Subscription, }",
       "cfg": []
     },
     {
@@ -59757,7 +59922,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "What a source editor reports to its owner.",
       "documentation": "What a source editor reports to its owner.",
-      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" The host should answer this revision-tagged language request.\"] ServiceRequested (EditorServiceRequest), # [doc = \" A stable service item was accepted successfully.\"] ServiceAccepted (SharedString), # [doc = \" Navigation belongs to the caller's document/workspace host.\"] DefinitionRequested { target : SharedString, range : Range<usize>, }, # [doc = \" A caller-defined code action requires host execution.\"] CodeActionRequested (SharedString), # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The value changed. The persistent snapshot does not materialize a\"] # [doc = \" contiguous string unless the recipient explicitly calls `text()`.\"] Changed (gpui::EditSnapshot), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
+      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" The host should answer this revision-tagged language request.\"] ServiceRequested (EditorServiceRequest), # [doc = \" A stable service item was accepted successfully.\"] ServiceAccepted (SharedString), # [doc = \" Navigation belongs to the caller's document/workspace host.\"] DefinitionRequested { target : SharedString, range : Range<usize>, }, # [doc = \" A caller-defined code action requires host execution.\"] CodeActionRequested (SharedString), # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The value changed. The persistent snapshot does not materialize a\"] # [doc = \" contiguous string unless the recipient explicitly calls `text()`.\"] Changed (gpui::EditSnapshot), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" A caller-identified fold changed its transient collapsed state.\"] FoldChanged { id : SharedString, collapsed : bool }, # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
       "cfg": []
     },
     {
@@ -59979,6 +60144,65 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::editor::folding::Editor::is_fold_collapsed",
+      "name": "is_fold_collapsed",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::folding",
+      "path": "gpui_kit::controls::editor::folding",
+      "source": "crates/gpui-kit/src/controls/editor/folding.rs",
+      "summary": "Whether a caller-identified fold is currently collapsed.",
+      "documentation": "Whether a caller-identified fold is currently collapsed.",
+      "signature": "pub fn is_fold_collapsed (& self, id : & str) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::folding::Editor::set_fold_collapsed",
+      "name": "set_fold_collapsed",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::folding",
+      "path": "gpui_kit::controls::editor::folding",
+      "source": "crates/gpui-kit/src/controls/editor/folding.rs",
+      "summary": "Changes one fold's transient visual state without changing text, selection or history. Disabled editors refuse interaction. Read-only editors still permit browsing. Navigation into hidden text expands it.",
+      "documentation": "Changes one fold's transient visual state without changing text,\nselection or history. Disabled editors refuse interaction. Read-only\neditors still permit browsing. Navigation into hidden text expands it.",
+      "signature": "pub fn set_fold_collapsed (& mut self, id : & str, collapsed : bool, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::folding::Editor::set_folds",
+      "name": "set_folds",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::folding",
+      "path": "gpui_kit::controls::editor::folding",
+      "source": "crates/gpui-kit/src/controls/editor/folding.rs",
+      "summary": "Installs folds for the current revision atomically. Invalid/stale sets leave the previous set unchanged. Editing invalidates all fold ranges; callers can publish a fresh set from their parser's new revision.",
+      "documentation": "Installs folds for the current revision atomically. Invalid/stale sets\nleave the previous set unchanged. Editing invalidates all fold ranges;\ncallers can publish a fresh set from their parser's new revision.",
+      "signature": "pub fn set_folds (& mut self, revision : u64, mut folds : Vec<EditorFold>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::folding::EditorFold",
+      "name": "EditorFold",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::folding",
+      "path": "gpui_kit::controls::editor::folding",
+      "source": "crates/gpui-kit/src/controls/editor/folding.rs",
+      "summary": "A fold header and its body, in zero-based, half-open source line indices. The first line remains visible. Identities must be unique and stable across caller updates. Nested folds are supported; crossing ranges are refused.",
+      "documentation": "A fold header and its body, in zero-based, half-open source line indices.\nThe first line remains visible. Identities must be unique and stable across\ncaller updates. Nested folds are supported; crossing ranges are refused.",
+      "signature": "# [doc = \" A fold header and its body, in zero-based, half-open source line indices.\"] # [doc = \" The first line remains visible. Identities must be unique and stable across\"] # [doc = \" caller updates. Nested folds are supported; crossing ranges are refused.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorFold { pub id : SharedString, pub lines : Range<usize>, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::controls::editor::reexport-1",
       "name": "syntax :: { EditorParseWork , EditorSyntax , EditorSyntaxCapture , EditorSyntaxError }",
       "kind": "reexport",
@@ -60006,6 +60230,20 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use services::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::reexport-3",
+      "name": "folding :: EditorFold",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use folding::EditorFold;",
       "cfg": []
     },
     {
@@ -66114,7 +66352,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "documentation": "Wrapped, multi-line editable text.\n\nEnter inserts a line and the platform modifier plus enter submits. Motion\nfollows visual rows with a preserved goal column, and the frame grows from\n`rows` to `max_rows` before it scrolls rather than pushing the page around.",
-      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
+      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, line_projection : Option<gpui::EditableLineProjection>, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
       "cfg": []
     },
     {
@@ -125549,6 +125787,7 @@
         "Edited",
         "Changed",
         "SelectionChanged",
+        "FoldChanged",
         "Pasted",
         "Submitted",
         "Cancelled",
@@ -125560,7 +125799,8 @@
       "scenes": [
         "editor",
         "editor-multicursor",
-        "editor-services"
+        "editor-services",
+        "editor-folding"
       ]
     },
     {
@@ -132477,6 +132717,7 @@
         "Edited",
         "Changed",
         "SelectionChanged",
+        "FoldChanged",
         "Pasted",
         "Submitted",
         "Cancelled",
@@ -132485,6 +132726,16 @@
         "Parsed",
         "SyntaxUnavailable"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorFold",
+      "path": "gpui_kit::controls::EditorFold",
+      "summary": "A fold header and its body, in zero-based, half-open source line indices. The first line remains visible. Identities must be unique and stable across caller updates. Nested folds are supported; crossing ranges are refused.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],
@@ -148693,6 +148944,18 @@
       "example": "fn editor_services(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::controls::editor::*;\n    if !cx.has_global::<SceneEditorServices>() {\n        let editors = [\"ready\", \"loading\", \"refused\", \"hover\"].map(|state| {\n            let editor = cx.new(|cx| {\n                Editor::new(\n                    format!(\"scene.editor.services.{state}\"),\n                    format!(\"Language service {state} fixture\"),\n                    \"let count = val;\\n// caller-owned fixture\",\n                    window,\n                    cx,\n                )\n                .rows(3)\n                .language_services(true)\n            });\n            editor.update(cx, |editor, cx| {\n                let kind = if state == \"hover\" {\n                    EditorServiceKind::Hover\n                } else {\n                    EditorServiceKind::Completion\n                };\n                let request = editor\n                    .request_service(kind, 14, cx)\n                    .expect(\"fixture request\");\n                editor.set_diagnostics(\n                    0,\n                    vec![EditorDiagnostic {\n                        id: \"unresolved-value\".into(),\n                        range: 12..15,\n                        message: \"Fixture: unresolved name\".into(),\n                        severity: EditorDiagnosticSeverity::Warning,\n                    }],\n                    cx,\n                );\n                editor.set_semantic_tokens(\n                    0,\n                    vec![EditorSemanticToken {\n                        range: 0..3,\n                        class: gpui_kit_theme::SyntaxColor::Keyword,\n                    }],\n                    cx,\n                );\n                let result = match state {\n                    \"loading\" => AsyncValue::loading(),\n                    \"refused\" => AsyncValue::refused(\"Fixture host denied this request\"),\n                    \"hover\" => AsyncValue::ready(EditorServiceResult::Hover(EditorHover {\n                        range: 12..15,\n                        contents: \"Fixture: value → integer\\nDocumentation is caller text.\".into(),\n                    })),\n                    _ => AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {\n                        id: \"value\".into(),\n                        label: \"value\".into(),\n                        detail: Some(\" · integer (fixture)\".into()),\n                        effect: EditorServiceEffect::Edits(vec![EditorReplacement {\n                            range: 12..15,\n                            text: \"value\".into(),\n                        }]),\n                    }])),\n                };\n                editor.set_service_result(request.id, result, cx);\n            });\n            editor\n        });\n        cx.set_global(SceneEditorServices(editors.into()));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(900.0))\n        .child(caption(&theme, \"caller fixtures · completion / loading / host refusal / hover + diagnostic · no server process\"))\n        .children(cx.global::<SceneEditorServices>().0.chunks(2).map(|pair| {\n            row(&theme).items_start().children(pair.iter().map(|editor| div().w(px(430.0)).h(px(225.0)).child(editor.clone())))\n        }))\n        .into_any_element()\n}"
     },
     {
+      "name": "editor-folding",
+      "capture": "cargo run -p xtask -- headless capture editor-folding",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_folding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneFoldedEditor>() {\n        let editor = cx.new(|cx| Editor::new(\"scene.editor.folding\", \"Folded Unicode source fixture\", \"fn outer() {\\n    let 界 = 13;\\n    if ready {\\n        process();\\n    }\\n}\\nfn tail() {}\\n\", window, cx).rows(6));\n        editor.update(cx, |editor, cx| {\n            use crate::controls::editor::EditorFold;\n            editor.set_folds(\n                0,\n                vec![\n                    EditorFold {\n                        id: \"outer\".into(),\n                        lines: 0..6,\n                    },\n                    EditorFold {\n                        id: \"ready\".into(),\n                        lines: 2..5,\n                    },\n                ],\n                cx,\n            );\n            editor.set_fold_collapsed(\"ready\", true, cx);\n        });\n        cx.set_global(SceneFoldedEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · nested source folds · gutter toggles or Ctrl-Alt-F · hidden text remains in the document\"))\n        .child(cx.global::<SceneFoldedEditor>().0.clone())\n        .into_any_element()\n}"
+    },
+    {
       "name": "mention-input",
       "capture": "cargo run -p xtask -- headless capture mention-input",
       "kind": "exhibit",
@@ -150595,6 +150858,8 @@
     },
     "framework_context_menu": {
       "contract": "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability.",
+      "native_smoke": "cargo run --locked -p gpui-box-platform --features test-support --example native_menu_smoke",
+      "native_smoke_contract": "Logged-in macOS/Windows desktop only: observe actual tracking before cancel/replacement, preserve the new menu after stale/wrong-window close and old-owner destruction, await teardown, then open successfully in the surviving window. Unsupported and watchdog expiry fail; no Kit fallback or native selection-input claim.",
       "tests": [
         "native_context_menu_revision_and_refusal",
         "native_context_menu_cross_window_replacement",
