@@ -150,6 +150,28 @@ struct Entry<T: 'static> {
     _subscription: Subscription,
 }
 
+/// The shared host registry, not the adapter, owns reference authority/lifetime.
+fn focus_reference<T: gpui::Focusable + 'static>(
+    entries: &RefCell<HashMap<Key, Rc<Entry<T>>>>,
+    key: &Key,
+    cx: &App,
+    refs: &crate::references::Registration<'_>,
+    allowed: fn(&T, &App) -> bool,
+) -> anyhow::Result<Value> {
+    let entity = entries
+        .borrow()
+        .get(key)
+        .map(|entry| entry.entity.clone())
+        .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+    let focus = entity.read(cx).focus_handle(cx);
+    refs.focus(
+        &entity,
+        &focus,
+        |control, focus, cx| control.focus_handle(cx) == *focus,
+        allowed,
+    )
+}
+
 #[derive(Default)]
 pub(super) struct State {
     searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
@@ -161,6 +183,105 @@ pub(super) struct State {
 }
 
 impl State {
+    pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
+        let key = (node.instance, node.id.clone());
+        match node.component.as_deref()? {
+            "SearchInput" => self
+                .searches
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "TransferList" => self
+                .transfers
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "NumberInput" => self
+                .numbers
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "KeymapEditor" => self
+                .keymaps
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "CopyButton" => self
+                .copies
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "SplitButton" => self
+                .splits
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            _ => None,
+        }
+    }
+
+    pub(super) fn reference_query(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        cx: &App,
+        refs: &crate::references::Registration<'_>,
+    ) -> Option<anyhow::Result<Value>> {
+        let component = node.component.as_deref()?;
+        if component == "SplitButton" && method == "menu" {
+            return Some((|| {
+                let schema = super::validation::invocation(component, method, args, true)?;
+                let entity = self
+                    .splits
+                    .borrow()
+                    .get(&(node.instance, node.id.clone()))
+                    .map(|entry| entry.entity.clone())
+                    .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+                let menu = entity.read(cx).menu().clone();
+                let result = refs.entity(
+                    "Menu",
+                    &entity,
+                    &menu,
+                    |parent, _| Some(parent.menu().clone()),
+                    |parent, _| !parent.is_disabled(),
+                    super::reference_dispatch::menu,
+                )?;
+                super::validation::validate(&result, schema)?;
+                Ok(result)
+            })());
+        }
+        if method != "focus_handle"
+            || !matches!(
+                component,
+                "SearchInput" | "NumberInput" | "CopyButton" | "SplitButton"
+            )
+        {
+            return None;
+        }
+        Some((|| {
+            let schema = super::validation::invocation(component, method, args, true)?;
+            let key = (node.instance, node.id.clone());
+            let result = match component {
+                "SearchInput" => focus_reference(&self.searches, &key, cx, refs, |control, _| {
+                    !control.is_disabled()
+                }),
+                "NumberInput" => focus_reference(&self.numbers, &key, cx, refs, |control, _| {
+                    !control.is_disabled()
+                }),
+                "CopyButton" => focus_reference(&self.copies, &key, cx, refs, |control, _| {
+                    !control.is_disabled()
+                }),
+                "SplitButton" => focus_reference(&self.splits, &key, cx, refs, |control, _| {
+                    !control.is_disabled()
+                }),
+                _ => unreachable!("matched retained focus component"),
+            }?;
+            super::validation::validate(&result, schema)?;
+            Ok(result)
+        })())
+    }
+
     pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
         fn visit(node: &Node, live: &mut HashMap<Key, String>) {
             if let Some(component) = &node.component {

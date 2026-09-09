@@ -8,6 +8,23 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('native reference getters expose only actual focus and menu contracts', () => {
+  for (const component of ['SearchInput', 'NumberInput', 'CopyButton', 'SplitButton']) {
+    const query = familyMethods[component].query.focus_handle;
+    validateValue({}, query.args);
+    validateValue({$nativeRef:'native-1',type:'FocusHandle'}, query.result);
+    assert.throws(() => validateValue({$nativeRef:'native-1',type:'TextInput'}, query.result));
+    assert.throws(() => validateValue({$nativeRef:'native-1',type:'FocusHandle',pointer:1}, query.result));
+    assert.throws(() => validateValue({extra:true}, query.args));
+  }
+  for (const component of ['TransferList', 'KeymapEditor']) {
+    assert.equal(familyMethods[component].query.focus_handle, undefined);
+  }
+  const menu = familyMethods.SplitButton.query.menu;
+  validateValue({$nativeRef:'native-2',type:'Menu'}, menu.result);
+  assert.throws(() => validateValue({items:[]}, menu.result));
+});
+
 test('split buttons reuse closed recursive menu items and exact named methods', () => {
   const item = {kind:'check',id:'pin',label:'Pin',checked:true};
   validateValue({items:[{kind:'submenu',id:'more',label:'More',items:[item]}]},familySchemas.SplitButton.props);

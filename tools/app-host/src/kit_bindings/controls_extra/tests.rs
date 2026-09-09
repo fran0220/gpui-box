@@ -3,6 +3,236 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut TestAppContext) {
+    for component in ["SearchInput", "NumberInput", "CopyButton", "SplitButton"] {
+        let owner = gpui::EffectOwner::new();
+        let state = Rc::new(KitState::default());
+        let descriptor = Rc::new(RefCell::new(node(
+            component,
+            "focus-target",
+            json!({}),
+            json!({}),
+        )));
+        let (build_state, build_node) = (state.clone(), descriptor.clone());
+        let mut harness = Harness::new(
+            cx,
+            move |cx| {
+                gpui_kit::install(cx);
+                gpui_kit::foundation::register_owner_state(owner, cx);
+            },
+            move |window, cx| {
+                let node = build_node.borrow();
+                build_state.reconcile(&node, cx);
+                let element = cx.with_effect_owner(Some(owner), |cx| {
+                    build_state.render(&node, BTreeMap::new(), window, cx, Rc::new(|_, _| {}))
+                });
+                gpui::effect_owner(owner, element).into_any_element()
+            },
+        );
+        let registry = crate::references::Registry::new();
+        let reference = harness.update(|window, cx| {
+            let node = descriptor.borrow();
+            let registration = registry.registration(&node, owner);
+            assert!(
+                state
+                    .controls_extra
+                    .reference_query(
+                        &node,
+                        "focus_handle",
+                        &json!({"extra":true}),
+                        cx,
+                        &registration
+                    )
+                    .expect("focus query")
+                    .is_err()
+            );
+            let reference = state
+                .controls_extra
+                .reference_query(&node, "focus_handle", &json!({}), cx, &registration)
+                .expect("focus query")
+                .expect("issued reference");
+            registry
+                .invoke(owner, &reference, "focus", &json!({}), false, window, cx)
+                .expect("native focus");
+            assert_eq!(
+                registry
+                    .invoke(
+                        owner,
+                        &reference,
+                        "is_focused",
+                        &json!({}),
+                        true,
+                        window,
+                        cx
+                    )
+                    .expect("focused query"),
+                json!(true)
+            );
+            assert!(
+                registry
+                    .invoke(
+                        gpui::EffectOwner::new(),
+                        &reference,
+                        "focus",
+                        &json!({}),
+                        false,
+                        window,
+                        cx
+                    )
+                    .is_err()
+            );
+            reference
+        });
+        let menu_references = (component == "SplitButton").then(|| {
+            harness.update(|window, cx| {
+                let node = descriptor.borrow();
+                let menu = state
+                    .controls_extra
+                    .reference_query(
+                        &node,
+                        "menu",
+                        &json!({}),
+                        cx,
+                        &registry.registration(&node, owner),
+                    )
+                    .expect("native menu query")
+                    .expect("issued menu");
+                assert_eq!(menu["type"], "Menu");
+                registry
+                    .invoke(owner, &menu, "open", &json!({}), false, window, cx)
+                    .expect("open actual child menu");
+                let native = state.controls_extra.splits.borrow();
+                let native = &native
+                    .get(&(node.instance, node.id.clone()))
+                    .expect("split")
+                    .entity;
+                assert!(native.read(cx).menu().read(cx).is_open());
+                let focus = registry
+                    .invoke(owner, &menu, "focus_handle", &json!({}), true, window, cx)
+                    .expect("nested focus reference");
+                assert_eq!(focus["type"], "FocusHandle");
+                (menu, focus)
+            })
+        });
+        descriptor
+            .borrow_mut()
+            .props
+            .insert("disabled".into(), json!(false));
+        harness.update(|_, cx| cx.refresh_windows());
+        harness.update(|window, cx| {
+            let replacement = node("Button", "replacement", json!({}), json!({}));
+            let node = descriptor.borrow();
+            assert_eq!(
+                state
+                    .controls_extra
+                    .reference_query(
+                        &node,
+                        "focus_handle",
+                        &json!({}),
+                        cx,
+                        &registry.registration(&node, owner)
+                    )
+                    .expect("query")
+                    .expect("same reference"),
+                reference
+            );
+            state
+                .invoke(
+                    &node,
+                    "set_disabled",
+                    &json!({"disabled":true}),
+                    false,
+                    window,
+                    cx,
+                )
+                .expect("disable native entity");
+            if let Some((menu, focus)) = &menu_references {
+                assert!(
+                    registry
+                        .invoke(owner, menu, "open", &json!({}), false, window, cx)
+                        .is_err()
+                );
+                assert!(
+                    registry
+                        .invoke(owner, focus, "focus", &json!({}), false, window, cx)
+                        .is_err()
+                );
+                assert!(
+                    registry
+                        .invoke(owner, menu, "is_open", &json!({}), true, window, cx)
+                        .is_ok()
+                );
+            }
+            assert!(
+                state
+                    .controls_extra
+                    .reference_query(
+                        &node,
+                        "focus_handle",
+                        &json!({}),
+                        cx,
+                        &registry.registration(&node, owner)
+                    )
+                    .expect("disabled query allowed")
+                    .is_ok()
+            );
+            assert!(
+                registry
+                    .invoke(owner, &reference, "focus", &json!({}), false, window, cx)
+                    .is_err(),
+                "disabled parent rejects native focus"
+            );
+            assert!(
+                registry
+                    .invoke(
+                        owner,
+                        &reference,
+                        "is_focused",
+                        &json!({}),
+                        true,
+                        window,
+                        cx
+                    )
+                    .is_ok()
+            );
+            state.reconcile(&replacement, cx);
+            registry.reconcile(
+                &replacement,
+                |_| Some(owner),
+                |_| state.controls_extra.native_entity_id(&node),
+                cx,
+            );
+            if let Some((menu, focus)) = &menu_references {
+                assert!(
+                    registry
+                        .invoke(owner, menu, "is_open", &json!({}), true, window, cx)
+                        .is_err()
+                );
+                assert!(
+                    registry
+                        .invoke(owner, focus, "is_focused", &json!({}), true, window, cx)
+                        .is_err()
+                );
+            }
+            assert!(
+                registry
+                    .invoke(
+                        owner,
+                        &reference,
+                        "is_focused",
+                        &json!({}),
+                        true,
+                        window,
+                        cx
+                    )
+                    .is_err(),
+                "removed reference revoked"
+            );
+        });
+    }
+}
+
+#[gpui::test]
 fn split_adapter_routes_native_menu_intents_and_preserves_cursor_on_paint(cx: &mut TestAppContext) {
     let state = Rc::new(KitState::default());
     let descriptor = Rc::new(RefCell::new(node(

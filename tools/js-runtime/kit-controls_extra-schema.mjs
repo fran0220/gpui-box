@@ -16,6 +16,7 @@ const precision = { type: 'number', integer: true, min: 0, max: 12 };
 const confirmation = { type: 'number', integer: true, min: 0, max: 60000 };
 const step = { ...number, min: Number.MIN_VALUE };
 const method = (fields, result) => ({ args: object(fields, Object.keys(fields)), result });
+const focusQuery = method({}, object({ $nativeRef: identity, type: choice('FocusHandle') }, ['$nativeRef', 'type']));
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -61,7 +62,7 @@ export const familyMethods = Object.freeze({
       set_default_disabled: method({ disabled: boolean }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
       set_items: method({ items: menuItemsSchema }, choice(null)), set_menu_name: method({ name: string }, choice(null)),
     },
-    query: { is_open: method({}, boolean), is_disabled: method({}, boolean) },
+    query: { menu: method({}, object({ $nativeRef: identity, type: choice('Menu') }, ['$nativeRef', 'type'])), focus_handle: focusQuery, is_open: method({}, boolean), is_disabled: method({}, boolean) },
   },
   CopyButton: {
     invoke: {
@@ -71,7 +72,7 @@ export const familyMethods = Object.freeze({
       set_variant: method({ variant }, choice(null)), set_control_size: method({ size: common.size }, choice(null)),
       set_confirmation: method({ confirmation_ms: confirmation }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
     },
-    query: { state: method({}, object({ state: choice('idle', 'copied', 'failed'), reason: { ...string, nullable: true } }, ['state', 'reason'])), is_disabled: method({}, boolean) },
+    query: { focus_handle: focusQuery, state: method({}, object({ state: choice('idle', 'copied', 'failed'), reason: { ...string, nullable: true } }, ['state', 'reason'])), is_disabled: method({}, boolean) },
   },
   KeymapEditor: { invoke: { set_commands: method({ commands: array(keymapCommand) }, choice(null)), set_query: method({ query: string }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)) }, query: { current_commands: method({}, array(keymapResult)), active_command: method({}, { ...identity, nullable: true }), is_disabled: method({}, boolean) } },
   NumberInput: {
@@ -86,6 +87,7 @@ export const familyMethods = Object.freeze({
       set_presentation: method({ name: { ...string, nullable: true }, unit: { ...string, nullable: true }, prefix: { ...string, nullable: true }, size: common.size }, choice(null)),
     },
     query: {
+      focus_handle: focusQuery,
       current: method({}, { ...number, nullable: true }), shown: method({}, { ...number, nullable: true }),
       is_disabled: method({}, boolean), is_invalid: method({}, boolean),
       invalid_reason: method({}, { ...string, nullable: true }), can_step: method({ delta: number }, boolean),
@@ -107,7 +109,7 @@ export const familyMethods = Object.freeze({
       set_value: method({ value: string }, choice(null)), set_name: method({ name: string }, choice(null)), set_placeholder: method({ placeholder: string }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)),
       set_presentation: method({ name: { ...string, nullable: true }, placeholder: { ...string, nullable: true }, size: common.size }, choice(null)),
     },
-    query: { value: method({}, string), is_disabled: method({}, boolean) },
+    query: { focus_handle: focusQuery, value: method({}, string), is_disabled: method({}, boolean) },
   },
   FormField: { invoke: {}, query: { is_invalid: method({}, boolean), is_validating: method({}, boolean) } },
 });

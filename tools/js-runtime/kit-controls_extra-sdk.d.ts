@@ -1,6 +1,7 @@
 import type { ControlProps, KitNode, SlotNode } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
 import type { MenuItemDescriptor } from './kit-overlay-sdk.js';
+import type { NativeRef } from './reference-sdk.js';
 export type NativeKitButtonNode = Omit<KitNode, 'component'> & { component: 'Button' };
 export type NativeSettingsRowNode = Omit<KitNode, 'component'> & { component: 'SettingsRow' };
 export type NativeSettingsSectionNode = Omit<KitNode, 'component'> & { component: 'SettingsSection' };
@@ -38,6 +39,7 @@ export interface ControlsExtraFactories {
   FormField(id: string, props: { label: string; control?: string; description?: string; validation?: 'pending' | 'validating' | 'invalid' | 'valid'; reason?: string; error?: string; hint?: string; required?: boolean }, events?: Record<string, never>, slots?: { content?: SlotNode[] }): KitNode;
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
+interface FocusQueries { focus_handle: { args: Record<string, never>; result: NativeRef<'FocusHandle'> } }
 export interface ControlsExtraMethodContracts {
   SplitButton: {
     invoke: {
@@ -51,7 +53,8 @@ export interface ControlsExtraMethodContracts {
       set_items: { args: { items: MenuItemDescriptor[] }; result: null };
       set_menu_name: { args: { name: string }; result: null };
     };
-    query: {
+    query: FocusQueries & {
+      menu: { args: Record<string, never>; result: NativeRef<'Menu'> };
       is_open: { args: Record<string, never>; result: boolean };
       is_disabled: { args: Record<string, never>; result: boolean };
     };
@@ -67,7 +70,7 @@ export interface ControlsExtraMethodContracts {
       set_confirmation: { args: { confirmation_ms: number }; result: null };
       set_disabled: { args: { disabled: boolean }; result: null };
     };
-    query: {
+    query: FocusQueries & {
       state: { args: Record<string, never>; result: { state: 'idle' | 'copied' | 'failed'; reason: string | null } };
       is_disabled: { args: Record<string, never>; result: boolean };
     };
@@ -95,7 +98,7 @@ export interface ControlsExtraMethodContracts {
       set_precision: { args: { precision: number }; result: null };
       set_presentation: { args: { name: string | null; unit: string | null; prefix: string | null; size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
     };
-    query: {
+    query: FocusQueries & {
       current: { args: Record<string, never>; result: number | null };
       shown: { args: Record<string, never>; result: number | null };
       is_disabled: { args: Record<string, never>; result: boolean };
@@ -123,7 +126,7 @@ export interface ControlsExtraMethodContracts {
       set_disabled: { args: { disabled: boolean }; result: null };
       set_presentation: { args: { name: string | null; placeholder: string | null; size: 'xs' | 'sm' | 'md' | 'lg' }; result: null };
     };
-    query: {
+    query: FocusQueries & {
       value: { args: Record<string, never>; result: string };
       is_disabled: { args: Record<string, never>; result: boolean };
     };
