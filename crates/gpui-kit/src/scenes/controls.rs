@@ -1671,6 +1671,62 @@ pub(super) fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
 struct SceneSettingsInputs(Vec<Entity<TextInput>>);
 impl Global for SceneSettingsInputs {}
 
+pub(super) fn settings_page(window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let search = window.use_keyed_state("scene.settings-page.search", cx, |window, cx| {
+        SearchInput::new("scene.settings-page.query", window, cx).placeholder("Search settings")
+    });
+    let category = window.use_keyed_state("scene.settings-page.category", cx, |_, _| {
+        SharedString::from("all")
+    });
+    let selected = category.read(cx).clone();
+    let query = search.read(cx).value(cx);
+    let general = SettingsSection::new("scene.settings-page.general", "General")
+        .label_width(px(150.0))
+        .row(SettingsRow::new("scene.settings-page.autosave", "Automatic save").value("On"))
+        .row(
+            SettingsRow::new("scene.settings-page.telemetry", "Usage reporting")
+                .value("Off")
+                .managed("fixture administrator"),
+        );
+    let appearance = SettingsSection::new("scene.settings-page.appearance", "Appearance")
+        .label_width(px(150.0))
+        .row(SettingsRow::new("scene.settings-page.theme", "Theme").value("Studio"))
+        .row(SettingsRow::new("scene.settings-page.density", "Density").value("Comfortable"));
+    let sections = match selected.as_ref() {
+        "general" => vec![general],
+        "appearance" => vec![appearance],
+        _ => vec![general, appearance],
+    };
+    let header_search = search.clone();
+    stack(&theme).w(px(840.0))
+        .child(caption(&theme, "Fixture settings page: category navigation and search remain available when there are no matches"))
+        .child(SettingsList::new("scene.settings-page.list").query(query).sections(sections)
+            .slot("header", move |_, cx| {
+                let theme = cx.theme();
+                div().column().gap_token(theme, Space::Sm)
+                    .child(crate::foundation::text(theme, TypeScale::Title, "Settings"))
+                    .child(header_search.clone()).into_any_element()
+            })
+            .slot("sidebar", move |_, _| {
+                let category = category.clone();
+                div().w(px(160.0)).child(Sidebar::new("scene.settings-page.categories")
+                    .section(SidebarSection::new("sections").items([
+                        SidebarItem::new("all", "All settings"), SidebarItem::new("general", "General"),
+                        SidebarItem::new("appearance", "Appearance")]))
+                    .active(selected.clone()).on_select(move |id, _, cx| category.update(cx, |value, cx| {
+                        *value = id; cx.notify();
+                    }))).into_any_element()
+            })
+            .slot("footer", move |_, _| {
+                let search = search.clone();
+                Button::new("scene.settings-page.reset").label("Reset search")
+                    .on_click(move |_, cx| search.update(cx, |search, cx| search.set_value("", cx)))
+                    .into_any_element()
+            }))
+        .into_any_element()
+}
+
 pub(super) fn settings(window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneSettingsInputs>() {
         let inputs = [("name", "Fixture assistant"), ("model", "Local model")]

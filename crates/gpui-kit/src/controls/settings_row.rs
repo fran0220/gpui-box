@@ -613,7 +613,10 @@ impl SettingsList {
 }
 
 impl Slotted for SettingsList {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY];
+    /// Page chrome is independent of filtering and remains mounted for empty
+    /// and no-match results. Put the caller's search field in `header`, category
+    /// navigation in `sidebar`, and save/reset actions in `footer`.
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, "header", "sidebar", "footer"];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots
@@ -622,6 +625,61 @@ impl Slotted for SettingsList {
 
 impl RenderOnce for SettingsList {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        if !["header", "sidebar", "footer"]
+            .iter()
+            .any(|name| self.slots.holds(name))
+        {
+            return self.render_content(window, cx).into_any_element();
+        }
+        let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
+        let ident = self.ident.clone();
+        let header = self.slots.render("header", window, cx);
+        let sidebar = self.slots.render("sidebar", window, cx);
+        let footer = self.slots.render("footer", window, cx);
+        let content = self.render_content(window, cx);
+        div()
+            .id(ident.child("page").element_id())
+            .column()
+            .w_full()
+            .min_w_0()
+            .gap_token(&theme, Space::Md)
+            .children(header.map(|header| {
+                div().w_full().child(header).semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("header").semantic_id(), Role::Group),
+                )
+            }))
+            .child(
+                div()
+                    .row_reading(direction)
+                    .w_full()
+                    .items_start()
+                    .gap_token(&theme, Space::Lg)
+                    .children(sidebar.map(|sidebar| {
+                        div().flex_none().child(sidebar).semantic_in(
+                            cx,
+                            NodeSpec::new(ident.child("sidebar").semantic_id(), Role::Group),
+                        )
+                    }))
+                    .child(div().flex_1().min_w_0().child(content)),
+            )
+            .children(footer.map(|footer| {
+                div().w_full().child(footer).semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("footer").semantic_id(), Role::Group),
+                )
+            }))
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.child("page").semantic_id(), Role::Group),
+            )
+            .into_any_element()
+    }
+}
+
+impl SettingsList {
+    fn render_content(self, window: &mut Window, cx: &mut App) -> AnyElement {
         let theme = cx.theme().clone();
         let matcher = cx.search();
         let query_is_empty = self.query.trim().is_empty();
@@ -655,7 +713,8 @@ impl RenderOnce for SettingsList {
                 .semantic_in(
                     cx,
                     NodeSpec::new(root_id, Role::Group).value(cx.numbers().count(0)),
-                );
+                )
+                .into_any_element();
         }
 
         let status = (!query_is_empty).then(|| {
@@ -687,5 +746,6 @@ impl RenderOnce for SettingsList {
                 cx,
                 NodeSpec::new(root_id, Role::Group).value(cx.numbers().count(count)),
             )
+            .into_any_element()
     }
 }

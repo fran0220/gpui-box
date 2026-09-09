@@ -14,6 +14,54 @@ type Calls = Rc<RefCell<Vec<String>>>;
 // ------------------------------------------------------------ settings rows
 
 #[gpui::test]
+fn settings_page_chrome_survives_no_matches_and_retains_layout(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(600.0))
+            .child(
+                SettingsList::new("page")
+                    .query("no-match")
+                    .section(
+                        SettingsSection::new("general", "General")
+                            .row(SettingsRow::new("sound", "Sound").value("On")),
+                    )
+                    .slot("header", |_, _| {
+                        Button::new("query")
+                            .label("Search settings")
+                            .into_any_element()
+                    })
+                    .slot("sidebar", |_, _| {
+                        div()
+                            .w(px(140.0))
+                            .child(Button::new("category").label("General"))
+                            .into_any_element()
+                    })
+                    .slot("footer", |_, _| {
+                        Button::new("reset")
+                            .label("Reset search")
+                            .into_any_element()
+                    }),
+            )
+            .into_any_element()
+    });
+    assert_eq!(
+        harness.node("page").expect("results").value.as_deref(),
+        Some("0")
+    );
+    assert!(harness.node("sound").is_none());
+    for id in ["query", "category", "reset", "page.empty"] {
+        assert!(harness.node(id).is_some(), "{id} remains available");
+    }
+    let header = harness.node("page.header").expect("header").bounds;
+    let sidebar = harness.node("page.sidebar").expect("sidebar").bounds;
+    let results = harness.node("page").expect("results").bounds;
+    let footer = harness.node("page.footer").expect("footer").bounds;
+    assert!(header.y + header.height <= results.y);
+    assert!(sidebar.x + sidebar.width <= results.x);
+    assert!(results.y + results.height <= footer.y);
+}
+
+#[gpui::test]
 fn settings_columns_align_and_blocks_keep_their_place(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
         div()
