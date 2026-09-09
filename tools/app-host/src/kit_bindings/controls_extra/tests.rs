@@ -3,6 +3,80 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn inline_edit_retains_failed_session_and_routes_only_current_handlers(cx: &mut TestAppContext) {
+    let owner = gpui::EffectOwner::new();
+    let descriptor = Rc::new(RefCell::new(node(
+        "InlineEdit",
+        "inline",
+        json!({"value":"Seed"}),
+        json!({"edit":"edit","commit":"commit","cancel":"cancel"}),
+    )));
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_node, output) = (descriptor.clone(), events.clone());
+    let mut harness = Harness::new(
+        cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            gpui_kit::foundation::register_owner_state(owner, cx);
+        },
+        move |window, cx| {
+            let output = output.clone();
+            let element = cx.with_effect_owner(Some(owner), |cx| {
+                render(
+                    &build_node.borrow(),
+                    BTreeMap::new(),
+                    window,
+                    cx,
+                    Rc::new(move |action, value| {
+                        output.borrow_mut().push((action.to_owned(), value))
+                    }),
+                )
+            });
+            gpui::effect_owner(owner, element).into_any_element()
+        },
+    );
+    harness.click("inline");
+    assert_eq!(*events.borrow(), vec![("edit".into(), Value::Null)]);
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("editing".into(), json!(true));
+    harness.update(|_, cx| cx.refresh_windows());
+    harness.keystrokes("end x enter");
+    assert_eq!(
+        events.borrow().last(),
+        Some(&("commit".into(), json!("Seedx")))
+    );
+    {
+        let mut node = descriptor.borrow_mut();
+        node.props
+            .insert("value".into(), json!("Server replacement"));
+        node.props.insert("failure".into(), json!("Save refused"));
+        node.events.insert("commit".into(), "retry".into());
+    }
+    harness.update(|_, cx| cx.refresh_windows());
+    harness.keystrokes("enter");
+    assert_eq!(
+        events.borrow().last(),
+        Some(&("retry".into(), json!("Seedx")))
+    );
+    harness.keystrokes("escape");
+    assert_eq!(
+        events.borrow().last(),
+        Some(&("cancel".into(), Value::Null))
+    );
+    descriptor
+        .borrow_mut()
+        .props
+        .insert("disabled".into(), json!(true));
+    harness.update(|_, cx| cx.refresh_windows());
+    events.borrow_mut().clear();
+    harness.click("inline");
+    harness.keystrokes("enter");
+    assert!(events.borrow().is_empty());
+}
+
+#[gpui::test]
 fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut TestAppContext) {
     for component in ["SearchInput", "NumberInput", "CopyButton", "SplitButton"] {
         let owner = gpui::EffectOwner::new();

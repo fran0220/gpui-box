@@ -36,6 +36,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SettingsSection",
     "SettingsList",
     "SplitButton",
+    "InlineEdit",
 ];
 
 pub(super) fn settings_section(
@@ -1435,6 +1436,36 @@ pub(super) fn render(
             .flatten()
     };
     match node.component.as_deref().unwrap_or_default() {
+        "InlineEdit" => {
+            let mut control = gpui_kit::controls::inline_edit::InlineEdit::new(
+                node.id.clone(),
+                text(node, "value"),
+            )
+            .editing(flag(node, "editing"))
+            .multiline(flag(node, "multiline"))
+            .rows(number(node, "rows", 3.) as usize)
+            .disabled(flag(node, "disabled"))
+            .control_size(size(node));
+            if node.props.contains_key("placeholder") {
+                control = control.placeholder(text(node, "placeholder"));
+            }
+            if node.props.contains_key("failure") {
+                control = control.failure(text(node, "failure"));
+            }
+            if let Some(action) = event("edit") {
+                let emit = emit.clone();
+                control = control.on_edit(move |_, _| emit(&action, Value::Null));
+            }
+            if let Some(action) = event("commit") {
+                let emit = emit.clone();
+                control =
+                    control.on_commit(move |value, _, _| emit(&action, json!(value.as_ref())));
+            }
+            if let Some(action) = event("cancel") {
+                control = control.on_cancel(move |_, _| emit(&action, Value::Null));
+            }
+            control.into_any_element()
+        }
         "SettingsRow" => settings_row(node, slots, window, cx).into_any_element(),
         "Button" => button(node, emit).into_any_element(),
         "IconButton" => {

@@ -34,6 +34,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  InlineEdit: { props: object({ ...common, value: string, placeholder: string, editing: boolean, multiline: boolean, rows: { ...integer, min: 1, max: 1024 }, failure: string }), events: { edit: choice(null), commit: string, cancel: choice(null) } },
   SplitButton: { props: object({ ...common, label: string, icon: iconSchema, variant, menuName: string, defaultDisabled: boolean, items: menuItemsSchema }), events: { click: choice(null), open: choice(null), close: choice(null), dismiss: choice(null), invoked: identity } },
   SettingsList: { props: object({ query: string }), events: {}, slots: ['sections', 'empty', 'header', 'sidebar', 'footer'] },
   SettingsSection: { props: object({ title: string, description: string, dimmedBy: string, labelWidth: { type: 'number', min: 0, max: 100000 } }, ['title']), events: {}, slots: ['rows', 'content', 'action'] },
