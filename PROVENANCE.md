@@ -758,3 +758,14 @@ container algorithm APIs. Intrinsic content dimensions are distinct from
 caller-authored aspect ratio. No dependency source is vendored or patched,
 and the frozen import receipt and both workspaces' package authority remain
 unchanged. Shader code and image atlas formats are unchanged.
+
+### Stable virtual row geometry and nested scrolling
+
+`ListState::remap_items`, retained unmeasured height estimates, and clamped
+Div/List wheel consumption are original GPUI Box framework work. Callers map
+their stable identities to previous indices; the framework preserves measured
+geometry, focus handles and absolute within-row anchors. Kit supplies separate
+row content revisions and consumes actual scroll direction for follow state.
+No external source was imported, no renderer ABI or platform event translation
+changed, and the frozen historical import receipt is unchanged. Root and
+headless workspaces retain the same local package authority.

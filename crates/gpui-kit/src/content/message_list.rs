@@ -31,6 +31,7 @@
 //! is what a scrollbar over one is settling towards as the reader moves.
 
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use gpui::{
@@ -459,6 +460,7 @@ impl RenderOnce for MessageList {
         // itself instead of every message after it.
         let row_keys: Vec<SharedString> =
             messages.iter().map(|message| message.id.clone()).collect();
+        let revisions = follow.cell.borrow().revisions.clone();
         // The same names say which messages the conversation still holds, so
         // per-message state goes when its message does rather than when its
         // row happens to stop being drawn.
@@ -469,14 +471,14 @@ impl RenderOnce for MessageList {
             cx,
         );
         let rows = List::new(ident.clone(), count, move |index, window, cx| {
-            if let Some(highest) = seen.borrow_mut().current.as_mut() {
-                *highest = (*highest).max(index);
-            } else {
-                seen.borrow_mut().current = Some(index);
-            }
             let Some(message) = messages.get(index) else {
                 return ListItem::new("unknown", div());
             };
+            if !flowing {
+                let mut seen = seen.borrow_mut();
+                seen.current.insert(message.id.clone());
+                seen.ever.insert(message.id.clone());
+            }
             let continues = group
                 && index > 0
                 && messages
@@ -498,7 +500,9 @@ impl RenderOnce for MessageList {
             .text(shown_author(message.author.as_ref()))
         })
         .row_height(row_height)
-        .when(body_lines.is_none(), |list| list.flowing().keys(row_keys))
+        .when(body_lines.is_none(), |list| {
+            list.flowing().keys(row_keys).revisions(revisions)
+        })
         .when_some(self.visible_rows, List::visible_rows);
 
         div()
@@ -516,17 +520,58 @@ struct Following {
     /// Whether this identity has rendered before. Nothing is "new" on the
     /// frame a conversation first appears.
     started: bool,
-    /// How many messages there were last time.
-    count: usize,
-    /// The highest index rendered in the frame being built.
-    current: Option<usize>,
-    /// The highest index rendered in the previous frame, which is where the
-    /// reader was.
-    previous: Option<usize>,
-    /// The highest index the reader has ever had on screen.
-    ever: Option<usize>,
+    messages: Vec<Message>,
+    revisions: Vec<u64>,
+    /// Stable identities, never row indices. Flowing lists read actual bounds
+    /// instead of marking measurement overdraw as read.
+    current: HashSet<SharedString>,
+    ever: HashSet<SharedString>,
     /// How many messages arrived while the reader was somewhere else.
-    arrived: usize,
+    arrived: HashSet<SharedString>,
+}
+
+impl Following {
+    /// Reconcile host data only when it changes. Static animation frames do
+    /// not clone message bodies or build identity maps.
+    fn reconcile(&mut self, messages: &[Message], at_bottom: bool) -> bool {
+        let started = std::mem::replace(&mut self.started, true);
+        if self.messages == messages {
+            return false;
+        }
+        let old: HashMap<_, _> = self
+            .messages
+            .iter()
+            .enumerate()
+            .map(|(index, message)| (&message.id, index))
+            .collect();
+        let tail_start = messages
+            .iter()
+            .rposition(|message| old.contains_key(&message.id))
+            .map_or(messages.len(), |index| index + 1);
+        let added: Vec<_> = messages[tail_start..]
+            .iter()
+            .filter(|message| !old.contains_key(&message.id))
+            .map(|message| message.id.clone())
+            .collect();
+        let revisions = messages
+            .iter()
+            .map(|message| {
+                old.get(&message.id).map_or(0, |&index| {
+                    self.revisions[index].wrapping_add(u64::from(self.messages[index] != *message))
+                })
+            })
+            .collect();
+        let live: HashSet<_> = messages.iter().map(|message| &message.id).collect();
+        self.ever.retain(|key| live.contains(key));
+        self.arrived.retain(|key| live.contains(key));
+        let stick = started && at_bottom && !added.is_empty();
+        if started && !at_bottom {
+            self.arrived.extend(added);
+        }
+        self.messages = messages.to_vec();
+        self.revisions = revisions;
+        stick
+    }
 }
 
 /// What one frame decided about following.
@@ -567,41 +612,63 @@ impl MessageList {
             cx,
         );
         let mut following = cell.borrow_mut();
-        following.previous = following.current.take();
-        if let Some(previous) = following.previous {
-            following.ever = Some(following.ever.map_or(previous, |ever| ever.max(previous)));
+        let mut previous = std::mem::take(&mut following.current);
+        let state =
+            crate::data::viewport::flow_state(&self.ident, window.window_handle().window_id(), cx);
+        if self.body_lines.is_none() {
+            if let Some(state) = &state {
+                let viewport = state.viewport_bounds();
+                for (index, message) in following
+                    .messages
+                    .iter()
+                    .enumerate()
+                    .skip(state.logical_scroll_top().item_ix)
+                {
+                    let Some(bounds) = state.bounds_for_item(index) else {
+                        break;
+                    };
+                    if bounds.top() >= viewport.bottom() {
+                        break;
+                    }
+                    if bounds.bottom() > viewport.top() {
+                        previous.insert(message.id.clone());
+                    }
+                }
+            }
+            following.ever.extend(previous.iter().cloned());
         }
 
         // Before the first frame has drawn a row, where the reader is has to
         // come from the viewport the caller asked for: a list opens at its
         // top.
-        let reach = |highest: Option<usize>| match highest {
-            Some(highest) => highest + 1,
-            None => self.visible_rows.unwrap_or(count),
-        };
         // A conversation that is holding its end is at the end even mid-glide,
         // when the last row it has drawn is not yet the last row there is.
         // Reading the rows alone would call that being away and start counting
         // at a reader who has not gone anywhere.
-        let at_bottom = held || reach(following.previous) >= following.count.max(1);
+        let at_bottom = if self.body_lines.is_none() {
+            held || state
+                .as_ref()
+                .and_then(|state| state.is_scrolled_to_end())
+                .unwrap_or(false)
+        } else {
+            following
+                .messages
+                .last()
+                .is_some_and(|message| previous.contains(&message.id))
+        };
 
-        let mut stick = false;
-        if !following.started {
-            following.started = true;
-        } else if count > following.count {
-            if at_bottom {
-                stick = true;
-            } else {
-                following.arrived += count - following.count;
-            }
-        }
-        following.count = count;
+        let stick = following.reconcile(&self.messages, at_bottom);
 
-        let mut below = count.saturating_sub(reach(following.ever));
+        let reach = self
+            .messages
+            .iter()
+            .rposition(|message| following.ever.contains(&message.id))
+            .map_or(self.visible_rows.unwrap_or(count), |index| index + 1);
+        let mut below = count.saturating_sub(reach);
         if below == 0 {
-            following.arrived = 0;
+            following.arrived.clear();
         }
-        let arrived = following.arrived.min(below);
+        let arrived = following.arrived.len().min(below);
         // A frame that is following the newest message is not behind it, even
         // though the row it is scrolling to has not been drawn yet.
         if stick || held {
@@ -656,7 +723,7 @@ impl MessageList {
                         .secondary()
                         .control_size(ControlSize::Sm)
                         .on_click(move |window, cx| {
-                            cell.borrow_mut().arrived = 0;
+                            cell.borrow_mut().arrived.clear();
                             // Going back to the newest message is a journey
                             // with a direction, so it is travelled rather than
                             // cut to: the reader sees what they are passing
@@ -1119,6 +1186,52 @@ fn reaction_chip(ident: &Ident, reaction: &Reaction, theme: &Theme, cx: &mut App
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn history_and_reorder_are_not_new_tail_messages() {
+        let messages = |ids: &[&str]| {
+            ids.iter()
+                .map(|id| Message::new(id.to_string(), "body"))
+                .collect::<Vec<_>>()
+        };
+        let mut state = Following::default();
+        assert!(!state.reconcile(&messages(&["a", "b"]), false));
+        assert!(!state.reconcile(&messages(&["history", "a", "b"]), true));
+        assert!(state.arrived.is_empty());
+        assert!(!state.reconcile(&messages(&["b", "history", "a"]), false));
+        assert!(state.arrived.is_empty());
+        assert!(!state.reconcile(&messages(&["b", "history", "a", "new"]), false));
+        assert_eq!(state.arrived, HashSet::from([SharedString::from("new")]));
+        assert!(!state.reconcile(&messages(&["a", "b"]), false));
+        assert!(
+            state.arrived.is_empty(),
+            "removed arrivals must not survive by count"
+        );
+        assert!(state.reconcile(&messages(&["a", "b", "tail"]), true));
+    }
+
+    #[test]
+    fn message_revision_changes_without_restarting_identity() {
+        let mut state = Following::default();
+        state.reconcile(
+            &[Message::new("a", "short"), Message::new("b", "settled")],
+            false,
+        );
+        state.ever.insert("a".into());
+        state.reconcile(
+            &[
+                Message::new("b", "settled"),
+                Message::new("a", "longer\nreply"),
+            ],
+            false,
+        );
+        assert_eq!(state.revisions, [0, 1]);
+        assert!(state.ever.contains("a"));
+        assert!(state.arrived.is_empty());
+        let unchanged = state.messages.clone();
+        state.reconcile(&unchanged, false);
+        assert_eq!(state.revisions, [0, 1]);
+    }
 
     #[test]
     fn every_delivery_state_has_its_own_name() {

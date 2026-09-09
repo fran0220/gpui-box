@@ -120,6 +120,7 @@ pub struct List {
     flowing: bool,
     /// The rows in order, when the caller named them. See [`List::keys`].
     keys: Option<Vec<SharedString>>,
+    revisions: Option<Vec<u64>>,
     /// Where a flowing list rests when its content does not fill it.
     alignment: ListAlignment,
     visible_rows: Option<usize>,
@@ -163,6 +164,7 @@ impl List {
             row_height: None,
             flowing: false,
             keys: None,
+            revisions: None,
             alignment: ListAlignment::Top,
             visible_rows: None,
             fills: false,
@@ -221,16 +223,23 @@ impl List {
     /// and a list told only that the count went up by one would keep every
     /// height against the wrong row.
     ///
-    /// Naming the rows answers it exactly. The list splices the range that
-    /// actually changed and keeps every measurement either side, so a
-    /// conversation whose newest block grew re-measures that block rather than
-    /// the conversation, and a reader's scroll position does not lurch.
+    /// Naming rows preserves measurements and the reader's within-row anchor
+    /// across insertion, removal and reorder. Names must be unique and stable.
+    /// Use [`Self::revisions`] for geometry changes under the same identity.
     ///
     /// The names are the rows' own identities, the same ones
     /// [`ListItem::new`] takes, and are ignored by a uniform list, which has
     /// nothing measured to keep.
     pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
         self.keys = Some(keys.into_iter().map(Into::into).collect());
+        self
+    }
+
+    /// Geometry revisions in stable key order, forwarded to [`Flow::revisions`].
+    /// Changes invalidate measurements without changing semantic identities.
+    /// Ignored by uniform lists.
+    pub fn revisions(mut self, revisions: Vec<u64>) -> Self {
+        self.revisions = Some(revisions);
         self
     }
 
@@ -390,6 +399,9 @@ impl RenderOnce for List {
             }
             if let Some(keys) = self.keys.clone() {
                 flow = flow.keys(keys);
+            }
+            if let Some(revisions) = self.revisions.clone() {
+                flow = flow.revisions(revisions);
             }
             if self.fills {
                 flow = flow.fills();

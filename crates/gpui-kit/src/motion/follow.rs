@@ -55,8 +55,6 @@ const GROWTH_EMA: f32 = 0.12;
 /// the edge of the viewport. Aiming a little short of it keeps the newest
 /// content off the boundary, which is where it can actually be read.
 const CHASE_LEAD: f32 = 32.0;
-/// Within this, the surface is at its end.
-const AT_END: f32 = 2.0;
 /// How long the loop stays warm after landing, so a stream that pauses for a
 /// moment resumes at speed instead of accelerating from nothing.
 const SETTLE_GRACE: Duration = Duration::from_millis(500);
@@ -393,8 +391,8 @@ pub fn follows_end(ident: &Ident, window: &Window, cx: &App) -> bool {
 /// still inside the band, and re-engaging on that would snap them straight
 /// back down: the pin would be unbreakable by the only gesture anyone would
 /// use to break it.
-fn should_restick(distance: f32, previous: f32) -> bool {
-    distance <= STICK_BAND && distance < previous
+fn should_restick(distance: f32, scroll_delta: f32) -> bool {
+    distance <= STICK_BAND && scroll_delta > 0.0
 }
 
 /// Teaches the list to report its own gestures.
@@ -405,7 +403,8 @@ fn should_restick(distance: f32, previous: f32) -> bool {
 /// reader leaving.
 fn listen(ident: &Ident, state: &ListState) {
     let ident = ident.clone();
-    state.set_scroll_handler(move |_event, window, cx| {
+    state.set_scroll_handler(move |event, window, cx| {
+        let scroll_delta = f32::from(event.scroll_delta);
         // The list is holding its own borrow while it calls this, so reading
         // the position back now would panic. By the end of the effect cycle it
         // has let go.
@@ -417,17 +416,14 @@ fn listen(ident: &Ident, state: &ListState) {
             };
             let distance = distance_from_end(&state);
             let changed = with_follower(&ident, window_id, cx, |follower| {
-                let previous = follower.distance;
                 follower.distance = distance;
                 let was = follower.pinned;
-                if distance > previous + 1.0 && distance > AT_END {
+                if scroll_delta < 0.0 {
                     follower.pinned = false;
                     follower.chase.reset();
                     follower.ticked = None;
                     follower.settled = None;
-                } else if !follower.pinned
-                    && (distance <= AT_END || should_restick(distance, previous))
-                {
+                } else if !follower.pinned && should_restick(distance, scroll_delta) {
                     follower.pinned = true;
                     follower.woken = true;
                     follower.settled = None;
@@ -558,14 +554,14 @@ mod tests {
     #[test]
     fn re_engaging_reads_the_direction_of_the_gesture() {
         // Leaving the bottom never re-engages, however small the movement.
-        assert!(!should_restick(20.0, 0.0));
-        assert!(!should_restick(69.0, 30.0));
+        assert!(!should_restick(0.5, -0.5));
+        assert!(!should_restick(69.0, -30.0));
         // Coming back does, once inside the band.
         assert!(should_restick(69.0, 120.0));
         assert!(should_restick(0.0, 30.0));
         // But not from outside it.
         assert!(!should_restick(200.0, 300.0));
         // A gesture that moved nothing decides nothing.
-        assert!(!should_restick(50.0, 50.0));
+        assert!(!should_restick(50.0, 0.0));
     }
 }

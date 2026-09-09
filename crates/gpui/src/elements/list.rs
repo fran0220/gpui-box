@@ -10,8 +10,8 @@
 use crate::{
     AnyElement, App, AvailableSpace, Bounds, ContentMask, DispatchPhase, Edges, Element, EntityId,
     FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, InspectorElementId, IntoElement,
-    Overflow, Pixels, Point, ScrollDelta, ScrollWheelEvent, Size, Style, StyleRefinement, Styled,
-    Window, point, px, size,
+    Overflow, Pixels, Point, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, Window, point,
+    px, size,
 };
 use collections::VecDeque;
 use refineable::Refineable as _;
@@ -63,6 +63,7 @@ struct StateInner {
     last_layout_bounds: Option<Bounds<Pixels>>,
     last_padding: Option<Edges<Pixels>>,
     items: SumTree<ListItem>,
+    default_item_height: Option<Pixels>,
     logical_scroll_top: Option<ListOffset>,
     alignment: ListAlignment,
     overdraw: Pixels,
@@ -170,6 +171,9 @@ pub enum ListAlignment {
 
 /// A scroll event that has been converted to be in terms of the list's items.
 pub struct ListScrollEvent {
+    /// Actual clamped wheel movement in pixels, positive toward the end.
+    /// Layout changes and programmatic scrolling do not emit this event.
+    pub scroll_delta: Pixels,
     /// The range of items currently visible in the list, after applying the scroll event.
     pub visible_range: Range<usize>,
 
@@ -316,6 +320,7 @@ impl ListState {
             last_layout_bounds: None,
             last_padding: None,
             items: SumTree::default(),
+            default_item_height: None,
             logical_scroll_top: None,
             alignment,
             overdraw,
@@ -380,6 +385,7 @@ impl ListState {
             height,
         };
         let mut state = self.0.borrow_mut();
+        state.default_item_height = Some(height);
         let new_items = state
             .items
             .iter()
@@ -411,6 +417,90 @@ impl ListState {
     /// loading), but the item itself still exists at the same index.
     pub fn remeasure_items(&self, range: Range<usize>) {
         self.remeasure_items_with_scroll_anchor(range, ScrollAnchor::Absolute);
+    }
+
+    /// Reconciles row identity without discarding surviving measurements or
+    /// focus handles. Each entry names that row's previous index; `None`
+    /// creates an unmeasured row. Indices must be unique and in bounds.
+    ///
+    /// The anchored row retains its absolute within-row pixel offset, even
+    /// across arbitrary reorder. If removed, the nearest surviving successor
+    /// in old order wins, then the nearest predecessor, with zero offset.
+    /// No survivor anchors the first new row. End-aligned following remains
+    /// end-aligned. Callers own business IDs and revision invalidation.
+    pub fn remap_items(&self, previous_indices: &[Option<usize>]) {
+        let state = &mut *self.0.borrow_mut();
+        let old: Vec<_> = state.items.iter().cloned().collect();
+        let mut inverse = vec![None; old.len()];
+        for (new, previous) in previous_indices.iter().enumerate() {
+            if let Some(previous) = previous {
+                assert!(*previous < old.len(), "previous row index out of bounds");
+                assert!(
+                    inverse[*previous].replace(new).is_none(),
+                    "duplicate previous row index"
+                );
+            }
+        }
+        let anchored = state
+            .logical_scroll_top
+            .or_else(|| {
+                (state.alignment == ListAlignment::Top && !old.is_empty())
+                    .then(|| state.logical_scroll_top())
+            })
+            .map(|anchor| {
+                if anchor.item_ix == old.len() && !old.is_empty() {
+                    return ListOffset {
+                        item_ix: previous_indices.len(),
+                        offset_in_item: px(0.),
+                    };
+                }
+                let same = inverse.get(anchor.item_ix).copied().flatten();
+                let fallback = inverse
+                    .iter()
+                    .skip(anchor.item_ix)
+                    .flatten()
+                    .next()
+                    .copied()
+                    .or_else(|| {
+                        inverse
+                            .iter()
+                            .take(anchor.item_ix)
+                            .rev()
+                            .flatten()
+                            .next()
+                            .copied()
+                    });
+                ListOffset {
+                    item_ix: same.or(fallback).unwrap_or(0),
+                    offset_in_item: if same.is_some() {
+                        anchor.offset_in_item
+                    } else {
+                        px(0.)
+                    },
+                }
+            });
+        state.items = SumTree::from_iter(
+            previous_indices.iter().map(|previous| {
+                previous.map_or(
+                    ListItem::Unmeasured {
+                        size_hint: state.default_item_height.map(|height| size(px(0.), height)),
+                        focus_handle: None,
+                    },
+                    |index| old[index].clone(),
+                )
+            }),
+            (),
+        );
+        state.logical_scroll_top = anchored;
+        // Pending geometry restoration belongs to the same identity as the
+        // logical anchor, not to its old numeric index.
+        state.pending_scroll = anchored
+            .filter(|_| !previous_indices.is_empty())
+            .map(|anchor| PendingScroll::Absolute {
+                item_ix: anchor.item_ix,
+                offset: anchor.offset_in_item,
+            });
+        state.measuring_behavior.reset();
     }
 
     fn remeasure_items_with_scroll_anchor(&self, range: Range<usize>, scroll_anchor: ScrollAnchor) {
@@ -523,7 +613,7 @@ impl ListState {
             focus_handles.into_iter().map(|focus_handle| {
                 spliced_count += 1;
                 ListItem::Unmeasured {
-                    size_hint: None,
+                    size_hint: state.default_item_height.map(|height| size(px(0.), height)),
                     focus_handle,
                 }
             }),
@@ -883,7 +973,6 @@ impl StateInner {
 
     fn scroll(
         &mut self,
-        scroll_top: &ListOffset,
         height: Pixels,
         delta: Point<Pixels>,
         current_view: EntityId,
@@ -899,9 +988,14 @@ impl StateInner {
         let padding = self.last_padding.unwrap_or_default();
         let scroll_max =
             (self.items.summary().height + padding.top + padding.bottom - height).max(px(0.));
-        let new_scroll_top = (self.scroll_top(scroll_top) - delta.y)
-            .max(px(0.))
-            .min(scroll_max);
+        let old_scroll_top = self.scroll_top(&self.logical_scroll_top()).min(scroll_max);
+        let new_scroll_top = (old_scroll_top - delta.y).max(px(0.)).min(scroll_max);
+        // Consume a wheel gesture exactly once, at the deepest surface that
+        // can move. At an edge let the next ancestor try the same gesture.
+        if new_scroll_top == old_scroll_top {
+            return;
+        }
+        cx.stop_propagation();
 
         if self.alignment == ListAlignment::Bottom && new_scroll_top == scroll_max {
             self.pending_scroll = None;
@@ -925,10 +1019,18 @@ impl StateInner {
             self.follow_state.stop_following();
         }
 
+        let (start, ..) =
+            self.items
+                .find::<ListItemSummary, _>((), &Height(new_scroll_top), Bias::Right);
+        let visible = ListOffset {
+            item_ix: start.count,
+            offset_in_item: new_scroll_top - start.height,
+        };
         if let Some(handler) = self.scroll_handler.as_mut() {
-            let visible_range = Self::visible_range(&self.items, height, scroll_top);
+            let visible_range = Self::visible_range(&self.items, height, &visible);
             handler(
                 &ListScrollEvent {
+                    scroll_delta: new_scroll_top - old_scroll_top,
                     visible_range,
                     count: self.items.summary().count,
                     is_scrolled: self.logical_scroll_top.is_some(),
@@ -1529,11 +1631,17 @@ impl Element for List {
         // If the width of the list has changed, invalidate all cached item heights
         if state
             .last_layout_bounds
-            .is_none_or(|last_bounds| last_bounds.size.width != bounds.size.width)
+            .is_some_and(|last_bounds| last_bounds.size.width != bounds.size.width)
         {
+            if let Some(anchor) = state.logical_scroll_top {
+                state.pending_scroll = Some(PendingScroll::Absolute {
+                    item_ix: anchor.item_ix,
+                    offset: anchor.offset_in_item,
+                });
+            }
             let new_items = SumTree::from_iter(
                 state.items.iter().map(|item| ListItem::Unmeasured {
-                    size_hint: None,
+                    size_hint: item.size_hint(),
                     focus_handle: item.focus_handle(),
                 }),
                 (),
@@ -1557,6 +1665,33 @@ impl Element for List {
                 }
             };
 
+        // Without caller estimates, rows above an initially bottom-aligned
+        // viewport otherwise contribute zero scroll extent. Seed unknown
+        // rows once from this measured viewport; they remain unmeasured and
+        // receive their actual size when reached. Future inserted rows use
+        // the same hint, so this does not rebuild the tree on static frames.
+        if state.default_item_height.is_none() && !layout.item_layouts.is_empty() {
+            let height = layout
+                .item_layouts
+                .iter()
+                .map(|item| item.size.height)
+                .sum::<Pixels>()
+                / layout.item_layouts.len() as f32;
+            state.default_item_height = Some(height);
+            state.items = SumTree::from_iter(
+                state.items.iter().map(|item| match item {
+                    ListItem::Unmeasured {
+                        size_hint: None,
+                        focus_handle,
+                    } => ListItem::Unmeasured {
+                        size_hint: Some(size(px(0.), height)),
+                        focus_handle: focus_handle.clone(),
+                    },
+                    _ => item.clone(),
+                }),
+                (),
+            );
+        }
         state.last_layout_bounds = Some(bounds);
         state.last_padding = Some(padding);
         ListPrepaintState { hitbox, layout }
@@ -1573,29 +1708,23 @@ impl Element for List {
         cx: &mut App,
     ) {
         let current_view = window.current_view();
+        let list_state = self.state.clone();
+        let height = bounds.size.height;
+        let hitbox_id = prepaint.hitbox.id;
+        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
+            if phase == DispatchPhase::Bubble && hitbox_id.should_handle_scroll(window) {
+                let pixel_delta = event.delta.pixel_delta(px(20.));
+                list_state
+                    .0
+                    .borrow_mut()
+                    .scroll(height, pixel_delta, current_view, window, cx)
+            }
+        });
+        // Bubble dispatch reverses registration order: descendants must get
+        // first refusal before their list's default scroll listener.
         window.with_content_mask(Some(ContentMask { bounds }), |window| {
             for item in &mut prepaint.layout.item_layouts {
                 item.element.paint(window, cx);
-            }
-        });
-
-        let list_state = self.state.clone();
-        let height = bounds.size.height;
-        let scroll_top = prepaint.layout.scroll_top;
-        let hitbox_id = prepaint.hitbox.id;
-        let mut accumulated_scroll_delta = ScrollDelta::default();
-        window.on_mouse_event(move |event: &ScrollWheelEvent, phase, window, cx| {
-            if phase == DispatchPhase::Bubble && hitbox_id.should_handle_scroll(window) {
-                accumulated_scroll_delta = accumulated_scroll_delta.coalesce(event.delta);
-                let pixel_delta = accumulated_scroll_delta.pixel_delta(px(20.));
-                list_state.0.borrow_mut().scroll(
-                    &scroll_top,
-                    height,
-                    pixel_delta,
-                    current_view,
-                    window,
-                    cx,
-                )
             }
         });
     }
@@ -1711,6 +1840,179 @@ mod test {
         self as gpui, AppContext, Bounds, Context, Element, FollowMode, IntoElement, ListState,
         Render, Styled, TestAppContext, Window, canvas, div, list, point, px, size,
     };
+
+    #[test]
+    fn reordered_rows_preserve_identity_anchor() {
+        let state =
+            ListState::new(4, crate::ListAlignment::Top, px(0.)).with_uniform_item_height(px(40.));
+        state.scroll_to(gpui::ListOffset {
+            item_ix: 1,
+            offset_in_item: px(13.),
+        });
+        state.remap_items(&[Some(3), Some(0), Some(1), Some(2)]);
+        assert_eq!(state.logical_scroll_top().item_ix, 2);
+        assert_eq!(state.logical_scroll_top().offset_in_item, px(13.));
+    }
+
+    #[test]
+    fn removed_anchor_uses_old_order_successor_then_predecessor() {
+        for (mapping, expected) in [
+            (vec![Some(3), Some(0), Some(2)], 2),
+            (vec![None, Some(0)], 1),
+            (vec![None, None], 0),
+            (vec![], 0),
+        ] {
+            let state = ListState::new(4, crate::ListAlignment::Top, px(0.));
+            state.scroll_to(gpui::ListOffset {
+                item_ix: 1,
+                offset_in_item: px(13.),
+            });
+            state.remap_items(&mapping);
+            assert_eq!(state.logical_scroll_top().item_ix, expected);
+            assert_eq!(state.logical_scroll_top().offset_in_item, px(0.));
+        }
+    }
+
+    #[gpui::test]
+    fn remap_retains_measurements_focus_and_rebases_pending_geometry(cx: &mut TestAppContext) {
+        use super::{ListItem, PendingScroll};
+        let focus = cx.update(|cx| cx.focus_handle());
+        let state = ListState::new(3, crate::ListAlignment::Top, px(0.));
+        state.0.borrow_mut().items = sum_tree::SumTree::from_iter(
+            [
+                ListItem::Measured {
+                    size: size(px(100.), px(31.)),
+                    focus_handle: None,
+                },
+                ListItem::Measured {
+                    size: size(px(100.), px(67.)),
+                    focus_handle: Some(focus.clone()),
+                },
+                ListItem::Measured {
+                    size: size(px(100.), px(93.)),
+                    focus_handle: None,
+                },
+            ],
+            (),
+        );
+        state.scroll_to(gpui::ListOffset {
+            item_ix: 1,
+            offset_in_item: px(23.),
+        });
+        state.remeasure_items(1..2);
+        state.remap_items(&[Some(2), None, Some(0), Some(1)]);
+        let inner = state.0.borrow();
+        let rows: Vec<_> = inner.items.iter().collect();
+        assert_eq!(rows[0].size().expect("retained").height, px(93.));
+        assert_eq!(rows[2].size().expect("retained").height, px(31.));
+        assert!(rows[3].size().is_none());
+        assert_eq!(rows[3].focus_handle(), Some(focus));
+        assert!(
+            matches!(inner.pending_scroll, Some(PendingScroll::Absolute { item_ix: 3, offset }) if offset == px(23.))
+        );
+    }
+
+    #[gpui::test]
+    fn nested_wheel_moves_only_consumer_and_chains_at_edge(cx: &mut TestAppContext) {
+        use crate::{InteractiveElement, ParentElement, ScrollHandle, StatefulInteractiveElement};
+        let cx = cx.add_empty_window();
+        let state = ListState::new(10, crate::ListAlignment::Top, px(1000.))
+            .with_uniform_item_height(px(20.));
+        let outer = ScrollHandle::new();
+        struct Nested(ListState, ScrollHandle);
+        impl Render for Nested {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div()
+                    .id("outer")
+                    .size_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&self.1)
+                    .child(
+                        list(self.0.clone(), |_, _, _| {
+                            div().h(px(20.)).into_any_element()
+                        })
+                        .w_full()
+                        .h(px(60.)),
+                    )
+                    .child(div().h(px(200.)))
+            }
+        }
+        cx.draw(point(px(0.), px(0.)), size(px(100.), px(100.)), |_, cx| {
+            cx.new(|_| Nested(state.clone(), outer.clone()))
+                .into_any_element()
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-17.))),
+            ..Default::default()
+        });
+        assert_eq!(state.logical_scroll_top().offset_in_item, px(17.));
+        assert_eq!(outer.offset().y, px(0.));
+        // Multiple events before paint must use the latest clamped position.
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-500.))),
+            ..Default::default()
+        });
+        assert_eq!(outer.offset().y, px(0.));
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-11.))),
+            ..Default::default()
+        });
+        assert_eq!(outer.offset().y, px(-11.));
+    }
+
+    #[gpui::test]
+    fn nested_div_gets_first_refusal_inside_list(cx: &mut TestAppContext) {
+        use crate::{InteractiveElement, ParentElement, ScrollHandle, StatefulInteractiveElement};
+        let cx = cx.add_empty_window();
+        let state = ListState::new(10, crate::ListAlignment::Top, px(0.))
+            .with_uniform_item_height(px(100.));
+        let inner = ScrollHandle::new();
+        struct Nested(ListState, ScrollHandle);
+        impl Render for Nested {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let inner = self.1.clone();
+                list(self.0.clone(), move |index, _, _| {
+                    if index == 0 {
+                        div()
+                            .h(px(100.))
+                            .child(
+                                div()
+                                    .id("inner")
+                                    .h(px(60.))
+                                    .overflow_y_scroll()
+                                    .track_scroll(&inner)
+                                    .child(div().h(px(180.))),
+                            )
+                            .into_any_element()
+                    } else {
+                        div().h(px(100.)).into_any_element()
+                    }
+                })
+                .size_full()
+            }
+        }
+        cx.draw(point(px(0.), px(0.)), size(px(100.), px(150.)), |_, cx| {
+            cx.new(|_| Nested(state.clone(), inner.clone()))
+                .into_any_element()
+        });
+        for (delta, child, parent) in [
+            (-17., -17., 0.),
+            (-500., -120., 0.),
+            (-11., -120., 11.),
+            (9., -111., 11.),
+        ] {
+            cx.simulate_event(ScrollWheelEvent {
+                position: point(px(5.), px(5.)),
+                delta: ScrollDelta::Pixels(point(px(0.), px(delta))),
+                ..Default::default()
+            });
+            assert_eq!(inner.offset().y, px(child));
+            assert_eq!(state.logical_scroll_top().offset_in_item, px(parent));
+        }
+    }
 
     #[gpui::test]
     fn test_autoscroll_above_item_top_renders_items_above(cx: &mut TestAppContext) {

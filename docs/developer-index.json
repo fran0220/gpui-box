@@ -564,7 +564,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2531
+      "symbolCount": 2532
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -1096,7 +1096,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4249
+      "symbolCount": 4252
     },
     {
       "name": "gpui-box-kit-assets",
@@ -16178,7 +16178,7 @@
       "source": "crates/gpui/src/elements/list.rs",
       "summary": "A scroll event that has been converted to be in terms of the list's items.",
       "documentation": "A scroll event that has been converted to be in terms of the list's items.",
-      "signature": "# [doc = \" A scroll event that has been converted to be in terms of the list's items.\"] pub struct ListScrollEvent { # [doc = \" The range of items currently visible in the list, after applying the scroll event.\"] pub visible_range : Range<usize>, # [doc = \" The number of items that are currently visible in the list, after applying the scroll event.\"] pub count : usize, # [doc = \" Whether the list has been scrolled.\"] pub is_scrolled : bool, # [doc = \" Whether the list is currently in follow-tail mode (auto-scrolling to end).\"] pub is_following_tail : bool, }",
+      "signature": "# [doc = \" A scroll event that has been converted to be in terms of the list's items.\"] pub struct ListScrollEvent { # [doc = \" Actual clamped wheel movement in pixels, positive toward the end.\"] # [doc = \" Layout changes and programmatic scrolling do not emit this event.\"] pub scroll_delta : Pixels, # [doc = \" The range of items currently visible in the list, after applying the scroll event.\"] pub visible_range : Range<usize>, # [doc = \" The number of items that are currently visible in the list, after applying the scroll event.\"] pub count : usize, # [doc = \" Whether the list has been scrolled.\"] pub is_scrolled : bool, # [doc = \" Whether the list is currently in follow-tail mode (auto-scrolling to end).\"] pub is_following_tail : bool, }",
       "cfg": []
     },
     {
@@ -16371,6 +16371,21 @@
       "summary": "Construct a new list state, for storage on a view.",
       "documentation": "Construct a new list state, for storage on a view.\n\nThe overdraw parameter controls how much extra space is rendered\nabove and below the visible area. Elements within this area will\nbe measured even though they are not visible. This can help ensure\nthat the list doesn't flicker or pop in when scrolling.",
       "signature": "pub fn new (item_count : usize, alignment : ListAlignment, overdraw : Pixels) -> Self",
+      "cfg": [],
+      "target": "ListState"
+    },
+    {
+      "id": "gpui::elements::list::ListState::remap_items",
+      "name": "remap_items",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::list",
+      "path": "gpui::elements::list",
+      "source": "crates/gpui/src/elements/list.rs",
+      "summary": "Reconciles row identity without discarding surviving measurements or focus handles. Each entry names that row's previous index; `None` creates an unmeasured row. Indices must be unique and in bounds.",
+      "documentation": "Reconciles row identity without discarding surviving measurements or\nfocus handles. Each entry names that row's previous index; `None`\ncreates an unmeasured row. Indices must be unique and in bounds.\n\nThe anchored row retains its absolute within-row pixel offset, even\nacross arbitrary reorder. If removed, the nearest surviving successor\nin old order wins, then the nearest predecessor, with zero offset.\nNo survivor anchors the first new row. End-aligned following remains\nend-aligned. Callers own business IDs and revision invalidation.",
+      "signature": "pub fn remap_items (& self, previous_indices : & [Option<usize>])",
       "cfg": [],
       "target": "ListState"
     },
@@ -66664,7 +66679,7 @@
       "source": "crates/gpui-kit/src/data/flow.rs",
       "summary": "Rows drawn by their caller, laid out only where the viewport reaches.",
       "documentation": "Rows drawn by their caller, laid out only where the viewport reaches.",
-      "signature": "# [doc = \" Rows drawn by their caller, laid out only where the viewport reaches.\"] # [derive (IntoElement)] pub struct Flow { ident : Ident, count : usize, render_row : RenderRow, keys : Option<Vec<SharedString>>, estimate : Option<f32>, alignment : ListAlignment, extent : Extent, inset : Option<(f32, f32)>, }",
+      "signature": "# [doc = \" Rows drawn by their caller, laid out only where the viewport reaches.\"] # [derive (IntoElement)] pub struct Flow { ident : Ident, count : usize, render_row : RenderRow, keys : Option<Vec<SharedString>>, revisions : Option<Vec<u64>>, estimate : Option<f32>, alignment : ListAlignment, extent : Extent, inset : Option<(f32, f32)>, }",
       "cfg": []
     },
     {
@@ -66737,7 +66752,7 @@
       "path": "gpui_kit::data::flow",
       "source": "crates/gpui-kit/src/data/flow.rs",
       "summary": "Names the rows, in the order they are drawn, so the measurements either side of a change survive it.",
-      "documentation": "Names the rows, in the order they are drawn, so the measurements either\nside of a change survive it.\n\nThe names are the rows' own identities. A name that covers a row's\n*content* as well as its identity — a revision, a content hash — is\nwhat a surface whose rows are rewritten in place wants, because a row\nthat kept its name keeps its measured height, and a row whose bytes\nchanged is a row whose height is no longer known.",
+      "documentation": "Names the rows, in the order they are drawn, so the measurements either\nside of a change survive it.\n\nNames must be unique, stable identities, never content hashes. Use\n[`Self::revisions`] to invalidate geometry independently of identity.",
       "signature": "pub fn keys (mut self, keys : impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
       "cfg": [],
       "target": "Flow"
@@ -66754,6 +66769,21 @@
       "summary": "A flow of `count` rows, each built on demand by `render_row`.",
       "documentation": "A flow of `count` rows, each built on demand by `render_row`.\n\nThe closure is called for the rows the viewport reaches, in any order,\nand may be called again for a row that scrolled away and came back — so\nit has to be able to build a row rather than hand over one it built\nearlier.",
       "signature": "pub fn new (ident : impl Into<Ident>, count : usize, render_row : impl Fn (usize, & mut Window, & mut App) -> AnyElement + 'static,) -> Self",
+      "cfg": [],
+      "target": "Flow"
+    },
+    {
+      "id": "gpui_kit::data::flow::Flow::revisions",
+      "name": "revisions",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::flow",
+      "path": "gpui_kit::data::flow",
+      "source": "crates/gpui-kit/src/data/flow.rs",
+      "summary": "Geometry revisions, one per row in key order. A changed revision invalidates only that row's measurement, preserving its identity and the reader's pixel offset within the anchored row. Omission means zero for every row; revisions need not be monotonic. Requires unique keys and exactly `count` revisions.",
+      "documentation": "Geometry revisions, one per row in key order. A changed revision\ninvalidates only that row's measurement, preserving its identity and\nthe reader's pixel offset within the anchored row. Omission means zero\nfor every row; revisions need not be monotonic. Requires unique keys\nand exactly `count` revisions.",
+      "signature": "pub fn revisions (mut self, revisions : Vec<u64>) -> Self",
       "cfg": [],
       "target": "Flow"
     },
@@ -68323,7 +68353,7 @@
       "source": "crates/gpui-kit/src/data/list.rs",
       "summary": "A list that renders only the rows its viewport holds.",
       "documentation": "A list that renders only the rows its viewport holds.",
-      "signature": "# [doc = \" A list that renders only the rows its viewport holds.\"] # [derive (IntoElement)] pub struct List { ident : Ident, count : usize, render_row : RenderRow, selected : Option<SharedString>, row_height : Option<f32>, # [doc = \" Whether a row is as tall as its content rather than as tall as a slot.\"] flowing : bool, # [doc = \" The rows in order, when the caller named them. See [`List::keys`].\"] keys : Option<Vec<SharedString>>, # [doc = \" Where a flowing list rests when its content does not fill it.\"] alignment : ListAlignment, visible_rows : Option<usize>, # [doc = \" Whether the list takes the height of whatever holds it.\"] fills : bool, # [doc = \" Whether the rows fade in as one wave when the list itself arrives.\"] arriving : bool, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, }",
+      "signature": "# [doc = \" A list that renders only the rows its viewport holds.\"] # [derive (IntoElement)] pub struct List { ident : Ident, count : usize, render_row : RenderRow, selected : Option<SharedString>, row_height : Option<f32>, # [doc = \" Whether a row is as tall as its content rather than as tall as a slot.\"] flowing : bool, # [doc = \" The rows in order, when the caller named them. See [`List::keys`].\"] keys : Option<Vec<SharedString>>, revisions : Option<Vec<u64>>, # [doc = \" Where a flowing list rests when its content does not fill it.\"] alignment : ListAlignment, visible_rows : Option<usize>, # [doc = \" Whether the list takes the height of whatever holds it.\"] fills : bool, # [doc = \" Whether the rows fade in as one wave when the list itself arrives.\"] arriving : bool, size : ControlSize, disabled : bool, on_select : Option<SelectHandler>, reorderable : bool, accepts : Option<Accepts>, on_reorder : Option<ReorderHandler>, }",
       "cfg": []
     },
     {
@@ -68411,7 +68441,7 @@
       "path": "gpui_kit::data::list",
       "source": "crates/gpui-kit/src/data/list.rs",
       "summary": "Names the rows, in the order they are drawn.",
-      "documentation": "Names the rows, in the order they are drawn.\n\nA flowing list only learns a row's height by laying it out, and what it\nhas learned is addressed by index. So when the set changes, the\nquestion is which indices still mean what they meant, and a count\ncannot answer it: a row inserted at the top moves every row below it,\nand a list told only that the count went up by one would keep every\nheight against the wrong row.\n\nNaming the rows answers it exactly. The list splices the range that\nactually changed and keeps every measurement either side, so a\nconversation whose newest block grew re-measures that block rather than\nthe conversation, and a reader's scroll position does not lurch.\n\nThe names are the rows' own identities, the same ones\n[`ListItem::new`] takes, and are ignored by a uniform list, which has\nnothing measured to keep.",
+      "documentation": "Names the rows, in the order they are drawn.\n\nA flowing list only learns a row's height by laying it out, and what it\nhas learned is addressed by index. So when the set changes, the\nquestion is which indices still mean what they meant, and a count\ncannot answer it: a row inserted at the top moves every row below it,\nand a list told only that the count went up by one would keep every\nheight against the wrong row.\n\nNaming rows preserves measurements and the reader's within-row anchor\nacross insertion, removal and reorder. Names must be unique and stable.\nUse [`Self::revisions`] for geometry changes under the same identity.\n\nThe names are the rows' own identities, the same ones\n[`ListItem::new`] takes, and are ignored by a uniform list, which has\nnothing measured to keep.",
       "signature": "pub fn keys (mut self, keys : impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
       "cfg": [],
       "target": "List"
@@ -68473,6 +68503,21 @@
       "summary": "Lets a row be picked up and put down somewhere else in the list.",
       "documentation": "Lets a row be picked up and put down somewhere else in the list.\n\nThe whole row is the handle. A list row's ordinary action is a click,\nand GPUI only calls a press a drag once it has travelled two pixels, so\nboth fit on the same row without a grip column the caller would have to\nrender into every row it owns.",
       "signature": "pub fn reorderable (mut self, reorderable : bool) -> Self",
+      "cfg": [],
+      "target": "List"
+    },
+    {
+      "id": "gpui_kit::data::list::List::revisions",
+      "name": "revisions",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::list",
+      "path": "gpui_kit::data::list",
+      "source": "crates/gpui-kit/src/data/list.rs",
+      "summary": "Geometry revisions in stable key order, forwarded to [`Flow::revisions`]. Changes invalidate measurements without changing semantic identities. Ignored by uniform lists.",
+      "documentation": "Geometry revisions in stable key order, forwarded to [`Flow::revisions`].\nChanges invalidate measurements without changing semantic identities.\nIgnored by uniform lists.",
+      "signature": "pub fn revisions (mut self, revisions : Vec<u64>) -> Self",
       "cfg": [],
       "target": "List"
     },
@@ -70155,6 +70200,20 @@
       "summary": "Travels to row `index` rather than arriving there.",
       "documentation": "Travels to row `index` rather than arriving there.\n\nA jump across a long conversation destroys the reader's place: the screen\nthey were looking at is replaced by another one, and nothing on it says\nwhich direction they came from or how far they went. Moving there over half\na second says both, and costs nothing but the half second.\n\nThe distance is not known when the glide starts. Rows above the viewport\nhave never been laid out, so the pixels between here and there can only be\nestimated, and the estimate is corrected as rows are measured. [`Glide`] is\nwhat makes that survivable: each frame consumes the share of the *current*\nremaining distance that the curve says belongs to it, so a correction\nmid-flight continues the same timeline instead of restarting it.\n\nA reader who has asked for reduced motion is taken straight there, and so\nis a surface that is not a variable-height list: a uniform list knows every\nrow's height without laying it out, so it has no unmeasured distance for\nthis to solve and its own scroll already lands correctly.",
       "signature": "pub fn glide_to_row (ident : & Ident, index : usize, window : & Window, cx : & mut App)",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::data::viewport::remeasure_rows",
+      "name": "remeasure_rows",
+      "kind": "function",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::viewport",
+      "path": "gpui_kit::data::viewport",
+      "source": "crates/gpui-kit/src/data/viewport.rs",
+      "summary": "Invalidates measured geometry after an asynchronous row update. Identity and the absolute pixel offset within the anchored row are retained. The range uses current row order; callers resolving async work must look up its stable key before calling. Missing surfaces are a no-op.",
+      "documentation": "Invalidates measured geometry after an asynchronous row update. Identity\nand the absolute pixel offset within the anchored row are retained. The\nrange uses current row order; callers resolving async work must look up\nits stable key before calling. Missing surfaces are a no-op.",
+      "signature": "pub fn remeasure_rows (ident : & Ident, rows : Range<usize>, window : & Window, cx : & mut App)",
       "cfg": []
     },
     {
@@ -121198,6 +121257,7 @@
       ],
       "options": [
         "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "revisions(revisions: Vec<u64>) -> Self",
         "estimate(height: f32) -> Self",
         "anchored_to_end() -> Self",
         "visible_rows(rows: usize) -> Self",
@@ -121818,6 +121878,7 @@
         "flowing() -> Self",
         "anchored_to_end() -> Self",
         "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "revisions(revisions: Vec<u64>) -> Self",
         "visible_rows(rows: usize) -> Self",
         "fills() -> Self",
         "arriving() -> Self",
@@ -145432,6 +145493,23 @@
       ],
       "frame_submission": "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames.",
       "meaning": "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
+    },
+    "framework_virtual_scroll": {
+      "contract": "ListState::remap_items retains row geometry and focus by caller-provided previous index and anchors the same row at its absolute pixel offset. Removal selects the nearest surviving old-order successor, then predecessor. Width changes invalidate geometry. List and Div clamp wheel motion and consume only when they move, deepest child first; subsequent edge gestures chain to ancestors. ListScrollEvent reports actual signed motion, not layout growth.",
+      "limitations": [
+        "a gesture reaching an edge is consumed as a whole; only subsequent gestures chain, not a fractional unused delta",
+        "count-only surfaces cannot infer insertion or reorder identity; use unique keys",
+        "offscreen asynchronous geometry changes require explicit revision or remeasure_rows notification"
+      ],
+      "platform_validation": "Shared platform-independent tests run on Linux; dispatch Platforms after integration for native macOS/Windows input tests and Metal/WARP scene catalogs. No platform renderer or native event translation changes.",
+      "tests": [
+        "reordered_rows_preserve_identity_anchor",
+        "removed_anchor_uses_old_order_successor_then_predecessor",
+        "remap_retains_measurements_focus_and_rebases_pending_geometry",
+        "nested_wheel_moves_only_consumer_and_chains_at_edge",
+        "revisions_remeasure_offscreen_rows_without_reidentifying_them",
+        "history_and_reorder_are_not_new_tail_messages"
+      ]
     },
     "kit_dock_tree": {
       "excluded": [

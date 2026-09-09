@@ -74,6 +74,7 @@ pub struct Flow {
     count: usize,
     render_row: RenderRow,
     keys: Option<Vec<SharedString>>,
+    revisions: Option<Vec<u64>>,
     estimate: Option<f32>,
     alignment: ListAlignment,
     extent: Extent,
@@ -110,6 +111,7 @@ impl Flow {
             count,
             render_row: Rc::new(render_row),
             keys: None,
+            revisions: None,
             estimate: None,
             alignment: ListAlignment::Top,
             extent: Extent::Content,
@@ -120,13 +122,20 @@ impl Flow {
     /// Names the rows, in the order they are drawn, so the measurements either
     /// side of a change survive it.
     ///
-    /// The names are the rows' own identities. A name that covers a row's
-    /// *content* as well as its identity — a revision, a content hash — is
-    /// what a surface whose rows are rewritten in place wants, because a row
-    /// that kept its name keeps its measured height, and a row whose bytes
-    /// changed is a row whose height is no longer known.
+    /// Names must be unique, stable identities, never content hashes. Use
+    /// [`Self::revisions`] to invalidate geometry independently of identity.
     pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
         self.keys = Some(keys.into_iter().map(Into::into).collect());
+        self
+    }
+
+    /// Geometry revisions, one per row in key order. A changed revision
+    /// invalidates only that row's measurement, preserving its identity and
+    /// the reader's pixel offset within the anchored row. Omission means zero
+    /// for every row; revisions need not be monotonic. Requires unique keys
+    /// and exactly `count` revisions.
+    pub fn revisions(mut self, revisions: Vec<u64>) -> Self {
+        self.revisions = Some(revisions);
         self
     }
 
@@ -187,6 +196,7 @@ impl RenderOnce for Flow {
         let state = list_state(
             &self.ident,
             described,
+            self.revisions.as_deref(),
             self.alignment,
             px(estimate),
             window,

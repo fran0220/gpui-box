@@ -283,6 +283,7 @@ not applicable
 not fetched
 null
 object
+one revision is required per row
 paired new
 paired old
 pane `{id}` has children
@@ -296,6 +297,7 @@ redacted, {shape}
 rich text is never blockless
 rich-text block `{id}` does not exist
 rich-text block id `{id}` is repeated
+row keys must be unique
 series is nonempty
 slot was filled
 soft break

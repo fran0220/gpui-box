@@ -6,7 +6,7 @@
 //! keeps the position across rebuilds without making every caller own a GPUI
 //! handle, and it lets a surface built on top of another one move it by name.
 
-use std::time::Duration;
+use std::{collections::HashMap, ops::Range, time::Duration};
 
 use crate::foundation::{Ident, window_state};
 use crate::motion::{Glide, MotionPolicy, MotionRole};
@@ -30,6 +30,7 @@ struct Flow {
     /// diffed against this; one that only counts them keeps the count here as
     /// a run of anonymous names it can still compare the length of.
     keys: Vec<SharedString>,
+    revisions: Vec<u64>,
 }
 
 /// How a surface describes the rows it is about to draw.
@@ -55,40 +56,6 @@ impl Rows<'_> {
     }
 }
 
-/// The narrowest range that turns `before` into `after`, as a splice.
-///
-/// Rows are matched from both ends, so the answer to appending is a splice at
-/// the end, the answer to a row changing is that row, and the answer to a
-/// streaming reply whose last block grew is the last block. What it never
-/// answers is "everything", unless everything did change.
-///
-/// A single contiguous range rather than a full edit script, because that is
-/// what the list takes and because the sequences this serves change at one
-/// place: a conversation grows at its end, a log appends, a diff re-renders a
-/// file. A caller whose rows are shuffled wholesale gets one wide splice,
-/// which is correct and no worse than the reset it replaces.
-fn splice_range(before: &[SharedString], after: &[SharedString]) -> Option<(usize, usize)> {
-    let prefix = before
-        .iter()
-        .zip(after)
-        .take_while(|(old, new)| old == new)
-        .count();
-    if prefix == before.len() && prefix == after.len() {
-        return None;
-    }
-    // The suffix may not reach back past what the prefix already claimed, or
-    // the two would describe the same rows twice.
-    let reach = before.len().min(after.len()) - prefix;
-    let suffix = before
-        .iter()
-        .rev()
-        .zip(after.iter().rev())
-        .take(reach)
-        .take_while(|(old, new)| old == new)
-        .count();
-    Some((prefix, before.len() - suffix - prefix))
-}
-
 /// The scroll position of the surface with this identity.
 pub(crate) fn scroll_handle(
     ident: &Ident,
@@ -109,14 +76,15 @@ pub(crate) fn scroll_handle(
 /// roughly the right size on the first frame and settles as rows are actually
 /// laid out, instead of starting as a full-height thumb that shrinks.
 ///
-/// Rows that were named are diffed, so only the range that actually changed is
-/// spliced and every measurement outside it survives. Rows that were only
+/// Named rows preserve measurements by identity across arbitrary reorder;
+/// content revisions invalidate geometry separately. Rows that were only
 /// counted keep the older, blunter rule: a count that grew is taken to mean
 /// rows arrived at the end, and any other change discards the measurements,
 /// because they described rows that are no longer at those indices.
 pub(crate) fn list_state(
     ident: &Ident,
     rows: Rows<'_>,
+    revisions: Option<&[u64]>,
     alignment: ListAlignment,
     estimate: Pixels,
     window: &Window,
@@ -132,17 +100,45 @@ pub(crate) fn list_state(
                 state: ListState::new(count, alignment, px(OVERDRAW))
                     .with_uniform_item_height(estimate),
                 keys: anonymous(count),
+                revisions: vec![0; count],
             });
 
             match rows {
                 Rows::Keyed(keys) => {
+                    let revisions = revisions.map_or_else(
+                        || vec![0; count],
+                        |values| {
+                            assert_eq!(values.len(), count, "one revision is required per row");
+                            values.to_vec()
+                        },
+                    );
                     if flow.keys != keys {
-                        if let Some((start, removed)) = splice_range(&flow.keys, keys) {
-                            let added = keys.len() - (flow.keys.len() - removed);
-                            flow.state.splice(start..start + removed, added);
+                        let old: HashMap<_, _> = flow
+                            .keys
+                            .iter()
+                            .enumerate()
+                            .map(|(index, key)| (key, index))
+                            .collect();
+                        let unique: std::collections::HashSet<_> = keys.iter().collect();
+                        assert_eq!(unique.len(), keys.len(), "row keys must be unique");
+                        let mapping: Vec<_> =
+                            keys.iter().map(|key| old.get(key).copied()).collect();
+                        flow.state.remap_items(&mapping);
+                        for (index, previous) in mapping.iter().enumerate() {
+                            if previous.is_some_and(|old| flow.revisions[old] != revisions[index]) {
+                                flow.state.remeasure_items(index..index + 1);
+                            }
                         }
                         flow.keys = keys.to_vec();
+                    } else {
+                        for (index, (old, new)) in flow.revisions.iter().zip(&revisions).enumerate()
+                        {
+                            if old != new {
+                                flow.state.remeasure_items(index..index + 1);
+                            }
+                        }
                     }
+                    flow.revisions = revisions;
                 }
                 Rows::Counted(count) => {
                     let known = flow.keys.len();
@@ -153,6 +149,7 @@ pub(crate) fn list_state(
                             flow.state.reset_with_uniform_height(count, estimate);
                         }
                         flow.keys = anonymous(count);
+                        flow.revisions = vec![0; count];
                     }
                 }
             }
@@ -170,6 +167,17 @@ fn anonymous(count: usize) -> Vec<SharedString> {
     (0..count)
         .map(|index| SharedString::from(format!("\u{0}{index}")))
         .collect()
+}
+
+/// Invalidates measured geometry after an asynchronous row update. Identity
+/// and the absolute pixel offset within the anchored row are retained. The
+/// range uses current row order; callers resolving async work must look up
+/// its stable key before calling. Missing surfaces are a no-op.
+pub fn remeasure_rows(ident: &Ident, rows: Range<usize>, window: &Window, cx: &mut App) {
+    if let Some(state) = flow_state(ident, window.window_handle().window_id(), cx) {
+        state.remeasure_items(rows);
+        cx.refresh_windows();
+    }
 }
 
 /// Brings row `index` of the surface with this identity to the bottom edge.
@@ -368,90 +376,104 @@ mod tests {
         names.iter().map(|name| SharedString::from(*name)).collect()
     }
 
-    #[test]
-    fn an_unchanged_sequence_is_not_spliced_at_all() {
-        let rows = keys(&["a", "b", "c"]);
-        assert_eq!(splice_range(&rows, &rows), None);
-    }
-
-    #[test]
-    fn appending_splices_only_the_end() {
-        let before = keys(&["a", "b"]);
-        let after = keys(&["a", "b", "c", "d"]);
-        // Nothing is removed at index 2, and the two new rows land there.
-        assert_eq!(splice_range(&before, &after), Some((2, 0)));
-    }
-
-    #[test]
-    fn a_changed_last_row_splices_that_row_alone() {
-        // The streaming case: a reply's final block is re-identified as it
-        // grows while every settled block above it keeps its measurement.
-        let before = keys(&["a", "b", "c@1"]);
-        let after = keys(&["a", "b", "c@2"]);
-        assert_eq!(splice_range(&before, &after), Some((2, 1)));
-    }
-
-    #[test]
-    fn a_row_removed_from_the_middle_keeps_both_sides() {
-        let before = keys(&["a", "b", "c", "d"]);
-        let after = keys(&["a", "c", "d"]);
-        assert_eq!(splice_range(&before, &after), Some((1, 1)));
-    }
-
-    #[test]
-    fn an_insertion_in_the_middle_keeps_both_sides() {
-        let before = keys(&["a", "d"]);
-        let after = keys(&["a", "b", "c", "d"]);
-        assert_eq!(splice_range(&before, &after), Some((1, 0)));
-    }
-
-    #[test]
-    fn a_wholesale_replacement_is_one_wide_splice() {
-        let before = keys(&["a", "b", "c"]);
-        let after = keys(&["x", "y"]);
-        assert_eq!(splice_range(&before, &after), Some((0, 3)));
-    }
-
-    #[test]
-    fn emptying_and_filling_are_both_expressible() {
-        let before = keys(&["a", "b"]);
-        assert_eq!(splice_range(&before, &[]), Some((0, 2)));
-        assert_eq!(splice_range(&[], &before), Some((0, 0)));
-    }
-
-    #[test]
-    fn a_repeated_row_does_not_let_the_suffix_reach_past_the_prefix() {
-        // Both ends match the same rows here. The ranges must not overlap, or
-        // the splice would describe more removals than there are rows.
-        let before = keys(&["a", "a"]);
-        let after = keys(&["a", "a", "a"]);
-        let (start, removed) = splice_range(&before, &after).expect("a change");
-        assert!(start + removed <= before.len());
-        let added = after.len() - (before.len() - removed);
-        assert_eq!(before.len() - removed + added, after.len());
-    }
-
-    #[test]
-    fn every_splice_reproduces_the_new_sequence() {
-        // The property the list depends on: applying what this returns to the
-        // old rows yields exactly the new ones.
-        let cases = [
-            (vec!["a", "b", "c"], vec!["a", "b", "c", "d"]),
-            (vec!["a", "b", "c"], vec!["a", "c"]),
-            (vec!["a"], vec!["b", "a"]),
-            (vec!["a", "b", "c", "d"], vec!["a", "x", "y", "d"]),
-            (vec![], vec!["a"]),
-            (vec!["a", "b"], vec![]),
-        ];
-        for (before, after) in cases {
-            let before = keys(&before);
-            let after = keys(&after);
-            let mut applied = before.clone();
-            if let Some((start, removed)) = splice_range(&before, &after) {
-                let added = after.len() - (before.len() - removed);
-                applied.splice(start..start + removed, after[start..start + added].to_vec());
+    #[gpui::test]
+    fn revisions_remeasure_offscreen_rows_without_reidentifying_them(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::{AppContext, Context, IntoElement, Render, Styled, div, list, point, size};
+        use std::rc::Rc;
+        let cx = cx.add_empty_window();
+        let ident = Ident::from("revision-test");
+        let names = keys(&["a", "b", "c", "d"]);
+        let state = cx.update(|window, cx| {
+            list_state(
+                &ident,
+                Rows::Keyed(&names),
+                Some(&[0, 0, 0, 0]),
+                ListAlignment::Top,
+                px(40.),
+                window,
+                cx,
+            )
+        });
+        struct RowsView(ListState, Rc<std::cell::Cell<f32>>);
+        impl Render for RowsView {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let height = self.1.get();
+                list(self.0.clone(), move |index, _, _| {
+                    div()
+                        .h(px(if index == 3 { height } else { 40. }))
+                        .into_any_element()
+                })
+                .w_full()
+                .h_full()
             }
-            assert_eq!(applied, after);
         }
+        let height = Rc::new(std::cell::Cell::new(80.));
+        let view = cx.update(|_, cx| cx.new(|_| RowsView(state.clone(), height.clone())));
+        cx.draw(point(px(0.), px(0.)), size(px(100.), px(40.)), |_, _| {
+            view.clone().into_any_element()
+        });
+        assert_eq!(
+            state
+                .bounds_for_item(3)
+                .expect("overdraw measured row")
+                .size
+                .height,
+            px(80.)
+        );
+        height.set(125.);
+        cx.update(|window, cx| {
+            list_state(
+                &ident,
+                Rows::Keyed(&names),
+                Some(&[0, 0, 0, 1]),
+                ListAlignment::Top,
+                px(40.),
+                window,
+                cx,
+            );
+        });
+        assert!(
+            state.bounds_for_item(3).is_none(),
+            "revision must invalidate offscreen geometry"
+        );
+        assert_eq!(
+            state
+                .bounds_for_item(1)
+                .expect("unchanged measurement")
+                .size
+                .height,
+            px(40.)
+        );
+        cx.draw(point(px(0.), px(0.)), size(px(100.), px(40.)), |_, _| {
+            view.clone().into_any_element()
+        });
+        assert_eq!(
+            state
+                .bounds_for_item(3)
+                .expect("remeasured row")
+                .size
+                .height,
+            px(125.)
+        );
+        state.scroll_to(ListOffset {
+            item_ix: 1,
+            offset_in_item: px(13.),
+        });
+        let reordered = keys(&["d", "a", "b", "c"]);
+        cx.update(|window, cx| {
+            list_state(
+                &ident,
+                Rows::Keyed(&reordered),
+                Some(&[1, 0, 0, 0]),
+                ListAlignment::Top,
+                px(40.),
+                window,
+                cx,
+            );
+        });
+        assert_eq!(state.logical_scroll_top().item_ix, 2);
+        assert_eq!(state.logical_scroll_top().offset_in_item, px(13.));
     }
 }

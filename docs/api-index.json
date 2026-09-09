@@ -2044,6 +2044,7 @@
       ],
       "options": [
         "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "revisions(revisions: Vec<u64>) -> Self",
         "estimate(height: f32) -> Self",
         "anchored_to_end() -> Self",
         "visible_rows(rows: usize) -> Self",
@@ -2664,6 +2665,7 @@
         "flowing() -> Self",
         "anchored_to_end() -> Self",
         "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "revisions(revisions: Vec<u64>) -> Self",
         "visible_rows(rows: usize) -> Self",
         "fills() -> Self",
         "arriving() -> Self",

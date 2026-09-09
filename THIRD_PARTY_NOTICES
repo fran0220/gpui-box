@@ -421,3 +421,8 @@ Scope: friction-spline fling math transcribed by the identified package source.
 GPUI Box retains its sole local framework/package authority and includes no
 gpui-pre, Longbridge, Zed Git dependency, or Cargo patch; see PROVENANCE.md P18.
 License text: licenses/ZED-APACHE-2.0.txt
+
+Stable virtual-row remapping, separate Kit geometry revisions, and clamped
+nested Div/List wheel consumption are original GPUI Box modifications to the
+historically imported framework. No additional third-party source or license
+was introduced; all existing framework copyright notices remain in force.
