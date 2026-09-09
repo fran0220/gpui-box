@@ -490,3 +490,7 @@ Native context-menu revision sessions, cancellation/completion gates and
 NSMenu/Win32 cancellation are original GPUI Box framework changes. No new
 third-party source or license was added; all upstream copyright notices and
 the frozen historical import receipt remain intact.
+
+Incremental accessible paragraph updates and run-local selection indexing are
+original GPUI Box changes, using the existing Unicode and AccessKit licenses.
+No additional third-party code or dependency was imported.

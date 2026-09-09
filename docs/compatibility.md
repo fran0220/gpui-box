@@ -635,3 +635,20 @@ completion requests a new revision after typing. Diagnostics and semantic
 tokens are revision-paired, with semantic colors overriding only covered
 parser spans and severity underlines layered over both. The editor-services
 exhibit uses explicit caller fixtures for ready, loading, refusal and hover.
+
+`AccessibleTextCache::publish_document` accepts persistent snapshots and
+resegments changed LF-delimited paragraphs, preserving unchanged offscreen
+TextRun ids and payloads across byte/line shifts. It verifies unchanged row
+mappings and falls back to a full segmentation when direction or wrapping
+outside the edit changes. Native position lookup indexes the run first and
+uses at most one run's selectable units instead of recounting the document
+prefix. Old published snapshots still refuse a different current revision.
+`TextArea::accessibility_work` exposes the last publication's segmented bytes,
+compared bytes, published run/value bytes and retained run count. These are
+not whole-frame allocation counters: complete source compatibility strings,
+run metadata, parent child-id lists and native parent values remain linear.
+The parent value is deliberately preserved: upstream AccessKit 0.24.1 omits
+Windows Value-pattern support and macOS AXValue when a multiline input omits
+its own value, even when all TextRun descendants remain available. Linux
+platform-independent tests cover incremental native trees and Unicode
+equivalence; macOS/Windows execution remains the separate platform lane.

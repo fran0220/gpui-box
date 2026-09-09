@@ -1050,6 +1050,15 @@ impl TextArea {
             .map(|layout| layout.shaping_work())
     }
 
+    /// Text segmentation and payload work of the last native accessibility
+    /// publication, separate from shaping and full-frame allocation costs.
+    pub fn accessibility_work(&self) -> gpui::AccessibleTextWork {
+        self.accessible_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .work()
+    }
+
     /// What the last layout pass measured, or nothing before the first one.
     pub fn measured(&self) -> Option<Measured> {
         let layout = self.last_layout.as_ref()?;
@@ -2133,6 +2142,7 @@ impl Render for TextArea {
         let focused = self.focus_handle.is_focused(window);
         let spec = self.semantics();
         let content = self.edit.text().clone();
+        let document = self.document();
         let (anchor, focus) = if self.edit.is_reversed() {
             (self.edit.selection().end, self.edit.selection().start)
         } else {
@@ -2254,9 +2264,9 @@ impl Render for TextArea {
                     let snapshot = accessible_cache
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .publish(
+                        .publish_document(
                             builder,
-                            &content,
+                            &document,
                             anchor,
                             focus,
                             accessible_direction,

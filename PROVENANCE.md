@@ -877,3 +877,8 @@ dispatch, and NSMenu/Win32 cancellation are original GPUI Box modifications
 to the locally owned framework. No upstream source or dependency was imported.
 The frozen historical import receipt remains unchanged. Native tracking-loop
 execution evidence must come from macOS/Windows, not shared Linux tests.
+
+Incremental accessible paragraph publication, shared run payloads, and indexed
+run-local native selection conversion are original GPUI Box work using the
+existing Ropey, Unicode and AccessKit dependencies. No external source port,
+adapter fork or historical receipt change is involved.

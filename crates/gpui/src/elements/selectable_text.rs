@@ -1,17 +1,17 @@
-use crate::{A11ySubtreeBuilder, Bounds, Pixels, SharedString, accesskit};
+use crate::{A11ySubtreeBuilder, Bounds, EditSnapshot, Pixels, SharedString, accesskit};
 use std::{ops::Range, sync::Arc};
 use unicode_bidi::{BidiInfo, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_ACCESSIBLE_RUN_CHARS: usize = 255;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct AccessibleRun {
     value: Range<usize>,
     start_byte: usize,
     start_character: usize,
-    character_lengths: Vec<u8>,
-    word_starts: Vec<u8>,
+    character_lengths: Arc<[u8]>,
+    word_starts: Arc<[u8]>,
     line: usize,
     direction: accesskit::TextDirection,
 }
@@ -31,7 +31,7 @@ pub struct PublishedAccessibleText {
 #[derive(Clone, Debug)]
 struct PublishedRun {
     node: accesskit::NodeId,
-    start_character: usize,
+    start_byte: usize,
     character_count: usize,
 }
 
@@ -49,9 +49,77 @@ pub struct AccessibleTextCache {
     ids: Arc<[accesskit::NodeId]>,
     published: Option<PublishedAccessibleText>,
     visible: Range<usize>,
+    document: Option<EditSnapshot>,
+    work: AccessibleTextWork,
+}
+
+/// Actual text work in the most recent accessible publication. Metadata and
+/// parent child-id lists are separate, still linear work; these counters do
+/// not claim an allocation bound for the entire AccessKit update.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AccessibleTextWork {
+    /// UTF-8 bytes passed to Unicode segmentation and bidi resolution.
+    pub segmented_bytes: usize,
+    /// Actual persistent-snapshot byte comparisons used to locate the edit.
+    pub compared_bytes: usize,
+    /// TextRun payloads transmitted in this update.
+    pub published_runs: usize,
+    /// UTF-8 value bytes transmitted in TextRun payloads.
+    pub published_text_bytes: usize,
+    /// Existing TextRuns connected without retransmitting their payloads.
+    pub retained_runs: usize,
 }
 
 impl AccessibleTextCache {
+    /// Work performed in the last publication, not cumulative totals.
+    pub fn work(&self) -> AccessibleTextWork {
+        self.work
+    }
+
+    /// Publishes a persistent document, resegmenting only changed LF-delimited
+    /// paragraphs when rows and direction outside the edit remain unchanged.
+    /// LF is a Unicode bidi/word reset boundary; arbitrary visual rows are not.
+    /// Source snapshots and run metadata remain complete, including offscreen
+    /// paragraphs. Native actions are still checked against the exact revision.
+    #[allow(clippy::too_many_arguments)]
+    pub fn publish_document(
+        &mut self,
+        builder: &mut A11ySubtreeBuilder,
+        document: &EditSnapshot,
+        anchor: usize,
+        focus: usize,
+        direction: accesskit::TextDirection,
+        rows: &[Range<usize>],
+        revision: u64,
+        visible: Range<usize>,
+        scale: f32,
+        geometry: impl Fn(Range<usize>) -> Vec<Bounds<Pixels>>,
+    ) -> Option<PublishedAccessibleText> {
+        let difference = self
+            .document
+            .as_ref()
+            .filter(|_| self.revision != revision)
+            .map(|before| document.difference_from(before));
+        let text = document.text();
+        self.document = Some(document.clone());
+        let result = publish_accessible_text_inner(
+            builder,
+            text,
+            anchor,
+            focus,
+            direction,
+            rows,
+            revision,
+            Some((&geometry, scale)),
+            Some((self, visible)),
+            difference.as_ref(),
+        );
+        if result.is_none() {
+            self.document = None;
+        }
+        result
+    }
+
     /// Publishes current selection and viewport geometry without rebuilding
     /// unchanged logical runs. `visible` must cover every byte whose geometry
     /// callback can return cells. Text/row/direction changes invalidate the
@@ -70,6 +138,7 @@ impl AccessibleTextCache {
         scale: f32,
         geometry: impl Fn(Range<usize>) -> Vec<Bounds<Pixels>>,
     ) -> Option<PublishedAccessibleText> {
+        self.document = None;
         publish_accessible_text_inner(
             builder,
             text,
@@ -80,6 +149,7 @@ impl AccessibleTextCache {
             revision,
             Some((&geometry, scale)),
             Some((self, visible)),
+            None,
         )
     }
 }
@@ -117,8 +187,8 @@ fn accessible_runs(
             value: 0..0,
             start_byte: 0,
             start_character: 0,
-            character_lengths: Vec::new(),
-            word_starts: Vec::new(),
+            character_lengths: Arc::default(),
+            word_starts: Arc::default(),
             line: 0,
             direction: fallback_direction,
         }];
@@ -194,13 +264,148 @@ fn accessible_runs(
             value: text.len()..text.len(),
             start_byte: text.len(),
             start_character: graphemes.len(),
-            character_lengths: Vec::new(),
-            word_starts: Vec::new(),
+            character_lengths: Arc::default(),
+            word_starts: Arc::default(),
             line: visual_rows.len(),
             direction: fallback_direction,
         });
     }
     runs
+}
+
+struct UpdatedRuns {
+    runs: Arc<[AccessibleRun]>,
+    prefix: usize,
+    old_suffix: usize,
+    new_suffix: usize,
+    segmented_bytes: usize,
+}
+
+fn update_runs(
+    cache: &AccessibleTextCache,
+    text: &str,
+    rows: &[Range<usize>],
+    direction: accesskit::TextDirection,
+    difference: &crate::EditDifference,
+) -> Option<UpdatedRuns> {
+    let old = cache.source.as_ref();
+    if old.is_empty() || text.is_empty() || cache.runs.is_empty() {
+        return None;
+    }
+    if difference.replaced.is_empty() && difference.inserted.is_empty() && cache.rows == rows {
+        return Some(UpdatedRuns {
+            runs: cache.runs.clone(),
+            prefix: cache.runs.len(),
+            old_suffix: cache.runs.len(),
+            new_suffix: cache.runs.len(),
+            segmented_bytes: 0,
+        });
+    }
+    let start = old[..difference.replaced.start]
+        .rfind('\n')
+        .map_or(0, |at| at + 1);
+    let old_end = old[difference.replaced.end..]
+        .find('\n')
+        .map_or(old.len(), |at| difference.replaced.end + at + 1);
+    let byte_delta = text.len() as isize - old.len() as isize;
+    let end = old_end.checked_add_signed(byte_delta)?;
+    let old_first = cache.rows.partition_point(|row| row.end <= start);
+    let first = rows.partition_point(|row| row.end <= start);
+    let old_last = if old_end == old.len() {
+        cache.rows.len()
+    } else {
+        cache.rows.partition_point(|row| row.start < old_end)
+    };
+    let last = if end == text.len() {
+        rows.len()
+    } else {
+        rows.partition_point(|row| row.start < end)
+    };
+    if old_first != first
+        || cache.rows[..old_first] != rows[..first]
+        || cache.rows.len() - old_last != rows.len() - last
+        || cache.rows[old_last..]
+            .iter()
+            .zip(&rows[last..])
+            .any(|(old, new)| {
+                old.start.checked_add_signed(byte_delta) != Some(new.start)
+                    || old.end.checked_add_signed(byte_delta) != Some(new.end)
+            })
+        || rows.get(first).is_none_or(|row| row.start != start)
+        || rows
+            .get(last.saturating_sub(1))
+            .is_none_or(|row| row.end != end)
+    {
+        return None;
+    }
+    let prefix = cache.runs.partition_point(|run| run.start_byte < start);
+    let old_suffix = if old_end == old.len() {
+        cache.runs.len()
+    } else {
+        cache.runs.partition_point(|run| run.start_byte < old_end)
+    };
+    let character_start = cache.runs.get(prefix).map_or_else(
+        || run_end_character(cache.runs.last().expect("nonempty runs")),
+        |run| run.start_character,
+    );
+    let old_character_end = cache.runs.get(old_suffix).map_or_else(
+        || run_end_character(cache.runs.last().expect("nonempty runs")),
+        |run| run.start_character,
+    );
+    let local_rows: Vec<_> = rows[first..last]
+        .iter()
+        .map(|row| row.start - start..row.end - start)
+        .collect();
+    let mut changed = accessible_runs(&text[start..end], &local_rows, direction);
+    if changed.is_empty() {
+        return None;
+    }
+    let new_character_end =
+        character_start + run_end_character(changed.last().expect("nonempty changed runs"));
+    if end < text.len() && changed.last().is_some_and(|run| run.value.is_empty()) {
+        changed.pop();
+    }
+    let mut runs = Vec::with_capacity(prefix + changed.len() + cache.runs.len() - old_suffix);
+    runs.extend_from_slice(&cache.runs[..prefix]);
+    runs.extend(changed.into_iter().map(|mut run| {
+        run.value = run.value.start + start..run.value.end + start;
+        run.start_byte += start;
+        run.start_character += character_start;
+        run.line += first;
+        run
+    }));
+    let new_suffix = runs.len();
+    let character_delta = new_character_end as isize - old_character_end as isize;
+    let line_delta = last as isize - old_last as isize;
+    runs.extend(cache.runs[old_suffix..].iter().cloned().map(|mut run| {
+        run.value = run
+            .value
+            .start
+            .checked_add_signed(byte_delta)
+            .expect("shifted source")
+            ..run
+                .value
+                .end
+                .checked_add_signed(byte_delta)
+                .expect("shifted source");
+        run.start_byte = run.value.start;
+        run.start_character = run
+            .start_character
+            .checked_add_signed(character_delta)
+            .expect("shifted character");
+        run.line = run
+            .line
+            .checked_add_signed(line_delta)
+            .expect("shifted line");
+        run
+    }));
+    Some(UpdatedRuns {
+        runs: runs.into(),
+        prefix,
+        old_suffix,
+        new_suffix,
+        segmented_bytes: end - start,
+    })
 }
 
 /// Returns whether every selectable grapheme can be represented by AccessKit.
@@ -234,6 +439,7 @@ pub fn publish_accessible_text(
         revision,
         None,
         None,
+        None,
     )
 }
 
@@ -263,6 +469,7 @@ pub fn publish_accessible_text_with_geometry(
         revision,
         Some((&bounds_for_range, scale_factor)),
         None,
+        None,
     )
 }
 
@@ -277,28 +484,74 @@ fn publish_accessible_text_inner(
     revision: u64,
     geometry: Option<(&dyn Fn(Range<usize>) -> Vec<Bounds<Pixels>>, f32)>,
     mut cache: Option<(&mut AccessibleTextCache, Range<usize>)>,
+    difference: Option<&crate::EditDifference>,
 ) -> Option<PublishedAccessibleText> {
     let reused = cache.as_ref().is_some_and(|(cache, _)| {
         cache.revision == revision
             && cache.parent == Some(builder.synthetic_node_id(0u8))
             && cache.direction == Some(fallback_direction)
-            && cache.source.as_ref() == text
+            && (std::ptr::eq(cache.source.as_ref(), text) || cache.source.as_ref() == text)
             && cache.rows == visual_rows
     });
+    let updated = cache.as_ref().and_then(|(cache, _)| {
+        (cache.parent == Some(builder.synthetic_node_id(0u8))
+            && cache.direction == Some(fallback_direction))
+        .then(|| {
+            difference.and_then(|difference| {
+                update_runs(cache, text, visual_rows, fallback_direction, difference)
+            })
+        })
+        .flatten()
+    });
+    let mut work = AccessibleTextWork {
+        compared_bytes: difference.map_or(0, |difference| difference.compared_bytes),
+        segmented_bytes: if reused {
+            0
+        } else {
+            updated
+                .as_ref()
+                .map_or(text.len(), |updated| updated.segmented_bytes)
+        },
+        ..Default::default()
+    };
     let runs: Arc<[AccessibleRun]> = if reused {
         cache.as_ref().expect("reused cache").0.runs.clone()
+    } else if let Some(updated) = &updated {
+        updated.runs.clone()
     } else {
         accessible_runs(text, visual_rows, fallback_direction).into()
     };
     if runs.is_empty() {
+        if let Some((cache, _)) = cache.as_mut() {
+            cache.work = work;
+        }
         return None;
     }
     let run_count = runs.len();
+    let old_index = |index: usize| {
+        if reused {
+            Some(index)
+        } else {
+            updated.as_ref().and_then(|updated| {
+                if index < updated.prefix {
+                    Some(index)
+                } else if index >= updated.new_suffix {
+                    Some(updated.old_suffix + index - updated.new_suffix)
+                } else {
+                    None
+                }
+            })
+        }
+    };
     let run_ids: Arc<[accesskit::NodeId]> = if reused {
         cache.as_ref().expect("reused cache").0.ids.clone()
     } else {
         runs.iter()
-            .map(|run| {
+            .enumerate()
+            .map(|(index, run)| {
+                if let Some(old) = old_index(index) {
+                    return cache.as_ref().expect("incremental cache").0.ids[old];
+                }
                 builder.synthetic_node_id((
                     revision,
                     run.line,
@@ -314,18 +567,27 @@ fn publish_accessible_text_inner(
             accessible_run.value.start < visible.end && visible.start < accessible_run.value.end
         });
         let was_visible = cache.as_ref().is_some_and(|(cache, _)| {
-            accessible_run.value.start < cache.visible.end
-                && cache.visible.start < accessible_run.value.end
+            old_index(run).is_some_and(|index| {
+                let old = &cache.runs[index];
+                old.value.start < cache.visible.end && cache.visible.start < old.value.end
+            })
         });
-        if reused && !visible && !was_visible && builder.retain_child(run_ids[run]) {
+        if old_index(run).is_some()
+            && !visible
+            && !was_visible
+            && builder.retain_child(run_ids[run])
+        {
+            work.retained_runs += 1;
             continue;
         }
+        work.published_runs += 1;
+        work.published_text_bytes += accessible_run.value.len();
         let mut node = accesskit::Node::new(accesskit::Role::TextRun);
         node.set_text_direction(accessible_run.direction);
         node.set_value(&text[accessible_run.value.clone()]);
-        node.set_character_lengths(accessible_run.character_lengths.clone());
+        node.set_character_lengths(accessible_run.character_lengths.to_vec());
         if !accessible_run.word_starts.is_empty() {
-            node.set_word_starts(accessible_run.word_starts.clone());
+            node.set_word_starts(accessible_run.word_starts.to_vec());
         }
         if let Some((bounds_for_range, scale)) = geometry.filter(|_| visible) {
             let mut positions = Vec::with_capacity(accessible_run.character_lengths.len());
@@ -387,14 +649,17 @@ fn publish_accessible_text_inner(
         cache.as_ref().expect("reused cache").0.published.clone()
     } else {
         Some(PublishedAccessibleText {
-            source: text.into(),
+            source: cache
+                .as_ref()
+                .and_then(|(cache, _)| cache.document.as_ref())
+                .map_or_else(|| text.into(), |document| document.text().clone()),
             revision,
             runs: runs
                 .iter()
                 .zip(run_ids.iter().copied())
                 .map(|(run, node)| PublishedRun {
                     node,
-                    start_character: run.start_character,
+                    start_byte: run.start_byte,
                     character_count: run.character_lengths.len(),
                 })
                 .collect(),
@@ -402,7 +667,7 @@ fn publish_accessible_text_inner(
     };
     if let Some((cache, visible)) = cache.as_mut() {
         if !reused {
-            cache.source = text.into();
+            cache.source = published.as_ref().expect("published runs").source.clone();
             cache.revision = revision;
             cache.parent = Some(builder.synthetic_node_id(0u8));
             cache.direction = Some(fallback_direction);
@@ -412,6 +677,7 @@ fn publish_accessible_text_inner(
             cache.published = published.clone();
         }
         cache.visible = visible.clone();
+        cache.work = work;
     }
     published
 }
@@ -422,28 +688,34 @@ fn accessible_position(
     runs: &[AccessibleRun],
     node_id: impl Fn(usize) -> accesskit::NodeId,
 ) -> accesskit::TextPosition {
-    let character = text
-        .grapheme_indices(true)
-        .take_while(|(offset, _)| *offset < byte_offset)
-        .count();
-    let run = runs
+    let byte_offset = byte_offset.min(text.len());
+    let mut run = runs
+        .partition_point(|run| run.start_byte < byte_offset)
+        .saturating_sub(1);
+    let local = byte_offset.saturating_sub(runs[run].start_byte);
+    let mut bytes = 0;
+    let mut character_index = runs[run]
+        .character_lengths
         .iter()
-        .enumerate()
-        .find_map(|(index, run)| {
-            let end = run_end_character(run);
-            if character < end
-                || (character == end
-                    && runs.get(index + 1).is_none_or(|next| next.line == run.line))
-            {
-                Some(index)
-            } else {
-                None
-            }
+        .take_while(|length| {
+            let before = bytes;
+            bytes += **length as usize;
+            before < local
         })
-        .unwrap_or(runs.len() - 1);
+        .count();
+    // Prefix semantics round an interior byte of a selectable unit forward.
+    // For CRLF that can reach the next logical line before its LF byte ends.
+    if character_index == runs[run].character_lengths.len()
+        && runs
+            .get(run + 1)
+            .is_some_and(|next| next.line != runs[run].line)
+    {
+        run += 1;
+        character_index = 0;
+    }
     accesskit::TextPosition {
         node: node_id(run),
-        character_index: character - runs[run].start_character,
+        character_index,
     }
 }
 
@@ -456,11 +728,11 @@ fn byte_offset_for_accessible_position(
     if position.character_index > run.character_count {
         return None;
     }
-    let character = run.start_character + position.character_index;
     Some(
-        text.grapheme_indices(true)
-            .nth(character)
-            .map(|(offset, _)| offset)
+        text[run.start_byte..]
+            .grapheme_indices(true)
+            .nth(position.character_index)
+            .map(|(offset, _)| run.start_byte + offset)
             .unwrap_or(text.len()),
     )
 }
@@ -482,6 +754,105 @@ mod tests {
     use super::*;
 
     #[test]
+    fn paragraph_updates_equal_full_unicode_segmentation_for_insert_delete_and_line_changes() {
+        let texts = [
+            "head\ncan't e\u{301} אבג DEF\r\n👩‍💻 tail\n".to_string(),
+            format!("head\n{}'word אבג\n終わり", "a".repeat(270)),
+            "\n\nend".to_string(),
+        ];
+        for text in texts {
+            for direction in [
+                accesskit::TextDirection::LeftToRight,
+                accesskit::TextDirection::RightToLeft,
+            ] {
+                let rows = hard_rows(&text);
+                let cache = AccessibleTextCache {
+                    source: text.clone().into(),
+                    rows: rows.clone(),
+                    runs: accessible_runs(&text, &rows, direction).into(),
+                    ..Default::default()
+                };
+                let boundaries: Vec<_> = text
+                    .char_indices()
+                    .map(|(at, _)| at)
+                    .chain([text.len()])
+                    .collect();
+                for (index, &start) in boundaries.iter().enumerate() {
+                    for end in [start, *boundaries.get(index + 2).unwrap_or(&text.len())] {
+                        for inserted in ["", "界\nאב", "\u{301}", "\r\n"] {
+                            let mut changed = text.clone();
+                            changed.replace_range(start..end, inserted);
+                            let new_text = changed.as_str();
+                            let difference = crate::EditDifference {
+                                replaced: start..end,
+                                inserted: inserted.into(),
+                                compared_bytes: 0,
+                                shared_bytes: 0,
+                            };
+                            let new_rows = hard_rows(new_text);
+                            let update =
+                                update_runs(&cache, new_text, &new_rows, direction, &difference)
+                                    .expect("nonempty paragraph update");
+                            assert_eq!(
+                                update.runs.as_ref(),
+                                accessible_runs(new_text, &new_rows, direction),
+                                "edit {start}..{end} -> {inserted:?}, direction {direction:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ten_thousand_paragraph_edit_segments_only_changed_text_and_shares_other_payloads() {
+        for count in [1000, 10000] {
+            let text = format!(
+                "[\n{}{{\"tail\":7}}\n]",
+                "{\"asymmetric\":\"界\",\"value\":13},\n".repeat(count)
+            );
+            let mut buffer = crate::EditBuffer::new(crate::EditRules::default());
+            buffer.set_text(&text);
+            let before = buffer.snapshot();
+            let rows = hard_rows(&text);
+            let cache = AccessibleTextCache {
+                source: text.clone().into(),
+                rows: rows.clone(),
+                runs: accessible_runs(&text, &rows, accesskit::TextDirection::LeftToRight).into(),
+                ..Default::default()
+            };
+            let at = text.find("13").expect("fixture number");
+            buffer.replace(at..at + 1, "987", crate::EditCause::Programmatic);
+            let after = buffer.snapshot();
+            let difference = after.difference_from(&before);
+            let updated = update_runs(
+                &cache,
+                after.text(),
+                &hard_rows(after.text()),
+                accesskit::TextDirection::LeftToRight,
+                &difference,
+            )
+            .expect("incremental update");
+            assert!(updated.segmented_bytes < 40);
+            assert!(difference.compared_bytes < 8192);
+            assert!(updated.runs.len() - updated.new_suffix >= count);
+            assert!(Arc::ptr_eq(
+                &cache.runs[updated.old_suffix].character_lengths,
+                &updated.runs[updated.new_suffix].character_lengths
+            ));
+            assert_eq!(
+                updated.runs.as_ref(),
+                accessible_runs(
+                    after.text(),
+                    &hard_rows(after.text()),
+                    accesskit::TextDirection::LeftToRight
+                )
+            );
+        }
+    }
+
+    #[test]
     fn indexed_words_preserve_global_boundaries_across_runs() {
         for text in [
             format!("{}tail e\u{301}👩‍💻 אבג123 abc\r\n界中文", "a".repeat(254)),
@@ -501,7 +872,12 @@ mod tests {
                         (text[..offset].graphemes(true).count() - run.start_character) as u8
                     })
                     .collect::<Vec<_>>();
-                assert_eq!(run.word_starts, expected, "{}", &text[run.value.clone()]);
+                assert_eq!(
+                    run.word_starts.as_ref(),
+                    expected,
+                    "{}",
+                    &text[run.value.clone()]
+                );
             }
         }
     }
@@ -549,6 +925,43 @@ mod tests {
     }
 
     #[test]
+    fn indexed_positions_match_global_prefix_semantics_at_every_unicode_byte() {
+        let text = format!("{}e\u{301}👩‍💻 אבג\r\nDEF\n", "x".repeat(270));
+        let rows = hard_rows(&text);
+        let runs = accessible_runs(&text, &rows, accesskit::TextDirection::LeftToRight);
+        for offset in 0..=text.len() {
+            let character = text
+                .grapheme_indices(true)
+                .take_while(|(at, _)| *at < offset)
+                .count();
+            let index = runs
+                .iter()
+                .enumerate()
+                .find_map(|(index, run)| {
+                    let end = run_end_character(run);
+                    (character < end
+                        || (character == end
+                            && runs.get(index + 1).is_none_or(|next| next.line == run.line)))
+                    .then_some(index)
+                })
+                .unwrap_or(runs.len() - 1);
+            let actual = accessible_position(&text, offset, &runs, |index| {
+                accesskit::NodeId(index as u64)
+            });
+            assert_eq!(
+                actual.node,
+                accesskit::NodeId(index as u64),
+                "byte {offset}"
+            );
+            assert_eq!(
+                actual.character_index,
+                character - runs[index].start_character,
+                "byte {offset}"
+            );
+        }
+    }
+
+    #[test]
     fn accessible_positions_round_trip_utf8_text() {
         let text = format!("{}e\u{301}👩‍💻\nאב", "x".repeat(255));
         let nodes = |run| accesskit::NodeId(100 + run as u64);
@@ -560,7 +973,7 @@ mod tests {
             .zip(&run_ids)
             .map(|(run, node)| PublishedRun {
                 node: *node,
-                start_character: run.start_character,
+                start_byte: run.start_byte,
                 character_count: run.character_lengths.len(),
             })
             .collect::<Vec<_>>();
@@ -580,7 +993,7 @@ mod tests {
         let runs = accessible_runs(text, &rows, accesskit::TextDirection::LeftToRight);
         assert_eq!(runs.len(), 2);
         assert_eq!(&text[runs[0].value.clone()], "e\u{301}👩‍💻\n");
-        assert_eq!(runs[0].character_lengths, vec![3, 11, 1]);
+        assert_eq!(runs[0].character_lengths.as_ref(), [3, 11, 1]);
         assert_eq!(&text[runs[1].value.clone()], "אב");
         assert_eq!(runs[1].direction, accesskit::TextDirection::RightToLeft);
     }
@@ -599,7 +1012,7 @@ mod tests {
                 .zip(ids)
                 .map(|(run, node)| PublishedRun {
                     node,
-                    start_character: run.start_character,
+                    start_byte: run.start_byte,
                     character_count: run.character_lengths.len(),
                 })
                 .collect::<Vec<_>>();

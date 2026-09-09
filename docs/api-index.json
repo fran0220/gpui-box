@@ -5205,6 +5205,7 @@
         "bounds_for_position(offset: usize) -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
+        "accessibility_work() -> gpui::AccessibleTextWork",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],

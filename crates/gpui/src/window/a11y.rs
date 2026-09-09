@@ -1031,6 +1031,104 @@ mod tests {
     }
 
     #[test]
+    fn edited_paragraphs_retain_other_native_nodes_and_reject_stale_positions() {
+        for count in [1000, 10000] {
+            let row = "{\"asymmetric\":\"界\",\"value\":13},\n";
+            let text = format!("[\n{}{{\"tail\":7}}\n]", row.repeat(count));
+            let mut buffer = crate::EditBuffer::new(crate::EditRules::default());
+            buffer.set_text(&text);
+            let mut a11y = new_a11y();
+            let mut cache = crate::AccessibleTextCache::default();
+            let mut previous = None;
+            let mut tail_id = None;
+            for revision in 0..3 {
+                if revision == 1 {
+                    let at = text.find("13").expect("fixture number");
+                    buffer.replace(at..at + 1, "987", crate::EditCause::Programmatic);
+                } else if revision == 2 {
+                    buffer.replace(2..2, "new界\n", crate::EditCause::Programmatic);
+                }
+                let document = buffer.snapshot();
+                let text = document.text();
+                let rows: Vec<_> = (0..document.line_count())
+                    .map(|line| document.line_range(line).expect("indexed line"))
+                    .collect();
+                a11y.begin_frame();
+                assert!(
+                    a11y.nodes
+                        .push(NodeId(1), accesskit::Node::new(Role::MultilineTextInput))
+                );
+                let published = {
+                    let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes);
+                    cache
+                        .publish_document(
+                            &mut builder,
+                            &document,
+                            0,
+                            document.len(),
+                            accesskit::TextDirection::LeftToRight,
+                            &rows,
+                            revision,
+                            0..2 + row.len() * 8,
+                            1.0,
+                            |_| Vec::new(),
+                        )
+                        .expect("representable document")
+                };
+                a11y.nodes.pop();
+                let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+                let parent = update
+                    .nodes
+                    .iter()
+                    .find(|(id, _)| *id == NodeId(1))
+                    .expect("parent");
+                let selection = parent.1.text_selection().expect("selection");
+                assert_eq!(
+                    crate::byte_offset_for_published_position(
+                        text,
+                        revision,
+                        &published,
+                        selection.focus
+                    ),
+                    Some(document.len())
+                );
+                if let Some(previous) = &previous {
+                    assert_eq!(
+                        crate::byte_offset_for_published_position(
+                            text,
+                            revision,
+                            previous,
+                            selection.focus
+                        ),
+                        None
+                    );
+                    assert_eq!(tail_id, Some(selection.focus.node));
+                    let work = cache.work();
+                    assert!(work.segmented_bytes <= row.len() + 10, "{work:?}");
+                    assert!(work.compared_bytes < 8192, "{work:?}");
+                    assert!(work.published_runs <= 10, "{work:?}");
+                    assert!(work.published_text_bytes <= row.len() * 10, "{work:?}");
+                    assert!(work.retained_runs >= count - 8, "{work:?}");
+                }
+                assert_eq!(
+                    parent.1.children().len(),
+                    count + 3 + usize::from(revision == 2)
+                );
+                let dump = a11y.debug_tree_json().expect("complete debug tree");
+                assert_eq!(dump.matches("asymmetric").count(), count);
+                if revision > 0 {
+                    assert!(dump.contains("9873"));
+                }
+                if revision == 2 {
+                    assert!(dump.contains("new界"));
+                }
+                previous = Some(published);
+                tail_id = Some(selection.focus.node);
+            }
+        }
+    }
+
+    #[test]
     fn retained_text_preserves_complete_tree_and_bounds_publication_work() {
         for count in [1000, 10000] {
             let row = "{\"asymmetric\":\"界\",\"value\":13},\n";
