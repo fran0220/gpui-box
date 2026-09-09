@@ -44750,6 +44750,167 @@
         ]
       }
     },
+    "predicates": {
+      "accepts": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "source": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "label": {
+            "type": "string",
+            "max": 16384
+          },
+          "kind": {
+            "type": "string",
+            "max": 16384
+          },
+          "icon": {
+            "type": "object",
+            "fields": {
+              "key": {
+                "enum": [
+                  "plus-circle",
+                  "caret-down",
+                  "caret-left",
+                  "caret-right",
+                  "archive",
+                  "box-arrow-up",
+                  "arrow-down",
+                  "arrow-left",
+                  "arrow-right",
+                  "arrow-up",
+                  "browser",
+                  "calendar",
+                  "calendar-dots",
+                  "chat-circle-text",
+                  "check",
+                  "check-square",
+                  "square",
+                  "check-circle",
+                  "list-checks",
+                  "clock-countdown",
+                  "x",
+                  "x-circle",
+                  "command",
+                  "copy",
+                  "corners-in",
+                  "warning",
+                  "file-text",
+                  "file-plus",
+                  "caret-double-left",
+                  "caret-double-right",
+                  "dots-six-vertical",
+                  "arrow-square-out",
+                  "funnel-simple",
+                  "folder",
+                  "prohibit",
+                  "folders",
+                  "git-branch",
+                  "git-diff",
+                  "globe",
+                  "graph",
+                  "house",
+                  "image",
+                  "info",
+                  "key",
+                  "keyboard",
+                  "laptop",
+                  "list",
+                  "sign-out",
+                  "magnifying-glass",
+                  "minus",
+                  "monitor",
+                  "notebook",
+                  "paperclip",
+                  "pause",
+                  "pencil-simple",
+                  "note-pencil",
+                  "play",
+                  "plus",
+                  "arrow-clockwise",
+                  "arrows-counter-clockwise",
+                  "arrow-bend-up-left",
+                  "gear-six",
+                  "sidebar",
+                  "sidebar-simple",
+                  "device-mobile",
+                  "arrows-down-up",
+                  "sparkle",
+                  "spinner-gap",
+                  "star",
+                  "waveform",
+                  "stop",
+                  "terminal-window",
+                  "trash",
+                  "sliders-horizontal",
+                  "video-camera",
+                  "squares-four"
+                ]
+              },
+              "weight": {
+                "enum": [
+                  "regular",
+                  "fill"
+                ]
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "nullable": true
+          },
+          "anchor": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "position": {
+            "enum": [
+              "before",
+              "after",
+              "into"
+            ]
+          },
+          "velocity": {
+            "type": "object",
+            "fields": {
+              "x": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              },
+              "y": {
+                "type": "number",
+                "min": -1000000000,
+                "max": 1000000000
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "label",
+          "kind",
+          "icon",
+          "anchor",
+          "position",
+          "velocity"
+        ]
+      }
+    },
     "slots": [
       "empty",
       "failed",

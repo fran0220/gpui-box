@@ -8,7 +8,7 @@ import { validateTree } from './tree.mjs';
 import { createSandbox, nativeBackend } from './sandbox.mjs';
 import { readFrames, encodeFrame, MAX_MESSAGE, validatePayload } from './wire.mjs';
 import { invocationTarget } from './invocation.mjs';
-import { predicateTarget, PREDICATE_LIMIT, PREDICATE_TIMEOUT } from './predicates.mjs';
+import { predicateTarget, validatePredicatePayload, PREDICATE_LIMIT, PREDICATE_TIMEOUT } from './predicates.mjs';
 import { validateResourceRegistration, validateResourceRef } from './resource-schema.mjs';
 
 const runtimeRoot = dirname(fileURLToPath(import.meta.url));
@@ -211,7 +211,7 @@ export class Session extends EventEmitter {
       return Promise.reject(new Error('Predicate deadline or capacity exceeded'));
     try {
       predicateTarget(this.tree, target, name, reference);
-      validatePayload(payload);
+      validatePredicatePayload(target.component, payload);
     } catch (error) { return Promise.reject(error); }
     const id = ++this.predicateSequence, revision = this.revision;
     return new Promise((resolve, reject) => {

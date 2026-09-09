@@ -250,7 +250,7 @@ fn range(v: &Value) -> CellRange {
 fn range_value(v: &CellRange) -> Value {
     json!({"startRow":v.start_row.as_ref(),"startColumn":v.start_column.as_ref(),"endRow":v.end_row.as_ref(),"endColumn":v.end_column.as_ref()})
 }
-fn drop_value(v: &DropIntent) -> Value {
+pub(super) fn drop_value(v: &DropIntent) -> Value {
     json!({"id":v.item.id.as_ref(),"source":v.item.source.as_ref(),"label":v.item.label.as_ref(),"kind":v.item.kind.as_ref(),
         "icon":v.item.icon.map(|icon|json!({"key":icon.name().source_name(),"weight":match icon.weight(){gpui_kit::assets::IconWeight::Regular=>"regular",gpui_kit::assets::IconWeight::Fill=>"fill"}})),
         "anchor":v.position.anchor().as_ref(),"position":v.position.verb(),"velocity":{"x":v.velocity.x,"y":v.velocity.y}})
@@ -289,6 +289,17 @@ pub(super) fn render(
     window: &mut Window,
     cx: &mut App,
     emit: Emit,
+) -> AnyElement {
+    render_deferred(node, slots, window, cx, emit, None)
+}
+
+pub(super) fn render_deferred(
+    node: &Node,
+    slots: KitSlots,
+    window: &mut Window,
+    cx: &mut App,
+    emit: Emit,
+    deferred: Option<(gpui_kit::interaction::dnd::DeferredDrop, u64)>,
 ) -> AnyElement {
     let p = Value::Object(node.props.clone());
     let event = |name: &str| {
@@ -790,6 +801,9 @@ pub(super) fn render(
             }
             if let Some(a) = event("move") {
                 c = c.on_move(move |v, _, _| emit(&a, drop_value(v)));
+            }
+            if let Some((controller, revision)) = deferred {
+                c = c.deferred_acceptance(controller, revision);
             }
             slotted(c, &slots).into_any_element()
         }

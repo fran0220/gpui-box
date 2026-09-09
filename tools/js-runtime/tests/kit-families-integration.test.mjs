@@ -136,6 +136,10 @@ const inputFocus: Promise<NativeRef<'FocusHandle'>> = query(kit.TextInput('input
 kit.Markdown('markdown', {source:'Caller document'});
 kit.VideoPlayer('video', {posterResource:{key:'poster'}});
 kit.Tree('tree', {nodes:[{id:'west',label:'West'}]});
+kit.Tree('tree', {nodes:[],reorderable:true}, {}, {}, {accepts: intent => intent.position === 'before'});
+kit.Tree('tree', {nodes:[],reorderable:true}, {}, {}, {accepts: async intent => intent.velocity.x < 0});
+// @ts-expect-error deferred decisions must be boolean, not a truthy string
+kit.Tree('tree', {nodes:[]}, {}, {}, {accepts: async () => 'true'});
 const changed: Promise<boolean> = invoke(kit.SchemaForm('form', {fields:[]}), 'set_files', {path:'uploads',files:['west']});
 // @ts-expect-error caller data required
 kit.AgentAvatar('agent', {});
@@ -151,7 +155,7 @@ query(kit.NodeGraph('graph'), 'focus_handle');
 const wrong: Promise<null> = invoke(kit.SchemaForm('form', {fields:[]}), 'set_files', {path:'uploads',files:[]});
 // @ts-expect-error native references are not structural caller objects
 const forged: NativeRef<'FocusHandle'> = {$nativeRef:'forged',type:'FocusHandle'};
-// @ts-expect-error Tree live predicate fifth argument remains deferred
+// @ts-expect-error only the native accepts release contract is exposed
 kit.Tree('tree', {nodes:[]}, {}, {}, {canDrop: () => true});
 `);
     const compiler = fileURLToPath(new URL('../../app-host/node_modules/typescript/bin/tsc', import.meta.url));

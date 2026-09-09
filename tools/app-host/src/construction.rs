@@ -11,6 +11,8 @@ pub(super) type Emit = Rc<dyn Fn(&str, serde_json::Value)>;
 
 #[derive(Default)]
 pub(super) struct NativeBuildContext {
+    /// Runtime-owned release-time decision controller, mounted by List/Tabs/Tree.
+    pub(super) deferred: Option<(gpui_kit::interaction::dnd::DeferredDrop, u64)>,
     pub(super) typed: TypedSlots,
     pub(super) slots: kit_bindings::KitSlots,
 }
@@ -240,6 +242,7 @@ mod tests {
             rendered_revision: Rc::new(Cell::new(1)),
             clipboard,
             references: Default::default(),
+            deferred: Default::default(),
         };
         let typed = TypedSlots::new(renderer, &parent, 1);
         let mut harness = Harness::new(cx, gpui_kit::install, |_, _| div().into_any_element());
@@ -333,6 +336,7 @@ mod tests {
             rendered_revision: Rc::new(Cell::new(1)),
             clipboard,
             references: Default::default(),
+            deferred: Default::default(),
         };
         let typed = TypedSlots::new(renderer.clone(), &parent, 1);
         let clicked = Rc::new(Cell::new(None));
@@ -406,6 +410,7 @@ mod tests {
             rendered_revision: revision.clone(),
             clipboard,
             references: Default::default(),
+            deferred: Default::default(),
         };
         let mut harness = Harness::new(cx, gpui_kit::install, |_, _| div().into_any_element());
         harness.update(|window, cx| {

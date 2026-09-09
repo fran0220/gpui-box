@@ -7,7 +7,7 @@ function fixture(callback) {
   const registry = new WorkerPredicates(() => context);
   const reference = registry.register('rows', 'List', 'accepts', callback);
   context.tree = { kind: 'kit', id: 'rows', component: 'List', props: {}, predicates: { accepts: reference } };
-  const request = (patch = {}) => ({ id: 1, revision: 7, target: { id: 'rows', component: 'List' }, name: 'accepts', reference, payload: { id: 'record-9' }, deadline: Date.now() + 1000, ...patch });
+  const request = (patch = {}) => ({ id: 1, revision: 7, target: { id: 'rows', component: 'List' }, name: 'accepts', reference, payload: { id: 'record-9', source:'rows', label:'Record nine', kind:'row', anchor:'record-3', position:'after', velocity:{x:17,y:31} }, deadline: Date.now() + 1000, ...patch });
   return { context, registry, request, reference };
 }
 

@@ -3,7 +3,12 @@
 use super::*;
 use gpui::{ParentElement, div};
 
-pub(super) fn render_list(node: &Node, slots: KitSlots, emit: Emit) -> AnyElement {
+pub(super) fn render_list(
+    node: &Node,
+    slots: KitSlots,
+    emit: Emit,
+    deferred: Option<(gpui_kit::interaction::dnd::DeferredDrop, u64)>,
+) -> AnyElement {
     let rows = node
         .props
         .get("rows")
@@ -63,6 +68,9 @@ pub(super) fn render_list(node: &Node, slots: KitSlots, emit: Emit) -> AnyElemen
         if let Some(action) = node.events.get("reorder").cloned() {
             list = list.on_reorder(move |intent, _, _| emit(&action, drop_payload(intent)));
         }
+    }
+    if let Some((controller, revision)) = deferred {
+        list = list.deferred_acceptance(controller, revision);
     }
     list.into_any_element()
 }

@@ -392,6 +392,20 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("unsupported Kit component"))?;
     validate(&Value::Object(node.props.clone()), &schema["props"])?;
     validate_slots(schema, node)?;
+    for (name, reference) in &node.predicates {
+        ensure!(
+            schema["predicates"].get(name).is_some(),
+            "unknown Kit predicate"
+        );
+        ensure!(
+            !reference.is_empty() && reference.len() <= 256,
+            "invalid Kit predicate reference"
+        );
+    }
+    ensure!(
+        node.props.get("disabled") != Some(&Value::Bool(true)) || node.predicates.is_empty(),
+        "disabled control has predicates"
+    );
     for (event, action) in &node.events {
         ensure!(schema["events"].get(event).is_some(), "unknown Kit event");
         ensure!(

@@ -69,6 +69,7 @@ try {
     await cp(host, resolve(destination, process.platform === 'win32' ? 'gpui-box-app-host.exe' : 'gpui-box-app-host'));
     for (const dir of ['js-runtime', 'plugin-platform']) await cp(resolve(here, '..', dir), resolve(destination, 'tools', dir), { recursive: true });
     await cp(resolve(here, 'runner.mjs'), resolve(destination, 'tools/app-host/runner.mjs'));
+    await cp(resolve(here, 'drop-bridge.mjs'), resolve(destination, 'tools/app-host/drop-bridge.mjs'));
     await cp(resolve(here, 'debug.mjs'), resolve(destination, 'tools/app-host/debug.mjs'));
     const bundled = args.includes('--bundle-node') ? await bundleNode(resolve(destination, 'runtime/node')) : null;
     if (debugHelper) {

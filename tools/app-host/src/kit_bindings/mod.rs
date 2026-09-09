@@ -153,6 +153,13 @@ fn drop_payload(intent: &gpui_kit::interaction::DropIntent) -> Value {
         "velocity":{"x":intent.velocity.x,"y":intent.velocity.y},
     })
 }
+pub(crate) fn deferred_payload(node: &Node, intent: &gpui_kit::interaction::DropIntent) -> Value {
+    if node.component.as_deref() == Some("Tree") {
+        data_extra::drop_value(intent)
+    } else {
+        drop_payload(intent)
+    }
+}
 fn size(node: &Node) -> ControlSize {
     match text(node, "size").as_str() {
         "xs" => ControlSize::Xs,
@@ -243,6 +250,11 @@ impl KitState {
         emit: Emit,
     ) -> anyhow::Result<AnyElement> {
         Ok(match node.component.as_deref() {
+            Some("List") => collections::render_list(node, context.slots, emit, context.deferred),
+            Some("Tabs") => layout::render(node, context.slots, window, cx, emit, context.deferred),
+            Some("Tree") => {
+                data_extra::render_deferred(node, context.slots, window, cx, emit, context.deferred)
+            }
             Some("ButtonGroup") => {
                 controls_extra::button_group(node, context, window, cx)?.into_any_element()
             }
@@ -617,9 +629,9 @@ impl KitState {
                     _ => unreachable!("reconcile replaces changed component identity"),
                 }
             }
-            "List" => collections::render_list(node, slots, emit),
+            "List" => collections::render_list(node, slots, emit, None),
             "Popover" | "Dialog" => overlays::render(self, node, slots, window, cx, emit),
-            _ => layout::render(node, slots, window, cx, emit),
+            _ => layout::render(node, slots, window, cx, emit, None),
         }
     }
 }

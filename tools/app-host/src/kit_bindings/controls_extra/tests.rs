@@ -515,6 +515,7 @@ fn settings_nested_slots_filter_and_refusals_preserve_child_events(cx: &mut Test
         rendered_revision: Rc::new(Cell::new(1)),
         clipboard: Default::default(),
         references: Default::default(),
+        deferred: Default::default(),
     }));
     let (build_node, build_renderer, build_kit) =
         (descriptor.clone(), renderer.clone(), kit.clone());
@@ -774,6 +775,7 @@ fn typed_button_group_uses_guarded_child_actions_and_refuses_stale_context(
         rendered_revision: revision.clone(),
         clipboard,
         references: Default::default(),
+        deferred: Default::default(),
     };
     let typed = TypedSlots::new(renderer, &descriptor, 1);
     let build_typed = typed.clone();

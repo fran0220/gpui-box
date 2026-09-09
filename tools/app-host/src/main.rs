@@ -24,6 +24,9 @@ const MAX_FRAME: u64 = 256 * 1024;
 mod capture;
 mod clipboard;
 mod construction;
+mod deferred;
+#[cfg(all(test, feature = "capture"))]
+mod deferred_e2e_tests;
 mod kit_bindings;
 mod native;
 mod references;
@@ -126,7 +129,8 @@ impl Node {
                 self.component.is_none()
                     && self.props.is_empty()
                     && self.slots.is_empty()
-                    && self.events.is_empty(),
+                    && self.events.is_empty()
+                    && self.predicates.is_empty(),
                 "Kit fields on primitive"
             );
         }
@@ -145,6 +149,7 @@ enum Incoming {
 enum HostRequest {
     Invoke(native::Invocation),
     Resource(resource_bridge::ResourceRequest),
+    Drop(deferred::Response),
 }
 
 fn read_incoming(reader: &mut impl BufRead) -> Result<Option<Incoming>> {
@@ -158,6 +163,11 @@ fn read_incoming(reader: &mut impl BufRead) -> Result<Option<Incoming>> {
         "protocol frame exceeds limit or is truncated"
     );
     let value: Value = serde_json::from_slice(&bytes)?;
+    if value.get("kind").and_then(Value::as_str) == Some("drop-response") {
+        let request: deferred::Response = serde_json::from_value(value)?;
+        request.validate()?;
+        return Ok(Some(Incoming::Request(HostRequest::Drop(request))));
+    }
     if value.get("kind").and_then(Value::as_str) == Some("invoke") {
         let request: native::Invocation = serde_json::from_value(value)?;
         request.validate()?;
@@ -275,6 +285,7 @@ struct Host {
     clipboard: clipboard::Policy,
     resource_store: resources::ResourceStore,
     references: references::Registry,
+    deferred: deferred::Router,
 }
 
 impl Host {
@@ -282,6 +293,10 @@ impl Host {
         match request {
             HostRequest::Invoke(request) => self.invoke_request(request, window, cx),
             HostRequest::Resource(request) => self.register_resource(request, cx),
+            HostRequest::Drop(response) => {
+                self.deferred
+                    .resolve(response, self.rendered_revision.get(), window, cx);
+            }
         }
     }
 }
@@ -293,11 +308,13 @@ struct NodeRenderer {
     rendered_revision: std::rc::Rc<std::cell::Cell<u64>>,
     clipboard: clipboard::Policy,
     references: references::Registry,
+    deferred: deferred::Router,
 }
 
 impl NodeRenderer {
     fn build_context(&self, node: &Node, revision: u64) -> construction::NativeBuildContext {
         construction::NativeBuildContext {
+            deferred: self.deferred.controller(node, revision),
             typed: construction::TypedSlots::new(self.clone(), node, revision),
             slots: self.slots(node, revision),
         }
@@ -483,8 +500,11 @@ impl Render for Host {
                 rendered_revision: self.rendered_revision.clone(),
                 clipboard: self.clipboard.clone(),
                 references: self.references.clone(),
+                deferred: self.deferred.clone(),
             };
             self.rendered_revision.set(frame.revision);
+            self.deferred
+                .reconcile(&frame.tree, frame.revision, &renderer, window, cx);
             root = root.child(renderer.node(&frame.tree, frame.revision, window, cx));
         } else {
             root = root.child("Loading native JavaScript app…");
@@ -498,6 +518,7 @@ impl Drop for Host {
         self.rendered_revision.set(0);
         self.clipboard.revoke();
         self.references.revoke();
+        self.deferred.clear(&self.bridge.outgoing);
     }
 }
 
@@ -594,6 +615,7 @@ fn main() -> Result<()> {
                             clipboard,
                             resource_store,
                             references: references::Registry::new(),
+                            deferred: deferred::Router::default(),
                         }
                     })
                 },
@@ -695,6 +717,7 @@ mod tests {
             rendered_revision: revision.clone(),
             clipboard,
             references: Default::default(),
+            deferred: Default::default(),
         };
         let captured = node.clone();
         let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {

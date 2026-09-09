@@ -1,4 +1,5 @@
 import { validatePayload } from './wire.mjs';
+import { kitSchemas, validateValue } from './kit-schema.mjs';
 
 export const PREDICATE_TIMEOUT = 3000;
 export const PREDICATE_LIMIT = 32;
@@ -12,11 +13,16 @@ export function predicateTarget(tree, target, name, reference) {
   }
   const node = find(tree);
   if (!node || node.kind !== 'kit' || node.component !== target?.component ||
-      !['List', 'Tabs'].includes(node.component) || name !== 'accepts' ||
+      !['List', 'Tabs', 'Tree'].includes(node.component) || name !== 'accepts' ||
       typeof reference !== 'string' || node.predicates?.[name] !== reference)
     throw new Error('Predicate target or reference is not mounted');
   if (node.props.disabled) throw new Error('Predicate target is disabled');
   return node;
+}
+
+export function validatePredicatePayload(component, payload) {
+  validatePayload(payload);
+  validateValue(payload, kitSchemas[component].predicates.accepts, 'DropIntent');
 }
 
 /** Callbacks never leave this worker. References are identities, not authority. */
@@ -28,7 +34,7 @@ export class WorkerPredicates {
     this.sequence = 0;
   }
   register(id, component, name, callback) {
-    if (!/^[\w.-]{1,120}$/.test(id) || !['List', 'Tabs'].includes(component) ||
+    if (!/^[\w.-]{1,120}$/.test(id) || !['List', 'Tabs', 'Tree'].includes(component) ||
         name !== 'accepts' || typeof callback !== 'function') throw new Error('Invalid predicate registration');
     const key = `${component}:${id}:${name}`;
     const previous = this.callbacks.get(key);
@@ -63,7 +69,7 @@ export class WorkerPredicates {
       predicateTarget(context.tree, target, name, reference);
     };
     check();
-    validatePayload(payload);
+    validatePredicatePayload(target.component, payload);
     const registered = this.callbacks.get(`${target.component}:${target.id}:${name}`);
     if (!registered || registered.reference !== reference) throw new Error('Predicate callback unavailable');
     let timer, call;

@@ -8,6 +8,7 @@ import { readFrames, encodeFrame, MAX_MESSAGE, validatePayload } from '../js-run
 import { PluginPlatform, validateManifest } from '../plugin-platform/platform.mjs';
 import { startDebug } from './debug.mjs';
 import { nativeBackend } from '../js-runtime/sandbox.mjs';
+import { DropBridge } from './drop-bridge.mjs';
 
 const args = process.argv.slice(2);
 const root = resolve(args[0]);
@@ -34,6 +35,8 @@ const output = message => {
   }
 };
 const text = (id, text) => ({ kind: 'text', id, text });
+const dropBridge = new DropBridge(() => ({ revision, nativeTargets,
+  sessions: [app, ...[...platform.active.values()].map(active => active.session)].filter(Boolean) }), output);
 const column = (id, children) => ({ kind: 'column', id, children });
 const button = (id, text, callback, disabled = false) => {
   if (!disabled) callbacks.set(id, callback);
@@ -129,9 +132,12 @@ function render() {
   const view = JSON.stringify({ tree, clipboard, resources });
   // Discovery and consent completion can converge on the same view. Refresh the
   // callback routes, but do not invalidate a visible native frame without change.
+  dropBridge.reconcile();
   if (view === lastView) return;
   lastView = view;
-  output({ kind: 'render', generation: 0, revision: ++revision, tree, clipboard, resources });
+  revision++;
+  dropBridge.reconcile();
+  output({ kind: 'render', generation: 0, revision, tree, clipboard, resources });
 }
 function prompt(owner, session, capability) {
   const key = `${session.generation}.${capability}`;
@@ -234,10 +240,13 @@ async function reload() {
 async function shutdown() {
   if (closing) return;
   closing = true; clearTimeout(debounce); watcher?.close();
+  dropBridge.close();
   await app?.stop(); await platform.close(); await debugServer?.close(); process.exit(0);
 }
 readFrames(process.stdin, message => {
-  if (message.kind === 'event' && message.revision === revision && message.generation === 0) {
+  if (message.kind === 'drop-request') { void dropBridge.request(message); }
+  else if (message.kind === 'drop-cancel') { dropBridge.cancel(message); }
+  else if (message.kind === 'event' && message.revision === revision && message.generation === 0) {
     const callback = callbacks.get(message.action);
     Promise.resolve().then(() => callback?.(validatePayload(message.payload ?? null))).catch(e => diagnose(e.message));
   } else if (message.kind === 'key') platform.key(message.key);

@@ -24,7 +24,7 @@ fn coordinates(value: &str, count: usize) -> Result<Vec<f32>> {
     Ok(values)
 }
 
-fn pump(cx: &mut HeadlessAppContext, handle: gpui::WindowHandle<Host>) -> Result<bool> {
+pub(super) fn pump(cx: &mut HeadlessAppContext, handle: gpui::WindowHandle<Host>) -> Result<bool> {
     let mut received = false;
     cx.update(|cx| {
         handle.update(cx, |host, window, cx| {
@@ -119,6 +119,7 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                 clipboard,
                 resource_store,
                 references: references::Registry::new(),
+                deferred: Default::default(),
             }
         })
     })?;

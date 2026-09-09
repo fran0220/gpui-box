@@ -21,6 +21,7 @@ pub(super) fn render(
     window: &mut Window,
     cx: &mut App,
     emit: Emit,
+    deferred: Option<(gpui_kit::interaction::dnd::DeferredDrop, u64)>,
 ) -> AnyElement {
     let id = SharedString::from(node.id.clone());
     let event = |name: &str| {
@@ -96,6 +97,9 @@ pub(super) fn render(
             if let Some(action) = event("reorder") {
                 control =
                     control.on_reorder(move |intent, _, _| emit(&action, drop_payload(intent)));
+            }
+            if let Some((controller, revision)) = deferred {
+                control = control.deferred_acceptance(controller, revision);
             }
             control.into_any_element()
         }

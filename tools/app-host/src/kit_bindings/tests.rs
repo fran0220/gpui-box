@@ -881,6 +881,7 @@ fn host_overlay_factories_reopen_with_retained_input_and_release_state(cx: &mut 
             rendered_revision: Rc::new(std::cell::Cell::new(1)),
             clipboard: crate::clipboard::Policy::default(),
             references: Default::default(),
+            deferred: Default::default(),
         };
         let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
             let descriptor = build_descriptor.borrow();
