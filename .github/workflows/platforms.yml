@@ -106,7 +106,22 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with: { node-version: "26.5.1" }
+      - name: Build and exercise native Windows debug pipe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force target/runtime-native | Out-Null
+          Start-Transcript -Path target/runtime-native/debug-pipe.log
+          try {
+            & tools/app-host/native/build-windows-debug.ps1
+            "GPUI_DEBUG_PIPE_HELPER=$env:GPUI_DEBUG_PIPE_HELPER" >> $env:GITHUB_ENV
+            node --test tools/app-host/test/debug.test.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Native Windows debug pipe checks failed' }
+          } finally {
+            Stop-Transcript
+          }
       - name: Execute native AppContainer and runtime supervisor checks
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -124,6 +139,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Node version check failed' }
             npm --prefix tools/app-host ci
             if ($LASTEXITCODE -ne 0) { throw 'Runtime dependencies failed' }
+            node --test tools/js-runtime/test/debug-cancellation.test.mjs tools/app-host/test/host.test.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Native Windows evaluator cancellation and Reload checks failed' }
             node --test tools/js-runtime/test/windows.test.mjs
             if ($LASTEXITCODE -ne 0) { throw 'Native Windows sandbox checks failed' }
             npm --prefix tools/app-host run check
