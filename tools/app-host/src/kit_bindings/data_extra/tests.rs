@@ -249,3 +249,73 @@ fn native_closed_schemas_reject_ambiguous_data() {
         assert!(super::super::validate_descriptor(&n).is_err());
     }
 }
+
+#[gpui::test]
+fn diagnostic_actions_preserve_business_ids_and_disabled_refusal(cx: &mut TestAppContext) {
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let sink = events.clone();
+    let n = node(
+        "DiagnosticsList",
+        json!({"state":"ready","diagnostics":[
+            {"id":"zeta","severity":"warning","location":"Fixture:7","message":"Caller diagnostic","actions":[{"id":"repair","label":"Repair"},{"id":"blocked","label":"Blocked","disabled":true}]}
+        ]}),
+        json!({"select":"select","action":"action"}),
+    );
+    super::super::validate_descriptor(&n).expect("valid diagnostic fixture");
+    let mut h = Harness::new(cx, gpui_kit::install, move |w, cx| {
+        let sink = sink.clone();
+        render(
+            &n,
+            KitSlots::new(),
+            w,
+            cx,
+            Rc::new(move |a, v| sink.borrow_mut().push((a.to_owned(), v))),
+        )
+    });
+    h.click("data.list.zeta");
+    h.click("data.list.zeta.action.repair");
+    assert_eq!(
+        &*events.borrow(),
+        &[
+            ("select".into(), json!("zeta")),
+            ("action".into(), json!({"id":"zeta","action":"repair"}))
+        ]
+    );
+    events.borrow_mut().clear();
+    h.click("data.list.zeta.action.blocked");
+    assert!(events.borrow().iter().all(|(action, _)| action != "action"));
+}
+
+#[gpui::test]
+fn kanban_move_emits_original_card_and_destination_without_mutating_caller_data(
+    cx: &mut TestAppContext,
+) {
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let sink = events.clone();
+    let n = node(
+        "KanbanBoard",
+        json!({"columns":[{"id":"todo","title":"Todo"},{"id":"done","title":"Done"}],"cards":[{"id":"issue-z","title":"Caller card","detail":"Unchanged","column":"todo"}],"held":"issue-z"}),
+        json!({"move":"move"}),
+    );
+    super::super::validate_descriptor(&n).expect("valid board fixture");
+    let mut h = Harness::new(cx, gpui_kit::install, move |w, cx| {
+        let sink = sink.clone();
+        render(
+            &n,
+            KitSlots::new(),
+            w,
+            cx,
+            Rc::new(move |_, v| sink.borrow_mut().push(v)),
+        )
+    });
+    let original = h.bounds("data.card.issue-z").expect("card bounds");
+    h.click("data.move.done");
+    assert_eq!(
+        &*events.borrow(),
+        &[
+            json!({"card":{"id":"issue-z","title":"Caller card","detail":"Unchanged","column":"todo"},"column":"done"})
+        ]
+    );
+    h.frame();
+    assert_eq!(h.bounds("data.card.issue-z"), Some(original));
+}
