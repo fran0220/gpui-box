@@ -75,6 +75,11 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.ButtonGroup('group', {size:'sm'}, {}, {buttons:[kit.Button('child', {label:'Run'}, {click() {}}), {kind:'button',id:'legacy'}]});
+// @ts-expect-error typed native group cannot consume a text element
+kit.ButtonGroup('bad', {}, {}, {buttons:[{kind:'text',id:'wrong'}]});
+// @ts-expect-error group actions belong to each button
+kit.ButtonGroup('bad', {}, {click() {}});
 kit.KeymapEditor('keys', {commands:[{id:'save',label:'Save',bindings:[{id:'custom',keystroke:'ctrl-k'}]}]}, {remove(value) { const id: string = value.binding_id; }});
 type KeymapMethods = ControlsExtraMethodContracts['KeymapEditor']['invoke'];
 const keymapValues: { [K in keyof KeymapMethods]: KeymapMethods[K]['args'] } = {set_commands:{commands:[]},set_query:{query:'save'},set_disabled:{disabled:true}};

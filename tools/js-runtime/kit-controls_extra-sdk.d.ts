@@ -1,5 +1,6 @@
 import type { ControlProps, KitNode, SlotNode } from './kit-sdk.js';
 import type { BuiltinIconDescriptor } from './kit-icon-sdk.js';
+export type NativeKitButtonNode = Omit<KitNode, 'component'> & { component: 'Button' };
 export interface KitColor { h: number; s: number; l: number; a: number }
 export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[]; NumberInput: number }
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
@@ -15,12 +16,13 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  ButtonGroup(id: string, props?: ControlProps, events?: Record<string, never>, slots?: { buttons?: (NativeKitButtonNode | { kind: 'button'; id: string })[] }): KitNode;
   KeymapEditor(id: string, props?: { disabled?: boolean; commands?: KeymapCommand[]; query?: string }, events?: { addCaptured?(value: { command_id: string; keystroke: string }): void; remove?(value: { command_id: string; binding_id: string }): void; reset?(value: { command_id: string }): void; recordingCancelled?(value: { command_id: string }): void }): KitNode;
   NumberInput(id: string, props?: ControlProps & { value?: number; min?: number; max?: number; step?: number; pageStep?: number; precision?: number; name?: string; unit?: string; prefix?: string; required?: boolean; invalid?: boolean }, events?: { change?(value: number): void; unparsable?(text: string): void; submit?(): void }): KitNode;
   TransferList(id: string, props?: ControlProps & { source?: TransferItem[]; target?: TransferItem[]; sourceSelected?: string[]; targetSelected?: string[]; sourceLabel?: string; targetLabel?: string; query?: string }, events?: { toggleSource?(id: string): void; toggleTarget?(id: string): void; moveToTarget?(): void; moveToSource?(): void; queryChange?(query: string): void }): KitNode;
   SettingsRow(id: string, props: { label: string; description?: string; labelWidth?: number; badge?: string; value?: string; searchTerms?: string[]; managed?: string }, events?: Record<string, never>, slots?: { control?: SlotNode[] }): KitNode;
   SearchInput(id: string, props?: ControlProps & { name?: string; placeholder?: string; value?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
-  Button(id: string, props?: NativeButtonProps & { label?: string; accessibleDescription?: string; iconOnly?: boolean; iconPosition?: 'leading' | 'trailing'; fullWidth?: boolean; checkedState?: boolean }, events?: { click?(): void }): KitNode;
+  Button(id: string, props?: NativeButtonProps & { label?: string; accessibleDescription?: string; iconOnly?: boolean; iconPosition?: 'leading' | 'trailing'; fullWidth?: boolean; checkedState?: boolean }, events?: { click?(): void }): NativeKitButtonNode;
   IconButton(id: string, props: NativeButtonProps & { icon: BuiltinIconDescriptor; accessibleName: string }, events?: { click?(): void }): KitNode;
   Toggle(id: string, props?: ControlProps & { label?: string; accessibleName?: string; semanticParent?: string; icon?: BuiltinIconDescriptor; iconOnly?: boolean; variant?: ButtonVariant; ground?: ControlGround; join?: ButtonJoin; pressed?: boolean }, events?: { press?(pressed: boolean): void }): KitNode;
   ToggleGroup(id: string, props?: ControlProps & { label?: string; items?: ToggleItem[]; pressed?: string[]; selection?: 'any' | 'atMostOne'; variant?: ButtonVariant; ground?: ControlGround }, events?: { change?(value: { pressed: string[]; changed: string }): void }): KitNode;

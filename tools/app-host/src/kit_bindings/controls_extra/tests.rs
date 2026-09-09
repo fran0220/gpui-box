@@ -3,6 +3,77 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn typed_button_group_uses_guarded_child_actions_and_refuses_stale_context(
+    cx: &mut TestAppContext,
+) {
+    use crate::construction::{NativeBuildContext, TypedSlots};
+    use std::{cell::Cell, sync::mpsc};
+    let descriptor: Node = serde_json::from_value(json!({
+        "kind":"kit","component":"ButtonGroup","id":"group","instance":7,
+        "props":{"size":"sm"},"slots":{"buttons":[
+            {"kind":"button","id":"legacy","instance":7,"text":"Legacy","action":"legacy-action"},
+            {"kind":"kit","component":"Button","id":"native","instance":7,"props":{"label":"Native","checkedState":true},"events":{"click":"native-action"}},
+            {"kind":"kit","component":"Button","id":"disabled","instance":7,"props":{"label":"Refused","disabled":true}}
+        ]}
+    })).expect("typed group fixture");
+    let kit = Rc::new(KitState::default());
+    let (outgoing, events) = mpsc::sync_channel(8);
+    let mut clipboard = crate::clipboard::Policy::default();
+    cx.update(|cx| clipboard.reconcile(&descriptor, &BTreeMap::new(), cx));
+    let revision = Rc::new(Cell::new(1));
+    let renderer = crate::NodeRenderer {
+        outgoing,
+        kit: Rc::downgrade(&kit),
+        rendered_revision: revision.clone(),
+        clipboard,
+    };
+    let typed = TypedSlots::new(renderer, &descriptor, 1);
+    let build_typed = typed.clone();
+    let build_node = descriptor.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        button_group(
+            &build_node,
+            NativeBuildContext {
+                typed: build_typed.clone(),
+                ..Default::default()
+            },
+            window,
+            cx,
+        )
+        .expect("guarded group")
+        .into_any_element()
+    });
+    harness.click("legacy");
+    harness.click("native");
+    harness.click("disabled");
+    assert_eq!(
+        events.try_recv().expect("legacy event")["action"],
+        "legacy-action"
+    );
+    assert_eq!(
+        events.try_recv().expect("native event")["action"],
+        "native-action"
+    );
+    assert!(events.try_recv().is_err());
+    harness.update(|window, cx| {
+        revision.set(2);
+        assert!(
+            button_group(
+                &descriptor,
+                NativeBuildContext {
+                    typed: typed.clone(),
+                    ..Default::default()
+                },
+                window,
+                cx
+            )
+            .is_err()
+        );
+        revision.set(1);
+    });
+}
+
+#[gpui::test]
 fn keymap_reports_native_identities_and_keeps_recording_until_hidden(cx: &mut TestAppContext) {
     let state = Rc::new(KitState::default());
     let commands = json!([

@@ -27,7 +27,45 @@ pub(super) const COMPONENTS: &[&str] = &[
     "TransferList",
     "NumberInput",
     "KeymapEditor",
+    "ButtonGroup",
 ];
+
+/// The host supplies the mounted, revision-checked typed construction context.
+/// Child handlers and scopes survive the native group's join/size transforms.
+pub(super) fn button_group(
+    node: &Node,
+    context: crate::construction::NativeBuildContext,
+    window: &mut Window,
+    cx: &mut App,
+) -> anyhow::Result<gpui_kit::controls::button::ButtonGroup> {
+    let buttons = context.typed.build(
+        "buttons",
+        "Button",
+        window,
+        cx,
+        |child, _, _, emit, _, _| {
+            if matches!(child.kind, crate::Kind::Button) {
+                let mut button = Button::new(child.id.clone())
+                    .label(child.text.clone())
+                    .disabled(child.disabled);
+                if !child.disabled
+                    && let Some(action) = child.action.clone()
+                {
+                    button = button.on_click(move |_, _| emit(&action, Value::Null));
+                }
+                Ok(button)
+            } else {
+                Ok(button(child, emit))
+            }
+        },
+    )?;
+    Ok(
+        gpui_kit::controls::button::ButtonGroup::new(node.id.clone())
+            .control_size(size(node))
+            .disabled(flag(node, "disabled"))
+            .children(buttons),
+    )
+}
 
 struct Entry<T: 'static> {
     entity: Entity<T>,
