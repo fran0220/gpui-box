@@ -13,6 +13,52 @@ type SessionSlot = Rc<RefCell<Option<Entity<RichTextEditSession>>>>;
 type EditorSlot = Rc<RefCell<Option<Entity<RichTextEditor>>>>;
 
 #[gpui::test]
+fn retained_options_keep_rich_text_session_selection_and_history(cx: &mut TestAppContext) {
+    let document = RichTextDocument::empty("stable-block").expect("fixture");
+    let (mut harness, slot, editors) = editor(cx, document, |editor| editor.toolbar(false));
+    let entity = editors.borrow().clone().expect("editor");
+    let session = slot.borrow().clone().expect("session");
+    harness.click("form.rich");
+    harness.keystrokes("a b c");
+    let selection = harness.update(|_, cx| session.read(cx).selection().clone());
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            editor.set_frame(gpui_kit::controls::textarea::Frame::Host, cx);
+            editor.set_toolbar(true, cx);
+            editor.set_rows(2, cx);
+            editor.set_max_rows(Some(7), cx);
+            editor.set_max_rows(None, cx);
+        })
+    });
+    harness.frame();
+    harness.update(|_, cx| {
+        assert_eq!(entity.read(cx).session(), &session);
+        assert_eq!(session.read(cx).selection(), &selection);
+        assert!(!entity.read(cx).is_disabled());
+    });
+    assert_eq!(block_texts(&mut harness, &slot), ["abc"]);
+    harness.keystrokes(&primary("z"));
+    assert_eq!(block_texts(&mut harness, &slot), [""]);
+    harness.keystrokes("a enter b enter c");
+    let two_rows = harness
+        .bounds("form.rich")
+        .expect("two-row editor")
+        .size
+        .height;
+    harness.update(|_, cx| entity.update(cx, |editor, cx| editor.set_rows(1, cx)));
+    harness.frame();
+    assert!(
+        harness
+            .bounds("form.rich")
+            .expect("fixed one-row editor")
+            .size
+            .height
+            < two_rows,
+        "removing the cap must remain fixed-height after the minimum changes"
+    );
+}
+
+#[gpui::test]
 fn missing_clipboard_owner_does_not_cut_or_change_history(cx: &mut TestAppContext) {
     let document = RichTextDocument::empty("first").expect("fixture");
     let (mut harness, slot, _) = editor(cx, document, |editor| editor.toolbar(false));

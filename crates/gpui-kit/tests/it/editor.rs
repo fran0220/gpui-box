@@ -13,6 +13,55 @@ use gpui_kit_testkit::harness::Harness;
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
 
 #[gpui::test]
+fn retained_options_update_editor_authority_and_remove_caller_policies(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "évalue", |editor| editor.language_services(true));
+    let entity = slot.borrow().clone().expect("editor");
+    let area = harness.update(|_, cx| entity.read(cx).text_area().clone());
+    harness.click("source.input");
+    harness.keystrokes("x");
+    let before = harness.update(|_, cx| entity.read(cx).snapshot(cx));
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            editor.set_label("Updated source", cx);
+            editor.set_rows(3, cx);
+            editor.set_line_numbers(false, cx);
+            editor.set_indent_with(Some(Rc::new(|_| panic!("removed policy must not run"))), cx);
+            editor.set_indent_with(None, cx);
+            editor.set_read_only(true, cx);
+            editor.set_disabled(true, cx);
+            editor.set_language_services(false, cx);
+            #[cfg(feature = "syntax")]
+            {
+                editor.set_syntax(Some(gpui_kit::controls::editor::EditorSyntax::json()), cx);
+                editor.set_syntax(None, cx);
+                assert!(editor.syntax_state().is_none());
+            }
+        })
+    });
+    harness.frame();
+    harness.update(|_, cx| {
+        let editor = entity.read(cx);
+        assert_eq!(editor.text_area(), &area);
+        assert!(editor.is_disabled());
+        assert!(editor.is_read_only());
+        assert!(area.read(cx).is_disabled());
+        assert!(area.read(cx).is_read_only());
+        assert_eq!(editor.snapshot(cx), before);
+    });
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            editor.set_disabled(false, cx);
+            editor.set_read_only(false, cx);
+        })
+    });
+    harness.frame();
+    harness.update(|window, cx| window.focus(&area.read(cx).focus_handle(cx), cx));
+    harness.keystrokes("tab");
+    harness
+        .update(|_, cx| assert_eq!(area.read(cx).value().as_ref(), format!("{}\t", before.text)));
+}
+
+#[gpui::test]
 fn folded_rows_keep_source_identity_and_expand_for_hidden_navigation(cx: &mut TestAppContext) {
     use gpui_kit::controls::editor::EditorFold;
     let source = "header\n界 hidden\nאבג hidden\nlast hidden\ntail😀\n";

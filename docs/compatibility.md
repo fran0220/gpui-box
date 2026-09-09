@@ -704,3 +704,24 @@ Line geometry reports original source line numbers, not projected row numbers.
 The `editor-folding` exhibit reviews nested collapsed and expanded headers.
 Linux framework/input checks cover projection and retained Unicode text;
 macOS/Windows rendering and native adapter checks remain their dispatch lanes.
+
+### Retained editor options preserve the editing session
+
+TextArea, Editor and RichTextEditor expose mutable option setters; hosts do
+not need to replace an entity when layout or service policy changes. The
+`editor-options` exhibit applies these options after construction. Text,
+selection, IME composition and history remain attached to the original session.
+Wrapping/size changes invalidate measured geometry without resetting text.
+Disabling keeps the existing refusal/cancellation semantics; re-enabling does
+not steal keyboard focus.
+
+`TextArea::set_max_length(None)` removes the future-input byte limit. Lowering
+the limit never truncates existing text or history. Optional row caps on both
+text editors accept `None` to keep fixed minimum-row height, including after
+later minimum-row changes; TextArea's optional autosize pair can also be removed.
+Editor owns its retained rows/read-only/disabled state and updates its child
+immediately, so rendering does not overwrite host transitions. Optional
+indentation and syntax providers accept `None`; disabling language services
+removes outstanding popups and releases claimed completion/navigation keys.
+Native full-document values remain complete; these setters make no additional
+large-document performance claim.

@@ -58,9 +58,9 @@ use content::{
 };
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
-    dropzone, editor, editor_folding, editor_multicursor, editor_services, filter_bar,
-    find_replace, form, inline_edit, input, keybinding, keymap_editor, mention_input, multi_select,
-    rich_text_editor, search_field, search_input, settings, settings_page, textarea, toggle,
+    dropzone, editor, editor_folding, editor_multicursor, editor_options, editor_services,
+    filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor, mention_input,
+    multi_select, rich_text_editor, search_field, search_input, settings, settings_page, textarea, toggle,
     transfer_list, translation_packs, upload_list,
 };
 use data::{
@@ -257,6 +257,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "editor-folding",
             build: editor_folding,
             shows: Shows::Subjects(&["Editor"]),
+        },
+        Scene {
+            name: "editor-options",
+            build: editor_options,
+            shows: Shows::Subjects(&["Editor", "TextArea", "RichTextEditor"]),
         },
         Scene {
             name: "mention-input",

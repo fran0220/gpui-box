@@ -15,6 +15,77 @@ use unicode_segmentation::UnicodeSegmentation;
 const WIDTH: f32 = 200.0;
 
 #[gpui::test]
+fn retained_wrap_and_size_changes_keep_utf16_composition_and_one_undo_step(
+    cx: &mut TestAppContext,
+) {
+    use gpui::EntityInputHandler;
+    let (mut harness, slot) = area(cx, |area| area.text("é"));
+    let entity = slot.borrow().clone().expect("area");
+    harness.click("form.notes");
+    harness.update(|window, cx| {
+        entity.update(cx, |area, cx| {
+            area.replace_and_mark_text_in_range(None, "😀", Some(0..2), window, cx);
+            area.set_wrap(TextAreaWrap::None, cx);
+            area.set_control_size(ControlSize::Lg, cx);
+            assert_eq!(area.marked_text_range(window, cx), Some(1..3));
+        })
+    });
+    harness.frame();
+    harness.update(|window, cx| {
+        entity.update(cx, |area, cx| {
+            assert_eq!(area.marked_text_range(window, cx), Some(1..3));
+            area.replace_and_mark_text_in_range(None, "字", Some(0..1), window, cx);
+            area.set_wrap(TextAreaWrap::Soft, cx);
+            area.unmark_text(window, cx);
+            assert_eq!(area.value().as_ref(), "é字");
+        })
+    });
+    harness.keystrokes(&primary("z"));
+    harness.update(|_, cx| assert_eq!(entity.read(cx).value().as_ref(), "é"));
+}
+
+#[gpui::test]
+fn retained_options_preserve_text_selection_and_undo_while_removing_limits(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::controls::textarea::Enter;
+    let (mut harness, slot) = area(cx, |area| area.text("é界"));
+    let entity = slot.borrow().clone().expect("area");
+    harness.click("form.notes");
+    harness.keystrokes("x");
+    let before =
+        harness.update(|_, cx| (entity.read(cx).snapshot(), entity.read(cx).selected_range()));
+    harness.update(|_, cx| {
+        entity.update(cx, |area, cx| {
+            area.set_frame(Frame::Host, cx);
+            area.set_wrap(TextAreaWrap::None, cx);
+            area.set_required(true, cx);
+            area.set_rows(3, cx);
+            area.set_max_rows(Some(7), cx);
+            area.set_autosize(Some((2, 5)), cx);
+            area.set_autosize(None, cx);
+            area.set_max_rows(None, cx);
+            area.set_enter(Enter::Submits, cx);
+            area.set_max_length(Some(1), cx);
+            area.set_control_size(ControlSize::Lg, cx);
+        })
+    });
+    harness.frame();
+    harness.update(|_, cx| {
+        assert_eq!(entity.read(cx).snapshot(), before.0);
+        assert_eq!(entity.read(cx).selected_range(), before.1);
+        assert_eq!(entity.read(cx).wrap_mode(), TextAreaWrap::None);
+    });
+    harness.keystrokes("y");
+    harness.update(|_, cx| assert_eq!(entity.read(cx).snapshot(), before.0));
+    harness.update(|_, cx| entity.update(cx, |area, cx| area.set_max_length(None, cx)));
+    harness.keystrokes("z");
+    harness.update(|_, cx| assert!(entity.read(cx).value().ends_with("xz")));
+    harness.keystrokes(&primary("z"));
+    harness.update(|_, cx| assert_eq!(entity.read(cx).value().as_ref(), "é界"));
+}
+
+#[gpui::test]
 fn native_document_stays_connected_during_the_first_edit_relayout_frame(cx: &mut TestAppContext) {
     let source = format!(
         "[\n{}{{\"tail\":7}}\n]",

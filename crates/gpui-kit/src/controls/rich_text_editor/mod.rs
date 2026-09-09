@@ -250,7 +250,7 @@ pub struct RichTextEditor {
     frame: Frame,
     toolbar: bool,
     rows: usize,
-    max_rows: usize,
+    max_rows: Option<usize>,
     visible_rows: usize,
     scroll_offset: Pixels,
     goal_x: Option<Pixels>,
@@ -306,7 +306,7 @@ impl RichTextEditor {
             frame: Frame::Own,
             toolbar: true,
             rows: DEFAULT_ROWS,
-            max_rows: DEFAULT_MAX_ROWS,
+            max_rows: Some(DEFAULT_MAX_ROWS),
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
             goal_x: None,
@@ -361,15 +361,38 @@ impl RichTextEditor {
         self
     }
 
+    pub fn set_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
+        self.frame = frame;
+        cx.notify();
+    }
+
+    pub fn set_toolbar(&mut self, toolbar: bool, cx: &mut Context<Self>) {
+        self.toolbar = toolbar;
+        cx.notify();
+    }
+
+    pub fn set_rows(&mut self, rows: usize, cx: &mut Context<Self>) {
+        self.rows = rows.max(1);
+        self.visible_rows = self.visible_rows.clamp(self.rows, self.row_limits().1);
+        cx.notify();
+    }
+
+    /// `None` restores fixed minimum-row height without replacing the session.
+    pub fn set_max_rows(&mut self, max_rows: Option<usize>, cx: &mut Context<Self>) {
+        self.max_rows = max_rows.map(|rows| rows.max(1));
+        self.visible_rows = self.visible_rows.clamp(self.rows, self.row_limits().1);
+        cx.notify();
+    }
+
     pub fn rows(mut self, rows: usize) -> Self {
         self.rows = rows.max(1);
         self.visible_rows = self.rows;
-        self.max_rows = self.max_rows.max(self.rows);
+        self.max_rows = self.max_rows.map(|max| max.max(self.rows));
         self
     }
 
     pub fn max_rows(mut self, max_rows: usize) -> Self {
-        self.max_rows = max_rows.max(self.rows);
+        self.max_rows = Some(max_rows.max(self.rows));
         self
     }
 
@@ -446,7 +469,7 @@ impl RichTextEditor {
     }
 
     pub(super) fn row_limits(&self) -> (usize, usize) {
-        (self.rows, self.max_rows)
+        (self.rows, self.max_rows.unwrap_or(self.rows).max(self.rows))
     }
 
     pub(super) fn placeholder_text(&self) -> &SharedString {
@@ -457,8 +480,12 @@ impl RichTextEditor {
         &self.diagnostics
     }
 
-    pub(super) fn is_disabled(&self) -> bool {
+    pub fn is_disabled(&self) -> bool {
         self.disabled
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
     }
 
     pub(super) fn scroll_offset(&self) -> Pixels {

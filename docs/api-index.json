@@ -1927,6 +1927,14 @@
         "accept_service_item(id: &str, cx: &mut Context<Self>) -> bool",
         "set_diagnostics(revision: u64, diagnostics: Vec<EditorDiagnostic>, cx: &mut Context<Self>) -> bool",
         "set_semantic_tokens(revision: u64, mut tokens: Vec<EditorSemanticToken>, cx: &mut Context<Self>) -> bool",
+        "set_label(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_line_numbers(visible: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_indent_with(indenter: Option<Rc<dyn Fn(EditorIndentRequest) -> Option<EditorIndentation>>>, cx: &mut Context<Self>)",
+        "set_syntax(syntax: Option<EditorSyntax>, cx: &mut Context<Self>)",
+        "set_language_services(enabled: bool, cx: &mut Context<Self>)",
         "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
         "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
         "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
@@ -1935,6 +1943,8 @@
       ],
       "queries": [
         "is_fold_collapsed(id: &str) -> bool",
+        "is_disabled() -> bool",
+        "is_read_only() -> bool",
         "syntax_state() -> Option<&EditorSyntax>",
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
@@ -1964,7 +1974,8 @@
         "editor",
         "editor-multicursor",
         "editor-services",
-        "editor-folding"
+        "editor-folding",
+        "editor-options"
       ]
     },
     {
@@ -4118,6 +4129,10 @@
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_frame(frame: Frame, cx: &mut Context<Self>)",
+        "set_toolbar(toolbar: bool, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_max_rows(max_rows: Option<usize>, cx: &mut Context<Self>)",
         "set_diagnostics(diagnostics: impl IntoIterator<Item = RichTextDiagnostic>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -4126,7 +4141,9 @@
         "apply_intent(intent: RichTextIntent, cx: &mut Context<Self>)"
       ],
       "queries": [
-        "session() -> &Entity<RichTextEditSession>"
+        "session() -> &Entity<RichTextEditSession>",
+        "is_disabled() -> bool",
+        "is_read_only() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -4137,6 +4154,7 @@
         "Blur"
       ],
       "scenes": [
+        "editor-options",
         "rich-text-editor"
       ]
     },
@@ -5227,6 +5245,15 @@
       ],
       "commands": [
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_frame(frame: Frame, cx: &mut Context<Self>)",
+        "set_wrap(wrap: TextAreaWrap, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_max_rows(max_rows: Option<usize>, cx: &mut Context<Self>)",
+        "set_autosize(rows: Option<(usize, usize)>, cx: &mut Context<Self>)",
+        "set_enter(enter: Enter, cx: &mut Context<Self>)",
+        "set_max_length(max_length: Option<usize>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_arrows_claimed(claimed: bool)",
         "set_completion_claimed(claimed: bool)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -5282,7 +5309,8 @@
         "Blur"
       ],
       "scenes": [
-        "textarea"
+        "textarea",
+        "editor-options"
       ]
     },
     {
@@ -15805,6 +15833,22 @@
         "Editor"
       ],
       "example": "fn editor_folding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneFoldedEditor>() {\n        let editor = cx.new(|cx| Editor::new(\"scene.editor.folding\", \"Folded Unicode source fixture\", \"fn outer() {\\n    let 界 = 13;\\n    if ready {\\n        process();\\n    }\\n}\\nfn tail() {}\\n\", window, cx).rows(6));\n        editor.update(cx, |editor, cx| {\n            use crate::controls::editor::EditorFold;\n            editor.set_folds(\n                0,\n                vec![\n                    EditorFold {\n                        id: \"outer\".into(),\n                        lines: 0..6,\n                    },\n                    EditorFold {\n                        id: \"ready\".into(),\n                        lines: 2..5,\n                    },\n                ],\n                cx,\n            );\n            editor.set_fold_collapsed(\"ready\", true, cx);\n        });\n        cx.set_global(SceneFoldedEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · nested source folds · gutter toggles or Ctrl-Alt-F · hidden text remains in the document\"))\n        .child(cx.global::<SceneFoldedEditor>().0.clone())\n        .into_any_element()\n}"
+    },
+    {
+      "name": "editor-options",
+      "capture": "cargo run -p xtask -- headless capture editor-options",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor",
+        "TextArea",
+        "RichTextEditor"
+      ],
+      "uses": [
+        "Editor",
+        "TextArea",
+        "RichTextEditor"
+      ],
+      "example": "fn editor_options(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneEditorOptions>() {\n        let area = cx.new(|cx| {\n            TextArea::new(\"scene.options.area\", window, cx)\n                .text(\"Caller text survives layout changes. 界 😀\\nA retained second line.\")\n        });\n        area.update(cx, |area, cx| {\n            area.set_control_size(ControlSize::Lg, cx);\n            area.set_autosize(Some((2, 4)), cx);\n            area.set_required(true, cx);\n        });\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.options.editor\",\n                \"Retained source fixture\",\n                \"let unchanged = 13;\\n// same entity, new options\",\n                window,\n                cx,\n            )\n        });\n        editor.update(cx, |editor, cx| {\n            editor.set_rows(3, cx);\n            editor.set_line_numbers(false, cx);\n            editor.set_read_only(true, cx);\n        });\n        let document = RichTextDocument::new([RichTextBlock::new(\n            \"options-body\",\n            \"Caller-owned rich text remains attached to the same session.\",\n        )])\n        .expect(\"fixture document is valid\");\n        let session = cx.new(|_| RichTextEditSession::new(document));\n        let next_id = Rc::new(std::cell::Cell::new(0_u64));\n        let rich = cx.new(|cx| {\n            RichTextEditor::new(\n                \"scene.options.rich\",\n                session,\n                move || {\n                    let id = next_id.get() + 1;\n                    next_id.set(id);\n                    RichTextBlockId::new(format!(\"options-{id}\"))\n                },\n                window,\n                cx,\n            )\n        });\n        rich.update(cx, |editor, cx| {\n            editor.set_rows(2, cx);\n            editor.set_max_rows(None, cx);\n            editor.set_toolbar(false, cx);\n        });\n        cx.set_global(SceneEditorOptions(area, editor, rich));\n    }\n    let theme = cx.theme().clone();\n    let editors = cx.global::<SceneEditorOptions>();\n    stack(&theme).w(px(720.0))\n        .child(caption(&theme, \"fixture · retained options: large autosizing text / read-only source without gutter / fixed rich text without toolbar\"))\n        .child(editors.0.clone()).child(editors.1.clone()).child(editors.2.clone())\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",

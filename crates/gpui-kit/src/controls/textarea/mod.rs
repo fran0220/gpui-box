@@ -600,6 +600,76 @@ impl TextArea {
         cx.notify();
     }
 
+    /// Changes frame ownership without replacing the editing session.
+    pub fn set_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
+        self.frame = frame;
+        cx.notify();
+    }
+
+    /// Changes wrapping and invalidates measured geometry, preserving text,
+    /// selection, composition and history. The caret is revealed on relayout.
+    pub fn set_wrap(&mut self, wrap: TextAreaWrap, cx: &mut Context<Self>) {
+        if self.wrap != wrap {
+            self.wrap = wrap;
+            self.last_layout = None;
+            self.line_projection = None;
+            self.horizontal_scroll_offset = px(0.0);
+            self.reveal_caret = true;
+            cx.notify();
+        }
+    }
+
+    pub fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        cx.notify();
+    }
+
+    pub fn set_rows(&mut self, rows: usize, cx: &mut Context<Self>) {
+        self.rows = rows.max(1);
+        self.visible_rows = self.visible_rows.clamp(self.rows, self.row_limits().1);
+        cx.notify();
+    }
+
+    /// `None` removes autosizing's maximum and restores fixed `rows` height.
+    pub fn set_max_rows(&mut self, max_rows: Option<usize>, cx: &mut Context<Self>) {
+        self.max_rows = max_rows.map(|rows| rows.max(1));
+        self.visible_rows = self.visible_rows.clamp(self.rows, self.row_limits().1);
+        cx.notify();
+    }
+
+    /// `None` removes autosizing while retaining the current minimum rows.
+    pub fn set_autosize(&mut self, rows: Option<(usize, usize)>, cx: &mut Context<Self>) {
+        if let Some((min, max)) = rows {
+            self.rows = min.max(1);
+            self.max_rows = Some(max.max(self.rows));
+        } else {
+            self.max_rows = None;
+        }
+        self.visible_rows = self.visible_rows.clamp(self.rows, self.row_limits().1);
+        cx.notify();
+    }
+
+    pub fn set_enter(&mut self, enter: Enter, cx: &mut Context<Self>) {
+        self.enter = enter;
+        cx.notify();
+    }
+
+    /// Changes the byte limit for future input; existing text and history are
+    /// not truncated. `None` removes the limit.
+    pub fn set_max_length(&mut self, max_length: Option<usize>, cx: &mut Context<Self>) {
+        self.max_length = max_length;
+        self.edit.rules_mut().max_length = max_length;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        if self.size != size {
+            self.size = size;
+            self.last_layout = None;
+            cx.notify();
+        }
+    }
+
     /// Who draws the frame around the text. See [`Frame`].
     pub fn frame(mut self, frame: Frame) -> Self {
         self.frame = frame;

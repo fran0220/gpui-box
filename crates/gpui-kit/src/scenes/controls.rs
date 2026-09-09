@@ -1571,6 +1571,70 @@ pub(super) fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElemen
         .into_any_element()
 }
 
+struct SceneEditorOptions(Entity<TextArea>, Entity<Editor>, Entity<RichTextEditor>);
+
+impl Global for SceneEditorOptions {}
+
+pub(super) fn editor_options(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneEditorOptions>() {
+        let area = cx.new(|cx| {
+            TextArea::new("scene.options.area", window, cx)
+                .text("Caller text survives layout changes. 界 😀\nA retained second line.")
+        });
+        area.update(cx, |area, cx| {
+            area.set_control_size(ControlSize::Lg, cx);
+            area.set_autosize(Some((2, 4)), cx);
+            area.set_required(true, cx);
+        });
+        let editor = cx.new(|cx| {
+            Editor::new(
+                "scene.options.editor",
+                "Retained source fixture",
+                "let unchanged = 13;\n// same entity, new options",
+                window,
+                cx,
+            )
+        });
+        editor.update(cx, |editor, cx| {
+            editor.set_rows(3, cx);
+            editor.set_line_numbers(false, cx);
+            editor.set_read_only(true, cx);
+        });
+        let document = RichTextDocument::new([RichTextBlock::new(
+            "options-body",
+            "Caller-owned rich text remains attached to the same session.",
+        )])
+        .expect("fixture document is valid");
+        let session = cx.new(|_| RichTextEditSession::new(document));
+        let next_id = Rc::new(std::cell::Cell::new(0_u64));
+        let rich = cx.new(|cx| {
+            RichTextEditor::new(
+                "scene.options.rich",
+                session,
+                move || {
+                    let id = next_id.get() + 1;
+                    next_id.set(id);
+                    RichTextBlockId::new(format!("options-{id}"))
+                },
+                window,
+                cx,
+            )
+        });
+        rich.update(cx, |editor, cx| {
+            editor.set_rows(2, cx);
+            editor.set_max_rows(None, cx);
+            editor.set_toolbar(false, cx);
+        });
+        cx.set_global(SceneEditorOptions(area, editor, rich));
+    }
+    let theme = cx.theme().clone();
+    let editors = cx.global::<SceneEditorOptions>();
+    stack(&theme).w(px(720.0))
+        .child(caption(&theme, "fixture · retained options: large autosizing text / read-only source without gutter / fixed rich text without toolbar"))
+        .child(editors.0.clone()).child(editors.1.clone()).child(editors.2.clone())
+        .into_any_element()
+}
+
 struct SceneFoldedEditor(Entity<Editor>);
 
 impl Global for SceneFoldedEditor {}

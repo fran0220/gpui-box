@@ -304,6 +304,87 @@ impl Editor {
         self
     }
 
+    pub fn set_label(&mut self, label: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.label = label.into();
+        cx.notify();
+    }
+
+    pub fn set_rows(&mut self, rows: usize, cx: &mut Context<Self>) {
+        self.rows = rows.max(1);
+        self.area.update(cx, |area, cx| {
+            area.set_rows(self.rows, cx);
+            area.set_max_rows(Some(self.rows), cx);
+        });
+        cx.notify();
+    }
+
+    pub fn set_line_numbers(&mut self, visible: bool, cx: &mut Context<Self>) {
+        self.line_numbers = visible;
+        cx.notify();
+    }
+
+    pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
+        self.read_only = read_only;
+        self.area
+            .update(cx, |area, cx| area.set_read_only(read_only, cx));
+        cx.notify();
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        if disabled {
+            self.service_popup = None;
+            self.hover_position = None;
+        }
+        self.area
+            .update(cx, |area, cx| area.set_disabled(disabled, cx));
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    /// Replaces the caller indentation policy in place. `None` restores literal
+    /// Tab input. The closure is never called merely to update this option.
+    pub fn set_indent_with(
+        &mut self,
+        indenter: Option<Rc<dyn Fn(EditorIndentRequest) -> Option<EditorIndentation>>>,
+        cx: &mut Context<Self>,
+    ) {
+        self.indenter = indenter;
+        self.area.update(cx, |area, _| {
+            area.set_indentation_claimed(self.indenter.is_some())
+        });
+        cx.notify();
+    }
+
+    /// Installs/replaces a parser or removes it without replacing document state.
+    #[cfg(feature = "syntax")]
+    pub fn set_syntax(&mut self, syntax: Option<EditorSyntax>, cx: &mut Context<Self>) {
+        self.syntax = syntax;
+        cx.notify();
+    }
+
+    /// Changes service bindings in place. Disabling cancels the visible request;
+    /// late replies cannot restore its popup. Caller diagnostics remain intact.
+    pub fn set_language_services(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.services_enabled = enabled;
+        if !enabled {
+            self.service_popup = None;
+            self.hover_position = None;
+            self.area.update(cx, |area, _| {
+                area.set_completion_claimed(false);
+                area.set_arrows_claimed(false);
+            });
+        }
+        cx.notify();
+    }
+
     pub fn line_numbers(mut self, visible: bool) -> Self {
         self.line_numbers = visible;
         self
