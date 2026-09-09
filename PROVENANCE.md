@@ -769,3 +769,11 @@ row content revisions and consumes actual scroll direction for follow state.
 No external source was imported, no renderer ABI or platform event translation
 changed, and the frozen historical import receipt is unchanged. Root and
 headless workspaces retain the same local package authority.
+
+### Incremental editable document storage
+
+`EditBuffer` stores text in Ropey 1.6.1 (MIT), with LF-only line indexing and
+lazy contiguous compatibility snapshots. The byte-coordinate integration,
+line-local grapheme clamping, and exact history replay are original GPUI Box
+work. Ropey is a crates.io dependency, not a source port or synchronization
+lane. The frozen import receipt and local framework authority are unchanged.

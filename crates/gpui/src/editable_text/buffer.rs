@@ -17,7 +17,7 @@ use crate::SharedString;
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::history::{EditHistory, EditSelection};
-use super::{fit_to_max_graphemes, fit_to_max_length};
+use super::{EditSnapshot, fit_to_max_graphemes, fit_to_max_length};
 
 use super::history::EditCause;
 
@@ -45,7 +45,7 @@ pub struct EditOutcome {
 /// One control's editable value.
 #[derive(Debug)]
 pub struct EditBuffer {
-    text: SharedString,
+    text: EditSnapshot,
     /// A caret is an empty selection, so one range describes both.
     selection: Range<usize>,
     reversed: bool,
@@ -59,7 +59,7 @@ pub struct EditBuffer {
 impl Default for EditBuffer {
     fn default() -> Self {
         Self {
-            text: SharedString::default(),
+            text: EditSnapshot::default(),
             selection: 0..0,
             reversed: false,
             marked: None,
@@ -80,7 +80,13 @@ impl EditBuffer {
 
     /// Returns the current UTF-8 value.
     pub fn text(&self) -> &SharedString {
-        &self.text
+        self.text.text()
+    }
+
+    /// Shares the current document without copying its bytes. Indexed line and
+    /// range access on this snapshot does not materialize a contiguous value.
+    pub fn snapshot(&self) -> EditSnapshot {
+        self.text.clone()
     }
 
     /// Returns whether the current value is empty.
@@ -144,7 +150,7 @@ impl EditBuffer {
 
     /// Collapses the selection to the nearest valid offset at or before `offset`.
     pub fn set_caret(&mut self, offset: usize) {
-        let offset = floor_grapheme_boundary(&self.text, offset);
+        let offset = self.text.floor_grapheme(offset);
         self.selection = offset..offset;
         self.reversed = false;
     }
@@ -157,7 +163,7 @@ impl EditBuffer {
 
     /// Moves the end that is moving, keeping the other one anchored.
     pub fn extend_selection(&mut self, offset: usize) {
-        let offset = floor_grapheme_boundary(&self.text, offset);
+        let offset = self.text.floor_grapheme(offset);
         if self.reversed {
             self.selection.start = offset;
         } else {
@@ -178,7 +184,7 @@ impl EditBuffer {
         let range = self.clamp(range);
         let insertion = self.fit(&range, text);
 
-        let before = self.text[range.clone()].to_owned();
+        let before = self.text.slice(range.clone()).unwrap();
         if before == insertion {
             // Nothing changed, but the caret still lands where the edit
             // pointed, which is what makes a delete over an empty selection
@@ -190,8 +196,7 @@ impl EditBuffer {
         }
 
         let selection_before = self.selection_state();
-        let next = self.text[..range.start].to_owned() + &insertion + &self.text[range.end..];
-        self.text = next.into();
+        self.text.replace(range.clone(), &insertion);
         let caret = range.start + insertion.len();
         self.selection = caret..caret;
         self.reversed = false;
@@ -226,15 +231,14 @@ impl EditBuffer {
 
         self.history.begin_composition(
             range.clone(),
-            &self.text[range.clone()],
+            &self.text.slice(range.clone()).unwrap(),
             self.selection_state(),
         );
 
-        let before = self.text[range.clone()].to_owned();
+        let before = self.text.slice(range.clone()).unwrap();
         let changed = before != insertion;
         if changed {
-            let next = self.text[..range.start].to_owned() + &insertion + &self.text[range.end..];
-            self.text = next.into();
+            self.text.replace(range.clone(), &insertion);
         }
 
         self.marked = (!insertion.is_empty()).then(|| range.start..range.start + insertion.len());
@@ -263,7 +267,7 @@ impl EditBuffer {
         let composed = self
             .marked
             .clone()
-            .map(|range| self.text[self.clamp(range)].to_owned())
+            .map(|range| self.text.slice(self.clamp(range)).unwrap())
             .unwrap_or_default();
         self.history
             .end_composition(&composed, self.selection_state());
@@ -286,9 +290,9 @@ impl EditBuffer {
     }
 
     fn apply(&mut self, step: super::history::EditStep) -> bool {
-        let range = self.clamp(step.range);
-        let next = self.text[..range.start].to_owned() + &step.text + &self.text[range.end..];
-        self.text = next.into();
+        // History stores exact byte replacements, including insertions that
+        // joined an adjacent grapheme. Re-clamping would delete its neighbour.
+        self.text.replace(step.range, &step.text);
         self.marked = None;
         let end = self.text.len();
         self.selection = step.selection.range.start.min(end)..step.selection.range.end.min(end);
@@ -307,8 +311,8 @@ impl EditBuffer {
         } else {
             text.to_owned()
         };
-        let changed = self.text.as_ref() != normalised.as_str();
-        self.text = normalised.into();
+        let changed = self.text.text().as_ref() != normalised.as_str();
+        self.text = EditSnapshot::new(&normalised);
         let end = self.text.len();
         self.selection = end..end;
         self.reversed = false;
@@ -318,7 +322,9 @@ impl EditBuffer {
     }
 
     fn clamp(&self, range: Range<usize>) -> Range<usize> {
-        clamp_grapheme_range(&self.text, range)
+        let start = self.text.floor_grapheme(range.start);
+        let end = self.text.floor_grapheme(range.end);
+        start.min(end)..start.max(end)
     }
 
     fn normalise(&self, text: &str) -> String {
@@ -331,8 +337,11 @@ impl EditBuffer {
 
     fn fit(&self, range: &Range<usize>, text: &str) -> String {
         let text = self.normalise(text);
-        let text = fit_to_max_length(&self.text, self.rules.max_length, range, &text);
-        fit_to_max_graphemes(&self.text, self.rules.max_graphemes, range, &text)
+        if self.rules.max_length.is_none() && self.rules.max_graphemes.is_none() {
+            return text;
+        }
+        let text = fit_to_max_length(self.text.text(), self.rules.max_length, range, &text);
+        fit_to_max_graphemes(self.text.text(), self.rules.max_graphemes, range, &text)
     }
 }
 
@@ -342,7 +351,7 @@ impl EditBuffer {
 /// point inside a multi-byte scalar or a user-perceived character after the
 /// text around it moved. Slicing there would panic or split the character, so
 /// it is walked back to a boundary the editor can expose.
-fn floor_grapheme_boundary(text: &str, offset: usize) -> usize {
+pub(super) fn floor_grapheme_boundary(text: &str, offset: usize) -> usize {
     let offset = offset.min(text.len());
     if offset == text.len() {
         return text.len();
@@ -371,6 +380,33 @@ mod tests {
         });
         buffer.replace(0..0, text, EditCause::Programmatic);
         buffer
+    }
+
+    #[test]
+    fn undo_replays_exact_bytes_when_insertion_joined_a_grapheme() {
+        let mut buffer = buffer("az");
+        buffer.set_caret(1);
+        buffer.replace(1..1, "\u{301}", EditCause::Paste);
+        assert_eq!(buffer.text().as_ref(), "a\u{301}z");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "az");
+        assert_eq!(buffer.selection(), 1..1);
+        assert!(buffer.redo());
+        assert_eq!(buffer.text().as_ref(), "a\u{301}z");
+    }
+
+    #[test]
+    fn chunk_crossing_graphemes_match_contiguous_clamping() {
+        let text = "prefix\n".to_owned() + &"e\u{301}".repeat(800) + "👩‍💻🇺🇳\r\nlast";
+        let mut buffer = EditBuffer::default();
+        buffer.set_text(&text);
+        for offset in 0..text.len() {
+            buffer.set_caret(offset);
+            assert_eq!(
+                buffer.selection().start,
+                floor_grapheme_boundary(&text, offset)
+            );
+        }
     }
 
     #[test]

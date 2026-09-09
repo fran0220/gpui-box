@@ -394,6 +394,15 @@
           "features": []
         },
         {
+          "alias": "ropey",
+          "package": "ropey",
+          "kind": "normal",
+          "optional": false,
+          "features": [
+            "simd"
+          ]
+        },
+        {
           "alias": "scheduler",
           "package": "gpui-box-scheduler",
           "kind": "normal",
@@ -564,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2532
+      "symbolCount": 2544
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -12076,7 +12085,7 @@
       "source": "crates/gpui/src/editable_text/buffer.rs",
       "summary": "One control's editable value.",
       "documentation": "One control's editable value.",
-      "signature": "# [doc = \" One control's editable value.\"] # [derive (Debug)] pub struct EditBuffer { text : SharedString, # [doc = \" A caret is an empty selection, so one range describes both.\"] selection : Range<usize>, reversed : bool, # [doc = \" The range an input method is composing, underlined and replaced whole\"] # [doc = \" as composition continues.\"] marked : Option<Range<usize>>, history : EditHistory, rules : EditRules, }",
+      "signature": "# [doc = \" One control's editable value.\"] # [derive (Debug)] pub struct EditBuffer { text : EditSnapshot, # [doc = \" A caret is an empty selection, so one range describes both.\"] selection : Range<usize>, reversed : bool, # [doc = \" The range an input method is composing, underlined and replaced whole\"] # [doc = \" as composition continues.\"] marked : Option<Range<usize>>, history : EditHistory, rules : EditRules, }",
       "cfg": []
     },
     {
@@ -12350,6 +12359,21 @@
       "target": "EditBuffer"
     },
     {
+      "id": "gpui::editable_text::buffer::EditBuffer::snapshot",
+      "name": "snapshot",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Shares the current document without copying its bytes. Indexed line and range access on this snapshot does not materialize a contiguous value.",
+      "documentation": "Shares the current document without copying its bytes. Indexed line and\nrange access on this snapshot does not materialize a contiguous value.",
+      "signature": "pub fn snapshot (& self) -> EditSnapshot",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
       "id": "gpui::editable_text::buffer::EditBuffer::text",
       "name": "text",
       "kind": "method",
@@ -12406,6 +12430,155 @@
       "documentation": "What a particular control accepts.",
       "signature": "# [doc = \" What a particular control accepts.\"] # [derive (Clone, Copy, Debug, Default)] pub struct EditRules { # [doc = \" A byte limit, applied by trimming an over-long insertion rather than\"] # [doc = \" refusing it.\"] pub max_length : Option<usize>, # [doc = \" A limit in user-perceived characters, for a field whose slots are\"] # [doc = \" graphemes rather than bytes.\"] pub max_graphemes : Option<usize>, # [doc = \" True for a field that holds one line, where a newline arriving from a\"] # [doc = \" paste becomes a space rather than a second line nobody can see.\"] pub single_line : bool, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot",
+      "name": "EditSnapshot",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "An immutable, cheap-to-clone document revision with indexed hard lines.",
+      "documentation": "An immutable, cheap-to-clone document revision with indexed hard lines.",
+      "signature": "# [doc = \" An immutable, cheap-to-clone document revision with indexed hard lines.\"] # [derive (Clone, Default)] pub struct EditSnapshot { rope : Rope, contiguous : OnceLock<SharedString>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::is_empty",
+      "name": "is_empty",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Whether there are no bytes (an empty document still has one line).",
+      "documentation": "Whether there are no bytes (an empty document still has one line).",
+      "signature": "pub fn is_empty (& self) -> bool",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::len",
+      "name": "len",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "UTF-8 byte length, without flattening the rope.",
+      "documentation": "UTF-8 byte length, without flattening the rope.",
+      "signature": "pub fn len (& self) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::line_at",
+      "name": "line_at",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Zero-based hard line containing the clamped byte offset.",
+      "documentation": "Zero-based hard line containing the clamped byte offset.",
+      "signature": "pub fn line_at (& self, offset : usize) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::line_count",
+      "name": "line_count",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Number of LF-delimited lines, including an empty trailing line.",
+      "documentation": "Number of LF-delimited lines, including an empty trailing line.",
+      "signature": "pub fn line_count (& self) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::line_range",
+      "name": "line_range",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Byte range of a zero-based hard line, including its LF if present.",
+      "documentation": "Byte range of a zero-based hard line, including its LF if present.",
+      "signature": "pub fn line_range (& self, line : usize) -> Option<Range<usize>>",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::offset_from_utf16",
+      "name": "offset_from_utf16",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Converts UTF-16 units to bytes. An offset inside a surrogate pair rounds upward to the end of that scalar, matching the existing API.",
+      "documentation": "Converts UTF-16 units to bytes. An offset inside a surrogate pair\nrounds upward to the end of that scalar, matching the existing API.",
+      "signature": "pub fn offset_from_utf16 (& self, offset : usize) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::offset_to_utf16",
+      "name": "offset_to_utf16",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Converts a byte offset to UTF-16 units, rounding an interior scalar offset upward, as the platform editable-text API does.",
+      "documentation": "Converts a byte offset to UTF-16 units, rounding an interior scalar\noffset upward, as the platform editable-text API does.",
+      "signature": "pub fn offset_to_utf16 (& self, offset : usize) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::slice",
+      "name": "slice",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Copies only the requested range. Invalid UTF-8 boundaries return None.",
+      "documentation": "Copies only the requested range. Invalid UTF-8 boundaries return None.",
+      "signature": "pub fn slice (& self, range : Range<usize>) -> Option<String>",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::text",
+      "name": "text",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Compatibility snapshot. The first call in a revision copies all bytes; subsequent calls reuse that allocation. Prefer indexed slices for views.",
+      "documentation": "Compatibility snapshot. The first call in a revision copies all bytes;\nsubsequent calls reuse that allocation. Prefer indexed slices for views.",
+      "signature": "pub fn text (& self) -> & SharedString",
+      "cfg": [],
+      "target": "EditSnapshot"
     },
     {
       "id": "gpui::editable_text::history::EditCause",
@@ -12950,6 +13123,20 @@
     },
     {
       "id": "gpui::editable_text::reexport-2",
+      "name": "document :: EditSnapshot",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text",
+      "path": "gpui::editable_text",
+      "source": "crates/gpui/src/editable_text/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use document::EditSnapshot;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::reexport-3",
       "name": "history :: EditCause",
       "kind": "reexport",
       "package": "gpui-box",
@@ -12963,7 +13150,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::editable_text::reexport-3",
+      "id": "gpui::editable_text::reexport-4",
       "name": "layout :: EditableTextLayout",
       "kind": "reexport",
       "package": "gpui-box",
@@ -12977,7 +13164,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::editable_text::reexport-4",
+      "id": "gpui::editable_text::reexport-5",
       "name": "style_runs :: { EditableStyleRun , EditableStyleRuns }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -145569,6 +145756,21 @@
     },
     "framework_context_menu": {
       "contract": "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
+    },
+    "framework_editable_document": {
+      "contract": "EditBuffer uses persistent Ropey storage with LF line indexing; EditSnapshot indexed slices and UTF-16 conversion avoid whole-document materialization. Legacy text() intentionally materializes once per revision. Grapheme clamping scans the affected hard line; exact history byte deltas are never re-clamped.",
+      "limitations": [
+        "contiguous compatibility callers still copy the whole document",
+        "a single arbitrarily long hard line still requires a line-length grapheme scan",
+        "native macOS and Windows evidence requires the on-demand platform lane"
+      ],
+      "tests": [
+        "indexed_lines_survive_asymmetric_edits_and_persistent_snapshots",
+        "large_file_edits_do_not_materialize_document_and_lines_stay_indexed",
+        "indexed_unicode_offsets_match_platform_rounding",
+        "chunk_crossing_graphemes_match_contiguous_clamping",
+        "undo_replays_exact_bytes_when_insertion_joined_a_grapheme"
+      ]
     },
     "framework_gestures": {
       "limitations": [

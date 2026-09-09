@@ -79,6 +79,7 @@ profiling.workspace = true
 rand.workspace = true
 raw-window-handle.workspace = true
 regex.workspace = true
+ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
 refineable.workspace = true
 scheduler.workspace = true
 resvg.workspace = true

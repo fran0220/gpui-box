@@ -7,11 +7,13 @@
 //! layer visual policy on top instead of keeping private edit engines.
 
 mod buffer;
+mod document;
 mod history;
 mod layout;
 mod style_runs;
 
 pub use buffer::{EditBuffer, EditOutcome, EditRules};
+pub use document::EditSnapshot;
 pub use history::EditCause;
 pub use layout::EditableTextLayout;
 pub use style_runs::{EditableStyleRun, EditableStyleRuns};
