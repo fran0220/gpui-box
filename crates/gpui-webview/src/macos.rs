@@ -60,7 +60,7 @@ extern "C" fn failed(this: &Object, _: Sel, view: *mut Object, _: *mut Object, e
 extern "C" fn terminated(this: &Object, _: Sel, _: *mut Object) {
     unsafe {
         let sender = &*(*this.get_ivar::<usize>("sender") as *const EventSender);
-        let _ = sender.send(BrowserEvent::ProcessTerminated(
+        let _ = sender.send(BrowserEvent::ProcessFailed(
             "WebKit content process terminated".into(),
         ));
     }

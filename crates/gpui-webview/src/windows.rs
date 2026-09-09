@@ -40,7 +40,7 @@ pub(super) fn build(
                 if let Some(args) = args {
                     let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED;
                     args.ProcessFailedKind(&mut kind)?;
-                    let _ = process_sender.send(BrowserEvent::ProcessTerminated(format!(
+                    let _ = process_sender.send(BrowserEvent::ProcessFailed(format!(
                         "WebView2 process failure {}",
                         kind.0
                     )));

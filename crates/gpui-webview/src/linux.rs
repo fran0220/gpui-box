@@ -63,7 +63,7 @@ pub(super) fn build(
         true
     });
     widget.connect_web_process_terminated(move |_, reason| {
-        let _ = sender.send(BrowserEvent::ProcessTerminated(format!("{reason:?}")));
+        let _ = sender.send(BrowserEvent::ProcessFailed(format!("{reason:?}")));
     });
     let top = widget
         .toplevel()

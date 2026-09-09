@@ -128,6 +128,7 @@ fn main() {
                                             }
                                             BrowserEvent::LoadFailed { .. }
                                             | BrowserEvent::NavigationRefused(_)
+                                            | BrowserEvent::ProcessFailed(_)
                                             | BrowserEvent::EventsDropped(_) => this.failed = true,
                                             BrowserEvent::PageFinished(_) if this.failed => {
                                                 continue;

@@ -39,7 +39,8 @@ pub enum BrowserEvent {
         url: String,
         description: String,
     },
-    ProcessTerminated(String),
+    /// Native process failure, including termination or unresponsiveness.
+    ProcessFailed(String),
     PopupRefused(String),
     DownloadRefused(String),
     PermissionRefused(String),
