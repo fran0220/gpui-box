@@ -862,6 +862,31 @@ pub struct SankeyData {
     pub links: Vec<SankeyLink>,
 }
 
+/// Horizontal alignment of an acyclic flow graph. Vertical order follows the
+/// caller's node order, making repeated layouts stable and reviewable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SankeyAlignment {
+    #[default]
+    Left,
+    Right,
+    /// Longest-path columns, with terminal nodes at the right edge.
+    Justify,
+}
+
+/// Invalid graph or normalized layout constraints. Layout never silently
+/// drops a flow or fabricates a value for an invalid input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SankeyLayoutError {
+    InvalidDimensions,
+    DuplicateNode(SharedString),
+    DuplicateLink(SharedString),
+    MissingEndpoint(SharedString),
+    InvalidWeight(SharedString),
+    WeightCount,
+    Cycle,
+    InsufficientHeight,
+}
+
 impl SankeyData {
     pub fn new(
         nodes: impl IntoIterator<Item = SankeyNode>,
@@ -871,6 +896,170 @@ impl SankeyData {
             nodes: nodes.into_iter().collect(),
             links: links.into_iter().collect(),
         }
+    }
+
+    /// Lay out a directed acyclic graph in normalized chart coordinates.
+    /// `weights` follows link order; labels and formatted values remain caller
+    /// owned. All columns use one linear weight-to-height scale, so equal
+    /// quantities have equal ribbon widths, including at merges and splits.
+    /// Node height is max(total incoming, total outgoing). Zero-flow nodes
+    /// remain zero-height; cycles, missing endpoints, and invalid constraints
+    /// are errors rather than approximations. Returns geometry and the scale.
+    pub fn layout(
+        mut self,
+        weights: &[f64],
+        node_width: f32,
+        gap: f32,
+        alignment: SankeyAlignment,
+    ) -> Result<(Self, f64), SankeyLayoutError> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+
+        if !node_width.is_finite()
+            || node_width <= 0.0
+            || node_width >= 1.0
+            || !gap.is_finite()
+            || !(0.0..1.0).contains(&gap)
+        {
+            return Err(SankeyLayoutError::InvalidDimensions);
+        }
+        if weights.len() != self.links.len() {
+            return Err(SankeyLayoutError::WeightCount);
+        }
+        let n = self.nodes.len();
+        let mut index = HashMap::new();
+        for (i, node) in self.nodes.iter().enumerate() {
+            if index.insert(node.id.clone(), i).is_some() {
+                return Err(SankeyLayoutError::DuplicateNode(node.id.clone()));
+            }
+        }
+        let mut ids = HashSet::new();
+        let mut edges = Vec::new();
+        let mut outgoing = vec![Vec::new(); n];
+        let mut indegree = vec![0usize; n];
+        let mut incoming_value = vec![0.0f64; n];
+        let mut outgoing_value = vec![0.0f64; n];
+        for (link, &weight) in self.links.iter().zip(weights) {
+            if !ids.insert(link.id.clone()) {
+                return Err(SankeyLayoutError::DuplicateLink(link.id.clone()));
+            }
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(SankeyLayoutError::InvalidWeight(link.id.clone()));
+            }
+            let source = *index
+                .get(&link.source)
+                .ok_or_else(|| SankeyLayoutError::MissingEndpoint(link.source.clone()))?;
+            let target = *index
+                .get(&link.target)
+                .ok_or_else(|| SankeyLayoutError::MissingEndpoint(link.target.clone()))?;
+            outgoing[source].push(target);
+            indegree[target] += 1;
+            outgoing_value[source] += weight;
+            incoming_value[target] += weight;
+            if !outgoing_value[source].is_finite() || !incoming_value[target].is_finite() {
+                return Err(SankeyLayoutError::InvalidWeight(link.id.clone()));
+            }
+            edges.push((source, target));
+        }
+        let mut queue: VecDeque<_> = (0..n).filter(|&i| indegree[i] == 0).collect();
+        let mut order = Vec::new();
+        let mut depth = vec![0usize; n];
+        while let Some(source) = queue.pop_front() {
+            order.push(source);
+            for &target in &outgoing[source] {
+                depth[target] = depth[target].max(depth[source] + 1);
+                indegree[target] -= 1;
+                if indegree[target] == 0 {
+                    queue.push_back(target);
+                }
+            }
+        }
+        if order.len() != n {
+            return Err(SankeyLayoutError::Cycle);
+        }
+        let last = depth.iter().copied().max().unwrap_or(0);
+        if last > 0 && node_width >= (1.0 - node_width) / last as f32 {
+            return Err(SankeyLayoutError::InvalidDimensions);
+        }
+        match alignment {
+            SankeyAlignment::Left => {}
+            SankeyAlignment::Justify => {
+                for i in 0..n {
+                    if outgoing[i].is_empty() {
+                        depth[i] = last;
+                    }
+                }
+            }
+            SankeyAlignment::Right => {
+                let mut height = vec![0usize; n];
+                for &i in order.iter().rev() {
+                    for &target in &outgoing[i] {
+                        height[i] = height[i].max(height[target] + 1);
+                    }
+                    depth[i] = last - height[i];
+                }
+            }
+        }
+        let values: Vec<_> = incoming_value
+            .iter()
+            .zip(&outgoing_value)
+            .map(|(&a, &b)| a.max(b))
+            .collect();
+        let mut columns = vec![Vec::new(); last + 1];
+        for (i, &column) in depth.iter().enumerate() {
+            columns[column].push(i);
+        }
+        let mut scale = f64::INFINITY;
+        for column in &columns {
+            let available = 1.0 - f64::from(gap) * column.len().saturating_sub(1) as f64;
+            if available <= 0.0 {
+                return Err(SankeyLayoutError::InsufficientHeight);
+            }
+            let total: f64 = column.iter().map(|&i| values[i]).sum();
+            if !total.is_finite() {
+                return Err(SankeyLayoutError::InsufficientHeight);
+            }
+            if total > 0.0 {
+                scale = scale.min(available / total);
+            }
+        }
+        if !scale.is_finite() {
+            scale = 0.0;
+        }
+        for (column_index, column) in columns.iter().enumerate() {
+            let used = column.iter().map(|&i| values[i] * scale).sum::<f64>()
+                + f64::from(gap) * column.len().saturating_sub(1) as f64;
+            let mut y = (1.0 - used) / 2.0;
+            let x = if last == 0 {
+                0.5 * (1.0 - node_width)
+            } else {
+                column_index as f32 / last as f32 * (1.0 - node_width)
+            };
+            for &i in column {
+                let height = values[i] * scale;
+                self.nodes[i].bounds = bounds(point(x, y as f32), size(node_width, height as f32));
+                y += height + f64::from(gap);
+            }
+        }
+        let mut source_offsets = vec![0.0f64; n];
+        let mut target_offsets = vec![0.0f64; n];
+        for ((link, &(source, target)), &weight) in self.links.iter_mut().zip(&edges).zip(weights) {
+            let width = weight * scale;
+            let a = self.nodes[source].bounds;
+            let b = self.nodes[target].bounds;
+            link.start = point(
+                a.origin.x + a.size.width,
+                a.origin.y + (source_offsets[source] + width / 2.0) as f32,
+            );
+            link.end = point(
+                b.origin.x,
+                b.origin.y + (target_offsets[target] + width / 2.0) as f32,
+            );
+            link.start_width = width as f32;
+            link.end_width = width as f32;
+            source_offsets[source] += width;
+            target_offsets[target] += width;
+        }
+        Ok((self, scale))
     }
 }
 
@@ -1134,5 +1323,73 @@ mod tests {
             )],
         );
         assert!(valid_sankey(&data).links.is_empty());
+    }
+
+    fn flow_graph() -> SankeyData {
+        SankeyData::new(
+            ["a", "b", "c", "d"].map(|id| SankeyNode::new(id, id, "", Bounds::default())),
+            [("ab", "a", "b"), ("bc", "b", "c"), ("ad", "a", "d")].map(|(id, source, target)| {
+                SankeyLink::new(
+                    id,
+                    source,
+                    target,
+                    id,
+                    "",
+                    Point::default(),
+                    Point::default(),
+                    0.0,
+                )
+            }),
+        )
+    }
+
+    #[test]
+    fn sankey_layout_conserves_asymmetric_flows_and_stacks_ribbons() {
+        let (data, scale) = flow_graph()
+            .layout(&[6.0, 6.0, 2.0], 0.1, 0.2, SankeyAlignment::Justify)
+            .expect("valid justified graph");
+        assert!((scale - 0.1).abs() < 1e-8);
+        assert!((data.nodes[0].bounds.size.height - 0.8).abs() < 1e-6);
+        assert!((data.links[0].start_width - 0.6).abs() < 1e-6);
+        assert!((data.links[2].start_width - 0.2).abs() < 1e-6);
+        let first_bottom = data.links[0].start.y + data.links[0].start_width / 2.0;
+        let second_top = data.links[2].start.y - data.links[2].start_width / 2.0;
+        assert!((first_bottom - second_top).abs() < 1e-6);
+        assert_eq!(data.nodes[2].bounds.origin.x, data.nodes[3].bounds.origin.x);
+        for link in &data.links {
+            assert_eq!(link.start_width, link.end_width);
+            assert!(link.start.x < link.end.x);
+        }
+        assert_eq!(valid_sankey(&data).links.len(), 3);
+    }
+
+    #[test]
+    fn sankey_alignment_and_rejections_are_explicit() {
+        let (left, _) = flow_graph()
+            .layout(&[6.0, 6.0, 2.0], 0.1, 0.2, SankeyAlignment::Left)
+            .expect("valid left-aligned graph");
+        let (right, _) = flow_graph()
+            .layout(&[6.0, 6.0, 2.0], 0.1, 0.2, SankeyAlignment::Right)
+            .expect("valid right-aligned graph");
+        assert!(left.nodes[3].bounds.origin.x < right.nodes[3].bounds.origin.x);
+        let mut cyclic = flow_graph();
+        cyclic.links[1].target = "a".into();
+        assert_eq!(
+            cyclic.layout(&[1.0; 3], 0.1, 0.1, SankeyAlignment::Left),
+            Err(SankeyLayoutError::Cycle)
+        );
+        assert_eq!(
+            flow_graph().layout(&[], 0.1, 0.1, SankeyAlignment::Left),
+            Err(SankeyLayoutError::WeightCount)
+        );
+        assert_eq!(
+            flow_graph().layout(&[1.0, -1.0, 1.0], 0.1, 0.1, SankeyAlignment::Left),
+            Err(SankeyLayoutError::InvalidWeight("bc".into()))
+        );
+        let (zero, scale) = flow_graph()
+            .layout(&[0.0; 3], 0.1, 0.1, SankeyAlignment::Left)
+            .expect("zero flow remains zero");
+        assert_eq!(scale, 0.0);
+        assert!(zero.nodes.iter().all(|node| node.bounds.size.height == 0.0));
     }
 }

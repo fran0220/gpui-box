@@ -705,7 +705,15 @@ pub(super) fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .tint(theme.colors.warning),
         ],
-    );
+    )
+    .layout(
+        &[34.0, 26.0, 8.0],
+        0.08,
+        0.16,
+        crate::display::plot::SankeyAlignment::Justify,
+    )
+    .expect("acyclic fixture with valid flow weights")
+    .0;
 
     let column = || div().column().flex_1().min_w_0();
     stack(&theme)

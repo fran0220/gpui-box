@@ -1105,7 +1105,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4262
+      "symbolCount": 4265
     },
     {
       "name": "gpui-box-kit-assets",
@@ -76734,6 +76734,20 @@
       "target": "PlotState<T>"
     },
     {
+      "id": "gpui_kit::display::plot::SankeyAlignment",
+      "name": "SankeyAlignment",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "display::plot",
+      "path": "gpui_kit::display::plot",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "Horizontal alignment of an acyclic flow graph. Vertical order follows the caller's node order, making repeated layouts stable and reviewable.",
+      "documentation": "Horizontal alignment of an acyclic flow graph. Vertical order follows the\ncaller's node order, making repeated layouts stable and reviewable.",
+      "signature": "# [doc = \" Horizontal alignment of an acyclic flow graph. Vertical order follows the\"] # [doc = \" caller's node order, making repeated layouts stable and reviewable.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default)] pub enum SankeyAlignment { # [default] Left, Right, # [doc = \" Longest-path columns, with terminal nodes at the right edge.\"] Justify, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::display::plot::SankeyChart",
       "name": "SankeyChart",
       "kind": "struct",
@@ -76807,6 +76821,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::display::plot::SankeyData::layout",
+      "name": "layout",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "display::plot",
+      "path": "gpui_kit::display::plot",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "Lay out a directed acyclic graph in normalized chart coordinates. `weights` follows link order; labels and formatted values remain caller owned. All columns use one linear weight-to-height scale, so equal quantities have equal ribbon widths, including at merges and splits. Node height is max(total incoming, total outgoing). Zero-flow nodes remain zero-height; cycles, missing endpoints, and invalid constraints are errors rather than approximations. Returns geometry and the scale.",
+      "documentation": "Lay out a directed acyclic graph in normalized chart coordinates.\n`weights` follows link order; labels and formatted values remain caller\nowned. All columns use one linear weight-to-height scale, so equal\nquantities have equal ribbon widths, including at merges and splits.\nNode height is max(total incoming, total outgoing). Zero-flow nodes\nremain zero-height; cycles, missing endpoints, and invalid constraints\nare errors rather than approximations. Returns geometry and the scale.",
+      "signature": "pub fn layout (mut self, weights : & [f64], node_width : f32, gap : f32, alignment : SankeyAlignment,) -> Result<(Self, f64), SankeyLayoutError>",
+      "cfg": [],
+      "target": "SankeyData"
+    },
+    {
       "id": "gpui_kit::display::plot::SankeyData::new",
       "name": "new",
       "kind": "method",
@@ -76820,6 +76849,20 @@
       "signature": "pub fn new (nodes : impl IntoIterator<Item = SankeyNode>, links : impl IntoIterator<Item = SankeyLink>,) -> Self",
       "cfg": [],
       "target": "SankeyData"
+    },
+    {
+      "id": "gpui_kit::display::plot::SankeyLayoutError",
+      "name": "SankeyLayoutError",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "display::plot",
+      "path": "gpui_kit::display::plot",
+      "source": "crates/gpui-kit/src/display/plot.rs",
+      "summary": "Invalid graph or normalized layout constraints. Layout never silently drops a flow or fabricates a value for an invalid input.",
+      "documentation": "Invalid graph or normalized layout constraints. Layout never silently\ndrops a flow or fabricates a value for an invalid input.",
+      "signature": "# [doc = \" Invalid graph or normalized layout constraints. Layout never silently\"] # [doc = \" drops a flow or fabricates a value for an invalid input.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum SankeyLayoutError { InvalidDimensions, DuplicateNode (SharedString), DuplicateLink (SharedString), MissingEndpoint (SharedString), InvalidWeight (SharedString), WeightCount, Cycle, InsufficientHeight, }",
+      "cfg": []
     },
     {
       "id": "gpui_kit::display::plot::SankeyLink",
@@ -132565,6 +132608,20 @@
       ]
     },
     {
+      "name": "SankeyAlignment",
+      "path": "gpui_kit::display::SankeyAlignment",
+      "summary": "Horizontal alignment of an acyclic flow graph. Vertical order follows the caller's node order, making repeated layouts stable and reviewable.",
+      "variants": [
+        "Left",
+        "Right",
+        "Justify"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "SankeyData",
       "path": "gpui_kit::display::SankeyData",
       "summary": "Caller-owned node and ribbon geometry for a Sankey presentation.",
@@ -132572,6 +132629,27 @@
       "construct": [
         "new(nodes: impl IntoIterator<Item = SankeyNode>, links: impl IntoIterator<Item = SankeyLink>) -> Self"
       ],
+      "options": [
+        "layout(weights: &[f64], node_width: f32, gap: f32, alignment: SankeyAlignment) -> Result<(Self, f64), SankeyLayoutError>"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SankeyLayoutError",
+      "path": "gpui_kit::display::SankeyLayoutError",
+      "summary": "Invalid graph or normalized layout constraints. Layout never silently drops a flow or fabricates a value for an invalid input.",
+      "variants": [
+        "InvalidDimensions",
+        "DuplicateNode",
+        "DuplicateLink",
+        "MissingEndpoint",
+        "InvalidWeight",
+        "WeightCount",
+        "Cycle",
+        "InsufficientHeight"
+      ],
+      "construct": [],
       "options": [],
       "commands": [],
       "queries": []
@@ -145662,7 +145740,7 @@
         "Plot",
         "SankeyChart"
       ],
-      "example": "fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let accent = theme.colors.accent;\n    let custom_marks = vec![\n        PlotMark::new(\n            \"first\",\n            \"First stage\",\n            \"18 jobs\",\n            bounds(point(0.08, 0.58), size(0.18, 0.28)),\n        ),\n        PlotMark::new(\n            \"middle\",\n            \"Middle stage\",\n            \"34 jobs\",\n            bounds(point(0.40, 0.30), size(0.18, 0.56)),\n        ),\n        PlotMark::new(\n            \"last\",\n            \"Last stage\",\n            \"26 jobs\",\n            bounds(point(0.72, 0.44), size(0.18, 0.42)),\n        ),\n    ];\n    let painted_marks = custom_marks.clone();\n    let candles = [\n        Candlestick::new(\"monday\", 0.10, 0.32, 0.58, 0.20, 0.50, \"Monday\", \"32–50\"),\n        Candlestick::new(\"tuesday\", 0.30, 0.52, 0.66, 0.38, 0.44, \"Tuesday\", \"52–44\"),\n        Candlestick::new(\n            \"wednesday\",\n            0.50,\n            0.45,\n            0.80,\n            0.40,\n            0.72,\n            \"Wednesday\",\n            \"45–72\",\n        ),\n        Candlestick::new(\n            \"thursday\", 0.70, 0.70, 0.76, 0.34, 0.42, \"Thursday\", \"70–42\",\n        ),\n        Candlestick::new(\"friday\", 0.90, 0.44, 0.88, 0.36, 0.82, \"Friday\", \"44–82\"),\n    ];\n    let source_tint = identity_tint(&theme, \"agent.read\");\n    let target_tint = identity_tint(&theme, \"agent.write\");\n    let sankey = SankeyData::new(\n        [\n            SankeyNode::new(\n                \"queued\",\n                \"Queued\",\n                \"48 jobs\",\n                bounds(point(0.03, 0.20), size(0.08, 0.58)),\n            )\n            .tint(source_tint),\n            SankeyNode::new(\n                \"running\",\n                \"Running\",\n                \"34 jobs\",\n                bounds(point(0.46, 0.28), size(0.08, 0.42)),\n            ),\n            SankeyNode::new(\n                \"completed\",\n                \"Completed\",\n                \"26 jobs\",\n                bounds(point(0.89, 0.12), size(0.08, 0.32)),\n            )\n            .tint(target_tint),\n            SankeyNode::new(\n                \"deferred\",\n                \"Deferred\",\n                \"8 jobs\",\n                bounds(point(0.89, 0.62), size(0.08, 0.18)),\n            )\n            .tint(theme.colors.warning),\n        ],\n        [\n            SankeyLink::new(\n                \"queue-running\",\n                \"queued\",\n                \"running\",\n                \"Queued to running\",\n                \"34 jobs\",\n                point(0.11, 0.48),\n                point(0.46, 0.49),\n                0.30,\n            )\n            .tint(source_tint),\n            SankeyLink::new(\n                \"running-completed\",\n                \"running\",\n                \"completed\",\n                \"Running to completed\",\n                \"26 jobs\",\n                point(0.54, 0.44),\n                point(0.89, 0.28),\n                0.24,\n            )\n            .tint(target_tint),\n            SankeyLink::new(\n                \"running-deferred\",\n                \"running\",\n                \"deferred\",\n                \"Running to deferred\",\n                \"8 jobs\",\n                point(0.54, 0.62),\n                point(0.89, 0.71),\n                0.10,\n            )\n            .tint(theme.colors.warning),\n        ],\n    );\n\n    let column = || div().column().flex_1().min_w_0();\n    stack(&theme)\n        .w(px(920.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry and exact wording remain caller-owned\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .w_full()\n                .gap(px(theme.space(Space::Lg)))\n                .child(\n                    column().child(\n                        Plot::new(\n                            \"scene.plot.custom\",\n                            \"Pipeline\",\n                            PlotState::Ready(custom_marks),\n                        )\n                        .current(\"middle\")\n                        .on_current(|_, _, _| {})\n                        .paint(move |frame, window, _| {\n                            for mark in &painted_marks {\n                                window\n                                    .paint_quad(gpui::fill(frame.mark_bounds(mark.bounds), accent));\n                            }\n                        }),\n                    ),\n                )\n                .child(\n                    column().child(\n                        CandlestickChart::new(\n                            \"scene.plot.candles\",\n                            \"Daily range\",\n                            PlotState::Ready(candles.into()),\n                        )\n                        .current(\"wednesday\")\n                        .on_current(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    column().child(\n                        SankeyChart::new(\"scene.plot.sankey\", \"Run flow\", PlotState::Ready(sankey))\n                            .current(\"node.running\")\n                            .on_current(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn plot(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let accent = theme.colors.accent;\n    let custom_marks = vec![\n        PlotMark::new(\n            \"first\",\n            \"First stage\",\n            \"18 jobs\",\n            bounds(point(0.08, 0.58), size(0.18, 0.28)),\n        ),\n        PlotMark::new(\n            \"middle\",\n            \"Middle stage\",\n            \"34 jobs\",\n            bounds(point(0.40, 0.30), size(0.18, 0.56)),\n        ),\n        PlotMark::new(\n            \"last\",\n            \"Last stage\",\n            \"26 jobs\",\n            bounds(point(0.72, 0.44), size(0.18, 0.42)),\n        ),\n    ];\n    let painted_marks = custom_marks.clone();\n    let candles = [\n        Candlestick::new(\"monday\", 0.10, 0.32, 0.58, 0.20, 0.50, \"Monday\", \"32–50\"),\n        Candlestick::new(\"tuesday\", 0.30, 0.52, 0.66, 0.38, 0.44, \"Tuesday\", \"52–44\"),\n        Candlestick::new(\n            \"wednesday\",\n            0.50,\n            0.45,\n            0.80,\n            0.40,\n            0.72,\n            \"Wednesday\",\n            \"45–72\",\n        ),\n        Candlestick::new(\n            \"thursday\", 0.70, 0.70, 0.76, 0.34, 0.42, \"Thursday\", \"70–42\",\n        ),\n        Candlestick::new(\"friday\", 0.90, 0.44, 0.88, 0.36, 0.82, \"Friday\", \"44–82\"),\n    ];\n    let source_tint = identity_tint(&theme, \"agent.read\");\n    let target_tint = identity_tint(&theme, \"agent.write\");\n    let sankey = SankeyData::new(\n        [\n            SankeyNode::new(\n                \"queued\",\n                \"Queued\",\n                \"48 jobs\",\n                bounds(point(0.03, 0.20), size(0.08, 0.58)),\n            )\n            .tint(source_tint),\n            SankeyNode::new(\n                \"running\",\n                \"Running\",\n                \"34 jobs\",\n                bounds(point(0.46, 0.28), size(0.08, 0.42)),\n            ),\n            SankeyNode::new(\n                \"completed\",\n                \"Completed\",\n                \"26 jobs\",\n                bounds(point(0.89, 0.12), size(0.08, 0.32)),\n            )\n            .tint(target_tint),\n            SankeyNode::new(\n                \"deferred\",\n                \"Deferred\",\n                \"8 jobs\",\n                bounds(point(0.89, 0.62), size(0.08, 0.18)),\n            )\n            .tint(theme.colors.warning),\n        ],\n        [\n            SankeyLink::new(\n                \"queue-running\",\n                \"queued\",\n                \"running\",\n                \"Queued to running\",\n                \"34 jobs\",\n                point(0.11, 0.48),\n                point(0.46, 0.49),\n                0.30,\n            )\n            .tint(source_tint),\n            SankeyLink::new(\n                \"running-completed\",\n                \"running\",\n                \"completed\",\n                \"Running to completed\",\n                \"26 jobs\",\n                point(0.54, 0.44),\n                point(0.89, 0.28),\n                0.24,\n            )\n            .tint(target_tint),\n            SankeyLink::new(\n                \"running-deferred\",\n                \"running\",\n                \"deferred\",\n                \"Running to deferred\",\n                \"8 jobs\",\n                point(0.54, 0.62),\n                point(0.89, 0.71),\n                0.10,\n            )\n            .tint(theme.colors.warning),\n        ],\n    )\n    .layout(\n        &[34.0, 26.0, 8.0],\n        0.08,\n        0.16,\n        crate::display::plot::SankeyAlignment::Justify,\n    )\n    .expect(\"acyclic fixture with valid flow weights\")\n    .0;\n\n    let column = || div().column().flex_1().min_w_0();\n    stack(&theme)\n        .w(px(920.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry and exact wording remain caller-owned\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .w_full()\n                .gap(px(theme.space(Space::Lg)))\n                .child(\n                    column().child(\n                        Plot::new(\n                            \"scene.plot.custom\",\n                            \"Pipeline\",\n                            PlotState::Ready(custom_marks),\n                        )\n                        .current(\"middle\")\n                        .on_current(|_, _, _| {})\n                        .paint(move |frame, window, _| {\n                            for mark in &painted_marks {\n                                window\n                                    .paint_quad(gpui::fill(frame.mark_bounds(mark.bounds), accent));\n                            }\n                        }),\n                    ),\n                )\n                .child(\n                    column().child(\n                        CandlestickChart::new(\n                            \"scene.plot.candles\",\n                            \"Daily range\",\n                            PlotState::Ready(candles.into()),\n                        )\n                        .current(\"wednesday\")\n                        .on_current(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    column().child(\n                        SankeyChart::new(\"scene.plot.sankey\", \"Run flow\", PlotState::Ready(sankey))\n                            .current(\"node.running\")\n                            .on_current(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "metric-card",
