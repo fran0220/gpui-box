@@ -13,7 +13,13 @@ export interface ResourceAPI {
    */
   register(registration: ResourceRegistration): Promise<ResourceRef>;
 }
+export interface AssetDeclaration {
+  readonly key: string;
+  readonly path: string;
+  readonly mime: ResourceRegistration['mime'];
+}
 export declare const RESOURCE_LIMITS: Readonly<{ encoded: number; bytes: number; dimension: number; ownerBytes: number; ownerCount: number }>;
 export declare function validateResourceRef(value: unknown): ResourceRef;
+export declare function validateAssetDeclarations(value: unknown): AssetDeclaration[];
 export declare function validateResourceRegistration(value: unknown): ResourceRegistration;
 export declare function rgbaResource(key: string, width: number, height: number, pixels: Uint8Array): ResourceRegistration;

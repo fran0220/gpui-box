@@ -91,13 +91,13 @@ fn rejects_paths_mime_compression_corruption_and_allocation_before_consuming_quo
     assert!(store.0.borrow().owners[&owner].is_empty());
     let reference = store
         .register(owner, registration("x", RGBA, &pixels()))
-        .unwrap();
+        .expect("valid raw image");
     let state = store.0.borrow();
     let Asset::Image(image) = &state.owners[&owner][&reference.key].asset else {
         panic!("not image")
     };
     assert_eq!(
-        image.as_bytes(0).unwrap(),
+        image.as_bytes(0).expect("first image frame"),
         &[0, 0, 255, 255, 255, 0, 0, 255]
     );
     assert_eq!(image.size(0), size(2.into(), 1.into()));
@@ -123,7 +123,7 @@ fn quotas_are_per_owner_and_duplicates_cannot_replace_bytes() {
     for index in 0..MAX_OWNER_COUNT {
         store
             .register(owner, registration(&format!("r{index}"), BYTES, &[1]))
-            .unwrap();
+            .expect("within count quota");
     }
     assert!(
         store
@@ -146,7 +146,7 @@ fn quotas_are_per_owner_and_duplicates_cannot_replace_bytes() {
                 foreign,
                 registration(&format!("large{index}"), BYTES, &vec![0; MAX_BYTES]),
             )
-            .unwrap();
+            .expect("within byte quota");
     }
     assert!(
         other
@@ -159,7 +159,7 @@ fn quotas_are_per_owner_and_duplicates_cannot_replace_bytes() {
     // 1 MiB minus 10 * 96 KiB leaves exactly 64 KiB.
     other
         .register(foreign, registration("tail", BYTES, &vec![0; 65536]))
-        .unwrap();
+        .expect("exact aggregate boundary");
     assert!(
         other
             .register(foreign, registration("last", BYTES, &[1]))
@@ -177,10 +177,11 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         store.reconcile(&HashSet::from([owner, foreign]), cx);
         let reference = store
             .register(owner, registration("data", BYTES, &[7, 9]))
-            .unwrap();
+            .expect("authorized bytes");
         assert!(Resources::bytes(&reference, cx).is_err());
-        let bytes =
-            cx.with_effect_owner(Some(owner), |cx| Resources::bytes(&reference, cx).unwrap());
+        let bytes = cx.with_effect_owner(Some(owner), |cx| {
+            Resources::bytes(&reference, cx).expect("authorized lease")
+        });
         cx.with_effect_owner(Some(foreign), |cx| {
             assert!(Resources::bytes(&reference, cx).is_err());
             assert!(
@@ -191,7 +192,9 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         });
         cx.with_effect_owner(Some(owner), |cx| {
             assert_eq!(
-                bytes.with_bytes(cx, |data| Ok(data.to_vec())).unwrap(),
+                bytes
+                    .with_bytes(cx, |data| Ok(data.to_vec()))
+                    .expect("authorized use"),
                 [7, 9]
             );
             assert!(Resources::image(&reference, cx).is_err());
@@ -200,21 +203,22 @@ fn leases_revalidate_owner_generation_revocation_and_host_drop(cx: &mut gpui::Te
         store.reconcile(&HashSet::from([owner]), cx);
         store
             .register(owner, registration("data", BYTES, &[11]))
-            .unwrap();
+            .expect("new registration after reauthorization");
         cx.with_effect_owner(Some(owner), |cx| {
             assert!(bytes.with_bytes(cx, |_| Ok(())).is_err())
         });
-        let fresh =
-            cx.with_effect_owner(Some(owner), |cx| Resources::bytes(&reference, cx).unwrap());
+        let fresh = cx.with_effect_owner(Some(owner), |cx| {
+            Resources::bytes(&reference, cx).expect("fresh lease")
+        });
         store.reconcile(&HashSet::from([foreign]), cx);
         cx.with_effect_owner(Some(owner), |cx| {
             assert!(fresh.with_bytes(cx, |_| Ok(())).is_err())
         });
         store
             .register(foreign, registration("data", BYTES, &[13]))
-            .unwrap();
+            .expect("new owner data");
         let final_lease = cx.with_effect_owner(Some(foreign), |cx| {
-            Resources::bytes(&reference, cx).unwrap()
+            Resources::bytes(&reference, cx).expect("lease before drop")
         });
         drop(store);
         cx.with_effect_owner(Some(foreign), |cx| {

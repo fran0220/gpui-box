@@ -13,6 +13,21 @@ export function validateResourceRef(value) {
   return value;
 }
 
+/** Manifest assets only. Paths are never native resource references. */
+export function validateAssetDeclarations(assets) {
+  if (!Array.isArray(assets) || assets.length > RESOURCE_LIMITS.ownerCount) throw new Error('Invalid asset count');
+  const keys = new Set();
+  for (const asset of assets) {
+    closed(asset, ['key', 'path', 'mime']);
+    validateResourceRef({ key: asset.key });
+    if (keys.has(asset.key)) throw new Error('Duplicate asset key');
+    keys.add(asset.key);
+    if (![RGBA, 'application/octet-stream'].includes(asset.mime)) throw new Error('Unsupported resource MIME');
+    if (typeof asset.path !== 'string' || asset.path.length > 512 || !/^[A-Za-z0-9_.\/-]+$/.test(asset.path) || asset.path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('Invalid package asset path');
+  }
+  return assets;
+}
+
 export function validateResourceRegistration(value) {
   closed(value, ['key', 'mime', 'data']);
   validateResourceRef({ key: value.key });

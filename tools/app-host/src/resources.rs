@@ -192,6 +192,11 @@ fn evict(entries: &HashMap<String, Entry>, cx: &mut App) {
     for entry in entries.values() {
         if let Asset::Image(image) = &entry.asset {
             cx.drop_image(image.clone(), None);
+            // A window currently updating is temporarily absent from App.windows.
+            // Once that update returns, evict its atlas too. This is one bounded
+            // turn of retention, not a resource cache or an asynchronous load.
+            let image = image.clone();
+            cx.defer(move |cx| cx.drop_image(image, None));
         }
     }
 }
@@ -282,16 +287,18 @@ impl Resources {
             );
             Ok(())
         })?;
-        Ok(ImageSource::Custom(Arc::new(move |_, cx| {
-            Some(
-                lease
-                    .with_entry(cx.current_effect_owner(), |entry| match &entry.asset {
-                        Asset::Image(image) => Ok(image.clone()),
-                        Asset::Bytes(_) => Err(anyhow!("resource is not an image")),
-                    })
-                    .map_err(|error| ImageCacheError::Other(Arc::new(error))),
-            )
-        })))
+        Ok(ImageSource::from(
+            move |_: &mut gpui::Window, cx: &mut App| {
+                Some(
+                    lease
+                        .with_entry(cx.current_effect_owner(), |entry| match &entry.asset {
+                            Asset::Image(image) => Ok(image.clone()),
+                            Asset::Bytes(_) => Err(anyhow!("resource is not an image")),
+                        })
+                        .map_err(|error| ImageCacheError::Other(Arc::new(error))),
+                )
+            },
+        ))
     }
 
     pub fn bytes(reference: &ResourceRef, cx: &App) -> Result<ResourceBytes> {
@@ -310,3 +317,7 @@ impl Resources {
 #[cfg(test)]
 #[path = "resources_tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "capture"))]
+#[path = "resources_visual_tests.rs"]
+mod visual_tests;
