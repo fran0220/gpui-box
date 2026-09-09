@@ -14,6 +14,13 @@ input, and an entry in `docs/components.md`.
 
 ## Covered
 
+The isolated JS host does not grant external-file or pasted-image read access
+from `ExternalPaths` or paste events. These require an explicit refusal, not
+host paths or apparently readable references. A future host capability must
+define consent, mount/revision scope, read-only operations, expiry/revocation,
+size limits, path privacy, and negative tests. Internal `DragItem` events are
+data-only identity/label/kind/built-in-icon values, not file capabilities.
+
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |

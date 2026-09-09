@@ -1,5 +1,6 @@
 // Data-family wire contracts. No executable builders cross the boundary.
 import {iconSchema} from './kit-icon-schema.mjs';
+import {dragItemSchema} from './kit-drag-schema.mjs';
 const s = {type:'string',max:16384};
 const id = {type:'string',min:1,max:256};
 const b = {type:'boolean'};
@@ -21,7 +22,7 @@ const row=o({id,label:s,disabled:b,cells:a(cell)},['id','cells']);
 const sort=o({column:id,direction:e('ascending','descending')},['column','direction']);
 const toggle=o({id,expanded:b},['id','expanded']);
 const velocity=o({x:{type:'number',min:-1e9,max:1e9},y:{type:'number',min:-1e9,max:1e9}},['x','y']);
-const drop=o({id,source:id,label:s,kind:s,icon:{...iconSchema,nullable:true},anchor:id,position:e('before','after','into'),velocity},['id','source','label','kind','icon','anchor','position','velocity']);
+const drop=o({...dragItemSchema.fields,anchor:id,position:e('before','after','into'),velocity},[...dragItemSchema.required,'anchor','position','velocity']);
 const range=o({startRow:id,startColumn:id,endRow:id,endColumn:id},['startRow','startColumn','endRow','endColumn']);
 const address=o({row:id,column:id},['row','column']);
 const surfaceSlots=['empty','failed','loading','header_extra','empty_action'];

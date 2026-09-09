@@ -17,6 +17,7 @@ export interface ControlProps { disabled?: boolean; size?: KitSize }
 export interface ChoiceProps extends ControlProps { label?: string; description?: string }
 export interface SelectionItem { id: string; label: string; disabled?: boolean }
 export interface SelectOption extends SelectionItem { description?: string; group?: string }
+export interface KitDragItem { id: string; source: string; label: string; kind: string; icon: import('./kit-icon-sdk.js').BuiltinIconDescriptor | null }
 export interface KitDropIntent { id: string; source: string; label: string; kind: string; anchor: string; position: 'before' | 'after' | 'into'; velocity: { x: number; y: number } }
 export interface KitDropPredicates { accepts?(intent: KitDropIntent): boolean | Promise<boolean> }
 export interface SlotNode { kind: string; id: string }

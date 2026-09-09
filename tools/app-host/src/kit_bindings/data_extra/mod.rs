@@ -251,9 +251,11 @@ fn range_value(v: &CellRange) -> Value {
     json!({"startRow":v.start_row.as_ref(),"startColumn":v.start_column.as_ref(),"endRow":v.end_row.as_ref(),"endColumn":v.end_column.as_ref()})
 }
 pub(super) fn drop_value(v: &DropIntent) -> Value {
-    json!({"id":v.item.id.as_ref(),"source":v.item.source.as_ref(),"label":v.item.label.as_ref(),"kind":v.item.kind.as_ref(),
-        "icon":v.item.icon.map(|icon|json!({"key":icon.name().source_name(),"weight":match icon.weight(){gpui_kit::assets::IconWeight::Regular=>"regular",gpui_kit::assets::IconWeight::Fill=>"fill"}})),
-        "anchor":v.position.anchor().as_ref(),"position":v.position.verb(),"velocity":{"x":v.velocity.x,"y":v.velocity.y}})
+    let mut value = super::drag_item_payload(&v.item);
+    value["anchor"] = json!(v.position.anchor().as_ref());
+    value["position"] = json!(v.position.verb());
+    value["velocity"] = json!({"x":v.velocity.x,"y":v.velocity.y});
+    value
 }
 fn selection(v: &SelectionChange) -> Value {
     match v {

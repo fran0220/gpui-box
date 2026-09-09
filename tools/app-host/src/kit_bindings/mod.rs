@@ -145,6 +145,20 @@ fn number(node: &Node, key: &str, default: f32) -> f32 {
         .and_then(Value::as_f64)
         .map_or(default, |v| v as f32)
 }
+/// Bare native drag data, without target geometry or external-file authority.
+pub(super) fn drag_item_payload(item: &gpui_kit::interaction::DragItem) -> Value {
+    json!({
+        "id":item.id.as_ref(), "source":item.source.as_ref(),
+        "label":item.label.as_ref(), "kind":item.kind.as_ref(),
+        "icon":item.icon.map(|icon| json!({
+            "key":icon.name().source_name(),
+            "weight":match icon.weight() {
+                gpui_kit::assets::IconWeight::Regular => "regular",
+                gpui_kit::assets::IconWeight::Fill => "fill",
+            }
+        })),
+    })
+}
 fn drop_payload(intent: &gpui_kit::interaction::DropIntent) -> Value {
     json!({
         "id":intent.item.id.as_ref(), "source":intent.item.source.as_ref(),

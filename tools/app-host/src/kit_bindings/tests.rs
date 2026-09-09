@@ -2,6 +2,19 @@ use super::*;
 use gpui::{ParentElement, Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
+#[test]
+fn bare_drag_item_has_no_target_or_file_authority() {
+    let item =
+        gpui_kit::interaction::DragItem::new("source.panel", "row.beta", "Beta").kind("custom-row");
+    assert_eq!(
+        drag_item_payload(&item),
+        json!({
+            "source":"source.panel", "id":"row.beta", "label":"Beta",
+            "kind":"custom-row", "icon":null,
+        })
+    );
+}
+
 fn node(component: &str, id: &str, props: Value, events: Value) -> Node {
     let node = serde_json::from_value(
         json!({"kind":"kit","component":component,"id":id,"props":props,"events":events}),
