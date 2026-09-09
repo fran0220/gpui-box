@@ -8,6 +8,20 @@ fact, a locale fact, a transport, or a platform chrome the OS already
 owns. `docs/components.md` describes the components themselves; this file
 exists so a gap is a recorded decision rather than an oversight.
 
+## Media-caption image sizing gap
+
+The `media-caption` exhibit currently records a known framework defect, not
+correct bottom-corner rendering. `Img::request_layout` applies the image's
+intrinsic aspect ratio even when both dimensions are constrained. For an
+880×220 logical card holding a 480×144 image, the image becomes 880×264;
+the parent's overflow clip cuts off the image's bottom rounded corners.
+This was reproduced on Metal; the narrower 480×220 fixture passes on both
+Metal and Linux WGPU. The Clear caption itself has the expected rounded
+shape. U1 is fixing the generic image sizing contract; Kit deliberately adds
+no mask or component-specific sizing workaround. The current Linux baseline
+records this known defect. Reinspect and accept both `media-caption` theme
+frames after the framework fix lands.
+
 A component counts as covered only when it has all four of: a public builder or
 view, a scene in `gpui_kit::scenes`, behaviour tests driven through simulated
 input, and an entry in `docs/components.md`.

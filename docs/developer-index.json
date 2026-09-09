@@ -142010,6 +142010,12 @@
       "anchor": "media"
     },
     {
+      "id": "coverage-media-caption-image-sizing-gap",
+      "title": "Media-caption image sizing gap",
+      "guide": "coverage",
+      "anchor": "media-caption-image-sizing-gap"
+    },
+    {
       "id": "coverage-covered",
       "title": "Covered",
       "guide": "coverage",
