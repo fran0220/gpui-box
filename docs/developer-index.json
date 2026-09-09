@@ -626,7 +626,9 @@
           "package": "gpui-kit",
           "kind": "normal",
           "optional": false,
-          "features": []
+          "features": [
+            "syntax"
+          ]
         },
         {
           "alias": "gpui-kit-semantics",

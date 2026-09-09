@@ -97,8 +97,8 @@ fn service_result(
     }
 }
 
-fn event_name(event: &EditorEvent) -> &'static str {
-    match event {
+fn event_name(event: &EditorEvent) -> Option<&'static str> {
+    Some(match event {
         EditorEvent::Changed(_) => "changed",
         EditorEvent::Edited(_) => "edited",
         EditorEvent::SelectionChanged(_) => "selectionChanged",
@@ -112,7 +112,10 @@ fn event_name(event: &EditorEvent) -> &'static str {
         EditorEvent::ServiceAccepted(_) => "serviceAccepted",
         EditorEvent::DefinitionRequested { .. } => "definitionRequested",
         EditorEvent::CodeActionRequested(_) => "codeActionRequested",
-    }
+        // Parser installation has no worker contract. Compiling syntax support
+        // must not invent an event route outside the closed binding schema.
+        EditorEvent::Parsed { .. } | EditorEvent::SyntaxUnavailable(_) => return None,
+    })
 }
 fn event_value(event: &EditorEvent) -> Value {
     match event {
@@ -166,7 +169,9 @@ impl State {
                 if entity.read(cx).is_disabled() {
                     return;
                 }
-                let name = event_name(event);
+                let Some(name) = event_name(event) else {
+                    return;
+                };
                 let target = callback.upgrade().and_then(|route| {
                     let route = route.borrow();
                     if route.disabled {
@@ -360,7 +365,7 @@ impl State {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "capture"))]
 mod tests {
     use super::*;
     use gpui::TestAppContext;

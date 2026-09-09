@@ -1,4 +1,828 @@
 {
+  "MentionInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "rows": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 4096
+        },
+        "suggestions": {
+          "oneOf": [
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "idle",
+                    "loading",
+                    "empty"
+                  ]
+                },
+                "attempts": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "ready",
+                    "refreshing"
+                  ]
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "max": 256,
+                        "min": 1
+                      },
+                      "label": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "description": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "replacement": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "searchTerms": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "max": 1024
+                      },
+                      "refusal": {
+                        "type": "string",
+                        "max": 16384
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label"
+                    ]
+                  },
+                  "max": 1024
+                },
+                "attempts": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                }
+              },
+              "required": [
+                "state",
+                "value"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "error",
+                    "unavailable"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "max": 256,
+                        "min": 1
+                      },
+                      "label": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "description": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "replacement": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "searchTerms": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "max": 1024
+                      },
+                      "refusal": {
+                        "type": "string",
+                        "max": 16384
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label"
+                    ]
+                  },
+                  "max": 1024
+                },
+                "attempts": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "changed": {
+        "type": "string",
+        "max": 16384
+      },
+      "submitted": {
+        "enum": [
+          null
+        ]
+      },
+      "cancelled": {
+        "enum": [
+          null
+        ]
+      },
+      "focused": {
+        "enum": [
+          null
+        ]
+      },
+      "blurred": {
+        "enum": [
+          null
+        ]
+      },
+      "pasteRefused": {
+        "type": "object",
+        "fields": {
+          "state": {
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "images",
+              "paths"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "state",
+          "kind",
+          "reason"
+        ]
+      },
+      "queryChanged": {
+        "type": "object",
+        "fields": {
+          "text": {
+            "type": "string",
+            "max": 16384
+          },
+          "range": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "range"
+        ],
+        "nullable": true
+      },
+      "accepted": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "range": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "range"
+        ]
+      }
+    }
+  },
+  "Editor": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "rows": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 4096
+        },
+        "lineNumbers": {
+          "type": "boolean"
+        },
+        "languageServices": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "changed": {
+        "type": "string",
+        "max": 16384
+      },
+      "edited": {
+        "type": "object",
+        "fields": {
+          "revision": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "replaced": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          },
+          "inserted": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "revision",
+          "replaced",
+          "inserted"
+        ]
+      },
+      "selectionChanged": {
+        "type": "object",
+        "fields": {
+          "start": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "end": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ]
+      },
+      "foldChanged": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "collapsed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "collapsed"
+        ]
+      },
+      "pasteRefused": {
+        "type": "object",
+        "fields": {
+          "state": {
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "images",
+              "paths"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "state",
+          "kind",
+          "reason"
+        ]
+      },
+      "submitted": {
+        "enum": [
+          null
+        ]
+      },
+      "cancelled": {
+        "enum": [
+          null
+        ]
+      },
+      "focused": {
+        "enum": [
+          null
+        ]
+      },
+      "blurred": {
+        "enum": [
+          null
+        ]
+      },
+      "serviceRequested": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "revision": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "kind": {
+            "enum": [
+              "completion",
+              "hover",
+              "definition",
+              "codeActions"
+            ]
+          },
+          "position": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "selection": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          },
+          "document": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "kind",
+          "position",
+          "selection",
+          "document"
+        ]
+      },
+      "serviceAccepted": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "definitionRequested": {
+        "type": "object",
+        "fields": {
+          "target": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "range": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "range"
+        ]
+      },
+      "codeActionRequested": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      }
+    }
+  },
+  "TextArea": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "frame": {
+          "enum": [
+            "own",
+            "host"
+          ]
+        },
+        "wrap": {
+          "enum": [
+            "soft",
+            "none"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "rows": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 4096
+        },
+        "maxRows": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 4096
+        },
+        "autosize": {
+          "type": "object",
+          "fields": {
+            "min": {
+              "type": "number",
+              "integer": true,
+              "min": 1,
+              "max": 4096
+            },
+            "max": {
+              "type": "number",
+              "integer": true,
+              "min": 1,
+              "max": 4096
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ]
+        },
+        "enter": {
+          "enum": [
+            "opens",
+            "submits"
+          ]
+        },
+        "maxLength": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        },
+        "arrowsClaimed": {
+          "type": "boolean"
+        },
+        "completionClaimed": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "change": {
+        "type": "string",
+        "max": 16384
+      },
+      "edited": {
+        "type": "object",
+        "fields": {
+          "revision": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "replaced": {
+            "type": "object",
+            "fields": {
+              "start": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              },
+              "end": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ]
+          },
+          "inserted": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "revision",
+          "replaced",
+          "inserted"
+        ]
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      },
+      "cancel": {
+        "enum": [
+          null
+        ]
+      },
+      "pasteRefused": {
+        "type": "object",
+        "fields": {
+          "state": {
+            "enum": [
+              "unavailable"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "images",
+              "paths"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "state",
+          "kind",
+          "reason"
+        ]
+      },
+      "moveUp": {
+        "enum": [
+          null
+        ]
+      },
+      "moveDown": {
+        "enum": [
+          null
+        ]
+      },
+      "acceptCompletion": {
+        "enum": [
+          null
+        ]
+      },
+      "dismissCompletion": {
+        "enum": [
+          null
+        ]
+      },
+      "indentRequested": {
+        "enum": [
+          null
+        ]
+      },
+      "outdentRequested": {
+        "enum": [
+          null
+        ]
+      },
+      "selectionChanged": {
+        "type": "object",
+        "fields": {
+          "start": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "end": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ]
+      },
+      "geometryChanged": {
+        "enum": [
+          null
+        ]
+      },
+      "focus": {
+        "enum": [
+          null
+        ]
+      },
+      "blur": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
   "Cascader": {
     "props": {
       "$defs": {

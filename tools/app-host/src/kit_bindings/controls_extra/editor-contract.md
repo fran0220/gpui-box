@@ -24,7 +24,9 @@ Not exposed by this host:
 - External pasted paths and images: no approved read/image capability bridge.
   `pasteRefused` reports Unavailable and a reason, never paths, bytes or fake refs.
 - Native indentation callbacks: no serialized synchronous closure capability.
-- Parser installation: the app-host Kit dependency does not enable `syntax`.
+- Parser installation: syntax is compiled consistently with the all-feature
+  workspace graph, but this adapter installs no grammar and exposes no parser
+  events or grammar-loading authority.
 - Arbitrary native HighlightStyle values: use revision-paired semantic tokens
   and diagnostics; no unvalidated native style object crosses the worker wire.
 

@@ -56,6 +56,95 @@ export interface KitMethodDefinitions0 {
   "CascaderOption": { "id": string; "label": string; "disabled"?: boolean; "children"?: { "state": "idle" | "loading" | "empty" } | { "state": "unavailable" | "error"; "reason": string } | { "state": "ready"; "value": Array<KitMethodDefinitions0["CascaderOption"]> } };
 }
 export interface KitMethodContracts {
+  MentionInput: {
+    invoke: {
+      set_suggestions: { args: { "suggestions": { "state": "idle" | "loading" | "empty"; "attempts"?: number } | { "state": "ready" | "refreshing"; "value": Array<{ "id": string; "label": string; "description"?: string; "replacement"?: string; "searchTerms"?: Array<string>; "refusal"?: string }>; "attempts"?: number } | { "state": "error" | "unavailable"; "reason": string; "value"?: Array<{ "id": string; "label": string; "description"?: string; "replacement"?: string; "searchTerms"?: Array<string>; "refusal"?: string }>; "attempts"?: number } }; result: null };
+    };
+    query: {
+      editor: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextArea" } };
+      active_query: { args: Record<string, never>; result: { "text": string; "range": { "start": number; "end": number } } | null };
+      is_open: { args: Record<string, never>; result: boolean };
+    };
+  };
+  Editor: {
+    invoke: {
+      set_diagnostics: { args: { "revision": number; "diagnostics": Array<{ "id": string; "range": { "start": number; "end": number }; "message": string; "severity": "error" | "warning" | "information" | "hint" }> }; result: boolean };
+      set_semantic_tokens: { args: { "revision": number; "tokens": Array<{ "range": { "start": number; "end": number }; "class": "keyword" | "stringLiteral" | "comment" | "number" | "inline" | "inlineWash" | "added" | "addedWash" | "removed" | "removedWash" }> }; result: boolean };
+      set_value: { args: { "value": string }; result: null };
+      set_label: { args: { "label": string }; result: null };
+      set_rows: { args: { "rows": number }; result: null };
+      set_line_numbers: { args: { "visible": boolean }; result: null };
+      set_read_only: { args: { "read_only": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_folds: { args: { "revision": number; "folds": Array<{ "id": string; "lines": { "start": number; "end": number } }> }; result: boolean };
+      set_fold_collapsed: { args: { "id": string; "collapsed": boolean }; result: boolean };
+      set_selections: { args: { "selections": Array<{ "range": { "start": number; "end": number }; "reversed": boolean }> }; result: boolean };
+      apply_edits: { args: { "revision": number; "edits": Array<{ "range": { "start": number; "end": number }; "text": string }> }; result: boolean };
+      set_language_services: { args: { "enabled": boolean }; result: null };
+      request_service: { args: { "kind": "completion" | "hover" | "definition" | "codeActions"; "position": number }; result: { "id": number; "revision": number; "kind": "completion" | "hover" | "definition" | "codeActions"; "position": number; "selection": { "start": number; "end": number }; "document": string } | null };
+      set_service_result: { args: { "request": number; "result": { "state": "idle" | "loading" | "empty"; "attempts"?: number } | { "state": "ready" | "refreshing"; "value": { "kind": "items"; "items": Array<{ "id": string; "label": string; "detail"?: string; "effect": { "kind": "edits"; "edits": Array<{ "range": { "start": number; "end": number }; "text": string }> } | { "kind": "definition"; "target": string; "range": { "start": number; "end": number } } | { "kind": "action"; "id": string } }> } | { "kind": "hover"; "range": { "start": number; "end": number }; "contents": string }; "attempts"?: number } | { "state": "error" | "unavailable"; "reason": string; "value"?: { "kind": "items"; "items": Array<{ "id": string; "label": string; "detail"?: string; "effect": { "kind": "edits"; "edits": Array<{ "range": { "start": number; "end": number }; "text": string }> } | { "kind": "definition"; "target": string; "range": { "start": number; "end": number } } | { "kind": "action"; "id": string } }> } | { "kind": "hover"; "range": { "start": number; "end": number }; "contents": string }; "attempts"?: number } }; result: boolean };
+      dismiss_service: { args: Record<string, never>; result: null };
+      accept_service_item: { args: { "id": string }; result: boolean };
+    };
+    query: {
+      text_area: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextArea" } };
+      snapshot: { args: Record<string, never>; result: { "revision": number; "text": string } };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      is_read_only: { args: Record<string, never>; result: boolean };
+      selected_range: { args: Record<string, never>; result: { "start": number; "end": number } };
+      selections: { args: Record<string, never>; result: Array<{ "range": { "start": number; "end": number }; "reversed": boolean }> };
+      is_fold_collapsed: { args: { "id": string }; result: boolean };
+      geometry: { args: Record<string, never>; result: { "revision": number; "viewport": { "x": number; "y": number; "width": number; "height": number }; "horizontal_scroll": number; "vertical_scroll": number; "lines": Array<{ "line": number; "range": { "start": number; "end": number }; "bounds": { "x": number; "y": number; "width": number; "height": number } }> } | null };
+    };
+  };
+  TextArea: {
+    invoke: {
+      set_value: { args: { "value": string }; result: null };
+      insert: { args: { "text": string }; result: null };
+      replace_range: { args: { "range": { "start": number; "end": number }; "text": string }; result: { "start": number; "end": number } | null };
+      replace_ranges: { args: { "edits": Array<{ "range": { "start": number; "end": number }; "text": string }> }; result: boolean };
+      set_selected_range: { args: { "range": { "start": number; "end": number } }; result: null };
+      set_selections: { args: { "selections": Array<{ "range": { "start": number; "end": number }; "reversed": boolean }> }; result: boolean };
+      select_rectangle: { args: { "anchor": { "x": number; "y": number }; "focus": { "x": number; "y": number } }; result: boolean };
+      set_placeholder: { args: { "placeholder": string }; result: null };
+      set_frame: { args: { "frame": "own" | "host" }; result: null };
+      set_wrap: { args: { "wrap": "soft" | "none" }; result: null };
+      set_enter: { args: { "enter": "opens" | "submits" }; result: null };
+      set_rows: { args: { "rows": number }; result: null };
+      set_max_rows: { args: { "max_rows": number | null }; result: null };
+      set_autosize: { args: { "rows": { "min": number; "max": number } | null }; result: null };
+      set_max_length: { args: { "max_length": number | null }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_read_only: { args: { "read_only": boolean }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_required: { args: { "required": boolean }; result: null };
+      set_arrows_claimed: { args: { "claimed": boolean }; result: null };
+      set_completion_claimed: { args: { "claimed": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      focus: { args: Record<string, never>; result: null };
+    };
+    query: {
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      value: { args: Record<string, never>; result: string };
+      snapshot: { args: Record<string, never>; result: { "revision": number; "text": string } };
+      revision: { args: Record<string, never>; result: number };
+      is_empty: { args: Record<string, never>; result: boolean };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      is_read_only: { args: Record<string, never>; result: boolean };
+      wrap_mode: { args: Record<string, never>; result: "soft" | "none" };
+      selected_range: { args: Record<string, never>; result: { "start": number; "end": number } };
+      cursor_offset: { args: Record<string, never>; result: number };
+      cursor_row: { args: Record<string, never>; result: number };
+      arrows_claimed: { args: Record<string, never>; result: boolean };
+      completion_claimed: { args: Record<string, never>; result: boolean };
+      selections: { args: Record<string, never>; result: Array<{ "range": { "start": number; "end": number }; "reversed": boolean }> };
+      bounds_for_range: { args: { "range": { "start": number; "end": number } }; result: Array<{ "x": number; "y": number; "width": number; "height": number }> | null };
+      bounds_for_position: { args: { "offset": number }; result: { "x": number; "y": number; "width": number; "height": number } | null };
+      caret_bounds: { args: Record<string, never>; result: { "x": number; "y": number; "width": number; "height": number } | null };
+      measured: { args: Record<string, never>; result: { "text": number; "height": number; "wrapped": number; "pass": number } | null };
+      horizontal_scroll_offset: { args: Record<string, never>; result: number };
+    };
+  };
   Cascader: {
     invoke: {
       set_options: { args: { "options": Array<KitMethodDefinitions0["CascaderOption"]> }; result: null };

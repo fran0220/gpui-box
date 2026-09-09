@@ -66,7 +66,7 @@ export interface KitBindingCatalog {
   readonly "DockTree": { readonly source: "crates/gpui-kit/src/layout/dock_tree.rs"; readonly status: "partial" };
   readonly "Drawer": { readonly source: "crates/gpui-kit/src/overlay/drawer.rs"; readonly status: "partial" };
   readonly "Dropzone": { readonly source: "crates/gpui-kit/src/controls/dropzone.rs"; readonly status: "unbound" };
-  readonly "Editor": { readonly source: "crates/gpui-kit/src/controls/editor.rs"; readonly status: "unbound" };
+  readonly "Editor": { readonly source: "crates/gpui-kit/src/controls/editor.rs"; readonly status: "partial" };
   readonly "EffectParticles": { readonly source: "crates/gpui-kit/src/effects.rs"; readonly status: "partial" };
   readonly "EmptyState": { readonly source: "crates/gpui-kit/src/display/empty.rs"; readonly status: "partial" };
   readonly "FailurePanel": { readonly source: "crates/gpui-kit/src/display/failure_panel.rs"; readonly status: "partial" };
@@ -100,7 +100,7 @@ export interface KitBindingCatalog {
   readonly "LogStream": { readonly source: "crates/gpui-kit/src/content/log_stream.rs"; readonly status: "partial" };
   readonly "Markdown": { readonly source: "crates/gpui-kit/src/content/markdown.rs"; readonly status: "partial" };
   readonly "Masonry": { readonly source: "crates/gpui-kit/src/data/masonry.rs"; readonly status: "partial" };
-  readonly "MentionInput": { readonly source: "crates/gpui-kit/src/controls/mention.rs"; readonly status: "unbound" };
+  readonly "MentionInput": { readonly source: "crates/gpui-kit/src/controls/mention.rs"; readonly status: "partial" };
   readonly "Menu": { readonly source: "crates/gpui-kit/src/overlay/menu.rs"; readonly status: "partial" };
   readonly "Menubar": { readonly source: "crates/gpui-kit/src/overlay/menubar.rs"; readonly status: "partial" };
   readonly "MessageList": { readonly source: "crates/gpui-kit/src/content/message_list.rs"; readonly status: "partial" };
@@ -179,7 +179,7 @@ export interface KitBindingCatalog {
   readonly "Tag": { readonly source: "crates/gpui-kit/src/display/tag.rs"; readonly status: "partial" };
   readonly "TagInput": { readonly source: "crates/gpui-kit/src/controls/tag_input.rs"; readonly status: "partial" };
   readonly "Terminal": { readonly source: "crates/gpui-kit/src/content/terminal/view.rs"; readonly status: "partial" };
-  readonly "TextArea": { readonly source: "crates/gpui-kit/src/controls/textarea/mod.rs"; readonly status: "unbound" };
+  readonly "TextArea": { readonly source: "crates/gpui-kit/src/controls/textarea/mod.rs"; readonly status: "partial" };
   readonly "TextInput": { readonly source: "crates/gpui-kit/src/controls/input/mod.rs"; readonly status: "partial" };
   readonly "ThinkingBlock": { readonly source: "crates/gpui-kit/src/agent/thinking.rs"; readonly status: "partial" };
   readonly "TimeInput": { readonly source: "crates/gpui-kit/src/datetime/time_input.rs"; readonly status: "partial" };

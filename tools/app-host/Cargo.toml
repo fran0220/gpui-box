@@ -16,7 +16,7 @@ base64.workspace = true
 env_logger.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
-gpui-kit.workspace = true
+gpui-kit = { workspace = true, features = ["syntax"] }
 gpui-kit-theme.workspace = true
 gpui-kit-semantics.workspace = true
 gpui-kit-testkit = { workspace = true, optional = true, features = ["test-support"] }

@@ -9917,8 +9917,1413 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "path": "gpui_kit::controls::Editor",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Editor",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "readOnly",
+          "label",
+          "value",
+          "rows",
+          "lineNumbers",
+          "languageServices"
+        ],
+        "events": [
+          "changed",
+          "edited",
+          "selectionChanged",
+          "foldChanged",
+          "pasteRefused",
+          "submitted",
+          "cancelled",
+          "focused",
+          "blurred",
+          "serviceRequested",
+          "serviceAccepted",
+          "definitionRequested",
+          "codeActionRequested"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_diagnostics": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "diagnostics": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "max": 256,
+                          "min": 1
+                        },
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "severity": {
+                          "enum": [
+                            "error",
+                            "warning",
+                            "information",
+                            "hint"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "range",
+                        "message",
+                        "severity"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "revision",
+                  "diagnostics"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_semantic_tokens": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "tokens": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "class": {
+                          "enum": [
+                            "keyword",
+                            "stringLiteral",
+                            "comment",
+                            "number",
+                            "inline",
+                            "inlineWash",
+                            "added",
+                            "addedWash",
+                            "removed",
+                            "removedWash"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "range",
+                        "class"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "revision",
+                  "tokens"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_label": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_rows": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "rows": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 1,
+                    "max": 4096
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_line_numbers": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "visible": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "visible"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_read_only": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "read_only": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "read_only"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_folds": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "folds": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "max": 256,
+                          "min": 1
+                        },
+                        "lines": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "lines"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "revision",
+                  "folds"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_fold_collapsed": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "collapsed"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_selections": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "selections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "reversed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "range",
+                        "reversed"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "selections"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "apply_edits": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "edits": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "text": {
+                          "type": "string",
+                          "max": 16384
+                        }
+                      },
+                      "required": [
+                        "range",
+                        "text"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "revision",
+                  "edits"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_language_services": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "request_service": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "kind": {
+                    "enum": [
+                      "completion",
+                      "hover",
+                      "definition",
+                      "codeActions"
+                    ]
+                  },
+                  "position": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "kind",
+                  "position"
+                ]
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "kind": {
+                    "enum": [
+                      "completion",
+                      "hover",
+                      "definition",
+                      "codeActions"
+                    ]
+                  },
+                  "position": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "selection": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "document": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "id",
+                  "revision",
+                  "kind",
+                  "position",
+                  "selection",
+                  "document"
+                ],
+                "nullable": true
+              }
+            },
+            "set_service_result": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "request": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "result": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "idle",
+                              "loading",
+                              "empty"
+                            ]
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "ready",
+                              "refreshing"
+                            ]
+                          },
+                          "value": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "fields": {
+                                  "kind": {
+                                    "enum": [
+                                      "items"
+                                    ]
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "fields": {
+                                        "id": {
+                                          "type": "string",
+                                          "max": 256,
+                                          "min": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "max": 16384
+                                        },
+                                        "detail": {
+                                          "type": "string",
+                                          "max": 16384
+                                        },
+                                        "effect": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "edits"
+                                                  ]
+                                                },
+                                                "edits": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "fields": {
+                                                      "range": {
+                                                        "type": "object",
+                                                        "fields": {
+                                                          "start": {
+                                                            "type": "number",
+                                                            "integer": true,
+                                                            "min": 0,
+                                                            "max": 1000000
+                                                          },
+                                                          "end": {
+                                                            "type": "number",
+                                                            "integer": true,
+                                                            "min": 0,
+                                                            "max": 1000000
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "start",
+                                                          "end"
+                                                        ]
+                                                      },
+                                                      "text": {
+                                                        "type": "string",
+                                                        "max": 16384
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "range",
+                                                      "text"
+                                                    ]
+                                                  },
+                                                  "max": 1024
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "edits"
+                                              ]
+                                            },
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "definition"
+                                                  ]
+                                                },
+                                                "target": {
+                                                  "type": "string",
+                                                  "max": 256,
+                                                  "min": 1
+                                                },
+                                                "range": {
+                                                  "type": "object",
+                                                  "fields": {
+                                                    "start": {
+                                                      "type": "number",
+                                                      "integer": true,
+                                                      "min": 0,
+                                                      "max": 1000000
+                                                    },
+                                                    "end": {
+                                                      "type": "number",
+                                                      "integer": true,
+                                                      "min": 0,
+                                                      "max": 1000000
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "start",
+                                                    "end"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "target",
+                                                "range"
+                                              ]
+                                            },
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "action"
+                                                  ]
+                                                },
+                                                "id": {
+                                                  "type": "string",
+                                                  "max": 256,
+                                                  "min": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "id"
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "effect"
+                                      ]
+                                    },
+                                    "max": 1024
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "items"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "fields": {
+                                  "kind": {
+                                    "enum": [
+                                      "hover"
+                                    ]
+                                  },
+                                  "range": {
+                                    "type": "object",
+                                    "fields": {
+                                      "start": {
+                                        "type": "number",
+                                        "integer": true,
+                                        "min": 0,
+                                        "max": 1000000
+                                      },
+                                      "end": {
+                                        "type": "number",
+                                        "integer": true,
+                                        "min": 0,
+                                        "max": 1000000
+                                      }
+                                    },
+                                    "required": [
+                                      "start",
+                                      "end"
+                                    ]
+                                  },
+                                  "contents": {
+                                    "type": "string",
+                                    "max": 16384
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "range",
+                                  "contents"
+                                ]
+                              }
+                            ]
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "value"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "error",
+                              "unavailable"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "max": 16384
+                          },
+                          "value": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "fields": {
+                                  "kind": {
+                                    "enum": [
+                                      "items"
+                                    ]
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "fields": {
+                                        "id": {
+                                          "type": "string",
+                                          "max": 256,
+                                          "min": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "max": 16384
+                                        },
+                                        "detail": {
+                                          "type": "string",
+                                          "max": 16384
+                                        },
+                                        "effect": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "edits"
+                                                  ]
+                                                },
+                                                "edits": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "fields": {
+                                                      "range": {
+                                                        "type": "object",
+                                                        "fields": {
+                                                          "start": {
+                                                            "type": "number",
+                                                            "integer": true,
+                                                            "min": 0,
+                                                            "max": 1000000
+                                                          },
+                                                          "end": {
+                                                            "type": "number",
+                                                            "integer": true,
+                                                            "min": 0,
+                                                            "max": 1000000
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "start",
+                                                          "end"
+                                                        ]
+                                                      },
+                                                      "text": {
+                                                        "type": "string",
+                                                        "max": 16384
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "range",
+                                                      "text"
+                                                    ]
+                                                  },
+                                                  "max": 1024
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "edits"
+                                              ]
+                                            },
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "definition"
+                                                  ]
+                                                },
+                                                "target": {
+                                                  "type": "string",
+                                                  "max": 256,
+                                                  "min": 1
+                                                },
+                                                "range": {
+                                                  "type": "object",
+                                                  "fields": {
+                                                    "start": {
+                                                      "type": "number",
+                                                      "integer": true,
+                                                      "min": 0,
+                                                      "max": 1000000
+                                                    },
+                                                    "end": {
+                                                      "type": "number",
+                                                      "integer": true,
+                                                      "min": 0,
+                                                      "max": 1000000
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "start",
+                                                    "end"
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "target",
+                                                "range"
+                                              ]
+                                            },
+                                            {
+                                              "type": "object",
+                                              "fields": {
+                                                "kind": {
+                                                  "enum": [
+                                                    "action"
+                                                  ]
+                                                },
+                                                "id": {
+                                                  "type": "string",
+                                                  "max": 256,
+                                                  "min": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "id"
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "effect"
+                                      ]
+                                    },
+                                    "max": 1024
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "items"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "fields": {
+                                  "kind": {
+                                    "enum": [
+                                      "hover"
+                                    ]
+                                  },
+                                  "range": {
+                                    "type": "object",
+                                    "fields": {
+                                      "start": {
+                                        "type": "number",
+                                        "integer": true,
+                                        "min": 0,
+                                        "max": 1000000
+                                      },
+                                      "end": {
+                                        "type": "number",
+                                        "integer": true,
+                                        "min": 0,
+                                        "max": 1000000
+                                      }
+                                    },
+                                    "required": [
+                                      "start",
+                                      "end"
+                                    ]
+                                  },
+                                  "contents": {
+                                    "type": "string",
+                                    "max": 16384
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "range",
+                                  "contents"
+                                ]
+                              }
+                            ]
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "request",
+                  "result"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "dismiss_service": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "accept_service_item": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          },
+          "query": {
+            "text_area": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextArea"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "revision",
+                  "text"
+                ]
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_read_only": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "selected_range": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "start": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "end": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ]
+              }
+            },
+            "selections": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "range": {
+                      "type": "object",
+                      "fields": {
+                        "start": {
+                          "type": "number",
+                          "integer": true,
+                          "min": 0,
+                          "max": 1000000
+                        },
+                        "end": {
+                          "type": "number",
+                          "integer": true,
+                          "min": 0,
+                          "max": 1000000
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "reversed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "range",
+                    "reversed"
+                  ]
+                },
+                "max": 1024
+              }
+            },
+            "is_fold_collapsed": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "geometry": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "viewport": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      },
+                      "width": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      },
+                      "height": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "width",
+                      "height"
+                    ]
+                  },
+                  "horizontal_scroll": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "vertical_scroll": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "lines": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "line": {
+                          "type": "number",
+                          "integer": true,
+                          "min": 0,
+                          "max": 1000000
+                        },
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "bounds": {
+                          "type": "object",
+                          "fields": {
+                            "x": {
+                              "type": "number",
+                              "min": -1000000000000,
+                              "max": 1000000000000
+                            },
+                            "y": {
+                              "type": "number",
+                              "min": -1000000000000,
+                              "max": 1000000000000
+                            },
+                            "width": {
+                              "type": "number",
+                              "min": -1000000000000,
+                              "max": 1000000000000
+                            },
+                            "height": {
+                              "type": "number",
+                              "min": -1000000000000,
+                              "max": 1000000000000
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "line",
+                        "range",
+                        "bounds"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "revision",
+                  "viewport",
+                  "horizontal_scroll",
+                  "vertical_scroll",
+                  "lines"
+                ],
+                "nullable": true
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -12679,8 +14084,280 @@
       "source": "crates/gpui-kit/src/controls/mention.rs",
       "path": "gpui_kit::controls::MentionInput",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.MentionInput",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "readOnly",
+          "value",
+          "placeholder",
+          "rows",
+          "suggestions"
+        ],
+        "events": [
+          "changed",
+          "submitted",
+          "cancelled",
+          "focused",
+          "blurred",
+          "pasteRefused",
+          "queryChanged",
+          "accepted"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_suggestions": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "suggestions": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "idle",
+                              "loading",
+                              "empty"
+                            ]
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "ready",
+                              "refreshing"
+                            ]
+                          },
+                          "value": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "fields": {
+                                "id": {
+                                  "type": "string",
+                                  "max": 256,
+                                  "min": 1
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "replacement": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "searchTerms": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "max": 16384
+                                  },
+                                  "max": 1024
+                                },
+                                "refusal": {
+                                  "type": "string",
+                                  "max": 16384
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label"
+                              ]
+                            },
+                            "max": 1024
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "value"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "error",
+                              "unavailable"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "max": 16384
+                          },
+                          "value": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "fields": {
+                                "id": {
+                                  "type": "string",
+                                  "max": 256,
+                                  "min": 1
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "replacement": {
+                                  "type": "string",
+                                  "max": 16384
+                                },
+                                "searchTerms": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "max": 16384
+                                  },
+                                  "max": 1024
+                                },
+                                "refusal": {
+                                  "type": "string",
+                                  "max": 16384
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label"
+                              ]
+                            },
+                            "max": 1024
+                          },
+                          "attempts": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "suggestions"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "editor": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextArea"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "active_query": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  }
+                },
+                "required": [
+                  "text",
+                  "range"
+                ],
+                "nullable": true
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -32774,8 +34451,1108 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "path": "gpui_kit::controls::TextArea",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.TextArea",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "placeholder",
+          "value",
+          "frame",
+          "wrap",
+          "required",
+          "invalid",
+          "readOnly",
+          "rows",
+          "maxRows",
+          "autosize",
+          "enter",
+          "maxLength",
+          "arrowsClaimed",
+          "completionClaimed"
+        ],
+        "events": [
+          "change",
+          "edited",
+          "submit",
+          "cancel",
+          "pasteRefused",
+          "moveUp",
+          "moveDown",
+          "acceptCompletion",
+          "dismissCompletion",
+          "indentRequested",
+          "outdentRequested",
+          "selectionChanged",
+          "geometryChanged",
+          "focus",
+          "blur"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "insert": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "replace_range": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "range",
+                  "text"
+                ]
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "start": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "end": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "nullable": true
+              }
+            },
+            "replace_ranges": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "edits": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "text": {
+                          "type": "string",
+                          "max": 16384
+                        }
+                      },
+                      "required": [
+                        "range",
+                        "text"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "edits"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_selected_range": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  }
+                },
+                "required": [
+                  "range"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selections": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "selections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "range": {
+                          "type": "object",
+                          "fields": {
+                            "start": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            },
+                            "end": {
+                              "type": "number",
+                              "integer": true,
+                              "min": 0,
+                              "max": 1000000
+                            }
+                          },
+                          "required": [
+                            "start",
+                            "end"
+                          ]
+                        },
+                        "reversed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "range",
+                        "reversed"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "selections"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "select_rectangle": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "anchor": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  },
+                  "focus": {
+                    "type": "object",
+                    "fields": {
+                      "x": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      },
+                      "y": {
+                        "type": "number",
+                        "min": -1000000000000,
+                        "max": 1000000000000
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor",
+                  "focus"
+                ]
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_frame": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "frame": {
+                    "enum": [
+                      "own",
+                      "host"
+                    ]
+                  }
+                },
+                "required": [
+                  "frame"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_wrap": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "wrap": {
+                    "enum": [
+                      "soft",
+                      "none"
+                    ]
+                  }
+                },
+                "required": [
+                  "wrap"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_enter": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "enter": {
+                    "enum": [
+                      "opens",
+                      "submits"
+                    ]
+                  }
+                },
+                "required": [
+                  "enter"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_rows": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "rows": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 1,
+                    "max": 4096
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_max_rows": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "max_rows": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 1,
+                    "max": 4096,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "max_rows"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_autosize": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "rows": {
+                    "type": "object",
+                    "fields": {
+                      "min": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 1,
+                        "max": 4096
+                      },
+                      "max": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 1,
+                        "max": 4096
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_max_length": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "max_length": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "max_length"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_read_only": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "read_only": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "read_only"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_required": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "required"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_arrows_claimed": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "claimed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "claimed"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_completion_claimed": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "claimed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "claimed"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "focus": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "value": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "revision": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "revision",
+                  "text"
+                ]
+              }
+            },
+            "revision": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "is_empty": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_read_only": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "wrap_mode": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  "soft",
+                  "none"
+                ]
+              }
+            },
+            "selected_range": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "start": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "end": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "start",
+                  "end"
+                ]
+              }
+            },
+            "cursor_offset": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "cursor_row": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "arrows_claimed": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "completion_claimed": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "selections": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "range": {
+                      "type": "object",
+                      "fields": {
+                        "start": {
+                          "type": "number",
+                          "integer": true,
+                          "min": 0,
+                          "max": 1000000
+                        },
+                        "end": {
+                          "type": "number",
+                          "integer": true,
+                          "min": 0,
+                          "max": 1000000
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "end"
+                      ]
+                    },
+                    "reversed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "range",
+                    "reversed"
+                  ]
+                },
+                "max": 1024
+              }
+            },
+            "bounds_for_range": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  }
+                },
+                "required": [
+                  "range"
+                ]
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "x": {
+                      "type": "number",
+                      "min": -1000000000000,
+                      "max": 1000000000000
+                    },
+                    "y": {
+                      "type": "number",
+                      "min": -1000000000000,
+                      "max": 1000000000000
+                    },
+                    "width": {
+                      "type": "number",
+                      "min": -1000000000000,
+                      "max": 1000000000000
+                    },
+                    "height": {
+                      "type": "number",
+                      "min": -1000000000000,
+                      "max": 1000000000000
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ]
+                },
+                "max": 1024,
+                "nullable": true
+              }
+            },
+            "bounds_for_position": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "offset": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "offset"
+                ]
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "nullable": true
+              }
+            },
+            "caret_bounds": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "nullable": true
+              }
+            },
+            "measured": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "text": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "wrapped": {
+                    "type": "number",
+                    "min": -1000000000000,
+                    "max": 1000000000000
+                  },
+                  "pass": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000
+                  }
+                },
+                "required": [
+                  "text",
+                  "height",
+                  "wrapped",
+                  "pass"
+                ],
+                "nullable": true
+              }
+            },
+            "horizontal_scroll_offset": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "min": -1000000000000,
+                "max": 1000000000000
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle",
+          "focus": "gpui::window::FocusHandle::focus"
+        }
       },
       "rustSignatures": {
         "construct": [
