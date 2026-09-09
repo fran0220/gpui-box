@@ -1,4 +1,4 @@
-import { readFile, mkdir, open } from 'node:fs/promises';
+import { readFile, mkdir, open, realpath } from 'node:fs/promises';
 import { watch, constants } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -11,7 +11,9 @@ import { nativeBackend } from '../js-runtime/sandbox.mjs';
 import { DropBridge } from './drop-bridge.mjs';
 
 const args = process.argv.slice(2);
-const root = resolve(args[0]);
+// Windows notifications use long paths; libuv requires the watch root to use
+// that same spelling rather than an 8.3 TEMP ancestor (e.g. RUNNER~1).
+const root = await realpath(resolve(args[0]));
 const flag = name => args.includes(name);
 const value = name => { const i = args.indexOf(name); return i < 0 ? undefined : args[i + 1]; };
 if (value('--sandbox-launcher')) process.env.GPUI_SANDBOX_LAUNCHER = resolve(value('--sandbox-launcher'));
