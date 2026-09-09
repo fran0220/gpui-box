@@ -128,6 +128,44 @@ fn main() -> Result<()> {
             reports.push(report);
         }
     }
+    for columns in [1_000, 10_000] {
+        for rtl in [false, true] {
+            for report in run_wide_grid(columns, rtl)? {
+                if columns == 10_000 && report["destination"].as_u64().is_some_and(|at| at <= 703) {
+                    let small = reports
+                        .iter()
+                        .find(|small| {
+                            small["name"] == "wide-data-grid"
+                                && small["dataset_columns"] == 1_000
+                                && small["rtl"] == rtl
+                                && small["destination"] == report["destination"]
+                        })
+                        .expect("matching smaller viewport");
+                    for path in [
+                        "/cell_builder_calls",
+                        "/sample/builder_calls",
+                        "/sample/frame/request_layout_calls",
+                        "/sample/frame/prepaint_calls",
+                        "/sample/frame/paint_calls",
+                        "/sample/frame/semantic_nodes",
+                    ] {
+                        let small = small
+                            .pointer(path)
+                            .and_then(serde_json::Value::as_u64)
+                            .context("small wide metric unavailable")?;
+                        let large = report
+                            .pointer(path)
+                            .and_then(serde_json::Value::as_u64)
+                            .context("large wide metric unavailable")?;
+                        if large > small {
+                            bail!("wide-grid viewport work {path} grew with column count");
+                        }
+                    }
+                }
+                reports.push(report);
+            }
+        }
+    }
     reports.push(run(
         "node-graph-material",
         node_graph_material_fixture,
@@ -210,6 +248,12 @@ fn run(name: &str, fixture: Fixture, items: usize) -> Result<serde_json::Value> 
     let mut report = serde_json::to_value(report)?;
     report["dataset_items"] = items.into();
     report["caller_input_conversions"] = if eager { calls.get() } else { 0 }.into();
+    report["caller_eager_cell_conversions"] = if matches!(name, "data-grid" | "tree-grid") {
+        calls.get() * 3
+    } else {
+        0
+    }
+    .into();
     report["has_row_builder_callback"] = matches!(name, "list" | "data-grid" | "tree-grid").into();
     Ok(report)
 }
@@ -239,6 +283,7 @@ fn heap_allocation_limit(name: &str) -> u64 {
         // removes steady-state frame allocations.
         "list" => 1_330,
         "data-grid" => 3_723,
+        "wide-data-grid" => 12_140,
         "tree-grid" => 4_452,
         "code-view" => 6_096,
         "log-stream" => 6_485,
@@ -327,6 +372,111 @@ fn data_grid_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {
         .visible_rows(VISIBLE_ROWS)
         .into_any_element()
     })
+}
+
+/// The caller retains column descriptors and supplies cells by key. Descriptor
+/// cloning is still dataset-sized input work; cell building must not be.
+fn run_wide_grid(column_count: usize, rtl: bool) -> Result<Vec<serde_json::Value>> {
+    let columns: Vec<_> = (0..column_count)
+        .map(|index| {
+            let column = GridColumn::new(format!("field-{index}"), format!("Field {index}"))
+                .pinned(index == 0)
+                .sortable(true)
+                .resizable(true)
+                .editable(true);
+            if index % 5 == 0 {
+                column.flex(2.0).min_width(180.0)
+            } else {
+                column.fixed(180.0 + (index % 7) as f32 * 31.0)
+            }
+        })
+        .collect();
+    let rows = Rc::new(Cell::new(0));
+    let cells = Rc::new(Cell::new(0));
+    let target = Rc::new(Cell::new(0));
+    let mut cx = TestAppContext::single();
+    let mut harness = Harness::new(
+        &mut cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            gpui_kit::prelude::set_layout_direction(
+                if rtl {
+                    gpui_kit::prelude::LayoutDirection::RightToLeft
+                } else {
+                    gpui_kit::prelude::LayoutDirection::LeftToRight
+                },
+                cx,
+            );
+        },
+        {
+            let rows = Rc::clone(&rows);
+            let cells = Rc::clone(&cells);
+            let target = Rc::clone(&target);
+            move |_, _| {
+                let rows = Rc::clone(&rows);
+                let cells = Rc::clone(&cells);
+                div()
+                    .w(gpui::px(870.0))
+                    .child(
+                        DataGrid::new("perf.wide-grid", DATASET_ITEMS, move |row, _, _| {
+                            rows.set(rows.get() + 1);
+                            let cells = Rc::clone(&cells);
+                            GridRow::new(format!("row-{row}")).cells_with(move |key, _, _| {
+                                cells.set(cells.get() + 1);
+                                gpui_kit::prelude::Cell::new(format!("{row}/{key}")).published(true)
+                            })
+                        })
+                        .columns(columns.iter().cloned())
+                        .row_height(31.5)
+                        .visible_rows(VISIBLE_ROWS)
+                        .on_sort(|_, _, _, _| {})
+                        .on_resize(|_, _, _, _| {})
+                        .on_edit_request(|_, _, _, _| {})
+                        .footer_cell("field-0", "Summary")
+                        .scroll_to_cell(target.get(), format!("field-{}", target.get())),
+                    )
+                    .into_any_element()
+            }
+        },
+    );
+    let mut positions = Vec::new();
+    for destination in [0, 703, column_count - 1] {
+        target.set(destination);
+        harness.frame();
+        harness.frame();
+        rows.set(0);
+        cells.set(0);
+        begin_allocation_measurement();
+        harness.frame();
+        let heap = end_allocation_measurement();
+        let snapshot = harness.current_snapshot();
+        let mounted_rows = snapshot
+            .nodes
+            .iter()
+            .filter(|node| node.role == Role::Row)
+            .count();
+        let sample = PerformanceSample::new(harness.frame_stats())
+            .heap_allocations(heap)
+            .mounted_items(mounted_rows as u64)
+            .builder_calls(rows.get());
+        let report = budget("wide-data-grid")
+            .enforce(sample)
+            .map_err(|error| anyhow::anyhow!(error))?;
+        if cells.get() > 192 {
+            bail!("wide-grid built {} cells (limit 192)", cells.get());
+        }
+        let mut report = serde_json::to_value(report)?;
+        report["cell_builder_calls"] = cells.get().into();
+        report["cell_builder_limit"] = 192.into();
+        report["destination"] = destination.into();
+        report["dataset_rows"] = DATASET_ITEMS.into();
+        report["dataset_columns"] = column_count.into();
+        report["rtl"] = rtl.into();
+        report["caller_column_conversions"] = column_count.into();
+        report["caller_eager_cell_conversions"] = 0.into();
+        positions.push(report);
+    }
+    Ok(positions)
 }
 
 fn tree_grid_fixture(calls: Rc<Cell<u64>>, items: usize) -> ViewBuilder {

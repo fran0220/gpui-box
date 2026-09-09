@@ -22,6 +22,51 @@ fixture renders twice, then only drains already-scheduled work; it fails if the
 window's frame index advances without an invalidation. The command additionally renders a deliberately
 unbounded 10,000-child fixture and fails if the budget does not reject it.
 
+## Wide grids are measured on both axes
+
+The `wide-data-grid` reports use 10,000 rows and either 1,000 or 10,000
+columns in an 870-pixel viewport, with 24 visible 31.5-pixel rows. Columns
+mix 180-pixel flexible minimums with fixed widths from 180 to 366 pixels.
+Every column is sortable, resizable, and editable; the leading column is
+pinned. Each direction is measured at the start, column/row 703, and the last
+column. Header, body, and summary share the column geometry.
+
+The existing layout/paint/semantic budgets are unchanged. The new interactive
+wide-grid case has its own allocation ratchet: 12,140 calls, the observed
+11,036-call maximum plus a 10% integer ceiling. It builds 104–130 cells per
+measured frame (explicit ceiling 192), with at most 752 layout calls and 169
+semantic nodes in these cases. The row-builder counter is separate from the
+cell-builder counter: neither disguises descriptor or eager-cell conversion.
+
+Use `GridRow::cells_with` for wide data. The provider receives a column key
+and builds its `Cell` only when mounted or explicitly requested by range copy.
+Existing `.cell` entries override the provider and retain their eager cost;
+filtering after the row callback cannot undo their construction. The legacy
+three-column grid cases report `caller_eager_cell_conversions` separately.
+Wide cases report zero eager cells and `caller_column_conversions` equal to
+the number of column descriptors cloned to supply each frame. Descriptor
+preparation, prefix geometry, and navigation metadata remain column-count
+sized; this is a cell/element-work bound, not constant-time ingestion or
+constant retained bytes.
+
+Pinned columns remain mounted. At most two actionable header entry points
+per omitted run preserve forward/reverse Tab access. An editor or the active
+keyboard-navigation cell remains mounted horizontally while its row is
+mounted. Header/body/summary gaps carry exact logical widths, including RTL;
+wide header reorder animations do not interpolate away from body geometry.
+`scroll_to_cell(row_index, column_key)` performs nearest-edge reveal on both
+axes once per changed request, without selecting or editing data. Editing a
+new target also reveals it; locating its caller-owned row identity and range
+copy/changed-range resolution can scan row metadata. Rows retain the existing
+uniform-height contract; this does not implement per-row variable heights.
+
+The grid integration suite covers mixed widths, far-cell reveal, RTL pinned
+geometry, real focused semantic nodes after navigation, header Tab traversal,
+editing Tab across an omitted run, and range copy through the lazy provider
+with eager overrides. Offscreen data cells are absent from the semantic tree,
+apart from the bounded active-cell retention described above. The grid node
+continues to publish the caller's total row count.
+
 ## What is counted
 
 `Window::frame_stats()` returns the most recently completed `FrameStats` for
