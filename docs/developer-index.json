@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2551
+      "symbolCount": 2552
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -953,6 +953,10 @@
         "native-media": [
           "media/native-playback"
         ],
+        "syntax": [
+          "dep:tree-sitter",
+          "dep:tree-sitter-json"
+        ],
         "terminal": [
           "dep:alacritty_terminal"
         ]
@@ -1084,6 +1088,20 @@
           "features": []
         },
         {
+          "alias": "tree-sitter",
+          "package": "tree-sitter",
+          "kind": "normal",
+          "optional": true,
+          "features": []
+        },
+        {
+          "alias": "tree-sitter-json",
+          "package": "tree-sitter-json",
+          "kind": "normal",
+          "optional": true,
+          "features": []
+        },
+        {
           "alias": "unicode-segmentation",
           "package": "unicode-segmentation",
           "kind": "normal",
@@ -1105,7 +1123,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4274
+      "symbolCount": 4304
     },
     {
       "name": "gpui-box-kit-assets",
@@ -12444,6 +12462,21 @@
       "documentation": "An immutable, cheap-to-clone document revision with indexed hard lines.",
       "signature": "# [doc = \" An immutable, cheap-to-clone document revision with indexed hard lines.\"] # [derive (Clone, Default)] pub struct EditSnapshot { rope : Rope, contiguous : OnceLock<SharedString>, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::byte_chunks",
+      "name": "byte_chunks",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Borrows byte chunks intersecting a range, clipped to document bounds. Chunks concatenate to that exact byte range without allocating or flattening. Byte boundaries need not be UTF-8 scalar boundaries, which lets incremental parsers request input at arbitrary decoder offsets.",
+      "documentation": "Borrows byte chunks intersecting a range, clipped to document bounds.\nChunks concatenate to that exact byte range without allocating or\nflattening. Byte boundaries need not be UTF-8 scalar boundaries, which\nlets incremental parsers request input at arbitrary decoder offsets.",
+      "signature": "pub fn byte_chunks (& self, range : Range<usize>) -> impl Iterator<Item = & [u8]>",
+      "cfg": [],
+      "target": "EditSnapshot"
     },
     {
       "id": "gpui::editable_text::document::EditSnapshot::is_empty",
@@ -58389,7 +58422,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "Plain source editing with caller-owned language policy.",
       "documentation": "Plain source editing with caller-owned language policy.",
-      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, _subscription : Subscription, }",
+      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, # [cfg (feature = \"syntax\")] syntax : Option<EditorSyntax>, _subscription : Subscription, }",
       "cfg": []
     },
     {
@@ -58558,6 +58591,40 @@
       "target": "Editor"
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::syntax",
+      "name": "syntax",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Installs actual incremental in-process syntax parsing. Explicit caller highlights for the current revision take precedence over it.",
+      "documentation": "Installs actual incremental in-process syntax parsing. Explicit\ncaller highlights for the current revision take precedence over it.",
+      "signature": "pub fn syntax (mut self, syntax : EditorSyntax) -> Self",
+      "cfg": [
+        "cfg (feature = \"syntax\")"
+      ],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::syntax_state",
+      "name": "syntax_state",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "The parser's current revision, captures, grammar errors and work counts.",
+      "documentation": "The parser's current revision, captures, grammar errors and work counts.",
+      "signature": "pub fn syntax_state (& self) -> Option<& EditorSyntax>",
+      "cfg": [
+        "cfg (feature = \"syntax\")"
+      ],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::text_area",
       "name": "text_area",
       "kind": "method",
@@ -58583,7 +58650,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "What a source editor reports to its owner.",
       "documentation": "What a source editor reports to its owner.",
-      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The complete plain-text value changed.\"] Changed (SharedString), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, }",
+      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The complete plain-text value changed.\"] Changed (SharedString), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
       "cfg": []
     },
     {
@@ -58802,6 +58869,198 @@
       "summary": "Current-frame geometry for one hard source line.",
       "documentation": "Current-frame geometry for one hard source line.",
       "signature": "# [doc = \" Current-frame geometry for one hard source line.\"] # [derive (Debug, Clone, PartialEq)] pub struct EditorLineGeometry { # [doc = \" One-based line number.\"] pub line : usize, # [doc = \" UTF-8 source range, including its trailing line break when present.\"] pub range : Range<usize>, # [doc = \" Painted row bounds in window coordinates.\"] pub bounds : Bounds<Pixels>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::reexport-1",
+      "name": "syntax :: { EditorParseWork , EditorSyntax , EditorSyntaxCapture , EditorSyntaxError }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [cfg (feature = \"syntax\")] pub use syntax::{ EditorParseWork, EditorSyntax, EditorSyntaxCapture, EditorSyntaxError };",
+      "cfg": [
+        "cfg (feature = \"syntax\")"
+      ]
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorParseWork",
+      "name": "EditorParseWork",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
+      "documentation": "Observed input work and reuse for the last syntax parse. Offered bytes may\nbe requested more than once by Tree-sitter; no source bytes are copied.",
+      "signature": "# [doc = \" Observed input work and reuse for the last syntax parse. Offered bytes may\"] # [doc = \" be requested more than once by Tree-sitter; no source bytes are copied.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct EditorParseWork { pub incremental : bool, pub input_bytes_offered : usize, pub input_requests : usize, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax",
+      "name": "EditorSyntax",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Revision-aware Tree-sitter adapter, available with the `syntax` feature.",
+      "documentation": "Revision-aware Tree-sitter adapter, available with the `syntax` feature.",
+      "signature": "# [doc = \" Revision-aware Tree-sitter adapter, available with the `syntax` feature.\"] pub struct EditorSyntax { parser : Parser, query : Query, tree : Option<Tree>, document : EditSnapshot, revision : Option<u64>, styles : HashMap<SharedString, HighlightStyle>, work : EditorParseWork, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::capture_style",
+      "name": "capture_style",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Overrides one named query capture's theme-derived appearance.",
+      "documentation": "Overrides one named query capture's theme-derived appearance.",
+      "signature": "pub fn capture_style (mut self, name : impl Into<SharedString>, style : HighlightStyle) -> Self",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::captures",
+      "name": "captures",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Queries only the requested source region. Captures retain their full node ranges; callers can clip at paint boundaries. Query exhaustion is reported rather than presenting a partial result as complete.",
+      "documentation": "Queries only the requested source region. Captures retain their full\nnode ranges; callers can clip at paint boundaries. Query exhaustion is\nreported rather than presenting a partial result as complete.",
+      "signature": "pub fn captures (& self, range : Range<usize>) -> Result<Vec<EditorSyntaxCapture>, SharedString>",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::errors",
+      "name": "errors",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Error nodes in source order. Error-free subtrees are skipped outright.",
+      "documentation": "Error nodes in source order. Error-free subtrees are skipped outright.",
+      "signature": "pub fn errors (& self) -> Vec<EditorSyntaxError>",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::json",
+      "name": "json",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Working bundled JSON grammar; other languages use `new` with their grammar crate and query. No grammar is fetched at runtime.",
+      "documentation": "Working bundled JSON grammar; other languages use `new` with their\ngrammar crate and query. No grammar is fetched at runtime.",
+      "signature": "pub fn json () -> Self",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Configures a registry-provided grammar and its highlighting query.",
+      "documentation": "Configures a registry-provided grammar and its highlighting query.",
+      "signature": "pub fn new (language : Language, highlights : & str) -> Result<Self, SharedString>",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::revision",
+      "name": "revision",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn revision (& self) -> Option<u64>",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::update",
+      "name": "update",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "Parses a revision. `edit`, when supplied, must be the exact transition from the preceding revision to `document`; missing/skipped revisions deliberately reparse without an old tree. Stale revisions are refused.",
+      "documentation": "Parses a revision. `edit`, when supplied, must be the exact transition\nfrom the preceding revision to `document`; missing/skipped revisions\ndeliberately reparse without an old tree. Stale revisions are refused.",
+      "signature": "pub fn update (& mut self, revision : u64, document : EditSnapshot, edit : Option<& TextAreaEdit>,) -> bool",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntax::work",
+      "name": "work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn work (& self) -> EditorParseWork",
+      "cfg": [],
+      "target": "EditorSyntax"
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntaxCapture",
+      "name": "EditorSyntaxCapture",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "One query capture in UTF-8 source coordinates.",
+      "documentation": "One query capture in UTF-8 source coordinates.",
+      "signature": "# [doc = \" One query capture in UTF-8 source coordinates.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorSyntaxCapture { pub range : Range<usize>, pub name : SharedString, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::syntax::EditorSyntaxError",
+      "name": "EditorSyntaxError",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::syntax",
+      "path": "gpui_kit::controls::editor::syntax",
+      "source": "crates/gpui-kit/src/controls/editor/syntax.rs",
+      "summary": "A grammar error or missing node, not an LSP diagnostic.",
+      "documentation": "A grammar error or missing node, not an LSP diagnostic.",
+      "signature": "# [doc = \" A grammar error or missing node, not an LSP diagnostic.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorSyntaxError { pub id : usize, pub range : Range<usize>, pub kind : SharedString, pub missing : bool, }",
       "cfg": []
     },
     {
@@ -121926,13 +122185,15 @@
         "line_numbers(visible: bool) -> Self",
         "read_only(read_only: bool) -> Self",
         "indent_with(indenter: impl Fn(EditorIndentRequest) -> Option<EditorIndentation> + 'static) -> Self",
-        "highlights(highlights: EditorHighlights) -> Self"
+        "highlights(highlights: EditorHighlights) -> Self",
+        "syntax(syntax: EditorSyntax) -> Self"
       ],
       "commands": [
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
       ],
       "queries": [
+        "syntax_state() -> Option<&EditorSyntax>",
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
         "selected_range(cx: &App) -> Range<usize>",
@@ -121947,7 +122208,9 @@
         "Submitted",
         "Cancelled",
         "Focused",
-        "Blurred"
+        "Blurred",
+        "Parsed",
+        "SyntaxUnavailable"
       ],
       "scenes": [
         "editor"
@@ -128670,7 +128933,9 @@
         "Submitted",
         "Cancelled",
         "Focused",
-        "Blurred"
+        "Blurred",
+        "Parsed",
+        "SyntaxUnavailable"
       ],
       "construct": [],
       "options": [],
@@ -128758,6 +129023,58 @@
       "name": "EditorLineGeometry",
       "path": "gpui_kit::controls::EditorLineGeometry",
       "summary": "Current-frame geometry for one hard source line.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorParseWork",
+      "path": "gpui_kit::controls::EditorParseWork",
+      "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSyntax",
+      "path": "gpui_kit::controls::EditorSyntax",
+      "summary": "Revision-aware Tree-sitter adapter, available with the syntax feature.",
+      "variants": [],
+      "construct": [
+        "new(language: Language, highlights: &str) -> Result<Self, SharedString>",
+        "json() -> Self"
+      ],
+      "options": [
+        "capture_style(name: impl Into<SharedString>, style: HighlightStyle) -> Self"
+      ],
+      "commands": [
+        "update(revision: u64, document: EditSnapshot, edit: Option<&TextAreaEdit>) -> bool"
+      ],
+      "queries": [
+        "revision() -> Option<u64>",
+        "work() -> EditorParseWork",
+        "captures(range: Range<usize>) -> Result<Vec<EditorSyntaxCapture>, SharedString>",
+        "errors() -> Vec<EditorSyntaxError>"
+      ]
+    },
+    {
+      "name": "EditorSyntaxCapture",
+      "path": "gpui_kit::controls::EditorSyntaxCapture",
+      "summary": "One query capture in UTF-8 source coordinates.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSyntaxError",
+      "path": "gpui_kit::controls::EditorSyntaxError",
+      "summary": "A grammar error or missing node, not an LSP diagnostic.",
       "variants": [],
       "construct": [],
       "options": [],
@@ -144034,6 +144351,12 @@
       "anchor": "tokens"
     },
     {
+      "id": "performance-testing-wide-grids-are-measured-on-both-axes",
+      "title": "Wide grids are measured on both axes",
+      "guide": "performance-testing",
+      "anchor": "wide-grids-are-measured-on-both-axes"
+    },
+    {
       "id": "performance-testing-what-is-counted",
       "title": "What is counted",
       "guide": "performance-testing",
@@ -144597,7 +144920,7 @@
       "uses": [
         "Editor"
       ],
-      "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor)\n        .into_any_element()\n}"
+      "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    let scene = stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor);\n    #[cfg(feature = \"syntax\")]\n    let scene = scene\n        .child(caption(\n            &theme,\n            \"JSON fixture · in-process incremental syntax, no language server\",\n        ))\n        .child(cx.global::<SceneEditor>().syntax.clone());\n    scene.into_any_element()\n}"
     },
     {
       "name": "mention-input",
@@ -146574,6 +146897,21 @@
         "ratios are dimensionless across container sizes"
       ],
       "ownership": "DockTopology and its stable ids remain caller-owned; DockTree projects them through SplitTree, Tabs, and the shared drag system and emits selection, collapse, resize, move, and split intents without applying them."
+    },
+    "kit_editor_syntax": {
+      "contract": "Optional syntax feature: Tree-sitter 0.25.10 with bundled JSON 0.24.8; borrowed EditSnapshot byte chunks, exact revisioned UTF-8 InputEdit transitions, viewport highlight queries, caller highlight precedence. No LSP transport, grammar download, process, or workspace ownership.",
+      "limitations": [
+        "synchronous parsing",
+        "parser internal work is not measured by borrowed input counters",
+        "only JSON grammar bundled",
+        "native macOS and Windows parser evidence awaits platform lane"
+      ],
+      "tests": [
+        "incremental_json_edits_use_utf8_points_and_match_a_fresh_parse",
+        "a_large_json_edit_reuses_the_tree_and_queries_only_the_requested_region",
+        "grammar_errors_and_invalid_queries_are_reported",
+        "syntax_tracks_real_area_edits_and_reports_parse_errors"
+      ]
     },
     "platform": [
       {

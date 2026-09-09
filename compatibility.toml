@@ -113,3 +113,8 @@ contract = "ListState::remap_items and ListOffset::remap retain row geometry and
 tests = ["reordered_rows_preserve_identity_anchor", "removed_anchor_uses_old_order_successor_then_predecessor", "remap_retains_measurements_focus_and_rebases_pending_geometry", "nested_wheel_moves_only_consumer_and_chains_at_edge", "revisions_remeasure_offscreen_rows_without_reidentifying_them", "history_and_reorder_are_not_new_tail_messages"]
 platform_validation = "Shared platform-independent tests run on Linux; dispatch Platforms after integration for native macOS/Windows input tests and Metal/WARP scene catalogs. No platform renderer or native event translation changes."
 limitations = ["count-only surfaces cannot infer insertion or reorder identity; use unique keys", "offscreen asynchronous geometry changes require explicit revision or remeasure_rows notification"]
+
+[kit_editor_syntax]
+contract = "Optional syntax feature: Tree-sitter 0.25.10 with bundled JSON 0.24.8; borrowed EditSnapshot byte chunks, exact revisioned UTF-8 InputEdit transitions, viewport highlight queries, caller highlight precedence. No LSP transport, grammar download, process, or workspace ownership."
+tests = ["incremental_json_edits_use_utf8_points_and_match_a_fresh_parse", "a_large_json_edit_reuses_the_tree_and_queries_only_the_requested_region", "grammar_errors_and_invalid_queries_are_reported", "syntax_tracks_real_area_edits_and_reports_parse_errors"]
+limitations = ["synchronous parsing", "parser internal work is not measured by borrowed input counters", "only JSON grammar bundled", "native macOS and Windows parser evidence awaits platform lane"]

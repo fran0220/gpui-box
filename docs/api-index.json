@@ -1877,13 +1877,15 @@
         "line_numbers(visible: bool) -> Self",
         "read_only(read_only: bool) -> Self",
         "indent_with(indenter: impl Fn(EditorIndentRequest) -> Option<EditorIndentation> + 'static) -> Self",
-        "highlights(highlights: EditorHighlights) -> Self"
+        "highlights(highlights: EditorHighlights) -> Self",
+        "syntax(syntax: EditorSyntax) -> Self"
       ],
       "commands": [
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
       ],
       "queries": [
+        "syntax_state() -> Option<&EditorSyntax>",
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
         "selected_range(cx: &App) -> Range<usize>",
@@ -1898,7 +1900,9 @@
         "Submitted",
         "Cancelled",
         "Focused",
-        "Blurred"
+        "Blurred",
+        "Parsed",
+        "SyntaxUnavailable"
       ],
       "scenes": [
         "editor"
@@ -8621,7 +8625,9 @@
         "Submitted",
         "Cancelled",
         "Focused",
-        "Blurred"
+        "Blurred",
+        "Parsed",
+        "SyntaxUnavailable"
       ],
       "construct": [],
       "options": [],
@@ -8709,6 +8715,58 @@
       "name": "EditorLineGeometry",
       "path": "gpui_kit::controls::EditorLineGeometry",
       "summary": "Current-frame geometry for one hard source line.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorParseWork",
+      "path": "gpui_kit::controls::EditorParseWork",
+      "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSyntax",
+      "path": "gpui_kit::controls::EditorSyntax",
+      "summary": "Revision-aware Tree-sitter adapter, available with the syntax feature.",
+      "variants": [],
+      "construct": [
+        "new(language: Language, highlights: &str) -> Result<Self, SharedString>",
+        "json() -> Self"
+      ],
+      "options": [
+        "capture_style(name: impl Into<SharedString>, style: HighlightStyle) -> Self"
+      ],
+      "commands": [
+        "update(revision: u64, document: EditSnapshot, edit: Option<&TextAreaEdit>) -> bool"
+      ],
+      "queries": [
+        "revision() -> Option<u64>",
+        "work() -> EditorParseWork",
+        "captures(range: Range<usize>) -> Result<Vec<EditorSyntaxCapture>, SharedString>",
+        "errors() -> Vec<EditorSyntaxError>"
+      ]
+    },
+    {
+      "name": "EditorSyntaxCapture",
+      "path": "gpui_kit::controls::EditorSyntaxCapture",
+      "summary": "One query capture in UTF-8 source coordinates.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSyntaxError",
+      "path": "gpui_kit::controls::EditorSyntaxError",
+      "summary": "A grammar error or missing node, not an LSP diagnostic.",
       "variants": [],
       "construct": [],
       "options": [],
@@ -15280,7 +15338,7 @@
       "uses": [
         "Editor"
       ],
-      "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor)\n        .into_any_element()\n}"
+      "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    let scene = stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor);\n    #[cfg(feature = \"syntax\")]\n    let scene = scene\n        .child(caption(\n            &theme,\n            \"JSON fixture · in-process incremental syntax, no language server\",\n        ))\n        .child(cx.global::<SceneEditor>().syntax.clone());\n    scene.into_any_element()\n}"
     },
     {
       "name": "mention-input",

@@ -4,8 +4,13 @@
 //! session, or text layout. It fixes the shared area to no-wrap source
 //! geometry, adds a measured line-number gutter, and projects caller-owned
 //! revision-tagged highlights and indentation decisions onto that one editing
-//! surface. Parsing, language servers, persistence, collaboration, folding,
-//! and minimaps remain downstream concerns.
+//! surface. Optional Tree-sitter parsing runs in-process; language servers,
+//! persistence, collaboration and workspace policy remain downstream concerns.
+
+#[cfg(feature = "syntax")]
+mod syntax;
+#[cfg(feature = "syntax")]
+pub use syntax::{EditorParseWork, EditorSyntax, EditorSyntaxCapture, EditorSyntaxError};
 
 use std::ops::Range;
 use std::rc::Rc;
@@ -158,6 +163,15 @@ pub enum EditorEvent {
     Focused,
     /// The shared editing surface lost focus.
     Blurred,
+    /// A revision was parsed in-process, including any grammar errors.
+    #[cfg(feature = "syntax")]
+    Parsed {
+        revision: u64,
+        errors: Vec<EditorSyntaxError>,
+    },
+    /// The configured highlight query refused to publish a partial result.
+    #[cfg(feature = "syntax")]
+    SyntaxUnavailable(SharedString),
 }
 
 impl EventEmitter<EditorEvent> for Editor {}
@@ -173,6 +187,8 @@ pub struct Editor {
     read_only: bool,
     highlights: Option<EditorHighlights>,
     indenter: Option<Indenter>,
+    #[cfg(feature = "syntax")]
+    syntax: Option<EditorSyntax>,
     _subscription: Subscription,
 }
 
@@ -221,6 +237,8 @@ impl Editor {
             read_only: false,
             highlights: None,
             indenter: None,
+            #[cfg(feature = "syntax")]
+            syntax: None,
             _subscription: subscription,
         }
     }
@@ -256,6 +274,20 @@ impl Editor {
     pub fn highlights(mut self, highlights: EditorHighlights) -> Self {
         self.highlights = Some(highlights);
         self
+    }
+
+    /// Installs actual incremental in-process syntax parsing. Explicit
+    /// caller highlights for the current revision take precedence over it.
+    #[cfg(feature = "syntax")]
+    pub fn syntax(mut self, syntax: EditorSyntax) -> Self {
+        self.syntax = Some(syntax);
+        self
+    }
+
+    /// The parser's current revision, captures, grammar errors and work counts.
+    #[cfg(feature = "syntax")]
+    pub fn syntax_state(&self) -> Option<&EditorSyntax> {
+        self.syntax.as_ref()
     }
 
     pub fn text_area(&self) -> &Entity<TextArea> {
@@ -318,7 +350,11 @@ impl Editor {
         cx: &mut Context<Self>,
     ) {
         match event {
-            TextAreaEvent::Edited(edit) => cx.emit(EditorEvent::Edited(edit.clone())),
+            TextAreaEvent::Edited(edit) => {
+                cx.emit(EditorEvent::Edited(edit.clone()));
+                #[cfg(feature = "syntax")]
+                self.update_syntax(Some(edit), cx);
+            }
             TextAreaEvent::Change(value) => cx.emit(EditorEvent::Changed(value.clone())),
             TextAreaEvent::SelectionChanged(selection) => {
                 cx.emit(EditorEvent::SelectionChanged(selection.clone()));
@@ -373,6 +409,70 @@ impl Editor {
             }
         });
     }
+
+    #[cfg(feature = "syntax")]
+    fn update_syntax(&mut self, edit: Option<&TextAreaEdit>, cx: &mut Context<Self>) {
+        let Some(syntax) = self.syntax.as_mut() else {
+            return;
+        };
+        let area = self.area.read(cx);
+        let revision = area.revision();
+        if syntax.update(revision, area.document(), edit) {
+            cx.emit(EditorEvent::Parsed {
+                revision,
+                errors: syntax.errors(),
+            });
+            cx.notify();
+        }
+    }
+
+    #[cfg(feature = "syntax")]
+    fn syntax_spans(
+        &mut self,
+        fallback: (u64, Vec<(Range<usize>, HighlightStyle)>),
+        cx: &mut Context<Self>,
+    ) -> (u64, Vec<(Range<usize>, HighlightStyle)>) {
+        self.update_syntax(None, cx);
+        let Some(syntax) = self.syntax.as_ref() else {
+            return fallback;
+        };
+        let area = self.area.read(cx);
+        let revision = area.revision();
+        if self
+            .highlights
+            .as_ref()
+            .is_some_and(|highlights| highlights.revision == revision)
+        {
+            return fallback;
+        }
+        let document = area.document();
+        let theme = cx.theme();
+        let line_height = px(theme
+            .type_style(gpui_kit_theme::TypeScale::Code)
+            .line_height);
+        let (_, rows) = area.source_viewport(line_height, line_height * self.rows as f32);
+        let first = document
+            .line_range(rows.start)
+            .map(|range| range.start)
+            .unwrap_or(0);
+        let last = document
+            .line_range(rows.end.saturating_sub(1))
+            .map(|range| range.end)
+            .unwrap_or(document.len());
+        match syntax.highlights(first..last, theme) {
+            Ok(spans) => (
+                revision,
+                spans
+                    .into_iter()
+                    .map(|span| (span.range, span.style))
+                    .collect(),
+            ),
+            Err(reason) => {
+                cx.emit(EditorEvent::SyntaxUnavailable(reason));
+                fallback
+            }
+        }
+    }
 }
 
 impl Disableable for Editor {
@@ -398,6 +498,8 @@ impl Render for Editor {
                 )
             })
             .unwrap_or_default();
+        #[cfg(feature = "syntax")]
+        let spans = self.syntax_spans(spans, cx);
         self.area.update(cx, |area, cx| {
             area.set_row_limits(self.rows, self.rows);
             area.set_indentation_claimed(self.indenter.is_some());

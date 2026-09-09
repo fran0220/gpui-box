@@ -499,3 +499,15 @@ TextArea's new `document()` returns a persistent indexed snapshot;
 `snapshot()` and `value()` retain their contiguous compatibility contracts.
 This preserves caller behavior but does not eliminate their document-wide
 cost. See `docs/coverage.md` for the remaining large-file paths.
+
+The optional Kit `syntax` feature adds `Editor::syntax(EditorSyntax::json())`
+or `EditorSyntax::new(language, query)` for caller-selected grammars compatible
+with Tree-sitter 0.25.10. Consecutive `TextAreaEdit` events incrementally update
+the retained tree using UTF-8 byte columns; skipped revisions reparse. Explicit
+`EditorHighlights` for the current revision override parser colors. Parsing
+is synchronous, with no process or filesystem access; error nodes are reported
+through `EditorEvent::Parsed`, not silently converted to language diagnostics.
+`EditorParseWork` counts borrowed input bytes offered and requests, including
+repeated reads, and records whether a prior tree was reused. It does not
+measure the parser's internal allocations or claim constant-time parsing.
+The editor scene includes a JSON fixture when this feature is enabled.

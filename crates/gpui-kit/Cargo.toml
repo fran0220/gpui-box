@@ -29,6 +29,9 @@ dotlottie = ["dep:base64", "dep:image", "dep:rasterlottie", "dep:zip"]
 # `home` do not compile there, so the live compose serves every other scene
 # and the hosted catalog still shows the native capture.
 terminal = ["dep:alacritty_terminal"]
+# Optional in-process incremental syntax parsing. Grammars and queries use
+# registry packages/public APIs; language-server transports stay in the host.
+syntax = ["dep:tree-sitter", "dep:tree-sitter-json"]
 
 [dependencies]
 unicode-segmentation.workspace = true
@@ -47,6 +50,8 @@ rasterlottie = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json.workspace = true
 smallvec.workspace = true
+tree-sitter = { version = "=0.25.10", optional = true }
+tree-sitter-json = { version = "=0.24.8", optional = true }
 web-time.workspace = true
 zip = { workspace = true, optional = true }
 

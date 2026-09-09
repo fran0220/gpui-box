@@ -103,6 +103,25 @@ impl EditSnapshot {
         Some(self.rope.slice(start..end).to_string())
     }
 
+    /// Borrows byte chunks intersecting a range, clipped to document bounds.
+    /// Chunks concatenate to that exact byte range without allocating or
+    /// flattening. Byte boundaries need not be UTF-8 scalar boundaries, which
+    /// lets incremental parsers request input at arbitrary decoder offsets.
+    pub fn byte_chunks(&self, range: Range<usize>) -> impl Iterator<Item = &[u8]> {
+        let mut next = range.start.min(self.len());
+        let end = range.end.min(self.len());
+        std::iter::from_fn(move || {
+            if next >= end {
+                return None;
+            }
+            let (chunk, start, _, _) = self.rope.chunk_at_byte(next);
+            let until = (start + chunk.len()).min(end);
+            let bytes = &chunk.as_bytes()[next - start..until - start];
+            next = until;
+            Some(bytes)
+        })
+    }
+
     /// Compatibility snapshot. The first call in a revision copies all bytes;
     /// subsequent calls reuse that allocation. Prefer indexed slices for views.
     pub fn text(&self) -> &SharedString {
@@ -159,6 +178,24 @@ impl EditSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parser_chunks_borrow_exact_clipped_bytes_even_inside_scalars() {
+        let text = "a".repeat(991) + &"界😀z".repeat(400);
+        let doc = EditSnapshot::new(&text);
+        for range in [990..1002, 993..2017, 0..0, text.len() - 2..text.len() + 9] {
+            let bytes = doc
+                .byte_chunks(range.clone())
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>();
+            assert_eq!(
+                bytes,
+                text.as_bytes()[range.start..range.end.min(text.len())]
+            );
+        }
+        assert!(doc.contiguous.get().is_none());
+    }
 
     #[test]
     fn indexed_unicode_offsets_match_platform_rounding() {

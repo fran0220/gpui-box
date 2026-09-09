@@ -119,27 +119,14 @@ impl Element for TextAreaElement {
         let line_height = window.line_height();
         let layout = if wrap == TextAreaWrap::None && !empty {
             let document = area.document();
-            let height = line_height * document.line_count() as f32;
-            let caret_y = line_height * document.line_at(cursor) as f32;
-            let mut scroll = area
-                .scroll_offset()
-                .max(px(0.0))
-                .min((height - bounds.size.height).max(px(0.0)));
-            if caret_y < scroll {
-                scroll = caret_y;
-            }
-            if caret_y + line_height > scroll + bounds.size.height {
-                scroll = caret_y + line_height - bounds.size.height;
-            }
-            let first = (scroll / line_height).floor() as usize;
-            let last = ((scroll + bounds.size.height) / line_height).ceil() as usize;
+            let (_, visible) = area.source_viewport(line_height, bounds.size.height);
             let layout = EditableTextLayout::unwrapped(
                 document,
                 window.text_system().clone(),
                 font_size,
                 line_height,
                 runs,
-                first..last,
+                visible,
             );
             // Width and painting share these same shaped visible rows.
             layout.painted_lines().for_each(drop);

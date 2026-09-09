@@ -961,6 +961,32 @@ impl TextArea {
         self.scroll_offset
     }
 
+    pub(crate) fn source_viewport(
+        &self,
+        line_height: Pixels,
+        viewport_height: Pixels,
+    ) -> (Pixels, Range<usize>) {
+        let document = self.document();
+        let height = line_height * document.line_count() as f32;
+        let caret_y = line_height * document.line_at(self.cursor_offset()) as f32;
+        let mut scroll = self
+            .scroll_offset
+            .max(px(0.0))
+            .min((height - viewport_height).max(px(0.0)));
+        if caret_y < scroll {
+            scroll = caret_y;
+        }
+        if caret_y + line_height > scroll + viewport_height {
+            scroll = caret_y + line_height - viewport_height;
+        }
+        let first = (scroll / line_height).floor() as usize;
+        let last = ((scroll + viewport_height) / line_height).ceil() as usize;
+        (
+            scroll,
+            first.min(document.line_count())..last.min(document.line_count()),
+        )
+    }
+
     pub fn horizontal_scroll_offset(&self) -> Pixels {
         self.horizontal_scroll_offset
     }

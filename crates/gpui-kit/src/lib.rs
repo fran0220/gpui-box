@@ -179,6 +179,10 @@ pub mod prelude {
         Editor, EditorEvent, EditorGeometry, EditorHighlight, EditorHighlights,
         EditorIndentDirection, EditorIndentRequest, EditorIndentation, EditorLineGeometry,
     };
+    #[cfg(feature = "syntax")]
+    pub use crate::controls::editor::{
+        EditorParseWork, EditorSyntax, EditorSyntaxCapture, EditorSyntaxError,
+    };
     pub use crate::controls::field::{FieldState, field_shell};
     pub use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
     pub use crate::controls::form_field::FormField;

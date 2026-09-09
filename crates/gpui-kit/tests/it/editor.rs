@@ -10,6 +10,50 @@ use gpui_kit_testkit::harness::Harness;
 
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
 
+#[cfg(feature = "syntax")]
+#[gpui::test]
+fn syntax_tracks_real_area_edits_and_reports_parse_errors(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "{\"é\":13}", |editor| {
+        editor.syntax(EditorSyntax::json())
+    });
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| {
+        let syntax = entity.read(cx).syntax_state().expect("parser");
+        assert_eq!(syntax.revision(), Some(0));
+        assert!(!syntax.work().incremental);
+        assert!(syntax.errors().is_empty());
+    });
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().clone();
+        area.update(cx, |area, cx| {
+            assert_eq!(area.replace_range(6..8, "271", cx), Some(6..9));
+        });
+    });
+    harness.update(|_, cx| {
+        let syntax = entity.read(cx).syntax_state().expect("parser");
+        assert_eq!(syntax.revision(), Some(1));
+        assert!(syntax.work().incremental);
+        assert!(
+            syntax
+                .captures(0..10)
+                .expect("captures")
+                .iter()
+                .any(|capture| { capture.name.as_ref() == "number" && capture.range == (6..9) })
+        );
+    });
+    harness.click("source.input");
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-end x"
+    } else {
+        "ctrl-end x"
+    });
+    harness.update(|_, cx| {
+        let syntax = entity.read(cx).syntax_state().expect("parser");
+        assert_eq!(syntax.revision(), Some(2));
+        assert!(!syntax.errors().is_empty());
+    });
+}
+
 fn editor(
     cx: &mut TestAppContext,
     text: &'static str,

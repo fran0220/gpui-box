@@ -785,3 +785,14 @@ No-wrap `EditableTextLayout` uses the local `WindowTextSystem` to shape visible
 hard lines and exact on-demand geometry. Indexed source mapping, bounded
 selection painting, shaping-input counters, and viewport accessibility-cell
 capture are original GPUI Box work. No renderer or shader formats changed.
+
+### Optional incremental editor syntax
+
+The Kit `syntax` feature uses registry Tree-sitter 0.25.10 and the JSON grammar
+0.24.8 (both MIT) through their public APIs. Revision-paired tree edits,
+borrowed rope-byte input, viewport query projection, and editor event wiring
+are original GPUI Box work. Other grammar crates are caller-selected; no
+language server, workspace, process, or grammar download is owned by Kit.
+The framework's borrowed byte-range iterator is product-neutral and does not
+change platform input or renderer behavior. The frozen import receipt and
+both workspaces' sole local GPUI authority remain unchanged.

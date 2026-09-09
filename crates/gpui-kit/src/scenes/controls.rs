@@ -1380,6 +1380,8 @@ const LONG_SOURCE_LINE: &str = "one source row stays whole without wrapping";
 
 pub(super) struct SceneEditor {
     editor: Entity<Editor>,
+    #[cfg(feature = "syntax")]
+    syntax: Entity<Editor>,
 }
 
 impl Global for SceneEditor {}
@@ -1441,21 +1443,44 @@ pub(super) fn ensure_editor(window: &mut Window, cx: &mut App) {
         .expect("scene source contains the focused line");
     area.update(cx, |area, cx| area.set_selected_range(caret..caret, cx));
     window.focus(&area.read(cx).focus_handle(cx), cx);
-    cx.set_global(SceneEditor { editor });
+    #[cfg(feature = "syntax")]
+    let syntax = cx.new(|cx| {
+        Editor::new(
+            "scene.editor.json",
+            "Incremental JSON syntax fixture",
+            "{\n  \"name\": \"éclair 😀\",\n  \"budget\": 65536,\n  \"incremental\": true\n}",
+            window,
+            cx,
+        )
+        .rows(5)
+        .syntax(crate::controls::editor::EditorSyntax::json())
+    });
+    cx.set_global(SceneEditor {
+        editor,
+        #[cfg(feature = "syntax")]
+        syntax,
+    });
 }
 
 pub(super) fn editor(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_editor(window, cx);
     let editor = cx.global::<SceneEditor>().editor.clone();
     let theme = cx.theme().clone();
-    stack(&theme)
+    let scene = stack(&theme)
         .w(px(760.0))
         .child(caption(
             &theme,
             "one text/IME/history geometry; caller-owned revision highlights and indentation",
         ))
-        .child(editor)
-        .into_any_element()
+        .child(editor);
+    #[cfg(feature = "syntax")]
+    let scene = scene
+        .child(caption(
+            &theme,
+            "JSON fixture · in-process incremental syntax, no language server",
+        ))
+        .child(cx.global::<SceneEditor>().syntax.clone());
+    scene.into_any_element()
 }
 
 pub(super) struct SceneMentionInput {
