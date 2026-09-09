@@ -1189,6 +1189,7 @@ pub struct Window {
     focus_listeners: SubscriberSet<(), AnyWindowFocusListener>,
     pub(crate) focus_lost_listeners: SubscriberSet<(), AnyObserver>,
     default_prevented: bool,
+    remaining_scroll_delta: Option<crate::ScrollDelta>,
     mouse_position: Point<Pixels>,
     mouse_hit_test: HitTest,
     modifiers: Modifiers,
@@ -2079,6 +2080,7 @@ impl Window {
             focus_listeners: SubscriberSet::new(),
             focus_lost_listeners: SubscriberSet::new(),
             default_prevented: true,
+            remaining_scroll_delta: None,
             mouse_position,
             mouse_hit_test: HitTest::default(),
             modifiers,
@@ -3137,6 +3139,26 @@ impl Window {
     /// Obtain whether default has been prevented for the event currently being dispatched.
     pub fn default_prevented(&self) -> bool {
         self.default_prevented
+    }
+
+    /// Consumes actual wheel movement on the event's original axes. Subsequent
+    /// listeners receive only the remainder, including unused axes and edge
+    /// overshoot. Supply the same line height used to interpret the event;
+    /// line deltas remain in lines for ancestors with different typography.
+    /// Does nothing outside mouse-wheel dispatch. Fully consumed events stop
+    /// propagating; explicit `App::stop_propagation` still refuses all remainder.
+    pub fn consume_scroll_delta(
+        &mut self,
+        consumed: Point<Pixels>,
+        line_height: Pixels,
+        cx: &mut App,
+    ) {
+        if let Some(delta) = &mut self.remaining_scroll_delta {
+            delta.consume_pixels(consumed, line_height);
+            if delta.pixel_delta(px(1.)) == Point::default() {
+                cx.stop_propagation();
+            }
+        }
     }
 
     /// Determine whether the given action is available along the dispatch path to the currently focused element.
@@ -6688,6 +6710,11 @@ impl Window {
         }
 
         let mut mouse_listeners = mem::take(&mut self.rendered_frame.mouse_listeners);
+        // Both native wheel delivery and recognized touch scrolling enter
+        // here. Save/restore for synchronous nested event dispatch.
+        let wheel = event.downcast_ref::<crate::ScrollWheelEvent>();
+        let previous_delta = self.remaining_scroll_delta.take();
+        self.remaining_scroll_delta = wheel.map(|event| event.delta);
 
         // Capture phase, events bubble from back to front. Handlers for this phase are used for
         // special purposes, such as detecting events outside of a given Bounds.
@@ -6695,6 +6722,11 @@ impl Window {
             let listener = listener
                 .as_mut()
                 .expect("required framework invariant must hold");
+            let remaining = wheel.map(|wheel| crate::ScrollWheelEvent {
+                delta: self.remaining_scroll_delta.unwrap_or(wheel.delta),
+                ..wheel.clone()
+            });
+            let event = remaining.as_ref().map_or(event, |event| event as &dyn Any);
             listener(event, DispatchPhase::Capture, self, cx);
             if !cx.propagate_event && !cancelled {
                 break;
@@ -6707,6 +6739,11 @@ impl Window {
                 let listener = listener
                     .as_mut()
                     .expect("required framework invariant must hold");
+                let remaining = wheel.map(|wheel| crate::ScrollWheelEvent {
+                    delta: self.remaining_scroll_delta.unwrap_or(wheel.delta),
+                    ..wheel.clone()
+                });
+                let event = remaining.as_ref().map_or(event, |event| event as &dyn Any);
                 listener(event, DispatchPhase::Bubble, self, cx);
                 if !cx.propagate_event && !cancelled {
                     break;
@@ -6715,6 +6752,7 @@ impl Window {
         }
 
         self.rendered_frame.mouse_listeners = mouse_listeners;
+        self.remaining_scroll_delta = previous_delta;
 
         if cx.has_active_drag() {
             if event.is::<MouseMoveEvent>() {

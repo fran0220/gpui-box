@@ -431,54 +431,12 @@ impl ListState {
     pub fn remap_items(&self, previous_indices: &[Option<usize>]) {
         let state = &mut *self.0.borrow_mut();
         let old: Vec<_> = state.items.iter().cloned().collect();
-        let mut inverse = vec![None; old.len()];
-        for (new, previous) in previous_indices.iter().enumerate() {
-            if let Some(previous) = previous {
-                assert!(*previous < old.len(), "previous row index out of bounds");
-                assert!(
-                    inverse[*previous].replace(new).is_none(),
-                    "duplicate previous row index"
-                );
-            }
-        }
-        let anchored = state
-            .logical_scroll_top
-            .or_else(|| {
-                (state.alignment == ListAlignment::Top && !old.is_empty())
-                    .then(|| state.logical_scroll_top())
-            })
-            .map(|anchor| {
-                if anchor.item_ix == old.len() && !old.is_empty() {
-                    return ListOffset {
-                        item_ix: previous_indices.len(),
-                        offset_in_item: px(0.),
-                    };
-                }
-                let same = inverse.get(anchor.item_ix).copied().flatten();
-                let fallback = inverse
-                    .iter()
-                    .skip(anchor.item_ix)
-                    .flatten()
-                    .next()
-                    .copied()
-                    .or_else(|| {
-                        inverse
-                            .iter()
-                            .take(anchor.item_ix)
-                            .rev()
-                            .flatten()
-                            .next()
-                            .copied()
-                    });
-                ListOffset {
-                    item_ix: same.or(fallback).unwrap_or(0),
-                    offset_in_item: if same.is_some() {
-                        anchor.offset_in_item
-                    } else {
-                        px(0.)
-                    },
-                }
-            });
+        let remapped = state
+            .logical_scroll_top()
+            .remap(previous_indices, old.len());
+        let anchored = (state.logical_scroll_top.is_some()
+            || state.alignment == ListAlignment::Top)
+            .then_some(remapped);
         state.items = SumTree::from_iter(
             previous_indices.iter().map(|previous| {
                 previous.map_or(
@@ -990,12 +948,11 @@ impl StateInner {
             (self.items.summary().height + padding.top + padding.bottom - height).max(px(0.));
         let old_scroll_top = self.scroll_top(&self.logical_scroll_top()).min(scroll_max);
         let new_scroll_top = (old_scroll_top - delta.y).max(px(0.)).min(scroll_max);
-        // Consume a wheel gesture exactly once, at the deepest surface that
-        // can move. At an edge let the next ancestor try the same gesture.
+        // Ancestors receive only the unconsumed axes and edge remainder.
         if new_scroll_top == old_scroll_top {
             return;
         }
-        cx.stop_propagation();
+        window.consume_scroll_delta(point(px(0.), old_scroll_top - new_scroll_top), px(20.), cx);
 
         if self.alignment == ListAlignment::Bottom && new_scroll_top == scroll_max {
             self.pending_scroll = None;
@@ -1525,6 +1482,60 @@ pub struct ListOffset {
     pub offset_in_item: Pixels,
 }
 
+impl ListOffset {
+    /// Maps an anchor through an identity edit shared by fixed- and variable-
+    /// height lists. Entries name unique previous indices, or `None` for new
+    /// rows. Preserves the pixel remainder of a survivor; removal chooses the
+    /// nearest surviving old-order successor, then predecessor, at offset zero.
+    /// An explicit end sentinel maps to the new end. No survivors map to zero.
+    /// Runs in linear time in the old and new row counts, without rendering.
+    pub fn remap(self, previous_indices: &[Option<usize>], previous_count: usize) -> Self {
+        let mut inverse = vec![None; previous_count];
+        for (new, previous) in previous_indices.iter().enumerate() {
+            if let Some(previous) = previous {
+                assert!(
+                    *previous < previous_count,
+                    "previous row index out of bounds"
+                );
+                assert!(
+                    inverse[*previous].replace(new).is_none(),
+                    "duplicate previous row index"
+                );
+            }
+        }
+        if self.item_ix == previous_count && previous_count > 0 {
+            return Self {
+                item_ix: previous_indices.len(),
+                offset_in_item: px(0.),
+            };
+        }
+        let same = inverse.get(self.item_ix).copied().flatten();
+        let fallback = inverse
+            .iter()
+            .skip(self.item_ix)
+            .flatten()
+            .next()
+            .copied()
+            .or_else(|| {
+                inverse
+                    .iter()
+                    .take(self.item_ix)
+                    .rev()
+                    .flatten()
+                    .next()
+                    .copied()
+            });
+        Self {
+            item_ix: same.or(fallback).unwrap_or(0),
+            offset_in_item: if same.is_some() {
+                self.offset_in_item
+            } else {
+                px(0.)
+            },
+        }
+    }
+}
+
 impl Element for List {
     type RequestLayoutState = ();
     type PrepaintState = ListPrepaintState;
@@ -1951,16 +1962,16 @@ mod test {
         // Multiple events before paint must use the latest clamped position.
         cx.simulate_event(ScrollWheelEvent {
             position: point(px(5.), px(5.)),
-            delta: ScrollDelta::Pixels(point(px(0.), px(-500.))),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-133.))),
             ..Default::default()
         });
-        assert_eq!(outer.offset().y, px(0.));
+        assert_eq!(outer.offset().y, px(-10.));
         cx.simulate_event(ScrollWheelEvent {
             position: point(px(5.), px(5.)),
             delta: ScrollDelta::Pixels(point(px(0.), px(-11.))),
             ..Default::default()
         });
-        assert_eq!(outer.offset().y, px(-11.));
+        assert_eq!(outer.offset().y, px(-21.));
     }
 
     #[gpui::test]
@@ -2000,9 +2011,9 @@ mod test {
         });
         for (delta, child, parent) in [
             (-17., -17., 0.),
-            (-500., -120., 0.),
-            (-11., -120., 11.),
-            (9., -111., 11.),
+            (-113., -120., 10.),
+            (-11., -120., 21.),
+            (9., -111., 21.),
         ] {
             cx.simulate_event(ScrollWheelEvent {
                 position: point(px(5.), px(5.)),
@@ -2012,6 +2023,44 @@ mod test {
             assert_eq!(inner.offset().y, px(child));
             assert_eq!(state.logical_scroll_top().offset_in_item, px(parent));
         }
+    }
+
+    #[gpui::test]
+    fn diagonal_wheel_keeps_unconsumed_axis_for_horizontal_parent(cx: &mut TestAppContext) {
+        use crate::{InteractiveElement, ParentElement, ScrollHandle, StatefulInteractiveElement};
+        let cx = cx.add_empty_window();
+        let state =
+            ListState::new(10, crate::ListAlignment::Top, px(0.)).with_uniform_item_height(px(20.));
+        let outer = ScrollHandle::new();
+        struct Nested(ListState, ScrollHandle);
+        impl Render for Nested {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div()
+                    .id("horizontal")
+                    .size_full()
+                    .overflow_x_scroll()
+                    .track_scroll(&self.1)
+                    .child(
+                        list(self.0.clone(), |_, _, _| {
+                            div().h(px(20.)).into_any_element()
+                        })
+                        .w(px(300.))
+                        .h(px(60.)),
+                    )
+            }
+        }
+        cx.draw(point(px(0.), px(0.)), size(px(100.), px(100.)), |_, cx| {
+            cx.new(|_| Nested(state.clone(), outer.clone()))
+                .into_any_element()
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(-31.), px(-17.))),
+            ..Default::default()
+        });
+        assert_eq!(state.logical_scroll_top().offset_in_item, px(17.));
+        assert_eq!(outer.offset().x, px(-31.));
+        assert_eq!(outer.offset().y, px(0.));
     }
 
     #[gpui::test]

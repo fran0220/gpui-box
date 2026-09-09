@@ -500,8 +500,9 @@ impl RenderOnce for MessageList {
             .text(shown_author(message.author.as_ref()))
         })
         .row_height(row_height)
+        .keys(row_keys)
         .when(body_lines.is_none(), |list| {
-            list.flowing().keys(row_keys).revisions(revisions)
+            list.flowing().revisions(revisions)
         })
         .when_some(self.visible_rows, List::visible_rows);
 

@@ -228,8 +228,8 @@ impl List {
     /// Use [`Self::revisions`] for geometry changes under the same identity.
     ///
     /// The names are the rows' own identities, the same ones
-    /// [`ListItem::new`] takes, and are ignored by a uniform list, which has
-    /// nothing measured to keep.
+    /// [`ListItem::new`] takes. Uniform lists also retain the identity anchor,
+    /// using their authored row height rather than measured geometry.
     pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
         self.keys = Some(keys.into_iter().map(Into::into).collect());
         self
@@ -346,6 +346,12 @@ impl RenderOnce for List {
             .filter(|_| count > 0);
         let render_row = Rc::clone(&self.render_row);
         let scroll = scroll_handle(&ident, window, cx);
+        if !self.flowing
+            && let Some(keys) = &self.keys
+        {
+            assert_eq!(keys.len(), count, "one key is required per row");
+            crate::data::viewport::reconcile_uniform(&ident, keys, px(row_height), window, cx);
+        }
         let reorder = self.reorder(window, cx);
 
         // Which index published which id on the last frame. The rows fill it

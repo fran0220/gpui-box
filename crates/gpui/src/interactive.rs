@@ -1,6 +1,6 @@
 use crate::{
     Bounds, Capslock, Context, Empty, ImageFormat, IntoElement, Keystroke, LongPressEvent,
-    Modifiers, Pixels, Point, Render, Result, SharedString, TouchDragEvent, Window, point,
+    Modifiers, Pixels, Point, Render, Result, SharedString, TouchDragEvent, Window, point, px,
     seal::Sealed,
 };
 use futures::{FutureExt as _, future::LocalBoxFuture};
@@ -663,6 +663,25 @@ impl Deref for PinchEvent {
 }
 
 impl ScrollDelta {
+    /// Subtract actual movement on the original wheel axes, preserving native
+    /// units so a remaining line delta can use its next consumer's line height.
+    pub(crate) fn consume_pixels(&mut self, consumed: Point<Pixels>, line_height: Pixels) {
+        fn remaining(total: f32, consumed: f32) -> f32 {
+            total - consumed.clamp(total.min(0.), total.max(0.))
+        }
+        match self {
+            Self::Pixels(delta) => {
+                delta.x = px(remaining(delta.x.into(), consumed.x.into()));
+                delta.y = px(remaining(delta.y.into(), consumed.y.into()));
+            }
+            Self::Lines(delta) if line_height > px(0.) => {
+                delta.x = remaining(delta.x, consumed.x / line_height);
+                delta.y = remaining(delta.y, consumed.y / line_height);
+            }
+            Self::Lines(_) => {}
+        }
+    }
+
     /// Returns true if this is a precise scroll delta in pixels.
     pub fn precise(&self) -> bool {
         match self {
@@ -1165,6 +1184,18 @@ impl PlatformInput {
 
 #[cfg(test)]
 mod test {
+
+    #[test]
+    fn wheel_remainders_preserve_native_units_and_axes() {
+        use super::*;
+        let mut delta = ScrollDelta::Lines(point(-3., 2.));
+        delta.consume_pixels(point(px(-25.), px(0.)), px(10.));
+        assert_eq!(delta.pixel_delta(px(24.)), point(px(-12.), px(48.)));
+        delta.consume_pixels(point(px(5.), px(60.)), px(24.));
+        assert_eq!(delta.pixel_delta(px(24.)), point(px(-12.), px(0.)));
+        delta.consume_pixels(point(px(-99.), px(0.)), px(24.));
+        assert_eq!(delta.pixel_delta(px(24.)), point(px(0.), px(0.)));
+    }
 
     #[test]
     fn pointer_button_state_chords_and_cancellation_are_idempotent() {

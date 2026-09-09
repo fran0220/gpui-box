@@ -70,6 +70,75 @@ pub(crate) fn scroll_handle(
     )
 }
 
+struct Uniform {
+    keys: Vec<SharedString>,
+    height: Pixels,
+}
+
+/// Reconcile a fixed-height viewport through the same anchor policy as Flow.
+/// The existing pixel scroll primitive owns clamping during the next layout;
+/// business keys and the caller's fixed row height remain Kit-owned inputs.
+pub(crate) fn reconcile_uniform(
+    ident: &Ident,
+    keys: &[SharedString],
+    height: Pixels,
+    window: &Window,
+    cx: &mut App,
+) {
+    let handle = scroll_handle(ident, window, cx);
+    window_state::with_key(
+        &ident.semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+        |known: &mut Option<Uniform>| {
+            if known
+                .as_ref()
+                .is_some_and(|previous| previous.keys == keys && previous.height == height)
+            {
+                return;
+            }
+            let unique: std::collections::HashSet<_> = keys.iter().collect();
+            assert_eq!(unique.len(), keys.len(), "row keys must be unique");
+            let Some(previous) = known else {
+                *known = Some(Uniform {
+                    keys: keys.to_vec(),
+                    height,
+                });
+                return;
+            };
+            let old: HashMap<_, _> = previous
+                .keys
+                .iter()
+                .enumerate()
+                .map(|(index, key)| (key, index))
+                .collect();
+            let mapping: Vec<_> = keys.iter().map(|key| old.get(key).copied()).collect();
+            let state = handle.0.borrow();
+            // A navigation request from this frame already names the new
+            // sequence and takes precedence over passive anchor restoration.
+            if state.deferred_scroll_to_item.is_none()
+                && previous.height > px(0.)
+                && height > px(0.)
+            {
+                let offset = state.base_handle.offset();
+                let top = (-offset.y).max(px(0.));
+                let index = (top / previous.height).floor() as usize;
+                let anchor = ListOffset {
+                    item_ix: index,
+                    offset_in_item: top - previous.height * index,
+                }
+                .remap(&mapping, previous.keys.len());
+                state.base_handle.set_offset(gpui::point(
+                    offset.x,
+                    -(height * anchor.item_ix + anchor.offset_in_item.min(height)),
+                ));
+            }
+            previous.keys = keys.to_vec();
+            previous.height = height;
+        },
+    );
+}
+
 /// The measured rows of the variable-height surface with this identity.
 ///
 /// `estimate` is what an unmeasured row is assumed to be, so a scrollbar is
@@ -173,10 +242,10 @@ fn anonymous(count: usize) -> Vec<SharedString> {
 /// and the absolute pixel offset within the anchored row are retained. The
 /// range uses current row order; callers resolving async work must look up
 /// its stable key before calling. Missing surfaces are a no-op.
-pub fn remeasure_rows(ident: &Ident, rows: Range<usize>, window: &Window, cx: &mut App) {
+pub fn remeasure_rows(ident: &Ident, rows: Range<usize>, window: &mut Window, cx: &mut App) {
     if let Some(state) = flow_state(ident, window.window_handle().window_id(), cx) {
         state.remeasure_items(rows);
-        cx.refresh_windows();
+        window.refresh();
     }
 }
 
@@ -374,6 +443,61 @@ mod tests {
 
     fn keys(names: &[&str]) -> Vec<SharedString> {
         names.iter().map(|name| SharedString::from(*name)).collect()
+    }
+
+    #[gpui::test]
+    fn uniform_anchor_retains_pixels_on_resize_and_uses_removal_fallback(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let cx = cx.add_empty_window();
+        cx.update(|window, cx| {
+            let ident = Ident::from("uniform-anchor");
+            reconcile_uniform(&ident, &keys(&["a", "b", "c", "d"]), px(40.), window, cx);
+            let handle = scroll_handle(&ident, window, cx);
+            handle
+                .0
+                .borrow()
+                .base_handle
+                .set_offset(gpui::point(px(0.), px(-93.)));
+            reconcile_uniform(&ident, &keys(&["d", "a", "c", "b"]), px(60.), window, cx);
+            assert_eq!(handle.0.borrow().base_handle.offset().y, px(-133.));
+            // c was followed by b in the old order, even though d is nearer
+            // in the new order. Removal restarts that successor at zero.
+            reconcile_uniform(&ident, &keys(&["b", "d", "a"]), px(60.), window, cx);
+            assert_eq!(handle.0.borrow().base_handle.offset().y, px(0.));
+        });
+    }
+
+    #[gpui::test]
+    fn targeted_remeasurement_leaves_other_window_idle(cx: &mut gpui::TestAppContext) {
+        let mut first = cx.add_empty_window().clone();
+        let mut second = cx.add_empty_window().clone();
+        let ident = Ident::from("local-measurement");
+        first.update(|window, cx| {
+            list_state(
+                &ident,
+                Rows::Counted(3),
+                None,
+                ListAlignment::Top,
+                px(40.),
+                window,
+                cx,
+            );
+            window.draw(cx).clear(cx);
+        });
+        let idle_before = second.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            window.frame_stats().frame_index
+        });
+        let dirty = first.update(|window, cx| {
+            remeasure_rows(&ident, 1..2, window, cx);
+            window.draw(cx).clear(cx);
+            window.frame_stats().invalidations
+        });
+        cx.run_until_parked();
+        let idle_after = second.update(|window, _| window.frame_stats().frame_index);
+        assert_eq!(dirty, 1);
+        assert_eq!(idle_after, idle_before);
     }
 
     #[gpui::test]

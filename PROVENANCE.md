@@ -761,11 +761,14 @@ unchanged. Shader code and image atlas formats are unchanged.
 
 ### Stable virtual row geometry and nested scrolling
 
-`ListState::remap_items`, retained unmeasured height estimates, and clamped
-Div/List wheel consumption are original GPUI Box framework work. Callers map
+`ListState::remap_items`, shared `ListOffset::remap`, retained unmeasured height
+estimates, and per-dispatch source-axis wheel remainders through
+`Window::consume_scroll_delta` are original GPUI Box framework work. Callers map
 their stable identities to previous indices; the framework preserves measured
 geometry, focus handles and absolute within-row anchors. Kit supplies separate
-row content revisions and consumes actual scroll direction for follow state.
+row content revisions, keyed uniform anchors, window-local remeasurement and
+consumes actual scroll direction for follow state. Wheel leftovers preserve
+native line units and reach ancestors without repeating consumed movement.
 No external source was imported, no renderer ABI or platform event translation
 changed, and the frozen historical import receipt is unchanged. Root and
 headless workspaces retain the same local package authority.

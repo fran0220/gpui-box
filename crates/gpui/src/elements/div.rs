@@ -3489,7 +3489,21 @@ impl Interactivity {
                     scroll_offset.y = (scroll_offset.y + delta_y).clamp(-scroll_max.y, px(0.));
                     scroll_offset.x = (scroll_offset.x + delta_x).clamp(-scroll_max.x, px(0.));
                     if *scroll_offset != old_scroll_offset {
-                        cx.stop_propagation();
+                        let moved = *scroll_offset - old_scroll_offset;
+                        // Single-axis fallback maps the input axis; report
+                        // consumption in that original coordinate system.
+                        let mut consumed = point(px(0.), px(0.));
+                        if delta.x.is_zero() && !delta_x.is_zero() {
+                            consumed.y += moved.x;
+                        } else {
+                            consumed.x += moved.x;
+                        }
+                        if delta.y.is_zero() && !delta_y.is_zero() {
+                            consumed.x += moved.y;
+                        } else {
+                            consumed.y += moved.y;
+                        }
+                        window.consume_scroll_delta(consumed, line_height, cx);
                         cx.notify(current_view);
                     }
                 }

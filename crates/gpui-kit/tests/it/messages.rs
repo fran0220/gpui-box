@@ -535,3 +535,88 @@ fn a_growing_conversation_still_only_builds_its_viewport(cx: &mut TestAppContext
         "growing to fit is still virtualization: a message nobody can see is not laid out"
     );
 }
+
+#[gpui::test]
+fn prepending_and_reordering_history_keep_the_same_visible_message(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.scroll("chat", 750.0);
+    let first = harness.update(|window, cx| {
+        gpui_kit::data::viewed_rows(&Ident::new("chat"), window, cx)
+            .expect("measured viewport")
+            .first_row
+    });
+    assert!(first > 0 && first < 30);
+    let anchor = format!("chat.msg-{first}");
+    let before = harness.bounds(&anchor).expect("visible anchor").top();
+    thread
+        .borrow_mut()
+        .insert(0, message("older", "Grace", "Earlier history"));
+    harness.frame();
+    assert_eq!(
+        harness.bounds(&anchor).expect("same identity").top(),
+        before
+    );
+    assert!(
+        !harness
+            .node("chat.pending")
+            .expect("history below")
+            .text
+            .expect("pending label")
+            .contains("new")
+    );
+
+    // A wide edit that a prefix/suffix splice cannot preserve internally.
+    thread.borrow_mut().rotate_left(2);
+    harness.frame();
+    assert_eq!(
+        harness.bounds(&anchor).expect("reordered identity").top(),
+        before
+    );
+}
+
+#[gpui::test]
+fn a_subpixel_upward_gesture_leaves_follow_mode(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.update(|window, cx| engage_end(&Ident::new("chat"), window, cx));
+    settle(&mut harness);
+    harness.scroll("chat", -0.5);
+    assert!(!harness.update(|window, cx| follows_end(&Ident::new("chat"), window, cx)));
+    thread
+        .borrow_mut()
+        .push(message("new-tail", "Grace", "A new tail"));
+    harness.frame();
+    assert!(!harness.update(|window, cx| follows_end(&Ident::new("chat"), window, cx)));
+    assert!(harness.node("chat.pending").is_some());
+}
+
+#[gpui::test]
+fn keyed_slotted_messages_preserve_identity_on_prepend_and_reorder(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let (mut harness, _) = conversation(cx, thread.clone(), Some(3), false);
+    harness.scroll("chat", 750.0);
+    let viewport = harness.bounds("chat").expect("viewport");
+    let (anchor, before) = (0..40)
+        .find_map(|index| {
+            let id = format!("chat.msg-{index}");
+            let bounds = harness.bounds(&id)?;
+            (bounds.top() >= viewport.top() && bounds.bottom() <= viewport.bottom())
+                .then_some((id, bounds.top()))
+        })
+        .expect("fully visible row");
+    thread
+        .borrow_mut()
+        .insert(0, message("older", "Grace", "Earlier history"));
+    harness.frame();
+    assert_eq!(harness.bounds(&anchor).expect("same row").top(), before);
+    thread.borrow_mut().rotate_left(2);
+    harness.frame();
+    assert_eq!(
+        harness
+            .bounds(&anchor)
+            .expect("same row after reorder")
+            .top(),
+        before
+    );
+}
