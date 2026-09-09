@@ -1,0 +1,136 @@
+# Full platform delivery
+
+This is the execution ledger for the user-authorized performance, component,
+document, browser, runtime, and plugin expansion. An assigned stream is not a
+completed capability. Integration, tests, platform evidence, and deployment are
+tracked separately from implementation.
+
+Coordinator: https://ampcode.com/threads/T-01a0862b-202e-71a0-b491-fbb2fe9d5357
+
+## Ownership
+
+| Stream | Owner thread | Initial state |
+| --- | --- | --- |
+| Framework scrolling, Flow, MessageList | https://ampcode.com/threads/T-01a0865a-4044-734a-9c17-f5dafceefcbb | Implementation assigned |
+| Markdown and AgentDocument | https://ampcode.com/threads/T-01a0865a-4951-714b-ae8b-3a63380c8167 | Implementation assigned |
+| Large text and editor | https://ampcode.com/threads/T-01a0865a-51b7-7360-ad3f-eae8b6b87fe1 | Implementation assigned |
+| Two-axis DataGrid and performance checks | https://ampcode.com/threads/T-01a0865a-59cd-74ac-b288-cf4a2c85d6f1 | Implementation assigned |
+| Navigation, attachments, Dock, charts, settings, localization, assets | https://ampcode.com/threads/T-01a0865a-ee10-75da-81ff-beb1052435f2 | Implementation assigned |
+| Cross-platform WebView | https://ampcode.com/threads/T-01a0865a-f730-713e-9dcc-9dd492532c3e | Implementation assigned |
+| JS/TS runtime, application host, plugins | https://ampcode.com/threads/T-01a0865a-fe20-726a-918a-b1d6e9c4c744 | Implementation assigned |
+
+Workers use isolated checkouts and local staged commits. The coordinator
+transfers commits/files, resolves shared manifests and generated catalogs,
+validates the combined tree, and pushes directly to main with the required
+hosted deployment. Existing source changes are preserved. Shared source edits
+must be reconciled, not overwritten with another checkout's final file.
+
+## Architecture contracts
+
+- Generic scrolling, text storage/layout, clipping, hit testing, input and
+  platform views belong to the local GPUI framework authority.
+- Kit components read caller data and emit caller actions. Document revisions
+  invalidate measurements without changing stable semantic/business IDs.
+- Application runtime, transport, filesystem, process, credentials and plugin
+  policy live in separate host packages depending on Kit, never vice versa.
+- Browser engines supply browser-grade HTML/CSS. Native rich text has an
+  explicit supported subset; no browser compatibility is inferred from it.
+- A permission whitelist alone is not an untrusted-code sandbox. Security
+  claims require enforced resource and process/OS boundaries and negative tests.
+
+## Acceptance matrix
+
+### Reading, scrolling and streaming
+
+- Reading history while tokens arrive preserves the reading anchor and does
+  not resume tail follow. User navigation to the tail can resume following.
+- Prepending history is distinct from appending new messages and updating an
+  existing message; unread counts and follow decisions reflect that distinction.
+- Identity survives insertion/reorder; anchor removal has a documented fallback.
+- Content revisions, asynchronous images, expanded code and width/font changes
+  invalidate affected heights without resetting the whole conversation.
+- Nested code/table scroll containers consume the appropriate axes and hand
+  off unconsumed scrolling consistently at boundaries.
+- Static scrolling does not repeatedly parse/replan the whole document.
+- Streaming fences, lists, references and replacements preserve parser
+  correctness; stale asynchronous parse results cannot replace newer content.
+- Selection, copy, search navigation and semantic targeting remain consistent
+  across virtualized blocks. Unsupported cross-unmounted selection is not
+  silently described as complete.
+
+### Large text and grids
+
+- Local editing does not require copying or shaping the entire document.
+  Unicode, grapheme, UTF-16/IME, undo/redo and selection invariants are tested.
+- Editor capabilities are integrated interactions, not service traits alone:
+  multiple selections, rectangular selection, folding, syntax and language
+  service results must be exercised with revision/cancellation handling.
+- Grid cell building is bounded by visible rows and columns plus pinned and
+  explicit overdraw regions; eager input preparation remains separately counted.
+- Horizontal scrolling, RTL, resizing, pinned regions, editing, keyboard focus,
+  selection and accessibility share one column geometry.
+- Performance fixtures include wide grids, streaming documents and large-text
+  edits, not only narrow grids and warmed visible-row counts.
+
+### Components and resources
+
+- NavStack includes history, transition lifecycle and focus behavior.
+- Attachments expose media/content/action slots and truthful processing states.
+- Dock supports floating tiles and validated caller-owned restoration contracts.
+- Sankey accepts caller data with a tested layout algorithm, not only normalized
+  precomputed geometry. Settings, locale packs and icon selection are integrated.
+- Every new public component has real state exhibits, semantic targets and
+  generated API documentation. Images are inspected before baseline acceptance.
+
+### Browser, runtime and plugins
+
+- WebView examples load actual content and exercise navigation, focus, IPC,
+  lifecycle, failure, popup/download/permission handling and host integration.
+- Platform clipping, stacking and capture restrictions are explicit and tested
+  independently; unsupported platforms do not return fake successful operations.
+- JS views render and dispatch real events; state, module/async lifecycle,
+  hot reload, cancellation, errors and typed bindings work end to end.
+- Plugin discovery, contribution registration, permission refusal, enable/disable,
+  dependency/version validation, installation/update/rollback and cleanup have
+  executable tests, including malicious paths/manifests and crashed workers.
+- CLI/templates and application packaging demonstrate an executable application.
+  External signing credentials and release authorization are recorded separately.
+
+## Integrated validation and release
+
+For each integrated stage, record commits, actual commands, decisive results,
+reviewed artifacts, remaining gaps and platform coverage. Run the repository's
+full Linux gate before shipping. Framework/platform work also needs dependency
+authority and provenance checks plus relevant macOS/Windows validation. Timing
+claims require matched workloads and measured evidence; structural budgets are
+not GPU or presentation-latency measurements.
+
+After every main push, deploy with `tools/site/deploy-main.sh` and verify the
+hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
+
+## Evidence log
+
+- Initial coordinator checkout was clean and six commits behind origin/main;
+  it was fast-forwarded before integration. No unpushed source was distributed.
+- Seven high-mode implementation threads launched. No stream is yet accepted
+  as complete by this ledger.
+- Baseline `cargo run -p xtask -- dependencies check` passed: package
+  identities, dependency graphs, compatibility and provenance records agree.
+  Baseline `cargo run -p xtask -- gate full` passed, including 316 matching
+  Linux headless images. This certifies the pre-integration baseline, not any
+  of the independently implemented streams.
+- Scroll/document owners agreed on stable row keys plus separate
+  `revisions(Vec<u64>)`, targeted remeasurement, and stable-ID anchor remapping.
+  This is an implementation contract, not a verified delivered API yet.
+- The grid owner found eager cell construction before filtering and is adding
+  a lazy keyed provider while preserving the eager API's compatibility.
+- The editor owner is migrating to persistent Ropey storage and indexed
+  snapshots, including an exact-byte undo regression for combining marks.
+- The runtime owner selected supervised Node/V8 processes. Runtime version,
+  application packaging, complete binding coverage, and malicious-plugin OS
+  isolation remain acceptance requirements; Node permissions alone do not
+  satisfy the sandbox contract.
+- WebView inspection found no active Linux framework platform-view attachment.
+  Wry Xlib child integration requires GTK/GLib event pumping; direct embedding
+  in GPUI Wayland is not established. Linux implementation and platform-specific
+  constraints remain open, not accepted as a working cross-platform host.
