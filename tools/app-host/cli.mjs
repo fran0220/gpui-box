@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { PluginPlatform, bundleDirectory, bundleFileBytes } from '../plugin-platform/platform.mjs';
 import { bundleNode } from './node-distribution.mjs';
-import { evaluateDebug } from './debug.mjs';
+import { debugPipeHelper, evaluateDebug } from './debug.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, '../..');
@@ -57,6 +57,8 @@ try {
     const bundle = await bundleDirectory(root, await manifest(root));
     const host = option('--host') ?? resolve(repo, 'target/release/gpui-box-app-host');
     await stat(host);
+    const debugHelper = option('--debug-helper') ?? (process.platform === 'win32' ? debugPipeHelper() : null);
+    if (debugHelper && !(await stat(debugHelper)).isFile()) throw new Error('Debug helper must be a regular executable file');
     await mkdir(destination); // Packaging is local and refuses an existing output directory.
     await mkdir(resolve(destination, 'app'));
     for (const [path, content] of Object.entries(bundle.files)) {
@@ -69,6 +71,10 @@ try {
     await cp(resolve(here, 'runner.mjs'), resolve(destination, 'tools/app-host/runner.mjs'));
     await cp(resolve(here, 'debug.mjs'), resolve(destination, 'tools/app-host/debug.mjs'));
     const bundled = args.includes('--bundle-node') ? await bundleNode(resolve(destination, 'runtime/node')) : null;
+    if (debugHelper) {
+      await mkdir(resolve(destination, 'runtime'), { recursive: true });
+      await cp(debugHelper, resolve(destination, 'runtime/gpui-debug-pipe.exe'));
+    }
     const sandboxLauncher = option('--sandbox-launcher');
     const launcherName = `gpui-sandbox-launch${process.platform === 'win32' ? '.exe' : ''}`;
     if (sandboxLauncher) {
@@ -79,14 +85,15 @@ try {
     }
     const launch = '#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n' +
       (bundled ? 'export GPUI_NODE="$HERE/runtime/node/bin/node"\n' : '') +
+      (debugHelper ? 'export GPUI_DEBUG_PIPE_HELPER="$HERE/runtime/gpui-debug-pipe.exe"\n' : '') +
       (sandboxLauncher ? `export GPUI_SANDBOX_LAUNCHER="$HERE/runtime/${launcherName}"\n` : '') +
       'exec "$HERE/gpui-box-app-host" "$HERE/tools/app-host/runner.mjs" "$HERE/app" "$@"\n';
     await writeFile(resolve(destination, 'run.sh'), launch); await chmod(resolve(destination, 'run.sh'), 0o755);
-    await writeFile(resolve(destination, 'run.cmd'), '@echo off\r\n' + (bundled ? 'set "GPUI_NODE=%~dp0runtime\\node\\node.exe"\r\n' : '') + (sandboxLauncher ? `set "GPUI_SANDBOX_LAUNCHER=%~dp0runtime\\${launcherName}"\r\n` : '') + '"%~dp0gpui-box-app-host.exe" "%~dp0tools\\app-host\\runner.mjs" "%~dp0app" %*\r\n');
-    await writeFile(resolve(destination, 'build-info.json'), JSON.stringify({ schema: 1, app: bundle.manifest, digest: bundle.sha256, platform: process.platform, arch: process.arch, node: bundled?.version ?? process.versions.node, runtimeBundled: Boolean(bundled), runtime: bundled, sandboxLauncher: sandboxLauncher ? launcherName : null }, null, 2));
+    await writeFile(resolve(destination, 'run.cmd'), '@echo off\r\n' + (bundled ? 'set "GPUI_NODE=%~dp0runtime\\node\\node.exe"\r\n' : '') + (debugHelper ? 'set "GPUI_DEBUG_PIPE_HELPER=%~dp0runtime\\gpui-debug-pipe.exe"\r\n' : '') + (sandboxLauncher ? `set "GPUI_SANDBOX_LAUNCHER=%~dp0runtime\\${launcherName}"\r\n` : '') + '"%~dp0gpui-box-app-host.exe" "%~dp0tools\\app-host\\runner.mjs" "%~dp0app" %*\r\n');
+    await writeFile(resolve(destination, 'build-info.json'), JSON.stringify({ schema: 1, app: bundle.manifest, digest: bundle.sha256, platform: process.platform, arch: process.arch, node: bundled?.version ?? process.versions.node, runtimeBundled: Boolean(bundled), runtime: bundled, sandboxLauncher: sandboxLauncher ? launcherName : null, debugHelper: debugHelper ? 'gpui-debug-pipe.exe' : null }, null, 2));
     console.log(`Packaged ${destination}. ${bundled ? 'Pinned Node26.5.1 and its LICENSE included.' : 'External Node >=26.5.1 required.'} Linux bubblewrap/prlimit remain required; this is not a signed installer.`);
   } else {
-    console.log('gpui-app init DIR | dev APP [--debug] [--trust-local] [--data-dir DIR] [--host BIN] | run APP | debug DATA EXPRESSION | bundle APP FILE | plugin-install FILE STORE | plugin-list STORE | build APP OUT [--host BIN] [--bundle-node] [--sandbox-launcher BIN]');
+    console.log('gpui-app init DIR | dev APP [--debug] [--trust-local] [--data-dir DIR] [--host BIN] | run APP | debug DATA EXPRESSION | bundle APP FILE | plugin-install FILE STORE | plugin-list STORE | build APP OUT [--host BIN] [--bundle-node] [--sandbox-launcher BIN] [--debug-helper BIN]');
     if (command && command !== '--help') process.exitCode = 1;
   }
 } catch (error) { console.error(error.message); process.exitCode = 1; }

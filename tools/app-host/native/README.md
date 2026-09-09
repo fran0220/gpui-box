@@ -12,6 +12,12 @@ The script uses the inbox x64 .NET Framework 4.x compiler and sets
 `target/app-host-windows/gpui-debug-pipe.exe`; `-OutputDirectory` overrides it.
 Distributions must ship that helper and set its absolute path in
 `GPUI_DEBUG_PIPE_HELPER`. There is no insecure fallback when it is missing.
+`gpui-app build` on Windows includes the configured helper automatically and
+refuses a missing helper before creating its output directory. `--debug-helper
+PATH` selects an explicit build artifact. The package stores it at
+`runtime/gpui-debug-pipe.exe`; its launchers set `GPUI_DEBUG_PIPE_HELPER` relative
+to the launcher's own directory, so relocating the package preserves the
+absolute runtime path. `build-info.json` records the included helper name.
 The helper invokes Windows kernel named-pipe APIs; it is not a TCP service.
 
 `debugEndpoint(data)` is a deterministic address derived from the absolute data
