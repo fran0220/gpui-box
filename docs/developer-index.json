@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2584
+      "symbolCount": 2587
     },
     {
       "name": "gpui-box-app-host",
@@ -12706,6 +12706,20 @@
       "cfg": []
     },
     {
+      "id": "gpui::editable_text::document::EditDifference",
+      "name": "EditDifference",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "An exact scalar-aligned replacement between two persistent snapshots.",
+      "documentation": "An exact scalar-aligned replacement between two persistent snapshots.",
+      "signature": "# [doc = \" An exact scalar-aligned replacement between two persistent snapshots.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditDifference { # [doc = \" Bytes replaced in the preceding snapshot.\"] pub replaced : Range<usize>, # [doc = \" Only the replacement bytes are copied.\"] pub inserted : String, # [doc = \" Bytes actually compared when shared chunk identity did not suffice.\"] pub compared_bytes : usize, # [doc = \" Equal bytes skipped by live shared-chunk identity.\"] pub shared_bytes : usize, }",
+      "cfg": []
+    },
+    {
       "id": "gpui::editable_text::document::EditSnapshot",
       "name": "EditSnapshot",
       "kind": "struct",
@@ -12731,6 +12745,21 @@
       "summary": "Borrows byte chunks intersecting a range, clipped to document bounds. Chunks concatenate to that exact byte range without allocating or flattening. Byte boundaries need not be UTF-8 scalar boundaries, which lets incremental parsers request input at arbitrary decoder offsets.",
       "documentation": "Borrows byte chunks intersecting a range, clipped to document bounds.\nChunks concatenate to that exact byte range without allocating or\nflattening. Byte boundaries need not be UTF-8 scalar boundaries, which\nlets incremental parsers request input at arbitrary decoder offsets.",
       "signature": "pub fn byte_chunks (& self, range : Range<usize>) -> impl Iterator<Item = & [u8]>",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::difference_from",
+      "name": "difference_from",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Computes one exact replacement without flattening either snapshot. Shared chunks skip byte comparisons. Separate equal documents still require linear comparison; widely separated edits include intervening unchanged text in this single replacement.",
+      "documentation": "Computes one exact replacement without flattening either snapshot.\nShared chunks skip byte comparisons. Separate equal documents still\nrequire linear comparison; widely separated edits include intervening\nunchanged text in this single replacement.",
+      "signature": "pub fn difference_from (& self, before : & Self) -> EditDifference",
       "cfg": [],
       "target": "EditSnapshot"
     },
@@ -12806,6 +12835,21 @@
       "summary": "Byte range of a zero-based hard line, including its LF if present.",
       "documentation": "Byte range of a zero-based hard line, including its LF if present.",
       "signature": "pub fn line_range (& self, line : usize) -> Option<Range<usize>>",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::materialized_bytes",
+      "name": "materialized_bytes",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Bytes held by this snapshot's optional contiguous compatibility cache. Reading this counter never materializes text.",
+      "documentation": "Bytes held by this snapshot's optional contiguous compatibility cache.\nReading this counter never materializes text.",
+      "signature": "pub fn materialized_bytes (& self) -> usize",
       "cfg": [],
       "target": "EditSnapshot"
     },
@@ -13516,7 +13560,7 @@
     },
     {
       "id": "gpui::editable_text::reexport-2",
-      "name": "document :: EditSnapshot",
+      "name": "document :: { EditDifference , EditSnapshot }",
       "kind": "reexport",
       "package": "gpui-box",
       "crate": "gpui",
@@ -13525,7 +13569,7 @@
       "source": "crates/gpui/src/editable_text/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use document::EditSnapshot;",
+      "signature": "pub use document::{ EditDifference, EditSnapshot };",
       "cfg": []
     },
     {
@@ -59413,7 +59457,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "What a source editor reports to its owner.",
       "documentation": "What a source editor reports to its owner.",
-      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The complete plain-text value changed.\"] Changed (SharedString), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
+      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The value changed. The persistent snapshot does not materialize a\"] # [doc = \" contiguous string unless the recipient explicitly calls `text()`.\"] Changed (gpui::EditSnapshot), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
       "cfg": []
     },
     {
@@ -66199,7 +66243,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "What a text area reports to its owner.",
       "documentation": "What a text area reports to its owner.",
-      "signature": "# [doc = \" What a text area reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum TextAreaEvent { # [doc = \" A revisioned edit suitable for caller-owned parsing, diagnostics, and\"] # [doc = \" syntax projections. This accompanies [`Self::Change`].\"] Edited (TextAreaEdit), # [doc = \" The text changed, by typing, deletion, paste, or a programmatic set.\"] Change (SharedString), # [doc = \" The submit chord was pressed while the area had focus.\"] Submit, # [doc = \" Editing was abandoned with the cancel key.\"] Cancel, # [doc = \" A paste carried something the text cannot hold.\"] Pasted (Pasted), # [doc = \" Up, while the arrows belong to something else. The caret did not move.\"] MoveUp, # [doc = \" Down, on the same terms.\"] MoveDown, # [doc = \" Enter, while the owner has claimed completion keys. No text changed.\"] AcceptCompletion, # [doc = \" Escape, on the same terms. Ordinary cancellation was not emitted.\"] DismissCompletion, # [doc = \" Tab, while a source editor has claimed indentation.\"] IndentRequested, # [doc = \" Shift-tab, while a source editor has claimed indentation.\"] OutdentRequested, # [doc = \" The caret or selection moved, including as the result of an edit.\"] SelectionChanged (Range<usize>), # [doc = \" Painted text geometry changed and current-frame range bounds are ready.\"] GeometryChanged, Focus, Blur, }",
+      "signature": "# [doc = \" What a text area reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum TextAreaEvent { # [doc = \" A revisioned edit suitable for caller-owned parsing, diagnostics, and\"] # [doc = \" syntax projections. This accompanies [`Self::Change`].\"] Edited (TextAreaEdit), # [doc = \" The text changed. This persistent snapshot is cheap to clone; call\"] # [doc = \" `text()` explicitly only when a contiguous compatibility value is needed.\"] Change (gpui::EditSnapshot), # [doc = \" The submit chord was pressed while the area had focus.\"] Submit, # [doc = \" Editing was abandoned with the cancel key.\"] Cancel, # [doc = \" A paste carried something the text cannot hold.\"] Pasted (Pasted), # [doc = \" Up, while the arrows belong to something else. The caret did not move.\"] MoveUp, # [doc = \" Down, on the same terms.\"] MoveDown, # [doc = \" Enter, while the owner has claimed completion keys. No text changed.\"] AcceptCompletion, # [doc = \" Escape, on the same terms. Ordinary cancellation was not emitted.\"] DismissCompletion, # [doc = \" Tab, while a source editor has claimed indentation.\"] IndentRequested, # [doc = \" Shift-tab, while a source editor has claimed indentation.\"] OutdentRequested, # [doc = \" The caret or selection moved, including as the result of an edit.\"] SelectionChanged (Range<usize>), # [doc = \" Painted text geometry changed and current-frame range bounds are ready.\"] GeometryChanged, Focus, Blur, }",
       "cfg": []
     },
     {

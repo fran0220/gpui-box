@@ -16,6 +16,27 @@ pub struct EditSnapshot {
     contiguous: OnceLock<SharedString>,
 }
 
+impl PartialEq for EditSnapshot {
+    fn eq(&self, other: &Self) -> bool {
+        self.rope == other.rope
+    }
+}
+
+impl Eq for EditSnapshot {}
+
+/// An exact scalar-aligned replacement between two persistent snapshots.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EditDifference {
+    /// Bytes replaced in the preceding snapshot.
+    pub replaced: Range<usize>,
+    /// Only the replacement bytes are copied.
+    pub inserted: String,
+    /// Bytes actually compared when shared chunk identity did not suffice.
+    pub compared_bytes: usize,
+    /// Equal bytes skipped by live shared-chunk identity.
+    pub shared_bytes: usize,
+}
+
 impl std::fmt::Debug for EditSnapshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EditSnapshot")
@@ -103,6 +124,49 @@ impl EditSnapshot {
         Some(self.rope.slice(start..end).to_string())
     }
 
+    /// Computes one exact replacement without flattening either snapshot.
+    /// Shared chunks skip byte comparisons. Separate equal documents still
+    /// require linear comparison; widely separated edits include intervening
+    /// unchanged text in this single replacement.
+    pub fn difference_from(&self, before: &Self) -> EditDifference {
+        let limit = self.len().min(before.len());
+        let mut work = (0, 0);
+        let mut prefix = common_edge(
+            before.rope.chunks(),
+            self.rope.chunks(),
+            limit,
+            false,
+            &mut work,
+        );
+        while !before.is_scalar_boundary(prefix) || !self.is_scalar_boundary(prefix) {
+            prefix -= 1;
+        }
+        let mut suffix = common_edge(
+            before.rope.chunks_at_byte(before.len()).0.reversed(),
+            self.rope.chunks_at_byte(self.len()).0.reversed(),
+            limit - prefix,
+            true,
+            &mut work,
+        );
+        while !before.is_scalar_boundary(before.len() - suffix)
+            || !self.is_scalar_boundary(self.len() - suffix)
+        {
+            suffix -= 1;
+        }
+        EditDifference {
+            replaced: prefix..before.len() - suffix,
+            inserted: self
+                .slice(prefix..self.len() - suffix)
+                .expect("scalar-aligned difference"),
+            compared_bytes: work.0,
+            shared_bytes: work.1,
+        }
+    }
+
+    fn is_scalar_boundary(&self, offset: usize) -> bool {
+        offset == self.len() || self.rope.byte(offset) & 0xc0 != 0x80
+    }
+
     /// Borrows byte chunks intersecting a range, clipped to document bounds.
     /// Chunks concatenate to that exact byte range without allocating or
     /// flattening. Byte boundaries need not be UTF-8 scalar boundaries, which
@@ -126,6 +190,12 @@ impl EditSnapshot {
     /// subsequent calls reuse that allocation. Prefer indexed slices for views.
     pub fn text(&self) -> &SharedString {
         self.contiguous.get_or_init(|| self.rope.to_string().into())
+    }
+
+    /// Bytes held by this snapshot's optional contiguous compatibility cache.
+    /// Reading this counter never materializes text.
+    pub fn materialized_bytes(&self) -> usize {
+        self.contiguous.get().map_or(0, |text| text.len())
     }
 
     pub(super) fn replace(&mut self, range: Range<usize>, text: &str) {
@@ -208,9 +278,90 @@ impl EditSnapshot {
     }
 }
 
+fn common_edge(
+    mut left: ropey::iter::Chunks<'_>,
+    mut right: ropey::iter::Chunks<'_>,
+    limit: usize,
+    backward: bool,
+    work: &mut (usize, usize),
+) -> usize {
+    let (mut a, mut b): (&[u8], &[u8]) = (&[], &[]);
+    let mut matched = 0;
+    while matched < limit {
+        while a.is_empty() {
+            let Some(chunk) = left.next() else {
+                return matched;
+            };
+            a = chunk.as_bytes();
+        }
+        while b.is_empty() {
+            let Some(chunk) = right.next() else {
+                return matched;
+            };
+            b = chunk.as_bytes();
+        }
+        let length = a.len().min(b.len()).min(limit - matched);
+        let (x, y) = if backward {
+            (&a[a.len() - length..], &b[b.len() - length..])
+        } else {
+            (&a[..length], &b[..length])
+        };
+        if x.as_ptr() == y.as_ptr() {
+            work.1 += length;
+        } else {
+            let mismatch = if backward {
+                x.iter().rev().zip(y.iter().rev()).position(|(a, b)| a != b)
+            } else {
+                x.iter().zip(y.iter()).position(|(a, b)| a != b)
+            };
+            work.0 += mismatch.map_or(length, |index| index + 1);
+            if let Some(index) = mismatch {
+                return matched + index;
+            }
+        }
+        matched += length;
+        if backward {
+            a = &a[..a.len() - length];
+            b = &b[..b.len() - length];
+        } else {
+            a = &a[length..];
+            b = &b[length..];
+        }
+    }
+    matched
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn borrowed_differences_preserve_scalar_edges_without_flattening() {
+        for (before, after, range, inserted) in [
+            ("aéz", "aêz", 1..3, "ê"),
+            ("Ӏ", "Ā", 0..2, "Ā"),
+            ("left😀tail", "left界tail", 4..8, "界"),
+            ("same", "same", 4..4, ""),
+            ("", "new", 0..0, "new"),
+        ] {
+            let before = EditSnapshot::new(before);
+            let after = EditSnapshot::new(after);
+            let diff = after.difference_from(&before);
+            assert_eq!(diff.replaced, range);
+            assert_eq!(diff.inserted, inserted);
+            assert!(before.contiguous.get().is_none());
+            assert!(after.contiguous.get().is_none());
+        }
+        let mut after = EditSnapshot::new(&"asymmetric界\n".repeat(100000));
+        let before = after.clone();
+        after.replace(3..4, "longer😀");
+        let diff = after.difference_from(&before);
+        assert_eq!(diff.replaced, 3..4);
+        assert_eq!(diff.inserted, "longer😀");
+        assert!(diff.compared_bytes < 8192, "{diff:?}");
+        assert!(diff.shared_bytes > before.len() - 8192);
+        assert!(after.contiguous.get().is_none());
+    }
 
     #[test]
     fn parser_chunks_borrow_exact_clipped_bytes_even_inside_scalars() {

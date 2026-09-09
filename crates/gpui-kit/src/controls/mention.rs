@@ -244,7 +244,7 @@ impl MentionInput {
             // on the complete value so it never updates twice for one edit.
             TextAreaEvent::Edited(_) => {}
             TextAreaEvent::Change(value) => {
-                cx.emit(MentionInputEvent::Changed(value.clone()));
+                cx.emit(MentionInputEvent::Changed(value.text().clone()));
                 self.sync_trigger(cx);
             }
             TextAreaEvent::Submit => cx.emit(MentionInputEvent::Submitted),

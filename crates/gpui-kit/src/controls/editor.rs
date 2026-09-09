@@ -149,8 +149,9 @@ pub struct EditorGeometry {
 pub enum EditorEvent {
     /// One replacement entered the shared undo history.
     Edited(TextAreaEdit),
-    /// The complete plain-text value changed.
-    Changed(SharedString),
+    /// The value changed. The persistent snapshot does not materialize a
+    /// contiguous string unless the recipient explicitly calls `text()`.
+    Changed(gpui::EditSnapshot),
     /// The byte selection changed on grapheme boundaries.
     SelectionChanged(Range<usize>),
     /// The platform clipboard supplied non-text input.

@@ -864,3 +864,8 @@ locale file was imported. English remains the existing source vocabulary;
 the exhaustive translated match and placeholder tests keep both packs current.
 Number/date adapters, text direction, and caller content are not translated by
 these packs. Font sources and their notices remain unchanged.
+
+Borrowed persistent-snapshot difference scanning and lazy Kit change-event
+payloads are original GPUI Box work using Ropey's public chunk iterators.
+Shared immutable byte spans skip comparisons without relying on private tree
+layouts or changing the frozen import receipt.

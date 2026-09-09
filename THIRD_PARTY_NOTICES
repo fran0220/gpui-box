@@ -482,3 +482,6 @@ GPUI Box changes to the local framework, with no additional imported source.
 
 Retained AccessKit text publication and debug-tree accumulation are original
 GPUI Box modifications using the existing AccessKit dependency and license.
+
+Persistent-snapshot difference scanning uses the existing MIT-licensed Ropey
+dependency through public chunk iterators; the integration is original work.

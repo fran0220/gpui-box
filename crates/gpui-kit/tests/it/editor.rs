@@ -12,6 +12,39 @@ use gpui_kit_testkit::harness::Harness;
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
 
 #[gpui::test]
+fn changed_events_retain_lazy_snapshots_instead_of_eager_whole_values(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "old😀tail", |editor| editor.rows(3));
+    let entity = slot.borrow().clone().expect("editor");
+    let snapshots = Rc::new(RefCell::new(Vec::new()));
+    let output = snapshots.clone();
+    let _subscription = harness.update(|_, cx| {
+        cx.subscribe(&entity, move |_, event, _| {
+            if let EditorEvent::Changed(snapshot) = event {
+                assert_eq!(snapshot.materialized_bytes(), 0);
+                output.borrow_mut().push(snapshot.clone());
+            }
+        })
+    });
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().clone();
+        area.update(cx, |area, cx| {
+            area.replace_range(3..7, "界", cx);
+        });
+    });
+    harness.frame();
+    let snapshots = snapshots.borrow();
+    assert_eq!(snapshots.len(), 1);
+    assert_eq!(snapshots[0].materialized_bytes(), 0);
+    assert_eq!(
+        snapshots[0].slice(0..snapshots[0].len()).as_deref(),
+        Some("old界tail")
+    );
+    assert_eq!(snapshots[0].materialized_bytes(), 0);
+    assert_eq!(snapshots[0].text().as_ref(), "old界tail");
+    assert_eq!(snapshots[0].materialized_bytes(), "old界tail".len());
+}
+
+#[gpui::test]
 fn multicursor_typing_deletion_and_history_share_the_real_input_surface(cx: &mut TestAppContext) {
     let (mut harness, slot) = editor(cx, "é middle 😀 end", |editor| editor.rows(3));
     let entity = slot.borrow().clone().expect("editor");

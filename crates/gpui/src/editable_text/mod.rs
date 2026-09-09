@@ -13,7 +13,7 @@ mod layout;
 mod style_runs;
 
 pub use buffer::{EditBuffer, EditOutcome, EditRules};
-pub use document::EditSnapshot;
+pub use document::{EditDifference, EditSnapshot};
 pub use history::EditCause;
 pub use layout::{EditableTextLayout, EditableTextWork};
 pub use style_runs::{EditableStyleRun, EditableStyleRuns};

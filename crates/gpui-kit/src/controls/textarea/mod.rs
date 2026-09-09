@@ -402,8 +402,9 @@ pub enum TextAreaEvent {
     /// A revisioned edit suitable for caller-owned parsing, diagnostics, and
     /// syntax projections. This accompanies [`Self::Change`].
     Edited(TextAreaEdit),
-    /// The text changed, by typing, deletion, paste, or a programmatic set.
-    Change(SharedString),
+    /// The text changed. This persistent snapshot is cheap to clone; call
+    /// `text()` explicitly only when a contiguous compatibility value is needed.
+    Change(gpui::EditSnapshot),
     /// The submit chord was pressed while the area had focus.
     Submit,
     /// Editing was abandoned with the cancel key.
@@ -759,7 +760,7 @@ impl TextArea {
             let signal = signal.clone();
             cx.subscribe(area, move |_area, event, cx| {
                 if let TextAreaEvent::Change(text) = event {
-                    signal.set(cx, text.to_string());
+                    signal.set(cx, text.text().to_string());
                 }
             })
         };
@@ -780,13 +781,13 @@ impl TextArea {
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         // A value the host set is not a step the reader can walk back
         // through, so it ends the history rather than joining it.
         let outcome = self.edit.set_text(&value.into());
         if outcome.changed {
             self.record_edit(&before, cx);
-            cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+            cx.emit(TextAreaEvent::Change(self.edit.snapshot()));
         }
         self.scroll_offset = px(0.0);
         self.horizontal_scroll_offset = px(0.0);
@@ -906,7 +907,7 @@ impl TextArea {
         if self.disabled || self.read_only {
             return false;
         }
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         let selection_before = self.edit.selection();
         let Some(outcome) = self.edit.replace_many(edits, text_edit::Cause::Paste) else {
             return false;
@@ -1260,7 +1261,7 @@ impl TextArea {
             if self.disabled || self.read_only {
                 return;
             }
-            let before = self.edit.text().clone();
+            let before = self.edit.snapshot();
             let selection_before = self.edit.selection();
             let outcome = self.edit.replace_selections(new_text, cause);
             self.finish_edit(outcome, &before, selection_before, cx);
@@ -1281,7 +1282,7 @@ impl TextArea {
             return;
         }
         let selection_before = self.edit.selection();
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         // A key that arrives while an input method is composing ends the
         // composition, so the run is one step rather than merging with what
         // follows it.
@@ -1293,14 +1294,14 @@ impl TextArea {
     fn finish_edit(
         &mut self,
         outcome: gpui::EditOutcome,
-        before: &str,
+        before: &gpui::EditSnapshot,
         selection_before: Range<usize>,
         cx: &mut Context<Self>,
     ) {
         self.goal_x = None;
         if outcome.changed {
             self.record_edit(before, cx);
-            cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+            cx.emit(TextAreaEvent::Change(self.edit.snapshot()));
         }
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
@@ -1308,41 +1309,39 @@ impl TextArea {
 
     fn undo(&mut self, _: &Undo, _: &mut Window, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         if self.disabled || self.read_only || !self.edit.undo() {
             return;
         }
         self.record_edit(&before, cx);
         self.goal_x = None;
-        cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        cx.emit(TextAreaEvent::Change(self.edit.snapshot()));
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
     fn redo(&mut self, _: &Redo, _: &mut Window, cx: &mut Context<Self>) {
         let selection_before = self.edit.selection();
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         if self.disabled || self.read_only || !self.edit.redo() {
             return;
         }
         self.record_edit(&before, cx);
         self.goal_x = None;
-        cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        cx.emit(TextAreaEvent::Change(self.edit.snapshot()));
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
-    fn record_edit(&mut self, before: &str, cx: &mut Context<Self>) {
+    fn record_edit(&mut self, before: &gpui::EditSnapshot, cx: &mut Context<Self>) {
         self.reveal_caret = true;
-        let after = self.edit.text();
-        let (replaced, inserted) = replacement_between(before, after);
-        let inserted = SharedString::from(inserted.to_owned());
+        let difference = self.edit.snapshot().difference_from(before);
         self.revision = self.revision.saturating_add(1);
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         cx.emit(TextAreaEvent::Edited(TextAreaEdit {
             revision: self.revision,
-            replaced,
-            inserted,
+            replaced: difference.replaced,
+            inserted: difference.inserted.into(),
         }));
     }
 
@@ -1703,7 +1702,7 @@ impl TextArea {
         if self.disabled || self.read_only {
             return;
         }
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         let selection_before = self.edit.selection();
         let outcome = self.edit.delete_selections(backward);
         self.finish_edit(outcome, &before, selection_before, cx);
@@ -1777,7 +1776,7 @@ impl TextArea {
                 }
             })
             .collect();
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         let selection_before = self.edit.selection();
         let outcome = self.edit.delete_ranges(ranges);
         self.finish_edit(outcome, &before, selection_before, cx);
@@ -2060,7 +2059,7 @@ impl EntityInputHandler for TextArea {
         }
         let selection_before = self.edit.selection();
         let range = self.edit_range(range_utf16);
-        let before = self.edit.text().clone();
+        let before = self.edit.snapshot();
         // The composing selection is reported relative to the replacement,
         // not to the whole value, so it is converted against exactly that
         // replacement. Converting against the already-mutated value can land
@@ -2073,7 +2072,7 @@ impl EntityInputHandler for TextArea {
         self.goal_x = None;
         if outcome.changed {
             self.record_edit(&before, cx);
-            cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+            cx.emit(TextAreaEvent::Change(self.edit.snapshot()));
         }
         self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
@@ -2430,39 +2429,4 @@ fn non_text(item: &ClipboardItem) -> Option<Pasted> {
         .flatten()
         .collect();
     (!paths.is_empty()).then_some(Pasted::Paths(paths))
-}
-
-/// Finds the one contiguous replacement between two values. Every mutation
-/// of an edit buffer is one replacement, but undo, redo, and composition hide
-/// their original transaction detail from the control. Recovering the common
-/// prefix and suffix here gives every route the same caller-facing delta.
-fn replacement_between<'a>(before: &str, after: &'a str) -> (Range<usize>, &'a str) {
-    let mut prefix = before
-        .as_bytes()
-        .iter()
-        .zip(after.as_bytes())
-        .take_while(|(left, right)| left == right)
-        .count();
-    while !before.is_char_boundary(prefix) || !after.is_char_boundary(prefix) {
-        prefix -= 1;
-    }
-
-    let max_suffix = before.len().min(after.len()) - prefix;
-    let mut suffix = before.as_bytes()[prefix..]
-        .iter()
-        .rev()
-        .zip(after.as_bytes()[prefix..].iter().rev())
-        .take(max_suffix)
-        .take_while(|(left, right)| left == right)
-        .count();
-    while !before.is_char_boundary(before.len() - suffix)
-        || !after.is_char_boundary(after.len() - suffix)
-    {
-        suffix -= 1;
-    }
-
-    (
-        prefix..before.len() - suffix,
-        &after[prefix..after.len() - suffix],
-    )
 }

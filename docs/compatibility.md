@@ -577,3 +577,19 @@ a text revision still invalidates the logical cache. Compatibility whole-value
 events and semantic values remain separate allocation work. Platform-independent
 tests cover complete 1,000/10,000-row content, distant select-all endpoints,
 bounded viewport cell queries, removal/reattachment and mid-frame deactivation.
+
+Source migration: `TextAreaEvent::Change` and `EditorEvent::Changed` now carry
+`gpui::EditSnapshot`, not `SharedString`. Read slices or indexed line/UTF-16
+positions without a full copy; call `snapshot.text()` explicitly for the old
+contiguous value. String signal bindings and MentionInput's existing string
+event retain their compatibility conversion at the subscribing consumer.
+Internal Editor forwarding does not flatten the snapshot.
+
+`EditSnapshot::difference_from` computes a scalar-aligned single replacement
+using borrowed chunks. Its `compared_bytes` and `shared_bytes` report actual
+comparison and identity-skipped work; `inserted.len()` is the copied payload.
+The regression edits a 100,000-row persistent snapshot, compares under 8 KiB,
+and leaves both contiguous caches empty. Independent equal snapshots can
+still require full comparison, and separated multicursor changes can span
+unchanged text in the single-delta compatibility representation. This is not
+a claim that rendering or new-revision accessibility publication is bounded.
