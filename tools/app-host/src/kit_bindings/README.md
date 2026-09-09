@@ -17,8 +17,10 @@ or replaced entities. Retained subscription routes update to the current frame
 emitter and action map; disabled controls publish no callable action. Caller
 props remain authoritative. Select emits a choice without applying it.
 
-Named slots are pre-rendered by the host and contain no callbacks or native
-handles. Accordion slots use section identity; ScrollArea uses `content`;
+Named slots are host-owned factories over validated data, producing fresh
+elements on each invocation. No executable closures cross JSON. Shared
+`KitState` drops its internal map borrow before constructing nested elements.
+Accordion slots use section identity; ScrollArea uses `content`;
 SplitPane uses `start` and `end`. The host owns recursive node validation,
 aggregate budgets, revision/generation checks, namespaces, and permissions.
 

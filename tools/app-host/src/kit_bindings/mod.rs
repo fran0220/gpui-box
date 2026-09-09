@@ -37,6 +37,9 @@ pub(super) const COMPONENTS: &[&str] = &[
 ];
 type Emit = Rc<dyn Fn(&str, Value)>;
 type Key = (u64, String);
+/// Host factories retain validated descriptors, not previously consumed elements.
+/// They must preserve the source owner/generation and refuse revoked owners.
+pub(super) type KitSlots = BTreeMap<String, Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>;
 
 struct Route {
     events: BTreeMap<String, String>,
@@ -59,12 +62,12 @@ enum Control {
 struct Retained {
     control: Control,
     route: Rc<RefCell<Route>>,
-    props: serde_json::Map<String, Value>,
+    props: RefCell<serde_json::Map<String, Value>>,
     _subscriptions: Vec<Subscription>,
 }
 #[derive(Default)]
 pub(super) struct KitState {
-    retained: HashMap<Key, Retained>,
+    retained: RefCell<HashMap<Key, Rc<Retained>>>,
 }
 
 fn flag(node: &Node, key: &str) -> bool {
@@ -111,7 +114,7 @@ fn options(node: &Node) -> Vec<SelectOption> {
 }
 
 impl KitState {
-    pub(super) fn reconcile(&mut self, root: &Node, _cx: &mut App) {
+    pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
         fn visit(node: &Node, live: &mut HashMap<Key, String>) {
             if let Some(component) = &node.component {
                 live.insert((node.instance, node.id.clone()), component.clone());
@@ -122,7 +125,7 @@ impl KitState {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
-        self.retained.retain(|key, entry| {
+        self.retained.borrow_mut().retain(|key, entry| {
             live.get(key).is_some_and(|component| {
                 matches!(
                     (&entry.control, component.as_str()),
@@ -133,9 +136,9 @@ impl KitState {
     }
 
     pub(super) fn render(
-        &mut self,
+        &self,
         node: &Node,
-        slots: BTreeMap<String, Vec<AnyElement>>,
+        slots: KitSlots,
         window: &mut Window,
         cx: &mut App,
         emit: Emit,
@@ -274,86 +277,97 @@ impl KitState {
             }
             "TextInput" | "Select" => {
                 let key = (node.instance, node.id.clone());
-                let entry = self.retained.entry(key).or_insert_with(|| {
-                    let route = Rc::new(RefCell::new(Route {
-                        events: BTreeMap::new(),
-                        emit: emit.clone(),
-                        disabled: true,
-                    }));
-                    let callback = route.clone();
-                    if node.component.as_deref() == Some("TextInput") {
-                        let entity = cx.new(|cx| {
-                            let mut input = TextInput::new(id, window, cx)
-                                .text(text(node, "text"))
-                                .placeholder(text(node, "placeholder"))
-                                .name(text(node, "name"))
-                                .required(flag(node, "required"))
-                                .secret(flag(node, "secret"))
-                                .bare(flag(node, "bare"))
-                                .control_size(size(node));
-                            if let Some(max) = node.props.get("maxLength").and_then(Value::as_u64) {
-                                input = input.max_length(max as usize);
-                            }
-                            input
-                        });
-                        let subscription =
-                            cx.subscribe(&entity, move |_, event: &TextInputEvent, _| {
-                                let (name, value) = match event {
-                                    TextInputEvent::Change(value) => {
-                                        ("change", json!(value.as_ref()))
-                                    }
-                                    TextInputEvent::Submit => ("submit", Value::Null),
-                                    TextInputEvent::Cancel => ("cancel", Value::Null),
-                                    TextInputEvent::BackspaceAtStart => {
-                                        ("backspaceAtStart", Value::Null)
-                                    }
-                                    TextInputEvent::Focus => ("focus", Value::Null),
-                                    TextInputEvent::Blur => ("blur", Value::Null),
-                                };
-                                callback.borrow().send(name, value);
-                            });
+                let entry = self
+                    .retained
+                    .borrow_mut()
+                    .entry(key)
+                    .or_insert_with(|| {
+                        let route = Rc::new(RefCell::new(Route {
+                            events: BTreeMap::new(),
+                            emit: emit.clone(),
+                            disabled: true,
+                        }));
                         let callback = route.clone();
-                        let denial_subscription =
-                            cx.subscribe(&entity, move |_, denial: &gpui::ClipboardDenied, _| {
-                                let reason = match denial {
-                                    gpui::ClipboardDenied::MissingOwner => "missingOwner",
-                                    gpui::ClipboardDenied::Denied => "denied",
-                                };
-                                callback.borrow().send("clipboardDenied", json!(reason));
+                        if node.component.as_deref() == Some("TextInput") {
+                            let entity = cx.new(|cx| {
+                                let mut input = TextInput::new(id, window, cx)
+                                    .text(text(node, "text"))
+                                    .placeholder(text(node, "placeholder"))
+                                    .name(text(node, "name"))
+                                    .required(flag(node, "required"))
+                                    .secret(flag(node, "secret"))
+                                    .bare(flag(node, "bare"))
+                                    .control_size(size(node));
+                                if let Some(max) =
+                                    node.props.get("maxLength").and_then(Value::as_u64)
+                                {
+                                    input = input.max_length(max as usize);
+                                }
+                                input
                             });
-                        Retained {
-                            control: Control::Input(entity),
-                            route,
-                            props: Default::default(),
-                            _subscriptions: vec![subscription, denial_subscription],
-                        }
-                    } else {
-                        let entity = cx.new(|cx| {
-                            Select::new(id, window, cx)
-                                .placeholder(text(node, "placeholder"))
-                                .clearable(flag(node, "clearable"))
-                                .control_size(size(node))
-                        });
-                        let subscription =
-                            cx.subscribe(&entity, move |_, event: &SelectEvent, _| {
-                                let (name, value) = match event {
-                                    SelectEvent::Selected(value) => {
-                                        ("change", json!(value.as_ref()))
-                                    }
-                                    SelectEvent::Cleared => ("change", Value::Null),
-                                    SelectEvent::Opened => ("open", Value::Null),
-                                    SelectEvent::Closed => ("close", Value::Null),
-                                };
-                                callback.borrow().send(name, value);
+                            let subscription =
+                                cx.subscribe(&entity, move |_, event: &TextInputEvent, _| {
+                                    let (name, value) = match event {
+                                        TextInputEvent::Change(value) => {
+                                            ("change", json!(value.as_ref()))
+                                        }
+                                        TextInputEvent::Submit => ("submit", Value::Null),
+                                        TextInputEvent::Cancel => ("cancel", Value::Null),
+                                        TextInputEvent::BackspaceAtStart => {
+                                            ("backspaceAtStart", Value::Null)
+                                        }
+                                        TextInputEvent::Focus => ("focus", Value::Null),
+                                        TextInputEvent::Blur => ("blur", Value::Null),
+                                    };
+                                    callback.borrow().send(name, value);
+                                });
+                            let callback = route.clone();
+                            let denial_subscription = cx.subscribe(
+                                &entity,
+                                move |_, denial: &gpui::ClipboardDenied, _| {
+                                    let reason = match denial {
+                                        gpui::ClipboardDenied::MissingOwner => "missingOwner",
+                                        gpui::ClipboardDenied::Denied => "denied",
+                                    };
+                                    callback.borrow().send("clipboardDenied", json!(reason));
+                                },
+                            );
+                            Rc::new(Retained {
+                                control: Control::Input(entity),
+                                route,
+                                props: Default::default(),
+                                _subscriptions: vec![subscription, denial_subscription],
+                            })
+                        } else {
+                            let entity = cx.new(|cx| {
+                                Select::new(id, window, cx)
+                                    .placeholder(text(node, "placeholder"))
+                                    .clearable(flag(node, "clearable"))
+                                    .control_size(size(node))
                             });
-                        Retained {
-                            control: Control::Select(entity),
-                            route,
-                            props: Default::default(),
-                            _subscriptions: vec![subscription],
+                            let subscription =
+                                cx.subscribe(&entity, move |_, event: &SelectEvent, _| {
+                                    let (name, value) = match event {
+                                        SelectEvent::Selected(value) => {
+                                            ("change", json!(value.as_ref()))
+                                        }
+                                        SelectEvent::Cleared => ("change", Value::Null),
+                                        SelectEvent::Opened => ("open", Value::Null),
+                                        SelectEvent::Closed => ("close", Value::Null),
+                                    };
+                                    callback.borrow().send(name, value);
+                                });
+                            Rc::new(Retained {
+                                control: Control::Select(entity),
+                                route,
+                                props: Default::default(),
+                                _subscriptions: vec![subscription],
+                            })
                         }
-                    }
-                });
+                    })
+                    .clone();
+                // The map borrow ends above, before updating controls or evaluating slots.
+                let previous_props = entry.props.borrow().clone();
                 *entry.route.borrow_mut() = Route {
                     events: node.events.clone(),
                     emit,
@@ -368,7 +382,7 @@ impl KitState {
                             {
                                 input.set_text_quietly(text(node, "text"), cx);
                             }
-                            if entry.props == node.props {
+                            if previous_props == node.props {
                                 return;
                             }
                             input.set_name(text(node, "name"), cx);
@@ -388,15 +402,15 @@ impl KitState {
                                 cx,
                             );
                         });
-                        entry.props = node.props.clone();
+                        *entry.props.borrow_mut() = node.props.clone();
                         entity.clone().into_any_element()
                     }
                     Control::Select(entity) => {
                         entity.update(cx, |select, cx| {
-                            if entry.props == node.props {
+                            if previous_props == node.props {
                                 return;
                             }
-                            if entry.props.get("options") != node.props.get("options") {
+                            if previous_props.get("options") != node.props.get("options") {
                                 select.set_options(options(node), cx);
                             }
                             let selected = node
@@ -420,12 +434,12 @@ impl KitState {
                             select.set_clearable(flag(node, "clearable"), cx);
                             select.set_control_size(size(node), cx);
                         });
-                        entry.props = node.props.clone();
+                        *entry.props.borrow_mut() = node.props.clone();
                         entity.clone().into_any_element()
                     }
                 }
             }
-            _ => layout::render(node, slots, emit),
+            _ => layout::render(node, slots, window, cx, emit),
         }
     }
 }

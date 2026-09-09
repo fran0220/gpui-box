@@ -54,7 +54,7 @@ fn choices_render_native_semantics_and_emit_typed_intents(cx: &mut TestAppContex
         ),
     ];
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
-        let mut state = KitState::default();
+        let state = KitState::default();
         let output = captured.clone();
         let emit: Emit =
             Rc::new(move |action, payload| output.borrow_mut().push((action.to_owned(), payload)));
@@ -94,7 +94,7 @@ fn choices_render_native_semantics_and_emit_typed_intents(cx: &mut TestAppContex
 
 #[gpui::test]
 fn retained_input_routes_latest_actions_and_drops_removed_entities(cx: &mut TestAppContext) {
-    let state = Rc::new(RefCell::new(KitState::default()));
+    let state = Rc::new(KitState::default());
     let descriptor = Rc::new(RefCell::new(node(
         "TextInput",
         "field",
@@ -107,7 +107,7 @@ fn retained_input_routes_latest_actions_and_drops_removed_entities(cx: &mut Test
     let output = events.clone();
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let node = build_node.borrow();
-        let mut state = build_state.borrow_mut();
+        let state = &build_state;
         state.reconcile(&node, cx);
         let output = output.clone();
         state.render(
@@ -120,7 +120,7 @@ fn retained_input_routes_latest_actions_and_drops_removed_entities(cx: &mut Test
     });
     harness.click("field");
     harness.keystrokes("a");
-    let input = match &state.borrow().retained[&(0, "field".into())].control {
+    let input = match &state.retained.borrow()[&(0, "field".into())].control {
         Control::Input(entity) => entity.clone(),
         _ => unreachable!(),
     };
@@ -139,11 +139,11 @@ fn retained_input_routes_latest_actions_and_drops_removed_entities(cx: &mut Test
         Some(&("latest".into(), json!("ab")))
     );
     harness.update(|_, cx| assert_eq!(input.read(cx).value().as_ref(), "ab"));
-    assert_eq!(state.borrow().retained.len(), 1);
+    assert_eq!(state.retained.borrow().len(), 1);
     let empty: Node =
         serde_json::from_value(json!({"kind":"column","id":"root"})).expect("empty tree");
-    harness.update(|_, cx| state.borrow_mut().reconcile(&empty, cx));
-    assert!(state.borrow().retained.is_empty());
+    harness.update(|_, cx| state.reconcile(&empty, cx));
+    assert!(state.retained.borrow().is_empty());
     let count = events.borrow().len();
     harness.update(|_, cx| input.update(cx, |input, cx| input.set_value("detached", cx)));
     assert_eq!(
@@ -155,7 +155,7 @@ fn retained_input_routes_latest_actions_and_drops_removed_entities(cx: &mut Test
 
 #[gpui::test]
 fn select_preserves_menu_and_caller_refusal(cx: &mut TestAppContext) {
-    let state = Rc::new(RefCell::new(KitState::default()));
+    let state = Rc::new(KitState::default());
     let descriptor = node(
         "Select",
         "select",
@@ -166,7 +166,7 @@ fn select_preserves_menu_and_caller_refusal(cx: &mut TestAppContext) {
     let events = output.clone();
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let events = events.clone();
-        state.borrow_mut().render(
+        state.render(
             &descriptor,
             BTreeMap::new(),
             window,
@@ -214,15 +214,16 @@ fn navigation_uses_business_ids_and_mounts_named_slots(cx: &mut TestAppContext) 
             json!({"page":3,"totalPages":8}),
             json!({"select":"page"}),
         );
-        let mut state = KitState::default();
-        let slots = BTreeMap::from([(
+        let state = KitState::default();
+        let mut slots = KitSlots::new();
+        slots.insert(
             "advanced".into(),
-            vec![
+            Rc::new(|_, _| {
                 Button::new("slot.action")
                     .label("Nested native button")
-                    .into_any_element(),
-            ],
-        )]);
+                    .into_any_element()
+            }),
+        );
         div()
             .flex()
             .flex_col()
@@ -251,23 +252,22 @@ fn navigation_uses_business_ids_and_mounts_named_slots(cx: &mut TestAppContext) 
 #[gpui::test]
 fn layout_slots_keep_asymmetric_split_geometry(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
-        let mut state = KitState::default();
+        let state = KitState::default();
         let split = node(
             "SplitPane",
             "split",
             json!({"ratio":0.3,"minStart":0,"minEnd":0}),
             json!({}),
         );
-        let slots = BTreeMap::from([
-            (
-                "start".into(),
-                vec![Button::new("pane.start").label("Start").into_any_element()],
-            ),
-            (
-                "end".into(),
-                vec![Button::new("pane.end").label("End").into_any_element()],
-            ),
-        ]);
+        let mut slots = KitSlots::new();
+        slots.insert(
+            "start".into(),
+            Rc::new(|_, _| Button::new("pane.start").label("Start").into_any_element()),
+        );
+        slots.insert(
+            "end".into(),
+            Rc::new(|_, _| Button::new("pane.end").label("End").into_any_element()),
+        );
         div()
             .w(px(600.))
             .h(px(240.))
@@ -286,7 +286,7 @@ fn layout_slots_keep_asymmetric_split_geometry(cx: &mut TestAppContext) {
 #[gpui::test]
 fn clipboard_refusal_routes_data_only_and_tears_down(cx: &mut TestAppContext) {
     let owner = gpui::EffectOwner::new();
-    let state = Rc::new(RefCell::new(KitState::default()));
+    let state = Rc::new(KitState::default());
     let build_state = state.clone();
     let events = Rc::new(RefCell::new(Vec::new()));
     let output = events.clone();
@@ -298,7 +298,7 @@ fn clipboard_refusal_routes_data_only_and_tears_down(cx: &mut TestAppContext) {
     );
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let output = output.clone();
-        let rendered = build_state.borrow_mut().render(
+        let rendered = build_state.render(
             &descriptor,
             BTreeMap::new(),
             window,
@@ -317,15 +317,60 @@ fn clipboard_refusal_routes_data_only_and_tears_down(cx: &mut TestAppContext) {
     harness.keystrokes(&format!("{primary}-a {primary}-x"));
     assert_eq!(&*events.borrow(), &[("refusal".into(), json!("denied"))]);
     harness.update(|_, cx| {
-        let mut state = state.borrow_mut();
-        let Control::Input(entity) = &state.retained.values().next().expect("retained").control
-        else {
+        let entry = state
+            .retained
+            .borrow()
+            .values()
+            .next()
+            .expect("retained")
+            .clone();
+        let Control::Input(entity) = &entry.control else {
             panic!("input")
         };
         assert_eq!(entity.read(cx).value().as_ref(), "retained");
         let empty: Node = serde_json::from_value(json!({"kind":"column","id":"empty"}))
             .expect("empty root fixture");
         state.reconcile(&empty, cx);
-        assert!(state.retained.is_empty());
+        assert!(state.retained.borrow().is_empty());
     });
+}
+
+#[gpui::test]
+fn reusable_slot_recurses_into_shared_state_without_borrowing_outer_map(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let nested_state = state.clone();
+    let mut slots = KitSlots::new();
+    slots.insert(
+        "content".into(),
+        Rc::new(move |window, cx| {
+            nested_state.render(
+                &node("TextInput", "nested.field", json!({}), json!({})),
+                KitSlots::new(),
+                window,
+                cx,
+                Rc::new(|_, _| {}),
+            )
+        }),
+    );
+    let container = node(
+        "ScrollArea",
+        "nested.scroll",
+        json!({"height":180}),
+        json!({}),
+    );
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        state.render(&container, slots.clone(), window, cx, Rc::new(|_, _| {}))
+    });
+    harness.click("nested.field");
+    harness.keystrokes("a");
+    harness.frame();
+    harness.keystrokes("b");
+    assert_eq!(
+        harness
+            .node("nested.field")
+            .expect("retained slot")
+            .value
+            .as_deref(),
+        Some("ab")
+    );
 }

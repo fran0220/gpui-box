@@ -1,14 +1,12 @@
 //! Native navigation and layout slots. Slot contents have already passed host
-//! validation and recursive rendering; they are never executable callbacks.
+//! validation; host factories rebuild their elements without running guest code.
 use super::*;
-use gpui::{ParentElement, Styled, div};
+use gpui::div;
 
-fn content(slots: &mut BTreeMap<String, Vec<AnyElement>>, name: &str) -> AnyElement {
-    div()
-        .flex()
-        .flex_col()
-        .children(slots.remove(name).unwrap_or_default())
-        .into_any_element()
+fn content(slots: &KitSlots, name: &str, window: &mut Window, cx: &mut App) -> AnyElement {
+    slots
+        .get(name)
+        .map_or_else(|| div().into_any_element(), |factory| factory(window, cx))
 }
 fn integer(node: &Node, key: &str, default: usize) -> usize {
     node.props
@@ -19,7 +17,9 @@ fn integer(node: &Node, key: &str, default: usize) -> usize {
 
 pub(super) fn render(
     node: &Node,
-    mut slots: BTreeMap<String, Vec<AnyElement>>,
+    slots: KitSlots,
+    window: &mut Window,
+    cx: &mut App,
     emit: Emit,
 ) -> AnyElement {
     let id = SharedString::from(node.id.clone());
@@ -111,7 +111,7 @@ pub(super) fn render(
                         section = section.description(description.to_owned());
                     }
                     if slots.contains_key(id) {
-                        section = section.body(content(&mut slots, id));
+                        section = section.body(content(&slots, id, window, cx));
                     }
                     section
                 })
@@ -139,7 +139,7 @@ pub(super) fn render(
             control.into_any_element()
         }
         "ScrollArea" => {
-            let mut control = ScrollArea::new(id).child(content(&mut slots, "content"));
+            let mut control = ScrollArea::new(id).child(content(&slots, "content", window, cx));
             control = match text(node, "axis").as_str() {
                 "horizontal" => control.horizontal(),
                 "both" => control.both(),
@@ -161,8 +161,8 @@ pub(super) fn render(
         }
         "SplitPane" => {
             let mut control = SplitPane::new(id)
-                .start(content(&mut slots, "start"))
-                .end(content(&mut slots, "end"))
+                .start(content(&slots, "start", window, cx))
+                .end(content(&slots, "end", window, cx))
                 .collapsible(flag(node, "collapsible"));
             if text(node, "axis") == "vertical" {
                 control = control.vertical();
