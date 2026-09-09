@@ -1,14 +1,18 @@
 //! Deterministic structural performance authority for large Kit surfaces.
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use anyhow::{Context as _, Result, bail};
-use gpui::{AnyElement, IntoElement, ParentElement as _, Styled as _, TestAppContext, div};
+use gpui::{
+    AnyElement, AppContext as _, IntoElement, ParentElement as _, Styled as _, TestAppContext, div,
+};
+use gpui_kit::controls::editor::{Editor, EditorSyntax};
+use gpui_kit::controls::textarea::{TextArea, TextAreaWrap};
 use gpui_kit::foundation::Selectable as _;
 use gpui_kit::prelude::{
     AgentDocument, AgentDocumentBlock, Badge, Button, CodeLine, CodeView, ColorChoice, DataGrid,
@@ -34,6 +38,7 @@ struct CountingAllocator;
 
 static COUNT_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
 static HEAP_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+static HEAP_REQUESTED_BYTES: AtomicU64 = AtomicU64::new(0);
 
 #[global_allocator]
 static GLOBAL_ALLOCATOR: CountingAllocator = CountingAllocator;
@@ -43,13 +48,13 @@ static GLOBAL_ALLOCATOR: CountingAllocator = CountingAllocator;
 // allocator behavior.
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        count_allocation();
+        count_allocation(layout.size());
         // SAFETY: `layout` is forwarded unchanged to the system allocator.
         unsafe { System.alloc(layout) }
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        count_allocation();
+        count_allocation(layout.size());
         // SAFETY: `layout` is forwarded unchanged to the system allocator.
         unsafe { System.alloc_zeroed(layout) }
     }
@@ -60,21 +65,23 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        count_allocation();
+        count_allocation(new_size);
         // SAFETY: all arguments are forwarded unchanged to the system allocator.
         unsafe { System.realloc(ptr, layout, new_size) }
     }
 }
 
-fn count_allocation() {
+fn count_allocation(bytes: usize) {
     if COUNT_ALLOCATIONS.load(Ordering::Relaxed) {
         HEAP_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        HEAP_REQUESTED_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
     }
 }
 
 fn begin_allocation_measurement() {
     COUNT_ALLOCATIONS.store(false, Ordering::Relaxed);
     HEAP_ALLOCATIONS.store(0, Ordering::Relaxed);
+    HEAP_REQUESTED_BYTES.store(0, Ordering::Relaxed);
     COUNT_ALLOCATIONS.store(true, Ordering::Release);
 }
 
@@ -177,6 +184,14 @@ fn main() -> Result<()> {
         THEME_SEMANTIC_NODES,
     )?);
     reports.push(serde_json::to_value(run_idle_frame()?)?);
+    for items in [1_000, 10_000] {
+        eprintln!("measuring Markdown history: {items}");
+        reports.extend(run_markdown_history(items)?);
+        for syntax in [false, true] {
+            eprintln!("measuring editable document: {items}, syntax={syntax}");
+            reports.extend(run_editable_document(items, syntax)?);
+        }
+    }
     prove_unbounded_fixture_fails()?;
 
     let document = serde_json::json!({
@@ -213,6 +228,239 @@ fn output_path() -> Result<PathBuf> {
 }
 
 type Fixture = fn(Rc<Cell<u64>>, usize) -> ViewBuilder;
+
+#[test]
+fn mounted_markdown_history_work() {
+    for items in [1_000, 10_000] {
+        run_markdown_history(items).expect("mounted Markdown budgets");
+    }
+}
+
+fn check_document_frame(harness: &mut Harness) -> Result<PerformanceReport> {
+    PerformanceBudget::new("document-viewport")
+        .limit(PerformanceMetric::RequestLayoutCalls, 1_500)
+        .limit(PerformanceMetric::PrepaintCalls, 1_500)
+        .limit(PerformanceMetric::PaintCalls, 1_500)
+        .limit(PerformanceMetric::SemanticNodes, 350)
+        .enforce(PerformanceSample::new(harness.frame_stats()))
+        .map_err(|error| anyhow::anyhow!(error))
+}
+
+fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
+    let blocks = Rc::new(RefCell::new(
+        (0..items)
+            .map(|index| {
+                (
+                    gpui::SharedString::from(format!("message-{index}")),
+                    gpui::SharedString::from("**Asymmetric** history with `code`.\n\n"),
+                )
+            })
+            .collect::<Vec<_>>(),
+    ));
+    let input = blocks.clone();
+    let mut cx = TestAppContext::single();
+    let mut harness = Harness::new(&mut cx, gpui_kit::install, move |_, _| {
+        AgentDocument::new("perf.markdown")
+            .blocks(input.borrow().iter().map(|(id, source)| {
+                AgentDocumentBlock::markdown(id.clone(), source.clone()).streaming(true)
+            }))
+            .virtualized(VISIBLE_ROWS)
+            .into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let mut reports = Vec::new();
+    for phase in ["static", "append", "stream"] {
+        let before =
+            harness.update(|window, cx| AgentDocument::work(&"perf.markdown".into(), window, cx));
+        let delta = "Streamed **delta**.\n\n";
+        if phase == "append" {
+            blocks
+                .borrow_mut()
+                .push(("new-message".into(), delta.into()));
+        } else if phase == "stream" {
+            blocks.borrow_mut().last_mut().expect("tail").1 = format!("{delta}{delta}").into();
+        }
+        begin_allocation_measurement();
+        harness.frame();
+        let allocations = end_allocation_measurement();
+        let requested_bytes = HEAP_REQUESTED_BYTES.load(Ordering::Acquire);
+        let after =
+            harness.update(|window, cx| AgentDocument::work(&"perf.markdown".into(), window, cx));
+        let passes = after.parser.parser_passes - before.parser.parser_passes;
+        let parsed = after.parser.parsed_bytes - before.parser.parsed_bytes;
+        let copied = after.parser.copied_bytes - before.parser.copied_bytes;
+        let planned = after.planned_rows - before.planned_rows;
+        if phase == "static" {
+            anyhow::ensure!(
+                after.input_checks - before.input_checks == items,
+                "history input comparisons changed"
+            );
+            anyhow::ensure!(
+                (passes, parsed, copied, planned) == (0, 0, 0, 0),
+                "static Markdown repeated work"
+            );
+        } else {
+            anyhow::ensure!(
+                passes == 1
+                    && copied == delta.len()
+                    && parsed == delta.len() * if phase == "stream" { 2 } else { 1 }
+                    && planned == items + if phase == "stream" { 2 } else { 1 },
+                "Markdown append work: {passes}/{parsed}/{copied}/{planned}"
+            );
+        }
+        reports.push(serde_json::json!({"name":"markdown-history", "phase":phase,
+            "dataset_items":items, "parser_passes":passes, "parsed_bytes":parsed,
+            "copied_bytes":copied, "planned_rows":planned,
+            "input_checks":after.input_checks-before.input_checks,
+            "caller_input_conversions":blocks.borrow().len(), "heap_allocations":allocations,
+            "heap_requested_bytes":requested_bytes,
+            "checked_frame":check_document_frame(&mut harness)?, "total_work_bounded":false}));
+    }
+    Ok(reports)
+}
+
+fn run_editable_document(items: usize, syntax: bool) -> Result<Vec<serde_json::Value>> {
+    // Caller source preparation precedes mounting and every measured operation.
+    let row = "{\"asymmetric\":\"界\",\"value\":13},\n";
+    let source = format!("[\n{}{{\"tail\":7}}\n]", row.repeat(items));
+    let source_bytes = source.len();
+    let mut cx = TestAppContext::single();
+    let area_slot = Rc::new(RefCell::new(None::<gpui::Entity<TextArea>>));
+    let editor_slot = Rc::new(RefCell::new(None::<gpui::Entity<Editor>>));
+    let area_build = area_slot.clone();
+    let editor_build = editor_slot.clone();
+    eprintln!("  mounting");
+    let mut harness = Harness::new(&mut cx, gpui_kit::install, move |window, cx| {
+        let child = if syntax {
+            let entity = editor_build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        Editor::new("perf.editor", "Source", source.clone(), window, cx)
+                            .rows(8)
+                            .syntax(EditorSyntax::json())
+                    })
+                })
+                .clone();
+            *area_build.borrow_mut() = Some(entity.read(cx).text_area().clone());
+            entity.into_any_element()
+        } else {
+            area_build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        TextArea::new("perf.area", window, cx)
+                            .text(source.clone())
+                            .rows(8)
+                            .wrap(TextAreaWrap::None)
+                    })
+                })
+                .clone()
+                .into_any_element()
+        };
+        div().w(gpui::px(640.0)).child(child).into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let area = area_slot.borrow().clone().expect("mounted area");
+    let mut reports = Vec::new();
+    for phase in ["static", "edit", "scroll", "select-all"] {
+        eprintln!("  {phase}");
+        let before_scroll = (phase == "scroll")
+            .then(|| harness.update(|_, cx| area.read(cx).caret_bounds().expect("caret").top()));
+        begin_allocation_measurement();
+        match phase {
+            "edit" => harness.update(|_, cx| {
+                area.update(cx, |area, cx| {
+                    // Change one digit near the start; preserving byte length also
+                    // makes the independent select-all expectation unambiguous.
+                    let offset = 2 + row.find("13").expect("number");
+                    assert_eq!(
+                        area.replace_range(offset..offset + 1, "2", cx),
+                        Some(offset..offset + 1)
+                    );
+                })
+            }),
+            "scroll" => harness.scroll(
+                if syntax {
+                    "perf.editor.input"
+                } else {
+                    "perf.area"
+                },
+                173.0,
+            ),
+            "select-all" => harness.update(|_, cx| {
+                area.update(cx, |area, cx| area.set_selected_range(0..source_bytes, cx))
+            }),
+            _ => {}
+        }
+        let operation_allocations = end_allocation_measurement();
+        let operation_bytes = HEAP_REQUESTED_BYTES.load(Ordering::Acquire);
+        begin_allocation_measurement();
+        harness.frame();
+        let frame_allocations = end_allocation_measurement();
+        let frame_bytes = HEAP_REQUESTED_BYTES.load(Ordering::Acquire);
+        let work = harness.update(|_, cx| {
+            let area = area.read(cx);
+            assert_eq!(area.document().len(), source_bytes);
+            if phase != "static" {
+                let offset = 2 + row.find("13").expect("number");
+                assert_eq!(
+                    area.document().slice(offset..offset + 2).as_deref(),
+                    Some("23")
+                );
+            }
+            if phase == "select-all" {
+                assert_eq!(area.selected_range(), 0..source_bytes);
+            }
+            area.shaping_work().expect("mounted text layout")
+        });
+        anyhow::ensure!(
+            work.shaped_lines > 0 && work.shaped_lines <= 9 && work.shaped_bytes <= 9 * row.len(),
+            "{phase} shaped whole document: {work:?}"
+        );
+        if let Some(before) = before_scroll {
+            let after = harness.update(|_, cx| area.read(cx).caret_bounds().expect("caret").top());
+            anyhow::ensure!(
+                after == before - gpui::px(173.0),
+                "wheel did not scroll the viewport"
+            );
+        }
+        let parser = if syntax && phase == "edit" {
+            Some(harness.update(|_, cx| {
+                editor_slot
+                    .borrow()
+                    .as_ref()
+                    .expect("editor")
+                    .read(cx)
+                    .syntax_state()
+                    .expect("syntax")
+                    .work()
+            }))
+        } else {
+            None
+        };
+        if let Some(parser) = parser {
+            anyhow::ensure!(
+                parser.incremental && parser.input_bytes_offered < 65_536,
+                "incremental parser regressed: {parser:?}"
+            );
+        }
+        reports.push(serde_json::json!({"name":if syntax {"editor-json"} else {"textarea-no-wrap"},
+            "phase":phase, "dataset_items":items, "caller_source_bytes":source_bytes,
+            "operation_heap_allocations":operation_allocations, "frame_heap_allocations":frame_allocations,
+            "operation_heap_requested_bytes":operation_bytes, "frame_heap_requested_bytes":frame_bytes,
+            "shaped_lines":work.shaped_lines, "shaped_bytes":work.shaped_bytes,
+            "parser_input_bytes_offered":parser.map(|p| p.input_bytes_offered),
+            "parser_input_requests":parser.map(|p| p.input_requests),
+            "checked_frame":check_document_frame(&mut harness)?, "total_work_bounded":false}));
+    }
+    drop(area);
+    area_slot.borrow_mut().take();
+    editor_slot.borrow_mut().take();
+    Ok(reports)
+}
 
 fn run(name: &str, fixture: Fixture, items: usize) -> Result<serde_json::Value> {
     let calls = Rc::new(Cell::new(0));

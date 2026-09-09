@@ -74,6 +74,45 @@ with eager overrides. Offscreen data cells are absent from the semantic tree,
 apart from the bounded active-cell retention described above. The grid node
 continues to publish the caller's total row count.
 
+## Mounted Markdown and editable documents
+
+Separate `markdown-history`, `textarea-no-wrap`, and `editor-json` reports
+exercise the real components, with native accessibility enabled, at 1,000
+and 10,000 records. They do not replace the original plain-text AgentDocument
+fixture or change any existing allocation ratchet.
+
+Markdown history contains distinct message identities and parsed emphasis and
+inline code. A static redraw must add zero parser passes, parsed/copied bytes,
+or planned rows; its input comparisons are explicitly linear in message count.
+The next two frames insert a new 21-byte Markdown message and append another
+21 bytes to that same source. Parser work must be exactly one pass and 21/42
+parsed bytes respectively; each update copies exactly 21 source bytes.
+These small per-message sources exercise the synchronous retained-plan path,
+not background parsing of a single source above the worker threshold.
+
+TextArea and JSON Editor retain their entities and use an eight-row no-wrap
+viewport. Each corpus has Unicode JSON records and a distinct final object.
+Cases measure static redraw, an actual one-digit replacement, a 173-pixel
+wheel scroll, and selecting the complete source. Checks verify edited bytes,
+unchanged source length, the scroll displacement, and the selected range.
+Shaping must stay between one and nine lines and below nine source-row byte
+lengths, including selection. The Editor's real incremental JSON parser must
+offer fewer than 65,536 bytes after the local replacement. Offered bytes count
+repeated parser reads, not copies or total parsing CPU work.
+
+Caller strings are prepared before mounting. Markdown's per-frame owned-block
+conversions remain counted separately. Edit operation accounting includes
+Harness settling (and any resulting render); a subsequent explicit redraw has
+its own allocation counts. Neither is called a storage-only edit measurement.
+Requested allocation bytes include full replacement sizes for reallocations,
+not net live bytes or peak memory. These new totals are observations, not a
+claim that whole-source event snapshots, accessibility publication, or source
+ingestion are bounded. The existing 1,500 layout/prepaint/paint and 350 semantic
+node ceilings apply to each measured redraw. Soft wrap, long single-line
+shaping, background-worker throughput, and total frame latency are not certified
+by these cases. Exact offscreen caret queries used to verify scroll displacement
+run outside the measured shaping sample.
+
 ## What is counted
 
 `Window::frame_stats()` returns the most recently completed `FrameStats` for

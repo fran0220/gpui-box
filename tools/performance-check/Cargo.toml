@@ -11,7 +11,7 @@ rust-version.workspace = true
 [dependencies]
 anyhow.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
-gpui-kit.workspace = true
+gpui-kit = { workspace = true, features = ["syntax"] }
 gpui-kit-semantics.workspace = true
 gpui-kit-testkit = { workspace = true, features = ["test-support"] }
 serde_json.workspace = true
