@@ -2,7 +2,7 @@
 //!
 //! Everything here is a rendering of things this repository already generates
 //! and already checks: `docs/api-index.json` for what exists and what it is
-//! called, `snapshots/headless/macos/scenes` for what it looks like, and `docs/*.md`
+//! called, `snapshots/headless/linux/scenes` for what it looks like, and `docs/*.md`
 //! for the prose. Nothing is authored twice, so the site cannot disagree with
 //! the library — it can only be regenerated.
 //!
@@ -42,6 +42,9 @@ const BROWSER_GALLERY_FILES: &[&str] = &[
     "gpui_kit_browser_gallery.js",
     "gpui_kit_browser_gallery_bg.wasm",
 ];
+// The daily Linux gate owns publication. Native platform baselines remain
+// independent evidence, not prerequisites for publishing a new component.
+const IMAGE_SOURCE: &str = r#"{"schema":1,"platform":"linux","renderer":"wgpu-software-vulkan","directory":"snapshots/headless/linux/scenes"}"#;
 
 pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Result<PathBuf> {
     let out = out
@@ -56,12 +59,14 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
 
     let components = array(&index, "components");
     let scenes = array(&index, "scenes");
-    let image_version = image_version(root)?;
+    let image_paths = scene_images(root, &scenes)?;
+    let image_version = image_version(&image_paths)?;
     let image_root = format!("/images/{image_version}");
 
     write(&out.join("assets/site.css"), &site_style())?;
     write(&out.join("assets/site.js"), SCRIPT)?;
     write(&out.join("image-version.txt"), &image_version)?;
+    write(&out.join("image-source.json"), IMAGE_SOURCE)?;
     write(
         &out.join("llms.txt"),
         &fs::read_to_string(root.join("docs/llms.txt"))?,
@@ -118,14 +123,10 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
 
     let images = out.join("images").join(&image_version);
     fs::create_dir_all(&images)?;
-    let mut copied = 0;
-    for entry in fs::read_dir(root.join("snapshots/headless/macos/scenes"))? {
-        let path = entry?.path();
-        if path.extension().is_some_and(|e| e == "png") {
-            let name = path.file_name().context("an image has a name")?;
-            fs::copy(&path, images.join(name))?;
-            copied += 1;
-        }
+    let copied = image_paths.len();
+    for path in &image_paths {
+        let name = path.file_name().context("an image has a name")?;
+        fs::copy(path, images.join(name))?;
     }
 
     write(
@@ -227,23 +228,42 @@ fn copy_browser_gallery(source: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Select exactly the checked scene/theme pairs, including newly added scenes.
+/// Missing daily baselines fail `site check`, not the later deployment.
+fn scene_images(root: &Path, scenes: &[Value]) -> Result<Vec<PathBuf>> {
+    let source: Value = serde_json::from_str(IMAGE_SOURCE)?;
+    let directory = root.join(string(&source, "directory"));
+    let mut paths = Vec::with_capacity(scenes.len() * 2);
+    for scene in scenes {
+        for theme in ["studio-dark", "studio-light"] {
+            let path = directory.join(format!("{}-{theme}.png", string(scene, "name")));
+            anyhow::ensure!(
+                path.is_file(),
+                "missing published scene image {}",
+                path.display()
+            );
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
 /// A cache identity for the complete visual catalog.
 ///
 /// Static asset caches can retain an old response at a stable path after a
 /// deployment. Put every capture set under a path derived from its bytes so a
 /// page can never pair a current API with a previous image. This is an FNV-1a
 /// content fingerprint, not a security boundary.
-fn image_version(root: &Path) -> Result<String> {
-    let mut paths = fs::read_dir(root.join("snapshots/headless/macos/scenes"))?
-        .map(|entry| entry.map(|entry| entry.path()))
-        .collect::<std::io::Result<Vec<_>>>()?;
-    paths.retain(|path| path.extension().is_some_and(|extension| extension == "png"));
-    paths.sort();
-
+fn image_version(paths: &[PathBuf]) -> Result<String> {
     let mut hash = 0xcbf29ce484222325_u64;
+    for byte in IMAGE_SOURCE.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
     for path in paths {
         let name = path.file_name().context("an image has a name")?;
-        let bytes = fs::read(&path)?;
+        let bytes = fs::read(path)?;
         for byte in name.as_encoded_bytes().iter().chain(bytes.iter()) {
             hash ^= u64::from(*byte);
             hash = hash.wrapping_mul(0x100000001b3);
@@ -1525,6 +1545,49 @@ mod tests {
             html.contains("/compose/?scene=button&amp;theme=studio-dark&amp;embed=1"),
             "{html}"
         );
+    }
+
+    #[test]
+    fn published_images_use_complete_daily_baselines_and_fingerprint_their_bytes() {
+        let fixture = std::env::temp_dir().join(format!(
+            "gpui-box-site-images-fixture-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&fixture);
+        let linux = fixture.join("snapshots/headless/linux/scenes");
+        let macos = fixture.join("snapshots/headless/macos/scenes");
+        fs::create_dir_all(&linux).expect("Linux fixtures");
+        fs::create_dir_all(&macos).expect("Metal fixtures");
+        let scenes = vec![
+            serde_json::json!({"name":"zeta"}),
+            serde_json::json!({"name":"alpha"}),
+        ];
+        for name in ["alpha", "zeta"] {
+            for theme in ["studio-dark", "studio-light"] {
+                fs::write(
+                    linux.join(format!("{name}-{theme}.png")),
+                    format!("Linux {name} {theme}"),
+                )
+                .expect("daily frame");
+            }
+        }
+        fs::write(macos.join("zeta-studio-dark.png"), "old Metal frame").expect("native frame");
+        let paths = scene_images(&fixture, &scenes).expect("no Metal alpha needed");
+        assert_eq!(paths.len(), 4);
+        assert!(paths.iter().all(|path| path.starts_with(&linux)));
+        assert_eq!(paths[0], linux.join("alpha-studio-dark.png"));
+        let before = image_version(&paths).expect("fingerprint");
+        fs::write(macos.join("zeta-studio-dark.png"), "changed Metal frame")
+            .expect("native update");
+        assert_eq!(image_version(&paths).expect("fingerprint"), before);
+        fs::write(linux.join("alpha-studio-light.png"), "updated daily frame")
+            .expect("daily update");
+        assert_ne!(image_version(&paths).expect("fingerprint"), before);
+        fs::remove_file(linux.join("alpha-studio-light.png")).expect("missing daily frame");
+        fs::write(macos.join("alpha-studio-light.png"), "not daily authority")
+            .expect("native only");
+        assert!(scene_images(&fixture, &scenes).is_err());
+        fs::remove_dir_all(&fixture).expect("remove image fixture");
     }
 
     #[test]

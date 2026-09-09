@@ -290,6 +290,7 @@ impl Catalog {
 
     fn check_complete(&self, revision: &str) -> Result<()> {
         ensure!(self.hosted, "only a hosted catalog can be release-checked");
+        self.image_source()?;
         ensure!(
             self.revision.as_str() == revision,
             "catalog revision differs from bundle"
@@ -334,6 +335,18 @@ impl Catalog {
             }
         }
         Ok(())
+    }
+
+    fn image_source(&self) -> Result<Value> {
+        let source = read_json(self.root.join("image-source.json"))?;
+        ensure!(
+            source["schema"] == 1
+                && source["platform"] == "linux"
+                && source["renderer"] == "wgpu-software-vulkan"
+                && source["directory"] == "snapshots/headless/linux/scenes",
+            "published images must identify the Linux daily visual authority"
+        );
+        Ok(source)
     }
 }
 
@@ -630,6 +643,11 @@ impl Server {
         let name = required_str(arguments, "name")?;
         let theme = theme(arguments)?;
         ensure_scene(&self.catalog, name)?;
+        let capture = if self.catalog.hosted {
+            Some(self.catalog.image_source()?)
+        } else {
+            None
+        };
         let (png, source) = if self.catalog.hosted {
             let version = std::fs::read_to_string(self.catalog.root.join("image-version.txt"))?;
             let path = self
@@ -651,6 +669,7 @@ impl Server {
             "bytes": png.len(),
             "source": source,
             "revision": self.catalog.revision.as_str(),
+            "capture": capture,
         });
         Ok(json!({
             "content": [
@@ -1694,6 +1713,36 @@ fn find_root(start: &Path) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hosted_scene_reports_daily_capture_provenance_and_requires_it() {
+        let fixture =
+            std::env::temp_dir().join(format!("gpui-box-mcp-images-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&fixture);
+        std::fs::create_dir_all(fixture.join("images/test-version")).expect("image fixture");
+        std::fs::write(fixture.join("image-version.txt"), "test-version").expect("version");
+        std::fs::write(
+            fixture.join("images/test-version/button-studio-dark.png"),
+            b"fixture image",
+        )
+        .expect("image");
+        let mut catalog = Catalog::local(root().expect("checkout")).expect("catalog");
+        catalog.root = fixture.clone();
+        catalog.hosted = true;
+        let server = Server::new(catalog);
+        let arguments = json!({"name":"button","theme":"studio-dark"});
+        assert!(server.render_result(&arguments).is_err());
+        let source = json!({"schema":1,"platform":"linux","renderer":"wgpu-software-vulkan","directory":"snapshots/headless/linux/scenes"});
+        std::fs::write(fixture.join("image-source.json"), source.to_string()).expect("provenance");
+        let result = server.render_result(&arguments).expect("published scene");
+        assert_eq!(result["structuredContent"]["capture"], source);
+        assert_eq!(result["structuredContent"]["bytes"], 13);
+        assert_eq!(result["content"][1]["data"], "Zml4dHVyZSBpbWFnZQ==");
+        std::fs::write(fixture.join("image-source.json"), r#"{"schema":1,"platform":"macos","renderer":"metal","directory":"snapshots/headless/macos/scenes"}"#)
+            .expect("wrong provenance");
+        assert!(server.render_result(&arguments).is_err());
+        std::fs::remove_dir_all(&fixture).expect("remove fixture");
+    }
 
     #[test]
     fn hostile_batches_are_bounded_and_protocol_recovers() {

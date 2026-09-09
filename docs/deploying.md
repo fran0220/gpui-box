@@ -121,7 +121,15 @@ pinned BWG Ed25519 host key is in `tools/site/ops/bwg-known-hosts`.
 | `/resources/guides/*`, `/resources/tokens/*` | raw MCP-readable authority documents |
 | `/build-info.json` | deployed revision and catalog counts |
 | `/semantic/{theme}/{scene}.json` | deploy-time redacted semantics |
-| `/images/*` | fingerprinted committed macOS scene captures |
+| `/images/*` | fingerprinted committed Linux software-Vulkan scene captures |
+| `/image-source.json` | platform, renderer, and baseline directory for published captures |
+
+Publication follows the Linux daily visual authority. `site check` requires
+both themes for every indexed scene before a push; native Metal/WARP baselines
+remain separate on-demand evidence and are never copied between platforms.
+Hosted `render_scene` includes this capture provenance in its structured result.
+This replaces the macOS-only image source, which prevented a Linux-verified new
+scene from being deployed until a native baseline had also been committed.
 
 ## Routing and rollback
 

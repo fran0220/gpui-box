@@ -44,7 +44,7 @@
   },
   {
     "name": "render_scene",
-    "description": "Return a canonical scene PNG. Hosted MCP returns the immutable gate-produced capture for its declared revision; checkout stdio renders the working tree now.",
+    "description": "Return a canonical scene PNG. Hosted MCP returns the committed Linux software-Vulkan daily-gate capture for its declared revision and identifies the capture source; checkout stdio renders the working tree now. This is not Metal or WARP validation.",
     "inputSchema": {
       "type": "object",
       "properties": {
