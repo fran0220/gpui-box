@@ -24,12 +24,17 @@ There are no native entity commands. Two data queries dispatch real public
 data APIs (not fabricated methods on the builders):
 
 - Sparkline.published_points({}) builds caller SparklineReading and calls its
-  native published_points(). It reports the native bounded-point count.
+  native published_points(). It reports the native bounded-point count for
+  ready/stale only; absent verified readings refuse rather than report zero.
 - SankeyChart.layout({data,weights,nodeWidth,gap,alignment}) calls actual
   SankeyData.layout(); returns scale and bounded nodes/links. Cycles, invalid
   weight cardinality, nonpositive flow and invalid geometry return refusal.
   The native algorithm computes geometry; the adapter does not substitute a
   prearranged example. The query accepts caller data rather than native handles.
+
+ChartLegend's native callback bool is the current hidden state before the
+toggle, not the desired new hidden state. The wire preserves that native value;
+the worker can apply its own controlled visibility policy.
 
 ChartPoint/SparklinePoint, ChartSeries, ChartAxes, Candlestick, PlotMark,
 SankeyNode/Link/Data and SparklineReading are converted directly into typed

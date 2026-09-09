@@ -123,6 +123,11 @@ fn every_chart_query_uses_native_data_algorithms(cx: &mut TestAppContext) {
         assert!(result["nodes"][1]["bounds"]["x"].as_f64().expect("position")>0.9);
         args["weights"]=json!([-1]);assert!(invoke(&sankey_node,"layout",&args,true,w,c).is_err());
         assert!(invoke(&spark,"published_points",&json!({}),false,w,c).is_err());
+        for kind in ["loading","empty","error","unavailable"] {
+            let state=if matches!(kind,"error"|"unavailable"){json!({"kind":kind,"reason":"Refused"})}else{json!({"kind":kind})};
+            let absent=node("Sparkline","absent",json!({"label":"No verified reading","state":state}),json!({}));
+            assert!(invoke(&absent,"published_points",&json!({}),true,w,c).is_err(),"{kind} must not become zero points");
+        }
     });
 }
 

@@ -456,9 +456,14 @@ pub(super) fn invoke(
 ) -> Result<Value> {
     ensure!(query, "charts have no native commands");
     match (node.component.as_deref(), method) {
-        (Some("Sparkline"), "published_points") => Ok(json!(
-            reading(&node.props["state"]["data"]).published_points()
-        )),
+        (Some("Sparkline"), "published_points") => {
+            let state = &node.props["state"];
+            ensure!(
+                matches!(state["kind"].as_str(), Some("ready" | "stale")),
+                "Sparkline has no verified reading"
+            );
+            Ok(json!(reading(&state["data"]).published_points()))
+        }
         (Some("SankeyChart"), "layout") => {
             let alignment = match args["alignment"].as_str() {
                 Some("right") => SankeyAlignment::Right,
