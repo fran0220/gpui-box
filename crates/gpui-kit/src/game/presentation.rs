@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, StyledImage as _, Window, div, px,
 };
 use gpui_kit_assets::{Icon, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -1105,6 +1105,8 @@ fn reward_item(
     let ident = owner.child("item").child(item.id.as_str());
     let quantity = cx.numbers().count(item.quantity);
     let fallback_icon = (item.image.is_none() && item.icon.is_none()).then_some(Icon::Widget);
+    let unavailable = cx.strings().text(StringKey::StateViewUnavailable);
+    let image_ident = ident.child("image-unavailable");
     let art = div()
         .size(px(42.0))
         .flex_none()
@@ -1113,7 +1115,17 @@ fn reward_item(
         .rounded_full()
         .overflow_hidden()
         .bg(theme.colors.sunken)
-        .children(item.image.map(|image| gpui::img(image.0).size_full()))
+        .children(item.image.map(|image| {
+            gpui::img(image.0).size_full().with_fallback(move || {
+                crate::display::icon::Icon::named(
+                    image_ident.clone(),
+                    Icon::Danger,
+                    unavailable.clone(),
+                )
+                .warning()
+                .into_any_element()
+            })
+        }))
         .children(item.icon.or(fallback_icon).map(|icon| {
             glyph(icon)
                 .size(px(20.0))
