@@ -87,6 +87,12 @@ or planned rows; its input comparisons are explicitly linear in message count.
 The next two phases insert a new 21-byte Markdown message and append another
 21 bytes to that same source. Parser work must be exactly one pass and 21/42
 parsed bytes respectively; each update copies exactly 21 source bytes.
+The new message constructs exactly one row plan. Appending its second
+paragraph constructs exactly two: the first paragraph becomes non-last (its
+spacing/streaming metadata changes) and the new tail needs its own row.
+All history row plans stay retained; List metadata vectors and caller input
+comparisons remain history-sized work. Matching phases must have identical
+shaping/parser/planning and layout/prepaint/paint/semantic counts at both sizes.
 These phases include scrolling to the new tail and settling its redraw;
 semantic assertions prove the streamed message is mounted. Allocation and
 caller-conversion observations include every render in those phases, not

@@ -186,10 +186,41 @@ fn main() -> Result<()> {
     reports.push(serde_json::to_value(run_idle_frame()?)?);
     for items in [1_000, 10_000] {
         eprintln!("measuring Markdown history: {items}");
-        reports.extend(run_markdown_history(items)?);
+        let mut measured = run_markdown_history(items)?;
         for syntax in [false, true] {
             eprintln!("measuring editable document: {items}, syntax={syntax}");
-            reports.extend(run_editable_document(items, syntax)?);
+            measured.extend(run_editable_document(items, syntax)?);
+        }
+        for report in measured {
+            if items == 10_000 {
+                let small = reports
+                    .iter()
+                    .find(|small| {
+                        small["name"] == report["name"] && small["phase"] == report["phase"]
+                    })
+                    .expect("smaller document fixture");
+                for path in [
+                    "/checked_frame/sample/frame/request_layout_calls",
+                    "/checked_frame/sample/frame/prepaint_calls",
+                    "/checked_frame/sample/frame/paint_calls",
+                    "/checked_frame/sample/frame/semantic_nodes",
+                    "/shaped_lines",
+                    "/shaped_bytes",
+                    "/parser_input_bytes_offered",
+                    "/parser_passes",
+                    "/parsed_bytes",
+                    "/copied_bytes",
+                    "/planned_rows",
+                ] {
+                    anyhow::ensure!(
+                        report.pointer(path) == small.pointer(path),
+                        "{} {} work {path} changed with dataset size",
+                        report["name"],
+                        report["phase"]
+                    );
+                }
+            }
+            reports.push(report);
         }
     }
     prove_unbounded_fixture_fails()?;
@@ -318,7 +349,7 @@ fn run_markdown_history(items: usize) -> Result<Vec<serde_json::Value>> {
                 passes == 1
                     && copied == delta.len()
                     && parsed == delta.len() * if phase == "stream" { 2 } else { 1 }
-                    && planned == items + if phase == "stream" { 2 } else { 1 },
+                    && planned == if phase == "stream" { 2 } else { 1 },
                 "Markdown append work: {passes}/{parsed}/{copied}/{planned}"
             );
             anyhow::ensure!(
