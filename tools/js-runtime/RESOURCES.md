@@ -100,3 +100,32 @@ same-generation ImageId sharing, revoked-mount errors and released CPU image
 ownership. GPUI's existing atlas eviction API is used; the wgpu atlas does not
 implement the optional `contains` test instrumentation, so these tests do not
 claim a measured GPU allocation count.
+
+### Isolated worker to native image
+
+After the runtime resource bridge and content family are integrated, register
+`#[cfg(all(test, feature = "capture"))] mod resource_e2e_tests;` in
+`tools/app-host/src/kit_bindings/mod.rs`, alongside `content`, then run:
+
+```sh
+GPUI_RESOURCE_ARTIFACTS=.amp/in/artifacts cargo test -p gpui-box-app-host --all-features isolated_worker_registers_native_image -- --ignored --nocapture
+```
+
+The explicitly invoked test starts the real supervisor and OS-sandboxed worker
+using `src/resource-fixture`; it never uses `--trust-local`. It verifies that an
+unsafe resource key and explicit permission denial produce zero native resource
+requests, then retries with explicit permission and receives one native store
+acknowledgement. A separate native ImageViewer review window uses the content
+adapter and that worker mount's actual resource alias to render the registered
+red/blue bytes. Exact native pixels and visible semantic `ready` state are
+asserted. An actual supervisor Reload app replaces the worker; the old image
+loses its pixels and reports visible semantic `unavailable` state.
+
+This deliberately does not change or test the central JS ImageViewer descriptor
+registry: the worker sends ordinary primitive status/buttons, and the test calls
+the content adapter directly with a closed image reference. Resource transport,
+authorization, native storage, image resolution and real generation teardown are
+not mocked. The test is explicit/ignored by default because it requires a working
+native OS sandbox and the independently delivered runtime/content integrations.
+It does not establish binary package assembly or automatic packaged-asset
+activation; those remain the runtime/package owner's integration work.

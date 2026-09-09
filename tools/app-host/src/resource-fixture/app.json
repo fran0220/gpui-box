@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "resource-native-e2e",
+  "version": "1.0.0",
+  "entry": "main.mjs",
+  "permissions": ["resources"],
+  "dependencies": {},
+  "contributes": { "commands": [], "keymaps": [], "panels": [] }
+}
