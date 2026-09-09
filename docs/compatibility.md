@@ -593,3 +593,18 @@ and leaves both contiguous caches empty. Independent equal snapshots can
 still require full comparison, and separated multicursor changes can span
 unchanged text in the single-delta compatibility representation. This is not
 a claim that rendering or new-revision accessibility publication is bounded.
+
+Editor language services are opt-in via `language_services(true)`. Ctrl-Space,
+F12, Ctrl-K Ctrl-I and Ctrl-. emit completion, definition, hover and code-action
+requests carrying persistent snapshots and exact UTF-8 byte coordinates.
+Callers publish `AsyncValue` replies against the request id; stale revisions,
+duplicate identities, split-grapheme edits and overlapping batches are refused.
+Completion and local code-action replacements use one shared undo transaction.
+Definition targets and external code actions emit events; Kit never opens a
+file, launches a server or executes a host command. Refresh errors retain the
+last verified visible result but do not permit its acceptance. Navigation,
+blur and text revision changes invalidate outstanding responses; an open
+completion requests a new revision after typing. Diagnostics and semantic
+tokens are revision-paired, with semantic colors overriding only covered
+parser spans and severity underlines layered over both. The editor-services
+exhibit uses explicit caller fixtures for ready, loading, refusal and hover.

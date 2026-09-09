@@ -1015,6 +1015,22 @@ impl TextArea {
         ))
     }
 
+    /// Current painted insertion rectangle for a source byte position.
+    pub fn bounds_for_position(&self, offset: usize) -> Option<Bounds<Pixels>> {
+        if self.last_layout_text != *self.edit.text() || offset > self.document().len() {
+            return None;
+        }
+        Some(self.last_layout.as_ref()?.caret_bounds(
+            offset,
+            self.text_origin(self.last_bounds?),
+            self.caret_width,
+        ))
+    }
+
+    pub(crate) fn viewport_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.last_bounds
+    }
+
     /// The visual row the caret sits on, counting wrapped rows.
     ///
     /// Zero until the area has been laid out once, because a wrapped row only

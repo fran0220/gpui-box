@@ -266,6 +266,7 @@ camelCase
 candidate value
 checked above
 configured parser without cancellation
+ctrl-k ctrl-i
 empty array
 empty object
 end before start
@@ -361,6 +362,7 @@ x1b[Z
 {}
 {} none
 {} — {detail}
+{}: {reason}
 {}]({PENDING_LINK})
 {}{closers}{}u{200B}
 {…}

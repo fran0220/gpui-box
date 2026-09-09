@@ -1571,6 +1571,84 @@ pub(super) fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElemen
         .into_any_element()
 }
 
+struct SceneEditorServices(Vec<Entity<Editor>>);
+
+impl Global for SceneEditorServices {}
+
+pub(super) fn editor_services(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::controls::editor::*;
+    if !cx.has_global::<SceneEditorServices>() {
+        let editors = ["ready", "loading", "refused", "hover"].map(|state| {
+            let editor = cx.new(|cx| {
+                Editor::new(
+                    format!("scene.editor.services.{state}"),
+                    format!("Language service {state} fixture"),
+                    "let count = val;\n// caller-owned fixture",
+                    window,
+                    cx,
+                )
+                .rows(3)
+                .language_services(true)
+            });
+            editor.update(cx, |editor, cx| {
+                let kind = if state == "hover" {
+                    EditorServiceKind::Hover
+                } else {
+                    EditorServiceKind::Completion
+                };
+                let request = editor
+                    .request_service(kind, 14, cx)
+                    .expect("fixture request");
+                editor.set_diagnostics(
+                    0,
+                    vec![EditorDiagnostic {
+                        id: "unresolved-value".into(),
+                        range: 12..15,
+                        message: "Fixture: unresolved name".into(),
+                        severity: EditorDiagnosticSeverity::Warning,
+                    }],
+                    cx,
+                );
+                editor.set_semantic_tokens(
+                    0,
+                    vec![EditorSemanticToken {
+                        range: 0..3,
+                        class: gpui_kit_theme::SyntaxColor::Keyword,
+                    }],
+                    cx,
+                );
+                let result = match state {
+                    "loading" => AsyncValue::loading(),
+                    "refused" => AsyncValue::refused("Fixture host denied this request"),
+                    "hover" => AsyncValue::ready(EditorServiceResult::Hover(EditorHover {
+                        range: 12..15,
+                        contents: "Fixture: value → integer\nDocumentation is caller text.".into(),
+                    })),
+                    _ => AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {
+                        id: "value".into(),
+                        label: "value".into(),
+                        detail: Some(" · integer (fixture)".into()),
+                        effect: EditorServiceEffect::Edits(vec![EditorReplacement {
+                            range: 12..15,
+                            text: "value".into(),
+                        }]),
+                    }])),
+                };
+                editor.set_service_result(request.id, result, cx);
+            });
+            editor
+        });
+        cx.set_global(SceneEditorServices(editors.into()));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme).w(px(900.0))
+        .child(caption(&theme, "caller fixtures · completion / loading / host refusal / hover + diagnostic · no server process"))
+        .children(cx.global::<SceneEditorServices>().0.chunks(2).map(|pair| {
+            row(&theme).items_start().children(pair.iter().map(|editor| div().w(px(430.0)).h(px(225.0)).child(editor.clone())))
+        }))
+        .into_any_element()
+}
+
 pub(super) struct SceneMentionInput {
     input: Entity<MentionInput>,
 }

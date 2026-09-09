@@ -11,6 +11,189 @@ use gpui_kit_testkit::harness::Harness;
 
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
 
+fn completion() -> AsyncValue<EditorServiceResult, gpui::SharedString> {
+    AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {
+        id: "complete-unicode".into(),
+        label: "界_value".into(),
+        detail: None,
+        effect: EditorServiceEffect::Edits(vec![EditorReplacement {
+            range: 3..5,
+            text: "界_value".into(),
+        }]),
+    }]))
+}
+
+#[gpui::test]
+fn language_completion_keyboard_accepts_one_transaction_and_rejects_late_replies(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, slot) = editor(cx, "// é tail", |editor| editor.language_services(true));
+    let entity = slot.borrow().clone().expect("editor");
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let received = requests.clone();
+    let _subscription = harness.update(|_, cx| {
+        cx.subscribe(&entity, move |_, event, _| {
+            if let EditorEvent::ServiceRequested(request) = event {
+                received.borrow_mut().push(request.clone());
+            }
+        })
+    });
+    harness.click("source.input");
+    harness.update(|_, cx| {
+        entity
+            .read(cx)
+            .text_area()
+            .clone()
+            .update(cx, |area, cx| area.set_selected_range(5..5, cx));
+    });
+    harness.keystrokes("ctrl-space");
+    let request = requests.borrow().last().cloned().expect("keyboard request");
+    assert_eq!(request.kind, EditorServiceKind::Completion);
+    assert_eq!(request.position, 5);
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            assert!(editor.set_service_result(request.id, completion(), cx));
+        })
+    });
+    harness.frame();
+    harness.keystrokes("enter");
+    harness.update(|_, cx| {
+        assert_eq!(
+            entity.read(cx).snapshot(cx).text.as_ref(),
+            "// 界_value tail"
+        );
+        entity.update(cx, |editor, cx| {
+            assert!(!editor.set_service_result(request.id, completion(), cx))
+        });
+    });
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-z"
+    } else {
+        "ctrl-z"
+    });
+    harness.update(|_, cx| assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), "// é tail"));
+}
+
+#[gpui::test]
+fn service_refresh_retains_verified_values_but_refuses_acceptance_until_ready(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, slot) = editor(cx, "// é tail", |editor| editor.language_services(true));
+    let entity = slot.borrow().clone().expect("editor");
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            let first = editor
+                .request_service(EditorServiceKind::Completion, 5, cx)
+                .expect("first");
+            assert!(editor.set_service_result(first.id, completion(), cx));
+            let second = editor
+                .request_service(EditorServiceKind::Completion, 5, cx)
+                .expect("second");
+            assert!(!editor.set_service_result(first.id, completion(), cx));
+            assert!(editor.set_service_result(
+                second.id,
+                AsyncValue::error("Host refused refresh".into()),
+                cx
+            ));
+            assert!(!editor.accept_service_item("complete-unicode", cx));
+        })
+    });
+    harness.frame();
+    assert!(harness.bounds("source.service.complete-unicode").is_some());
+    assert!(harness.bounds("source.service.status").is_some());
+    harness.update(|_, cx| assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), "// é tail"));
+}
+
+#[gpui::test]
+fn service_batches_validate_unicode_overlap_revision_and_host_owned_effects(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, slot) = editor(cx, "// é tail", |editor| editor.language_services(true));
+    let entity = slot.borrow().clone().expect("editor");
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let received = events.clone();
+    let _subscription = harness.update(|_, cx| {
+        cx.subscribe(&entity, move |_, event, _| {
+            received.borrow_mut().push(event.clone())
+        })
+    });
+    harness.update(|_, cx| {
+        entity.update(cx, |editor, cx| {
+            assert!(
+                editor
+                    .request_service(EditorServiceKind::Completion, 4, cx)
+                    .is_none()
+            );
+            let request = editor
+                .request_service(EditorServiceKind::Completion, 5, cx)
+                .expect("request");
+            let mut invalid = completion();
+            if let Some(EditorServiceResult::Items(items)) = &mut invalid.value {
+                items[0].effect = EditorServiceEffect::Edits(vec![EditorReplacement {
+                    range: 4..5,
+                    text: "bad".into(),
+                }]);
+            }
+            assert!(!editor.set_service_result(request.id, invalid, cx));
+            assert!(!editor.set_semantic_tokens(9, vec![], cx));
+            assert!(editor.set_semantic_tokens(
+                0,
+                vec![EditorSemanticToken {
+                    range: 3..5,
+                    class: gpui_kit_theme::SyntaxColor::StringLiteral
+                }],
+                cx
+            ));
+            assert!(!editor.set_diagnostics(
+                0,
+                vec![EditorDiagnostic {
+                    id: "bad-byte".into(),
+                    range: 4..5,
+                    message: "invalid".into(),
+                    severity: EditorDiagnosticSeverity::Error
+                }],
+                cx
+            ));
+            let request = editor
+                .request_service(EditorServiceKind::Definition, 5, cx)
+                .expect("definition");
+            assert!(editor.set_service_result(
+                request.id,
+                AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {
+                    id: "definition".into(),
+                    label: "Declaration".into(),
+                    detail: None,
+                    effect: EditorServiceEffect::Definition {
+                        target: "caller-document".into(),
+                        range: 37..41
+                    }
+                }])),
+                cx
+            ));
+            assert!(editor.accept_service_item("definition", cx));
+            let request = editor
+                .request_service(EditorServiceKind::CodeActions, 5, cx)
+                .expect("actions");
+            assert!(editor.set_service_result(
+                request.id,
+                AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {
+                    id: "fix".into(),
+                    label: "Host fix".into(),
+                    detail: None,
+                    effect: EditorServiceEffect::Action("caller-fix".into())
+                }])),
+                cx
+            ));
+            assert!(editor.accept_service_item("fix", cx));
+            assert_eq!(editor.snapshot(cx).text.as_ref(), "// é tail");
+        })
+    });
+    assert!(events.borrow().iter().any(|event| matches!(event, EditorEvent::DefinitionRequested { target, range } if target == "caller-document" && *range == (37..41))));
+    assert!(events.borrow().iter().any(
+        |event| matches!(event, EditorEvent::CodeActionRequested(action) if action == "caller-fix")
+    ));
+}
+
 #[gpui::test]
 fn changed_events_retain_lazy_snapshots_instead_of_eager_whole_values(cx: &mut TestAppContext) {
     let (mut harness, slot) = editor(cx, "old😀tail", |editor| editor.rows(3));

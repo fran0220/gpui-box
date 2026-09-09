@@ -1216,7 +1216,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4339
+      "symbolCount": 4371
     },
     {
       "name": "gpui-box-kit-assets",
@@ -59169,7 +59169,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "Plain source editing with caller-owned language policy.",
       "documentation": "Plain source editing with caller-owned language policy.",
-      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, # [cfg (feature = \"syntax\")] syntax : Option<EditorSyntax>, _subscription : Subscription, }",
+      "signature": "# [doc = \" Plain source editing with caller-owned language policy.\"] pub struct Editor { ident : Ident, label : SharedString, area : Entity<TextArea>, rows : usize, line_numbers : bool, disabled : bool, read_only : bool, highlights : Option<EditorHighlights>, indenter : Option<Indenter>, services_enabled : bool, next_service_request : u64, service_popup : Option<services::ServicePopup>, hover_position : Option<(u64, usize)>, diagnostics : Option<(u64, Vec<EditorDiagnostic>)>, semantic_tokens : Option<(u64, Vec<EditorSemanticToken>)>, # [cfg (feature = \"syntax\")] syntax : Option<EditorSyntax>, _subscription : Subscription, }",
       "cfg": []
     },
     {
@@ -59457,7 +59457,7 @@
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "What a source editor reports to its owner.",
       "documentation": "What a source editor reports to its owner.",
-      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The value changed. The persistent snapshot does not materialize a\"] # [doc = \" contiguous string unless the recipient explicitly calls `text()`.\"] Changed (gpui::EditSnapshot), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
+      "signature": "# [doc = \" What a source editor reports to its owner.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum EditorEvent { # [doc = \" The host should answer this revision-tagged language request.\"] ServiceRequested (EditorServiceRequest), # [doc = \" A stable service item was accepted successfully.\"] ServiceAccepted (SharedString), # [doc = \" Navigation belongs to the caller's document/workspace host.\"] DefinitionRequested { target : SharedString, range : Range<usize>, }, # [doc = \" A caller-defined code action requires host execution.\"] CodeActionRequested (SharedString), # [doc = \" One replacement entered the shared undo history.\"] Edited (TextAreaEdit), # [doc = \" The value changed. The persistent snapshot does not materialize a\"] # [doc = \" contiguous string unless the recipient explicitly calls `text()`.\"] Changed (gpui::EditSnapshot), # [doc = \" The byte selection changed on grapheme boundaries.\"] SelectionChanged (Range<usize>), # [doc = \" The platform clipboard supplied non-text input.\"] Pasted (Pasted), # [doc = \" The configured submit chord was pressed.\"] Submitted, # [doc = \" Escape or the configured cancellation chord was pressed.\"] Cancelled, # [doc = \" The shared editing surface gained focus.\"] Focused, # [doc = \" The shared editing surface lost focus.\"] Blurred, # [doc = \" A revision was parsed in-process, including any grammar errors.\"] # [cfg (feature = \"syntax\")] Parsed { revision : u64, errors : Vec<EditorSyntaxError>, }, # [doc = \" The configured highlight query refused to publish a partial result.\"] # [cfg (feature = \"syntax\")] SyntaxUnavailable (SharedString), }",
       "cfg": []
     },
     {
@@ -59693,6 +59693,265 @@
       "cfg": [
         "cfg (feature = \"syntax\")"
       ]
+    },
+    {
+      "id": "gpui_kit::controls::editor::reexport-2",
+      "name": "services :: *",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use services::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::accept_service_item",
+      "name": "accept_service_item",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Accepts a stable result identity. Edits are one undo transaction; navigation and external actions are emitted for the caller to handle.",
+      "documentation": "Accepts a stable result identity. Edits are one undo transaction;\nnavigation and external actions are emitted for the caller to handle.",
+      "signature": "pub fn accept_service_item (& mut self, id : & str, cx : & mut Context<Self>) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::dismiss_service",
+      "name": "dismiss_service",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Dismisses the current popup and invalidates its outstanding reply.",
+      "documentation": "Dismisses the current popup and invalidates its outstanding reply.",
+      "signature": "pub fn dismiss_service (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::language_services",
+      "name": "language_services",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Enables caller language requests and their keyboard/mouse bindings.",
+      "documentation": "Enables caller language requests and their keyboard/mouse bindings.",
+      "signature": "pub fn language_services (mut self, enabled : bool) -> Self",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::request_service",
+      "name": "request_service",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Requests a language operation at a UTF-8 byte position. No service process, file, or network operation is started by Kit.",
+      "documentation": "Requests a language operation at a UTF-8 byte position. No service\nprocess, file, or network operation is started by Kit.",
+      "signature": "pub fn request_service (& mut self, kind : EditorServiceKind, position : usize, cx : & mut Context<Self>,) -> Option<EditorServiceRequest>",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::set_diagnostics",
+      "name": "set_diagnostics",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Publishes revision-paired diagnostic ranges and messages. Stale or malformed batches are refused without dropping the previous batch.",
+      "documentation": "Publishes revision-paired diagnostic ranges and messages. Stale or\nmalformed batches are refused without dropping the previous batch.",
+      "signature": "pub fn set_diagnostics (& mut self, revision : u64, diagnostics : Vec<EditorDiagnostic>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::set_semantic_tokens",
+      "name": "set_semantic_tokens",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Semantic tokens override parser colors only for their current revision.",
+      "documentation": "Semantic tokens override parser colors only for their current revision.",
+      "signature": "pub fn set_semantic_tokens (& mut self, revision : u64, mut tokens : Vec<EditorSemanticToken>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::Editor::set_service_result",
+      "name": "set_service_result",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Publishes a reply only while its request and document revision remain current. Refresh errors retain the last verified result for inspection.",
+      "documentation": "Publishes a reply only while its request and document revision remain\ncurrent. Refresh errors retain the last verified result for inspection.",
+      "signature": "pub fn set_service_result (& mut self, request : u64, mut result : AsyncValue<EditorServiceResult, SharedString>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorDiagnostic",
+      "name": "EditorDiagnostic",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Diagnostics are caller claims about one revision, not parser error nodes.",
+      "documentation": "Diagnostics are caller claims about one revision, not parser error nodes.",
+      "signature": "# [doc = \" Diagnostics are caller claims about one revision, not parser error nodes.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorDiagnostic { pub id : SharedString, pub range : Range<usize>, pub message : SharedString, pub severity : EditorDiagnosticSeverity, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorDiagnosticSeverity",
+      "name": "EditorDiagnosticSeverity",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Clone, Debug, PartialEq, Eq)] pub enum EditorDiagnosticSeverity { Error, Warning, Information, Hint, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorHover",
+      "name": "EditorHover",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Hover content is plain caller text, not interpreted HTML or executable code.",
+      "documentation": "Hover content is plain caller text, not interpreted HTML or executable code.",
+      "signature": "# [doc = \" Hover content is plain caller text, not interpreted HTML or executable code.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorHover { pub range : Range<usize>, pub contents : SharedString, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorReplacement",
+      "name": "EditorReplacement",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Current-document replacement in the request's original UTF-8 coordinates.",
+      "documentation": "Current-document replacement in the request's original UTF-8 coordinates.",
+      "signature": "# [doc = \" Current-document replacement in the request's original UTF-8 coordinates.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorReplacement { pub range : Range<usize>, pub text : SharedString, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorSemanticToken",
+      "name": "EditorSemanticToken",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Caller-classified semantic token using the shared theme's code palette.",
+      "documentation": "Caller-classified semantic token using the shared theme's code palette.",
+      "signature": "# [doc = \" Caller-classified semantic token using the shared theme's code palette.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorSemanticToken { pub range : Range<usize>, pub class : gpui_kit_theme::SyntaxColor, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorServiceEffect",
+      "name": "EditorServiceEffect",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Effects are either local atomic edits or caller-owned navigation/actions.",
+      "documentation": "Effects are either local atomic edits or caller-owned navigation/actions.",
+      "signature": "# [doc = \" Effects are either local atomic edits or caller-owned navigation/actions.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub enum EditorServiceEffect { Edits (Vec<EditorReplacement>), Definition { target : SharedString, range : Range<usize>, }, Action (SharedString), }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorServiceItem",
+      "name": "EditorServiceItem",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Stable caller identity, display label, and the effect of accepting a result.",
+      "documentation": "Stable caller identity, display label, and the effect of accepting a result.",
+      "signature": "# [doc = \" Stable caller identity, display label, and the effect of accepting a result.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorServiceItem { pub id : SharedString, pub label : SharedString, pub detail : Option<SharedString>, pub effect : EditorServiceEffect, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorServiceKind",
+      "name": "EditorServiceKind",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "A caller-owned language operation requested by the editing surface.",
+      "documentation": "A caller-owned language operation requested by the editing surface.",
+      "signature": "# [doc = \" A caller-owned language operation requested by the editing surface.\"] # [derive (Clone, Copy, Debug, PartialEq, Eq)] pub enum EditorServiceKind { Completion, Hover, Definition, CodeActions, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorServiceRequest",
+      "name": "EditorServiceRequest",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Immutable request identity. Replies must match this id and text revision.",
+      "documentation": "Immutable request identity. Replies must match this id and text revision.",
+      "signature": "# [doc = \" Immutable request identity. Replies must match this id and text revision.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub struct EditorServiceRequest { pub id : u64, pub revision : u64, pub kind : EditorServiceKind, pub position : usize, pub selection : Range<usize>, pub document : EditSnapshot, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::editor::services::EditorServiceResult",
+      "name": "EditorServiceResult",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor::services",
+      "path": "gpui_kit::controls::editor::services",
+      "source": "crates/gpui-kit/src/controls/editor/services.rs",
+      "summary": "Service result paired with a request by `Editor::set_service_result`.",
+      "documentation": "Service result paired with a request by `Editor::set_service_result`.",
+      "signature": "# [doc = \" Service result paired with a request by `Editor::set_service_result`.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub enum EditorServiceResult { Items (Vec<EditorServiceItem>), Hover (EditorHover), }",
+      "cfg": []
     },
     {
       "id": "gpui_kit::controls::editor::syntax::EditorParseWork",
@@ -64045,6 +64304,21 @@
       "target": "Select"
     },
     {
+      "id": "gpui_kit::controls::select::Select::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::select",
+      "path": "gpui_kit::controls::select",
+      "source": "crates/gpui-kit/src/controls/select.rs",
+      "summary": "Whether native selection and opening are currently refused.",
+      "documentation": "Whether native selection and opening are currently refused.",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "Select"
+    },
+    {
       "id": "gpui_kit::controls::select::Select::is_open",
       "name": "is_open",
       "kind": "method",
@@ -65555,6 +65829,21 @@
       "summary": "Keeps an area and a caller-owned [`Signal`] holding the same text.",
       "documentation": "Keeps an area and a caller-owned [`Signal`] holding the same text.\n\nThe area is seeded from the signal, typing writes the signal, and a\nchange to the signal writes the area. Neither direction fires when the\ntwo already agree, so the caret is not thrown to the end of the text\non every keystroke.\n\nThe subscriptions are the binding: the caller holds them for as long\nas the area and the signal should stay together.",
       "signature": "pub fn bind (area : & Entity<Self>, signal : & Signal<String>, cx : & mut App) -> Vec<Subscription>",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::bounds_for_position",
+      "name": "bounds_for_position",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Current painted insertion rectangle for a source byte position.",
+      "documentation": "Current painted insertion rectangle for a source byte position.",
+      "signature": "pub fn bounds_for_position (& self, offset : usize) -> Option<Bounds<Pixels>>",
       "cfg": [],
       "target": "TextArea"
     },
@@ -97073,6 +97362,51 @@
       "target": "Dialog"
     },
     {
+      "id": "gpui_kit::overlay::dialog::Dialog::set_cancel_label",
+      "name": "set_cancel_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::dialog",
+      "path": "gpui_kit::overlay::dialog",
+      "source": "crates/gpui-kit/src/overlay/dialog.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_cancel_label (& mut self, label : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Dialog"
+    },
+    {
+      "id": "gpui_kit::overlay::dialog::Dialog::set_confirm_label",
+      "name": "set_confirm_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::dialog",
+      "path": "gpui_kit::overlay::dialog",
+      "source": "crates/gpui-kit/src/overlay/dialog.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_confirm_label (& mut self, label : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Dialog"
+    },
+    {
+      "id": "gpui_kit::overlay::dialog::Dialog::set_content",
+      "name": "set_content",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::dialog",
+      "path": "gpui_kit::overlay::dialog",
+      "source": "crates/gpui-kit/src/overlay/dialog.rs",
+      "summary": "Replaces the per-frame body factory without reopening the modal. `None` removes the body; focus and modal-stack membership are retained.",
+      "documentation": "Replaces the per-frame body factory without reopening the modal.\n`None` removes the body; focus and modal-stack membership are retained.",
+      "signature": "pub fn set_content (& mut self, content : Option<Body>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Dialog"
+    },
+    {
       "id": "gpui_kit::overlay::dialog::Dialog::set_description",
       "name": "set_description",
       "kind": "method",
@@ -97084,6 +97418,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_description (& mut self, description : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Dialog"
+    },
+    {
+      "id": "gpui_kit::overlay::dialog::Dialog::set_destructive",
+      "name": "set_destructive",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::dialog",
+      "path": "gpui_kit::overlay::dialog",
+      "source": "crates/gpui-kit/src/overlay/dialog.rs",
+      "summary": "Changes action styling without moving focus. Initial focus policy is applied only when the dialog is next opened.",
+      "documentation": "Changes action styling without moving focus. Initial focus policy is\napplied only when the dialog is next opened.",
+      "signature": "pub fn set_destructive (& mut self, destructive : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Dialog"
+    },
+    {
+      "id": "gpui_kit::overlay::dialog::Dialog::set_dismissable",
+      "name": "set_dismissable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::dialog",
+      "path": "gpui_kit::overlay::dialog",
+      "source": "crates/gpui-kit/src/overlay/dialog.rs",
+      "summary": "Changes user dismissal policy without closing the modal.",
+      "documentation": "Changes user dismissal policy without closing the modal.",
+      "signature": "pub fn set_dismissable (& mut self, dismissable : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Dialog"
     },
@@ -100737,6 +101101,20 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::overlay::popover::Content",
+      "name": "Content",
+      "kind": "type",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "Builds the popover body for one frame.",
+      "documentation": "Builds the popover body for one frame.",
+      "signature": "# [doc = \" Builds the popover body for one frame.\"] pub type Content = Rc<dyn Fn (& mut Window, & mut App) -> AnyElement>;",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::overlay::popover::MenuKey",
       "name": "MenuKey",
       "kind": "enum",
@@ -100911,6 +101289,96 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn placement (mut self, placement : Placement) -> Self",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_content",
+      "name": "set_content",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "Replaces the per-frame body factory; `None` removes the body. Open state, animation, and the current focus are retained.",
+      "documentation": "Replaces the per-frame body factory; `None` removes the body.\nOpen state, animation, and the current focus are retained.",
+      "signature": "pub fn set_content (& mut self, content : Option<Content>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_dismissable",
+      "name": "set_dismissable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "Changes user dismissal policy without opening or closing the surface.",
+      "documentation": "Changes user dismissal policy without opening or closing the surface.",
+      "signature": "pub fn set_dismissable (& mut self, dismissable : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_hang",
+      "name": "set_hang",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_hang (& mut self, hang : Hang, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_placement",
+      "name": "set_placement",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_placement (& mut self, placement : Placement, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_trigger",
+      "name": "set_trigger",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "Changes the trigger without replacing its focus handle or open surface.",
+      "documentation": "Changes the trigger without replacing its focus handle or open surface.",
+      "signature": "pub fn set_trigger (& mut self, label : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Popover"
+    },
+    {
+      "id": "gpui_kit::overlay::popover::Popover::set_trigger_icon",
+      "name": "set_trigger_icon",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::popover",
+      "path": "gpui_kit::overlay::popover",
+      "source": "crates/gpui-kit/src/overlay/popover.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_trigger_icon (& mut self, icon : Option<Icon>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Popover"
     },
@@ -123568,6 +124036,11 @@
       "commands": [
         "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_description(description: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Body>, cx: &mut Context<Self>)",
+        "set_confirm_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_cancel_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+        "set_destructive(destructive: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "confirm(window: &mut Window, cx: &mut Context<Self>)",
@@ -123819,6 +124292,10 @@
       ],
       "slots": [],
       "reports": [
+        "ServiceRequested",
+        "ServiceAccepted",
+        "DefinitionRequested",
+        "CodeActionRequested",
         "Edited",
         "Changed",
         "SelectionChanged",
@@ -123832,7 +124309,8 @@
       ],
       "scenes": [
         "editor",
-        "editor-multicursor"
+        "editor-multicursor",
+        "editor-services"
       ]
     },
     {
@@ -125650,6 +126128,12 @@
         "dismissable(dismissable: bool) -> Self"
       ],
       "commands": [
+        "set_trigger(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Content>, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "toggle(window: &mut Window, cx: &mut Context<Self>)",
@@ -126295,7 +126779,8 @@
       "queries": [
         "selected_id() -> Option<&SharedString>",
         "selected_option() -> Option<&SelectOption>",
-        "is_open() -> bool"
+        "is_open() -> bool",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -127097,6 +127582,7 @@
         "selections() -> Vec<(Range<usize>, bool)>",
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
+        "bounds_for_position(offset: usize) -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
         "measured() -> Option<Measured>",
@@ -130575,10 +131061,39 @@
       "queries": []
     },
     {
+      "name": "EditorDiagnostic",
+      "path": "gpui_kit::controls::EditorDiagnostic",
+      "summary": "Diagnostics are caller claims about one revision, not parser error nodes.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorDiagnosticSeverity",
+      "path": "gpui_kit::controls::EditorDiagnosticSeverity",
+      "summary": "",
+      "variants": [
+        "Error",
+        "Warning",
+        "Information",
+        "Hint"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "EditorEvent",
       "path": "gpui_kit::controls::EditorEvent",
       "summary": "What a source editor reports to its owner.",
       "variants": [
+        "ServiceRequested",
+        "ServiceAccepted",
+        "DefinitionRequested",
+        "CodeActionRequested",
         "Edited",
         "Changed",
         "SelectionChanged",
@@ -130636,6 +131151,16 @@
       ]
     },
     {
+      "name": "EditorHover",
+      "path": "gpui_kit::controls::EditorHover",
+      "summary": "Hover content is plain caller text, not interpreted HTML or executable code.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "EditorIndentDirection",
       "path": "gpui_kit::controls::EditorIndentDirection",
       "summary": "Which indentation chord the source editor received.",
@@ -130687,6 +131212,88 @@
       "path": "gpui_kit::controls::EditorParseWork",
       "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
       "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorReplacement",
+      "path": "gpui_kit::controls::EditorReplacement",
+      "summary": "Current-document replacement in the request's original UTF-8 coordinates.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSemanticToken",
+      "path": "gpui_kit::controls::EditorSemanticToken",
+      "summary": "Caller-classified semantic token using the shared theme's code palette.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceEffect",
+      "path": "gpui_kit::controls::EditorServiceEffect",
+      "summary": "Effects are either local atomic edits or caller-owned navigation/actions.",
+      "variants": [
+        "Edits",
+        "Definition",
+        "Action"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceItem",
+      "path": "gpui_kit::controls::EditorServiceItem",
+      "summary": "Stable caller identity, display label, and the effect of accepting a result.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceKind",
+      "path": "gpui_kit::controls::EditorServiceKind",
+      "summary": "A caller-owned language operation requested by the editing surface.",
+      "variants": [
+        "Completion",
+        "Hover",
+        "Definition",
+        "CodeActions"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceRequest",
+      "path": "gpui_kit::controls::EditorServiceRequest",
+      "summary": "Immutable request identity. Replies must match this id and text revision.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceResult",
+      "path": "gpui_kit::controls::EditorServiceResult",
+      "summary": "Service result paired with a request by Editor::set_service_result.",
+      "variants": [
+        "Items",
+        "Hover"
+      ],
       "construct": [],
       "options": [],
       "commands": [],
@@ -146678,6 +147285,18 @@
         "Editor"
       ],
       "example": "fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMulticursorEditor>() {\n        let source = \"let alpha = 1;\\nlet beta  = 2;\\nlet gamma = 3;\";\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.editor.multiple\",\n                \"Multicursor source fixture\",\n                source,\n                window,\n                cx,\n            )\n            .rows(4)\n        });\n        editor.update(cx, |editor, cx| {\n            let selections = [\"gamma\", \"alpha\", \"beta\"].map(|name| {\n                let start = source.find(name).expect(\"fixture variable\");\n                (start..start + name.len(), false)\n            });\n            editor.set_selections(selections, cx);\n        });\n        window.focus(&editor.read(cx).text_area().read(cx).focus_handle(cx), cx);\n        cx.set_global(SceneMulticursorEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · type in three selections; undo restores all · Alt-click adds a caret · Alt-Shift-drag selects columns\"))\n        .child(cx.global::<SceneMulticursorEditor>().0.clone())\n        .into_any_element()\n}"
+    },
+    {
+      "name": "editor-services",
+      "capture": "cargo run -p xtask -- headless capture editor-services",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_services(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::controls::editor::*;\n    if !cx.has_global::<SceneEditorServices>() {\n        let editors = [\"ready\", \"loading\", \"refused\", \"hover\"].map(|state| {\n            let editor = cx.new(|cx| {\n                Editor::new(\n                    format!(\"scene.editor.services.{state}\"),\n                    format!(\"Language service {state} fixture\"),\n                    \"let count = val;\\n// caller-owned fixture\",\n                    window,\n                    cx,\n                )\n                .rows(3)\n                .language_services(true)\n            });\n            editor.update(cx, |editor, cx| {\n                let kind = if state == \"hover\" {\n                    EditorServiceKind::Hover\n                } else {\n                    EditorServiceKind::Completion\n                };\n                let request = editor\n                    .request_service(kind, 14, cx)\n                    .expect(\"fixture request\");\n                editor.set_diagnostics(\n                    0,\n                    vec![EditorDiagnostic {\n                        id: \"unresolved-value\".into(),\n                        range: 12..15,\n                        message: \"Fixture: unresolved name\".into(),\n                        severity: EditorDiagnosticSeverity::Warning,\n                    }],\n                    cx,\n                );\n                editor.set_semantic_tokens(\n                    0,\n                    vec![EditorSemanticToken {\n                        range: 0..3,\n                        class: gpui_kit_theme::SyntaxColor::Keyword,\n                    }],\n                    cx,\n                );\n                let result = match state {\n                    \"loading\" => AsyncValue::loading(),\n                    \"refused\" => AsyncValue::refused(\"Fixture host denied this request\"),\n                    \"hover\" => AsyncValue::ready(EditorServiceResult::Hover(EditorHover {\n                        range: 12..15,\n                        contents: \"Fixture: value → integer\\nDocumentation is caller text.\".into(),\n                    })),\n                    _ => AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {\n                        id: \"value\".into(),\n                        label: \"value\".into(),\n                        detail: Some(\" · integer (fixture)\".into()),\n                        effect: EditorServiceEffect::Edits(vec![EditorReplacement {\n                            range: 12..15,\n                            text: \"value\".into(),\n                        }]),\n                    }])),\n                };\n                editor.set_service_result(request.id, result, cx);\n            });\n            editor\n        });\n        cx.set_global(SceneEditorServices(editors.into()));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(900.0))\n        .child(caption(&theme, \"caller fixtures · completion / loading / host refusal / hover + diagnostic · no server process\"))\n        .children(cx.global::<SceneEditorServices>().0.chunks(2).map(|pair| {\n            row(&theme).items_start().children(pair.iter().map(|editor| div().w(px(430.0)).h(px(225.0)).child(editor.clone())))\n        }))\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",

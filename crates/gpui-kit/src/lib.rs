@@ -176,8 +176,11 @@ pub mod prelude {
     pub use crate::controls::copy_button::{CopyButton, CopyEvent, CopyState};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
     pub use crate::controls::editor::{
-        Editor, EditorEvent, EditorGeometry, EditorHighlight, EditorHighlights,
-        EditorIndentDirection, EditorIndentRequest, EditorIndentation, EditorLineGeometry,
+        Editor, EditorDiagnostic, EditorDiagnosticSeverity, EditorEvent, EditorGeometry,
+        EditorHighlight, EditorHighlights, EditorHover, EditorIndentDirection, EditorIndentRequest,
+        EditorIndentation, EditorLineGeometry, EditorReplacement, EditorSemanticToken,
+        EditorServiceEffect, EditorServiceItem, EditorServiceKind, EditorServiceRequest,
+        EditorServiceResult,
     };
     #[cfg(feature = "syntax")]
     pub use crate::controls::editor::{
@@ -371,5 +374,6 @@ pub fn install(cx: &mut App) {
     controls::input::install(cx);
     controls::rich_text_editor::install(cx);
     controls::textarea::install(cx);
+    controls::editor::install(cx);
     overlay::toast::install(cx);
 }

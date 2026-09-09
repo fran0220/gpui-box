@@ -12,6 +12,9 @@ mod syntax;
 #[cfg(feature = "syntax")]
 pub use syntax::{EditorParseWork, EditorSyntax, EditorSyntaxCapture, EditorSyntaxError};
 
+mod services;
+pub use services::*;
+
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -31,6 +34,25 @@ use super::textarea::{
 };
 
 const DEFAULT_ROWS: usize = 12;
+
+gpui::actions!(
+    editor,
+    [
+        RequestCompletion,
+        RequestHover,
+        RequestDefinition,
+        RequestCodeActions
+    ]
+);
+
+pub(crate) fn install(cx: &mut App) {
+    cx.bind_keys([
+        gpui::KeyBinding::new("ctrl-space", RequestCompletion, Some("Editor")),
+        gpui::KeyBinding::new("f12", RequestDefinition, Some("Editor")),
+        gpui::KeyBinding::new("ctrl-k ctrl-i", RequestHover, Some("Editor")),
+        gpui::KeyBinding::new("ctrl-.", RequestCodeActions, Some("Editor")),
+    ]);
+}
 
 type Indenter = Rc<dyn Fn(EditorIndentRequest) -> Option<EditorIndentation>>;
 
@@ -147,6 +169,17 @@ pub struct EditorGeometry {
 /// What a source editor reports to its owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorEvent {
+    /// The host should answer this revision-tagged language request.
+    ServiceRequested(EditorServiceRequest),
+    /// A stable service item was accepted successfully.
+    ServiceAccepted(SharedString),
+    /// Navigation belongs to the caller's document/workspace host.
+    DefinitionRequested {
+        target: SharedString,
+        range: Range<usize>,
+    },
+    /// A caller-defined code action requires host execution.
+    CodeActionRequested(SharedString),
     /// One replacement entered the shared undo history.
     Edited(TextAreaEdit),
     /// The value changed. The persistent snapshot does not materialize a
@@ -188,6 +221,12 @@ pub struct Editor {
     read_only: bool,
     highlights: Option<EditorHighlights>,
     indenter: Option<Indenter>,
+    services_enabled: bool,
+    next_service_request: u64,
+    service_popup: Option<services::ServicePopup>,
+    hover_position: Option<(u64, usize)>,
+    diagnostics: Option<(u64, Vec<EditorDiagnostic>)>,
+    semantic_tokens: Option<(u64, Vec<EditorSemanticToken>)>,
     #[cfg(feature = "syntax")]
     syntax: Option<EditorSyntax>,
     _subscription: Subscription,
@@ -238,6 +277,12 @@ impl Editor {
             read_only: false,
             highlights: None,
             indenter: None,
+            services_enabled: false,
+            next_service_request: 0,
+            service_popup: None,
+            hover_position: None,
+            diagnostics: None,
+            semantic_tokens: None,
             #[cfg(feature = "syntax")]
             syntax: None,
             _subscription: subscription,
@@ -391,12 +436,32 @@ impl Editor {
     ) {
         match event {
             TextAreaEvent::Edited(edit) => {
+                let refresh = self
+                    .service_popup
+                    .as_ref()
+                    .is_some_and(|popup| popup.request.kind == EditorServiceKind::Completion);
+                self.service_popup = None;
+                self.hover_position = None;
                 cx.emit(EditorEvent::Edited(edit.clone()));
                 #[cfg(feature = "syntax")]
                 self.update_syntax(Some(edit), cx);
+                if refresh {
+                    self.request_service(
+                        EditorServiceKind::Completion,
+                        area.read(cx).cursor_offset(),
+                        cx,
+                    );
+                }
             }
             TextAreaEvent::Change(value) => cx.emit(EditorEvent::Changed(value.clone())),
             TextAreaEvent::SelectionChanged(selection) => {
+                if self.service_popup.as_ref().is_some_and(|popup| {
+                    popup.request.position != area.read(cx).cursor_offset()
+                        || popup.request.selection != *selection
+                        || popup.request.revision != area.read(cx).revision()
+                }) {
+                    self.service_popup = None;
+                }
                 cx.emit(EditorEvent::SelectionChanged(selection.clone()));
                 cx.notify();
             }
@@ -404,7 +469,11 @@ impl Editor {
             TextAreaEvent::Submit => cx.emit(EditorEvent::Submitted),
             TextAreaEvent::Cancel => cx.emit(EditorEvent::Cancelled),
             TextAreaEvent::Focus => cx.emit(EditorEvent::Focused),
-            TextAreaEvent::Blur => cx.emit(EditorEvent::Blurred),
+            TextAreaEvent::Blur => {
+                self.service_popup = None;
+                cx.emit(EditorEvent::Blurred);
+                cx.notify();
+            }
             TextAreaEvent::IndentRequested => {
                 self.apply_indentation(area, EditorIndentDirection::Indent, cx)
             }
@@ -412,10 +481,10 @@ impl Editor {
                 self.apply_indentation(area, EditorIndentDirection::Outdent, cx)
             }
             TextAreaEvent::GeometryChanged => cx.notify(),
-            TextAreaEvent::MoveUp
-            | TextAreaEvent::MoveDown
-            | TextAreaEvent::AcceptCompletion
-            | TextAreaEvent::DismissCompletion => {}
+            TextAreaEvent::MoveUp => self.move_service_selection(-1, cx),
+            TextAreaEvent::MoveDown => self.move_service_selection(1, cx),
+            TextAreaEvent::AcceptCompletion => self.accept_selected_service(cx),
+            TextAreaEvent::DismissCompletion => self.dismiss_service(cx),
         }
     }
 
@@ -540,7 +609,14 @@ impl Render for Editor {
             .unwrap_or_default();
         #[cfg(feature = "syntax")]
         let spans = self.syntax_spans(spans, cx);
+        let spans = self.diagnostic_spans(spans, cx);
+        let service_open = self
+            .service_popup
+            .as_ref()
+            .is_some_and(|popup| popup.request.kind != EditorServiceKind::Hover);
         self.area.update(cx, |area, cx| {
+            area.set_completion_claimed(service_open);
+            area.set_arrows_claimed(service_open);
             area.set_row_limits(self.rows, self.rows);
             area.set_indentation_claimed(self.indenter.is_some());
             area.set_highlights(spans.0, spans.1);
@@ -600,8 +676,10 @@ impl Render for Editor {
                 )
         });
 
+        let popup = self.service_surface(cx);
         div()
             .id(self.ident.element_id())
+            .key_context("Editor")
             .w_full()
             .min_w_0()
             .flex()
@@ -611,6 +689,60 @@ impl Render for Editor {
             .well(&theme)
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .track_focus(&focus)
+            .when(self.services_enabled && !self.disabled, |element| {
+                element
+                    .on_action(cx.listener(|editor, _: &RequestCompletion, _, cx| {
+                        editor.request_service(
+                            EditorServiceKind::Completion,
+                            editor.area.read(cx).cursor_offset(),
+                            cx,
+                        );
+                    }))
+                    .on_action(cx.listener(|editor, _: &RequestHover, _, cx| {
+                        editor.request_service(
+                            EditorServiceKind::Hover,
+                            editor.area.read(cx).cursor_offset(),
+                            cx,
+                        );
+                    }))
+                    .on_action(cx.listener(|editor, _: &RequestDefinition, _, cx| {
+                        editor.request_service(
+                            EditorServiceKind::Definition,
+                            editor.area.read(cx).cursor_offset(),
+                            cx,
+                        );
+                    }))
+                    .on_action(cx.listener(|editor, _: &RequestCodeActions, _, cx| {
+                        editor.request_service(
+                            EditorServiceKind::CodeActions,
+                            editor.area.read(cx).cursor_offset(),
+                            cx,
+                        );
+                    }))
+                    .on_mouse_move(cx.listener(|editor, event: &gpui::MouseMoveEvent, _, cx| {
+                        if event.pressed_button.is_some()
+                            || editor
+                                .service_popup
+                                .as_ref()
+                                .is_some_and(|popup| popup.request.kind != EditorServiceKind::Hover)
+                        {
+                            return;
+                        }
+                        let area = editor.area.read(cx);
+                        if !area
+                            .viewport_bounds()
+                            .is_some_and(|bounds| bounds.contains(&event.position))
+                        {
+                            return;
+                        }
+                        let position = area.index_for_position(event.position);
+                        let key = (area.revision(), position);
+                        if editor.hover_position != Some(key) {
+                            editor.hover_position = Some(key);
+                            editor.request_service(EditorServiceKind::Hover, position, cx);
+                        }
+                    }))
+            })
             .mono(&theme)
             .type_scale(&theme, gpui_kit_theme::TypeScale::Code)
             .children(numbers)
@@ -621,6 +753,7 @@ impl Render for Editor {
                     .px_token(&theme, Space::Sm)
                     .child(self.area.clone()),
             )
+            .children(popup)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group).text(self.label.clone()),

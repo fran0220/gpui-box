@@ -1910,6 +1910,10 @@
       ],
       "slots": [],
       "reports": [
+        "ServiceRequested",
+        "ServiceAccepted",
+        "DefinitionRequested",
+        "CodeActionRequested",
         "Edited",
         "Changed",
         "SelectionChanged",
@@ -1923,7 +1927,8 @@
       ],
       "scenes": [
         "editor",
-        "editor-multicursor"
+        "editor-multicursor",
+        "editor-services"
       ]
     },
     {
@@ -5195,6 +5200,7 @@
         "selections() -> Vec<(Range<usize>, bool)>",
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
+        "bounds_for_position(offset: usize) -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
         "measured() -> Option<Measured>",
@@ -8673,10 +8679,39 @@
       "queries": []
     },
     {
+      "name": "EditorDiagnostic",
+      "path": "gpui_kit::controls::EditorDiagnostic",
+      "summary": "Diagnostics are caller claims about one revision, not parser error nodes.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorDiagnosticSeverity",
+      "path": "gpui_kit::controls::EditorDiagnosticSeverity",
+      "summary": "",
+      "variants": [
+        "Error",
+        "Warning",
+        "Information",
+        "Hint"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "EditorEvent",
       "path": "gpui_kit::controls::EditorEvent",
       "summary": "What a source editor reports to its owner.",
       "variants": [
+        "ServiceRequested",
+        "ServiceAccepted",
+        "DefinitionRequested",
+        "CodeActionRequested",
         "Edited",
         "Changed",
         "SelectionChanged",
@@ -8734,6 +8769,16 @@
       ]
     },
     {
+      "name": "EditorHover",
+      "path": "gpui_kit::controls::EditorHover",
+      "summary": "Hover content is plain caller text, not interpreted HTML or executable code.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "EditorIndentDirection",
       "path": "gpui_kit::controls::EditorIndentDirection",
       "summary": "Which indentation chord the source editor received.",
@@ -8785,6 +8830,88 @@
       "path": "gpui_kit::controls::EditorParseWork",
       "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
       "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorReplacement",
+      "path": "gpui_kit::controls::EditorReplacement",
+      "summary": "Current-document replacement in the request's original UTF-8 coordinates.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorSemanticToken",
+      "path": "gpui_kit::controls::EditorSemanticToken",
+      "summary": "Caller-classified semantic token using the shared theme's code palette.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceEffect",
+      "path": "gpui_kit::controls::EditorServiceEffect",
+      "summary": "Effects are either local atomic edits or caller-owned navigation/actions.",
+      "variants": [
+        "Edits",
+        "Definition",
+        "Action"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceItem",
+      "path": "gpui_kit::controls::EditorServiceItem",
+      "summary": "Stable caller identity, display label, and the effect of accepting a result.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceKind",
+      "path": "gpui_kit::controls::EditorServiceKind",
+      "summary": "A caller-owned language operation requested by the editing surface.",
+      "variants": [
+        "Completion",
+        "Hover",
+        "Definition",
+        "CodeActions"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceRequest",
+      "path": "gpui_kit::controls::EditorServiceRequest",
+      "summary": "Immutable request identity. Replies must match this id and text revision.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EditorServiceResult",
+      "path": "gpui_kit::controls::EditorServiceResult",
+      "summary": "Service result paired with a request by Editor::set_service_result.",
+      "variants": [
+        "Items",
+        "Hover"
+      ],
       "construct": [],
       "options": [],
       "commands": [],
@@ -15454,6 +15581,18 @@
         "Editor"
       ],
       "example": "fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMulticursorEditor>() {\n        let source = \"let alpha = 1;\\nlet beta  = 2;\\nlet gamma = 3;\";\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.editor.multiple\",\n                \"Multicursor source fixture\",\n                source,\n                window,\n                cx,\n            )\n            .rows(4)\n        });\n        editor.update(cx, |editor, cx| {\n            let selections = [\"gamma\", \"alpha\", \"beta\"].map(|name| {\n                let start = source.find(name).expect(\"fixture variable\");\n                (start..start + name.len(), false)\n            });\n            editor.set_selections(selections, cx);\n        });\n        window.focus(&editor.read(cx).text_area().read(cx).focus_handle(cx), cx);\n        cx.set_global(SceneMulticursorEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · type in three selections; undo restores all · Alt-click adds a caret · Alt-Shift-drag selects columns\"))\n        .child(cx.global::<SceneMulticursorEditor>().0.clone())\n        .into_any_element()\n}"
+    },
+    {
+      "name": "editor-services",
+      "capture": "cargo run -p xtask -- headless capture editor-services",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_services(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::controls::editor::*;\n    if !cx.has_global::<SceneEditorServices>() {\n        let editors = [\"ready\", \"loading\", \"refused\", \"hover\"].map(|state| {\n            let editor = cx.new(|cx| {\n                Editor::new(\n                    format!(\"scene.editor.services.{state}\"),\n                    format!(\"Language service {state} fixture\"),\n                    \"let count = val;\\n// caller-owned fixture\",\n                    window,\n                    cx,\n                )\n                .rows(3)\n                .language_services(true)\n            });\n            editor.update(cx, |editor, cx| {\n                let kind = if state == \"hover\" {\n                    EditorServiceKind::Hover\n                } else {\n                    EditorServiceKind::Completion\n                };\n                let request = editor\n                    .request_service(kind, 14, cx)\n                    .expect(\"fixture request\");\n                editor.set_diagnostics(\n                    0,\n                    vec![EditorDiagnostic {\n                        id: \"unresolved-value\".into(),\n                        range: 12..15,\n                        message: \"Fixture: unresolved name\".into(),\n                        severity: EditorDiagnosticSeverity::Warning,\n                    }],\n                    cx,\n                );\n                editor.set_semantic_tokens(\n                    0,\n                    vec![EditorSemanticToken {\n                        range: 0..3,\n                        class: gpui_kit_theme::SyntaxColor::Keyword,\n                    }],\n                    cx,\n                );\n                let result = match state {\n                    \"loading\" => AsyncValue::loading(),\n                    \"refused\" => AsyncValue::refused(\"Fixture host denied this request\"),\n                    \"hover\" => AsyncValue::ready(EditorServiceResult::Hover(EditorHover {\n                        range: 12..15,\n                        contents: \"Fixture: value → integer\\nDocumentation is caller text.\".into(),\n                    })),\n                    _ => AsyncValue::ready(EditorServiceResult::Items(vec![EditorServiceItem {\n                        id: \"value\".into(),\n                        label: \"value\".into(),\n                        detail: Some(\" · integer (fixture)\".into()),\n                        effect: EditorServiceEffect::Edits(vec![EditorReplacement {\n                            range: 12..15,\n                            text: \"value\".into(),\n                        }]),\n                    }])),\n                };\n                editor.set_service_result(request.id, result, cx);\n            });\n            editor\n        });\n        cx.set_global(SceneEditorServices(editors.into()));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(900.0))\n        .child(caption(&theme, \"caller fixtures · completion / loading / host refusal / hover + diagnostic · no server process\"))\n        .children(cx.global::<SceneEditorServices>().0.chunks(2).map(|pair| {\n            row(&theme).items_start().children(pair.iter().map(|editor| div().w(px(430.0)).h(px(225.0)).child(editor.clone())))\n        }))\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",
