@@ -20,6 +20,9 @@ const join = choice('alone', 'leading', 'middle', 'trailing');
 const colorChoice = object({ palette: identity, semantic: choice('accent', 'accentStrong', 'danger', 'warning', 'success', 'info'), custom: color });
 const button = { ...common, accessibleName: string, semanticParent: identity, icon: iconSchema, variant: choice(...variant.enum, 'filled', 'light', 'subtle', 'default', 'transparent', 'white'), color: colorChoice, ground, join, loading: boolean };
 const transferItems = array(object({ id: identity, label: string, disabled: boolean }, ['id', 'label']));
+const keymapBinding = object({ id: identity, keystroke: string, conflict: string, provenance: string }, ['id', 'keystroke']);
+const keymapCommand = object({ id: identity, label: string, context: string, defaults: array(string), bindings: array(keymapBinding), searchText: string, keywords: array(string), refusal: string }, ['id', 'label']);
+const keymapResult = object({ ...keymapCommand.fields, context: { ...string, nullable: true }, refusal: { ...string, nullable: true }, bindings: array(object({ ...keymapBinding.fields, conflict: { ...string, nullable: true }, provenance: { ...string, nullable: true } }, Object.keys(keymapBinding.fields))) }, Object.keys(keymapCommand.fields));
 
 export const familyBindings = Object.freeze({
   NumberInput: { prop: 'value', event: 'change' },
@@ -28,6 +31,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  KeymapEditor: { props: object({ disabled: boolean, commands: array(keymapCommand), query: string }), events: { addCaptured: object({ command_id: identity, keystroke: string }, ['command_id', 'keystroke']), remove: object({ command_id: identity, binding_id: identity }, ['command_id', 'binding_id']), reset: object({ command_id: identity }, ['command_id']), recordingCancelled: object({ command_id: identity }, ['command_id']) } },
   NumberInput: { props: object({ ...common, value: number, min: number, max: number, step, pageStep: step, precision, name: string, unit: string, prefix: string, required: boolean, invalid: boolean }), events: { change: number, unparsable: string, submit: choice(null) } },
   TransferList: { props: object({ ...common, source: transferItems, target: transferItems, sourceSelected: array(identity), targetSelected: array(identity), sourceLabel: string, targetLabel: string, query: string }), events: { toggleSource: identity, toggleTarget: identity, moveToTarget: choice(null), moveToSource: choice(null), queryChange: string } },
   SettingsRow: { props: object({ label: string, description: string, labelWidth: { type: 'number', min: 0, max: 100000 }, badge: string, value: string, searchTerms: array(string), managed: string }, ['label']), events: {}, slots: ['control'] },
@@ -42,6 +46,7 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  KeymapEditor: { invoke: { set_commands: method({ commands: array(keymapCommand) }, choice(null)), set_query: method({ query: string }, choice(null)), set_disabled: method({ disabled: boolean }, choice(null)) }, query: { current_commands: method({}, array(keymapResult)), active_command: method({}, { ...identity, nullable: true }), is_disabled: method({}, boolean) } },
   NumberInput: {
     invoke: {
       set_value: method({ value: number }, choice(null)),

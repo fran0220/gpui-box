@@ -265,6 +265,10 @@ impl KeymapEditor {
         self.active_command.as_ref()
     }
 
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn current_commands(&self) -> &[KeymapCommand] {
         &self.commands
     }

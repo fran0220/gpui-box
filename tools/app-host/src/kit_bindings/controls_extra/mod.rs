@@ -3,6 +3,9 @@
 use super::*;
 use gpui::{Hsla, ParentElement};
 use gpui_kit::controls::button::{ButtonJoin, ButtonStyle, IconPosition};
+use gpui_kit::controls::keymap_editor::{
+    KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
+};
 use gpui_kit::controls::number_input::{NumberInput, NumberInputEvent};
 use gpui_kit::state::ValidationState;
 use gpui_kit_theme::{ColorChoice, SemanticColor, Surface, Variant};
@@ -23,6 +26,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SettingsRow",
     "TransferList",
     "NumberInput",
+    "KeymapEditor",
 ];
 
 struct Entry<T: 'static> {
@@ -37,6 +41,7 @@ pub(super) struct State {
     searches: RefCell<HashMap<Key, Rc<Entry<SearchInput>>>>,
     transfers: RefCell<HashMap<Key, Rc<Entry<TransferList>>>>,
     numbers: RefCell<HashMap<Key, Rc<Entry<NumberInput>>>>,
+    keymaps: RefCell<HashMap<Key, Rc<Entry<KeymapEditor>>>>,
 }
 
 impl State {
@@ -60,6 +65,9 @@ impl State {
         self.numbers
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "NumberInput"));
+        self.keymaps
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "KeymapEditor"));
     }
 
     pub(super) fn render(
@@ -70,6 +78,9 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("KeymapEditor") {
+            return self.render_keymap(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("NumberInput") {
             return self.render_number(node, window, cx, emit);
         }
@@ -160,6 +171,9 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if node.component.as_deref() == Some("KeymapEditor") {
+            return self.invoke_keymap(node, method, args, query, cx);
+        }
         if node.component.as_deref() == Some("NumberInput") {
             return self.invoke_number(node, method, args, query, cx);
         }
@@ -396,6 +410,152 @@ impl State {
                     );
                 }
                 _ => anyhow::bail!("unsupported NumberInput command"),
+            }
+            Ok(Value::Null)
+        })
+    }
+}
+
+fn keymap_commands(value: Option<&Value>) -> Vec<KeymapCommand> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|value| {
+            let string = |key: &str| value[key].as_str().unwrap_or_default().to_owned();
+            let bindings = value["bindings"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|binding| {
+                    let mut item = KeymapBinding::new(
+                        binding["id"].as_str().unwrap_or_default().to_owned(),
+                        binding["keystroke"].as_str().unwrap_or_default().to_owned(),
+                    );
+                    if let Some(value) = binding["conflict"].as_str() {
+                        item = item.conflict(value.to_owned());
+                    }
+                    if let Some(value) = binding["provenance"].as_str() {
+                        item = item.provenance(value.to_owned());
+                    }
+                    item
+                });
+            let mut command = KeymapCommand::new(string("id"), string("label"))
+                .defaults(strings(value.get("defaults")))
+                .bindings(bindings)
+                .searchable(string("searchText"), strings(value.get("keywords")));
+            if let Some(value) = value["context"].as_str() {
+                command = command.context(value.to_owned());
+            }
+            if let Some(value) = value["refusal"].as_str() {
+                command = command.refused(value.to_owned());
+            }
+            command
+        })
+        .collect()
+}
+
+fn keymap_snapshot(commands: &[KeymapCommand]) -> Value {
+    json!(commands.iter().map(|command| json!({
+        "id":command.id().as_ref(), "label":command.label_text().as_ref(),
+        "context":command.context_label().map(|s| s.as_ref()),
+        "defaults":command.default_bindings().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+        "bindings":command.effective_bindings().iter().map(|binding| json!({
+            "id":binding.id().as_ref(),"keystroke":binding.keystroke().as_ref(),
+            "conflict":binding.conflict_reason().map(|s| s.as_ref()),
+            "provenance":binding.provenance_label().map(|s| s.as_ref()),
+        })).collect::<Vec<_>>(),
+        "searchText":command.search_text().as_ref(),
+        "keywords":command.keywords().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+        "refusal":command.refusal_reason().map(|s| s.as_ref()),
+    })).collect::<Vec<_>>())
+}
+
+impl State {
+    fn render_keymap(
+        &self,
+        node: &Node,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> AnyElement {
+        let key = (node.instance, node.id.clone());
+        let existing = self.keymaps.borrow().get(&key).cloned();
+        let entry = existing.unwrap_or_else(|| {
+            let entity = cx.new(|cx| KeymapEditor::new(node.id.clone(), window, cx));
+            let route = Rc::new(RefCell::new(Route { events: node.events.clone(), emit: emit.clone(), disabled: flag(node, "disabled") }));
+            let callback = Rc::downgrade(&route);
+            let subscription = cx.subscribe(&entity, move |entity, event: &KeymapEditorEvent, cx| {
+                if entity.read(cx).is_disabled() { return; }
+                let (name, payload) = match event {
+                    KeymapEditorEvent::AddCaptured {command_id,keystroke} => ("addCaptured", json!({"command_id":command_id.as_ref(),"keystroke":keystroke.as_ref()})),
+                    KeymapEditorEvent::Remove {command_id,binding_id} => ("remove", json!({"command_id":command_id.as_ref(),"binding_id":binding_id.as_ref()})),
+                    KeymapEditorEvent::Reset {command_id} => ("reset", json!({"command_id":command_id.as_ref()})),
+                    KeymapEditorEvent::RecordingCancelled {command_id} => ("recordingCancelled", json!({"command_id":command_id.as_ref()})),
+                };
+                let target = callback.upgrade().and_then(|route| {
+                    let route = route.borrow();
+                    (!route.disabled).then(|| route.events.get(name).map(|action| (action.clone(),route.emit.clone()))).flatten()
+                });
+                if let Some((action,emit)) = target { emit(&action,payload); }
+            });
+            let entry = Rc::new(Entry {entity,route,props:Default::default(),_subscription:subscription});
+            self.keymaps.borrow_mut().insert(key,entry.clone());
+            entry
+        });
+        *entry.route.borrow_mut() = Route {
+            events: node.events.clone(),
+            emit,
+            disabled: flag(node, "disabled"),
+        };
+        if *entry.props.borrow() != node.props {
+            entry.entity.update(cx, |editor, cx| {
+                editor.set_commands(keymap_commands(node.props.get("commands")), cx);
+                editor.set_query(text(node, "query"), cx);
+                editor.set_disabled(flag(node, "disabled"), cx);
+            });
+            *entry.props.borrow_mut() = node.props.clone();
+        }
+        entry.entity.clone().into_any_element()
+    }
+
+    fn invoke_keymap(
+        &self,
+        node: &Node,
+        method: &str,
+        args: &Value,
+        query: bool,
+        cx: &mut App,
+    ) -> anyhow::Result<Value> {
+        let entity = self
+            .keymaps
+            .borrow()
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| entry.entity.clone())
+            .ok_or_else(|| anyhow::anyhow!("native target is not mounted"))?;
+        anyhow::ensure!(
+            query || (!flag(node, "disabled") && !entity.read(cx).is_disabled()),
+            "disabled target refuses invocation"
+        );
+        if query {
+            let editor = entity.read(cx);
+            return match method {
+                "current_commands" => Ok(keymap_snapshot(editor.current_commands())),
+                "active_command" => Ok(json!(editor.active_command().map(|s| s.as_ref()))),
+                "is_disabled" => Ok(json!(editor.is_disabled())),
+                _ => anyhow::bail!("unsupported KeymapEditor query"),
+            };
+        }
+        entity.update(cx, |editor, cx| {
+            match method {
+                "set_commands" => editor.set_commands(keymap_commands(args.get("commands")), cx),
+                "set_query" => {
+                    editor.set_query(args["query"].as_str().unwrap_or_default().to_owned(), cx)
+                }
+                "set_disabled" => {
+                    editor.set_disabled(args["disabled"].as_bool().unwrap_or(false), cx)
+                }
+                _ => anyhow::bail!("unsupported KeymapEditor command"),
             }
             Ok(Value::Null)
         })

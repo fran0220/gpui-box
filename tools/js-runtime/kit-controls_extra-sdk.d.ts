@@ -11,7 +11,11 @@ export interface NativeButtonProps extends ControlProps { accessibleName?: strin
 export interface ToggleItem { id: string; label: string; icon?: BuiltinIconDescriptor; iconOnly?: boolean; disabled?: boolean }
 export interface FilterCondition { id: string; field: string; operator: string; value: string; tone?: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info' }
 export interface TransferItem { id: string; label: string; disabled?: boolean }
+export interface KeymapBinding { id: string; keystroke: string; conflict?: string; provenance?: string }
+export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
+export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  KeymapEditor(id: string, props?: { disabled?: boolean; commands?: KeymapCommand[]; query?: string }, events?: { addCaptured?(value: { command_id: string; keystroke: string }): void; remove?(value: { command_id: string; binding_id: string }): void; reset?(value: { command_id: string }): void; recordingCancelled?(value: { command_id: string }): void }): KitNode;
   NumberInput(id: string, props?: ControlProps & { value?: number; min?: number; max?: number; step?: number; pageStep?: number; precision?: number; name?: string; unit?: string; prefix?: string; required?: boolean; invalid?: boolean }, events?: { change?(value: number): void; unparsable?(text: string): void; submit?(): void }): KitNode;
   TransferList(id: string, props?: ControlProps & { source?: TransferItem[]; target?: TransferItem[]; sourceSelected?: string[]; targetSelected?: string[]; sourceLabel?: string; targetLabel?: string; query?: string }, events?: { toggleSource?(id: string): void; toggleTarget?(id: string): void; moveToTarget?(): void; moveToSource?(): void; queryChange?(query: string): void }): KitNode;
   SettingsRow(id: string, props: { label: string; description?: string; labelWidth?: number; badge?: string; value?: string; searchTerms?: string[]; managed?: string }, events?: Record<string, never>, slots?: { control?: SlotNode[] }): KitNode;
@@ -26,6 +30,18 @@ export interface ControlsExtraFactories {
   FilterBar(id: string, props?: ControlProps & { conditions?: FilterCondition[]; countState?: 'unknown' | 'counting' | 'known' | 'unavailable'; count?: number; countReason?: string; noun?: string; addLabel?: string; clearLabel?: string }, events?: { add?(): void; remove?(id: string): void; clear?(): void }, slots?: { add_control?: SlotNode[] }): KitNode;
 }
 export interface ControlsExtraMethodContracts {
+  KeymapEditor: {
+    invoke: {
+      set_commands: { args: { commands: KeymapCommand[] }; result: null };
+      set_query: { args: { query: string }; result: null };
+      set_disabled: { args: { disabled: boolean }; result: null };
+    };
+    query: {
+      current_commands: { args: Record<string, never>; result: KeymapCommandResult[] };
+      active_command: { args: Record<string, never>; result: string | null };
+      is_disabled: { args: Record<string, never>; result: boolean };
+    };
+  };
   NumberInput: {
     invoke: {
       set_value: { args: { value: number }; result: null };

@@ -3,6 +3,140 @@ use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn keymap_reports_native_identities_and_keeps_recording_until_hidden(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let commands = json!([
+        {"id":"save","label":"Save","context":"Editor","defaults":["ctrl-s"],"bindings":[{"id":"custom","keystroke":"ctrl-shift-s","conflict":"Other action","provenance":"Fixture"}],"keywords":["persist"]},
+        {"id":"locked","label":"Locked","refusal":"Policy"}
+    ]);
+    let descriptor = Rc::new(RefCell::new(node(
+        "KeymapEditor",
+        "keymap",
+        json!({"commands":commands}),
+        json!({"remove":"remove","reset":"reset","addCaptured":"add","recordingCancelled":"cancel"}),
+    )));
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let (build_state, build_node, output) = (state.clone(), descriptor.clone(), events.clone());
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let node = build_node.borrow();
+        build_state.reconcile(&node, cx);
+        let output = output.clone();
+        build_state.render(
+            &node,
+            BTreeMap::new(),
+            window,
+            cx,
+            Rc::new(move |action, value| output.borrow_mut().push((action.to_owned(), value))),
+        )
+    });
+    assert!(harness.node("keymap.locked.add").is_none());
+    harness.click("keymap.save.binding.custom.remove");
+    harness.click("keymap.save.reset");
+    assert_eq!(
+        *events.borrow(),
+        vec![
+            (
+                "remove".into(),
+                json!({"command_id":"save","binding_id":"custom"})
+            ),
+            ("reset".into(), json!({"command_id":"save"}))
+        ]
+    );
+    harness.click("keymap.save.add");
+    harness.update(|window,cx| {
+        assert_eq!(state.invoke(&descriptor.borrow(),"active_command",&json!({}),true,window,cx).expect("active"),json!("save"));
+        let result = state.invoke(&descriptor.borrow(),"current_commands",&json!({}),true,window,cx).expect("commands");
+        assert_eq!(result[0]["bindings"][0],json!({"id":"custom","keystroke":"ctrl-shift-s","conflict":"Other action","provenance":"Fixture"}));
+        assert_eq!(result[1]["refusal"],json!("Policy"));
+        state.invoke(&descriptor.borrow(),"set_commands",&json!({"commands":commands}),false,window,cx).expect("replace commands");
+        assert_eq!(state.invoke(&descriptor.borrow(),"active_command",&json!({}),true,window,cx).expect("retained active"),json!("save"));
+        state.invoke(&descriptor.borrow(),"set_query",&json!({"query":"unmatched"}),false,window,cx).expect("filter");
+    });
+    assert_eq!(
+        events.borrow().last(),
+        Some(&("cancel".into(), json!({"command_id":"save"})))
+    );
+    harness.update(|window, cx| {
+        assert_eq!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "active_command",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .expect("cancelled"),
+            Value::Null
+        );
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_query",
+                &json!({"query":""}),
+                false,
+                window,
+                cx,
+            )
+            .expect("clear filter");
+    });
+    harness.click("keymap.save.add");
+    harness.keystrokes("ctrl-k");
+    assert_eq!(
+        events.borrow().last(),
+        Some(&(
+            "add".into(),
+            json!({"command_id":"save","keystroke":"ctrl-k"})
+        ))
+    );
+    harness.update(|window, cx| {
+        state
+            .invoke(
+                &descriptor.borrow(),
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                window,
+                cx,
+            )
+            .expect("disable");
+        assert_eq!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "is_disabled",
+                    &json!({}),
+                    true,
+                    window,
+                    cx
+                )
+                .expect("disabled"),
+            json!(true)
+        );
+        assert!(
+            state
+                .invoke(
+                    &descriptor.borrow(),
+                    "set_query",
+                    &json!({"query":"save"}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+    });
+    assert!(harness.node("keymap.save.add").is_none());
+    *descriptor.borrow_mut() = node("Button", "replacement", json!({}), json!({}));
+    harness.update(|_, cx| {
+        state.reconcile(&descriptor.borrow(), cx);
+        cx.refresh_windows();
+    });
+    assert!(state.controls_extra.keymaps.borrow().is_empty());
+}
+
+#[gpui::test]
 fn typed_containers_preserve_child_effect_owners_after_native_transforms(cx: &mut TestAppContext) {
     use gpui::{EffectOwner, EffectScoped};
     use gpui_kit::controls::button::ButtonGroup;

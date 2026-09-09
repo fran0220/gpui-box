@@ -8,6 +8,16 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('keymap metadata is closed and command and binding identities cannot collide', () => {
+  const command = { id: 'save', label: 'Save', bindings: [{ id: 'custom', keystroke: 'ctrl-k' }] };
+  validateValue({ commands: [command] }, familySchemas.KeymapEditor.props);
+  for (const commands of [[command, command], [{ ...command, bindings: [...command.bindings, ...command.bindings] }], [{ ...command, execute: 'shell' }]]) {
+    assert.throws(() => validateValue({ commands }, familySchemas.KeymapEditor.props));
+  }
+  assert.throws(() => validateValue({ command_id: 'save', index: 0 }, familySchemas.KeymapEditor.events.remove));
+  assert.throws(() => validateValue({ query: '' }, familyMethods.KeymapEditor.query.current_commands.args));
+});
+
 test('number options and named command/query arguments reject nonfinite and unbounded data', () => {
   validateValue({ value: -4.25, min: 9, max: -3, step: 0.25, precision: 2 }, familySchemas.NumberInput.props);
   for (const props of [{value: NaN}, {value: Infinity}, {step: 0}, {pageStep: -1}, {precision: 1.5}, {precision: 13}, {bind: {signal: 2}}]) {
@@ -65,6 +75,11 @@ test('family factory options, event payloads, and every search method typecheck 
     const path = join(dir, 'contract.ts');
     writeFileSync(path, `import type { ControlsExtraFactories, ControlsExtraMethodContracts } from ${JSON.stringify(sdk)};
 declare const kit: ControlsExtraFactories;
+kit.KeymapEditor('keys', {commands:[{id:'save',label:'Save',bindings:[{id:'custom',keystroke:'ctrl-k'}]}]}, {remove(value) { const id: string = value.binding_id; }});
+type KeymapMethods = ControlsExtraMethodContracts['KeymapEditor']['invoke'];
+const keymapValues: { [K in keyof KeymapMethods]: KeymapMethods[K]['args'] } = {set_commands:{commands:[]},set_query:{query:'save'},set_disabled:{disabled:true}};
+// @ts-expect-error remove uses binding identity, not position
+kit.KeymapEditor('bad', {}, {remove(value:{index:number}) {}});
 kit.NumberInput('number', {min:-3,max:9,precision:2}, {change(value) { const n: number = value; }, unparsable(text) { const s: string = text; }});
 type NumberMethods = ControlsExtraMethodContracts['NumberInput']['invoke'];
 const numberValues: { [K in keyof NumberMethods]: NumberMethods[K]['args'] } = {
