@@ -740,3 +740,12 @@ over the existing local GPUI primitives, not another framework import.
 `Theme::with_reduce_transparency(bool)` carries a host-projected reader
 preference, outside tokens. All glass presets and built-in overlay recipes
 resolve to Frosted under that theme; Kit does not read platform preferences.
+
+### Unicode line-breaking authority
+
+GPUI's unshaped fragment wrapper and shaped glyph wrapper use
+`unicode-linebreak` 0.1.5 (Unicode 15.0 UAX #14), already present in the local
+lockfiles through cosmic-text. Wrapped truncation reuses the fragment wrapper.
+The fragment/object byte mapping and layout integration are original GPUI Box
+work, not a new upstream source import. The historical import receipt remains
+unchanged; both workspaces continue to resolve local GPUI Box packages.

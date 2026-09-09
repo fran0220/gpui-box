@@ -109,6 +109,7 @@ uuid.workspace = true
 web-time.workspace = true
 heapless.workspace = true
 unicode-bidi.workspace = true
+unicode-linebreak.workspace = true
 unicode-segmentation.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]

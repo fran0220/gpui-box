@@ -84,3 +84,10 @@
   token radii against actual small bounds and compare interior pixels to the
   aligned backdrop. Keep material attenuation inside the material rather than
   depending on same-layer primitive batching to define its optical order.
+
+## 2026-09-09: text rules need a visual specimen that exercises them
+
+- A passing catalog cannot establish CJK line-breaking behavior if its text
+  never exercises punctuation at wrap boundaries. Add a narrow mixed-script
+  specimen, verify the bundled fallback family directly, and inspect both
+  themes. Keep existing exhibit states visible when adding the specimen.

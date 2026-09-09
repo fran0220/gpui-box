@@ -508,6 +508,13 @@
           "features": []
         },
         {
+          "alias": "unicode-linebreak",
+          "package": "unicode-linebreak",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
           "alias": "unicode-segmentation",
           "package": "unicode-segmentation",
           "kind": "normal",
@@ -35299,7 +35306,7 @@
       "path": "gpui::text_system::line_wrapper",
       "source": "crates/gpui/src/text_system/line_wrapper.rs",
       "summary": "Truncate text to fit within a given number of wrapped lines.",
-      "documentation": "Truncate text to fit within a given number of wrapped lines.\n\nUnlike `truncate_line` which treats the text as a flat width budget\n(`width * max_lines`), this method accounts for word-boundary wrapping:\nit walks through characters once, tracking wrap boundaries and the\ntruncation point simultaneously. When text overflows on the last\nallowed line, it truncates there and appends the affix.\n\nFor `max_lines == 1`, this delegates to `truncate_line`.",
+      "documentation": "Truncate text to fit within a given number of wrapped lines.\n\nUnlike `truncate_line` which treats the text as a flat width budget\n(`width * max_lines`), this method uses `wrap_line`'s Unicode boundaries\nand continuation indent, then fits the affix on the last allowed line.\n\nFor `max_lines == 1`, this delegates to `truncate_line`.",
       "signature": "pub fn truncate_wrapped_line<'a> (& mut self, text : SharedString, wrap_width : Pixels, max_lines : usize, truncation_affix : & str, runs : & 'a [TextRun], truncate_from : TruncateFrom,) -> (SharedString, Cow<'a, [TextRun]>)",
       "cfg": [],
       "target": "LineWrapper"
@@ -35313,8 +35320,8 @@
       "module": "text_system::line_wrapper",
       "path": "gpui::text_system::line_wrapper",
       "source": "crates/gpui/src/text_system/line_wrapper.rs",
-      "summary": "Wrap a line of text to the given width with this wrapper's font and font size.",
-      "documentation": "Wrap a line of text to the given width with this wrapper's font and font size.",
+      "summary": "Wrap a line of text to the given width with this wrapper's font and font size. UAX #14 supplies break opportunities across fragment boundaries. Inline elements behave as object replacement characters, but returned indices retain their caller-supplied UTF-8 lengths. When no opportunity fits, emergency wrapping still breaks before the overflowing character/item.",
+      "documentation": "Wrap a line of text to the given width with this wrapper's font and font size.\nUAX #14 supplies break opportunities across fragment boundaries. Inline\nelements behave as object replacement characters, but returned indices\nretain their caller-supplied UTF-8 lengths. When no opportunity fits,\nemergency wrapping still breaks before the overflowing character/item.",
       "signature": "pub fn wrap_line<'a> (& 'a mut self, fragments : & 'a [LineFragment], wrap_width : Pixels,) -> impl Iterator<Item = Boundary> + 'a",
       "cfg": [],
       "target": "LineWrapper"
@@ -142011,6 +142018,12 @@
       "anchor": "clear-pill-geometry-and-dimming-order"
     },
     {
+      "id": "coverage-unicode-line-breaks-across-text-and-inline-objects",
+      "title": "Unicode line breaks across text and inline objects",
+      "guide": "coverage",
+      "anchor": "unicode-line-breaks-across-text-and-inline-objects"
+    },
+    {
       "id": "datetime-why-the-seam-is-here",
       "title": "Why the seam is here",
       "guide": "datetime",
@@ -143978,7 +143991,7 @@
       "uses": [
         "Markdown"
       ],
-      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let document = stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(\n            Divider::new()\n                .id(\"scene.markdown.flat-rule\")\n                .label(\"The same fence in flat presentation\"),\n        )\n        .child(\n            Markdown::new(\n                \"scene.markdown.flat\",\n                \"```rust\\nfn main() { println!(\\\"a long line keeps its horizontal code overflow\\\"); }\\n```\",\n            )\n            .code_presentation(MarkdownCodePresentation::Flat)\n            .on_event(|_, _, _| {}),\n        )\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        );\n    div().row().child(document).child(\n        stack(&theme).w(px(272.0))\n            .child(caption(&theme, \"Unicode line breaks · CJK and Latin\"))\n            .child(Markdown::new(\n                \"scene.markdown.unicode-wrap\",\n                \"设计图通过后仍需运行、测量和批注；截图不能证明可玩。请检查「运行结果」（第12轮），然后比较 Hello world你好世界与 internationalization 2026-09。\",\n            )),\n    )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-document",
@@ -144927,6 +144940,16 @@
     },
     "framework_layout": {
       "measured_reveal": "A stable-id Reveal measures its subtree at an unconstrained primary extent, contributes caller progress to layout, and shares one clip across paint, hit testing, and accessibility; it owns no motion clock or easing."
+    },
+    "framework_line_breaking": {
+      "contract": "Unshaped fragments, shaped glyph runs and wrapped truncation use Unicode 15.0 UAX #14 opportunities from unicode-linebreak 0.1.5. Inline objects use U+FFFC for classification while retaining caller UTF-8 byte lengths. Continuation indentation and emergency character wrapping remain supported. No host text preprocessing or width expansion.",
+      "tests": [
+        "unicode_wrap_keeps_punctuation_with_its_text",
+        "unicode_wrap_crosses_fragments_and_maps_inline_element_bytes",
+        "unicode_wrap_preserves_words_and_mixed_script_opportunities",
+        "unicode_mandatory_breaks_and_truncation_share_wrap_boundaries",
+        "shaped_unicode_wrap_respects_punctuation_across_runs"
+      ]
     },
     "framework_luminance_probe": {
       "contract": "LuminanceProbeLease encodes a 4-bit physical slot and 28-bit generation in the existing u32 material field. Exhausted slots retire without wraparound. Metal, Direct3D and WGPU share LuminanceProbeCache: absent probes read None; completed samples must match full ID and current activation, and cannot overwrite newer samples. No GPU ABI change or new Metal wait.",

@@ -49,6 +49,10 @@ limitations = ["application context menus use the in-window fallback", "native m
 [framework_context_menu]
 contract = "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
 
+[framework_line_breaking]
+contract = "Unshaped fragments, shaped glyph runs and wrapped truncation use Unicode 15.0 UAX #14 opportunities from unicode-linebreak 0.1.5. Inline objects use U+FFFC for classification while retaining caller UTF-8 byte lengths. Continuation indentation and emergency character wrapping remain supported. No host text preprocessing or width expansion."
+tests = ["unicode_wrap_keeps_punctuation_with_its_text", "unicode_wrap_crosses_fragments_and_maps_inline_element_bytes", "unicode_wrap_preserves_words_and_mixed_script_opportunities", "unicode_mandatory_breaks_and_truncation_share_wrap_boundaries", "shaped_unicode_wrap_respects_punctuation_across_runs"]
+
 [framework_glass_profile]
 contract = "BackdropGlass::optical_bevel bounds requested dome depth by positive corner radii and half-extents before Metal, Direct3D and WGPU uniform packing. The optical slope vanishes before rounded arc normals collapse; square corners retain incident-face creases. No shader ABI change."
 tests = ["rounded_optical_profiles_flatten_before_the_arc_normal_collapses", "glass_corner_medial_axis_does_not_invent_a_specular_normal", "glass_menu_corner_does_not_concentrate_light_at_the_arc_centre"]

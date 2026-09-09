@@ -11,6 +11,7 @@ use std::{
     ops::Range,
     sync::Arc,
 };
+use unicode_linebreak::{BreakOpportunity, linebreaks};
 
 use super::LineWrapper;
 
@@ -143,7 +144,7 @@ impl LineLayout {
             glyph_ix: 0,
         };
         let mut last_boundary_x = px(0.);
-        let mut prev_ch = '\0';
+        let breaks = linebreaks(text).collect::<Vec<_>>();
         let mut glyphs = self
             .runs
             .iter()
@@ -156,6 +157,7 @@ impl LineLayout {
                         .expect("required framework invariant must hold");
                     (
                         WrapBoundary { run_ix, glyph_ix },
+                        glyph.index,
                         character,
                         glyph.position.x,
                     )
@@ -163,33 +165,31 @@ impl LineLayout {
             })
             .peekable();
 
-        while let Some((boundary, ch, x)) = glyphs.next() {
-            if ch == '\n' {
-                continue;
+        while let Some((boundary, index, ch, x)) = glyphs.next() {
+            // Match the unshaped wrapper's UAX #14 opportunities. Glyph runs
+            // may split a word; their boundaries are not line-break rules.
+            let opportunity = breaks
+                .binary_search_by_key(&index, |&(ix, _)| ix)
+                .ok()
+                .map(|ix| breaks[ix].1);
+            let mandatory = opportunity == Some(BreakOpportunity::Mandatory);
+            if opportunity.is_some() && first_non_whitespace_ix.is_some() {
+                last_candidate_ix = Some(boundary);
+                last_candidate_x = x;
             }
-
-            // Here is very similar to `LineWrapper::wrap_line` to determine text wrapping,
-            // but there are some differences, so we have to duplicate the code here.
-            if LineWrapper::is_word_char(ch) {
-                if prev_ch == ' ' && ch != ' ' && first_non_whitespace_ix.is_some() {
-                    last_candidate_ix = Some(boundary);
-                    last_candidate_x = x;
-                }
-            } else {
-                if ch != ' ' && first_non_whitespace_ix.is_some() {
-                    last_candidate_ix = Some(boundary);
-                    last_candidate_x = x;
-                }
-            }
-
-            if ch != ' ' && first_non_whitespace_ix.is_none() {
+            let line_ending = LineWrapper::is_line_ending(ch);
+            if !line_ending && ch != ' ' && first_non_whitespace_ix.is_none() {
                 first_non_whitespace_ix = Some(boundary);
             }
 
-            let next_x = glyphs.peek().map_or(self.width, |(_, _, x)| *x);
-            let width = next_x - last_boundary_x;
+            let next_x = glyphs.peek().map_or(self.width, |(_, _, _, x)| *x);
+            let width = if line_ending {
+                px(0.)
+            } else {
+                next_x - last_boundary_x
+            };
 
-            if width > wrap_width && boundary > last_boundary {
+            if (mandatory || width > wrap_width) && boundary > last_boundary {
                 // When used line_clamp, we should limit the number of lines.
                 if let Some(max_lines) = max_lines
                     && boundaries.len() >= max_lines.saturating_sub(1)
@@ -206,7 +206,6 @@ impl LineLayout {
                 }
                 boundaries.push(last_boundary);
             }
-            prev_ch = ch;
         }
 
         boundaries
@@ -1188,6 +1187,42 @@ mod tests {
                 glyphs,
             }],
             len: 0,
+        }
+    }
+
+    #[test]
+    fn shaped_unicode_wrap_respects_punctuation_across_runs() {
+        for (text, width, expected) in [
+            ("甲乙丙、丁", 30., vec![6]),
+            ("甲乙「丙丁", 30., vec![6]),
+            ("Hello world你好世界", 60., vec![6, 14]),
+            ("ab-cdef", 40., vec![3]),
+            ("甲\n\n乙", 100., vec![4, 5]),
+        ] {
+            let glyphs = text
+                .char_indices()
+                .enumerate()
+                .map(|(i, (index, _))| glyph_at(i as f32 * 10., index))
+                .collect::<Vec<_>>();
+            let mut layout = make_layout(glyphs[..2].to_vec());
+            layout.width = px(glyphs.len() as f32 * 10.);
+            layout.len = text.len();
+            layout.runs.push(ShapedRun {
+                font_id: FontId(1),
+                glyphs: glyphs[2..].to_vec(),
+            });
+            let boundaries = layout.compute_wrap_boundaries(text, px(width), None);
+            let indices = boundaries
+                .iter()
+                .map(|b| layout.runs[b.run_ix].glyphs[b.glyph_ix].index)
+                .collect::<Vec<_>>();
+            assert_eq!(indices, expected, "{text}");
+            assert_eq!(
+                layout
+                    .compute_wrap_boundaries(text, px(width), Some(1))
+                    .len(),
+                0
+            );
         }
     }
 

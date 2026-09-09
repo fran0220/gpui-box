@@ -427,7 +427,7 @@ Everything below this line is what truncation leaves out."#;
 
 pub(super) fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    stack(&theme)
+    let document = stack(&theme)
         .w(px(640.0))
         .child(Markdown::new("scene.markdown.document", SCENE_DOCUMENT).on_event(|_, _, _| {}))
         .child(
@@ -448,7 +448,15 @@ pub(super) fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
             Markdown::new("scene.markdown.short", SCENE_DOCUMENT)
                 .max_lines(4)
                 .on_event(|_, _, _| {}),
-        )
+        );
+    div().row().child(document).child(
+        stack(&theme).w(px(272.0))
+            .child(caption(&theme, "Unicode line breaks · CJK and Latin"))
+            .child(Markdown::new(
+                "scene.markdown.unicode-wrap",
+                "设计图通过后仍需运行、测量和批注；截图不能证明可玩。请检查「运行结果」（第12轮），然后比较 Hello world你好世界与 internationalization 2026-09。",
+            )),
+    )
         .into_any_element()
 }
 

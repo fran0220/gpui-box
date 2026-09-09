@@ -1122,3 +1122,28 @@ math from shadows. Run it on Metal or Linux/WGPU with:
 cargo test --manifest-path tools/headless-visual/Cargo.toml \
   clear_pill_dims_media_inside_a_clipped_card -- --nocapture
 ```
+
+## Unicode line breaks across text and inline objects
+
+Both `LineWrapper::wrap_line` and shaped `LineLayout` use the Unicode 15.0
+UAX #14 opportunities from the existing `unicode-linebreak` 0.1.5 package.
+Wrapped truncation obtains its line starts and continuation indentation from
+`wrap_line`, rather than keeping another word-character table. Single-line
+ellipsis fitting still measures characters; it does not choose word breaks.
+
+Text fragments are concatenated only for classification, with each inline
+element represented by U+FFFC. The width walk keeps separate normalized-text
+and original byte offsets, so an element's arbitrary `len_utf8` never shifts
+the returned caller indices. Shaped glyph runs query the same Unicode rules
+at their logical byte indices; a font/run boundary is not a break opportunity.
+Tests force overflowing closing punctuation and opening brackets, cross text
+and element boundaries, preserve Latin words and nonbreaking glue, exercise
+CJK/Latin mixing, and check mandatory breaks and ellipsis run lengths.
+
+Emergency character/item wrapping remains the fallback when no legal break
+fits: extremely narrow widths can still split an otherwise unbreakable unit.
+This is not punctuation hanging, width expansion, dictionary-based breaking
+for complex scripts, or a locale-tailored Japanese typography engine. The
+`markdown` exhibit includes a narrow mixed Chinese/Latin paragraph, rendered
+with the bundled Noto Sans SC fallback, to review punctuation and word wrapping
+in both themes without depending on system fonts.
