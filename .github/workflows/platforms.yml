@@ -127,7 +127,17 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force target/runtime-native | Out-Null
           Start-Transcript -Path target/runtime-native/check.log
+          $wfpStarted = $false
+          $wfpDirectory = Join-Path $PWD 'target/runtime-native/wfp'
+          New-Item -ItemType Directory -Force $wfpDirectory | Out-Null
           try {
+            $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+            $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+            if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'WFP evidence requires an elevated runner' }
+            # Capture only: do not change firewall rules, capabilities or exemptions.
+            netsh wfp capture start keywords=19 "file=$wfpDirectory/wfpdiag.cab"
+            if ($LASTEXITCODE -ne 0) { throw 'WFP capture start failed' }
+            $wfpStarted = $true
             $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
             $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
             if ($LASTEXITCODE -ne 0 -or -not $installation) { throw 'Visual C++ toolchain unavailable' }
@@ -146,14 +156,27 @@ jobs:
             npm --prefix tools/app-host run check
             if ($LASTEXITCODE -ne 0) { throw 'Native Windows runtime checks failed' }
           } finally {
-            Stop-Transcript
+            try {
+              if ($wfpStarted) {
+                netsh wfp capture stop
+                if ($LASTEXITCODE -ne 0) { throw 'WFP capture stop failed' }
+                $cab = Join-Path $wfpDirectory 'wfpdiag.cab'
+                if (!(Test-Path $cab)) { throw 'WFP capture produced no CAB' }
+                & expand.exe '-F:*' $cab $wfpDirectory
+                if ($LASTEXITCODE -ne 0) { throw 'WFP evidence extraction failed' }
+              }
+            } finally {
+              Stop-Transcript
+            }
           }
       - name: Retain native Windows sandbox diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: runtime-native-windows
-          path: target/runtime-native/*.log
+          path: |
+            target/runtime-native/*.log
+            target/runtime-native/wfp/
           if-no-files-found: warn
 
   native-macos:
