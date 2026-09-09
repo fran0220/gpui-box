@@ -849,3 +849,8 @@ Primary-first multiple selections, grouped replacement/history, rectangular
 painted hit testing, and nearest final-glyph caret correction are original
 GPUI Box framework/Kit work. Native IME retains one authoritative replacement
 range; no platform protocol or third-party source was changed.
+
+Retained synthetic accessibility leaves, revision-keyed text publication, and
+incrementally retained debug trees are original GPUI Box work using AccessKit's
+existing node-level TreeUpdate contract. No new dependency or upstream source
+was imported; local package authority and historical receipts remain intact.

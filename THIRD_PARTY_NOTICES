@@ -473,3 +473,6 @@ historical import receipt and upstream notices remain unchanged.
 
 Multiple selection transactions and final-glyph caret hit testing are original
 GPUI Box changes to the local framework, with no additional imported source.
+
+Retained AccessKit text publication and debug-tree accumulation are original
+GPUI Box modifications using the existing AccessKit dependency and license.

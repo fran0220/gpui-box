@@ -211,6 +211,9 @@ impl A11y {
     /// for more commentary.
     pub(crate) fn sync_active_flag(&mut self) {
         self.active_this_frame = !self.force_disabled && self.active_flag.load(Ordering::SeqCst);
+        if !self.active_this_frame {
+            self.nodes.published_ids.clear();
+        }
     }
 
     pub(crate) fn is_active(&self) -> bool {
@@ -294,6 +297,7 @@ impl A11y {
         let update = self.nodes.finalize();
         self.debug.capture(
             &update,
+            &self.nodes.seen_ids,
             self.nodes.focus,
             self.nodes.active_descendant,
             self.window_title.as_ref(),
@@ -301,6 +305,11 @@ impl A11y {
         );
         #[cfg(debug_assertions)]
         self.debug.capture_node_info(&self.nodes.node_info);
+        // Window discards a frame if accessibility became inactive while it
+        // was being built. Such a frame cannot authorize later retention.
+        if !self.active_this_frame {
+            self.nodes.published_ids.clear();
+        }
         update
     }
 
@@ -392,6 +401,19 @@ impl<'a> A11ySubtreeBuilder<'a> {
         pushed
     }
 
+    /// Keeps an unchanged synthetic leaf connected without retransmitting its
+    /// payload. Returns false when it was not published in the preceding
+    /// active frame; the caller must then provide a complete node with
+    /// `push_child`. Never use this for a node whose clipped geometry or
+    /// properties changed. Removed nodes must be republished on reattachment.
+    pub fn retain_child(&mut self, id: NodeId) -> bool {
+        if !self.nodes.published_ids.contains(&id) || !self.nodes.can_push(id) {
+            return false;
+        }
+        self.nodes.append_child(id);
+        true
+    }
+
     /// A mutable reference to the parent node.
     pub fn parent_node(&mut self) -> &mut accesskit::Node {
         self.nodes
@@ -434,6 +456,7 @@ pub(crate) struct A11yNodeBuilder {
     /// `HashMap<NodeId, Node>` to remove the need for `seen_ids`
     all_nodes: Vec<(NodeId, accesskit::Node)>,
     seen_ids: FxHashSet<NodeId>,
+    published_ids: FxHashSet<NodeId>,
     /// Role-bearing element identities present in this frame. A local
     /// [`ElementId`] is accepted only when it resolves to exactly one node in
     /// the active window, which is what lets deferred overlays refer back to
@@ -461,6 +484,7 @@ impl A11yNodeBuilder {
             current_reservation: None,
             all_nodes: Vec::new(),
             seen_ids: FxHashSet::default(),
+            published_ids: FxHashSet::default(),
             relationship_nodes: FxHashMap::default(),
             relationships: Vec::new(),
             focus: None,
@@ -728,7 +752,9 @@ impl A11yNodeBuilder {
             focus,
         };
 
-        Self::repair_tree_update(update)
+        let update = Self::repair_tree_update(update, &self.seen_ids);
+        self.published_ids.clone_from(&self.seen_ids);
+        update
     }
 
     fn resolve_deferred_children(&mut self) {
@@ -861,11 +887,11 @@ impl A11yNodeBuilder {
 
     /// Accesskit panics on invalid [`TreeUpdate`]s. This function defensively
     /// checks invariants that accesskit panics on, and tries to fix them.
-    fn repair_tree_update(mut update: TreeUpdate) -> TreeUpdate {
-        let node_ids: FxHashSet<NodeId> = update.nodes.iter().map(|(id, _)| *id).collect();
+    fn repair_tree_update(mut update: TreeUpdate, live_ids: &FxHashSet<NodeId>) -> TreeUpdate {
+        let contains = |id: &NodeId| *id == ROOT_NODE_ID || live_ids.contains(id);
 
         // Focus must point to a node in the tree.
-        if !node_ids.contains(&update.focus) {
+        if !contains(&update.focus) {
             log::error!(
                 "a11y: Focused node {:?} is not in the tree ({} nodes). \
                  Falling back to root. This is a bug in the a11y tree builder.",
@@ -877,15 +903,12 @@ impl A11yNodeBuilder {
 
         // Every child reference must point to a node in the update.
         for (id, node) in &mut update.nodes {
-            let has_invalid_child = node
-                .children()
-                .iter()
-                .any(|child_id| !node_ids.contains(child_id));
+            let has_invalid_child = node.children().iter().any(|child_id| !contains(child_id));
             if has_invalid_child {
                 let children = node.children();
                 let invalid_count = children
                     .iter()
-                    .filter(|child_id| !node_ids.contains(child_id))
+                    .filter(|child_id| !contains(child_id))
                     .count();
                 log::error!(
                     "a11y: Node {:?} references {} children not present in the tree. \
@@ -896,7 +919,7 @@ impl A11yNodeBuilder {
                 let valid: Vec<NodeId> = children
                     .iter()
                     .copied()
-                    .filter(|child_id| node_ids.contains(child_id))
+                    .filter(|child_id| contains(child_id))
                     .collect();
                 node.set_children(valid);
             }
@@ -905,7 +928,7 @@ impl A11yNodeBuilder {
                 .labelled_by()
                 .iter()
                 .copied()
-                .filter(|related| node_ids.contains(related))
+                .filter(|related| contains(related))
                 .collect();
             if valid_labelled_by.len() != node.labelled_by().len() {
                 log::error!(
@@ -924,7 +947,7 @@ impl A11yNodeBuilder {
                 .described_by()
                 .iter()
                 .copied()
-                .filter(|related| node_ids.contains(related))
+                .filter(|related| contains(related))
                 .collect();
             if valid_described_by.len() != node.described_by().len() {
                 log::error!(
@@ -978,8 +1001,127 @@ mod tests {
 
     fn new_a11y() -> A11y {
         let mut a11y = A11y::new(Arc::new(AtomicBool::new(true)), false, None);
+        a11y.sync_active_flag();
         a11y.begin_frame();
         a11y
+    }
+
+    #[test]
+    fn dropped_inactive_frame_cannot_authorize_retention() {
+        let mut a11y = new_a11y();
+        assert!(a11y.nodes.push_leaf(NodeId(42), test_node()));
+        a11y.active_flag
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        a11y.sync_active_flag();
+        a11y.end_frame(super::debug::FrameDebugInfo::default());
+        assert!(a11y.nodes.published_ids.is_empty());
+        a11y.active_flag
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        a11y.sync_active_flag();
+        a11y.begin_frame();
+        let mut builder = A11ySubtreeBuilder::new(ROOT_NODE_ID, &mut a11y.nodes);
+        assert!(!builder.retain_child(NodeId(42)));
+        assert!(builder.push_child(NodeId(42), test_node()));
+        assert_eq!(
+            a11y.end_frame(super::debug::FrameDebugInfo::default())
+                .nodes
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn retained_text_preserves_complete_tree_and_bounds_publication_work() {
+        for count in [1000, 10000] {
+            let row = "{\"asymmetric\":\"界\",\"value\":13},\n";
+            let text = format!("[\n{}{{\"tail\":7}}\n]", row.repeat(count));
+            let mut offset = 0;
+            let rows: Vec<_> = text
+                .split_inclusive('\n')
+                .map(|line| {
+                    let range = offset..offset + line.len();
+                    offset = range.end;
+                    range
+                })
+                .collect();
+            let mut a11y = new_a11y();
+            let mut cache = crate::AccessibleTextCache::default();
+            let mut former_leaf = None;
+            for frame in 0..3 {
+                a11y.begin_frame();
+                assert!(
+                    a11y.nodes
+                        .push(NodeId(1), accesskit::Node::new(Role::MultilineTextInput))
+                );
+                let visible = if frame == 0 {
+                    0..2 + row.len() * 8
+                } else {
+                    2 + row.len() * 30..2 + row.len() * 38
+                };
+                let cells = std::cell::Cell::new(0);
+                {
+                    let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes);
+                    assert!(
+                        cache
+                            .publish(
+                                &mut builder,
+                                &text,
+                                0,
+                                text.len(),
+                                accesskit::TextDirection::LeftToRight,
+                                &rows,
+                                1,
+                                visible.clone(),
+                                1.0,
+                                |range| {
+                                    cells.set(cells.get() + 1);
+                                    if range.start < visible.end && range.end > visible.start {
+                                        vec![crate::Bounds::new(
+                                            crate::point(crate::px(4.0), crate::px(7.0)),
+                                            crate::size(crate::px(9.0), crate::px(13.0)),
+                                        )]
+                                    } else {
+                                        Vec::new()
+                                    }
+                                }
+                            )
+                            .is_some()
+                    );
+                }
+                a11y.nodes.pop();
+                let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+                let text_nodes: Vec<_> = update
+                    .nodes
+                    .iter()
+                    .filter(|(_, node)| node.role() == Role::TextRun)
+                    .collect();
+                assert!(cells.get() <= 9 * row.len());
+                if frame == 0 {
+                    assert_eq!(text_nodes.len(), count + 3);
+                } else {
+                    assert!(text_nodes.len() <= 17, "{}", text_nodes.len());
+                }
+                let parent = update
+                    .nodes
+                    .iter()
+                    .find(|(id, _)| *id == NodeId(1))
+                    .expect("parent");
+                assert_eq!(parent.1.children().len(), count + 3);
+                let selection = parent.1.text_selection().expect("selection");
+                former_leaf = Some(selection.focus.node);
+                assert!(a11y.nodes.published_ids.contains(&selection.anchor.node));
+                assert!(a11y.nodes.published_ids.contains(&selection.focus.node));
+                let dump = a11y.debug_tree_json().expect("complete debug tree");
+                assert_eq!(dump.matches("asymmetric").count(), count);
+            }
+            // A disconnected leaf is not retained across reattachment.
+            a11y.begin_frame();
+            a11y.end_frame(super::debug::FrameDebugInfo::default());
+            a11y.begin_frame();
+            assert!(a11y.nodes.push(NodeId(1), test_node()));
+            let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes);
+            assert!(!builder.retain_child(former_leaf.expect("previously connected leaf")));
+        }
     }
 
     #[test]

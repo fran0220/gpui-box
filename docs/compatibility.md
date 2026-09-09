@@ -561,3 +561,19 @@ clears secondary carets during composition, and restores the previous set on
 undo. Accessibility selection continues to describe the primary native caret.
 Final-glyph hit testing now chooses the nearest start/end caret, including
 multibyte single-glyph lines, instead of always choosing end-of-line.
+
+`A11ySubtreeBuilder::retain_child` retains unchanged synthetic leaves only
+while they remain connected across active frames. A removed or inactive-frame
+leaf must be fully published before reuse; unchanged ids do not imply a live
+platform node. `AccessibleTextCache` uses this contract for TextArea logical
+runs. It rebuilds text segmentation on revision, row, or direction changes;
+scrolling refreshes current and former viewport geometry, retaining offscreen
+text payloads. Debug accessibility dumps accumulate incremental updates into
+the complete tree rather than exposing only the latest delta.
+
+This bounds text-run payload publication on scroll, not every frame operation:
+parent child-id lists and live-id bookkeeping still scale with run count, and
+a text revision still invalidates the logical cache. Compatibility whole-value
+events and semantic values remain separate allocation work. Platform-independent
+tests cover complete 1,000/10,000-row content, distant select-all endpoints,
+bounded viewport cell queries, removal/reattachment and mid-frame deactivation.

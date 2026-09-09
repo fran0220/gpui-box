@@ -26,7 +26,7 @@ pub(crate) use gpui::{
 /// the same geometry without cloning or independently reshaping the layout.
 pub(crate) struct AccessibleTextGeometry {
     source: SharedString,
-    scale_factor: f32,
+    pub(crate) scale_factor: f32,
     graphemes: HashMap<(usize, usize), Vec<Bounds<Pixels>>>,
 }
 
@@ -69,11 +69,25 @@ impl AccessibleTextGeometry {
         }
     }
 
-    fn matches(&self, source: &str) -> bool {
+    pub(crate) fn matches(&self, source: &str) -> bool {
         self.source.as_ref() == source
     }
 
-    fn bounds_for_range(&self, range: Range<usize>) -> Vec<Bounds<Pixels>> {
+    pub(crate) fn visible_range(&self) -> Range<usize> {
+        self.graphemes
+            .keys()
+            .map(|(start, _)| *start)
+            .min()
+            .unwrap_or(0)
+            ..self
+                .graphemes
+                .keys()
+                .map(|(_, end)| *end)
+                .max()
+                .unwrap_or(0)
+    }
+
+    pub(crate) fn bounds_for_range(&self, range: Range<usize>) -> Vec<Bounds<Pixels>> {
         self.graphemes
             .get(&(range.start, range.end))
             .cloned()

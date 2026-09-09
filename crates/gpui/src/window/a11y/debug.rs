@@ -6,7 +6,7 @@
 //! we capture extra info.
 
 use accesskit::{Action, NodeId, TreeUpdate};
-use collections::FxHashMap;
+use collections::{FxHashMap, FxHashSet};
 
 use crate::{Pixels, SharedString, Size};
 
@@ -56,6 +56,7 @@ pub(crate) struct NodeCreator {
 #[derive(Default)]
 pub(crate) struct A11yDebug {
     last_tree_update: Option<TreeUpdate>,
+    node_indices: FxHashMap<NodeId, usize>,
     last_gpui_focus: Option<NodeId>,
     last_active_descendant: Option<NodeId>,
     /// Monotonic counter incremented on each captured frame, so a re-dump makes
@@ -71,12 +72,39 @@ impl A11yDebug {
     pub(crate) fn capture(
         &mut self,
         update: &TreeUpdate,
+        live_ids: &FxHashSet<NodeId>,
         gpui_focus: Option<NodeId>,
         active_descendant: Option<NodeId>,
         window_title: Option<&SharedString>,
         frame: FrameDebugInfo,
     ) {
-        self.last_tree_update = Some(update.clone());
+        if let Some(previous) = self.last_tree_update.as_mut() {
+            previous
+                .nodes
+                .retain(|(id, _)| *id == super::ROOT_NODE_ID || live_ids.contains(id));
+            self.node_indices.clear();
+            self.node_indices.extend(
+                previous
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (id, _))| (*id, index)),
+            );
+            for (id, node) in &update.nodes {
+                if let Some(index) = self.node_indices.get(id) {
+                    previous.nodes[*index].1 = node.clone();
+                } else {
+                    self.node_indices.insert(*id, previous.nodes.len());
+                    previous.nodes.push((*id, node.clone()));
+                }
+            }
+            previous.focus = update.focus;
+            previous.tree.clone_from(&update.tree);
+        } else {
+            self.last_tree_update = Some(update.clone());
+        }
+        #[cfg(debug_assertions)]
+        self.last_node_info.retain(|id, _| live_ids.contains(id));
         self.last_gpui_focus = gpui_focus;
         self.last_active_descendant = active_descendant;
         self.frame_number += 1;
@@ -84,7 +112,10 @@ impl A11yDebug {
             rendered_at: chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
             frame_number: self.frame_number,
             window_title: window_title.cloned(),
-            node_count: update.nodes.len(),
+            node_count: self
+                .last_tree_update
+                .as_ref()
+                .map_or(0, |tree| tree.nodes.len()),
             tab_stop_count: frame.tab_stop_count,
             viewport_size: frame.viewport_size,
             scale_factor: frame.scale_factor,
@@ -93,7 +124,8 @@ impl A11yDebug {
 
     #[cfg(debug_assertions)]
     pub(crate) fn capture_node_info(&mut self, node_info: &FxHashMap<NodeId, NodeDebugInfo>) {
-        self.last_node_info = node_info.clone();
+        self.last_node_info
+            .extend(node_info.iter().map(|(id, info)| (*id, info.clone())));
     }
 
     /// Serialize the last tree update to a readable JSON string. Node ids are

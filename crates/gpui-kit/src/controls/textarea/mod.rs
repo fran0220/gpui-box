@@ -492,6 +492,7 @@ pub struct TextArea {
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
+    accessible_cache: Arc<Mutex<gpui::AccessibleTextCache>>,
     /// Held so the focus listeners live as long as the area does.
     _subscriptions: Vec<Subscription>,
 }
@@ -554,6 +555,7 @@ impl TextArea {
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
             accessible_geometry: Arc::default(),
+            accessible_cache: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -2123,6 +2125,7 @@ impl Render for TextArea {
         };
         let accessible_snapshot = self.accessible_snapshot.clone();
         let accessible_geometry = self.accessible_geometry.clone();
+        let accessible_cache = self.accessible_cache.clone();
         let selection_representable = text_edit::accessible_text_is_representable(&content);
         let accessible_rows = self.accessible_rows();
         let accessibility_revision = self.accessibility_revision;
@@ -2230,16 +2233,28 @@ impl Render for TextArea {
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
                         .take();
-                    let snapshot = text_edit::publish_accessible_text(
-                        builder,
-                        &content,
-                        anchor,
-                        focus,
-                        accessible_direction,
-                        &accessible_rows,
-                        accessibility_revision,
-                        geometry.as_ref(),
-                    );
+                    let geometry = geometry
+                        .as_ref()
+                        .filter(|geometry| geometry.matches(&content));
+                    let snapshot = accessible_cache
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .publish(
+                            builder,
+                            &content,
+                            anchor,
+                            focus,
+                            accessible_direction,
+                            &accessible_rows,
+                            accessibility_revision,
+                            geometry.map_or(0..0, |geometry| geometry.visible_range()),
+                            geometry.map_or(1.0, |geometry| geometry.scale_factor),
+                            |range| {
+                                geometry.map_or_else(Vec::new, |geometry| {
+                                    geometry.bounds_for_range(range)
+                                })
+                            },
+                        );
                     *accessible_snapshot
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner()) = snapshot;
