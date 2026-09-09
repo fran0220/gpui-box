@@ -150,6 +150,36 @@ impl Dialog {
         cx.notify();
     }
 
+    /// Replaces the per-frame body factory without reopening the modal.
+    /// `None` removes the body; focus and modal-stack membership are retained.
+    pub fn set_content(&mut self, content: Option<Body>, cx: &mut Context<Self>) {
+        self.body = content;
+        cx.notify();
+    }
+
+    pub fn set_confirm_label(&mut self, label: Option<SharedString>, cx: &mut Context<Self>) {
+        self.confirm_label = label;
+        cx.notify();
+    }
+
+    pub fn set_cancel_label(&mut self, label: Option<SharedString>, cx: &mut Context<Self>) {
+        self.cancel_label = label;
+        cx.notify();
+    }
+
+    /// Changes user dismissal policy without closing the modal.
+    pub fn set_dismissable(&mut self, dismissable: bool, cx: &mut Context<Self>) {
+        self.dismissable = dismissable;
+        cx.notify();
+    }
+
+    /// Changes action styling without moving focus. Initial focus policy is
+    /// applied only when the dialog is next opened.
+    pub fn set_destructive(&mut self, destructive: bool, cx: &mut Context<Self>) {
+        self.destructive = destructive;
+        cx.notify();
+    }
+
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.open {
             return;
@@ -320,6 +350,14 @@ impl Render for Dialog {
         if self.trap.stops().is_empty() {
             self.trap.register(self.focus_handle.clone());
         }
+        // A retained option update can remove the action currently holding
+        // focus. Keep keyboard input inside this modal instead of leaving a
+        // now-unmounted action handle focused.
+        if (self.cancel_label.is_none() && self.cancel_focus.is_focused(window))
+            || (self.confirm_label.is_none() && self.confirm_focus.is_focused(window))
+        {
+            self.pending_focus = true;
+        }
         if self.pending_focus {
             // The handle can only take focus once this frame has put it in the
             // dispatch tree, which is why opening only records the intent.
@@ -381,5 +419,97 @@ impl Render for Dialog {
             });
         }
         overlay.into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod retained_options_tests {
+    use super::*;
+    use gpui::{AppContext as _, TestAppContext};
+    use gpui_kit_testkit::harness::Harness;
+    use std::cell::RefCell;
+
+    #[gpui::test]
+    fn dialog_options_change_while_open_without_reopening(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        Dialog::new("retained.dialog", window, cx)
+                            .title("Original")
+                            .confirm_label("Confirm")
+                            .cancel_label("Cancel")
+                    })
+                })
+                .clone()
+                .into_any_element()
+        });
+        let dialog = slot.borrow().clone().expect("dialog built");
+        harness.update(|window, cx| dialog.update(cx, |dialog, cx| dialog.open(window, cx)));
+        harness.frame();
+        harness.update(|window, cx| {
+            dialog.update(cx, |dialog, cx| {
+                let focus = window.focused(cx);
+                dialog.set_title("Updated", cx);
+                dialog.set_description(Some("Current description".into()), cx);
+                dialog.set_content(
+                    Some(Rc::new(|_, _| {
+                        Button::new("retained.body")
+                            .label("Fresh body")
+                            .into_any_element()
+                    })),
+                    cx,
+                );
+                dialog.set_confirm_label(Some("Apply".into()), cx);
+                dialog.set_cancel_label(Some("Back".into()), cx);
+                dialog.set_destructive(true, cx);
+                dialog.set_dismissable(false, cx);
+                assert!(dialog.is_open());
+                assert_eq!(window.focused(cx), focus);
+            })
+        });
+        harness.frame();
+        assert!(harness.node("retained.body").is_some());
+        assert_eq!(
+            harness
+                .node("retained.dialog.confirm")
+                .expect("confirm")
+                .text
+                .as_deref(),
+            Some("Apply")
+        );
+        harness.keystrokes("escape");
+        harness.update(|window, cx| {
+            dialog.update(cx, |dialog, cx| {
+                assert!(dialog.is_open(), "dismissal policy takes effect while open");
+                dialog.close(window, cx);
+                dialog.open(window, cx);
+            })
+        });
+        harness.frame();
+        assert!(
+            harness.node("retained.body").is_some(),
+            "body factory must survive reopen"
+        );
+        harness.update(|_, cx| {
+            dialog.update(cx, |dialog, cx| {
+                dialog.set_content(None, cx);
+                dialog.set_description(None, cx);
+                dialog.set_confirm_label(None, cx);
+                dialog.set_cancel_label(None, cx);
+            })
+        });
+        harness.frame();
+        assert!(harness.node("retained.body").is_none());
+        assert!(harness.node("retained.dialog.confirm").is_none());
+        harness.update(|window, cx| {
+            assert!(
+                dialog.read(cx).focus_handle.is_focused(window),
+                "removing the focused action keeps focus inside the modal"
+            );
+        });
     }
 }

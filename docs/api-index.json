@@ -1654,6 +1654,11 @@
       "commands": [
         "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_description(description: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Body>, cx: &mut Context<Self>)",
+        "set_confirm_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_cancel_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+        "set_destructive(destructive: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "confirm(window: &mut Window, cx: &mut Context<Self>)",
@@ -3736,6 +3741,12 @@
         "dismissable(dismissable: bool) -> Self"
       ],
       "commands": [
+        "set_trigger(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_trigger_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_content(content: Option<Content>, cx: &mut Context<Self>)",
+        "set_placement(placement: Placement, cx: &mut Context<Self>)",
+        "set_hang(hang: Hang, cx: &mut Context<Self>)",
+        "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
         "toggle(window: &mut Window, cx: &mut Context<Self>)",

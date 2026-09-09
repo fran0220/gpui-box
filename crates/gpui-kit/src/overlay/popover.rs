@@ -584,7 +584,7 @@ pub enum PopoverEvent {
 impl EventEmitter<PopoverEvent> for Popover {}
 
 /// Builds the popover body for one frame.
-type Content = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+pub type Content = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// A surface anchored to a trigger, holding whatever the caller puts in it.
 ///
@@ -686,6 +686,40 @@ impl Popover {
     pub fn dismissable(mut self, dismissable: bool) -> Self {
         self.dismissable = dismissable;
         self
+    }
+
+    /// Changes the trigger without replacing its focus handle or open surface.
+    pub fn set_trigger(&mut self, label: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.trigger = label.into();
+        cx.notify();
+    }
+
+    pub fn set_trigger_icon(&mut self, icon: Option<Icon>, cx: &mut Context<Self>) {
+        self.trigger_icon = icon;
+        cx.notify();
+    }
+
+    /// Replaces the per-frame body factory; `None` removes the body.
+    /// Open state, animation, and the current focus are retained.
+    pub fn set_content(&mut self, content: Option<Content>, cx: &mut Context<Self>) {
+        self.content = content;
+        cx.notify();
+    }
+
+    pub fn set_placement(&mut self, placement: Placement, cx: &mut Context<Self>) {
+        self.placement = placement;
+        cx.notify();
+    }
+
+    pub fn set_hang(&mut self, hang: Hang, cx: &mut Context<Self>) {
+        self.hang = hang;
+        cx.notify();
+    }
+
+    /// Changes user dismissal policy without opening or closing the surface.
+    pub fn set_dismissable(&mut self, dismissable: bool, cx: &mut Context<Self>) {
+        self.dismissable = dismissable;
+        cx.notify();
     }
 
     /// True while the surface is here or on its way here.
@@ -958,5 +992,74 @@ mod tests {
         assert_eq!(typed_letter("s", none), Some('s'));
         assert_eq!(typed_letter("escape", none), None);
         assert_eq!(typed_letter("s", gpui::Modifiers::command()), None);
+    }
+}
+
+#[cfg(test)]
+mod retained_options_tests {
+    use super::*;
+    use gpui::TestAppContext;
+    use gpui_kit_testkit::harness::Harness;
+    use std::cell::RefCell;
+
+    #[gpui::test]
+    fn popover_options_retain_open_focus_and_rebuild_body(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| Popover::new("retained.popover", window, cx).trigger("Open"))
+                })
+                .clone()
+                .into_any_element()
+        });
+        let popover = slot.borrow().clone().expect("popover built");
+        harness.click("retained.popover.trigger");
+        harness.update(|window, cx| {
+            popover.update(cx, |popover, cx| {
+                let focus = window.focused(cx);
+                assert!(popover.is_open());
+                popover.set_trigger("Updated trigger", cx);
+                popover.set_trigger_icon(None, cx);
+                popover.set_placement(Placement::Above, cx);
+                popover.set_hang(Hang::End, cx);
+                popover.set_dismissable(false, cx);
+                popover.set_content(
+                    Some(Rc::new(|_, _| {
+                        Button::new("retained.popover.body")
+                            .label("Fresh")
+                            .into_any_element()
+                    })),
+                    cx,
+                );
+                assert_eq!(window.focused(cx), focus);
+                assert!(popover.is_open());
+            })
+        });
+        harness.frame();
+        assert!(harness.node("retained.popover.body").is_some());
+        assert_eq!(
+            harness
+                .node("retained.popover.trigger")
+                .expect("trigger")
+                .text
+                .as_deref(),
+            Some("Updated trigger")
+        );
+        harness.keystrokes("escape");
+        harness.update(|window, cx| {
+            popover.update(cx, |popover, cx| {
+                assert!(popover.is_open());
+                popover.close(window, cx);
+                popover.open(window, cx);
+            })
+        });
+        harness.frame();
+        assert!(harness.node("retained.popover.body").is_some());
+        harness.update(|_, cx| popover.update(cx, |popover, cx| popover.set_content(None, cx)));
+        harness.frame();
+        assert!(harness.node("retained.popover.body").is_none());
     }
 }
