@@ -11,11 +11,13 @@ packages=(
   pkg-config
   libfontconfig1-dev
   libwayland-dev
+  libwebkit2gtk-4.1-dev
   libx11-xcb-dev
   libxkbcommon-x11-dev
   libvulkan1
   musl-tools
   xauth
+  xdotool
   xvfb
 )
 missing_packages=()

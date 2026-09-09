@@ -13,7 +13,7 @@ pub struct PlatformView {
 }
 
 /// Hosts a native platform view — an `NSView` on macOS or a child `HWND` on
-/// Windows — inside the window, at the bounds this element is laid out at.
+/// Windows or an X11 child on Linux — at the bounds this element is laid out at.
 ///
 /// The element itself paints nothing. Size it the way you would size any other
 /// element; GPUI owns the native view's frame from then on and repositions it
@@ -25,7 +25,10 @@ pub struct PlatformView {
 /// The hosted view is ordered above GPUI's root scene. Content drawn on that
 /// same base surface does not composite over the native view. When the window's
 /// scene overlay is enabled, deferred and window-level overlay content is drawn
-/// on a separate surface above hosted views.
+/// on a separate surface above hosted views on macOS and Windows. X11 has no
+/// scene overlay above native children; hide the child before showing a GPUI
+/// overlay in its area. Rotation, scale, rounded masks and opacity are not
+/// native-child composition operations and must not be applied to this element.
 ///
 /// # Clipping
 ///
@@ -36,8 +39,9 @@ pub struct PlatformView {
 ///
 /// # Platforms
 ///
-/// macOS and Windows host native views. Elsewhere the element still lays out,
-/// reserves space, and does not host a view.
+/// macOS, Windows and Linux X11 host native views. Native Wayland and headless
+/// backends reserve layout space only. Hosts must reject unsupported backends
+/// before constructing a native child rather than present empty space as success.
 pub fn platform_view(handle: PlatformViewHandle) -> PlatformView {
     PlatformView {
         handle,

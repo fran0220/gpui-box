@@ -79,7 +79,7 @@ jobs:
           PY
           echo "release_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install Linux GPUI libraries
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libwebkit2gtk-4.1-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
@@ -244,7 +244,7 @@ jobs:
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - name: Install Linux GPUI libraries
         if: ${{ inputs.version != '0.1.0' && runner.os == 'Linux' }}
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libwebkit2gtk-4.1-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1 }
       - name: Install cargo-semver-checks

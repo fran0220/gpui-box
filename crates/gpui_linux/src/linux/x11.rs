@@ -2,6 +2,8 @@ mod client;
 mod clipboard;
 mod display;
 mod event;
+#[cfg(target_os = "linux")]
+mod platform_view;
 mod window;
 mod xim_handler;
 

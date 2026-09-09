@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Native engine fixture</title>
+<style>
+body { margin: 0; padding: 32px; font: 17px system-ui; background: #f2f7fc; color: #192e42; }
+h1 { font-size: 32px; margin: 0 0 8px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 24px 0; }
+.card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 5px 20px #19384b15; }
+.gradient { background: linear-gradient(135deg, #154d78, #308879); color: white; }
+button, input { font: inherit; padding: 10px 14px; border: 1px solid #9dafbf; border-radius: 8px; }
+button { cursor: pointer; background: #fff; }
+output { display: block; margin-top: 20px; }
+</style>
+<h1>HTML &amp; CSS, rendered by the native browser</h1>
+<p>Explicit test fixture • WebKitGTK / WKWebView / WebView2</p>
+<div class="cards"><div class="card gradient">CSS Grid<br>Gradient &amp; rounded corners</div><div class="card">Native text selection<br>Keyboard &amp; IME</div><div class="card">Separate engine process<br>No privileged script bridge</div></div>
+<label>Type here <input id="editor" placeholder="中文 · 日本語 · English"></label>
+<p><button id="message">Send untrusted message</button> <button id="popup">Request popup</button> <a href="https://example.com">Navigate</a></p>
+<output id="result">Ready for interaction</output>
+<script>
+document.querySelector('#message').onclick = () => { window.ipc.postMessage('fixture-message'); document.querySelector('#result').textContent = 'Message sent as untrusted data'; };
+document.querySelector('#popup').onclick = () => window.open('https://example.com');
+window.addEventListener('load', () => window.ipc.postMessage(JSON.stringify({fixture: 'ready', grid: getComputedStyle(document.querySelector('.cards')).display, width: innerWidth, height: innerHeight})));
+</script></html>

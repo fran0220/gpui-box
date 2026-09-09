@@ -796,3 +796,23 @@ language server, workspace, process, or grammar download is owned by Kit.
 The framework's borrowed byte-range iterator is product-neutral and does not
 change platform input or renderer behavior. The frozen import receipt and
 both workspaces' sole local GPUI authority remain unchanged.
+
+### X11 native platform views
+
+The X11 child/clip-window attachment, full-viewport toolkit allocation callback,
+native hit-testing/stacking tests and lifetime restoration are original GPUI Box
+framework work. They extend the existing macOS/Windows platform-view contract;
+no Zed source synchronization or framework Git dependency is introduced. The
+historical import receipt is unchanged. Native Wayland embedding and X11 scene
+overlays above native children are not implemented; see docs/webview.md.
+
+### Native browser engines
+
+`gpui-box-webview` uses the published Wry 0.57.0 API (Apache-2.0 OR MIT),
+release tag `wry-v0.57.0`, commit `792d0359ba6501a4fc360ece17de2ae42329a47c`
+in https://github.com/tauri-apps/wry. The wrapper, GTK allocation adapter,
+WebView2 error subscription and WK delegate forwarding are original GPUI Box
+integration, not copied Wry source. WKWebView, WebView2 and WebKitGTK retain
+their operating-system/distribution engine authority. Cargo.lock records the
+exact crates.io dependency checksums. No framework Git source, patch override,
+or update to the frozen historical import is introduced.

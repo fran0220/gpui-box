@@ -261,17 +261,17 @@ mod handle {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    /// An inert stand-in for a natively hosted view.
-    ///
-    /// This stub exists so cross-platform code that mentions
-    /// [`PlatformViewHandle`] still compiles; it does not refer to or host a
-    /// native view. Painting the [`crate::platform_view`] element with one only
-    /// reserves layout space.
+    /// A caller-owned X11 child on Linux, or an inert layout-only handle.
+    /// Native Wayland and headless backends do not host native children.
     #[derive(Clone)]
     pub struct PlatformViewHandle {
         id: PlatformViewId,
         lifetime: PlatformViewLifetime,
         clip_bounds: Option<Bounds<Pixels>>,
+        #[cfg(target_os = "linux")]
+        x11_window: Option<u32>,
+        #[cfg(target_os = "linux")]
+        x11_resize: Option<Rc<dyn Fn(crate::Size<crate::DevicePixels>)>>,
     }
 
     impl Default for PlatformViewHandle {
@@ -285,10 +285,61 @@ mod handle {
         pub fn inert() -> Self {
             static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
             Self {
-                id: PlatformViewId(NEXT_ID.fetch_add(1, Ordering::Relaxed)),
+                id: PlatformViewId((NEXT_ID.fetch_add(1, Ordering::Relaxed) << 1) | 1),
                 lifetime: PlatformViewLifetime::default(),
                 clip_bounds: None,
+                #[cfg(target_os = "linux")]
+                x11_window: None,
+                #[cfg(target_os = "linux")]
+                x11_resize: None,
             }
+        }
+
+        /// Wraps a caller-owned X11 child window. Only the X11 backend hosts it;
+        /// native Wayland and headless windows cannot embed X11 children.
+        ///
+        /// # Safety
+        /// The nonzero XID must name a live InputOutput window on the same X
+        /// server as its GPUI host. The caller must keep it alive (normally via
+        /// `keep_alive`) until the final handle drops. All use is on the UI thread.
+        #[cfg(target_os = "linux")]
+        pub unsafe fn from_x11_window(window: u32) -> Self {
+            assert_ne!(window, 0);
+            Self {
+                id: PlatformViewId((window as usize) << 1),
+                lifetime: PlatformViewLifetime::default(),
+                clip_bounds: None,
+                x11_window: Some(window),
+                x11_resize: None,
+            }
+        }
+
+        /// Installs toolkit allocation after native X11 geometry is applied.
+        /// Some foreign-window toolkits do not allocate descendants in response
+        /// to ConfigureNotify alone. The callback receives the full viewport in
+        /// physical pixels, never its clipped size. It must not reposition the
+        /// native window or reenter GPUI; GPUI owns geometry and clipping.
+        #[cfg(target_os = "linux")]
+        pub fn with_x11_resize_handler(
+            mut self,
+            handler: impl Fn(crate::Size<crate::DevicePixels>) + 'static,
+        ) -> Self {
+            self.x11_resize = Some(Rc::new(handler));
+            self
+        }
+
+        /// Called by the X11 platform host after applying native geometry.
+        #[cfg(target_os = "linux")]
+        pub fn notify_x11_resize(&self, size: crate::Size<crate::DevicePixels>) {
+            if let Some(handler) = &self.x11_resize {
+                handler(size);
+            }
+        }
+
+        /// Returns the native XID, or `None` for an inert handle.
+        #[cfg(target_os = "linux")]
+        pub fn as_x11_window(&self) -> Option<u32> {
+            self.x11_window
         }
 
         /// Keeps caller-owned state alive for the same lifetime cross-platform

@@ -118,3 +118,7 @@ limitations = ["count-only surfaces cannot infer insertion or reorder identity; 
 contract = "Optional syntax feature: Tree-sitter 0.25.10 with bundled JSON 0.24.8; borrowed EditSnapshot byte chunks, exact revisioned UTF-8 InputEdit transitions, viewport highlight queries, caller highlight precedence. No LSP transport, grammar download, process, or workspace ownership."
 tests = ["incremental_json_edits_use_utf8_points_and_match_a_fresh_parse", "a_large_json_edit_reuses_the_tree_and_queries_only_the_requested_region", "grammar_errors_and_invalid_queries_are_reported", "syntax_tracks_real_area_edits_and_reports_parse_errors"]
 limitations = ["synchronous parsing", "parser internal work is not measured by borrowed input counters", "only JSON grammar bundled", "native macOS and Windows parser evidence awaits platform lane"]
+
+[framework_x11_platform_view]
+contract = "Linux X11 (including XWayland) hosts caller-owned native child XIDs in rectangular clip windows; full viewport allocation, physical-pixel resize, native input crop, paint-order stacking and detach/lifetime restoration are supported. Native Wayland, GPU transforms, rounded masks and X11 GPUI scene overlays above native children are not supported."
+commands = ["xvfb-run cargo test -p gpui-box-linux x11_native_children -- --ignored", "cargo test -p gpui-box platform_view --features test-support"]

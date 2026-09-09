@@ -129,6 +129,19 @@ Scope: optional incremental editor parsing and bundled JSON highlighting query.
 Consumed as registry dependencies; no upstream source copied into GPUI Box.
 Revision-aware borrowed-source integration is original GPUI Box work.
 
+X11 native platform-view attachment and toolkit allocation integration
+Copyright GPUI Box contributors
+License: Apache-2.0 (framework)
+Scope: original GPUI Box work using existing x11rb bindings, no imported source.
+
+Wry 0.57.0 — https://github.com/tauri-apps/wry/tree/wry-v0.57.0
+Revision: 792d0359ba6501a4fc360ece17de2ae42329a47c
+License: Apache-2.0 OR MIT
+Copyright (c) 2020-2023 Ngo Iok Ui & Tauri Programme within The Commons Conservancy
+Scope: crates.io API dependency for WKWebView, WebView2 and WebKitGTK browser
+construction and events. GPUI Box host glue is original; no Wry source copied.
+The dependency distribution contains LICENSE-MIT and LICENSE-APACHE.
+
 Achromatic glass material (PROVENANCE.md P20): original GPUI Box saturation
 and wash implementation. Apple HIG Materials and WWDC25 session 219 are design
 references only; no Apple source was copied and no additional license applies.

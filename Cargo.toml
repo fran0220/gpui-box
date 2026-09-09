@@ -12,6 +12,7 @@ members = [
   "crates/gpui_web",
   "crates/gpui_wgpu",
   "crates/gpui_windows",
+  "crates/gpui-webview",
   "crates/http_client",
   "crates/media",
   "crates/refineable",

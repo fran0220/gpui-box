@@ -191,6 +191,16 @@ publish = false
 layer = 2
 
 [[package]]
+manifest = "crates/gpui-webview/Cargo.toml"
+name = "gpui-box-webview"
+lib = "gpui_webview"
+cohort = "framework"
+version = "0.1.2"
+license = "MIT"
+publish = true
+layer = 0
+
+[[package]]
 manifest = "crates/gpui-kit-assets/Cargo.toml"
 name = "gpui-box-kit-assets"
 lib = "gpui_kit_assets"

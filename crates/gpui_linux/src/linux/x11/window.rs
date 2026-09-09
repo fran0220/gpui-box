@@ -303,6 +303,8 @@ pub struct X11WindowState {
     pub handle: AnyWindowHandle,
     last_insets: [u32; 4],
     accesskit_adapter: Option<accesskit_unix::Adapter>,
+    #[cfg(target_os = "linux")]
+    native_children: super::platform_view::NativeChildren,
 }
 
 impl X11WindowState {
@@ -833,6 +835,8 @@ impl X11WindowState {
                 last_insets: [0, 0, 0, 0],
                 edge_constraints: None,
                 accesskit_adapter: None,
+                #[cfg(target_os = "linux")]
+                native_children: Default::default(),
                 counter_id: sync_request_counter,
                 last_sync_counter: None,
             })
@@ -859,6 +863,8 @@ pub(crate) struct X11Window(pub X11WindowStatePtr);
 impl Drop for X11Window {
     fn drop(&mut self) {
         let mut state = self.0.state.borrow_mut();
+        #[cfg(target_os = "linux")]
+        state.native_children.clear(&self.0.xcb).log_err();
 
         if let Some(parent) = state.parent.as_ref() {
             parent.state.borrow_mut().children.remove(&self.0.x_window);
@@ -1716,6 +1722,16 @@ impl PlatformWindow for X11Window {
 
     fn on_button_layout_changed(&self, callback: Box<dyn FnMut()>) {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
+    }
+
+    #[cfg(target_os = "linux")]
+    fn update_platform_views(&self, update: &gpui::PlatformViewUpdate) {
+        let mut state = self.0.state.borrow_mut();
+        let scale = state.scale_factor;
+        state
+            .native_children
+            .update(&self.0.xcb, self.0.x_window, scale, update)
+            .log_err();
     }
 
     fn draw(&self, scene: &Scene) {
