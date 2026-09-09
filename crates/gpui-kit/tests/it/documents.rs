@@ -2251,6 +2251,7 @@ fn cross_block_keyboard_copy_obeys_the_inherited_owner(cx: &mut TestAppContext) 
         cx,
         move |cx| {
             gpui_kit::install(cx);
+            gpui_kit::foundation::register_owner_state(owner, cx);
             cx.write_to_clipboard(ClipboardItem::new_string("sentinel".into()));
             cx.set_clipboard_policy(move |requester, operation| {
                 (requester == owner

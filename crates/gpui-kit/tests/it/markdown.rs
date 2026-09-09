@@ -626,6 +626,7 @@ fn code_copy_reports_owner_refusal_and_write_only_success(cx: &mut TestAppContex
         cx,
         move |cx| {
             gpui_kit::install(cx);
+            gpui_kit::foundation::register_owner_state(owner, cx);
             cx.write_to_clipboard(ClipboardItem::new_string("previous clipboard".into()));
             cx.set_clipboard_policy(move |requester, operation| {
                 policy_attempts.borrow_mut().push((requester, operation));
