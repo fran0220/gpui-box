@@ -531,3 +531,6 @@ work using the existing Ropey and Unicode dependencies and their licenses.
 
 Native menu NSRunLoop scheduling and Win32 notification corrections are
 original GPUI Box work. No new third-party code or license was introduced.
+
+Incremental paragraph wrapping is original GPUI Box work using the existing
+Ropey and local GPUI text-system implementations; existing notices remain intact.

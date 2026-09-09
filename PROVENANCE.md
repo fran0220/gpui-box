@@ -937,3 +937,8 @@ no upstream source was copied and the frozen import receipt is unchanged.
 Native menu modal-loop scheduling corrections use existing NSRunLoop and
 Win32 notification APIs. They are original GPUI Box modifications, with no
 new imported code, package, or change to the frozen historical receipt.
+
+Exact incremental paragraph wrapping and viewport-restricted editable geometry
+are original GPUI Box work on the existing local text-system authority. They
+reuse public Ropey snapshot differences and GPUI WrappedLine layout/painting;
+no imported renderer, shader, platform adapter or historical receipt changed.

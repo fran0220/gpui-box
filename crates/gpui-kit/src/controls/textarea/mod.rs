@@ -29,6 +29,7 @@
 
 mod element;
 
+use std::cell::RefCell;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -481,6 +482,7 @@ pub struct TextArea {
     is_selecting: bool,
     rectangular_anchor: Option<Point<Pixels>>,
     last_layout: Option<EditableTextLayout>,
+    wrapped_cache: RefCell<gpui::EditableWrappedCache>,
     last_layout_text: SharedString,
     last_layout_rows: Arc<[Range<usize>]>,
     hard_rows: Option<(u64, Arc<[Range<usize>]>)>,
@@ -551,6 +553,7 @@ impl TextArea {
             is_selecting: false,
             rectangular_anchor: None,
             last_layout: None,
+            wrapped_cache: RefCell::default(),
             last_layout_text: SharedString::default(),
             last_layout_rows: Arc::default(),
             hard_rows: None,
@@ -618,6 +621,7 @@ impl TextArea {
         if self.wrap != wrap {
             self.wrap = wrap;
             self.last_layout = None;
+            self.wrapped_cache.get_mut().clear();
             self.line_projection = None;
             self.horizontal_scroll_offset = px(0.0);
             self.reveal_caret = true;
@@ -1142,6 +1146,12 @@ impl TextArea {
     /// geometry exports and native child-id metadata.
     pub fn row_index_work(&self) -> usize {
         self.row_index_work
+    }
+
+    /// Hard-line metadata rebuilt by the latest soft-wrap update. Static
+    /// updates reuse the index; source edits currently rebuild its metadata.
+    pub fn wrapped_index_work(&self) -> usize {
+        self.wrapped_cache.borrow().indexed_lines()
     }
 
     /// What the last layout pass measured, or nothing before the first one.

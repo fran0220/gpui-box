@@ -16,7 +16,7 @@ mod style_runs;
 pub use buffer::{EditBuffer, EditOutcome, EditRules};
 pub use document::{EditDifference, EditSnapshot};
 pub use history::EditCause;
-pub use layout::{EditableTextLayout, EditableTextWork};
+pub use layout::{EditableTextLayout, EditableTextWork, EditableWrappedCache};
 pub use projection::EditableLineProjection;
 pub use style_runs::{EditableStyleRun, EditableStyleRuns};
 

@@ -15,6 +15,52 @@ use unicode_segmentation::UnicodeSegmentation;
 const WIDTH: f32 = 200.0;
 
 #[gpui::test]
+fn mounted_soft_wrap_retains_shape_on_scroll_and_rewraps_one_edited_paragraph(
+    cx: &mut TestAppContext,
+) {
+    for count in [1000, 10000] {
+        let paragraph = "asymmetric 界 words and more words\n";
+        let source = format!("{}tail אב", paragraph.repeat(count));
+        let (mut harness, slot) = area(cx, move |area| area.text(source.clone()).rows(8));
+        let entity = slot.borrow().clone().expect("area");
+        harness.update(|_, cx| entity.update(cx, |area, cx| area.set_selected_range(0..0, cx)));
+        harness.frame();
+        let caret = harness.update(|_, cx| entity.read(cx).caret_bounds().expect("caret"));
+        harness.scroll("form.notes", 73.0);
+        harness.frame();
+        harness.update(|window, cx| {
+            let area = entity.read(cx);
+            assert_eq!(area.cursor_offset(), 0);
+            assert_eq!(
+                area.caret_bounds().expect("caret").top(),
+                caret.top() - px(73.0)
+            );
+            assert_eq!(area.shaping_work(), Some(gpui::EditableTextWork::default()));
+            assert_eq!(area.wrapped_index_work(), 0);
+            assert_eq!(area.row_index_work(), 0);
+            let start = area
+                .document()
+                .line_range(count / 3)
+                .expect("middle line")
+                .start;
+            entity.update(cx, |area, cx| {
+                area.replace_range(start..start + 1, "XYZ", cx)
+            });
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(
+                entity.read(cx).shaping_work(),
+                Some(gpui::EditableTextWork {
+                    shaped_lines: 1,
+                    shaped_bytes: paragraph.len() + 1,
+                })
+            );
+            assert_eq!(entity.read(cx).wrapped_index_work(), count + 1);
+        });
+    }
+}
+
+#[gpui::test]
 fn native_static_values_are_retained_and_selection_changes_publish_complete_values(
     cx: &mut TestAppContext,
 ) {

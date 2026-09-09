@@ -117,7 +117,7 @@ impl Element for TextAreaElement {
 
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
-        let layout = if wrap == TextAreaWrap::None && !empty {
+        let mut layout = if wrap == TextAreaWrap::None && !empty {
             let document = area.document();
             let (_, visible) = area.source_viewport(line_height, bounds.size.height);
             let layout = EditableTextLayout::unwrapped_projected(
@@ -133,7 +133,17 @@ impl Element for TextAreaElement {
             // Width and painting share these same shaped visible rows.
             layout.painted_lines().for_each(drop);
             layout
+        } else if !empty {
+            area.wrapped_cache.borrow_mut().update(
+                area.document(),
+                window.text_system().clone(),
+                font_size,
+                line_height,
+                runs,
+                bounds.size.width,
+            )
         } else {
+            area.wrapped_cache.borrow_mut().clear();
             let lines = window
                 .text_system()
                 .shape_text(
@@ -179,6 +189,13 @@ impl Element for TextAreaElement {
             bounds.left() - horizontal_scroll_offset,
             bounds.top() - scroll_offset,
         );
+        if wrap == TextAreaWrap::Soft && !empty {
+            let first = (scroll_offset / line_height).floor().max(0.0) as usize;
+            let end = ((scroll_offset + bounds.size.height) / line_height)
+                .ceil()
+                .max(0.0) as usize;
+            layout.set_painted_rows(first..end);
+        }
         let accessible_geometry = text_edit::AccessibleTextGeometry::capture_ranges(
             source_text.clone(),
             window.scale_factor(),
@@ -196,8 +213,7 @@ impl Element for TextAreaElement {
             .iter()
             .filter(|(range, _)| range.is_empty())
             .filter(|(range, _)| {
-                wrap == TextAreaWrap::Soft
-                    || empty
+                empty
                     || visible
                         .iter()
                         .any(|visible| visible.start <= range.start && range.start <= visible.end)

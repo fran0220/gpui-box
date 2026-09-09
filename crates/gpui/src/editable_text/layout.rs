@@ -6,10 +6,14 @@
 //! visual rows, UTF-8 offsets, points, selections, and carets using the same
 //! [`WrappedLine`] values that are painted.
 
+mod wrapped;
+pub use wrapped::EditableWrappedCache;
+
 use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
     ops::Range,
+    rc::Rc,
     sync::Arc,
 };
 
@@ -22,16 +26,20 @@ use crate::{
 const PAST_END: Pixels = px(1.0e6);
 
 /// The shaped geometry of one editable UTF-8 document.
+#[derive(Clone)]
 pub struct EditableTextLayout {
-    lines: Vec<Arc<WrappedLine>>,
+    lines: Arc<[Arc<WrappedLine>]>,
     /// Where each hard line starts in the source text.
-    starts: Vec<usize>,
+    starts: Arc<[usize]>,
     /// The first visual row of each hard line.
-    rows: Vec<usize>,
+    rows: Arc<[usize]>,
     total_rows: usize,
     text_len: usize,
     line_height: Pixels,
-    source: Option<SourceLines>,
+    source: Option<Rc<SourceLines>>,
+    paint_rows: Option<Range<usize>>,
+    work: Option<EditableTextWork>,
+    width: Pixels,
 }
 
 /// Actual shaping input consumed by one layout, including on-demand geometry.
@@ -44,6 +52,7 @@ pub struct EditableTextWork {
     pub shaped_bytes: usize,
 }
 
+#[derive(Clone)]
 struct SourceLines {
     document: EditSnapshot,
     projection: EditableLineProjection,
@@ -135,14 +144,21 @@ impl EditableTextLayout {
             rows.push(row);
             row += line.wrap_boundaries().len() + 1;
         }
+        let width = lines
+            .iter()
+            .map(|line| line.unwrapped_layout.width)
+            .fold(px(0.0), Pixels::max);
         Self {
             lines: lines.into_iter().map(Arc::new).collect(),
-            starts,
-            rows,
+            starts: starts.into(),
+            rows: rows.into(),
             total_rows: row.max(1),
             text_len: text.len(),
             line_height,
             source: None,
+            paint_rows: None,
+            work: None,
+            width,
         }
     }
 
@@ -202,13 +218,13 @@ impl EditableTextLayout {
             .collect();
         let total_rows = projection.rows();
         Some(Self {
-            lines: Vec::new(),
-            starts: Vec::new(),
-            rows: Vec::new(),
+            lines: Arc::default(),
+            starts: Arc::default(),
+            rows: Arc::default(),
             total_rows,
             text_len: document.len(),
             line_height,
-            source: Some(SourceLines {
+            source: Some(Rc::new(SourceLines {
                 document,
                 projection,
                 text_system,
@@ -218,12 +234,18 @@ impl EditableTextLayout {
                 visible: visible.start.min(total_rows)..visible.end.min(total_rows),
                 shaped: RefCell::new(BTreeMap::new()),
                 work: Cell::default(),
-            }),
+            })),
+            paint_rows: None,
+            work: None,
+            width: px(0.0),
         })
     }
 
     /// Shaping performed so far by this layout, including on-demand queries.
     pub fn shaping_work(&self) -> EditableTextWork {
+        if let Some(work) = self.work {
+            return work;
+        }
         self.source
             .as_ref()
             .map(|source| source.work.get())
@@ -244,6 +266,15 @@ impl EditableTextLayout {
                     source
                         .document
                         .line_range(source.projection.source_line(row))
+                })
+                .collect();
+        }
+        if let Some(rows) = &self.paint_rows {
+            return rows
+                .clone()
+                .map(|row| {
+                    let range = self.row_range(row);
+                    range.start.min(range.end)..range.start.max(range.end)
                 })
                 .collect();
         }
@@ -270,6 +301,19 @@ impl EditableTextLayout {
         self.text_len == 0
     }
 
+    /// Restricts painting and painted-range geometry to these visual rows.
+    /// Logical geometry and native text remain complete. Rows are clamped to
+    /// the exact index, so this can be applied after scrolling/caret reveal.
+    pub fn set_painted_rows(&mut self, rows: Range<usize>) {
+        let end = rows.end.min(self.total_rows);
+        let rows = rows.start.min(end)..end;
+        if let Some(source) = &mut self.source {
+            Rc::make_mut(source).visible = rows;
+        } else {
+            self.paint_rows = Some(rows);
+        }
+    }
+
     /// Proves that two layouts share the same logical row index without
     /// enumerating source lines. False means unknown, not necessarily unequal.
     /// Viewport changes and line height do not change source row boundaries.
@@ -278,6 +322,9 @@ impl EditableTextLayout {
             (Some(left), Some(right)) => {
                 left.document.shares_storage_with(&right.document)
                     && left.projection == right.projection
+            }
+            (None, None) => {
+                Arc::ptr_eq(&self.lines, &other.lines) && Arc::ptr_eq(&self.starts, &other.starts)
             }
             _ => false,
         }
@@ -299,10 +346,7 @@ impl EditableTextLayout {
                 .map(|line| line.unwrapped_layout.width)
                 .fold(px(0.0), Pixels::max);
         }
-        self.lines
-            .iter()
-            .map(|line| line.unwrapped_layout.width)
-            .fold(px(0.0), Pixels::max)
+        self.width
     }
 
     /// Where each hard line should be painted relative to the text origin.
@@ -315,10 +359,20 @@ impl EditableTextLayout {
                 )
             }));
         }
+        let lines = self
+            .paint_rows
+            .as_ref()
+            .map_or(0..self.lines.len(), |rows| {
+                if rows.is_empty() {
+                    0..0
+                } else {
+                    self.line_for_row(rows.start)..self.line_for_row(rows.end - 1) + 1
+                }
+            });
         Box::new(
-            self.lines
+            self.lines[lines.clone()]
                 .iter()
-                .zip(&self.rows)
+                .zip(self.rows[lines].iter())
                 .map(|(line, row)| (line.clone(), self.line_height * *row as f32)),
         )
     }
@@ -558,6 +612,15 @@ impl EditableTextLayout {
             range.start = range.start.max(start);
             range.end = range.end.min(end);
         }
+        if let Some(rows) = &self.paint_rows {
+            if rows.is_empty() {
+                return Vec::new();
+            }
+            let first = self.row_range(rows.start);
+            let last = self.row_range(rows.end - 1);
+            range.start = range.start.max(first.start.min(first.end));
+            range.end = range.end.min(last.start.max(last.end));
+        }
         self.bounds_for_range(range, origin, align, align_width)
     }
 
@@ -607,7 +670,12 @@ impl EditableTextLayout {
             }
             return result;
         }
-        for (index, line) in self.lines.iter().enumerate() {
+        let first = self.line_for_offset(start);
+        let last = self.line_for_offset(end - 1);
+        for index in first..=last {
+            let Some(line) = self.lines.get(index) else {
+                continue;
+            };
             let line_start = self.starts[index];
             let line_end = line_start + line.len();
             let local_start = start.max(line_start).min(line_end) - line_start;
