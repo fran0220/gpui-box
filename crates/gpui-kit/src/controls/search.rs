@@ -132,6 +132,24 @@ impl SearchInput {
         &self.input
     }
 
+    /// Reconciles presentation without replacing the editable entity or its selection.
+    pub fn set_presentation(
+        &mut self,
+        name: Option<SharedString>,
+        placeholder: Option<SharedString>,
+        size: ControlSize,
+        cx: &mut Context<Self>,
+    ) {
+        self.name = name;
+        self.placeholder = placeholder;
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         self.input
