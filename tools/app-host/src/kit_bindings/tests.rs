@@ -374,3 +374,432 @@ fn reusable_slot_recurses_into_shared_state_without_borrowing_outer_map(cx: &mut
         Some("ab")
     );
 }
+
+#[gpui::test]
+fn lazy_list_rebuilds_scrolled_slots_and_retains_nested_entities(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let counts = Rc::new(RefCell::new(vec![0usize; 40]));
+    let mut slots = KitSlots::new();
+    for index in 0..40 {
+        let counts = counts.clone();
+        let state = state.clone();
+        slots.insert(
+            format!("item-{index}"),
+            Rc::new(move |window, cx| {
+                counts.borrow_mut()[index] += 1;
+                state.render(
+                    &node("TextInput", &format!("input-{index}"), json!({}), json!({})),
+                    KitSlots::new(),
+                    window,
+                    cx,
+                    Rc::new(|_, _| {}),
+                )
+            }),
+        );
+    }
+    let rows = (0..40)
+        .map(|index| json!({"id":format!("item-{index}"),"label":format!("Row {index}")}))
+        .collect::<Vec<_>>();
+    let list = node(
+        "List",
+        "virtual",
+        json!({"rows":rows,"visibleRows":3,"rowHeight":40}),
+        json!({}),
+    );
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        div()
+            .w(px(400.))
+            .child(state.render(&list, slots.clone(), window, cx, Rc::new(|_, _| {})))
+            .into_any_element()
+    });
+    assert_eq!(
+        counts.borrow()[20],
+        0,
+        "offscreen rows must not be eagerly constructed"
+    );
+    harness.click("input-0");
+    harness.keystrokes("a");
+    harness.scroll("virtual", 800.);
+    harness.frame();
+    assert!(
+        counts.borrow()[20] > 0,
+        "scroll must construct new visible native rows"
+    );
+    assert!(harness.node("input-20").is_some());
+    harness.scroll("virtual", -800.);
+    harness.frame();
+    harness.click("input-0");
+    harness.keystrokes("b");
+    assert_eq!(
+        harness
+            .node("input-0")
+            .expect("returned row input")
+            .value
+            .as_deref(),
+        Some("ab")
+    );
+    assert!(
+        counts.borrow()[0] > 1,
+        "returning row requires fresh elements"
+    );
+}
+
+#[gpui::test]
+fn native_methods_preserve_typed_results_and_actual_disabled_refusal(cx: &mut TestAppContext) {
+    let state = Rc::new(KitState::default());
+    let input = node(
+        "TextInput",
+        "methods.input",
+        json!({}),
+        json!({"change":"changed"}),
+    );
+    let select = node(
+        "Select",
+        "methods.select",
+        json!({"options":[{"id":"alpha","label":"Alpha"},{"id":"beta","label":"Beta"}],"selected":"alpha"}),
+        json!({}),
+    );
+    let build_state = state.clone();
+    let build_nodes = [input.clone(), select.clone()];
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        div()
+            .flex()
+            .flex_col()
+            .children(build_nodes.iter().map(|node| {
+                let output = output.clone();
+                build_state.render(
+                    node,
+                    KitSlots::new(),
+                    window,
+                    cx,
+                    Rc::new(move |action, payload| {
+                        output.borrow_mut().push((action.to_owned(), payload))
+                    }),
+                )
+            }))
+            .into_any_element()
+    });
+    harness.update(|window, cx| {
+        assert!(
+            state
+                .invoke(&input, "set_value", &json!({"value":42}), false, window, cx)
+                .is_err()
+        );
+        assert_eq!(
+            state
+                .invoke(
+                    &input,
+                    "set_value",
+                    &json!({"value":"é🙂"}),
+                    false,
+                    window,
+                    cx
+                )
+                .expect("set value"),
+            Value::Null
+        );
+        assert_eq!(
+            state
+                .invoke(&input, "value", &json!({}), true, window, cx)
+                .expect("query value"),
+            json!("é🙂")
+        );
+        state
+            .invoke(
+                &select,
+                "set_selected",
+                &json!({"id":"beta"}),
+                false,
+                window,
+                cx,
+            )
+            .expect("set selection");
+        assert_eq!(
+            state
+                .invoke(&select, "selected_option", &json!({}), true, window, cx)
+                .expect("query option"),
+            json!({"id":"beta","label":"Beta","disabled":false,"description":null,"group":null})
+        );
+    });
+    assert_eq!(&*events.borrow(), &[("changed".into(), json!("é🙂"))]);
+    harness.click("methods.input");
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    });
+    harness.update(|window, cx| {
+        assert_eq!(
+            state
+                .invoke(&input, "selected_range", &json!({}), true, window, cx)
+                .expect("byte selection"),
+            json!({"start":0,"end":6})
+        );
+        state
+            .invoke(
+                &input,
+                "set_text_quietly",
+                &json!({"value":"quiet"}),
+                false,
+                window,
+                cx,
+            )
+            .expect("quiet text");
+        state
+            .invoke(
+                &input,
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                window,
+                cx,
+            )
+            .expect("disable input");
+        state
+            .invoke(
+                &select,
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                window,
+                cx,
+            )
+            .expect("disable select");
+    });
+    assert_eq!(
+        events.borrow().len(),
+        1,
+        "quiet command does not echo change"
+    );
+    harness.frame();
+    harness.update(|window, cx| {
+        assert_eq!(
+            state
+                .invoke(&select, "selected_id", &json!({}), true, window, cx)
+                .expect("controlled selection"),
+            json!("alpha"),
+            "explicit caller selection wins on the next render"
+        );
+        assert_eq!(
+            state
+                .invoke(&input, "is_disabled", &json!({}), true, window, cx)
+                .expect("disabled query"),
+            json!(true)
+        );
+        assert!(
+            state
+                .invoke(
+                    &input,
+                    "set_value",
+                    &json!({"value":"must refuse"}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+        assert!(
+            state
+                .invoke(
+                    &select,
+                    "set_selected",
+                    &json!({"id":"alpha"}),
+                    false,
+                    window,
+                    cx
+                )
+                .is_err()
+        );
+        let mut stale = input.clone();
+        stale.instance = 99;
+        assert!(
+            state
+                .invoke(&stale, "value", &json!({}), true, window, cx)
+                .is_err()
+        );
+        let mut wrong = input.clone();
+        wrong.component = Some("Select".into());
+        assert!(
+            state
+                .invoke(&wrong, "is_open", &json!({}), true, window, cx)
+                .is_err()
+        );
+    });
+}
+
+#[gpui::test]
+fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
+    fn example(schema: &Value) -> Value {
+        if schema["nullable"] == true {
+            return Value::Null;
+        }
+        if let Some(values) = schema["enum"].as_array() {
+            return values[0].clone();
+        }
+        match schema["type"].as_str().expect("schema type") {
+            "string" => json!("fixture"),
+            "boolean" => json!(false),
+            "number" => schema["min"].clone(),
+            "array" => json!([]),
+            "object" => Value::Object(
+                schema["fields"]
+                    .as_object()
+                    .expect("fields")
+                    .iter()
+                    .map(|(key, value)| (key.clone(), example(value)))
+                    .collect(),
+            ),
+            _ => panic!("unsupported example schema"),
+        }
+    }
+    let methods: Value = serde_json::from_str(include_str!("methods.json")).expect("method schema");
+    let state = Rc::new(KitState::default());
+    let build_state = state.clone();
+    let nodes = methods
+        .as_object()
+        .expect("components")
+        .keys()
+        .map(|component| node(component, component, json!({}), json!({})))
+        .collect::<Vec<_>>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        div()
+            .flex()
+            .flex_col()
+            .children(nodes.iter().map(|node| {
+                build_state.render(node, KitSlots::new(), window, cx, Rc::new(|_, _| {}))
+            }))
+            .into_any_element()
+    });
+    harness.update(|window, cx| {
+        for (component, modes) in methods.as_object().expect("components") {
+            for (mode, methods) in modes.as_object().expect("modes") {
+                for (method, schema) in methods.as_object().expect("methods") {
+                    let descriptor = node(component, component, json!({}), json!({}));
+                    let result = state.invoke(
+                        &descriptor,
+                        method,
+                        &example(&schema["args"]),
+                        mode == "query",
+                        window,
+                        cx,
+                    );
+                    assert!(
+                        result.is_ok(),
+                        "{component}.{method} has no valid native dispatch: {result:?}"
+                    );
+                }
+            }
+        }
+    });
+}
+
+#[gpui::test]
+fn host_overlay_factories_reopen_with_retained_input_and_release_state(cx: &mut TestAppContext) {
+    for component in ["Popover", "Dialog"] {
+        let state = Rc::new(KitState::default());
+        let weak = Rc::downgrade(&state);
+        let mut surface = node(component, "surface", json!({}), json!({}));
+        surface.slots.insert(
+            "content".into(),
+            vec![node("TextInput", "surface.input", json!({}), json!({}))],
+        );
+        let descriptor = Rc::new(RefCell::new(surface));
+        let build_descriptor = descriptor.clone();
+        let (outgoing, _incoming) = std::sync::mpsc::sync_channel(32);
+        let renderer = crate::NodeRenderer {
+            outgoing,
+            kit: weak.clone(),
+            rendered_revision: Rc::new(std::cell::Cell::new(1)),
+            clipboard: crate::clipboard::Policy::default(),
+        };
+        let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+            let descriptor = build_descriptor.borrow();
+            if let Some(state) = renderer.kit.upgrade() {
+                state.reconcile(&descriptor, cx);
+            }
+            renderer.node(&descriptor, 1, window, cx)
+        });
+        harness.update(|window, cx| {
+            state
+                .invoke(&descriptor.borrow(), "open", &json!({}), false, window, cx)
+                .expect("open surface");
+        });
+        harness.frame();
+        harness.click("surface.input");
+        harness.keystrokes("a");
+        {
+            let mut descriptor = descriptor.borrow_mut();
+            descriptor.props.insert(
+                if component == "Popover" {
+                    "trigger"
+                } else {
+                    "title"
+                }
+                .into(),
+                json!("Updated while open"),
+            );
+            descriptor.slots.get_mut("content").expect("body")[0]
+                .props
+                .insert("placeholder".into(), json!("Updated nested option"));
+        }
+        harness.frame();
+        harness.update(|window, cx| {
+            assert_eq!(
+                state
+                    .invoke(
+                        &descriptor.borrow(),
+                        "is_open",
+                        &json!({}),
+                        true,
+                        window,
+                        cx
+                    )
+                    .expect("open query"),
+                json!(true)
+            );
+        });
+        assert_eq!(
+            harness
+                .node("surface.input")
+                .expect("updated body")
+                .value
+                .as_deref(),
+            Some("a")
+        );
+        harness.update(|window, cx| {
+            state
+                .invoke(&descriptor.borrow(), "close", &json!({}), false, window, cx)
+                .expect("close surface");
+        });
+        harness.frame();
+        harness.update(|window, cx| {
+            state
+                .invoke(&descriptor.borrow(), "open", &json!({}), false, window, cx)
+                .expect("reopen surface");
+        });
+        harness.frame();
+        harness.click("surface.input");
+        harness.keystrokes("b");
+        assert_eq!(
+            harness
+                .node("surface.input")
+                .expect("fresh reopened body")
+                .value
+                .as_deref(),
+            Some("ab"),
+            "{component} body must rebuild without replacing retained input"
+        );
+        drop(state);
+        assert!(
+            weak.upgrade().is_none(),
+            "{component} body factory must not retain KitState"
+        );
+        harness.frame();
+        assert!(
+            harness.node("surface.input").is_none(),
+            "closed host must remove nested action target"
+        );
+    }
+}

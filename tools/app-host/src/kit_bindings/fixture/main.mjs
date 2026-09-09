@@ -4,6 +4,8 @@ const tab = gpui.state('overview');
 const page = gpui.state(3);
 const expanded = gpui.state(['details']);
 const ratio = gpui.state(0.3);
+const selected = gpui.state('record-2');
+const rows = Array.from({ length: 40 }, (_, id) => ({ id: `record-${id}`, label: `Fixture record ${id}` }));
 gpui.mount(() => gpui.column('fixture', [
   gpui.text('title', 'Kit navigation and layout · fixture data'),
   kit.Tabs('tabs', { tabs: [{ id: 'overview', label: 'Overview' }, { id: 'activity', label: 'Activity', badge: '4' }], selected: tab.get() }, { select: id => tab.set(id) }),
@@ -13,11 +15,13 @@ gpui.mount(() => gpui.column('fixture', [
   kit.Divider('divider', { label: 'Asymmetric native split' }),
   kit.SplitPane('split', { ratio: ratio.get(), minStart: 80, minEnd: 80 }, { resize: value => ratio.set(value) }, {
     start: [gpui.text('start.text', 'Start pane · 30%')],
-    end: [kit.ScrollArea('scroll', { height: 120, label: 'Scrollable fixture content' }, {}, { content: [
+    end: [kit.ScrollArea('scroll', { height: 80, label: 'Scrollable fixture content' }, {}, { content: [
       gpui.text('end.text', 'End pane · native scroll area'),
       ...Array.from({ length: 8 }, (_, index) => gpui.text(`item.${index}`, `Fixture line ${index + 1}`)),
     ] })],
   }),
   kit.Pagination('pages', { page: page.get(), totalPages: 8 }, { select: value => page.set(value) }),
   gpui.text('state', `Tab: ${tab.get()} · page: ${page.get()}`),
+  kit.List('records', { rows, selected: selected.get(), visibleRows: 3, rowHeight: 36 }, { select: id => selected.set(id) }, Object.fromEntries(rows.map(row => [row.id, [gpui.text(`${row.id}.content`, `${row.label} · lazy native slot`)]]))),
+  gpui.text('selection', `Selected: ${selected.get()}`),
 ]));

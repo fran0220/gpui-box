@@ -26,6 +26,9 @@ export const kitSchemas = Object.freeze({
   ScrollArea: { props: object({ axis: choice('vertical', 'horizontal', 'both'), label: string, width: positive, height: positive, fitHeight: boolean }), events: {}, slots: ['content'] },
   SplitPane: { props: object({ axis: choice('horizontal', 'vertical'), ratio: { type: 'number', min: 0, max: 1 }, minStart: { ...number, min: 0 }, minEnd: { ...number, min: 0 }, step: positive, collapsible: boolean, handleLabel: string }), events: { resize: { type: 'number', min: 0, max: 1 }, collapse: choice('start', 'end') }, slots: ['start', 'end'] },
   Divider: { props: object({ label: string, axis: choice('horizontal', 'vertical') }), events: {} },
+  List: { props: object({ ...common, rows: array(object({ ...selectionItem.fields, within: identity }, ['id', 'label'])), selected: identity, rowHeight: positive, visibleRows: { ...integer, min: 1 }, flowing: boolean, anchoredToEnd: boolean, fills: boolean, arriving: boolean, reorderable: boolean }), events: { select: identity, reorder: object({ id: identity, source: identity, anchor: identity, position: choice('before', 'after', 'into') }, ['id', 'source', 'anchor', 'position']) }, slotIds: 'rows' },
+  Popover: { props: object({ trigger: string, placement: choice('above', 'below'), hang: choice('start', 'end'), dismissable: boolean }), events: { open: choice(null), close: choice(null), dismiss: choice(null) }, slots: ['content'] },
+  Dialog: { props: object({ title: string, description: string, confirmLabel: string, cancelLabel: string, destructive: boolean, dismissable: boolean }), events: { open: choice(null), close: choice(null), confirm: choice(null), cancel: choice(null), dismiss: choice(null) }, slots: ['content'] },
 });
 
 export function validateValue(value, schema, path = 'value') {
@@ -68,6 +71,16 @@ export function validateKitProps(component, id, props) {
     const { min = 0, max = 1, value = min, high } = props;
     if (min >= max || value < min || value > max || (high !== undefined && (high < value || high > max))) throw new TypeError('Slider: invalid range');
   }
+  if (component === 'List') {
+    const parents = new Map((props.rows ?? []).map(row => [row.id, row.within]));
+    for (const id of parents.keys()) {
+      const seen = new Set([id]);
+      for (let parent = parents.get(id); parent !== undefined; parent = parents.get(parent)) {
+        if (!parents.has(parent) || seen.has(parent)) throw new TypeError('List: invalid row parent');
+        seen.add(parent);
+      }
+    }
+  }
 }
 
 // The tree validator owns recursive slots, semantic-id uniqueness and aggregate budgets.
@@ -90,4 +103,79 @@ export function validateKitDescriptor(node) {
   validateValue(node.events, object(events), 'events');
   if (node.props.disabled && Object.keys(node.events).length) throw new TypeError('Disabled control has actions');
   return node;
+}
+
+// Only methods with native implementations belong here. Framework parameters
+// and Entity/Signal handles never cross this data-only boundary.
+const method = (fields, result = choice(null)) => ({ args: object(fields, Object.keys(fields)), result });
+export const kitMethods = Object.freeze({
+  TextInput: {
+    invoke: {
+      set_name: method({ name: string }), set_placeholder: method({ placeholder: string }),
+      set_value: method({ value: string }), set_text_quietly: method({ value: string }),
+      set_secret: method({ secret: boolean }), set_bare: method({ bare: boolean }),
+      set_max_length: method({ max_length: { ...integer, nullable: true } }),
+      set_disabled: method({ disabled: boolean }), set_read_only: method({ read_only: boolean }),
+      set_required: method({ required: boolean }), set_invalid: method({ invalid: boolean }),
+      set_control_size: method({ size: common.size }),
+    },
+    query: {
+      value: method({}, string), is_empty: method({}, boolean), is_disabled: method({}, boolean),
+      is_secret: method({}, boolean), selected_range: method({}, object({ start: integer, end: integer }, ['start', 'end'])),
+      cursor_offset: method({}, integer),
+    },
+  },
+  Select: {
+    invoke: {
+      set_name: method({ name: string }), set_placeholder: method({ placeholder: { ...string, nullable: true } }),
+      set_options: method({ options: array(selectionItem) }), set_selected: method({ id: { ...identity, nullable: true } }),
+      set_disabled: method({ disabled: boolean }), set_invalid: method({ invalid: boolean }),
+      set_clearable: method({ clearable: boolean }), set_control_size: method({ size: common.size }),
+    },
+    query: {
+      selected_id: method({}, { ...identity, nullable: true }), is_open: method({}, boolean),
+      is_disabled: method({}, boolean),
+      selected_option: method({}, { ...object({ ...selectionItem.fields, description: { ...string, nullable: true }, group: { ...string, nullable: true } }, ['id', 'label', 'disabled', 'description', 'group']), nullable: true }),
+    },
+  },
+  Popover: {
+    invoke: { open: method({}), close: method({}), toggle: method({}), dismiss: method({}), set_trigger: method({ label: string }), set_dismissable: method({ dismissable: boolean }), set_placement: method({ placement: choice('above', 'below') }), set_hang: method({ hang: choice('start', 'end') }) },
+    query: { is_open: method({}, boolean), is_dismissable: method({}, boolean) },
+  },
+  Dialog: {
+    invoke: { open: method({}), close: method({}), confirm: method({}), cancel: method({}), dismiss: method({}), set_title: method({ title: string }), set_description: method({ description: { ...string, nullable: true } }), set_confirm_label: method({ label: { ...string, nullable: true } }), set_cancel_label: method({ label: { ...string, nullable: true } }), set_dismissable: method({ dismissable: boolean }), set_destructive: method({ destructive: boolean }) },
+    query: { is_open: method({}, boolean), is_dismissable: method({}, boolean) },
+  },
+});
+
+export function validateInvocation(component, name, args, mode) {
+  if (mode !== 'invoke' && mode !== 'query') throw new TypeError('Unknown Kit invocation mode');
+  const methods = Object.hasOwn(kitMethods, component) && kitMethods[component][mode];
+  if (!methods || !Object.hasOwn(methods, name)) throw new TypeError(`Unsupported Kit ${mode}: ${component}.${name}`);
+  validateValue(args, methods[name].args, `${component}.${name}`);
+  return methods[name];
+}
+
+/** Source-derived method contracts for kit-sdk.d.ts; no catalog-only methods. */
+export function generateKitMethodTypes() {
+  function type(schema) {
+    let result;
+    if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
+    else if (schema.type === 'array') result = `Array<${type(schema.items)}>`;
+    else if (schema.type === 'object') result = Object.keys(schema.fields).length
+      ? `{ ${Object.entries(schema.fields).map(([key, value]) => `${JSON.stringify(key)}${schema.required.includes(key) ? '' : '?'}: ${type(value)}`).join('; ')} }`
+      : 'Record<string, never>';
+    else result = schema.type;
+    return schema.nullable ? `${result} | null` : result;
+  }
+  const contracts = Object.entries(kitMethods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${type(schema.args)}; result: ${type(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
+  return [
+    '// Generated from kitMethods by generateKitMethodTypes.',
+    `export interface KitMethodContracts {\n${contracts}\n}`,
+    'type MethodArguments<S> = S extends { args: infer A } ? {} extends A ? [args?: A] : [args: A] : never;',
+    'type MethodResult<S> = S extends { result: infer R } ? R : never;',
+    "export type KitInvoke = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['invoke']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['invoke'][M]>) => Promise<MethodResult<KitMethodContracts[C]['invoke'][M]>>;",
+    "export type KitQuery = <C extends keyof KitMethodContracts, M extends keyof KitMethodContracts[NoInfer<C>]['query']>(target: Pick<KitNode<C>, 'id' | 'component'>, method: M, ...args: MethodArguments<KitMethodContracts[C]['query'][M]>) => Promise<MethodResult<KitMethodContracts[C]['query'][M]>>;",
+    '',
+  ].join('\n');
 }

@@ -763,5 +763,233 @@
       "required": []
     },
     "events": {}
+  },
+  "List": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "within": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "selected": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "rowHeight": {
+          "type": "number",
+          "min": 5e-324,
+          "max": 1000000000
+        },
+        "visibleRows": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 1000000
+        },
+        "flowing": {
+          "type": "boolean"
+        },
+        "anchoredToEnd": {
+          "type": "boolean"
+        },
+        "fills": {
+          "type": "boolean"
+        },
+        "arriving": {
+          "type": "boolean"
+        },
+        "reorderable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "select": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      },
+      "reorder": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "source": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "anchor": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "position": {
+            "enum": [
+              "before",
+              "after",
+              "into"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "anchor",
+          "position"
+        ]
+      }
+    },
+    "slotIds": "rows"
+  },
+  "Popover": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "trigger": {
+          "type": "string",
+          "max": 16384
+        },
+        "placement": {
+          "enum": [
+            "above",
+            "below"
+          ]
+        },
+        "hang": {
+          "enum": [
+            "start",
+            "end"
+          ]
+        },
+        "dismissable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "open": {
+        "enum": [
+          null
+        ]
+      },
+      "close": {
+        "enum": [
+          null
+        ]
+      },
+      "dismiss": {
+        "enum": [
+          null
+        ]
+      }
+    },
+    "slots": [
+      "content"
+    ]
+  },
+  "Dialog": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "title": {
+          "type": "string",
+          "max": 16384
+        },
+        "description": {
+          "type": "string",
+          "max": 16384
+        },
+        "confirmLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "cancelLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "dismissable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "open": {
+        "enum": [
+          null
+        ]
+      },
+      "close": {
+        "enum": [
+          null
+        ]
+      },
+      "confirm": {
+        "enum": [
+          null
+        ]
+      },
+      "cancel": {
+        "enum": [
+          null
+        ]
+      },
+      "dismiss": {
+        "enum": [
+          null
+        ]
+      }
+    },
+    "slots": [
+      "content"
+    ]
   }
 }

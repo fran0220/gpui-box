@@ -4392,7 +4392,8 @@
       "queries": [
         "selected_id() -> Option<&SharedString>",
         "selected_option() -> Option<&SelectOption>",
-        "is_open() -> bool"
+        "is_open() -> bool",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [

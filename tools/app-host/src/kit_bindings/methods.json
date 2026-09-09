@@ -1,0 +1,931 @@
+{
+  "TextInput": {
+    "invoke": {
+      "set_name": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "name": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_placeholder": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "placeholder": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "placeholder"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_value": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "value": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "value"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_text_quietly": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "value": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "value"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_secret": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "secret": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "secret"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_bare": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "bare": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bare"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_max_length": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "max_length": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 1000000,
+              "nullable": true
+            }
+          },
+          "required": [
+            "max_length"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_disabled": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "disabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "disabled"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_read_only": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "read_only": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "read_only"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_required": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "required": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "required"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_invalid": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "invalid": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "invalid"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_control_size": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "size": {
+              "enum": [
+                "xs",
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "size"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      }
+    },
+    "query": {
+      "value": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "is_empty": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "is_disabled": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "is_secret": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "selected_range": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "object",
+          "fields": {
+            "start": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 1000000
+            },
+            "end": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 1000000
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ]
+        }
+      },
+      "cursor_offset": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        }
+      }
+    }
+  },
+  "Select": {
+    "invoke": {
+      "set_name": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "name": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_placeholder": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "placeholder": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            }
+          },
+          "required": [
+            "placeholder"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_options": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label"
+                ]
+              },
+              "max": 1024
+            }
+          },
+          "required": [
+            "options"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_selected": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "min": 1,
+              "max": 256,
+              "nullable": true
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_disabled": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "disabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "disabled"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_invalid": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "invalid": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "invalid"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_clearable": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "clearable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "clearable"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_control_size": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "size": {
+              "enum": [
+                "xs",
+                "sm",
+                "md",
+                "lg"
+              ]
+            }
+          },
+          "required": [
+            "size"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      }
+    },
+    "query": {
+      "selected_id": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "string",
+          "min": 1,
+          "max": 256,
+          "nullable": true
+        }
+      },
+      "is_open": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "is_disabled": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "selected_option": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "min": 1,
+              "max": 256
+            },
+            "label": {
+              "type": "string",
+              "max": 16384
+            },
+            "disabled": {
+              "type": "boolean"
+            },
+            "description": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            },
+            "group": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            }
+          },
+          "required": [
+            "id",
+            "label",
+            "disabled",
+            "description",
+            "group"
+          ],
+          "nullable": true
+        }
+      }
+    }
+  },
+  "Popover": {
+    "invoke": {
+      "open": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "close": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "toggle": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "dismiss": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_trigger": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "label": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "label"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_dismissable": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "dismissable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "dismissable"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_placement": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "placement": {
+              "enum": [
+                "above",
+                "below"
+              ]
+            }
+          },
+          "required": [
+            "placement"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_hang": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "hang": {
+              "enum": [
+                "start",
+                "end"
+              ]
+            }
+          },
+          "required": [
+            "hang"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      }
+    },
+    "query": {
+      "is_open": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "is_dismissable": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "Dialog": {
+    "invoke": {
+      "open": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "close": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "confirm": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "cancel": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "dismiss": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_title": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "title": {
+              "type": "string",
+              "max": 16384
+            }
+          },
+          "required": [
+            "title"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_description": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "description": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            }
+          },
+          "required": [
+            "description"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_confirm_label": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "label": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            }
+          },
+          "required": [
+            "label"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_cancel_label": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "label": {
+              "type": "string",
+              "max": 16384,
+              "nullable": true
+            }
+          },
+          "required": [
+            "label"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_dismissable": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "dismissable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "dismissable"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      },
+      "set_destructive": {
+        "args": {
+          "type": "object",
+          "fields": {
+            "destructive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "destructive"
+          ]
+        },
+        "result": {
+          "enum": [
+            null
+          ]
+        }
+      }
+    },
+    "query": {
+      "is_open": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      },
+      "is_dismissable": {
+        "args": {
+          "type": "object",
+          "fields": {},
+          "required": []
+        },
+        "result": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

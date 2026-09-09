@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createKitBindings } from '../kit-bindings.mjs';
-import { kitSchemas, validateKitProps, validateKitDescriptor } from '../kit-schema.mjs';
+import { kitSchemas, kitMethods, generateKitMethodTypes, validateInvocation, validateKitProps, validateKitDescriptor } from '../kit-schema.mjs';
 
 test('caller state is copied, typed events report intent without mutating descriptor', () => {
   const actions = new Map();
@@ -49,6 +49,10 @@ test('reject getters and unknown events before registering any action', () => {
 test('native embedded contracts match executable JS schemas', () => {
   const native = JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/schemas.json', import.meta.url), 'utf8'));
   assert.deepEqual(native, kitSchemas);
+  const methods = JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/methods.json', import.meta.url), 'utf8'));
+  assert.deepEqual(methods, kitMethods);
+  const sdk = readFileSync(new URL('../kit-sdk.d.ts', import.meta.url), 'utf8');
+  assert.equal(sdk.slice(sdk.indexOf('// Generated from kitMethods')), generateKitMethodTypes());
 });
 
 test('wire descriptors reject unbound slots and events', () => {
@@ -73,18 +77,53 @@ test('named slots are copied and accordion slot names follow section identity', 
   assert.throws(() => kit.Pagination('p', { page: 0 }), /invalid number/);
 });
 
+test('lazy List slots require row identities and acyclic semantic parents', () => {
+  const kit = createKitBindings((id, event) => `${id}.${event}`);
+  const rows = [{ id: 'parent', label: 'Parent' }, { id: 'child', label: 'Child', within: 'parent' }];
+  assert.equal(validateKitDescriptor(kit.List('list', { rows }, {}, { child: [kit.Checkbox('nested')] })).component, 'List');
+  assert.throws(() => kit.List('list', { rows }, {}, { missing: [] }), /unknown field/);
+  assert.throws(() => kit.List('list', { rows: [{ id: 'self', label: 'Self', within: 'self' }] }), /invalid row parent/);
+  assert.throws(() => kit.List('list', { rows: [{ id: 'a', label: 'A', within: 'b' }, { id: 'b', label: 'B', within: 'a' }] }), /invalid row parent/);
+});
+
+test('native method validation is mode-specific and rejects unknown or executable arguments', () => {
+  assert.equal(validateInvocation('TextInput', 'set_max_length', { max_length: null }, 'invoke').result.enum[0], null);
+  assert.throws(() => validateInvocation('TextInput', 'value', {}, 'invoke'), /Unsupported/);
+  assert.throws(() => validateInvocation('Select', 'set_value', { value: 'x' }, 'invoke'), /Unsupported/);
+  assert.throws(() => validateInvocation('TextInput', 'set_value', { value: 'x', source: '/etc/passwd' }, 'invoke'), /unknown field/);
+  assert.throws(() => validateInvocation('TextInput', 'set_value', { get value() { assert.fail('getter executed'); } }, 'invoke'), /accessor/);
+});
+
 test('SDK typechecks component options and typed callbacks, rejecting unknown members', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gpui-kit-types-'));
   try {
     const sdk = fileURLToPath(new URL('../kit-sdk', import.meta.url));
     const path = join(dir, 'contract.ts');
-    writeFileSync(path, `import type { KitAPI } from ${JSON.stringify(sdk)};
+    writeFileSync(path, `import type { KitAPI, KitInvoke, KitQuery } from ${JSON.stringify(sdk)};
 declare const kit: KitAPI;
+declare const invoke: KitInvoke;
+declare const query: KitQuery;
+const input = kit.TextInput('typed-input');
+const inputKind: 'TextInput' = input.component;
+const response: Promise<string> = query(input, 'value');
+const changed: Promise<null> = invoke(input, 'set_value', {value:'next'});
+const selection: Promise<string|null> = query(kit.Select('typed-select'), 'selected_id');
+const opened: Promise<null> = invoke(kit.Dialog('modal'), 'open');
+const isOpen: Promise<boolean> = query(kit.Popover('tip'), 'is_open');
+// @ts-expect-error wrong component's method cannot widen target inference
+query(input, 'selected_id');
+// @ts-expect-error query result is not arbitrary
+const wrongResult: Promise<number> = query(input, 'value');
+// @ts-expect-error a required typed argument cannot be omitted
+invoke(input, 'set_value');
+// @ts-expect-error unknown argument is not silently ignored
+invoke(input, 'set_value', {value:'next',path:'/etc/passwd'});
 kit.Checkbox('check', {checked:null}, {change(value) { const checked: boolean = value; }});
 kit.Slider('range', {min:-10,max:20,value:-3,high:17}, {rangeChange(value) { const high: number = value.high; }});
 kit.Select('select', {selected:null}, {change(value) { const selected: string|null = value; }});
 kit.SplitPane('panes', {ratio:0.3}, {collapse(side) { const value: 'start'|'end' = side; }}, {start:[kit.Radio('nested')]});
 kit.TextInput('secure', {}, {clipboardDenied(reason) { const refusal: 'missingOwner'|'denied' = reason; }});
+kit.List('list', {rows:[{id:'a',label:'A'}]}, {select(id) { const selected:string=id; }}, {a:[kit.Radio('row')]});
 // @ts-expect-error ScrollArea has only content slot
 kit.ScrollArea('scroll', {}, {}, {start:[]});
 // @ts-expect-error radio does not have the switch option

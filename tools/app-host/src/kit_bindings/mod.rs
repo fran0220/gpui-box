@@ -13,7 +13,10 @@ use std::{
     rc::Rc,
 };
 
+mod collections;
+mod invocation;
 mod layout;
+mod overlays;
 mod validation;
 pub(super) use validation::validate_descriptor;
 
@@ -34,6 +37,9 @@ pub(super) const COMPONENTS: &[&str] = &[
     "ScrollArea",
     "SplitPane",
     "Divider",
+    "List",
+    "Popover",
+    "Dialog",
 ];
 type Emit = Rc<dyn Fn(&str, Value)>;
 type Key = (u64, String);
@@ -58,11 +64,14 @@ impl Route {
 enum Control {
     Input(Entity<TextInput>),
     Select(Entity<Select>),
+    Popover(Entity<Popover>, Rc<RefCell<KitSlots>>),
+    Dialog(Entity<Dialog>, Rc<RefCell<KitSlots>>),
 }
 struct Retained {
     control: Control,
     route: Rc<RefCell<Route>>,
     props: RefCell<serde_json::Map<String, Value>>,
+    slot_data: RefCell<BTreeMap<String, Vec<Node>>>,
     _subscriptions: Vec<Subscription>,
 }
 #[derive(Default)]
@@ -129,7 +138,10 @@ impl KitState {
             live.get(key).is_some_and(|component| {
                 matches!(
                     (&entry.control, component.as_str()),
-                    (Control::Input(_), "TextInput") | (Control::Select(_), "Select")
+                    (Control::Input(_), "TextInput")
+                        | (Control::Select(_), "Select")
+                        | (Control::Popover(..), "Popover")
+                        | (Control::Dialog(..), "Dialog")
                 )
             })
         });
@@ -336,6 +348,7 @@ impl KitState {
                                 control: Control::Input(entity),
                                 route,
                                 props: Default::default(),
+                                slot_data: Default::default(),
                                 _subscriptions: vec![subscription, denial_subscription],
                             })
                         } else {
@@ -361,6 +374,7 @@ impl KitState {
                                 control: Control::Select(entity),
                                 route,
                                 props: Default::default(),
+                                slot_data: Default::default(),
                                 _subscriptions: vec![subscription],
                             })
                         }
@@ -407,9 +421,6 @@ impl KitState {
                     }
                     Control::Select(entity) => {
                         entity.update(cx, |select, cx| {
-                            if previous_props == node.props {
-                                return;
-                            }
                             if previous_props.get("options") != node.props.get("options") {
                                 select.set_options(options(node), cx);
                             }
@@ -418,8 +429,13 @@ impl KitState {
                                 .get("selected")
                                 .and_then(Value::as_str)
                                 .map(|v| SharedString::from(v.to_owned()));
-                            if select.selected_id() != selected.as_ref() {
+                            if node.props.contains_key("selected")
+                                && select.selected_id() != selected.as_ref()
+                            {
                                 select.set_selected(selected, cx);
+                            }
+                            if previous_props == node.props {
+                                return;
                             }
                             select.set_name(text(node, "name"), cx);
                             select.set_invalid(flag(node, "invalid"), cx);
@@ -437,8 +453,11 @@ impl KitState {
                         *entry.props.borrow_mut() = node.props.clone();
                         entity.clone().into_any_element()
                     }
+                    _ => unreachable!("reconcile replaces changed component identity"),
                 }
             }
+            "List" => collections::render_list(node, slots, emit),
+            "Popover" | "Dialog" => overlays::render(self, node, slots, window, cx, emit),
             _ => layout::render(node, slots, window, cx, emit),
         }
     }

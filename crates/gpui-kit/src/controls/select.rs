@@ -318,6 +318,11 @@ impl Select {
         self.open
     }
 
+    /// Whether native selection and opening are currently refused.
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         if disabled {

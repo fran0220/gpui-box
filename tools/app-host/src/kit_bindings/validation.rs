@@ -8,8 +8,11 @@ use std::{collections::HashSet, sync::LazyLock};
 static SCHEMAS: LazyLock<Value> = LazyLock::new(|| {
     serde_json::from_str(include_str!("schemas.json")).expect("generated Kit schemas")
 });
+static METHODS: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("methods.json")).expect("generated Kit method schemas")
+});
 
-fn validate(value: &Value, schema: &Value) -> Result<()> {
+pub(super) fn validate(value: &Value, schema: &Value) -> Result<()> {
     if value.is_null() && schema["nullable"] == true {
         return Ok(());
     }
@@ -89,6 +92,22 @@ fn validate(value: &Value, schema: &Value) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn invocation(
+    component: &str,
+    name: &str,
+    args: &Value,
+    query: bool,
+) -> Result<&'static Value> {
+    let mode = if query { "query" } else { "invoke" };
+    let method = METHODS
+        .get(component)
+        .and_then(|component| component.get(mode))
+        .and_then(|methods| methods.get(name))
+        .ok_or_else(|| anyhow::anyhow!("unsupported Kit method"))?;
+    validate(args, &method["args"])?;
+    Ok(&method["result"])
+}
+
 pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
     let component = node.component.as_deref().unwrap_or_default();
     let schema = SCHEMAS
@@ -144,6 +163,32 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
             ensure!(high >= value && high <= max, "invalid upper slider value");
         }
     }
+    if component == "List" {
+        let parents = node
+            .props
+            .get("rows")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|row| {
+                (
+                    row["id"].as_str().expect("validated id"),
+                    row["within"].as_str(),
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>();
+        for id in parents.keys() {
+            let mut seen = HashSet::from([*id]);
+            let mut next = parents[id];
+            while let Some(parent) = next {
+                ensure!(
+                    parents.contains_key(parent) && seen.insert(parent),
+                    "invalid row parent"
+                );
+                next = parents[parent];
+            }
+        }
+    }
     Ok(())
 }
 
@@ -168,6 +213,31 @@ mod tests {
         );
         assert!(validate_descriptor(&node(json!({"source":"/etc/passwd"}))).is_err());
         assert!(validate_descriptor(&node(json!({"disabled":"false"}))).is_err());
+    }
+
+    #[test]
+    fn native_list_rejects_missing_and_cyclic_row_parents() {
+        let list = |rows| {
+            serde_json::from_value::<Node>(
+                json!({"kind":"kit","id":"list","component":"List","props":{"rows":rows}}),
+            )
+            .expect("list fixture")
+        };
+        assert!(
+            validate_descriptor(&list(
+                json!([{"id":"a","label":"A"},{"id":"b","label":"B","within":"a"}])
+            ))
+            .is_ok()
+        );
+        assert!(
+            validate_descriptor(&list(json!([{"id":"a","label":"A","within":"missing"}]))).is_err()
+        );
+        assert!(
+            validate_descriptor(&list(
+                json!([{"id":"a","label":"A","within":"b"},{"id":"b","label":"B","within":"a"}])
+            ))
+            .is_err()
+        );
     }
 
     #[test]
