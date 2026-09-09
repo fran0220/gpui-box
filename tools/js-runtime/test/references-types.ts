@@ -1,5 +1,17 @@
 import type { GPUI, NativeRef } from '../sdk.js';
 declare const gpui: GPUI;
+declare const area: NativeRef<'TextArea'>;
+const areaSnapshot: Promise<{revision: number; text: string}> = gpui.query(area, 'snapshot');
+const areaFocus: Promise<NativeRef<'FocusHandle'>> = gpui.query(area, 'focus_handle');
+const editorArea: Promise<NativeRef<'TextArea'>> = gpui.query(gpui.kit.Editor('editor'), 'text_area');
+gpui.invoke(area, 'set_value', {value: 'Native λ document'});
+// @ts-expect-error TextArea does not inherit SearchField methods
+gpui.invoke(area, 'set_query', {text: 'wrong kind'});
+// @ts-expect-error TextArea snapshots are full values, not references
+const snapshotReference: Promise<NativeRef<'TextArea'>> = gpui.query(area, 'snapshot');
+// @ts-expect-error no Editor reference kind exists
+declare const editorReference: NativeRef<'Editor'>;
+void [areaSnapshot, areaFocus, editorArea];
 declare const input: NativeRef<'TextInput'>;
 declare const focus: NativeRef<'FocusHandle'>;
 declare const menu: NativeRef<'Menu'>;

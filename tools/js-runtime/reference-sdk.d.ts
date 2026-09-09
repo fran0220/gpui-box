@@ -10,6 +10,7 @@ export interface NativeRef<T extends keyof NativeReferenceContracts = keyof Nati
   readonly [issuedNativeReference]: T;
 }
 export interface NativeReferenceContracts {
+  TextArea: KitMethodContracts['TextArea'];
   TextInput: KitMethodContracts['TextInput'];
   Menu: KitMethodContracts['Menu'];
   SearchField: KitMethodContracts['SearchField'];

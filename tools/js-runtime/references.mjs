@@ -11,7 +11,7 @@ export function validateNativeRef(value) {
   if (Reflect.ownKeys(fields).length !== 2 || !fields.$nativeRef || !fields.type ||
       !Object.hasOwn(fields.$nativeRef, 'value') || !Object.hasOwn(fields.type, 'value') ||
       typeof fields.$nativeRef.value !== 'string' || !/^native-[1-9][0-9]{0,19}$/.test(fields.$nativeRef.value) ||
-      !['TextInput', 'Menu', 'SearchField', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
+      !['TextInput', 'TextArea', 'Menu', 'SearchField', 'FocusHandle'].includes(fields.type.value)) throw new Error('Invalid native reference fields');
   return value;
 }
 

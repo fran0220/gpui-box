@@ -4,6 +4,26 @@ import { NativeReferences, validateNativeRef, validateReferenceInvocation } from
 import { kitMethods, validateValue } from '../kit-schema.mjs';
 
 const ref = (id, type = 'FocusHandle') => ({ $nativeRef: `native-${id}`, type });
+test('TextArea references reuse frozen methods and full snapshots without an Editor kind', () => {
+  const registry = new NativeReferences();
+  const area = registry.adopt({ child: ref(51, 'TextArea') }).child;
+  assert.equal(registry.adopt(ref(51, 'TextArea')), area);
+  assert.equal(validateReferenceInvocation(area, 'set_value', {value:'Native λ document'}, 'invoke'), kitMethods.TextArea.invoke.set_value);
+  const snapshot = validateReferenceInvocation(area, 'snapshot', {}, 'query').result;
+  validateValue({revision:17,text:'Native λ document'}, snapshot);
+  assert.throws(() => validateValue({revision:17}, snapshot));
+  assert.throws(() => validateValue(ref(51, 'TextArea'), snapshot));
+  validateValue(ref(51, 'TextArea'), kitMethods.Editor.query.text_area.result);
+  assert.throws(() => validateValue(ref(51, 'TextInput'), kitMethods.Editor.query.text_area.result));
+  validateValue(ref(52), validateReferenceInvocation(area, 'focus_handle', {}, 'query').result);
+  assert.throws(() => registry.target(area, 'set_query', {text:'wrong kind'}, 'invoke'));
+  assert.throws(() => registry.target(area, 'set_value', {value:3}, 'invoke'));
+  assert.throws(() => registry.target(area, 'set_value', {value:'wrong mode'}, 'query'));
+  assert.throws(() => registry.adopt(ref(53, 'Editor')));
+  registry.clear();
+  assert.throws(() => registry.target(area, 'snapshot', {}, 'query'), /not issued/);
+});
+
 test('references require issued identity, retain same-worker identity, and release explicitly', () => {
   const registry = new NativeReferences(), peer = new NativeReferences();
   const reference = registry.adopt({ child: ref(3) }).child;
