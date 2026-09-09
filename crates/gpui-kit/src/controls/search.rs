@@ -49,6 +49,7 @@ pub enum SearchInputEvent {
 pub struct SearchInput {
     ident: Ident,
     input: Entity<TextInput>,
+    name: Option<SharedString>,
     placeholder: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
@@ -73,6 +74,7 @@ impl SearchInput {
         Self {
             ident,
             input,
+            name: None,
             placeholder: None,
             size: ControlSize::Md,
             disabled: false,
@@ -80,10 +82,39 @@ impl SearchInput {
         }
     }
 
-    /// Supplies both the empty hint and the accessible name.
+    /// Names the query independently of its visible empty hint. When omitted,
+    /// the accessible name falls back to the placeholder.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Supplies the empty hint, also used as the name unless explicitly named.
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = Some(placeholder.into());
         self
+    }
+
+    /// Updates the accessible name without changing the hint or query.
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let name = name.into();
+        if self.name.as_ref() != Some(&name) {
+            self.name = Some(name);
+            cx.notify();
+        }
+    }
+
+    /// Updates the empty hint without changing an explicit name or query.
+    pub fn set_placeholder(
+        &mut self,
+        placeholder: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        let placeholder = placeholder.into();
+        if self.placeholder.as_ref() != Some(&placeholder) {
+            self.placeholder = Some(placeholder);
+            cx.notify();
+        }
     }
 
     pub fn value(&self, cx: &App) -> SharedString {
@@ -186,7 +217,7 @@ impl Render for SearchInput {
                 cx,
                 NodeSpec::new(self.ident.child("label").semantic_id(), Role::Text)
                     .labels(self.ident.child("query").semantic_id())
-                    .text(placeholder),
+                    .text(self.name.clone().unwrap_or(placeholder)),
             ),
         )
         .semantic_in(

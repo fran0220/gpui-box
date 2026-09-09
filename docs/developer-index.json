@@ -1096,7 +1096,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4243
+      "symbolCount": 4246
     },
     {
       "name": "gpui-box-kit-assets",
@@ -61986,7 +61986,7 @@
       "source": "crates/gpui-kit/src/controls/search.rs",
       "summary": "An in-content query with a magnifier and a clear action when nonempty.",
       "documentation": "An in-content query with a magnifier and a clear action when nonempty.\n\nFor project filters and similar queries, not document find/replace.\nOwns only the edit buffer and reports `SearchInputEvent`; the host owns\nmatching, results and debounce. Sizes use the same field metrics as inputs.",
-      "signature": "# [doc = \" An in-content query with a magnifier and a clear action when nonempty.\"] # [doc = \"\"] # [doc = \" For project filters and similar queries, not document find/replace.\"] # [doc = \" Owns only the edit buffer and reports `SearchInputEvent`; the host owns\"] # [doc = \" matching, results and debounce. Sizes use the same field metrics as inputs.\"] pub struct SearchInput { ident : Ident, input : Entity<TextInput>, placeholder : Option<SharedString>, size : ControlSize, disabled : bool, _subscription : Subscription, }",
+      "signature": "# [doc = \" An in-content query with a magnifier and a clear action when nonempty.\"] # [doc = \"\"] # [doc = \" For project filters and similar queries, not document find/replace.\"] # [doc = \" Owns only the edit buffer and reports `SearchInputEvent`; the host owns\"] # [doc = \" matching, results and debounce. Sizes use the same field metrics as inputs.\"] pub struct SearchInput { ident : Ident, input : Entity<TextInput>, name : Option<SharedString>, placeholder : Option<SharedString>, size : ControlSize, disabled : bool, _subscription : Subscription, }",
       "cfg": []
     },
     {
@@ -62001,6 +62001,21 @@
       "summary": "The underlying editable control, for bindings and selection access.",
       "documentation": "The underlying editable control, for bindings and selection access.",
       "signature": "pub fn input (& self) -> & Entity<TextInput>",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::name",
+      "name": "name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Names the query independently of its visible empty hint. When omitted, the accessible name falls back to the placeholder.",
+      "documentation": "Names the query independently of its visible empty hint. When omitted,\nthe accessible name falls back to the placeholder.",
+      "signature": "pub fn name (mut self, name : impl Into<SharedString>) -> Self",
       "cfg": [],
       "target": "SearchInput"
     },
@@ -62028,8 +62043,8 @@
       "module": "controls::search",
       "path": "gpui_kit::controls::search",
       "source": "crates/gpui-kit/src/controls/search.rs",
-      "summary": "Supplies both the empty hint and the accessible name.",
-      "documentation": "Supplies both the empty hint and the accessible name.",
+      "summary": "Supplies the empty hint, also used as the name unless explicitly named.",
+      "documentation": "Supplies the empty hint, also used as the name unless explicitly named.",
       "signature": "pub fn placeholder (mut self, placeholder : impl Into<SharedString>) -> Self",
       "cfg": [],
       "target": "SearchInput"
@@ -62046,6 +62061,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::set_name",
+      "name": "set_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Updates the accessible name without changing the hint or query.",
+      "documentation": "Updates the accessible name without changing the hint or query.",
+      "signature": "pub fn set_name (& mut self, name : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Updates the empty hint without changing an explicit name or query.",
+      "documentation": "Updates the empty hint without changing an explicit name or query.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : impl Into<SharedString>, cx : & mut Context<Self>,)",
       "cfg": [],
       "target": "SearchInput"
     },
@@ -123296,9 +123341,12 @@
         "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
+        "name(name: impl Into<SharedString>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self"
       ],
       "commands": [
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
@@ -144913,7 +144961,7 @@
       "uses": [
         "SearchInput"
       ],
-      "example": "fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"Queries: Xs empty, Sm and Md populated, disabled\",\n        ))\n        .children(cx.global::<SceneSearch>().queries.clone())\n        .into_any_element()\n}"
+      "example": "fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"Queries: Xs empty, Sm and Md populated, disabled\",\n        ))\n        .children(cx.global::<SceneSearch>().queries.clone())\n        .child(caption(\n            &theme,\n            \"Last query: name ‘Search projects’, hint ‘Search…’\",\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "search-field",

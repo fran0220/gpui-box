@@ -4232,9 +4232,12 @@
         "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
+        "name(name: impl Into<SharedString>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self"
       ],
       "commands": [
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
@@ -16593,7 +16596,7 @@
       "uses": [
         "SearchInput"
       ],
-      "example": "fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"Queries: Xs empty, Sm and Md populated, disabled\",\n        ))\n        .children(cx.global::<SceneSearch>().queries.clone())\n        .into_any_element()\n}"
+      "example": "fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"Queries: Xs empty, Sm and Md populated, disabled\",\n        ))\n        .children(cx.global::<SceneSearch>().queries.clone())\n        .child(caption(\n            &theme,\n            \"Last query: name ‘Search projects’, hint ‘Search…’\",\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "search-field",

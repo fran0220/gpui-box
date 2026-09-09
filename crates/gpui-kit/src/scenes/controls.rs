@@ -197,6 +197,7 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
         ("sm", ControlSize::Sm, "Local projects", false),
         ("md", ControlSize::Md, "设计 review", false),
         ("disabled", ControlSize::Md, "Unavailable query", true),
+        ("named", ControlSize::Md, "", false),
     ]
     .into_iter()
     .map(|(id, size, value, disabled)| {
@@ -205,6 +206,9 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
                 .placeholder("Search projects")
                 .control_size(size)
                 .disabled(disabled);
+            if id == "named" {
+                input = input.name("Search projects").placeholder("Search…");
+            }
             input.set_value(value, cx);
             input
         })
@@ -283,6 +287,10 @@ pub(super) fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {
             "Queries: Xs empty, Sm and Md populated, disabled",
         ))
         .children(cx.global::<SceneSearch>().queries.clone())
+        .child(caption(
+            &theme,
+            "Last query: name ‘Search projects’, hint ‘Search…’",
+        ))
         .into_any_element()
 }
 

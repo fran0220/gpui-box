@@ -194,6 +194,90 @@ fn a_hidden_tab_can_still_be_reached_from_the_keyboard(cx: &mut TestAppContext) 
 // ---------------------------------------------------------------------- search
 
 #[gpui::test]
+fn query_name_and_hint_remain_independent_across_runtime_updates(cx: &mut TestAppContext) {
+    for named in [false, true] {
+        let held = Rc::new(RefCell::new(None::<Entity<SearchInput>>));
+        let sink = held.clone();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+            sink.borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        let input = SearchInput::new("query", window, cx).placeholder("Search…");
+                        if named {
+                            input.name("Search projects")
+                        } else {
+                            input
+                        }
+                    })
+                })
+                .clone()
+                .into_any_element()
+        });
+        let query = held.borrow().clone().expect("query built");
+        let label = harness.node("query.label").expect("query label");
+        assert_eq!(label.labels.as_deref(), Some("query.query"));
+        assert_eq!(
+            label.text.as_deref(),
+            Some(if named {
+                "Search projects"
+            } else {
+                "Search…"
+            })
+        );
+        let input = query.clone();
+        harness.update(move |_, cx| {
+            input.update(cx, |input, cx| input.set_placeholder("搜索…", cx));
+        });
+        harness.frame();
+        assert_eq!(
+            harness
+                .node("query.label")
+                .expect("updated query label")
+                .text
+                .as_deref(),
+            Some(if named {
+                "Search projects"
+            } else {
+                "搜索…"
+            })
+        );
+        let input = query.clone();
+        harness.update(move |_, cx| {
+            input.update(cx, |input, cx| {
+                input.set_name("搜索项目", cx);
+                input.set_value("Design", cx);
+            });
+        });
+        harness.frame();
+        assert_eq!(
+            harness
+                .node("query.query")
+                .expect("named query editor")
+                .placeholder
+                .as_deref(),
+            Some("搜索…"),
+            "changing the name preserves the hint"
+        );
+        harness.update(move |_, cx| {
+            query.update(cx, |input, cx| input.set_placeholder("Filter…", cx));
+        });
+        harness.frame();
+        harness.frame();
+        assert_eq!(
+            harness
+                .node("query.label")
+                .expect("persistent query label")
+                .text
+                .as_deref(),
+            Some("搜索项目")
+        );
+        let editor = harness.node("query.query").expect("updated query editor");
+        assert_eq!(editor.placeholder.as_deref(), Some("Filter…"));
+        assert_eq!(editor.value.as_deref(), Some("Design"));
+    }
+}
+
+#[gpui::test]
 fn a_query_clears_only_when_enabled_and_reports_the_edit(cx: &mut TestAppContext) {
     let held = Rc::new(RefCell::new(None::<Entity<SearchInput>>));
     let sink = held.clone();
