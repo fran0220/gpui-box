@@ -175,6 +175,12 @@ impl RenderOnce for EmptyState {
                     .child(action)
             }));
 
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Status)
+            .text(self.title.clone())
+            .value(self.kind.name());
+        if let Some(detail) = self.detail {
+            spec = spec.description(detail);
+        }
         // The rise happens inside the element that publishes the node, so the
         // published box is the settled one and only the pixels travel.
         div()
@@ -190,12 +196,7 @@ impl RenderOnce for EmptyState {
                 &theme,
                 content,
             ))
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(self.title.clone())
-                    .value(self.kind.name()),
-            )
+            .semantic_in(cx, spec)
     }
 }
 

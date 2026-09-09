@@ -13,13 +13,20 @@ fn code_copy_refusal_keeps_clipboard_and_granted_copy_uses_actual_caller_text(
 ) {
     let owner = gpui::EffectOwner::new();
     let node = fixtures().remove(1);
-    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
-        gpui::effect_owner(
-            owner,
-            render(&node, KitSlots::new(), window, cx, Rc::new(|_, _| {})),
-        )
-        .into_any_element()
-    });
+    let mut harness = Harness::new(
+        cx,
+        move |cx| {
+            gpui_kit::install(cx);
+            gpui_kit::foundation::register_owner_state(owner, cx);
+        },
+        move |window, cx| {
+            gpui::effect_owner(
+                owner,
+                render(&node, KitSlots::new(), window, cx, Rc::new(|_, _| {})),
+            )
+            .into_any_element()
+        },
+    );
     harness.update(|_, cx| {
         cx.set_clipboard_policy(move |candidate, operation| {
             candidate == owner && operation == gpui::ClipboardOperation::Read

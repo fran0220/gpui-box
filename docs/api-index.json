@@ -81,6 +81,7 @@
       ],
       "options": [
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "size(size: f32) -> Self",
         "parent(parent: impl Into<Ident>) -> Self"
@@ -105,6 +106,7 @@
       "options": [
         "task_label(label: impl Into<SharedString>) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "selected(selected: bool) -> Self",
         "on_action(handler: impl Fn(AgentUiAction, &mut Window, &mut App) + 'static) -> Self"
@@ -519,6 +521,7 @@
         "presence(presence: AvatarPresence) -> Self",
         "id(ident: impl Into<Ident>) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "size(size: f32) -> Self",
         "tint(tint: Hsla) -> Self"
       ],
@@ -804,8 +807,8 @@
         "new(ident: impl Into<Ident>) -> Self"
       ],
       "options": [
-        "child(button: Button) -> Self",
-        "children(buttons: impl IntoIterator<Item = Button>) -> Self"
+        "child(button: impl Into<EffectScoped<Button>>) -> Self",
+        "children<B: Into<EffectScoped<Button>>>(buttons: impl IntoIterator<Item = B>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2716,6 +2719,7 @@
       ],
       "queries": [
         "active_command() -> Option<&SharedString>",
+        "is_disabled() -> bool",
         "current_commands() -> &[KeymapCommand]"
       ],
       "slots": [],
@@ -3366,10 +3370,16 @@
       ],
       "commands": [
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_range(min: Option<f64>, max: Option<f64>, cx: &mut Context<Self>)",
+        "set_steps(step: f64, page_step: Option<f64>, cx: &mut Context<Self>)",
+        "set_precision(precision: usize, cx: &mut Context<Self>)",
+        "set_presentation(name: Option<SharedString>, unit: Option<SharedString>, prefix: Option<SharedString>, size: ControlSize, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
         "set_value(value: f64, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "current() -> Option<f64>",
         "field() -> &Entity<TextInput>",
         "shown(cx: &App) -> Option<f64>",
@@ -3703,6 +3713,7 @@
         "expression(expression: PersonaExpression) -> Self",
         "voice(sample: VoiceSample) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "on_event(handler: impl Fn(&PersonaDialogueEvent, &mut Window, &mut App) + 'static) -> Self",
         "markdown_image(source: impl Fn(&SharedString, &ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
@@ -3732,6 +3743,7 @@
         "expression(expression: PersonaExpression) -> Self",
         "voice(sample: VoiceSample) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "effect(plan: EffectPlan) -> Self",
         "sample_at(elapsed: Duration) -> Self",
@@ -4525,8 +4537,8 @@
       ],
       "options": [
         "query(query: impl Into<SharedString>) -> Self",
-        "section(section: SettingsSection) -> Self",
-        "sections(sections: impl IntoIterator<Item = SettingsSection>) -> Self"
+        "section(section: impl Into<EffectScoped<SettingsSection>>) -> Self",
+        "sections<S: Into<EffectScoped<SettingsSection>>>(sections: impl IntoIterator<Item = S>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -4580,8 +4592,8 @@
       "options": [
         "description(description: impl Into<SharedString>) -> Self",
         "dimmed_by(reason: impl Into<SharedString>) -> Self",
-        "row(row: SettingsRow) -> Self",
-        "rows(rows: impl IntoIterator<Item = SettingsRow>) -> Self",
+        "row(row: impl Into<EffectScoped<SettingsRow>>) -> Self",
+        "rows<R: Into<EffectScoped<SettingsRow>>>(rows: impl IntoIterator<Item = R>) -> Self",
         "label_width(width: Pixels) -> Self",
         "child(child: impl IntoElement) -> Self",
         "action(action: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
@@ -4770,9 +4782,19 @@
         "on_click(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [
+        "set_label(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_variant(variant: ButtonVariant, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_default_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
+        "set_menu_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_on_click(handler: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>)",
+        "clear_on_click(cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, window: &mut Window, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "menu() -> &Entity<Menu>",
         "is_open(cx: &App) -> bool",
         "open_menu(window: &mut Window, cx: &mut Context<Self>)"
@@ -5832,7 +5854,7 @@
       "options": [
         "upload(upload: Upload) -> Self",
         "uploads(uploads: impl IntoIterator<Item = Upload>) -> Self",
-        "dropzone(zone: Dropzone) -> Self",
+        "dropzone(zone: impl Into<EffectScoped<Dropzone>>) -> Self",
         "show_overall(show: bool) -> Self",
         "on_retry(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_cancel(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
@@ -6113,6 +6135,7 @@
       ],
       "options": [
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self"
       ],
       "commands": [],
@@ -12294,6 +12317,7 @@
       "options": [
         "expression(expression: PersonaExpression) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "gauge(gauge: PartyGauge) -> Self"
       ],
@@ -13055,7 +13079,8 @@
         "detail(detail: impl Into<SharedString>) -> Self",
         "quantity(quantity: usize) -> Self",
         "icon(icon: Icon) -> Self",
-        "image(image: impl Into<SharedString>) -> Self"
+        "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self"
       ],
       "commands": [],
       "queries": [

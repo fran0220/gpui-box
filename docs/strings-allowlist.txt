@@ -33,6 +33,7 @@ AnimatedNumber
 ApprovalPrompt
 AspectRatio
 AudioPlayer
+Avatar
 AvatarGroup
 BackspaceAtStart
 Banner
@@ -161,6 +162,7 @@ Placed
 PlatformMediaTransport
 Plot
 Popover
+PresentationImage
 ProgressBar
 ProgressCircle
 Radio

@@ -177,7 +177,7 @@ fn reserved(v: &Value) -> Edges<gpui::Pixels> {
     }
 }
 /// Builds native records after closed-schema and recursive identity validation.
-/// Shared by menu-bearing bindings; never substitutes records for an Entity<Menu>.
+/// Shared by menu-bearing bindings; never substitutes records for an `Entity<Menu>`.
 pub(super) fn menu_items(v: &Value) -> Vec<MenuItem> {
     array(v)
         .map(|v| {

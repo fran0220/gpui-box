@@ -11,9 +11,9 @@ import { familySchemas as media } from './kit-media-schema.mjs';
 import { familySchemas as data } from './kit-data-schema.mjs';
 import { familySchemas as structured } from './kit-structured-schema.mjs';
 
-// Frozen family implementations exist, but this JS-only stage does not install
-// their native host registration, reference consumers or resource construction.
-const pendingNative = new Set(Object.keys({ ...display, ...charts, ...agent, ...game,
+// These families are registered in the native host. Registration is not a
+// claim of complete component, transport, or platform feature parity.
+const registeredNative = new Set(Object.keys({ ...display, ...charts, ...agent, ...game,
   ...canvas, ...overlay, ...content, ...media, ...data, ...structured }));
 
 // This is a discoverability list, not a flattened validation schema: alternatives
@@ -26,13 +26,14 @@ function propertyNames(schema, definitions = schema.$defs) {
 
 // Snapshot aliases remain data-only; focus_handle names its native trait authority.
 const nativeMethodSources = {
-  TextInput: { focus_handle: 'gpui::window::Focusable::focus_handle' },
-  ...Object.fromEntries(Object.entries(familyReferenceMethods)
+  ...Object.fromEntries(Object.entries(kitMethods)
     .filter(([, modes]) => modes.query?.focus_handle)
     .map(([component]) => [component, { focus_handle: 'gpui::window::Focusable::focus_handle' }])),
   Calendar: { adapter_snapshot: 'adapter' },
   DateInput: { field_snapshot: 'field', calendar_snapshot: 'calendar' },
   RangePicker: { calendar_snapshot: 'calendar' },
+  SankeyChart: { layout: 'gpui_kit::display::plot::SankeyData::layout' },
+  Sparkline: { published_points: 'gpui_kit::display::sparkline::SparklineReading::published_points' },
 };
 
 export const bindings = {
@@ -42,9 +43,9 @@ export const bindings = {
     props: propertyNames(schema.props), events: Object.keys(schema.events),
     nativeMethods: kitMethods[component] ?? { invoke: {}, query: {} },
     ...(nativeMethodSources[component] ? { nativeMethodSources: nativeMethodSources[component] } : {}),
-    ...(pendingNative.has(component) ? { nativeIntegration: 'pending-central-hooks' } : {}),
+    ...(registeredNative.has(component) ? { nativeIntegration: 'registered' } : {}),
     ...(familyReferenceMethods[component] ? {
-      referenceIntegration: 'pending-native-registry',
+      referenceIntegration: 'registered',
       referenceMethods: Object.fromEntries(Object.entries(familyReferenceMethods[component])
         .map(([mode, methods]) => [mode, Object.keys(methods)])),
     } : {}),

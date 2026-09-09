@@ -78,6 +78,27 @@ fn ambiguous_object_identity_is_reported_without_dropping_or_renaming_members(
     });
     assert!(h.node("legacy.identity-error").is_some());
     h.accessibility_tree();
+    h.update(|_, cx| {
+        set_strings(
+            [
+                (StringKey::JsonIdentityRequired, "Member IDs missing".into()),
+                (StringKey::JsonIdentityDetail, "Kept document intact".into()),
+            ],
+            cx,
+        );
+    });
+    assert_eq!(
+        h.node("legacy.identity-error")
+            .expect("localized refusal")
+            .text
+            .as_deref(),
+        Some("Member IDs missing")
+    );
+    assert!(
+        h.accessibility_tree()
+            .to_string()
+            .contains("Kept document intact")
+    );
     let JsonValue::Object(members) = retained else {
         panic!("preserved object")
     };

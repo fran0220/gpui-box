@@ -60,8 +60,8 @@ use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
     dropzone, editor, editor_folding, editor_multicursor, editor_options, editor_services,
     filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor, mention_input,
-    multi_select, rich_text_editor, search_field, search_input, settings, settings_page, textarea, toggle,
-    transfer_list, translation_packs, upload_list,
+    multi_select, rich_text_editor, search_field, search_input, settings, settings_page, textarea,
+    toggle, transfer_list, translation_packs, upload_list,
 };
 use data::{
     data_grid, data_grid_editing, deferred_drop, diagnostics_list, drag_list, drag_tree, flow,

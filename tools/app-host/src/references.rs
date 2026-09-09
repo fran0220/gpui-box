@@ -167,26 +167,28 @@ impl Registry {
         &self,
         root: &Node,
         owner_for: impl Fn(&Node) -> Option<EffectOwner>,
-        parent_for: impl Fn(&str) -> Option<EntityId>,
+        parent_for: impl Fn(&Node) -> Option<EntityId>,
         cx: &App,
     ) {
         fn collect(
             node: &Node,
             owners: &impl Fn(&Node) -> Option<EffectOwner>,
-            scopes: &mut Vec<Scope>,
+            parents: &impl Fn(&Node) -> Option<EntityId>,
+            scopes: &mut Vec<(Scope, Option<EntityId>)>,
         ) {
             if let Some(owner) = owners(node) {
-                scopes.push(Scope::new(node, owner));
+                scopes.push((Scope::new(node, owner), parents(node)));
             }
             for child in node.children.iter().chain(node.slots.values().flatten()) {
-                collect(child, owners, scopes);
+                collect(child, owners, parents, scopes);
             }
         }
         let mut scopes = Vec::new();
-        collect(root, &owner_for, &mut scopes);
+        collect(root, &owner_for, &parent_for, &mut scopes);
         self.0.borrow_mut().entries.retain(|_, entry| {
-            scopes.contains(&entry.scope)
-                && parent_for(&entry.scope.id) == Some(entry.anchor)
+            scopes
+                .iter()
+                .any(|(scope, parent)| scope == &entry.scope && *parent == Some(entry.anchor))
                 && entry.is_valid(cx)
         });
     }

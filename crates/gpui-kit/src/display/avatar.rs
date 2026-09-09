@@ -8,7 +8,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, SemanticWash, Theme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
-use crate::strings::ActiveNumbers;
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// Whether the identity behind the mark is reachable, in the host's terms.
 ///
@@ -212,6 +212,7 @@ impl RenderOnce for Avatar {
             .when_some(lettering, |element, size| element.text_size(px(size)))
             .text_color(foreground)
             .when_some(self.image.clone(), |element, source| {
+                let unavailable = cx.strings().text(StringKey::AvatarImageUnavailable);
                 let ident = self
                     .ident
                     .as_ref()
@@ -225,7 +226,7 @@ impl RenderOnce for Avatar {
                                 Some(ident) => crate::display::icon::Icon::named(
                                     ident.clone(),
                                     glyph,
-                                    "Image unavailable",
+                                    unavailable.clone(),
                                 ),
                                 None => crate::display::icon::Icon::new(glyph),
                             };

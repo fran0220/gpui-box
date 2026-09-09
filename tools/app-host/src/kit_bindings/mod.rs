@@ -13,23 +13,55 @@ use std::{
     rc::Rc,
 };
 
+mod agent;
+mod canvas;
+mod charts;
 mod collections;
+mod content;
 mod controls_extra;
+mod data_extra;
 mod datetime;
+mod display;
+mod game_effects;
 mod icon;
 mod invocation;
 mod layout;
 mod layout_extra;
+mod media;
 mod navigation_extra;
+mod overlay_extra;
 mod overlays;
 pub(crate) mod reference_dispatch;
+mod structured;
 mod validation;
 pub(super) use validation::validate_descriptor;
 
 #[cfg(all(test, feature = "capture"))]
+mod resource_e2e_tests;
+#[cfg(all(test, feature = "capture"))]
 mod tests;
 
-pub(super) const COMPONENTS: &[&str] = &[
+pub(super) static COMPONENTS: std::sync::LazyLock<Vec<&str>> = std::sync::LazyLock::new(|| {
+    [
+        CORE_COMPONENTS,
+        controls_extra::COMPONENTS,
+        navigation_extra::COMPONENTS,
+        layout_extra::COMPONENTS,
+        datetime::COMPONENTS,
+        agent::COMPONENTS,
+        canvas::COMPONENTS,
+        charts::COMPONENTS,
+        content::COMPONENTS,
+        data_extra::COMPONENTS,
+        display::COMPONENTS,
+        game_effects::COMPONENTS,
+        media::COMPONENTS,
+        overlay_extra::COMPONENTS,
+        structured::COMPONENTS,
+    ]
+    .concat()
+});
+const CORE_COMPONENTS: &[&str] = &[
     "Checkbox",
     "Radio",
     "Switch",
@@ -46,41 +78,6 @@ pub(super) const COMPONENTS: &[&str] = &[
     "List",
     "Popover",
     "Dialog",
-    "Button",
-    "IconButton",
-    "Toggle",
-    "ToggleGroup",
-    "ColorPicker",
-    "ColorSwatch",
-    "FormField",
-    "FilterBar",
-    "SearchInput",
-    "SettingsRow",
-    "TransferList",
-    "AnchorList",
-    "Breadcrumb",
-    "Carousel",
-    "Collapsible",
-    "NavStack",
-    "Sidebar",
-    "UndoHistory",
-    "Wizard",
-    "AspectRatio",
-    "Container",
-    "DesktopTitlebar",
-    "Dock",
-    "DockTree",
-    "Grid",
-    "Responsive",
-    "ScrollEdgeEffect",
-    "ScrollFade",
-    "SplitTree",
-    "StatusBar",
-    "Toolbar",
-    "Calendar",
-    "DateInput",
-    "RangePicker",
-    "TimeInput",
 ];
 type Emit = Rc<dyn Fn(&str, Value)>;
 type Key = (u64, String);
@@ -122,6 +119,11 @@ pub(super) struct KitState {
     navigation_extra: navigation_extra::State,
     layout_extra: layout_extra::State,
     datetime: datetime::State,
+    agent: agent::State,
+    content: content::State,
+    media: media::State,
+    overlay_extra: overlay_extra::State,
+    structured: structured::State,
 }
 
 fn flag(node: &Node, key: &str) -> bool {
@@ -184,17 +186,18 @@ pub(super) fn select_options(value: Option<&Value>) -> Vec<SelectOption> {
 }
 
 impl KitState {
-    pub(super) fn native_entity_id(&self, id: &str) -> Option<gpui::EntityId> {
+    pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         self.retained
             .borrow()
-            .iter()
-            .find(|((_, key), _)| key == id)
-            .map(|(_, entry)| match &entry.control {
+            .get(&(node.instance, node.id.clone()))
+            .map(|entry| match &entry.control {
                 Control::Input(entity) => entity.entity_id(),
                 Control::Select(entity) => entity.entity_id(),
                 Control::Popover(entity, _) => entity.entity_id(),
                 Control::Dialog(entity, _) => entity.entity_id(),
             })
+            .or_else(|| self.controls_extra.native_entity_id(node))
+            .or_else(|| self.overlay_extra.native_entity_id(node))
     }
 
     pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
@@ -202,6 +205,11 @@ impl KitState {
         self.navigation_extra.reconcile(root, _cx);
         self.layout_extra.reconcile(root, _cx);
         self.datetime.reconcile(root, _cx);
+        self.agent.reconcile(root, _cx);
+        self.content.reconcile(root, _cx);
+        self.media.reconcile(root, _cx);
+        self.overlay_extra.reconcile(root, _cx);
+        self.structured.reconcile(root, _cx);
         fn visit(node: &Node, live: &mut HashMap<Key, String>) {
             if let Some(component) = &node.component {
                 live.insert((node.instance, node.id.clone()), component.clone());
@@ -225,6 +233,38 @@ impl KitState {
         });
     }
 
+    /// Build typed native children before erasing the parent's element type.
+    pub(super) fn render_constructed(
+        &self,
+        node: &Node,
+        context: crate::construction::NativeBuildContext,
+        window: &mut Window,
+        cx: &mut App,
+        emit: Emit,
+    ) -> anyhow::Result<AnyElement> {
+        Ok(match node.component.as_deref() {
+            Some("ButtonGroup") => {
+                controls_extra::button_group(node, context, window, cx)?.into_any_element()
+            }
+            Some("SettingsSection") => {
+                controls_extra::settings_section(node, context, window, cx)?.into_any_element()
+            }
+            Some("SettingsList") => {
+                controls_extra::settings_list(node, context, window, cx)?.into_any_element()
+            }
+            _ => self.render(node, context.slots, window, cx, emit),
+        })
+    }
+
+    pub(super) fn apply_reference_props(
+        &self,
+        node: &Node,
+        cx: &mut App,
+        refs: &crate::references::Registration<'_>,
+    ) -> anyhow::Result<()> {
+        self.overlay_extra.apply_reference_props(node, cx, refs)
+    }
+
     pub(super) fn render(
         &self,
         node: &Node,
@@ -245,6 +285,36 @@ impl KitState {
         }
         if datetime::COMPONENTS.contains(&component) {
             return self.datetime.render(node, slots, window, cx, emit);
+        }
+        if agent::COMPONENTS.contains(&component) {
+            return self.agent.render(node, slots, window, cx, emit);
+        }
+        if content::COMPONENTS.contains(&component) {
+            return self.content.render(node, slots, window, cx, emit);
+        }
+        if media::COMPONENTS.contains(&component) {
+            return self.media.render(node, slots, window, cx, emit);
+        }
+        if overlay_extra::COMPONENTS.contains(&component) {
+            return self.overlay_extra.render(node, slots, window, cx, emit);
+        }
+        if structured::COMPONENTS.contains(&component) {
+            return self.structured.render(node, slots, window, cx, emit);
+        }
+        if display::COMPONENTS.contains(&component) {
+            return display::render(node, slots, window, cx, emit);
+        }
+        if charts::COMPONENTS.contains(&component) {
+            return charts::render(node, slots, window, cx, emit);
+        }
+        if canvas::COMPONENTS.contains(&component) {
+            return canvas::render(node, slots, window, cx, emit);
+        }
+        if data_extra::COMPONENTS.contains(&component) {
+            return data_extra::render(node, slots, window, cx, emit);
+        }
+        if game_effects::COMPONENTS.contains(&component) {
+            return game_effects::render(node, slots, window, cx, emit);
         }
         let id = SharedString::from(node.id.clone());
         let disabled = flag(node, "disabled");

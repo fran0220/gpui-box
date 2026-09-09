@@ -64,6 +64,29 @@ impl KitState {
         cx: &mut App,
         refs: &Registration<'_>,
     ) -> Option<Result<Value>> {
+        if let Some(result) = self
+            .controls_extra
+            .reference_query(node, method, args, cx, refs)
+        {
+            return Some(result);
+        }
+        let component = node.component.as_deref().unwrap_or_default();
+        if overlay_extra::COMPONENTS.contains(&component)
+            && (method == "focus_handle"
+                || (component == "CommandPalette" && method == "query_input"))
+        {
+            return Some((|| {
+                let schema = validation::invocation(component, method, args, true)?;
+                let value = if method == "query_input" {
+                    self.overlay_extra.query_input(node, cx, refs, text_input)?
+                } else {
+                    self.overlay_extra
+                        .invoke_reference(node, method, args, true, cx, refs)?
+                };
+                validation::validate(&value, schema)?;
+                Ok(value)
+            })());
+        }
         if node.component.as_deref() != Some("TextInput") || method != "focus_handle" {
             return None;
         }

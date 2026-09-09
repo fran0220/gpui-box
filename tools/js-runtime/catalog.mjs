@@ -16,6 +16,9 @@ for (const component of catalog.components) {
     for (const name of Object.keys(methods)) {
       const nativeName = bindings[component.name].nativeMethodSources?.[name] ?? name;
       if (nativeName.includes('::')) {
+        // Queries on caller-owned data name the exact public method they call,
+        // rather than pretending it is an inherent method of the component.
+        if (developer.symbols.some(symbol => symbol.id === nativeName && symbol.kind === 'method')) continue;
         // Trait methods are deliberately absent from the inherent API index.
         // Name their trait authority explicitly; the native dispatcher compiles
         // the corresponding trait call on the concrete component type.

@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2618
+      "symbolCount": 2628
     },
     {
       "name": "gpui-box-app-host",
@@ -596,6 +596,13 @@
         {
           "alias": "anyhow",
           "package": "anyhow",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "base64",
+          "package": "base64",
           "kind": "normal",
           "optional": false,
           "features": []
@@ -666,7 +673,7 @@
           "features": []
         }
       ],
-      "symbolCount": 0
+      "symbolCount": 31
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -1216,7 +1223,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4438
+      "symbolCount": 4505
     },
     {
       "name": "gpui-box-kit-assets",
@@ -2541,6 +2548,458 @@
     }
   ],
   "symbols": [
+    {
+      "id": "app_host::references::EntityDispatch",
+      "name": "EntityDispatch",
+      "kind": "type",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub type EntityDispatch<T> = fn (& Entity<T>, & str, & Value, bool, & mut Window, & mut App, & Registration<'_>) -> Result<Value>;",
+      "cfg": []
+    },
+    {
+      "id": "app_host::references::Registration",
+      "name": "Registration",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub struct Registration<'a> { registry : & 'a Registry, scope : Scope, anchor : Option<EntityId>, ancestor : Option<Rc<Entry>>, }",
+      "cfg": []
+    },
+    {
+      "id": "app_host::references::Registration::borrow_focus",
+      "name": "borrow_focus",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn borrow_focus (& self, reference : & Value, cx : & App) -> Result<FocusHandle>",
+      "cfg": [],
+      "target": "Registration<'_>"
+    },
+    {
+      "id": "app_host::references::Registration::entity",
+      "name": "entity",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn entity<P : 'static, T : 'static> (& self, kind : & 'static str, parent : & Entity<P>, target : & Entity<T>, current : fn (& P, & App) -> Option<Entity<T>>, command_allowed : fn (& P, & App) -> bool, dispatch : EntityDispatch<T>,) -> Result<Value>",
+      "cfg": [],
+      "target": "Registration<'_>"
+    },
+    {
+      "id": "app_host::references::Registration::focus",
+      "name": "focus",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn focus<P : 'static> (& self, parent : & Entity<P>, target : & FocusHandle, current : fn (& P, & FocusHandle, & App) -> bool, command_allowed : fn (& P, & App) -> bool,) -> Result<Value>",
+      "cfg": [],
+      "target": "Registration<'_>"
+    },
+    {
+      "id": "app_host::references::Registry",
+      "name": "Registry",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Clone, Default)] pub struct Registry (Rc<RefCell<State>>);",
+      "cfg": []
+    },
+    {
+      "id": "app_host::references::Registry::invoke",
+      "name": "invoke",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn invoke (& self, owner : EffectOwner, reference : & Value, method : & str, args : & Value, query : bool, window : & mut Window, cx : & mut App,) -> Result<Value>",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new () -> Self",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::reconcile",
+      "name": "reconcile",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn reconcile (& self, root : & Node, owner_for : impl Fn (& Node) -> Option<EffectOwner>, parent_for : impl Fn (& Node) -> Option<EntityId>, cx : & App,)",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::registration",
+      "name": "registration",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn registration (& self, node : & Node, owner : EffectOwner) -> Registration<'_>",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::release",
+      "name": "release",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn release (& self, reference : & Value, owner : EffectOwner) -> Result<()>",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::revoke",
+      "name": "revoke",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn revoke (& self)",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::references::Registry::source",
+      "name": "source",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "references",
+      "path": "app_host::references",
+      "source": "tools/app-host/src/references.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn source (& self, reference : & Value, instance : u64) -> Result<(String, Option<String>)>",
+      "cfg": [],
+      "target": "Registry"
+    },
+    {
+      "id": "app_host::resources::MAX_BYTES",
+      "name": "MAX_BYTES",
+      "kind": "constant",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const MAX_BYTES: usize",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::MAX_ENCODED",
+      "name": "MAX_ENCODED",
+      "kind": "constant",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const MAX_ENCODED: usize",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::MAX_OWNER_BYTES",
+      "name": "MAX_OWNER_BYTES",
+      "kind": "constant",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const MAX_OWNER_BYTES: usize",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::MAX_OWNER_COUNT",
+      "name": "MAX_OWNER_COUNT",
+      "kind": "constant",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const MAX_OWNER_COUNT: usize",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::Registration",
+      "name": "Registration",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Debug, Deserialize)] # [serde (deny_unknown_fields)] pub struct Registration { pub key : String, pub mime : String, pub data : String, }",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::ResourceBytes",
+      "name": "ResourceBytes",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "A revocable lease, not ownership of resource bytes. Consumers must parse synchronously within with_bytes and enforce format-specific work limits. In particular, authorizing these bytes does not authorize external references.",
+      "documentation": "A revocable lease, not ownership of resource bytes. Consumers must parse\nsynchronously within with_bytes and enforce format-specific work limits.\nIn particular, authorizing these bytes does not authorize external references.",
+      "signature": "# [doc = \" A revocable lease, not ownership of resource bytes. Consumers must parse\"] # [doc = \" synchronously within with_bytes and enforce format-specific work limits.\"] # [doc = \" In particular, authorizing these bytes does not authorize external references.\"] pub struct ResourceBytes (Lease);",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::ResourceBytes::with_bytes",
+      "name": "with_bytes",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn with_bytes<R> (& self, cx : & App, use_bytes : impl FnOnce (& [u8]) -> Result<R>) -> Result<R>",
+      "cfg": [],
+      "target": "ResourceBytes"
+    },
+    {
+      "id": "app_host::resources::ResourceRef",
+      "name": "ResourceRef",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "# [derive (Clone, Debug, Deserialize, Serialize, PartialEq, Eq)] # [serde (deny_unknown_fields)] pub struct ResourceRef { pub key : String, }",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::ResourceStore",
+      "name": "ResourceStore",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub struct ResourceStore (Rc<RefCell<State>>);",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::ResourceStore::clear",
+      "name": "clear",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "Call from Host's release observer while App can still evict GPU atlases.",
+      "documentation": "Call from Host's release observer while App can still evict GPU atlases.",
+      "signature": "pub fn clear (& mut self, cx : & mut App)",
+      "cfg": [],
+      "target": "ResourceStore"
+    },
+    {
+      "id": "app_host::resources::ResourceStore::reconcile",
+      "name": "reconcile",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "Active authorized mount → generation principal, supplied only by host. Many mounts share one immutable bucket and one generation quota.",
+      "documentation": "Active authorized mount → generation principal, supplied only by host.\nMany mounts share one immutable bucket and one generation quota.",
+      "signature": "pub fn reconcile (& mut self, approved : & HashMap<EffectOwner, EffectOwner>, cx : & mut App)",
+      "cfg": [],
+      "target": "ResourceStore"
+    },
+    {
+      "id": "app_host::resources::ResourceStore::register",
+      "name": "register",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "Atomic registration: rejection consumes no count/byte quota and may be retried.",
+      "documentation": "Atomic registration: rejection consumes no count/byte quota and may be retried.",
+      "signature": "pub fn register (& mut self, owner : EffectOwner, registration : Registration,) -> Result<ResourceRef>",
+      "cfg": [],
+      "target": "ResourceStore"
+    },
+    {
+      "id": "app_host::resources::ResourceStore::revoke",
+      "name": "revoke",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn revoke (& mut self, owner : EffectOwner, cx : & mut App)",
+      "cfg": [],
+      "target": "ResourceStore"
+    },
+    {
+      "id": "app_host::resources::Resources",
+      "name": "Resources",
+      "kind": "struct",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "App contains only a weak view; the Host owns the lifetime via ResourceStore.",
+      "documentation": "App contains only a weak view; the Host owns the lifetime via ResourceStore.",
+      "signature": "# [doc = \" App contains only a weak view; the Host owns the lifetime via ResourceStore.\"] pub struct Resources (Weak<RefCell<State>>);",
+      "cfg": []
+    },
+    {
+      "id": "app_host::resources::Resources::bytes",
+      "name": "bytes",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn bytes (reference : & ResourceRef, cx : & App) -> Result<ResourceBytes>",
+      "cfg": [],
+      "target": "Resources"
+    },
+    {
+      "id": "app_host::resources::Resources::image",
+      "name": "image",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn image (reference : & ResourceRef, cx : & App) -> Result<ImageSource>",
+      "cfg": [],
+      "target": "Resources"
+    },
+    {
+      "id": "app_host::resources::Resources::install",
+      "name": "install",
+      "kind": "method",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "resources",
+      "path": "app_host::resources",
+      "source": "tools/app-host/src/resources.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn install (cx : & mut App) -> ResourceStore",
+      "cfg": [],
+      "target": "Resources"
+    },
+    {
+      "id": "app_host::review_fonts::register_emoji_review_font",
+      "name": "register_emoji_review_font",
+      "kind": "function",
+      "package": "gpui-box-app-host",
+      "crate": "app_host",
+      "module": "review_fonts",
+      "path": "app_host::review_fonts",
+      "source": "tools/app-host/src/review_fonts.rs",
+      "summary": "Add the pinned Noto Color Emoji review fixture to a caller-owned text system.",
+      "documentation": "Add the pinned Noto Color Emoji review fixture to a caller-owned text system.\n\nThis does not enable system font discovery or change default fallback policy.\nCall once per fresh capture text system, before constructing the headless app.",
+      "signature": "pub fn register_emoji_review_font (text_system : & dyn gpui::PlatformTextSystem) -> gpui::Result<()>",
+      "cfg": []
+    },
     {
       "id": "browser_gallery::start",
       "name": "start",
@@ -12936,6 +13395,21 @@
       "target": "EditSnapshot"
     },
     {
+      "id": "gpui::editable_text::document::EditSnapshot::shares_storage_with",
+      "name": "shares_storage_with",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Constant-time identity check for unchanged persistent storage. Equal contents constructed independently need not share storage. This does not compare or materialize document bytes.",
+      "documentation": "Constant-time identity check for unchanged persistent storage. Equal\ncontents constructed independently need not share storage. This does\nnot compare or materialize document bytes.",
+      "signature": "pub fn shares_storage_with (& self, other : & Self) -> bool",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
       "id": "gpui::editable_text::document::EditSnapshot::slice",
       "name": "slice",
       "kind": "method",
@@ -13335,6 +13809,21 @@
       "summary": "Shaping performed so far by this layout, including on-demand queries.",
       "documentation": "Shaping performed so far by this layout, including on-demand queries.",
       "signature": "pub fn shaping_work (& self) -> EditableTextWork",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
+      "id": "gpui::editable_text::layout::EditableTextLayout::shares_row_index_with",
+      "name": "shares_row_index_with",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Proves that two layouts share the same logical row index without enumerating source lines. False means unknown, not necessarily unequal. Viewport changes and line height do not change source row boundaries.",
+      "documentation": "Proves that two layouts share the same logical row index without\nenumerating source lines. False means unknown, not necessarily unequal.\nViewport changes and line height do not change source row boundaries.",
+      "signature": "pub fn shares_row_index_with (& self, other : & Self) -> bool",
       "cfg": [],
       "target": "EditableTextLayout"
     },
@@ -14131,6 +14620,50 @@
       "cfg": []
     },
     {
+      "id": "gpui::effect_owner::EffectScoped",
+      "name": "EffectScoped",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "A typed child whose owner survives container transformations until render.",
+      "documentation": "A typed child whose owner survives container transformations until render.\n\nContainers retain this wrapper instead of erasing a child into an element\nearly. Transform a child's options with `map`; inspect them with `as_ref`.\nPlain values converted with `From` inherit the eventual parent's context.",
+      "signature": "# [doc = \" A typed child whose owner survives container transformations until render.\"] # [doc = \"\"] # [doc = \" Containers retain this wrapper instead of erasing a child into an element\"] # [doc = \" early. Transform a child's options with `map`; inspect them with `as_ref`.\"] # [doc = \" Plain values converted with `From` inherit the eventual parent's context.\"] # [derive (Clone, Debug)] pub struct EffectScoped<T> { owner : Option<EffectOwner>, value : T, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::effect_owner::EffectScoped::map",
+      "name": "map",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Transforms a typed value without discarding its scope.",
+      "documentation": "Transforms a typed value without discarding its scope.",
+      "signature": "pub fn map<U> (self, transform : impl FnOnce (T) -> U) -> EffectScoped<U>",
+      "cfg": [],
+      "target": "EffectScoped<T>"
+    },
+    {
+      "id": "gpui::effect_owner::EffectScoped::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "effect_owner",
+      "path": "gpui::effect_owner",
+      "source": "crates/gpui/src/effect_owner.rs",
+      "summary": "Attributes the child's eventual element lifecycle to this mount owner.",
+      "documentation": "Attributes the child's eventual element lifecycle to this mount owner.",
+      "signature": "pub fn new (owner : EffectOwner, value : T) -> Self",
+      "cfg": [],
+      "target": "EffectScoped<T>"
+    },
+    {
       "id": "gpui::effect_owner::effect_owner",
       "name": "effect_owner",
       "kind": "function",
@@ -14302,7 +14835,7 @@
       "source": "crates/gpui/src/element.rs",
       "summary": "Implemented by types that participate in laying out and painting the contents of a window. Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy. You can create custom elements by implementing this trait, see the module-level documentation for more details.",
       "documentation": "Implemented by types that participate in laying out and painting the contents of a window.\nElements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.\nYou can create custom elements by implementing this trait, see the module-level documentation\nfor more details.",
-      "signature": "# [doc = \" Implemented by types that participate in laying out and painting the contents of a window.\"] # [doc = \" Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.\"] # [doc = \" You can create custom elements by implementing this trait, see the module-level documentation\"] # [doc = \" for more details.\"] pub trait Element : 'static + IntoElement { # [doc = \" The type of state returned from [`Element::request_layout`]. A mutable reference to this state is subsequently\"] # [doc = \" provided to [`Element::prepaint`] and [`Element::paint`].\"] type RequestLayoutState : 'static; # [doc = \" The type of state returned from [`Element::prepaint`]. A mutable reference to this state is subsequently\"] # [doc = \" provided to [`Element::paint`].\"] type PrepaintState : 'static; # [doc = \" If this element has a unique identifier, return it here. This is used to track elements across frames, and\"] # [doc = \" will cause a GlobalElementId to be passed to the request_layout, prepaint, and paint methods.\"] # [doc = \"\"] # [doc = \" The global id can in turn be used to access state that's connected to an element with the same id across\"] # [doc = \" frames. This id must be unique among children of the first containing element with an id.\"] fn id (& self) -> Option<ElementId>; # [doc = \" Source location where this element was constructed, used to disambiguate elements in the\"] # [doc = \" inspector and navigate to their source code.\"] fn source_location (& self) -> Option<& 'static panic::Location<'static>>; # [doc = \" Before an element can be painted, we need to know where it's going to be and how big it is.\"] # [doc = \" Use this method to request a layout from Taffy and initialize the element's state.\"] fn request_layout (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, window : & mut Window, cx : & mut App,) -> (LayoutId, Self::RequestLayoutState); # [doc = \" After laying out an element, we need to commit its bounds to the current frame for hitbox\"] # [doc = \" purposes. The state argument is the same state that was returned from [`Element::request_layout()`].\"] fn prepaint (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, bounds : Bounds<Pixels>, request_layout : & mut Self::RequestLayoutState, window : & mut Window, cx : & mut App,) -> Self::PrepaintState; # [doc = \" Once layout has been completed, this method will be called to paint the element to the screen.\"] # [doc = \" The state argument is the same state that was returned from [`Element::request_layout()`].\"] # [allow (clippy::too_many_arguments)] fn paint (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, bounds : Bounds<Pixels>, request_layout : & mut Self::RequestLayoutState, prepaint : & mut Self::PrepaintState, window : & mut Window, cx : & mut App,); # [doc = \" Returns the accessible role for this element, if any.\"] # [doc = \" Elements that return `None` are not included in the accessibility tree.\"] # [doc = \"\"] # [doc = \" Note: inclusion in accessibility tree requires non-`None` [`id`][Element::id].\"] # [doc = \"\"] # [doc = \" See the [accessibility guide](crate::_accessibility) for an overview.\"] fn a11y_role (& self) -> Option<accesskit::Role> { None } # [doc = \" Write accessibility properties to the given node.\"] # [doc = \" Called only when `a11y_role()` returns `Some`.\"] # [doc = \"\"] # [doc = \" See the [accessibility guide](crate::_accessibility) for an overview.\"] fn write_a11y_info (& self, _node : & mut accesskit::Node) { } # [doc = \" Returns this element's non-topological accessibility relationships.\"] # [doc = \"\"] # [doc = \" Called only when [`Element::a11y_role`] returns `Some`. GPUI resolves\"] # [doc = \" the referenced element identities after deferred prepaint completes.\"] fn a11y_relationships (& self) -> & [AccessibilityRelationship] { & [] } # [doc = \" Add synthetic child nodes to an [`Element`] that has an\"] # [doc = \" [`.id()`][Element::id] and a [`.role()`][Element::a11y_role].\"] # [doc = \"\"] # [doc = \" Some elements may want to inject accessibility nodes that do not\"] # [doc = \" correspond to any GPUI element. For example, a custom text field element\"] # [doc = \" may want to inject synthetic child nodes for the text content.\"] # [doc = \"\"] # [doc = \" See [Synthetic children](crate::_accessibility#synthetic-children) in\"] # [doc = \" the accessibility guide for more detail.\"] fn a11y_synthetic_children (& mut self, _prepaint : & mut Self::PrepaintState, _builder : & mut A11ySubtreeBuilder,) { } # [doc = \" Convert this element into a dynamically-typed [`AnyElement`].\"] fn into_any (self) -> AnyElement { AnyElement::new (self) } }",
+      "signature": "# [doc = \" Implemented by types that participate in laying out and painting the contents of a window.\"] # [doc = \" Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.\"] # [doc = \" You can create custom elements by implementing this trait, see the module-level documentation\"] # [doc = \" for more details.\"] pub trait Element : 'static + IntoElement { # [doc = \" The type of state returned from [`Element::request_layout`]. A mutable reference to this state is subsequently\"] # [doc = \" provided to [`Element::prepaint`] and [`Element::paint`].\"] type RequestLayoutState : 'static; # [doc = \" The type of state returned from [`Element::prepaint`]. A mutable reference to this state is subsequently\"] # [doc = \" provided to [`Element::paint`].\"] type PrepaintState : 'static; # [doc = \" If this element has a unique identifier, return it here. This is used to track elements across frames, and\"] # [doc = \" will cause a GlobalElementId to be passed to the request_layout, prepaint, and paint methods.\"] # [doc = \"\"] # [doc = \" The global id can in turn be used to access state that's connected to an element with the same id across\"] # [doc = \" frames. This id must be unique among children of the first containing element with an id.\"] fn id (& self) -> Option<ElementId>; # [doc = \" Source location where this element was constructed, used to disambiguate elements in the\"] # [doc = \" inspector and navigate to their source code.\"] fn source_location (& self) -> Option<& 'static panic::Location<'static>>; # [doc = \" Before an element can be painted, we need to know where it's going to be and how big it is.\"] # [doc = \" Use this method to request a layout from Taffy and initialize the element's state.\"] fn request_layout (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, window : & mut Window, cx : & mut App,) -> (LayoutId, Self::RequestLayoutState); # [doc = \" After laying out an element, we need to commit its bounds to the current frame for hitbox\"] # [doc = \" purposes. The state argument is the same state that was returned from [`Element::request_layout()`].\"] fn prepaint (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, bounds : Bounds<Pixels>, request_layout : & mut Self::RequestLayoutState, window : & mut Window, cx : & mut App,) -> Self::PrepaintState; # [doc = \" Once layout has been completed, this method will be called to paint the element to the screen.\"] # [doc = \" The state argument is the same state that was returned from [`Element::request_layout()`].\"] # [allow (clippy::too_many_arguments)] fn paint (& mut self, id : Option<& GlobalElementId>, inspector_id : Option<& InspectorElementId>, bounds : Bounds<Pixels>, request_layout : & mut Self::RequestLayoutState, prepaint : & mut Self::PrepaintState, window : & mut Window, cx : & mut App,); # [doc = \" Returns the accessible role for this element, if any.\"] # [doc = \" Elements that return `None` are not included in the accessibility tree.\"] # [doc = \"\"] # [doc = \" Note: inclusion in accessibility tree requires non-`None` [`id`][Element::id].\"] # [doc = \"\"] # [doc = \" See the [accessibility guide](crate::_accessibility) for an overview.\"] fn a11y_role (& self) -> Option<accesskit::Role> { None } # [doc = \" Write accessibility properties to the given node.\"] # [doc = \" Called only when `a11y_role()` returns `Some`.\"] # [doc = \"\"] # [doc = \" See the [accessibility guide](crate::_accessibility) for an overview.\"] fn write_a11y_info (& self, _node : & mut accesskit::Node) { } # [doc = \" Writes properties while optionally supplying the complete value as\"] # [doc = \" shared storage. GPUI materializes it only when the final node changes;\"] # [doc = \" this is native-node retention, not an abbreviated accessible value.\"] # [doc = \" Implementations returning a value must omit it from `node` here.\"] # [doc = \" The ordinary `write_a11y_info` contract remains fully materialized.\"] fn write_a11y_info_shared (& self, node : & mut accesskit::Node) -> Option<crate::SharedString> { self . write_a11y_info (node); None } # [doc = \" Returns this element's non-topological accessibility relationships.\"] # [doc = \"\"] # [doc = \" Called only when [`Element::a11y_role`] returns `Some`. GPUI resolves\"] # [doc = \" the referenced element identities after deferred prepaint completes.\"] fn a11y_relationships (& self) -> & [AccessibilityRelationship] { & [] } # [doc = \" Add synthetic child nodes to an [`Element`] that has an\"] # [doc = \" [`.id()`][Element::id] and a [`.role()`][Element::a11y_role].\"] # [doc = \"\"] # [doc = \" Some elements may want to inject accessibility nodes that do not\"] # [doc = \" correspond to any GPUI element. For example, a custom text field element\"] # [doc = \" may want to inject synthetic child nodes for the text content.\"] # [doc = \"\"] # [doc = \" See [Synthetic children](crate::_accessibility#synthetic-children) in\"] # [doc = \" the accessibility guide for more detail.\"] fn a11y_synthetic_children (& mut self, _prepaint : & mut Self::PrepaintState, _builder : & mut A11ySubtreeBuilder,) { } # [doc = \" Convert this element into a dynamically-typed [`AnyElement`].\"] fn into_any (self) -> AnyElement { AnyElement::new (self) } }",
       "cfg": []
     },
     {
@@ -18086,8 +18619,23 @@
       "source": "crates/gpui/src/elements/selectable_text.rs",
       "summary": "Revision-keyed logical text publication. Offscreen unchanged leaves are retained in AccessKit; visible and previously visible leaves refresh their geometry. Own one cache per text surface, never share it between windows.",
       "documentation": "Revision-keyed logical text publication. Offscreen unchanged leaves are\nretained in AccessKit; visible and previously visible leaves refresh their\ngeometry. Own one cache per text surface, never share it between windows.",
-      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Vec<Range<usize>>, document : Option<EditSnapshot>, work : AccessibleTextWork, }",
+      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Vec<Range<usize>>, visible_nodes : collections::FxHashMap<accesskit::NodeId, accesskit::Node>, clip : Option<accesskit::Rect>, document : Option<EditSnapshot>, representation : Option<(SharedString, bool)>, work : AccessibleTextWork, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache::is_representable",
+      "name": "is_representable",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Caches the complete grapheme representability check by immutable source storage. This does not suppress native Value for unrepresentable runs.",
+      "documentation": "Caches the complete grapheme representability check by immutable source\nstorage. This does not suppress native Value for unrepresentable runs.",
+      "signature": "pub fn is_representable (& mut self, text : & SharedString) -> bool",
+      "cfg": [],
+      "target": "AccessibleTextCache"
     },
     {
       "id": "gpui::elements::selectable_text::AccessibleTextCache::publish",
@@ -18160,7 +18708,7 @@
       "source": "crates/gpui/src/elements/selectable_text.rs",
       "summary": "Actual text work in the most recent accessible publication. Metadata and parent child-id lists are separate, still linear work; these counters do not claim an allocation bound for the entire AccessKit update.",
       "documentation": "Actual text work in the most recent accessible publication. Metadata and\nparent child-id lists are separate, still linear work; these counters do\nnot claim an allocation bound for the entire AccessKit update.",
-      "signature": "# [doc = \" Actual text work in the most recent accessible publication. Metadata and\"] # [doc = \" parent child-id lists are separate, still linear work; these counters do\"] # [doc = \" not claim an allocation bound for the entire AccessKit update.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct AccessibleTextWork { # [doc = \" UTF-8 bytes passed to Unicode segmentation and bidi resolution.\"] pub segmented_bytes : usize, # [doc = \" Actual persistent-snapshot byte comparisons used to locate the edit.\"] pub compared_bytes : usize, # [doc = \" TextRun payloads transmitted in this update.\"] pub published_runs : usize, # [doc = \" UTF-8 value bytes transmitted in TextRun payloads.\"] pub published_text_bytes : usize, # [doc = \" Existing TextRuns connected without retransmitting their payloads.\"] pub retained_runs : usize, }",
+      "signature": "# [doc = \" Actual text work in the most recent accessible publication. Metadata and\"] # [doc = \" parent child-id lists are separate, still linear work; these counters do\"] # [doc = \" not claim an allocation bound for the entire AccessKit update.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct AccessibleTextWork { # [doc = \" Bytes inspected by the last explicit representability check. Unchanged\"] # [doc = \" shared source storage requires zero; a new value is scanned once.\"] pub representability_bytes : usize, # [doc = \" UTF-8 bytes passed to Unicode segmentation and bidi resolution.\"] pub segmented_bytes : usize, # [doc = \" Actual persistent-snapshot byte comparisons used to locate the edit.\"] pub compared_bytes : usize, # [doc = \" TextRun payloads transmitted in this update.\"] pub published_runs : usize, # [doc = \" UTF-8 value bytes transmitted in TextRun payloads.\"] pub published_text_bytes : usize, # [doc = \" Existing TextRuns connected without retransmitting their payloads.\"] pub retained_runs : usize, }",
       "cfg": []
     },
     {
@@ -41658,6 +42206,21 @@
       "cfg": []
     },
     {
+      "id": "gpui::window::a11y::A11ySubtreeBuilder::bounds_clip",
+      "name": "bounds_clip",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window::a11y",
+      "path": "gpui::window::a11y",
+      "source": "crates/gpui/src/window/a11y.rs",
+      "summary": "Physical-pixel clip applied to synthetic node bounds. A retained geometry cache must invalidate when this changes, even when its unclipped source cells are unchanged.",
+      "documentation": "Physical-pixel clip applied to synthetic node bounds. A retained\ngeometry cache must invalidate when this changes, even when its\nunclipped source cells are unchanged.",
+      "signature": "pub fn bounds_clip (& self) -> Option<accesskit::Rect>",
+      "cfg": [],
+      "target": "A11ySubtreeBuilder<'a>"
+    },
+    {
       "id": "gpui::window::a11y::A11ySubtreeBuilder::parent_node",
       "name": "parent_node",
       "kind": "method",
@@ -41703,6 +42266,21 @@
       "target": "A11ySubtreeBuilder<'a>"
     },
     {
+      "id": "gpui::window::a11y::A11ySubtreeBuilder::set_parent_text_selection",
+      "name": "set_parent_text_selection",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window::a11y",
+      "path": "gpui::window::a11y",
+      "source": "crates/gpui/src/window/a11y.rs",
+      "summary": "Updates the parent's selection without forcing its shared value into owned storage before the final node-retention comparison.",
+      "documentation": "Updates the parent's selection without forcing its shared value into\nowned storage before the final node-retention comparison.",
+      "signature": "pub fn set_parent_text_selection (& mut self, selection : accesskit::TextSelection)",
+      "cfg": [],
+      "target": "A11ySubtreeBuilder<'a>"
+    },
+    {
       "id": "gpui::window::a11y::A11ySubtreeBuilder::synthetic_node_id",
       "name": "synthetic_node_id",
       "kind": "method",
@@ -41716,6 +42294,35 @@
       "signature": "pub fn synthetic_node_id (& self, key : impl Hash) -> NodeId",
       "cfg": [],
       "target": "A11ySubtreeBuilder<'a>"
+    },
+    {
+      "id": "gpui::window::a11y::A11yValueWork",
+      "name": "A11yValueWork",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window::a11y",
+      "path": "gpui::window::a11y",
+      "source": "crates/gpui/src/window/a11y.rs",
+      "summary": "Actual native-value copying in the last completed accessibility frame. These counters exclude geometry/child metadata, source flattening, native adapter copies and explicit platform value queries.",
+      "documentation": "Actual native-value copying in the last completed accessibility frame.\nThese counters exclude geometry/child metadata, source flattening, native\nadapter copies and explicit platform value queries.",
+      "signature": "# [doc = \" Actual native-value copying in the last completed accessibility frame.\"] # [doc = \" These counters exclude geometry/child metadata, source flattening, native\"] # [doc = \" adapter copies and explicit platform value queries.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct A11yValueWork { # [doc = \" UTF-8 bytes materialized from shared element values for changed nodes.\"] pub materialized_bytes : usize, # [doc = \" Complete value bytes retained natively without retransmission.\"] pub retained_bytes : usize, # [doc = \" Value bytes cloned to maintain the complete debug/inspection tree.\"] pub debug_clone_bytes : usize, # [doc = \" Bytes copied to resolve accessible label/description relationships.\"] pub relationship_bytes : usize, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::window::a11y::Window::accessibility_value_work",
+      "name": "accessibility_value_work",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window::a11y",
+      "path": "gpui::window::a11y",
+      "source": "crates/gpui/src/window/a11y.rs",
+      "summary": "Value-copy work for the last completed native accessibility frame.",
+      "documentation": "Value-copy work for the last completed native accessibility frame.",
+      "signature": "pub fn accessibility_value_work (& self) -> A11yValueWork",
+      "cfg": [],
+      "target": "Window"
     },
     {
       "id": "gpui::window::fill",
@@ -41860,7 +42467,7 @@
     },
     {
       "id": "gpui::window::reexport-1",
-      "name": "a11y :: A11ySubtreeBuilder",
+      "name": "a11y :: { A11ySubtreeBuilder , A11yValueWork }",
       "kind": "reexport",
       "package": "gpui-box",
       "crate": "gpui",
@@ -41869,7 +42476,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use a11y::A11ySubtreeBuilder;",
+      "signature": "pub use a11y::{ A11ySubtreeBuilder, A11yValueWork };",
       "cfg": []
     },
     {
@@ -45612,7 +46219,7 @@
       "source": "crates/gpui-kit/src/agent/persona.rs",
       "summary": "Persona-aware dialogue over the safe Markdown renderer.",
       "documentation": "Persona-aware dialogue over the safe Markdown renderer.\n\nPortrait placement, expression treatment, status, streaming presentation,\nchoice layout, RTL order, and disabled explanations are all owned here.\nThe component never advances the turn or applies a choice.",
-      "signature": "# [doc = \" Persona-aware dialogue over the safe Markdown renderer.\"] # [doc = \"\"] # [doc = \" Portrait placement, expression treatment, status, streaming presentation,\"] # [doc = \" choice layout, RTL order, and disabled explanations are all owned here.\"] # [doc = \" The component never advances the turn or applies a choice.\"] # [derive (IntoElement)] pub struct PersonaDialogue { ident : Ident, turn : DialogueTurn, expression : PersonaExpression, voice : Option<VoiceSample>, image : Option<SharedString>, tint : Option<Hsla>, on_event : Option<DialogueHandler>, image_source : Option<DialogueImage>, highlighter : Option<DialogueHighlighter>, }",
+      "signature": "# [doc = \" Persona-aware dialogue over the safe Markdown renderer.\"] # [doc = \"\"] # [doc = \" Portrait placement, expression treatment, status, streaming presentation,\"] # [doc = \" choice layout, RTL order, and disabled explanations are all owned here.\"] # [doc = \" The component never advances the turn or applies a choice.\"] # [derive (IntoElement)] pub struct PersonaDialogue { ident : Ident, turn : DialogueTurn, expression : PersonaExpression, voice : Option<VoiceSample>, image : Option<PresentationImage>, tint : Option<Hsla>, on_event : Option<DialogueHandler>, image_source : Option<DialogueImage>, highlighter : Option<DialogueHighlighter>, }",
       "cfg": []
     },
     {
@@ -45642,6 +46249,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PersonaDialogue"
+    },
+    {
+      "id": "gpui_kit::agent::persona::PersonaDialogue::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::persona",
+      "path": "gpui_kit::agent::persona",
+      "source": "crates/gpui-kit/src/agent/persona.rs",
+      "summary": "Uses caller-resolved portrait art without converting it to a URI.",
+      "documentation": "Uses caller-resolved portrait art without converting it to a URI.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "PersonaDialogue"
     },
@@ -45789,7 +46411,7 @@
       "source": "crates/gpui-kit/src/agent/persona.rs",
       "summary": "A large expressive portrait built on the standard [`AgentAvatar`].",
       "documentation": "A large expressive portrait built on the standard [`AgentAvatar`].\n\nAn optional [`EffectPlan`] is a decorative layer only. Its semantic event,\nbudget, replay, quality, and reduced-motion decision were already resolved\nby the shared effects policy.",
-      "signature": "# [doc = \" A large expressive portrait built on the standard [`AgentAvatar`].\"] # [doc = \"\"] # [doc = \" An optional [`EffectPlan`] is a decorative layer only. Its semantic event,\"] # [doc = \" budget, replay, quality, and reduced-motion decision were already resolved\"] # [doc = \" by the shared effects policy.\"] # [derive (Debug, IntoElement)] pub struct PersonaPortrait { ident : Ident, agent : AgentSnapshot, expression : PersonaExpression, voice : Option<VoiceSample>, image : Option<SharedString>, tint : Option<Hsla>, effect : Option<EffectPlan>, sample_at : Option<Duration>, size : f32, }",
+      "signature": "# [doc = \" A large expressive portrait built on the standard [`AgentAvatar`].\"] # [doc = \"\"] # [doc = \" An optional [`EffectPlan`] is a decorative layer only. Its semantic event,\"] # [doc = \" budget, replay, quality, and reduced-motion decision were already resolved\"] # [doc = \" by the shared effects policy.\"] # [derive (Debug, IntoElement)] pub struct PersonaPortrait { ident : Ident, agent : AgentSnapshot, expression : PersonaExpression, voice : Option<VoiceSample>, image : Option<PresentationImage>, tint : Option<Hsla>, effect : Option<EffectPlan>, sample_at : Option<Duration>, size : f32, }",
       "cfg": []
     },
     {
@@ -45834,6 +46456,21 @@
       "summary": "A host-resolved resource path or URI. This component performs no fetch.",
       "documentation": "A host-resolved resource path or URI. This component performs no fetch.",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PersonaPortrait"
+    },
+    {
+      "id": "gpui_kit::agent::persona::PersonaPortrait::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::persona",
+      "path": "gpui_kit::agent::persona",
+      "source": "crates/gpui-kit/src/agent/persona.rs",
+      "summary": "Uses caller-resolved portrait art and preserves custom loading policy.",
+      "documentation": "Uses caller-resolved portrait art and preserves custom loading policy.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "PersonaPortrait"
     },
@@ -46423,7 +47060,7 @@
       "source": "crates/gpui-kit/src/agent/presentation.rs",
       "summary": "Optional caller-owned art for an agent identity.",
       "documentation": "Optional caller-owned art for an agent identity.\n\nExecution and presence never come from this value. Changing a portrait or\nrole tint therefore cannot accidentally change the state the UI reports.",
-      "signature": "# [doc = \" Optional caller-owned art for an agent identity.\"] # [doc = \"\"] # [doc = \" Execution and presence never come from this value. Changing a portrait or\"] # [doc = \" role tint therefore cannot accidentally change the state the UI reports.\"] # [derive (Debug, Clone, PartialEq)] pub struct AgentAppearance { id : AgentId, image : Option<SharedString>, tint : Option<Hsla>, }",
+      "signature": "# [doc = \" Optional caller-owned art for an agent identity.\"] # [doc = \"\"] # [doc = \" Execution and presence never come from this value. Changing a portrait or\"] # [doc = \" role tint therefore cannot accidentally change the state the UI reports.\"] # [derive (Debug, Clone, PartialEq)] pub struct AgentAppearance { id : AgentId, image : Option<PresentationImage>, tint : Option<Hsla>, }",
       "cfg": []
     },
     {
@@ -46438,6 +47075,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "AgentAppearance"
+    },
+    {
+      "id": "gpui_kit::agent::presentation::AgentAppearance::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::presentation",
+      "path": "gpui_kit::agent::presentation",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "Uses caller-resolved art, preserving custom loader lifetime and policy.",
+      "documentation": "Uses caller-resolved art, preserving custom loader lifetime and policy.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "AgentAppearance"
     },
@@ -46482,7 +47134,7 @@
       "source": "crates/gpui-kit/src/agent/presentation.rs",
       "summary": "A status-coloured agent identity with a separate presence mark.",
       "documentation": "A status-coloured agent identity with a separate presence mark.",
-      "signature": "# [doc = \" A status-coloured agent identity with a separate presence mark.\"] # [derive (Debug, IntoElement)] pub struct AgentAvatar { ident : Ident, agent : AgentSnapshot, image : Option<SharedString>, tint : Option<Hsla>, size : f32, mark_inset : f32, parent : Option<Ident>, }",
+      "signature": "# [doc = \" A status-coloured agent identity with a separate presence mark.\"] # [derive (Debug, IntoElement)] pub struct AgentAvatar { ident : Ident, agent : AgentSnapshot, image : Option<PresentationImage>, tint : Option<Hsla>, size : f32, mark_inset : f32, parent : Option<Ident>, }",
       "cfg": []
     },
     {
@@ -46497,6 +47149,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "AgentAvatar"
+    },
+    {
+      "id": "gpui_kit::agent::presentation::AgentAvatar::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::presentation",
+      "path": "gpui_kit::agent::presentation",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "Uses caller-resolved art without converting a loader into a path.",
+      "documentation": "Uses caller-resolved art without converting a loader into a path.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "AgentAvatar"
     },
@@ -46571,7 +47238,7 @@
       "source": "crates/gpui-kit/src/agent/presentation.rs",
       "summary": "A complete summary of one agent and its current caller-owned task.",
       "documentation": "A complete summary of one agent and its current caller-owned task.",
-      "signature": "# [doc = \" A complete summary of one agent and its current caller-owned task.\"] # [derive (IntoElement)] pub struct AgentCard { ident : Ident, agent : AgentSnapshot, task_label : Option<SharedString>, image : Option<SharedString>, tint : Option<Hsla>, selected : bool, on_action : Option<ActionHandler>, }",
+      "signature": "# [doc = \" A complete summary of one agent and its current caller-owned task.\"] # [derive (IntoElement)] pub struct AgentCard { ident : Ident, agent : AgentSnapshot, task_label : Option<SharedString>, image : Option<PresentationImage>, tint : Option<Hsla>, selected : bool, on_action : Option<ActionHandler>, }",
       "cfg": []
     },
     {
@@ -46586,6 +47253,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "AgentCard"
+    },
+    {
+      "id": "gpui_kit::agent::presentation::AgentCard::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "agent::presentation",
+      "path": "gpui_kit::agent::presentation",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "Uses caller-resolved art, including revocable custom sources.",
+      "documentation": "Uses caller-resolved art, including revocable custom sources.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "AgentCard"
     },
@@ -58018,7 +58700,7 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "Adjacent related actions sharing one frame.",
       "documentation": "Adjacent related actions sharing one frame.\n\nThe group reports nothing: every action still reports itself, and the\ngroup only decides where the corners are. It publishes a `Group` node so\nthe actions inside it can be addressed as a set, and names each button as\nits child.",
-      "signature": "# [doc = \" Adjacent related actions sharing one frame.\"] # [doc = \"\"] # [doc = \" The group reports nothing: every action still reports itself, and the\"] # [doc = \" group only decides where the corners are. It publishes a `Group` node so\"] # [doc = \" the actions inside it can be addressed as a set, and names each button as\"] # [doc = \" its child.\"] # [derive (IntoElement)] pub struct ButtonGroup { ident : Ident, buttons : Vec<Button>, size : ControlSize, disabled : bool, }",
+      "signature": "# [doc = \" Adjacent related actions sharing one frame.\"] # [doc = \"\"] # [doc = \" The group reports nothing: every action still reports itself, and the\"] # [doc = \" group only decides where the corners are. It publishes a `Group` node so\"] # [doc = \" the actions inside it can be addressed as a set, and names each button as\"] # [doc = \" its child.\"] # [derive (IntoElement)] pub struct ButtonGroup { ident : Ident, buttons : Vec<EffectScoped<Button>>, size : ControlSize, disabled : bool, }",
       "cfg": []
     },
     {
@@ -58032,7 +58714,7 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn child (mut self, button : Button) -> Self",
+      "signature": "pub fn child (mut self, button : impl Into<EffectScoped<Button>>) -> Self",
       "cfg": [],
       "target": "ButtonGroup"
     },
@@ -58047,7 +58729,7 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn children (mut self, buttons : impl IntoIterator<Item = Button>) -> Self",
+      "signature": "pub fn children<B : Into<EffectScoped<Button>>> (mut self, buttons : impl IntoIterator<Item = B>,) -> Self",
       "cfg": [],
       "target": "ButtonGroup"
     },
@@ -59209,6 +59891,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::copy_button::CopyButton::clear_copier",
+      "name": "clear_copier",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "Restores owner-checked platform write and readback for future copies.",
+      "documentation": "Restores owner-checked platform write and readback for future copies.",
+      "signature": "pub fn clear_copier (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
       "id": "gpui_kit::controls::copy_button::CopyButton::confirmation",
       "name": "confirmation",
       "kind": "method",
@@ -59269,6 +59966,21 @@
       "target": "CopyButton"
     },
     {
+      "id": "gpui_kit::controls::copy_button::CopyButton::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
       "id": "gpui_kit::controls::copy_button::CopyButton::label",
       "name": "label",
       "kind": "method",
@@ -59299,6 +60011,51 @@
       "target": "CopyButton"
     },
     {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_confirmation",
+      "name": "set_confirmation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "Sets the duration for future copies without restarting an active confirmation.",
+      "documentation": "Sets the duration for future copies without restarting an active confirmation.",
+      "signature": "pub fn set_confirmation (& mut self, confirmation : Duration, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_copier",
+      "name": "set_copier",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "Replaces the native host copier without changing the last outcome.",
+      "documentation": "Replaces the native host copier without changing the last outcome.",
+      "signature": "pub fn set_copier (& mut self, copier : impl Fn (& str, & mut App) -> Result<(), SharedString> + 'static, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
       "id": "gpui_kit::controls::copy_button::CopyButton::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -59314,6 +60071,36 @@
       "target": "CopyButton"
     },
     {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_glyph_only",
+      "name": "set_glyph_only",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "Enables a named glyph-only button, or restores labeled mode with `None`.",
+      "documentation": "Enables a named glyph-only button, or restores labeled mode with `None`.",
+      "signature": "pub fn set_glyph_only (& mut self, name : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_label",
+      "name": "set_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "Replaces the label, or restores the localized default with `None`.",
+      "documentation": "Replaces the label, or restores the localized default with `None`.",
+      "signature": "pub fn set_label (& mut self, label : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
       "id": "gpui_kit::controls::copy_button::CopyButton::set_text",
       "name": "set_text",
       "kind": "method",
@@ -59325,6 +60112,21 @@
       "summary": "Replaces the payload from the host side, between frames.",
       "documentation": "Replaces the payload from the host side, between frames.",
       "signature": "pub fn set_text (& mut self, text : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "CopyButton"
+    },
+    {
+      "id": "gpui_kit::controls::copy_button::CopyButton::set_variant",
+      "name": "set_variant",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::copy_button",
+      "path": "gpui_kit::controls::copy_button",
+      "source": "crates/gpui-kit/src/controls/copy_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_variant (& mut self, variant : ButtonVariant, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "CopyButton"
     },
@@ -59698,6 +60500,36 @@
       "target": "Editor"
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::is_read_only",
+      "name": "is_read_only",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_read_only (& self) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::line_numbers",
       "name": "line_numbers",
       "kind": "method",
@@ -59803,6 +60635,21 @@
       "target": "Editor"
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::set_disabled",
+      "name": "set_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::set_highlights",
       "name": "set_highlights",
       "kind": "method",
@@ -59814,6 +60661,96 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_highlights (& mut self, highlights : EditorHighlights, cx : & mut Context<Self>) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_indent_with",
+      "name": "set_indent_with",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Replaces the caller indentation policy in place. `None` restores literal Tab input. The closure is never called merely to update this option.",
+      "documentation": "Replaces the caller indentation policy in place. `None` restores literal\nTab input. The closure is never called merely to update this option.",
+      "signature": "pub fn set_indent_with (& mut self, indenter : Option<Rc<dyn Fn (EditorIndentRequest) -> Option<EditorIndentation>>>, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_label",
+      "name": "set_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_label (& mut self, label : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_language_services",
+      "name": "set_language_services",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Changes service bindings in place. Disabling cancels the visible request; late replies cannot restore its popup. Caller diagnostics remain intact.",
+      "documentation": "Changes service bindings in place. Disabling cancels the visible request;\nlate replies cannot restore its popup. Caller diagnostics remain intact.",
+      "signature": "pub fn set_language_services (& mut self, enabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_line_numbers",
+      "name": "set_line_numbers",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_line_numbers (& mut self, visible : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_read_only",
+      "name": "set_read_only",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_read_only (& mut self, read_only : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_rows",
+      "name": "set_rows",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_rows (& mut self, rows : usize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Editor"
     },
@@ -59830,6 +60767,23 @@
       "documentation": "",
       "signature": "pub fn set_selections (& mut self, selections : impl IntoIterator<Item = (Range<usize>, bool)>, cx : & mut Context<Self>,) -> bool",
       "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_syntax",
+      "name": "set_syntax",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Installs/replaces a parser or removes it without replacing document state.",
+      "documentation": "Installs/replaces a parser or removes it without replacing document state.",
+      "signature": "pub fn set_syntax (& mut self, syntax : Option<EditorSyntax>, cx : & mut Context<Self>)",
+      "cfg": [
+        "cfg (feature = \"syntax\")"
+      ],
       "target": "Editor"
     },
     {
@@ -62479,6 +63433,21 @@
       "target": "KeymapEditor"
     },
     {
+      "id": "gpui_kit::controls::keymap_editor::KeymapEditor::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keymap_editor",
+      "path": "gpui_kit::controls::keymap_editor",
+      "source": "crates/gpui-kit/src/controls/keymap_editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "KeymapEditor"
+    },
+    {
       "id": "gpui_kit::controls::keymap_editor::KeymapEditor::new",
       "name": "new",
       "kind": "method",
@@ -63146,6 +64115,21 @@
       "target": "NumberInput"
     },
     {
+      "id": "gpui_kit::controls::number_input::NumberInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
       "id": "gpui_kit::controls::number_input::NumberInput::is_invalid",
       "name": "is_invalid",
       "kind": "method",
@@ -63326,6 +64310,81 @@
       "target": "NumberInput"
     },
     {
+      "id": "gpui_kit::controls::number_input::NumberInput::set_precision",
+      "name": "set_precision",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "Changes future number formatting without overwriting an in-progress edit.",
+      "documentation": "Changes future number formatting without overwriting an in-progress edit.",
+      "signature": "pub fn set_precision (& mut self, precision : usize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
+      "id": "gpui_kit::controls::number_input::NumberInput::set_presentation",
+      "name": "set_presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "Replaces presentation, including removing optional adornments and names.",
+      "documentation": "Replaces presentation, including removing optional adornments and names.",
+      "signature": "pub fn set_presentation (& mut self, name : Option<SharedString>, unit : Option<SharedString>, prefix : Option<SharedString>, size : ControlSize, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
+      "id": "gpui_kit::controls::number_input::NumberInput::set_range",
+      "name": "set_range",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "Replaces optional bounds without replacing the typist's text or selection.",
+      "documentation": "Replaces optional bounds without replacing the typist's text or selection.",
+      "signature": "pub fn set_range (& mut self, min : Option<f64>, max : Option<f64>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
+      "id": "gpui_kit::controls::number_input::NumberInput::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
+      "id": "gpui_kit::controls::number_input::NumberInput::set_steps",
+      "name": "set_steps",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::number_input",
+      "path": "gpui_kit::controls::number_input",
+      "source": "crates/gpui-kit/src/controls/number_input.rs",
+      "summary": "Replaces the step grid; an absent page step restores ten ordinary steps.",
+      "documentation": "Replaces the step grid; an absent page step restores ten ordinary steps.",
+      "signature": "pub fn set_steps (& mut self, step : f64, page_step : Option<f64>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "NumberInput"
+    },
+    {
       "id": "gpui_kit::controls::number_input::NumberInput::set_value",
       "name": "set_value",
       "kind": "method",
@@ -63482,7 +64541,7 @@
       "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
       "summary": "The visible projection over a caller-owned rich-text editing session.",
       "documentation": "The visible projection over a caller-owned rich-text editing session.",
-      "signature": "# [doc = \" The visible projection over a caller-owned rich-text editing session.\"] pub struct RichTextEditor { ident : Ident, session : Entity<RichTextEditSession>, new_block_id : BlockIdFactory, focus_handle : FocusHandle, name : SharedString, placeholder : SharedString, disabled : bool, read_only : bool, invalid : bool, required : bool, frame : Frame, toolbar : bool, rows : usize, max_rows : usize, visible_rows : usize, scroll_offset : Pixels, goal_x : Option<Pixels>, is_selecting : bool, diagnostics : Vec<RichTextDiagnostic>, last_layouts : Vec<StoredBlockLayout>, last_bounds : Option<Bounds<Pixels>>, content_height : Pixels, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<gpui::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, _subscriptions : Vec<Subscription>, }",
+      "signature": "# [doc = \" The visible projection over a caller-owned rich-text editing session.\"] pub struct RichTextEditor { ident : Ident, session : Entity<RichTextEditSession>, new_block_id : BlockIdFactory, focus_handle : FocusHandle, name : SharedString, placeholder : SharedString, disabled : bool, read_only : bool, invalid : bool, required : bool, frame : Frame, toolbar : bool, rows : usize, max_rows : Option<usize>, visible_rows : usize, scroll_offset : Pixels, goal_x : Option<Pixels>, is_selecting : bool, diagnostics : Vec<RichTextDiagnostic>, last_layouts : Vec<StoredBlockLayout>, last_bounds : Option<Bounds<Pixels>>, content_height : Pixels, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<gpui::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, _subscriptions : Vec<Subscription>, }",
       "cfg": []
     },
     {
@@ -63542,6 +64601,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn invalid (mut self, invalid : bool) -> Self",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::is_read_only",
+      "name": "is_read_only",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_read_only (& self) -> bool",
       "cfg": [],
       "target": "RichTextEditor"
     },
@@ -63696,6 +64785,21 @@
       "target": "RichTextEditor"
     },
     {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::set_frame",
+      "name": "set_frame",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_frame (& mut self, frame : Frame, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
       "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::set_invalid",
       "name": "set_invalid",
       "kind": "method",
@@ -63707,6 +64811,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::set_max_rows",
+      "name": "set_max_rows",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "`None` restores fixed minimum-row height without replacing the session.",
+      "documentation": "`None` restores fixed minimum-row height without replacing the session.",
+      "signature": "pub fn set_max_rows (& mut self, max_rows : Option<usize>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "RichTextEditor"
     },
@@ -63767,6 +64886,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::set_rows",
+      "name": "set_rows",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_rows (& mut self, rows : usize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "RichTextEditor"
+    },
+    {
+      "id": "gpui_kit::controls::rich_text_editor::RichTextEditor::set_toolbar",
+      "name": "set_toolbar",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::rich_text_editor",
+      "path": "gpui_kit::controls::rich_text_editor",
+      "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_toolbar (& mut self, toolbar : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "RichTextEditor"
     },
@@ -65225,7 +66374,7 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "Settings sections filtered by one caller-owned query.",
       "documentation": "Settings sections filtered by one caller-owned query.\n\nThe list searches every visible row phrase plus [`SettingsRow::search_terms`]\nwith the active locale matcher. It does not reorder matches: a settings\npage remains spatially familiar while it narrows. The query field is kept\noutside so a host can place it in its own page chrome without rebuilding a\nsecond filtering state machine.",
-      "signature": "# [doc = \" Settings sections filtered by one caller-owned query.\"] # [doc = \"\"] # [doc = \" The list searches every visible row phrase plus [`SettingsRow::search_terms`]\"] # [doc = \" with the active locale matcher. It does not reorder matches: a settings\"] # [doc = \" page remains spatially familiar while it narrows. The query field is kept\"] # [doc = \" outside so a host can place it in its own page chrome without rebuilding a\"] # [doc = \" second filtering state machine.\"] # [derive (IntoElement)] pub struct SettingsList { ident : Ident, query : SharedString, sections : Vec<SettingsSection>, slots : Slots, }",
+      "signature": "# [doc = \" Settings sections filtered by one caller-owned query.\"] # [doc = \"\"] # [doc = \" The list searches every visible row phrase plus [`SettingsRow::search_terms`]\"] # [doc = \" with the active locale matcher. It does not reorder matches: a settings\"] # [doc = \" page remains spatially familiar while it narrows. The query field is kept\"] # [doc = \" outside so a host can place it in its own page chrome without rebuilding a\"] # [doc = \" second filtering state machine.\"] # [derive (IntoElement)] pub struct SettingsList { ident : Ident, query : SharedString, sections : Vec<EffectScoped<SettingsSection>>, slots : Slots, }",
       "cfg": []
     },
     {
@@ -65269,7 +66418,7 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn section (mut self, section : SettingsSection) -> Self",
+      "signature": "pub fn section (mut self, section : impl Into<EffectScoped<SettingsSection>>) -> Self",
       "cfg": [],
       "target": "SettingsList"
     },
@@ -65284,7 +66433,7 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn sections (mut self, sections : impl IntoIterator<Item = SettingsSection>) -> Self",
+      "signature": "pub fn sections<S : Into<EffectScoped<SettingsSection>>> (mut self, sections : impl IntoIterator<Item = S>,) -> Self",
       "cfg": [],
       "target": "SettingsList"
     },
@@ -65537,7 +66686,7 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn row (mut self, row : SettingsRow) -> Self",
+      "signature": "pub fn row (mut self, row : impl Into<EffectScoped<SettingsRow>>) -> Self",
       "cfg": [],
       "target": "SettingsSection"
     },
@@ -65552,7 +66701,7 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub fn rows (mut self, rows : impl IntoIterator<Item = SettingsRow>) -> Self",
+      "signature": "pub fn rows<R : Into<EffectScoped<SettingsRow>>> (mut self, rows : impl IntoIterator<Item = R>,) -> Self",
       "cfg": [],
       "target": "SettingsSection"
     },
@@ -65809,6 +66958,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::split_button::SplitButton::clear_on_click",
+      "name": "clear_on_click",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn clear_on_click (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
       "id": "gpui_kit::controls::split_button::SplitButton::default_disabled",
       "name": "default_disabled",
       "kind": "method",
@@ -65835,6 +66999,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn icon (mut self, glyph : Icon) -> Self",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
       "cfg": [],
       "target": "SplitButton"
     },
@@ -65989,6 +67168,36 @@
       "target": "SplitButton"
     },
     {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_default_disabled",
+      "name": "set_default_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_default_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
       "id": "gpui_kit::controls::split_button::SplitButton::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -66000,6 +67209,96 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_disabled (& mut self, disabled : bool, window : & mut Window, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_icon",
+      "name": "set_icon",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_icon (& mut self, icon : Option<Icon>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_items",
+      "name": "set_items",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_items (& mut self, items : Vec<MenuItem>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_label",
+      "name": "set_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "Updates the default action without replacing its focus or retained menu.",
+      "documentation": "Updates the default action without replacing its focus or retained menu.",
+      "signature": "pub fn set_label (& mut self, label : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_menu_name",
+      "name": "set_menu_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_menu_name (& mut self, name : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_on_click",
+      "name": "set_on_click",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_on_click (& mut self, handler : impl Fn (& mut Window, & mut App) + 'static, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "SplitButton"
+    },
+    {
+      "id": "gpui_kit::controls::split_button::SplitButton::set_variant",
+      "name": "set_variant",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::split_button",
+      "path": "gpui_kit::controls::split_button",
+      "source": "crates/gpui-kit/src/controls/split_button.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_variant (& mut self, variant : ButtonVariant, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "SplitButton"
     },
@@ -66352,7 +67651,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "documentation": "Wrapped, multi-line editable text.\n\nEnter inserts a line and the platform modifier plus enter submits. Motion\nfollows visual rows with a preserved goal column, and the frame grows from\n`rows` to `max_rows` before it scrolls rather than pushing the page around.",
-      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, line_projection : Option<gpui::EditableLineProjection>, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
+      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, line_projection : Option<gpui::EditableLineProjection>, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_layout_rows : Arc<[Range<usize>]>, hard_rows : Option<(u64, Arc<[Range<usize>]>)>, row_index_work : usize, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
       "cfg": []
     },
     {
@@ -66806,6 +68105,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::row_index_work",
+      "name": "row_index_work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Logical row entries constructed during the latest render/layout pass. Unchanged no-wrap rows share storage; this excludes explicit caller geometry exports and native child-id metadata.",
+      "documentation": "Logical row entries constructed during the latest render/layout pass.\nUnchanged no-wrap rows share storage; this excludes explicit caller\ngeometry exports and native child-id metadata.",
+      "signature": "pub fn row_index_work (& self) -> usize",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::rows",
       "name": "rows",
       "kind": "method",
@@ -66881,6 +68195,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::set_autosize",
+      "name": "set_autosize",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "`None` removes autosizing while retaining the current minimum rows.",
+      "documentation": "`None` removes autosizing while retaining the current minimum rows.",
+      "signature": "pub fn set_autosize (& mut self, rows : Option<(usize, usize)>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::set_completion_claimed",
       "name": "set_completion_claimed",
       "kind": "method",
@@ -66892,6 +68221,21 @@
       "summary": "Hands enter, escape, and the unmodified vertical arrows to a completion surface without changing shift-enter or the platform submit chord.",
       "documentation": "Hands enter, escape, and the unmodified vertical arrows to a completion\nsurface without changing shift-enter or the platform submit chord.\n\nThis is intentionally separate from [`Self::set_arrows_claimed`]: an\nowner can use the older arrow handoff for a surface that has no accept\naction, while a completion surface gets one coherent key contract.\nThere is no notify because owners set this during their own render.",
       "signature": "pub fn set_completion_claimed (& mut self, claimed : bool)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextArea"
     },
@@ -66911,6 +68255,36 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::set_enter",
+      "name": "set_enter",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_enter (& mut self, enter : Enter, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_frame",
+      "name": "set_frame",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Changes frame ownership without replacing the editing session.",
+      "documentation": "Changes frame ownership without replacing the editing session.",
+      "signature": "pub fn set_frame (& mut self, frame : Frame, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::set_invalid",
       "name": "set_invalid",
       "kind": "method",
@@ -66922,6 +68296,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_max_length",
+      "name": "set_max_length",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Changes the byte limit for future input; existing text and history are not truncated. `None` removes the limit.",
+      "documentation": "Changes the byte limit for future input; existing text and history are\nnot truncated. `None` removes the limit.",
+      "signature": "pub fn set_max_length (& mut self, max_length : Option<usize>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_max_rows",
+      "name": "set_max_rows",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "`None` removes autosizing's maximum and restores fixed `rows` height.",
+      "documentation": "`None` removes autosizing's maximum and restores fixed `rows` height.",
+      "signature": "pub fn set_max_rows (& mut self, max_rows : Option<usize>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextArea"
     },
@@ -66952,6 +68356,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_read_only (& mut self, read_only : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_rows",
+      "name": "set_rows",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_rows (& mut self, rows : usize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextArea"
     },
@@ -66997,6 +68431,21 @@
       "summary": "Replaces the text from the host side, for example when a form resets.",
       "documentation": "Replaces the text from the host side, for example when a form resets.",
       "signature": "pub fn set_value (& mut self, value : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_wrap",
+      "name": "set_wrap",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Changes wrapping and invalidates measured geometry, preserving text, selection, composition and history. The caret is revealed on relayout.",
+      "documentation": "Changes wrapping and invalidates measured geometry, preserving text,\nselection, composition and history. The caret is revealed on relayout.",
+      "signature": "pub fn set_wrap (& mut self, wrap : TextAreaWrap, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextArea"
     },
@@ -68508,7 +69957,7 @@
       "source": "crates/gpui-kit/src/controls/upload_list.rs",
       "summary": "A list of files being uploaded, optionally over the zone that took them.",
       "documentation": "A list of files being uploaded, optionally over the zone that took them.",
-      "signature": "# [doc = \" A list of files being uploaded, optionally over the zone that took them.\"] # [derive (IntoElement)] pub struct UploadList { ident : Ident, uploads : Vec<Upload>, zone : Option<Dropzone>, size : ControlSize, disabled : bool, show_overall : bool, on_retry : Option<FileHandler>, on_cancel : Option<FileHandler>, on_remove : Option<FileHandler>, slots : Slots, }",
+      "signature": "# [doc = \" A list of files being uploaded, optionally over the zone that took them.\"] # [derive (IntoElement)] pub struct UploadList { ident : Ident, uploads : Vec<Upload>, zone : Option<EffectScoped<Dropzone>>, size : ControlSize, disabled : bool, show_overall : bool, on_retry : Option<FileHandler>, on_cancel : Option<FileHandler>, on_remove : Option<FileHandler>, slots : Slots, }",
       "cfg": []
     },
     {
@@ -68522,7 +69971,7 @@
       "source": "crates/gpui-kit/src/controls/upload_list.rs",
       "summary": "The zone the files arrive through, drawn above the list.",
       "documentation": "The zone the files arrive through, drawn above the list.\n\nSharing the surface is the point: a payload the zone refuses while it\nis being dragged and a file the host refused after it landed are the\nsame refusal, said in the same place.",
-      "signature": "pub fn dropzone (mut self, zone : Dropzone) -> Self",
+      "signature": "pub fn dropzone (mut self, zone : impl Into<EffectScoped<Dropzone>>) -> Self",
       "cfg": [],
       "target": "UploadList"
     },
@@ -72821,6 +74270,21 @@
       "target": "TreeGridRow"
     },
     {
+      "id": "gpui_kit::data::tree_grid::TreeGridRow::cells_with",
+      "name": "cells_with",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "data::tree_grid",
+      "path": "gpui_kit::data::tree_grid",
+      "source": "crates/gpui-kit/src/data/tree_grid.rs",
+      "summary": "Builds cells only when their columns are mounted or explicitly copied. Uses the same horizontal virtualization contract as [`GridRow::cells_with`]. Eager cells supplied with [`Self::cell`] take precedence.",
+      "documentation": "Builds cells only when their columns are mounted or explicitly copied.\nUses the same horizontal virtualization contract as [`GridRow::cells_with`].\nEager cells supplied with [`Self::cell`] take precedence.",
+      "signature": "pub fn cells_with (mut self, render : impl Fn (& SharedString, & mut Window, & mut App) -> Cell + 'static,) -> Self",
+      "cfg": [],
+      "target": "TreeGridRow"
+    },
+    {
       "id": "gpui_kit::data::tree_grid::TreeGridRow::disabled",
       "name": "disabled",
       "kind": "method",
@@ -75009,7 +76473,7 @@
       "source": "crates/gpui-kit/src/display/avatar.rs",
       "summary": "A circular mark for a person or a workspace.",
       "documentation": "A circular mark for a person or a workspace.\n\nWith no image it falls back to initials, and with nothing to take initials\nfrom it stays an empty circle rather than inventing a letter.",
-      "signature": "# [doc = \" A circular mark for a person or a workspace.\"] # [doc = \"\"] # [doc = \" With no image it falls back to initials, and with nothing to take initials\"] # [doc = \" from it stays an empty circle rather than inventing a letter.\"] # [derive (Debug, IntoElement)] pub struct Avatar { ident : Option<Ident>, name : SharedString, image : Option<SharedString>, size : f32, tint : Option<Hsla>, presence : AvatarPresence, # [doc = \" The colour the mark is cut out of when it overlaps another one. Only a\"] # [doc = \" stack sets this; a mark standing on its own has nothing to cut.\"] stacked_on : Option<Hsla>, }",
+      "signature": "# [doc = \" A circular mark for a person or a workspace.\"] # [doc = \"\"] # [doc = \" With no image it falls back to initials, and with nothing to take initials\"] # [doc = \" from it stays an empty circle rather than inventing a letter.\"] # [derive (IntoElement)] pub struct Avatar { ident : Option<Ident>, name : SharedString, image : Option<gpui::ImageSource>, size : f32, tint : Option<Hsla>, presence : AvatarPresence, # [doc = \" The colour the mark is cut out of when it overlaps another one. Only a\"] # [doc = \" stack sets this; a mark standing on its own has nothing to cut.\"] stacked_on : Option<Hsla>, }",
       "cfg": []
     },
     {
@@ -75039,6 +76503,21 @@
       "summary": "A resource path or URI the asset source can resolve.",
       "documentation": "A resource path or URI the asset source can resolve.",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "Avatar"
+    },
+    {
+      "id": "gpui_kit::display::avatar::Avatar::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "display::avatar",
+      "path": "gpui_kit::display::avatar",
+      "source": "crates/gpui-kit/src/display/avatar.rs",
+      "summary": "A caller-resolved image, including a custom loader whose authorization remains with the host. The avatar does not turn it into a resource path.",
+      "documentation": "A caller-resolved image, including a custom loader whose authorization\nremains with the host. The avatar does not turn it into a resource path.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "Avatar"
     },
@@ -83069,6 +84548,20 @@
     },
     {
       "id": "gpui_kit::foundation::reexport-7",
+      "name": "window_state :: { owner_state_is_live , register_owner_state , release_owner_state }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "foundation",
+      "path": "gpui_kit::foundation",
+      "source": "crates/gpui-kit/src/foundation/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use window_state::{ owner_state_is_live, register_owner_state, release_owner_state };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::foundation::reexport-8",
       "name": "gpui_kit_theme :: { ActiveTheme , ColorChoice , ControlSize , Density , Elevation , Layer , ThemeRegistry , Variant , VariantColors , activate_theme , set_density , }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -83395,6 +84888,48 @@
       "signature": "pub fn theme (theme : Theme, child : impl IntoElement) -> Self",
       "cfg": [],
       "target": "ThemeOverlay"
+    },
+    {
+      "id": "gpui_kit::foundation::window_state::owner_state_is_live",
+      "name": "owner_state_is_live",
+      "kind": "function",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "foundation::window_state",
+      "path": "gpui_kit::foundation::window_state",
+      "source": "crates/gpui-kit/src/foundation/window_state.rs",
+      "summary": "Whether an owner may still retain Kit keyed state. This is cache lifetime, not permission to perform effects. Native unowned state remains compatible.",
+      "documentation": "Whether an owner may still retain Kit keyed state. This is cache lifetime,\nnot permission to perform effects. Native unowned state remains compatible.",
+      "signature": "pub fn owner_state_is_live (owner : EffectOwner, cx : & App) -> bool",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::foundation::window_state::register_owner_state",
+      "name": "register_owner_state",
+      "kind": "function",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "foundation::window_state",
+      "path": "gpui_kit::foundation::window_state",
+      "source": "crates/gpui-kit/src/foundation/window_state.rs",
+      "summary": "Registers a freshly minted mount owner before constructing its Kit state. Only the host mount lifecycle calls this; never call it from a component, render, or delayed callback. Preserve registration across ordinary renders, release on unmount, and mint a new token for a subsequent mount. This grants cache lifetime only, not clipboard or other effect permission.",
+      "documentation": "Registers a freshly minted mount owner before constructing its Kit state.\nOnly the host mount lifecycle calls this; never call it from a component,\nrender, or delayed callback. Preserve registration across ordinary renders,\nrelease on unmount, and mint a new token for a subsequent mount.\nThis grants cache lifetime only, not clipboard or other effect permission.",
+      "signature": "pub fn register_owner_state (owner : EffectOwner, cx : & mut App)",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::foundation::window_state::release_owner_state",
+      "name": "release_owner_state",
+      "kind": "function",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "foundation::window_state",
+      "path": "gpui_kit::foundation::window_state",
+      "source": "crates/gpui-kit/src/foundation/window_state.rs",
+      "summary": "Immediately drops all typed keyed-registry entries belonging to this exact owner, across windows, and removes its registration. Ambient owner scopes cannot recreate it; no retired-token tombstones are retained. Returns the number of removed keys. No semantic-id parsing is involved.",
+      "documentation": "Immediately drops all typed keyed-registry entries belonging to this exact\nowner, across windows, and removes its registration. Ambient owner scopes\ncannot recreate it; no retired-token tombstones are retained.\nReturns the number of removed keys. No semantic-id parsing is involved.\n\nHosts use one owner per actual mount, preserve it across ordinary renders,\nand retire it on removal. Typed children must preserve `EffectScoped<T>`.\nThis releases registry references, not arbitrary externally retained Rc or\nEntity handles, and does not partition window-wide overlay coordination.",
+      "signature": "pub fn release_owner_state (owner : EffectOwner, cx : & mut App) -> usize",
+      "cfg": []
     },
     {
       "id": "gpui_kit::game::model::Ability",
@@ -84082,7 +85617,7 @@
       "source": "crates/gpui-kit/src/game/model.rs",
       "summary": "One caller-owned party member over the shared agent identity vocabulary.",
       "documentation": "One caller-owned party member over the shared agent identity vocabulary.",
-      "signature": "# [doc = \" One caller-owned party member over the shared agent identity vocabulary.\"] # [derive (Debug, Clone, PartialEq)] pub struct PartyMember { pub (crate) agent : AgentSnapshot, pub (crate) expression : PersonaExpression, pub (crate) image : Option<SharedString>, pub (crate) tint : Option<Hsla>, pub (crate) gauges : Vec<PartyGauge>, }",
+      "signature": "# [doc = \" One caller-owned party member over the shared agent identity vocabulary.\"] # [derive (Debug, Clone, PartialEq)] pub struct PartyMember { pub (crate) agent : AgentSnapshot, pub (crate) expression : PersonaExpression, pub (crate) image : Option<PresentationImage>, pub (crate) tint : Option<Hsla>, pub (crate) gauges : Vec<PartyGauge>, }",
       "cfg": []
     },
     {
@@ -84142,6 +85677,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "PartyMember"
+    },
+    {
+      "id": "gpui_kit::game::model::PartyMember::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "game::model",
+      "path": "gpui_kit::game::model",
+      "source": "crates/gpui-kit/src/game/model.rs",
+      "summary": "Uses caller-resolved art, retaining any custom loader's access checks.",
+      "documentation": "Uses caller-resolved art, retaining any custom loader's access checks.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "PartyMember"
     },
@@ -84245,7 +85795,7 @@
       "source": "crates/gpui-kit/src/game/model.rs",
       "summary": "One reward item. Quantity is a count, not a formatted string, so Kit can present it consistently without interpreting the item.",
       "documentation": "One reward item. Quantity is a count, not a formatted string, so Kit can\npresent it consistently without interpreting the item.",
-      "signature": "# [doc = \" One reward item. Quantity is a count, not a formatted string, so Kit can\"] # [doc = \" present it consistently without interpreting the item.\"] # [derive (Debug, Clone, PartialEq)] pub struct RewardItem { pub (crate) id : RewardItemId, pub (crate) label : SharedString, pub (crate) detail : Option<SharedString>, pub (crate) quantity : usize, pub (crate) icon : Option<Icon>, pub (crate) image : Option<SharedString>, }",
+      "signature": "# [doc = \" One reward item. Quantity is a count, not a formatted string, so Kit can\"] # [doc = \" present it consistently without interpreting the item.\"] # [derive (Debug, Clone, PartialEq)] pub struct RewardItem { pub (crate) id : RewardItemId, pub (crate) label : SharedString, pub (crate) detail : Option<SharedString>, pub (crate) quantity : usize, pub (crate) icon : Option<Icon>, pub (crate) image : Option<PresentationImage>, }",
       "cfg": []
     },
     {
@@ -84305,6 +85855,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn image (mut self, image : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "RewardItem"
+    },
+    {
+      "id": "gpui_kit::game::model::RewardItem::image_source",
+      "name": "image_source",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "game::model",
+      "path": "gpui_kit::game::model",
+      "source": "crates/gpui-kit/src/game/model.rs",
+      "summary": "Uses caller-resolved reward art without inferring a resource location.",
+      "documentation": "Uses caller-resolved reward art without inferring a resource location.",
+      "signature": "pub fn image_source (mut self, image : gpui::ImageSource) -> Self",
       "cfg": [],
       "target": "RewardItem"
     },
@@ -106152,6 +107717,35 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::structured::json_view::JsonMember",
+      "name": "JsonMember",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "structured::json_view",
+      "path": "gpui_kit::structured::json_view",
+      "source": "crates/gpui-kit/src/structured/json_view.rs",
+      "summary": "One identified object member. IDs must be nonempty and unique among siblings. A key may repeat; the ID must survive reorder and value or key edits.",
+      "documentation": "One identified object member. IDs must be nonempty and unique among siblings.\nA key may repeat; the ID must survive reorder and value or key edits.",
+      "signature": "# [doc = \" One identified object member. IDs must be nonempty and unique among siblings.\"] # [doc = \" A key may repeat; the ID must survive reorder and value or key edits.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct JsonMember { pub id : SharedString, pub key : SharedString, pub value : JsonValue, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::structured::json_view::JsonMember::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "structured::json_view",
+      "path": "gpui_kit::structured::json_view",
+      "source": "crates/gpui-kit/src/structured/json_view.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (id : impl Into<SharedString>, key : impl Into<SharedString>, value : JsonValue,) -> Self",
+      "cfg": [],
+      "target": "JsonMember"
+    },
+    {
       "id": "gpui_kit::structured::json_view::JsonValue",
       "name": "JsonValue",
       "kind": "enum",
@@ -106162,7 +107756,7 @@
       "source": "crates/gpui-kit/src/structured/json_view.rs",
       "summary": "A JSON value, plus the one thing JSON cannot say: that a subtree is being withheld on purpose.",
       "documentation": "A JSON value, plus the one thing JSON cannot say: that a subtree is being\nwithheld on purpose.",
-      "signature": "# [doc = \" A JSON value, plus the one thing JSON cannot say: that a subtree is being\"] # [doc = \" withheld on purpose.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum JsonValue { Null, Bool (bool), # [doc = \" The number exactly as the document wrote it.\"] Number (SharedString), String (SharedString), Array (Vec<JsonValue>), # [doc = \" Members in document order. A repeated key is kept, not collapsed.\"] Object (Vec<(SharedString, JsonValue)>), # [doc = \" Present, and not shown. Carries a description of the shape and no part\"] # [doc = \" of the value.\"] Redacted (SharedString), }",
+      "signature": "# [doc = \" A JSON value, plus the one thing JSON cannot say: that a subtree is being\"] # [doc = \" withheld on purpose.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum JsonValue { Null, Bool (bool), # [doc = \" The number exactly as the document wrote it.\"] Number (SharedString), String (SharedString), Array (Vec<JsonValue>), # [doc = \" Members in document order. A repeated key is kept, not collapsed.\"] # [doc = \" Rendering repeated keys requires [`Self::IdentifiedObject`]; without\"] # [doc = \" caller identities the view reports an identity error, retaining this data.\"] Object (Vec<(SharedString, JsonValue)>), # [doc = \" Ordered members with caller-owned identity independent of key and value.\"] IdentifiedObject (Vec<JsonMember>), # [doc = \" Present, and not shown. Carries a description of the shape and no part\"] # [doc = \" of the value.\"] Redacted (SharedString), }",
       "cfg": []
     },
     {
@@ -106177,6 +107771,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn array (items : impl IntoIterator<Item = JsonValue>) -> Self",
+      "cfg": [],
+      "target": "JsonValue"
+    },
+    {
+      "id": "gpui_kit::structured::json_view::JsonValue::identified_object",
+      "name": "identified_object",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "structured::json_view",
+      "path": "gpui_kit::structured::json_view",
+      "source": "crates/gpui-kit/src/structured/json_view.rs",
+      "summary": "Identifies members by caller ID. Paths use the reserved `~2` prefix followed by an RFC 6901 escaped ID, e.g. `~2record~1a` for `record/a`. Ordinary keys escape every `~`, so legacy paths cannot collide with it.",
+      "documentation": "Identifies members by caller ID. Paths use the reserved `~2` prefix\nfollowed by an RFC 6901 escaped ID, e.g. `~2record~1a` for `record/a`.\nOrdinary keys escape every `~`, so legacy paths cannot collide with it.",
+      "signature": "pub fn identified_object (members : impl IntoIterator<Item = JsonMember>) -> Self",
       "cfg": [],
       "target": "JsonValue"
     },
@@ -106450,7 +108059,7 @@
     },
     {
       "id": "gpui_kit::structured::reexport-1",
-      "name": "json_view :: { JsonValue , JsonView , ValueKind }",
+      "name": "json_view :: { JsonMember , JsonValue , JsonView , ValueKind }",
       "kind": "reexport",
       "package": "gpui-box-kit",
       "crate": "gpui_kit",
@@ -106459,7 +108068,7 @@
       "source": "crates/gpui-kit/src/structured/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use json_view::{ JsonValue, JsonView, ValueKind };",
+      "signature": "pub use json_view::{ JsonMember, JsonValue, JsonView, ValueKind };",
       "cfg": []
     },
     {
@@ -117674,7 +119283,7 @@
       "source": "crates/gpui-webview/src/lib.rs",
       "summary": "Engine notifications. PageFinished is deliberately not a success assertion: native failure notifications may follow it. Do not log URLs or messages without the application's privacy/redaction policy.",
       "documentation": "Engine notifications. PageFinished is deliberately not a success assertion:\nnative failure notifications may follow it. Do not log URLs or messages\nwithout the application's privacy/redaction policy.",
-      "signature": "# [doc = \" Engine notifications. PageFinished is deliberately not a success assertion:\"] # [doc = \" native failure notifications may follow it. Do not log URLs or messages\"] # [doc = \" without the application's privacy/redaction policy.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub enum BrowserEvent { NavigationStarted (String), NavigationRefused (String), PageFinished (String), LoadFailed { url : String, description : String, }, # [doc = \" Native process failure, including termination or unresponsiveness.\"] ProcessFailed (String), PopupRefused (String), DownloadRefused (String), PermissionRefused (String), # [doc = \" Untrusted page data, NEVER a privileged runtime command. In particular\"] # [doc = \" Linux Wry reports the main URL for iframe IPC, not the sender's origin.\"] Message { reported_url : String, body : String, }, MessageRefused, # [doc = \" The caller did not drain the bounded event queue quickly enough. State\"] # [doc = \" is incomplete; do not infer success from a stream with missing events.\"] EventsDropped (usize), }",
+      "signature": "# [doc = \" Engine notifications. PageFinished is deliberately not a success assertion:\"] # [doc = \" native failure notifications may follow it. Do not log URLs or messages\"] # [doc = \" without the application's privacy/redaction policy.\"] # [derive (Clone, Debug, PartialEq, Eq)] pub enum BrowserEvent { NavigationStarted (String), NavigationRefused (String), PageFinished (String), LoadFailed { url : String, description : String, }, # [doc = \" Native process failure, including termination or unresponsiveness.\"] ProcessFailed (String), # [doc = \" Host content allocation failed, distinct from a page navigation failure.\"] ViewportAllocationFailed (String), PopupRefused (String), DownloadRefused (String), PermissionRefused (String), # [doc = \" Untrusted page data, NEVER a privileged runtime command. In particular\"] # [doc = \" Linux Wry reports the main URL for iframe IPC, not the sender's origin.\"] Message { reported_url : String, body : String, }, MessageRefused, # [doc = \" The caller did not drain the bounded event queue quickly enough. State\"] # [doc = \" is incomplete; do not infer success from a stream with missing events.\"] EventsDropped (usize), }",
       "cfg": []
     },
     {
@@ -123925,6 +125534,7 @@
       ],
       "options": [
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "size(size: f32) -> Self",
         "parent(parent: impl Into<Ident>) -> Self"
@@ -123949,6 +125559,7 @@
       "options": [
         "task_label(label: impl Into<SharedString>) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "selected(selected: bool) -> Self",
         "on_action(handler: impl Fn(AgentUiAction, &mut Window, &mut App) + 'static) -> Self"
@@ -124363,6 +125974,7 @@
         "presence(presence: AvatarPresence) -> Self",
         "id(ident: impl Into<Ident>) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "size(size: f32) -> Self",
         "tint(tint: Hsla) -> Self"
       ],
@@ -124648,8 +126260,8 @@
         "new(ident: impl Into<Ident>) -> Self"
       ],
       "options": [
-        "child(button: Button) -> Self",
-        "children(buttons: impl IntoIterator<Item = Button>) -> Self"
+        "child(button: impl Into<EffectScoped<Button>>) -> Self",
+        "children<B: Into<EffectScoped<Button>>>(buttons: impl IntoIterator<Item = B>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -125267,11 +126879,19 @@
       ],
       "commands": [
         "set_text(text: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_glyph_only(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_variant(variant: ButtonVariant, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_confirmation(confirmation: Duration, cx: &mut Context<Self>)",
+        "set_copier(copier: impl Fn(&str, &mut App) -> Result<(), SharedString> + 'static, cx: &mut Context<Self>)",
+        "clear_copier(cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "copy(cx: &mut Context<Self>)"
       ],
       "queries": [
-        "state() -> &CopyState"
+        "state() -> &CopyState",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [],
@@ -125763,6 +127383,14 @@
         "accept_service_item(id: &str, cx: &mut Context<Self>) -> bool",
         "set_diagnostics(revision: u64, diagnostics: Vec<EditorDiagnostic>, cx: &mut Context<Self>) -> bool",
         "set_semantic_tokens(revision: u64, mut tokens: Vec<EditorSemanticToken>, cx: &mut Context<Self>) -> bool",
+        "set_label(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_line_numbers(visible: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_indent_with(indenter: Option<Rc<dyn Fn(EditorIndentRequest) -> Option<EditorIndentation>>>, cx: &mut Context<Self>)",
+        "set_syntax(syntax: Option<EditorSyntax>, cx: &mut Context<Self>)",
+        "set_language_services(enabled: bool, cx: &mut Context<Self>)",
         "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
         "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
         "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
@@ -125771,6 +127399,8 @@
       ],
       "queries": [
         "is_fold_collapsed(id: &str) -> bool",
+        "is_disabled() -> bool",
+        "is_read_only() -> bool",
         "syntax_state() -> Option<&EditorSyntax>",
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
@@ -125800,7 +127430,8 @@
         "editor",
         "editor-multicursor",
         "editor-services",
-        "editor-folding"
+        "editor-folding",
+        "editor-options"
       ]
     },
     {
@@ -126541,6 +128172,7 @@
       ],
       "queries": [
         "active_command() -> Option<&SharedString>",
+        "is_disabled() -> bool",
         "current_commands() -> &[KeymapCommand]"
       ],
       "slots": [],
@@ -127191,10 +128823,16 @@
       ],
       "commands": [
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_range(min: Option<f64>, max: Option<f64>, cx: &mut Context<Self>)",
+        "set_steps(step: f64, page_step: Option<f64>, cx: &mut Context<Self>)",
+        "set_precision(precision: usize, cx: &mut Context<Self>)",
+        "set_presentation(name: Option<SharedString>, unit: Option<SharedString>, prefix: Option<SharedString>, size: ControlSize, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
         "set_value(value: f64, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "current() -> Option<f64>",
         "field() -> &Entity<TextInput>",
         "shown(cx: &App) -> Option<f64>",
@@ -127528,6 +129166,7 @@
         "expression(expression: PersonaExpression) -> Self",
         "voice(sample: VoiceSample) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "on_event(handler: impl Fn(&PersonaDialogueEvent, &mut Window, &mut App) + 'static) -> Self",
         "markdown_image(source: impl Fn(&SharedString, &ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
@@ -127557,6 +129196,7 @@
         "expression(expression: PersonaExpression) -> Self",
         "voice(sample: VoiceSample) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "effect(plan: EffectPlan) -> Self",
         "sample_at(elapsed: Duration) -> Self",
@@ -127954,6 +129594,10 @@
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_frame(frame: Frame, cx: &mut Context<Self>)",
+        "set_toolbar(toolbar: bool, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_max_rows(max_rows: Option<usize>, cx: &mut Context<Self>)",
         "set_diagnostics(diagnostics: impl IntoIterator<Item = RichTextDiagnostic>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -127962,7 +129606,9 @@
         "apply_intent(intent: RichTextIntent, cx: &mut Context<Self>)"
       ],
       "queries": [
-        "session() -> &Entity<RichTextEditSession>"
+        "session() -> &Entity<RichTextEditSession>",
+        "is_disabled() -> bool",
+        "is_read_only() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -127973,6 +129619,7 @@
         "Blur"
       ],
       "scenes": [
+        "editor-options",
         "rich-text-editor"
       ]
     },
@@ -128343,8 +129990,8 @@
       ],
       "options": [
         "query(query: impl Into<SharedString>) -> Self",
-        "section(section: SettingsSection) -> Self",
-        "sections(sections: impl IntoIterator<Item = SettingsSection>) -> Self"
+        "section(section: impl Into<EffectScoped<SettingsSection>>) -> Self",
+        "sections<S: Into<EffectScoped<SettingsSection>>>(sections: impl IntoIterator<Item = S>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -128398,8 +130045,8 @@
       "options": [
         "description(description: impl Into<SharedString>) -> Self",
         "dimmed_by(reason: impl Into<SharedString>) -> Self",
-        "row(row: SettingsRow) -> Self",
-        "rows(rows: impl IntoIterator<Item = SettingsRow>) -> Self",
+        "row(row: impl Into<EffectScoped<SettingsRow>>) -> Self",
+        "rows<R: Into<EffectScoped<SettingsRow>>>(rows: impl IntoIterator<Item = R>) -> Self",
         "label_width(width: Pixels) -> Self",
         "child(child: impl IntoElement) -> Self",
         "action(action: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
@@ -128588,9 +130235,19 @@
         "on_click(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [
+        "set_label(label: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_icon(icon: Option<Icon>, cx: &mut Context<Self>)",
+        "set_variant(variant: ButtonVariant, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_default_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
+        "set_menu_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_on_click(handler: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>)",
+        "clear_on_click(cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, window: &mut Window, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "menu() -> &Entity<Menu>",
         "is_open(cx: &App) -> bool",
         "open_menu(window: &mut Window, cx: &mut Context<Self>)"
@@ -129063,6 +130720,15 @@
       ],
       "commands": [
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_frame(frame: Frame, cx: &mut Context<Self>)",
+        "set_wrap(wrap: TextAreaWrap, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_rows(rows: usize, cx: &mut Context<Self>)",
+        "set_max_rows(max_rows: Option<usize>, cx: &mut Context<Self>)",
+        "set_autosize(rows: Option<(usize, usize)>, cx: &mut Context<Self>)",
+        "set_enter(enter: Enter, cx: &mut Context<Self>)",
+        "set_max_length(max_length: Option<usize>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_arrows_claimed(claimed: bool)",
         "set_completion_claimed(claimed: bool)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -129096,6 +130762,7 @@
         "cursor_row() -> usize",
         "shaping_work() -> Option<gpui::EditableTextWork>",
         "accessibility_work() -> gpui::AccessibleTextWork",
+        "row_index_work() -> usize",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
@@ -129118,7 +130785,8 @@
         "Blur"
       ],
       "scenes": [
-        "textarea"
+        "textarea",
+        "editor-options"
       ]
     },
     {
@@ -129639,7 +131307,7 @@
       "options": [
         "upload(upload: Upload) -> Self",
         "uploads(uploads: impl IntoIterator<Item = Upload>) -> Self",
-        "dropzone(zone: Dropzone) -> Self",
+        "dropzone(zone: impl Into<EffectScoped<Dropzone>>) -> Self",
         "show_overall(show: bool) -> Self",
         "on_retry(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_cancel(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
@@ -129920,6 +131588,7 @@
       ],
       "options": [
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self"
       ],
       "commands": [],
@@ -134331,6 +136000,18 @@
       ]
     },
     {
+      "name": "JsonMember",
+      "path": "gpui_kit::structured::JsonMember",
+      "summary": "One identified object member. IDs must be nonempty and unique among siblings. A key may repeat; the ID must survive reorder and value or key edits.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, key: impl Into<SharedString>, value: JsonValue) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "JsonValue",
       "path": "gpui_kit::structured::JsonValue",
       "summary": "A JSON value, plus the one thing JSON cannot say: that a subtree is being withheld on purpose.",
@@ -134341,6 +136022,7 @@
         "String",
         "Array",
         "Object",
+        "IdentifiedObject",
         "Redacted"
       ],
       "construct": [
@@ -134348,6 +136030,7 @@
         "string(text: impl Into<SharedString>) -> Self",
         "array(items: impl IntoIterator<Item = JsonValue>) -> Self",
         "object(members: impl IntoIterator<Item = (impl Into<SharedString>, JsonValue)>) -> Self",
+        "identified_object(members: impl IntoIterator<Item = JsonMember>) -> Self",
         "redacted(shape: impl Into<SharedString>) -> Self",
         "redacted_from(value: &JsonValue, cx: &App) -> Self"
       ],
@@ -136087,6 +137770,7 @@
       "options": [
         "expression(expression: PersonaExpression) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self",
         "tint(tint: Hsla) -> Self",
         "gauge(gauge: PartyGauge) -> Self"
       ],
@@ -136848,7 +138532,8 @@
         "detail(detail: impl Into<SharedString>) -> Self",
         "quantity(quantity: usize) -> Self",
         "icon(icon: Icon) -> Self",
-        "image(image: impl Into<SharedString>) -> Self"
+        "image(image: impl Into<SharedString>) -> Self",
+        "image_source(image: gpui::ImageSource) -> Self"
       ],
       "commands": [],
       "queries": [
@@ -139005,6 +140690,7 @@
       "options": [
         "text(text: impl Into<SharedString>) -> Self",
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
+        "cells_with(render: impl Fn(&SharedString, &mut Window, &mut App) -> Cell + 'static) -> Self",
         "branch(expanded: bool) -> Self",
         "parent(id: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
@@ -148956,6 +150642,22 @@
       "example": "fn editor_folding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneFoldedEditor>() {\n        let editor = cx.new(|cx| Editor::new(\"scene.editor.folding\", \"Folded Unicode source fixture\", \"fn outer() {\\n    let 界 = 13;\\n    if ready {\\n        process();\\n    }\\n}\\nfn tail() {}\\n\", window, cx).rows(6));\n        editor.update(cx, |editor, cx| {\n            use crate::controls::editor::EditorFold;\n            editor.set_folds(\n                0,\n                vec![\n                    EditorFold {\n                        id: \"outer\".into(),\n                        lines: 0..6,\n                    },\n                    EditorFold {\n                        id: \"ready\".into(),\n                        lines: 2..5,\n                    },\n                ],\n                cx,\n            );\n            editor.set_fold_collapsed(\"ready\", true, cx);\n        });\n        cx.set_global(SceneFoldedEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · nested source folds · gutter toggles or Ctrl-Alt-F · hidden text remains in the document\"))\n        .child(cx.global::<SceneFoldedEditor>().0.clone())\n        .into_any_element()\n}"
     },
     {
+      "name": "editor-options",
+      "capture": "cargo run -p xtask -- headless capture editor-options",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor",
+        "TextArea",
+        "RichTextEditor"
+      ],
+      "uses": [
+        "Editor",
+        "TextArea",
+        "RichTextEditor"
+      ],
+      "example": "fn editor_options(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneEditorOptions>() {\n        let area = cx.new(|cx| {\n            TextArea::new(\"scene.options.area\", window, cx)\n                .text(\"Caller text survives layout changes. 界 😀\\nA retained second line.\")\n        });\n        area.update(cx, |area, cx| {\n            area.set_control_size(ControlSize::Lg, cx);\n            area.set_autosize(Some((2, 4)), cx);\n            area.set_required(true, cx);\n        });\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.options.editor\",\n                \"Retained source fixture\",\n                \"let unchanged = 13;\\n// same entity, new options\",\n                window,\n                cx,\n            )\n        });\n        editor.update(cx, |editor, cx| {\n            editor.set_rows(3, cx);\n            editor.set_line_numbers(false, cx);\n            editor.set_read_only(true, cx);\n        });\n        let document = RichTextDocument::new([RichTextBlock::new(\n            \"options-body\",\n            \"Caller-owned rich text remains attached to the same session.\",\n        )])\n        .expect(\"fixture document is valid\");\n        let session = cx.new(|_| RichTextEditSession::new(document));\n        let next_id = Rc::new(std::cell::Cell::new(0_u64));\n        let rich = cx.new(|cx| {\n            RichTextEditor::new(\n                \"scene.options.rich\",\n                session,\n                move || {\n                    let id = next_id.get() + 1;\n                    next_id.set(id);\n                    RichTextBlockId::new(format!(\"options-{id}\"))\n                },\n                window,\n                cx,\n            )\n        });\n        rich.update(cx, |editor, cx| {\n            editor.set_rows(2, cx);\n            editor.set_max_rows(None, cx);\n            editor.set_toolbar(false, cx);\n        });\n        cx.set_global(SceneEditorOptions(area, editor, rich));\n    }\n    let theme = cx.theme().clone();\n    let editors = cx.global::<SceneEditorOptions>();\n    stack(&theme).w(px(720.0))\n        .child(caption(&theme, \"fixture · retained options: large autosizing text / read-only source without gutter / fixed rich text without toolbar\"))\n        .child(editors.0.clone()).child(editors.1.clone()).child(editors.2.clone())\n        .into_any_element()\n}"
+    },
+    {
       "name": "mention-input",
       "capture": "cargo run -p xtask -- headless capture mention-input",
       "kind": "exhibit",
@@ -150854,7 +152556,10 @@
     "framework_accessibility": {
       "clipped_role_bounds": "Role-bearing element bounds are intersected with the active content mask before AccessKit publication; fully clipped nodes are omitted for that frame.",
       "cross_tree_active_descendant": "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node.",
-      "resolved_element_focus": "InteractiveElement::on_focus_resolved observes the exact explicit or framework-generated handle after subtree prepaint; non-focusable elements report no handle, and Kit diagnostics use this authority without changing AccessKit focus."
+      "logical_caches": "TextArea retains no-wrap row arrays by persistent document/projection identity and grapheme representability by immutable source storage. Static and selection-only frames construct zero row entries and check zero grapheme bytes. Edits invalidate both; wrap geometry changes invalidate rows. Native tree metadata remains document-wide.",
+      "resolved_element_focus": "InteractiveElement::on_focus_resolved observes the exact explicit or framework-generated handle after subtree prepaint; non-focusable elements report no handle, and Kit diagnostics use this authority without changing AccessKit focus.",
+      "shared_values": "Element::write_a11y_info_shared defers complete Value materialization until final node properties change. Static parents and identical visible TextRuns are retained; changed selection, value, bounds and reactivation publish complete values. Legacy mutable parent access and relationship naming retain full-value semantics.",
+      "value_work": "Window::accessibility_value_work reports producer materialized, retained, debug-cloned and relationship UTF-8 bytes. It excludes source flattening, child metadata, stock native consumer/adapter copies and explicit full-value queries; neither selection-only nor text-edit total work is claimed bounded. Native macOS/Windows evidence requires the on-demand platform lane."
     },
     "framework_context_menu": {
       "contract": "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability.",
@@ -150974,6 +152679,15 @@
       "frame_submission": "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames.",
       "meaning": "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
     },
+    "framework_typed_scopes_and_scroll_axes": {
+      "contract": "EffectScoped<T> retains the child's EffectOwner through typed map operations until element rendering. From<T> inherits ambient ownership. Vertical Div/UniformList no longer project pure horizontal wheel input into row scrolling; diagonal residuals preserve independent axes.",
+      "platform_validation": "Shared native input/owner tests and Linux full gate; macOS and Windows require the parent's integrated Platforms lane. No native translator or renderer changes.",
+      "tests": [
+        "unscoped_typed_children_inherit_but_owned_siblings_keep_their_scope",
+        "cached_and_deferred_callbacks_retain_nested_owner_and_reparent_safely",
+        "horizontal_wheel_bypasses_tall_uniform_list"
+      ]
+    },
     "framework_virtual_scroll": {
       "contract": "ListState::remap_items and ListOffset::remap retain row geometry and identity anchors at absolute pixel offsets for measured and keyed uniform lists. Removal selects the nearest surviving old-order successor, then predecessor. Width changes invalidate geometry. Window::consume_scroll_delta subtracts actual clamped source-axis motion; subsequent listeners receive unused axes and partial-edge remainder in native pixel/line units. ListScrollEvent reports actual signed motion, not layout growth. Targeted remeasurement refreshes only its window.",
       "limitations": [
@@ -150988,6 +152702,17 @@
         "nested_wheel_moves_only_consumer_and_chains_at_edge",
         "revisions_remeasure_offscreen_rows_without_reidentifying_them",
         "history_and_reorder_are_not_new_tail_messages"
+      ]
+    },
+    "framework_win32_toolkit_allocation": {
+      "commands": [
+        "cargo test -p gpui-box allocation_callback --features test-support",
+        "cargo run --locked -p gpui-box-webview --example smoke"
+      ],
+      "contract": "After native HWND placement, an opt-in UI-thread callback allocates toolkit content using the full physical viewport, not the clip region. WebView2 controller bounds use this callback; GPUI retains HWND positioning and clipping authority.",
+      "limitations": [
+        "Windows native execution required; cross-compilation and Linux smoke do not certify WebView2 allocation",
+        "does not add arbitrary transforms or rounded clipping"
       ]
     },
     "framework_x11_platform_view": {
@@ -151028,6 +152753,23 @@
         "a_large_json_edit_reuses_the_tree_and_queries_only_the_requested_region",
         "grammar_errors_and_invalid_queries_are_reported",
         "syntax_tracks_real_area_edits_and_reports_parse_errors"
+      ]
+    },
+    "kit_owner_keyed_state": {
+      "contract": "All typed keyed registries partition by exact EffectOwner, window and key. Hosts explicitly register_owner_state on minting a mount; ambient scopes never register. release_owner_state drops only that owner's registry entries synchronously and removes registration. Unknown/retired tokens cannot recache. Unowned native state retains prior behavior.",
+      "limitations": [
+        "host must register freshly minted true mount tokens and preserve typed child scopes; never register from rerender or callbacks",
+        "worker principals/grants are separate host policy",
+        "release drops registry references, not arbitrary externally retained Rc/Entity handles",
+        "active and owner-group tables shrink geometrically after removals; per-type release registry remains bounded by state types, and window shells live until window close",
+        "window-wide modal coordination, weak toast routing and effect budgeting are not keyed mount caches"
+      ],
+      "tests": [
+        "owner_churn_retains_no_history_or_peak_table_with_a_live_peer",
+        "owner_release_drops_every_typed_composite_key_without_touching_siblings",
+        "a_late_explicit_owner_continuation_cannot_repopulate_released_state",
+        "owner_is_retained_when_wheel_follow_updates_are_deferred",
+        "owner_retirement_stops_a_glide_before_its_final_jump"
       ]
     },
     "platform": [

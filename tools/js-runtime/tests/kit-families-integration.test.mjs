@@ -13,7 +13,7 @@ import { bindings } from '../bindings.mjs';
 
 const families = ['display', 'charts', 'agent', 'game-effects', 'canvas', 'overlay', 'content', 'media', 'data', 'structured'];
 
-test('central contracts preserve every frozen family member, method and pending boundary', async () => {
+test('central contracts preserve every frozen family member, method and registered boundary', async () => {
   const names = new Set();
   for (const family of families) {
     const source = await import(`../kit-${family}-schema.mjs`);
@@ -22,13 +22,13 @@ test('central contracts preserve every frozen family member, method and pending 
       names.add(name);
       assert.deepEqual(kitSchemas[name], schema, name);
       assert.deepEqual(kitMethods[name], source.familyMethods[name], name);
-      assert.equal(bindings[name].nativeIntegration, 'pending-central-hooks');
+      assert.equal(bindings[name].nativeIntegration, 'registered');
     }
   }
   assert.equal(names.size, 126);
-  assert.equal(Object.keys(kitSchemas).length, 177);
+  assert.equal(Object.keys(kitSchemas).length, 185);
   assert.equal(bindings.CinematicEffect.status, 'fallback-only');
-  assert.equal(bindings.Drawer.referenceIntegration, 'pending-native-registry');
+  assert.equal(bindings.Drawer.referenceIntegration, 'registered');
   assert.ok(bindings.AgentRoster.props.includes('agents'));
   assert.ok(bindings.AgentRoster.props.includes('run'));
   assert.equal(bindings.TextInput.nativeMethodSources.focus_handle, 'gpui::window::Focusable::focus_handle');

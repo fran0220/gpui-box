@@ -415,6 +415,36 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
     if super::datetime::COMPONENTS.contains(&component) {
         super::datetime::validate(node)?;
     }
+    if super::agent::COMPONENTS.contains(&component) {
+        super::agent::validate(node)?;
+    }
+    if super::game_effects::COMPONENTS.contains(&component) {
+        super::game_effects::validate(node)?;
+    }
+    if super::display::COMPONENTS.contains(&component) {
+        super::display::validate(node)?;
+    }
+    if super::charts::COMPONENTS.contains(&component) {
+        super::charts::validate(node)?;
+    }
+    if super::canvas::COMPONENTS.contains(&component) {
+        super::canvas::validate_props(node)?;
+    }
+    if super::overlay_extra::COMPONENTS.contains(&component) {
+        super::overlay_extra::validate_props(node)?;
+    }
+    if super::content::COMPONENTS.contains(&component) {
+        super::content::validate_descriptor(node)?;
+    }
+    if super::media::COMPONENTS.contains(&component) {
+        super::media::validate_descriptor(node)?;
+    }
+    if super::data_extra::COMPONENTS.contains(&component) {
+        super::data_extra::validate_props(node)?;
+    }
+    if super::structured::COMPONENTS.contains(&component) {
+        super::structured::validate_props(node)?;
+    }
     if component == "Slider" {
         let min = node.props.get("min").and_then(Value::as_f64).unwrap_or(0.);
         let max = node.props.get("max").and_then(Value::as_f64).unwrap_or(1.);

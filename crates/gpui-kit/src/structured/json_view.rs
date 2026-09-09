@@ -699,10 +699,13 @@ fn keystroke_move(
 impl RenderOnce for JsonView {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         if !self.value.valid_identities() {
-            return crate::display::empty::EmptyState::new(self.ident.child("identity-error"), "Object member identities required")
-                .kind(crate::display::empty::EmptyKind::Failed)
-                .detail("Repeated keys require unique caller-owned member IDs. The document has not been changed.")
-                .into_any_element();
+            return crate::display::empty::EmptyState::new(
+                self.ident.child("identity-error"),
+                cx.strings().text(StringKey::JsonIdentityRequired),
+            )
+            .kind(crate::display::empty::EmptyKind::Failed)
+            .detail(cx.strings().text(StringKey::JsonIdentityDetail))
+            .into_any_element();
         }
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);

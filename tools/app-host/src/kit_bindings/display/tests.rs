@@ -417,8 +417,17 @@ fn revoked_lazy_avatar_source_is_visibly_unavailable_not_initials() {
             ready.get_pixel(ready.width() / 2, ready.height() / 2).0,
             [255, 0, 0, 255]
         );
-        cx.update_window(window, |_, _, c| store.revoke(owner, c))
-            .expect("revoke");
+        cx.update_window(window, |_, _, c| {
+            gpui_kit::strings::set_strings(
+                [(
+                    gpui_kit::strings::StringKey::AvatarImageUnavailable,
+                    "Portrait refused".into(),
+                )],
+                c,
+            );
+            store.revoke(owner, c);
+        })
+        .expect("revoke");
         cx.update(|c| handle.update(c, |_, _, c| c.notify()).expect("redraw"));
         cx.run_until_parked();
         cx.update_window(window, |_, w, c| w.draw(c).clear(c))
@@ -435,7 +444,8 @@ fn revoked_lazy_avatar_source_is_visibly_unavailable_not_initials() {
                     .as_array()
                     .expect("nodes")
                     .iter()
-                    .any(|n| n["id"] == "avatar.image-unavailable"),
+                    .any(|n| n["id"] == "avatar.image-unavailable"
+                        && n["text"] == "Portrait refused"),
                 "{snapshot}"
             );
         });

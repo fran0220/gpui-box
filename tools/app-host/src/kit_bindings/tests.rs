@@ -634,7 +634,25 @@ fn native_methods_preserve_typed_results_and_actual_disabled_refusal(cx: &mut Te
 }
 
 #[gpui::test]
-fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
+fn shared_control_fixtures_exercise_every_declared_method(cx: &mut TestAppContext) {
+    // These fixtures predate the independently tested families. Their empty
+    // arrays and scalar examples are not valid substitutes for document, form,
+    // graph, reference, or chart contracts; those use their asymmetric fixtures.
+    const FIXTURES: &[&str] = &[
+        "TextInput",
+        "Select",
+        "Popover",
+        "Dialog",
+        "FormField",
+        "TransferList",
+        "SearchInput",
+        "AspectRatio",
+        "Toolbar",
+        "Calendar",
+        "DateInput",
+        "RangePicker",
+        "TimeInput",
+    ];
     fn props(component: &str) -> Value {
         if datetime::COMPONENTS.contains(&component) {
             let adapter: Value = serde_json::from_str(include_str!("datetime/fixture/data.json"))
@@ -674,7 +692,16 @@ fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
             _ => panic!("unsupported example schema"),
         }
     }
-    let methods: Value = serde_json::from_str(include_str!("methods.json")).expect("method schema");
+    let mut methods: Value =
+        serde_json::from_str(include_str!("methods.json")).expect("method schema");
+    let methods_map = methods.as_object_mut().expect("components");
+    for component in FIXTURES {
+        assert!(
+            methods_map.contains_key(*component),
+            "missing fixture contract: {component}"
+        );
+    }
+    methods_map.retain(|component, _| FIXTURES.contains(&component.as_str()));
     let state = Rc::new(KitState::default());
     let build_state = state.clone();
     let nodes = methods
@@ -853,6 +880,7 @@ fn host_overlay_factories_reopen_with_retained_input_and_release_state(cx: &mut 
             kit: weak.clone(),
             rendered_revision: Rc::new(std::cell::Cell::new(1)),
             clipboard: crate::clipboard::Policy::default(),
+            references: Default::default(),
         };
         let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
             let descriptor = build_descriptor.borrow();

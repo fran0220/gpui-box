@@ -287,3 +287,67 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   No local AccessKit authority/fork is approved by this checkpoint; accessible
   content and platform behavior must remain intact during independent GPUI
   cache and soft-wrap optimization.
+
+### Sixth-stage integration (not published)
+
+- Central native registration now consumes each family's component list and
+  routes rendering, retained-state reconciliation, cross-field validation and
+  data dispatch. Typed ButtonGroup/SettingsSection/SettingsList children are
+  built before type erasure, retaining their owner and mixed-content ordering.
+  Shared Menu/Focus references use central argument/result validation and
+  instance-aware native anchors; Drawer focus stops are revalidated on render.
+- Before the latest InlineEdit/editor/platform imports, the combined host
+  suite passed 135 tests; the explicitly executed real isolated-worker resource
+  registration/reload test also passed. The JS suite passed 178 tests with 15
+  OS skips, including strict declaration checking without skipLibCheck.
+  An actual native Settings click reported `Nested row action retained`; the
+  no-match state retained its page footer. Both resulting images were inspected.
+  These results are not evidence for the later imports or the whole full gate.
+- The latest local imports add InlineEdit (185 registered partial constructors,
+  15 still unbound), retained editor options, complete static native Value
+  retention and row/representability caches. Worker 49-case measurements reduce
+  10,000-line static requested bytes to 1,566,344 for TextArea and 1,756,914 for
+  Editor, but total work still scales with source size. Soft-wrap is still an
+  independently owned follow-up; no AccessKit fork or missing native Value.
+- Source-bound Platforms run 34396298822 at published source
+  `02468534f3863e1f627559808f55128eb8bc8c4d` rendered 334 Metal and 334 WARP
+  frames. The independent reviewer inspected all 17 changed/new candidates;
+  acceptance copied exactly 4 Metal and 13 WARP files and every SHA256 matched
+  the receipt. The nine existing WARP changes total 54 pixels over tolerance,
+  maximum two channel steps; tolerance remains unchanged. This does not prove
+  interaction, timing, sandbox, menu or later source correctness.
+- That run passed the full macOS WebView smoke. Windows WebView reached fixture
+  IPC and navigation refusals, then failed at its 200x200 controller viewport.
+  Both actual native-menu smokes timed out. macOS runtime failed only its old
+  socket-allocation network probe; Windows payload launch failed with error203.
+  Imported candidates add WebView2 full physical allocation, NSRunLoop menu
+  scheduling/Win32 notifications, live-endpoint network probes and private
+  AppContainer bootstrap paths. All require a new real native lane.
+- Windows debug-helper packaging is integrated with relocation and missing-file
+  refusal tests, not Windows ACL/execution proof. Live native deferred-drop to
+  worker predicate resolution/cancellation, packaged asset activation and
+  Windows evaluator cancellation remain runtime-owner work. No unused-field
+  lint suppression or fake deferred controller is used to declare completion.
+  The unused `deferred: None` construction field was removed from this partial
+  stage; the actual controller and its consumers must be delivered together.
+- The expanded full gate passed workspace check, then ran out of orb disk
+  during workspace test compilation. Generated incremental caches were cleared;
+  this failed run is not a successful gate and must be repeated.
+- The retry found three visible English strings outside StringKey and two Debug
+  names outside the allowlist. The visible Avatar/JSON refusal messages now use
+  English and Chinese translation keys; only the Debug names were allowlisted.
+  A real accessibility regression also showed EmptyState omitted its rendered
+  detail from the native tree. It now publishes that detail as description.
+  Focused native tests verify translated JSON title/description and the revoked
+  Avatar's translated accessible label; both pass. Expanded JS is 181 passing
+  tests plus 15 OS skips, with 185 constructors and current method authority.
+- The next full run reached rustdoc and rejected an unquoted `Entity<Menu>` in
+  the shared helper documentation. Quoting the type fixed the warning without
+  a lint exemption. The subsequent combined `CARGO_INCREMENTAL=0 cargo run -p
+  xtask -- gate full` passed, including 336 matching Linux images (426.36 seconds
+  rendering/comparison), both workspace test modes, strict Clippy, wasm32,
+  rustdoc, dependency checks, generated catalogs and performance ratchets.
+  The all-feature framework suite passed 574 tests; app-host passed 136 with
+  four explicit ignores. Later soft-wrap and KeybindingRecorder deliveries
+  are not part of this source or this result. Native candidates still require
+  actual macOS/Windows execution; no publication is implied by this local gate.

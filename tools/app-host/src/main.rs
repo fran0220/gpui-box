@@ -292,12 +292,12 @@ struct NodeRenderer {
     kit: std::rc::Weak<kit_bindings::KitState>,
     rendered_revision: std::rc::Rc<std::cell::Cell<u64>>,
     clipboard: clipboard::Policy,
+    references: references::Registry,
 }
 
 impl NodeRenderer {
     fn build_context(&self, node: &Node, revision: u64) -> construction::NativeBuildContext {
         construction::NativeBuildContext {
-            deferred: None,
             typed: construction::TypedSlots::new(self.clone(), node, revision),
             slots: self.slots(node, revision),
         }
@@ -374,9 +374,24 @@ impl NodeRenderer {
         let id = SharedString::from(node.id.clone());
         match node.kind {
             Kind::Kit => {
-                let slots = self.slots(node, revision);
+                let context = self.build_context(node, revision);
                 let emit = self.emitter(revision);
-                kit.render(node, slots, window, cx, emit)
+                let result = kit
+                    .render_constructed(node, context, window, cx, emit)
+                    .and_then(|element| {
+                        if let Some(owner) = self.clipboard.owner_of(node) {
+                            let refs = self.references.registration(node, owner);
+                            kit.apply_reference_props(node, cx, &refs)?;
+                        }
+                        Ok(element)
+                    });
+                result.unwrap_or_else(|error| {
+                    div()
+                        .id(id)
+                        .semantic_in(cx, NodeSpec::new(node.id.clone(), Role::Text))
+                        .child(format!("Unavailable: {error}"))
+                        .into_any_element()
+                })
             }
             Kind::Button => {
                 let mut button = Button::new(id)
@@ -459,7 +474,7 @@ impl Render for Host {
             self.references.reconcile(
                 &frame.tree,
                 |node| self.clipboard.owner_of(node),
-                |id| self.kit.native_entity_id(id),
+                |node| self.kit.native_entity_id(node),
                 cx,
             );
             let renderer = NodeRenderer {
@@ -467,6 +482,7 @@ impl Render for Host {
                 kit: std::rc::Rc::downgrade(&self.kit),
                 rendered_revision: self.rendered_revision.clone(),
                 clipboard: self.clipboard.clone(),
+                references: self.references.clone(),
             };
             self.rendered_revision.set(frame.revision);
             root = root.child(renderer.node(&frame.tree, frame.revision, window, cx));
@@ -678,6 +694,7 @@ mod tests {
             kit: Rc::downgrade(&kit),
             rendered_revision: revision.clone(),
             clipboard,
+            references: Default::default(),
         };
         let captured = node.clone();
         let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {

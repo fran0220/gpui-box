@@ -109,22 +109,34 @@ fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut
             let registration = registry.registration(&node, owner);
             assert!(
                 state
-                    .controls_extra
-                    .reference_query(
+                    .invoke_registered(
                         &node,
                         "focus_handle",
                         &json!({"extra":true}),
+                        true,
+                        window,
                         cx,
                         &registration
                     )
-                    .expect("focus query")
                     .is_err()
             );
             let reference = state
-                .controls_extra
-                .reference_query(&node, "focus_handle", &json!({}), cx, &registration)
-                .expect("focus query")
+                .invoke_registered(
+                    &node,
+                    "focus_handle",
+                    &json!({}),
+                    true,
+                    window,
+                    cx,
+                    &registration,
+                )
                 .expect("issued reference");
+            registry.reconcile(
+                &node,
+                |_| Some(owner),
+                |node| state.native_entity_id(node),
+                cx,
+            );
             registry
                 .invoke(owner, &reference, "focus", &json!({}), false, window, cx)
                 .expect("native focus");
@@ -161,15 +173,15 @@ fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut
             harness.update(|window, cx| {
                 let node = descriptor.borrow();
                 let menu = state
-                    .controls_extra
-                    .reference_query(
+                    .invoke_registered(
                         &node,
                         "menu",
                         &json!({}),
+                        true,
+                        window,
                         cx,
                         &registry.registration(&node, owner),
                     )
-                    .expect("native menu query")
                     .expect("issued menu");
                 assert_eq!(menu["type"], "Menu");
                 registry
@@ -198,15 +210,15 @@ fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut
             let node = descriptor.borrow();
             assert_eq!(
                 state
-                    .controls_extra
-                    .reference_query(
+                    .invoke_registered(
                         &node,
                         "focus_handle",
                         &json!({}),
+                        true,
+                        window,
                         cx,
                         &registry.registration(&node, owner)
                     )
-                    .expect("query")
                     .expect("same reference"),
                 reference
             );
@@ -239,15 +251,15 @@ fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut
             }
             assert!(
                 state
-                    .controls_extra
-                    .reference_query(
+                    .invoke_registered(
                         &node,
                         "focus_handle",
                         &json!({}),
+                        true,
+                        window,
                         cx,
                         &registry.registration(&node, owner)
                     )
-                    .expect("disabled query allowed")
                     .is_ok()
             );
             assert!(
@@ -273,7 +285,7 @@ fn retained_focus_references_follow_native_disabled_and_mount_lifetimes(cx: &mut
             registry.reconcile(
                 &replacement,
                 |_| Some(owner),
-                |_| state.controls_extra.native_entity_id(&node),
+                |node| state.native_entity_id(node),
                 cx,
             );
             if let Some((menu, focus)) = &menu_references {
@@ -502,6 +514,7 @@ fn settings_nested_slots_filter_and_refusals_preserve_child_events(cx: &mut Test
         kit: Rc::downgrade(&kit),
         rendered_revision: Rc::new(Cell::new(1)),
         clipboard: Default::default(),
+        references: Default::default(),
     }));
     let (build_node, build_renderer, build_kit) =
         (descriptor.clone(), renderer.clone(), kit.clone());
@@ -760,6 +773,7 @@ fn typed_button_group_uses_guarded_child_actions_and_refuses_stale_context(
         kit: Rc::downgrade(&kit),
         rendered_revision: revision.clone(),
         clipboard,
+        references: Default::default(),
     };
     let typed = TypedSlots::new(renderer, &descriptor, 1);
     let build_typed = typed.clone();

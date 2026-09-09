@@ -208,6 +208,7 @@ string_keys! {
     ImageViewerSizeUnknown => "image-viewer.size-unknown", "Size unknown";
     ImageViewerDimensionsAndScale => "image-viewer.dimensions-and-scale", "{0} · {1}";
     ImageViewerEmpty => "image-viewer.empty", "No images";
+    AvatarImageUnavailable => "avatar.image-unavailable", "Image unavailable";
 
     // Markdown.
     MarkdownImageAlt => "markdown.image-alt", "Image";
@@ -523,6 +524,8 @@ string_keys! {
     JsonShapeItemOne => "json.shape-item-one", "1 item";
     JsonShapeItems => "json.shape-items", "{0} items";
     JsonShapeValue => "json.shape-value", "a value";
+    JsonIdentityRequired => "json.identity-required", "Object member identities required";
+    JsonIdentityDetail => "json.identity-detail", "Repeated keys require unique caller-owned member IDs. The document has not been changed.";
 
     // Schema-generated form.
     SchemaNoChoices => "schema.no-choices", "No choices were offered, so there is nothing to pick.";

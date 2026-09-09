@@ -11,7 +11,6 @@ pub(super) type Emit = Rc<dyn Fn(&str, serde_json::Value)>;
 
 #[derive(Default)]
 pub(super) struct NativeBuildContext {
-    pub(super) deferred: Option<(gpui_kit::interaction::dnd::DeferredDrop, u64)>,
     pub(super) typed: TypedSlots,
     pub(super) slots: kit_bindings::KitSlots,
 }
@@ -240,6 +239,7 @@ mod tests {
             kit: Rc::downgrade(&kit),
             rendered_revision: Rc::new(Cell::new(1)),
             clipboard,
+            references: Default::default(),
         };
         let typed = TypedSlots::new(renderer, &parent, 1);
         let mut harness = Harness::new(cx, gpui_kit::install, |_, _| div().into_any_element());
@@ -332,6 +332,7 @@ mod tests {
             kit: Rc::downgrade(&kit),
             rendered_revision: Rc::new(Cell::new(1)),
             clipboard,
+            references: Default::default(),
         };
         let typed = TypedSlots::new(renderer.clone(), &parent, 1);
         let clicked = Rc::new(Cell::new(None));
@@ -370,17 +371,9 @@ mod tests {
                 }))
                 .into_any_element()
         });
-        let bounds = ["first", "middle", "second", "tail"].map(|id| {
-            harness
-                .node(id)
-                .expect("mixed semantic child")
-                .bounds
-        });
-        assert!(
-            bounds
-                .windows(2)
-                .all(|pair| pair[0].y < pair[1].y)
-        );
+        let bounds = ["first", "middle", "second", "tail"]
+            .map(|id| harness.node(id).expect("mixed semantic child").bounds);
+        assert!(bounds.windows(2).all(|pair| pair[0].y < pair[1].y));
         harness.click("second");
         assert_eq!(clicked.get(), Some(expected));
         renderer.clipboard.revoke();
@@ -412,6 +405,7 @@ mod tests {
             kit: Rc::downgrade(&kit),
             rendered_revision: revision.clone(),
             clipboard,
+            references: Default::default(),
         };
         let mut harness = Harness::new(cx, gpui_kit::install, |_, _| div().into_any_element());
         harness.update(|window, cx| {

@@ -15,10 +15,20 @@ impl KitState {
         cx: &mut App,
         refs: &crate::references::Registration<'_>,
     ) -> Result<Value> {
-        if query && let Some(result) = self.reference_query(node, method, args, window, cx, refs) {
-            return result;
-        }
-        self.invoke(node, method, args, query, window, cx)
+        let component = node.component.as_deref().unwrap_or_default();
+        let schema = validation::invocation(component, method, args, query)?;
+        let result = if query
+            && let Some(result) = self.reference_query(node, method, args, window, cx, refs)
+        {
+            result?
+        } else if component == "Drawer" && method == "set_focus_stops" && !query {
+            self.overlay_extra
+                .invoke_reference(node, method, args, false, cx, refs)?
+        } else {
+            self.invoke(node, method, args, query, window, cx)?
+        };
+        validation::validate(&result, schema)?;
+        Ok(result)
     }
 
     pub(crate) fn invoke(
@@ -49,6 +59,26 @@ impl KitState {
             )
         } else if datetime::COMPONENTS.contains(&component) {
             Some(self.datetime.invoke(node, method, args, query, window, cx))
+        } else if agent::COMPONENTS.contains(&component) {
+            Some(self.agent.invoke(node, method, args, query, window, cx))
+        } else if content::COMPONENTS.contains(&component) {
+            Some(self.content.invoke(node, method, args, query, window, cx))
+        } else if media::COMPONENTS.contains(&component) {
+            Some(self.media.invoke(node, method, args, query, window, cx))
+        } else if overlay_extra::COMPONENTS.contains(&component) {
+            Some(
+                self.overlay_extra
+                    .invoke(node, method, args, query, window, cx),
+            )
+        } else if structured::COMPONENTS.contains(&component) {
+            Some(
+                self.structured
+                    .invoke(node, method, args, query, window, cx),
+            )
+        } else if display::COMPONENTS.contains(&component) {
+            Some(display::invoke(node, method, args, query, window, cx))
+        } else if charts::COMPONENTS.contains(&component) {
+            Some(charts::invoke(node, method, args, query, window, cx))
         } else {
             None
         };
@@ -115,7 +145,9 @@ impl KitState {
                             args["id"].as_str().map(|value| value.to_owned().into()),
                             cx,
                         ),
-                        "set_options" => select.set_options(select_options(args.get("options")), cx),
+                        "set_options" => {
+                            select.set_options(select_options(args.get("options")), cx)
+                        }
                         "set_disabled" => {
                             select.set_disabled(boolean("disabled"), cx);
                             entry.route.borrow_mut().disabled = boolean("disabled");

@@ -147,6 +147,7 @@ fn isolated_worker_registers_native_image_and_reload_revokes_it() -> Result<()> 
                 kit: Default::default(),
                 clipboard,
                 resource_store,
+                references: Default::default(),
             }
         })
     })?;
