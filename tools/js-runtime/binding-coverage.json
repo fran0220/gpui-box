@@ -4709,6 +4709,14 @@
                         },
                         "disabled": {
                           "type": "boolean"
+                        },
+                        "description": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "group": {
+                          "type": "string",
+                          "max": 16384
                         }
                       },
                       "required": [
@@ -5789,6 +5797,7 @@
           "selections() -> Vec<(Range<usize>, bool)>",
           "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
           "caret_bounds() -> Option<Bounds<Pixels>>",
+          "bounds_for_position(offset: usize) -> Option<Bounds<Pixels>>",
           "cursor_row() -> usize",
           "shaping_work() -> Option<gpui::EditableTextWork>",
           "measured() -> Option<Measured>",

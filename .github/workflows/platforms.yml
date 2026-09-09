@@ -4,8 +4,8 @@ name: Platforms
 #
 # The daily gate is `cargo run -p xtask -- gate full` on the Linux orb, which
 # proves the all-feature native graph, the browser build, and the llvmpipe
-# visual baseline without any hosted runner. This workflow exists for the two
-# renderers that cannot run there: Metal and WARP. Dispatch it before a
+# visual baseline without any hosted runner. This workflow covers native OS
+# integrations and the two renderers that cannot run there: Metal and WARP. Dispatch it before a
 # release, after a renderer or token change, or whenever a macOS or Windows
 # claim in `compatibility.toml` needs fresh evidence. Nothing here runs on push.
 #
@@ -46,6 +46,73 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runtime-macos:
+    if: inputs.macos
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "26.5.1" }
+      - name: Execute native Seatbelt and runtime supervisor checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/runtime-native
+          {
+            node --version
+            cc -Wall -Wextra -Werror -O2 tools/js-runtime/native/macos-launch.c -o target/runtime-native/gpui-sandbox-launch
+            export GPUI_SANDBOX_LAUNCHER="$PWD/target/runtime-native/gpui-sandbox-launch"
+            npm --prefix tools/app-host ci
+            npm --prefix tools/app-host run check
+          } 2>&1 | tee target/runtime-native/check.log
+      - name: Retain native macOS sandbox diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-native-macos
+          path: target/runtime-native/*.log
+          if-no-files-found: warn
+
+  runtime-windows:
+    if: inputs.windows
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "26.5.1" }
+      - name: Execute native AppContainer and runtime supervisor checks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force target/runtime-native | Out-Null
+          Start-Transcript -Path target/runtime-native/check.log
+          try {
+            $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+            $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -ne 0 -or -not $installation) { throw 'Visual C++ toolchain unavailable' }
+            Import-Module "$installation/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+            Enter-VsDevShell -VsInstallPath $installation -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+            & tools/js-runtime/native/build-windows.ps1
+            # Keep the launcher/probe environment from the build script in this process.
+            node --version
+            if ($LASTEXITCODE -ne 0) { throw 'Node version check failed' }
+            npm --prefix tools/app-host ci
+            if ($LASTEXITCODE -ne 0) { throw 'Runtime dependencies failed' }
+            npm --prefix tools/app-host run check
+            if ($LASTEXITCODE -ne 0) { throw 'Native Windows runtime checks failed' }
+          } finally {
+            Stop-Transcript
+          }
+      - name: Retain native Windows sandbox diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-native-windows
+          path: target/runtime-native/*.log
+          if-no-files-found: warn
+
   native-macos:
     if: inputs.macos
     runs-on: macos-15
