@@ -60,6 +60,19 @@ test('wire descriptors reject unbound slots and events', () => {
   assert.throws(() => validateKitDescriptor({ ...node, props: { disabled: true } }), /Disabled/);
 });
 
+test('named slots are copied and accordion slot names follow section identity', () => {
+  const kit = createKitBindings((id, event) => `${id}.${event}`);
+  const child = kit.Checkbox('nested', { checked: false });
+  const node = kit.Accordion('accordion', { sections: [{ id: 'billing', title: 'Billing' }] }, {}, { billing: [child] });
+  child.props.checked = true;
+  assert.equal(node.slots.billing[0].props.checked, false);
+  assert.equal(validateKitDescriptor(node), node);
+  assert.throws(() => kit.Accordion('a', { sections: [{ id: 'billing', title: 'Billing' }] }, {}, { profile: [] }), /unknown field/);
+  assert.throws(() => kit.ScrollArea('s', {}, {}, { start: [] }), /unknown field/);
+  assert.throws(() => kit.SplitPane('s', { ratio: 1.01 }), /invalid number/);
+  assert.throws(() => kit.Pagination('p', { page: 0 }), /invalid number/);
+});
+
 test('SDK typechecks component options and typed callbacks, rejecting unknown members', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gpui-kit-types-'));
   try {
@@ -70,6 +83,9 @@ declare const kit: KitAPI;
 kit.Checkbox('check', {checked:null}, {change(value) { const checked: boolean = value; }});
 kit.Slider('range', {min:-10,max:20,value:-3,high:17}, {rangeChange(value) { const high: number = value.high; }});
 kit.Select('select', {selected:null}, {change(value) { const selected: string|null = value; }});
+kit.SplitPane('panes', {ratio:0.3}, {collapse(side) { const value: 'start'|'end' = side; }}, {start:[kit.Radio('nested')]});
+// @ts-expect-error ScrollArea has only content slot
+kit.ScrollArea('scroll', {}, {}, {start:[]});
 // @ts-expect-error radio does not have the switch option
 kit.Radio('radio', {on:true});
 // @ts-expect-error unsupported catalog names are not callable

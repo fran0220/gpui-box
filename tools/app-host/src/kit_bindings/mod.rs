@@ -13,6 +13,7 @@ use std::{
     rc::Rc,
 };
 
+mod layout;
 mod validation;
 pub(super) use validation::validate_descriptor;
 
@@ -27,6 +28,12 @@ pub(super) const COMPONENTS: &[&str] = &[
     "SegmentedControl",
     "TextInput",
     "Select",
+    "Pagination",
+    "Tabs",
+    "Accordion",
+    "ScrollArea",
+    "SplitPane",
+    "Divider",
 ];
 type Emit = Rc<dyn Fn(&str, Value)>;
 type Key = (u64, String);
@@ -128,7 +135,7 @@ impl KitState {
     pub(super) fn render(
         &mut self,
         node: &Node,
-        _slots: BTreeMap<String, Vec<AnyElement>>,
+        slots: BTreeMap<String, Vec<AnyElement>>,
         window: &mut Window,
         cx: &mut App,
         emit: Emit,
@@ -145,10 +152,14 @@ impl KitState {
         match node.component.as_deref().unwrap_or_default() {
             "Checkbox" => {
                 let mut control = Checkbox::new(id)
-                    .label(text(node, "label"))
-                    .description(text(node, "description"))
                     .disabled(disabled)
                     .control_size(size(node));
+                if node.props.contains_key("label") {
+                    control = control.label(text(node, "label"));
+                }
+                if node.props.contains_key("description") {
+                    control = control.description(text(node, "description"));
+                }
                 control = if node.props.get("checked") == Some(&Value::Null) {
                     control.mixed()
                 } else {
@@ -161,11 +172,15 @@ impl KitState {
             }
             "Radio" => {
                 let mut control = Radio::new(id)
-                    .label(text(node, "label"))
-                    .description(text(node, "description"))
                     .selected(flag(node, "selected"))
                     .disabled(disabled)
                     .control_size(size(node));
+                if node.props.contains_key("label") {
+                    control = control.label(text(node, "label"));
+                }
+                if node.props.contains_key("description") {
+                    control = control.description(text(node, "description"));
+                }
                 if let Some(action) = event("select") {
                     control = control.on_select(move |_, _| emit(&action, Value::Null));
                 }
@@ -173,13 +188,19 @@ impl KitState {
             }
             "Switch" => {
                 let mut control = Switch::new(id)
-                    .label(text(node, "label"))
-                    .description(text(node, "description"))
-                    .named(text(node, "name"))
                     .on(flag(node, "on"))
                     .invalid(flag(node, "invalid"))
                     .disabled(disabled)
                     .control_size(size(node));
+                if node.props.contains_key("label") {
+                    control = control.label(text(node, "label"));
+                }
+                if node.props.contains_key("description") {
+                    control = control.description(text(node, "description"));
+                }
+                if node.props.contains_key("name") {
+                    control = control.named(text(node, "name"));
+                }
                 if let Some(action) = event("change") {
                     control = control.on_change(move |value, _, _| emit(&action, json!(value)));
                 }
@@ -395,7 +416,7 @@ impl KitState {
                     }
                 }
             }
-            _ => unreachable!("host admitted an unsupported Kit component"),
+            _ => layout::render(node, slots, emit),
         }
     }
 }

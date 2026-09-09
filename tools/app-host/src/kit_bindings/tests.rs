@@ -187,3 +187,98 @@ fn select_preserves_menu_and_caller_refusal(cx: &mut TestAppContext) {
         Some("Alpha")
     );
 }
+
+#[gpui::test]
+fn navigation_uses_business_ids_and_mounts_named_slots(cx: &mut TestAppContext) {
+    let output = Rc::new(RefCell::new(Vec::new()));
+    let events = output.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let events = events.clone();
+        let emit: Emit =
+            Rc::new(move |action, value| events.borrow_mut().push((action.to_owned(), value)));
+        let tabs = node(
+            "Tabs",
+            "tabs",
+            json!({"tabs":[{"id":"first","label":"First"},{"id":"other","label":"Other","closable":true}],"selected":"first"}),
+            json!({"select":"tab"}),
+        );
+        let accordion = node(
+            "Accordion",
+            "details",
+            json!({"sections":[{"id":"advanced","title":"Advanced"}],"expanded":["advanced"]}),
+            json!({"toggle":"section"}),
+        );
+        let pages = node(
+            "Pagination",
+            "pages",
+            json!({"page":3,"totalPages":8}),
+            json!({"select":"page"}),
+        );
+        let mut state = KitState::default();
+        let slots = BTreeMap::from([(
+            "advanced".into(),
+            vec![
+                Button::new("slot.action")
+                    .label("Nested native button")
+                    .into_any_element(),
+            ],
+        )]);
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .children([
+                state.render(&tabs, BTreeMap::new(), window, cx, emit.clone()),
+                state.render(&accordion, slots, window, cx, emit.clone()),
+                state.render(&pages, BTreeMap::new(), window, cx, emit),
+            ])
+            .into_any_element()
+    });
+    assert!(harness.node("slot.action").is_some());
+    harness.click("tabs.other");
+    harness.click("details.advanced");
+    harness.click("pages.next");
+    assert_eq!(
+        &*output.borrow(),
+        &[
+            ("tab".into(), json!("other")),
+            ("section".into(), json!({"id":"advanced","expanded":false})),
+            ("page".into(), json!(4))
+        ]
+    );
+}
+
+#[gpui::test]
+fn layout_slots_keep_asymmetric_split_geometry(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let mut state = KitState::default();
+        let split = node(
+            "SplitPane",
+            "split",
+            json!({"ratio":0.3,"minStart":0,"minEnd":0}),
+            json!({}),
+        );
+        let slots = BTreeMap::from([
+            (
+                "start".into(),
+                vec![Button::new("pane.start").label("Start").into_any_element()],
+            ),
+            (
+                "end".into(),
+                vec![Button::new("pane.end").label("End").into_any_element()],
+            ),
+        ]);
+        div()
+            .w(px(600.))
+            .h(px(240.))
+            .child(state.render(&split, slots, window, cx, Rc::new(|_, _| {})))
+            .into_any_element()
+    });
+    let start = harness.bounds("pane.start").expect("start slot");
+    let end = harness.bounds("pane.end").expect("end slot");
+    assert!(start.origin.x < end.origin.x);
+    assert!(
+        end.origin.x > px(100.) && end.origin.x < px(300.),
+        "30% split should be left of midpoint"
+    );
+}

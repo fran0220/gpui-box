@@ -95,7 +95,28 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
         .get(component)
         .ok_or_else(|| anyhow::anyhow!("unsupported Kit component"))?;
     validate(&Value::Object(node.props.clone()), &schema["props"])?;
-    ensure!(node.slots.is_empty(), "component has no slots");
+    let mut slots: HashSet<&str> = schema["slots"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    if let Some(property) = schema["slotIds"].as_str() {
+        slots.extend(
+            node.props
+                .get(property)
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|item| item["id"].as_str()),
+        );
+    }
+    for (name, children) in &node.slots {
+        ensure!(
+            slots.contains(name.as_str()) && children.len() <= 1024,
+            "unknown slot or slot limit exceeded"
+        );
+    }
     for (event, action) in &node.events {
         ensure!(schema["events"].get(event).is_some(), "unknown Kit event");
         ensure!(

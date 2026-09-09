@@ -439,5 +439,323 @@
         ]
       }
     }
+  },
+  "Pagination": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "page": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 1000000
+        },
+        "totalPages": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 1000000
+        },
+        "hasNext": {
+          "type": "boolean"
+        },
+        "siblings": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "select": {
+        "type": "number",
+        "integer": true,
+        "min": 1,
+        "max": 1000000
+      }
+    }
+  },
+  "Tabs": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "closable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "selected": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "capsules": {
+          "type": "boolean"
+        },
+        "scrolling": {
+          "type": "boolean"
+        },
+        "overflowAfter": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "select": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      },
+      "close": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    }
+  },
+  "Accordion": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "description": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          },
+          "max": 1024
+        },
+        "expanded": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "max": 1024
+        },
+        "exclusive": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "toggle": {
+        "type": "object",
+        "fields": {
+          "id": {
+            "type": "string",
+            "min": 1,
+            "max": 256
+          },
+          "expanded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "expanded"
+        ]
+      }
+    },
+    "slotIds": "sections"
+  },
+  "ScrollArea": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "axis": {
+          "enum": [
+            "vertical",
+            "horizontal",
+            "both"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "width": {
+          "type": "number",
+          "min": 5e-324,
+          "max": 1000000000
+        },
+        "height": {
+          "type": "number",
+          "min": 5e-324,
+          "max": 1000000000
+        },
+        "fitHeight": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "SplitPane": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "axis": {
+          "enum": [
+            "horizontal",
+            "vertical"
+          ]
+        },
+        "ratio": {
+          "type": "number",
+          "min": 0,
+          "max": 1
+        },
+        "minStart": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000000
+        },
+        "minEnd": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000000
+        },
+        "step": {
+          "type": "number",
+          "min": 5e-324,
+          "max": 1000000000
+        },
+        "collapsible": {
+          "type": "boolean"
+        },
+        "handleLabel": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "resize": {
+        "type": "number",
+        "min": 0,
+        "max": 1
+      },
+      "collapse": {
+        "enum": [
+          "start",
+          "end"
+        ]
+      }
+    },
+    "slots": [
+      "start",
+      "end"
+    ]
+  },
+  "Divider": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "axis": {
+          "enum": [
+            "horizontal",
+            "vertical"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {}
   }
 }

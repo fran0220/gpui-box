@@ -20,6 +20,12 @@ export const kitSchemas = Object.freeze({
   SegmentedControl: { props: object({ ...common, label: string, segments: array(selectionItem), selected: identity }), events: { select: identity } },
   TextInput: { props: object({ ...common, text: string, name: string, placeholder: string, invalid: boolean, required: boolean, readOnly: boolean, secret: boolean, bare: boolean, maxLength: integer }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
   Select: { props: object({ ...common, options: array(selectionItem), selected: { ...identity, nullable: true }, name: string, placeholder: string, invalid: boolean, clearable: boolean }), events: { change: { ...identity, nullable: true }, open: choice(null), close: choice(null) } },
+  Pagination: { props: object({ ...common, page: { ...integer, min: 1 }, totalPages: { ...integer, min: 1 }, hasNext: boolean, siblings: integer }), events: { select: { ...integer, min: 1 } } },
+  Tabs: { props: object({ ...common, tabs: array(object({ ...selectionItem.fields, badge: string, closable: boolean }, ['id', 'label'])), selected: identity, capsules: boolean, scrolling: boolean, overflowAfter: integer }), events: { select: identity, close: identity } },
+  Accordion: { props: object({ size: common.size, sections: array(object({ id: identity, title: string, description: string, disabled: boolean }, ['id', 'title'])), expanded: array(identity), exclusive: boolean }), events: { toggle: object({ id: identity, expanded: boolean }, ['id', 'expanded']) }, slotIds: 'sections' },
+  ScrollArea: { props: object({ axis: choice('vertical', 'horizontal', 'both'), label: string, width: positive, height: positive, fitHeight: boolean }), events: {}, slots: ['content'] },
+  SplitPane: { props: object({ axis: choice('horizontal', 'vertical'), ratio: { type: 'number', min: 0, max: 1 }, minStart: { ...number, min: 0 }, minEnd: { ...number, min: 0 }, step: positive, collapsible: boolean, handleLabel: string }), events: { resize: { type: 'number', min: 0, max: 1 }, collapse: choice('start', 'end') }, slots: ['start', 'end'] },
+  Divider: { props: object({ label: string, axis: choice('horizontal', 'vertical') }), events: {} },
 });
 
 export function validateValue(value, schema, path = 'value') {
@@ -30,7 +36,11 @@ export function validateValue(value, schema, path = 'value') {
   }
   if (schema.type === 'array') {
     if (!Array.isArray(value) || value.length > schema.max) throw new TypeError(`${path}: invalid array`);
-    value.forEach((item, i) => validateValue(item, schema.items, `${path}[${i}]`));
+    for (let i = 0; i < value.length; i++) {
+      const item = Object.getOwnPropertyDescriptor(value, String(i));
+      if (!item || !Object.hasOwn(item, 'value')) throw new TypeError(`${path}: sparse arrays and accessors not permitted`);
+      validateValue(item.value, schema.items, `${path}[${i}]`);
+    }
     if (schema.items.fields?.id && new Set(value.map(item => item.id)).size !== value.length) throw new TypeError(`${path}: duplicate identity`);
     return;
   }
@@ -61,10 +71,21 @@ export function validateKitProps(component, id, props) {
 }
 
 // The tree validator owns recursive slots, semantic-id uniqueness and aggregate budgets.
+export function validateKitSlots(component, props, slots) {
+  if (!slots || Object.getPrototypeOf(slots) !== Object.prototype) throw new TypeError('Expected slots object');
+  const schema = kitSchemas[component];
+  const allowed = new Set(schema.slots ?? []);
+  if (schema.slotIds) for (const item of props[schema.slotIds] ?? []) allowed.add(item.id);
+  for (const name of Reflect.ownKeys(slots)) {
+    const value = Object.getOwnPropertyDescriptor(slots, name)?.value;
+    if (!allowed.has(name) || !Array.isArray(value) || value.length > 1024) throw new TypeError(`slots: unknown field or invalid slot ${String(name)}`);
+  }
+}
+
 export function validateKitDescriptor(node) {
   if (node.kind !== 'kit') throw new TypeError('Expected Kit descriptor');
   validateKitProps(node.component, node.id, node.props);
-  validateValue(node.slots, object({}), 'slots');
+  validateKitSlots(node.component, node.props, node.slots);
   const events = Object.fromEntries(Object.keys(kitSchemas[node.component].events).map(name => [name, identity]));
   validateValue(node.events, object(events), 'events');
   if (node.props.disabled && Object.keys(node.events).length) throw new TypeError('Disabled control has actions');
