@@ -281,6 +281,7 @@ fn chinese(key: StringKey) -> &'static str {
         CopyDone => "已复制",
         CopyFailed => "未复制",
         CopyFailedDetail => "剪贴板未接受此内容。",
+        CopyVerificationUnavailable => "写入已提交；无法验证：{0}",
         ApprovalDecline => "拒绝",
         ApprovalApproveOnce => "批准一次",
         ApprovalAlwaysSession => "在本次会话中始终批准",
@@ -676,6 +677,29 @@ mod tests {
                     assert!(strings.is_overridden(key));
                 }
             }
+        }
+    }
+
+    #[test]
+    fn clipboard_verification_refusal_preserves_submission_and_host_reason() {
+        let reason = "宿主拒绝读取（policy:{0}）";
+        let key = StringKey::CopyVerificationUnavailable;
+        let english = TranslationPack::English.strings().format(key, &[reason]);
+        let chinese = TranslationPack::SimplifiedChinese
+            .strings()
+            .format(key, &[reason]);
+        assert_eq!(
+            english.as_ref(),
+            "Clipboard write submitted; verification unavailable: 宿主拒绝读取（policy:{0}）"
+        );
+        assert_eq!(
+            chinese.as_ref(),
+            "写入已提交；无法验证：宿主拒绝读取（policy:{0}）"
+        );
+        for &pack in TranslationPack::ALL {
+            let text = pack.strings().format(key, &[reason]);
+            assert_ne!(text.as_ref(), pack.text(StringKey::CopyDone));
+            assert_ne!(text.as_ref(), pack.text(StringKey::CopyFailedDetail));
         }
     }
 
