@@ -573,7 +573,100 @@
           "features": []
         }
       ],
-      "symbolCount": 2572
+      "symbolCount": 2584
+    },
+    {
+      "name": "gpui-box-app-host",
+      "crate": "app_host",
+      "manifest": "tools/app-host/Cargo.toml",
+      "cohort": "tool",
+      "layer": 2,
+      "version": "0.1.2",
+      "license": "MIT",
+      "publish": false,
+      "description": null,
+      "readme": null,
+      "features": {
+        "capture": [
+          "gpui_platform/test-support",
+          "dep:gpui-kit-testkit"
+        ]
+      },
+      "dependencies": [
+        {
+          "alias": "anyhow",
+          "package": "anyhow",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "env_logger",
+          "package": "env_logger",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui",
+          "package": "gpui-box",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui-kit",
+          "package": "gpui-kit",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui-kit-semantics",
+          "package": "gpui-kit-semantics",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui-kit-testkit",
+          "package": "gpui-kit-testkit",
+          "kind": "normal",
+          "optional": true,
+          "features": [
+            "test-support"
+          ]
+        },
+        {
+          "alias": "gpui-kit-theme",
+          "package": "gpui-kit-theme",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "gpui_platform",
+          "package": "gpui-box-platform",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "serde",
+          "package": "serde",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        },
+        {
+          "alias": "serde_json",
+          "package": "serde_json",
+          "kind": "normal",
+          "optional": false,
+          "features": []
+        }
+      ],
+      "symbolCount": 0
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -1123,7 +1216,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4318
+      "symbolCount": 4339
     },
     {
       "name": "gpui-box-kit-assets",
@@ -12161,7 +12254,7 @@
       "source": "crates/gpui/src/editable_text/buffer.rs",
       "summary": "One control's editable value.",
       "documentation": "One control's editable value.",
-      "signature": "# [doc = \" One control's editable value.\"] # [derive (Debug)] pub struct EditBuffer { text : EditSnapshot, # [doc = \" A caret is an empty selection, so one range describes both.\"] selection : Range<usize>, reversed : bool, # [doc = \" The range an input method is composing, underlined and replaced whole\"] # [doc = \" as composition continues.\"] marked : Option<Range<usize>>, history : EditHistory, rules : EditRules, }",
+      "signature": "# [doc = \" One control's editable value.\"] # [derive (Debug)] pub struct EditBuffer { text : EditSnapshot, # [doc = \" A caret is an empty selection, so one range describes both.\"] selection : Range<usize>, reversed : bool, secondary : Vec<(Range<usize>, bool)>, # [doc = \" The range an input method is composing, underlined and replaced whole\"] # [doc = \" as composition continues.\"] marked : Option<Range<usize>>, history : EditHistory, rules : EditRules, }",
       "cfg": []
     },
     {
@@ -12191,6 +12284,36 @@
       "summary": "Returns whether an edit can be undone.",
       "documentation": "Returns whether an edit can be undone.",
       "signature": "pub fn can_undo (& self) -> bool",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::delete_ranges",
+      "name": "delete_ranges",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Deletes primary-first ranges as one transaction, merging overlaps and clamping to graphemes. Undo restores the selections before expansion.",
+      "documentation": "Deletes primary-first ranges as one transaction, merging overlaps and\nclamping to graphemes. Undo restores the selections before expansion.",
+      "signature": "pub fn delete_ranges (& mut self, ranges : impl IntoIterator<Item = Range<usize>>) -> EditOutcome",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::delete_selections",
+      "name": "delete_selections",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Deletes selections, extending empty carets by one grapheme. Overlapping deletion spans merge, so shared text is deleted only once. Undo restores the original primary-first selections, not the expanded deletion spans.",
+      "documentation": "Deletes selections, extending empty carets by one grapheme. Overlapping\ndeletion spans merge, so shared text is deleted only once. Undo restores\nthe original primary-first selections, not the expanded deletion spans.",
+      "signature": "pub fn delete_selections (& mut self, backward : bool) -> EditOutcome",
       "cfg": [],
       "target": "EditBuffer"
     },
@@ -12236,6 +12359,21 @@
       "summary": "Stops recording, permanently.",
       "documentation": "Stops recording, permanently.\n\nA credential that could be undone back into view would outlive the\nmoment it was replaced, so a secret field never has a history rather\nthan having one it clears.",
       "signature": "pub fn forbid_history (& mut self)",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::has_multiple_selections",
+      "name": "has_multiple_selections",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Returns whether secondary selections accompany the primary selection.",
+      "documentation": "Returns whether secondary selections accompany the primary selection.",
+      "signature": "pub fn has_multiple_selections (& self) -> bool",
       "cfg": [],
       "target": "EditBuffer"
     },
@@ -12345,6 +12483,36 @@
       "target": "EditBuffer"
     },
     {
+      "id": "gpui::editable_text::buffer::EditBuffer::replace_many",
+      "name": "replace_many",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Applies original-document replacements as one undo transaction. Invalid grapheme boundaries, overlaps and duplicate insertions are refused before mutation. Each edit produces a caret; the first is primary.",
+      "documentation": "Applies original-document replacements as one undo transaction. Invalid\ngrapheme boundaries, overlaps and duplicate insertions are refused\nbefore mutation. Each edit produces a caret; the first is primary.",
+      "signature": "pub fn replace_many (& mut self, edits : impl IntoIterator<Item = (Range<usize>, SharedString)>, cause : EditCause,) -> Option<EditOutcome>",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::replace_selections",
+      "name": "replace_selections",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Replaces all selections atomically in original source coordinates. One call is one undo transaction; single-caret typing keeps its normal coalescing. Each insertion follows the control's ordinary edit rules.",
+      "documentation": "Replaces all selections atomically in original source coordinates.\nOne call is one undo transaction; single-caret typing keeps its normal\ncoalescing. Each insertion follows the control's ordinary edit rules.",
+      "signature": "pub fn replace_selections (& mut self, text : & str, cause : EditCause) -> EditOutcome",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
       "id": "gpui::editable_text::buffer::EditBuffer::rules_mut",
       "name": "rules_mut",
       "kind": "method",
@@ -12371,6 +12539,21 @@
       "summary": "Returns the current normalized UTF-8 selection range.",
       "documentation": "Returns the current normalized UTF-8 selection range.",
       "signature": "pub fn selection (& self) -> Range<usize>",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::selections",
+      "name": "selections",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Selections in primary-first order. Secondary ranges do not overlap.",
+      "documentation": "Selections in primary-first order. Secondary ranges do not overlap.",
+      "signature": "pub fn selections (& self) -> Vec<(Range<usize>, bool)>",
       "cfg": [],
       "target": "EditBuffer"
     },
@@ -12416,6 +12599,21 @@
       "summary": "Sets a normalized selection and which endpoint carries focus.",
       "documentation": "Sets a normalized selection and which endpoint carries focus.",
       "signature": "pub fn set_selection (& mut self, range : Range<usize>, reversed : bool)",
+      "cfg": [],
+      "target": "EditBuffer"
+    },
+    {
+      "id": "gpui::editable_text::buffer::EditBuffer::set_selections",
+      "name": "set_selections",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::buffer",
+      "path": "gpui::editable_text::buffer",
+      "source": "crates/gpui/src/editable_text/buffer.rs",
+      "summary": "Sets primary-first selections, clamped to graphemes. Overlaps and duplicate carets merge, preserving primary direction. Empty input is refused.",
+      "documentation": "Sets primary-first selections, clamped to graphemes. Overlaps and\nduplicate carets merge, preserving primary direction. Empty input is refused.",
+      "signature": "pub fn set_selections (& mut self, selections : impl IntoIterator<Item = (Range<usize>, bool)>,) -> bool",
       "cfg": [],
       "target": "EditBuffer"
     },
@@ -12612,6 +12810,21 @@
       "target": "EditSnapshot"
     },
     {
+      "id": "gpui::editable_text::document::EditSnapshot::next_grapheme_boundary",
+      "name": "next_grapheme_boundary",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Next extended-grapheme boundary, without materializing a hard line.",
+      "documentation": "Next extended-grapheme boundary, without materializing a hard line.",
+      "signature": "pub fn next_grapheme_boundary (& self, offset : usize) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
       "id": "gpui::editable_text::document::EditSnapshot::offset_from_utf16",
       "name": "offset_from_utf16",
       "kind": "method",
@@ -12638,6 +12851,21 @@
       "summary": "Converts a byte offset to UTF-16 units, rounding an interior scalar offset upward, as the platform editable-text API does.",
       "documentation": "Converts a byte offset to UTF-16 units, rounding an interior scalar\noffset upward, as the platform editable-text API does.",
       "signature": "pub fn offset_to_utf16 (& self, offset : usize) -> usize",
+      "cfg": [],
+      "target": "EditSnapshot"
+    },
+    {
+      "id": "gpui::editable_text::document::EditSnapshot::previous_grapheme_boundary",
+      "name": "previous_grapheme_boundary",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::document",
+      "path": "gpui::editable_text::document",
+      "source": "crates/gpui/src/editable_text/document.rs",
+      "summary": "Previous extended-grapheme boundary, traversing borrowed rope chunks.",
+      "documentation": "Previous extended-grapheme boundary, traversing borrowed rope chunks.",
+      "signature": "pub fn previous_grapheme_boundary (& self, offset : usize) -> usize",
       "cfg": [],
       "target": "EditSnapshot"
     },
@@ -17649,6 +17877,35 @@
       "cfg": []
     },
     {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache",
+      "name": "AccessibleTextCache",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Revision-keyed logical text publication. Offscreen unchanged leaves are retained in AccessKit; visible and previously visible leaves refresh their geometry. Own one cache per text surface, never share it between windows.",
+      "documentation": "Revision-keyed logical text publication. Offscreen unchanged leaves are\nretained in AccessKit; visible and previously visible leaves refresh their\ngeometry. Own one cache per text surface, never share it between windows.",
+      "signature": "# [doc = \" Revision-keyed logical text publication. Offscreen unchanged leaves are\"] # [doc = \" retained in AccessKit; visible and previously visible leaves refresh their\"] # [doc = \" geometry. Own one cache per text surface, never share it between windows.\"] # [derive (Default)] pub struct AccessibleTextCache { source : SharedString, revision : u64, parent : Option<accesskit::NodeId>, direction : Option<accesskit::TextDirection>, rows : Vec<Range<usize>>, runs : Arc<[AccessibleRun]>, ids : Arc<[accesskit::NodeId]>, published : Option<PublishedAccessibleText>, visible : Range<usize>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::elements::selectable_text::AccessibleTextCache::publish",
+      "name": "publish",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "elements::selectable_text",
+      "path": "gpui::elements::selectable_text",
+      "source": "crates/gpui/src/elements/selectable_text.rs",
+      "summary": "Publishes current selection and viewport geometry without rebuilding unchanged logical runs. `visible` must cover every byte whose geometry callback can return cells. Text/row/direction changes invalidate the logical cache; clipping and viewport changes refresh visible leaves.",
+      "documentation": "Publishes current selection and viewport geometry without rebuilding\nunchanged logical runs. `visible` must cover every byte whose geometry\ncallback can return cells. Text/row/direction changes invalidate the\nlogical cache; clipping and viewport changes refresh visible leaves.",
+      "signature": "pub fn publish (& mut self, builder : & mut A11ySubtreeBuilder, text : & str, anchor : usize, focus : usize, direction : accesskit::TextDirection, rows : & [Range<usize>], revision : u64, visible : Range<usize>, scale : f32, geometry : impl Fn (Range<usize>) -> Vec<Bounds<Pixels>>,) -> Option<PublishedAccessibleText>",
+      "cfg": [],
+      "target": "AccessibleTextCache"
+    },
+    {
       "id": "gpui::elements::selectable_text::PublishedAccessibleText",
       "name": "PublishedAccessibleText",
       "kind": "struct",
@@ -17659,7 +17916,7 @@
       "source": "crates/gpui/src/elements/selectable_text.rs",
       "summary": "A snapshot of the text runs most recently published to AccessKit.",
       "documentation": "A snapshot of the text runs most recently published to AccessKit.\n\nKeep this beside the text revision that produced it. Accessibility actions\nmay arrive after a new frame, so positions from a stale tree must not be\ninterpreted against different text.",
-      "signature": "# [doc = \" A snapshot of the text runs most recently published to AccessKit.\"] # [doc = \"\"] # [doc = \" Keep this beside the text revision that produced it. Accessibility actions\"] # [doc = \" may arrive after a new frame, so positions from a stale tree must not be\"] # [doc = \" interpreted against different text.\"] # [derive (Clone, Debug)] pub struct PublishedAccessibleText { source : SharedString, revision : u64, runs : Vec<PublishedRun>, }",
+      "signature": "# [doc = \" A snapshot of the text runs most recently published to AccessKit.\"] # [doc = \"\"] # [doc = \" Keep this beside the text revision that produced it. Accessibility actions\"] # [doc = \" may arrive after a new frame, so positions from a stale tree must not be\"] # [doc = \" interpreted against different text.\"] # [derive (Clone, Debug)] pub struct PublishedAccessibleText { source : SharedString, revision : u64, runs : Arc<[PublishedRun]>, }",
       "cfg": []
     },
     {
@@ -40922,6 +41179,21 @@
       "target": "A11ySubtreeBuilder<'a>"
     },
     {
+      "id": "gpui::window::a11y::A11ySubtreeBuilder::retain_child",
+      "name": "retain_child",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window::a11y",
+      "path": "gpui::window::a11y",
+      "source": "crates/gpui/src/window/a11y.rs",
+      "summary": "Keeps an unchanged synthetic leaf connected without retransmitting its payload. Returns false when it was not published in the preceding active frame; the caller must then provide a complete node with `push_child`. Never use this for a node whose clipped geometry or properties changed. Removed nodes must be republished on reattachment.",
+      "documentation": "Keeps an unchanged synthetic leaf connected without retransmitting its\npayload. Returns false when it was not published in the preceding\nactive frame; the caller must then provide a complete node with\n`push_child`. Never use this for a node whose clipped geometry or\nproperties changed. Removed nodes must be republished on reattachment.",
+      "signature": "pub fn retain_child (& mut self, id : NodeId) -> bool",
+      "cfg": [],
+      "target": "A11ySubtreeBuilder<'a>"
+    },
+    {
       "id": "gpui::window::a11y::A11ySubtreeBuilder::synthetic_node_id",
       "name": "synthetic_node_id",
       "kind": "method",
@@ -52432,7 +52704,7 @@
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "What a rendered document reports. It applies none of it.",
       "documentation": "What a rendered document reports. It applies none of it.",
-      "signature": "# [doc = \" What a rendered document reports. It applies none of it.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum MarkdownEvent { # [doc = \" A link was taken. The crate opens nothing.\"] LinkClicked { href : SharedString }, # [doc = \" An image the host has not supplied was drawn as a placeholder.\"] # [doc = \"\"] # [doc = \" Reported once per source per rendered document, not once per frame, so\"] # [doc = \" a host may answer it by supplying the image without the answer\"] # [doc = \" provoking another request.\"] ImageRequested { src : SharedString, alt : SharedString, }, # [doc = \" A code block's exact text was put on the clipboard.\"] CodeCopied { language : Option<SharedString>, text : SharedString, }, # [doc = \" The reader asked for the lines [`Markdown::max_lines`] left out.\"] MoreRequested { lines : usize }, }",
+      "signature": "# [doc = \" What a rendered document reports. It applies none of it.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum MarkdownEvent { # [doc = \" A link was taken. The crate opens nothing.\"] LinkClicked { href : SharedString }, # [doc = \" An image the host has not supplied was drawn as a placeholder.\"] # [doc = \"\"] # [doc = \" Reported once per source per rendered document, not once per frame, so\"] # [doc = \" a host may answer it by supplying the image without the answer\"] # [doc = \" provoking another request.\"] ImageRequested { src : SharedString, alt : SharedString, }, # [doc = \" A code block's exact text was put on the clipboard.\"] CodeCopied { language : Option<SharedString>, text : SharedString, }, # [doc = \" The owner's clipboard policy refused the code-copy operation.\"] # [doc = \" A refusal contains no copied payload and is never a success event.\"] CodeCopyRefused { language : Option<SharedString>, reason : gpui::ClipboardDenied, }, # [doc = \" The reader asked for the lines [`Markdown::max_lines`] left out.\"] MoreRequested { lines : usize }, }",
       "cfg": []
     },
     {
@@ -58660,7 +58932,7 @@
       "path": "gpui_kit::controls::copy_button",
       "source": "crates/gpui-kit/src/controls/copy_button.rs",
       "summary": "Writes to the platform clipboard and reads it back to check.",
-      "documentation": "Writes to the platform clipboard and reads it back to check.\n\nThe readback is the whole point: the write itself cannot report anything.",
+      "documentation": "Writes to the platform clipboard and reads it back to check.\n\nThe readback verifies delivery; an authorized write alone is only submission.",
       "signature": "pub fn verified_clipboard_copy (text : & str, cx : & mut App) -> Result<(), SharedString>",
       "cfg": []
     },
@@ -58857,6 +59129,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::apply_edits",
+      "name": "apply_edits",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Applies caller-supplied changes only to the revision they describe. Overlapping or invalid edits are refused before any text/history change.",
+      "documentation": "Applies caller-supplied changes only to the revision they describe.\nOverlapping or invalid edits are refused before any text/history change.",
+      "signature": "pub fn apply_edits (& mut self, revision : u64, edits : impl IntoIterator<Item = (Range<usize>, SharedString)>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::geometry",
       "name": "geometry",
       "kind": "method",
@@ -58962,6 +59249,21 @@
       "target": "Editor"
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::select_rectangle",
+      "name": "select_rectangle",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn select_rectangle (& mut self, anchor : Point<Pixels>, focus : Point<Pixels>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::selected_range",
       "name": "selected_range",
       "kind": "method",
@@ -58977,6 +59279,21 @@
       "target": "Editor"
     },
     {
+      "id": "gpui_kit::controls::editor::Editor::selections",
+      "name": "selections",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "Primary-first selections owned by the shared input/history surface.",
+      "documentation": "Primary-first selections owned by the shared input/history surface.",
+      "signature": "pub fn selections (& self, cx : & App) -> Vec<(Range<usize>, bool)>",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
       "id": "gpui_kit::controls::editor::Editor::set_highlights",
       "name": "set_highlights",
       "kind": "method",
@@ -58988,6 +59305,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_highlights (& mut self, highlights : EditorHighlights, cx : & mut Context<Self>) -> bool",
+      "cfg": [],
+      "target": "Editor"
+    },
+    {
+      "id": "gpui_kit::controls::editor::Editor::set_selections",
+      "name": "set_selections",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::editor",
+      "path": "gpui_kit::controls::editor",
+      "source": "crates/gpui-kit/src/controls/editor.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_selections (& mut self, selections : impl IntoIterator<Item = (Range<usize>, bool)>, cx : & mut Context<Self>,) -> bool",
       "cfg": [],
       "target": "Editor"
     },
@@ -60415,6 +60747,36 @@
       "target": "TextInput"
     },
     {
+      "id": "gpui_kit::controls::input::TextInput::set_bare",
+      "name": "set_bare",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::input",
+      "path": "gpui_kit::controls::input",
+      "source": "crates/gpui-kit/src/controls/input/mod.rs",
+      "summary": "Changes whether a composing control supplies the frame.",
+      "documentation": "Changes whether a composing control supplies the frame.",
+      "signature": "pub fn set_bare (& mut self, bare : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextInput"
+    },
+    {
+      "id": "gpui_kit::controls::input::TextInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::input",
+      "path": "gpui_kit::controls::input",
+      "source": "crates/gpui-kit/src/controls/input/mod.rs",
+      "summary": "Changes control metrics while retaining text, selection, and focus.",
+      "documentation": "Changes control metrics while retaining text, selection, and focus.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextInput"
+    },
+    {
       "id": "gpui_kit::controls::input::TextInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -60441,6 +60803,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextInput"
+    },
+    {
+      "id": "gpui_kit::controls::input::TextInput::set_max_length",
+      "name": "set_max_length",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::input",
+      "path": "gpui_kit::controls::input",
+      "source": "crates/gpui-kit/src/controls/input/mod.rs",
+      "summary": "Changes the UTF-8 byte limit for subsequent edits; `None` removes it. Existing text, selection, and composition are not truncated or reset.",
+      "documentation": "Changes the UTF-8 byte limit for subsequent edits; `None` removes it.\nExisting text, selection, and composition are not truncated or reset.",
+      "signature": "pub fn set_max_length (& mut self, max_length : Option<usize>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextInput"
     },
@@ -60486,6 +60863,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_read_only (& mut self, read_only : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextInput"
+    },
+    {
+      "id": "gpui_kit::controls::input::TextInput::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::input",
+      "path": "gpui_kit::controls::input",
+      "source": "crates/gpui-kit/src/controls/input/mod.rs",
+      "summary": "Changes required semantics without replacing the editor.",
+      "documentation": "Changes required semantics without replacing the editor.",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextInput"
+    },
+    {
+      "id": "gpui_kit::controls::input::TextInput::set_secret",
+      "name": "set_secret",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::input",
+      "path": "gpui_kit::controls::input",
+      "source": "crates/gpui-kit/src/controls/input/mod.rs",
+      "summary": "Changes sensitivity without replacing the editor, caret, or focus. Enabling sensitivity irreversibly discards undo history. Disabling it is an explicit declassification, not the password reveal operation.",
+      "documentation": "Changes sensitivity without replacing the editor, caret, or focus.\nEnabling sensitivity irreversibly discards undo history. Disabling it\nis an explicit declassification, not the password reveal operation.",
+      "signature": "pub fn set_secret (& mut self, secret : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TextInput"
     },
@@ -63714,6 +64121,36 @@
       "target": "Select"
     },
     {
+      "id": "gpui_kit::controls::select::Select::set_clearable",
+      "name": "set_clearable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::select",
+      "path": "gpui_kit::controls::select",
+      "source": "crates/gpui-kit/src/controls/select.rs",
+      "summary": "Changes the clear affordance without clearing the caller's selection.",
+      "documentation": "Changes the clear affordance without clearing the caller's selection.",
+      "signature": "pub fn set_clearable (& mut self, clearable : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Select"
+    },
+    {
+      "id": "gpui_kit::controls::select::Select::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::select",
+      "path": "gpui_kit::controls::select",
+      "source": "crates/gpui-kit/src/controls/select.rs",
+      "summary": "Changes control metrics without replacing focus or open-menu state.",
+      "documentation": "Changes control metrics without replacing focus or open-menu state.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Select"
+    },
+    {
       "id": "gpui_kit::controls::select::Select::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -63770,6 +64207,21 @@
       "summary": "Replaces the options from the host side, keeping a selection that is still offered and dropping one that is not.",
       "documentation": "Replaces the options from the host side, keeping a selection that is\nstill offered and dropping one that is not.",
       "signature": "pub fn set_options (& mut self, options : Vec<SelectOption>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Select"
+    },
+    {
+      "id": "gpui_kit::controls::select::Select::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::select",
+      "path": "gpui_kit::controls::select",
+      "source": "crates/gpui-kit/src/controls/select.rs",
+      "summary": "Changes the placeholder without disturbing the open menu. `None` restores the current locale's built-in placeholder.",
+      "documentation": "Changes the placeholder without disturbing the open menu. `None`\nrestores the current locale's built-in placeholder.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Select"
     },
@@ -65014,7 +65466,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "documentation": "Wrapped, multi-line editable text.\n\nEnter inserts a line and the platform modifier plus enter submits. Motion\nfollows visual rows with a preserved goal column, and the frame grows from\n`rows` to `max_rows` before it scrolls rather than pushing the page around.",
-      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, is_selecting : bool, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
+      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
       "cfg": []
     },
     {
@@ -65393,6 +65845,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::replace_ranges",
+      "name": "replace_ranges",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Applies disjoint original-document replacements as one undo step. Invalid ranges and disabled/read-only controls are refused atomically. The first replacement's resulting caret is primary.",
+      "documentation": "Applies disjoint original-document replacements as one undo step.\nInvalid ranges and disabled/read-only controls are refused atomically.\nThe first replacement's resulting caret is primary.",
+      "signature": "pub fn replace_ranges (& mut self, edits : impl IntoIterator<Item = (Range<usize>, SharedString)>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::required",
       "name": "required",
       "kind": "method",
@@ -65438,6 +65905,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::select_rectangle",
+      "name": "select_rectangle",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Selects one source range per visual row between two window positions. Glyph hit testing, tabs and wrapping use the same painted layout as the input method. The focus row is primary; short rows clamp to their ends.",
+      "documentation": "Selects one source range per visual row between two window positions.\nGlyph hit testing, tabs and wrapping use the same painted layout as the\ninput method. The focus row is primary; short rows clamp to their ends.",
+      "signature": "pub fn select_rectangle (& mut self, anchor : Point<Pixels>, focus : Point<Pixels>, cx : & mut Context<Self>,) -> bool",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextArea::selected_range",
       "name": "selected_range",
       "kind": "method",
@@ -65449,6 +65931,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn selected_range (& self) -> Range<usize>",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::selections",
+      "name": "selections",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Primary-first, non-overlapping Unicode selections, including carets.",
+      "documentation": "Primary-first, non-overlapping Unicode selections, including carets.",
+      "signature": "pub fn selections (& self) -> Vec<(Range<usize>, bool)>",
       "cfg": [],
       "target": "TextArea"
     },
@@ -65554,6 +66051,21 @@
       "summary": "Moves the selection from the host side using UTF-8 byte offsets. Invalid offsets are clamped to surrounding grapheme boundaries by the shared editable-text buffer.",
       "documentation": "Moves the selection from the host side using UTF-8 byte offsets.\nInvalid offsets are clamped to surrounding grapheme boundaries by the\nshared editable-text buffer.",
       "signature": "pub fn set_selected_range (& mut self, range : Range<usize>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
+      "id": "gpui_kit::controls::textarea::TextArea::set_selections",
+      "name": "set_selections",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Sets primary-first selections. Overlaps and duplicate carets merge; offsets follow the shared grapheme-clamping rules. Empty input is refused.",
+      "documentation": "Sets primary-first selections. Overlaps and duplicate carets merge;\noffsets follow the shared grapheme-clamping rules. Empty input is refused.",
+      "signature": "pub fn set_selections (& mut self, selections : impl IntoIterator<Item = (Range<usize>, bool)>, cx : & mut Context<Self>,) -> bool",
       "cfg": [],
       "target": "TextArea"
     },
@@ -65729,7 +66241,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/element.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub struct PrepaintState { layout : Option<EditableTextLayout>, source_text : gpui::SharedString, cursor : Option<PaintQuad>, selection : Vec<PaintQuad>, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, visible_rows : usize, }",
+      "signature": "pub struct PrepaintState { layout : Option<EditableTextLayout>, source_text : gpui::SharedString, cursors : Vec<PaintQuad>, selection : Vec<PaintQuad>, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, visible_rows : usize, }",
       "cfg": []
     },
     {
@@ -103495,6 +104007,79 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::strings::packs::TranslationPack",
+      "name": "TranslationPack",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "strings::packs",
+      "path": "gpui_kit::strings::packs",
+      "source": "crates/gpui-kit/src/strings/packs.rs",
+      "summary": "Complete, bundled translations of Kit-owned labels. Caller content is never translated. Install `pack.strings()` with `cx.set_global`, then apply any application-specific overrides through the existing [`Strings`] interface. Number/date adapters, search matching and layout direction stay caller-owned.",
+      "documentation": "Complete, bundled translations of Kit-owned labels. Caller content is never\ntranslated. Install `pack.strings()` with `cx.set_global`, then apply any\napplication-specific overrides through the existing [`Strings`] interface.\nNumber/date adapters, search matching and layout direction stay caller-owned.",
+      "signature": "# [doc = \" Complete, bundled translations of Kit-owned labels. Caller content is never\"] # [doc = \" translated. Install `pack.strings()` with `cx.set_global`, then apply any\"] # [doc = \" application-specific overrides through the existing [`Strings`] interface.\"] # [doc = \" Number/date adapters, search matching and layout direction stay caller-owned.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq)] pub enum TranslationPack { English, SimplifiedChinese, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::strings::packs::TranslationPack::language_tag",
+      "name": "language_tag",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "strings::packs",
+      "path": "gpui_kit::strings::packs",
+      "source": "crates/gpui-kit/src/strings/packs.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const fn language_tag (self) -> & 'static str",
+      "cfg": [],
+      "target": "TranslationPack"
+    },
+    {
+      "id": "gpui_kit::strings::packs::TranslationPack::strings",
+      "name": "strings",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "strings::packs",
+      "path": "gpui_kit::strings::packs",
+      "source": "crates/gpui-kit/src/strings/packs.rs",
+      "summary": "A fresh caller-owned catalogue; later overrides never mutate the pack.",
+      "documentation": "A fresh caller-owned catalogue; later overrides never mutate the pack.",
+      "signature": "pub fn strings (self) -> Strings",
+      "cfg": [],
+      "target": "TranslationPack"
+    },
+    {
+      "id": "gpui_kit::strings::packs::TranslationPack::text",
+      "name": "text",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "strings::packs",
+      "path": "gpui_kit::strings::packs",
+      "source": "crates/gpui-kit/src/strings/packs.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn text (self, key : StringKey) -> & 'static str",
+      "cfg": [],
+      "target": "TranslationPack"
+    },
+    {
+      "id": "gpui_kit::strings::reexport-1",
+      "name": "packs :: TranslationPack",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "strings",
+      "path": "gpui_kit::strings",
+      "source": "crates/gpui-kit/src/strings.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use packs::TranslationPack;",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::strings::reset_numbers",
       "name": "reset_numbers",
       "kind": "function",
@@ -123174,6 +123759,9 @@
         "syntax(syntax: EditorSyntax) -> Self"
       ],
       "commands": [
+        "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+        "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
+        "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
       ],
@@ -123182,6 +123770,7 @@
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
         "selected_range(cx: &App) -> Range<usize>",
+        "selections(cx: &App) -> Vec<(Range<usize>, bool)>",
         "geometry(cx: &App) -> Option<EditorGeometry>"
       ],
       "slots": [],
@@ -123198,7 +123787,8 @@
         "SyntaxUnavailable"
       ],
       "scenes": [
-        "editor"
+        "editor",
+        "editor-multicursor"
       ]
     },
     {
@@ -124107,6 +124697,7 @@
         "LinkClicked",
         "ImageRequested",
         "CodeCopied",
+        "CodeCopyRefused",
         "MoreRequested"
       ],
       "scenes": [
@@ -125650,6 +126241,9 @@
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_clearable(clearable: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
@@ -126438,7 +127032,10 @@
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
-        "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)"
+        "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)",
+        "replace_ranges(edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
+        "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+        "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool"
       ],
       "queries": [
         "arrows_claimed() -> bool",
@@ -126453,6 +127050,7 @@
         "is_read_only() -> bool",
         "selected_range() -> Range<usize>",
         "cursor_offset() -> usize",
+        "selections() -> Vec<(Range<usize>, bool)>",
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
@@ -126505,11 +127103,16 @@
       ],
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_secret(secret: bool, cx: &mut Context<Self>)",
+        "set_max_length(max_length: Option<usize>, cx: &mut Context<Self>)",
+        "set_bare(bare: bool, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_text_quietly(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
@@ -131906,6 +132509,7 @@
         "LinkClicked",
         "ImageRequested",
         "CodeCopied",
+        "CodeCopyRefused",
         "MoreRequested"
       ],
       "construct": [],
@@ -136032,6 +136636,22 @@
         "value() -> T",
         "is_animating() -> bool"
       ]
+    },
+    {
+      "name": "TranslationPack",
+      "path": "gpui_kit::strings::TranslationPack",
+      "summary": "Complete, bundled translations of Kit-owned labels. Caller content is never translated. Install pack.strings() with cx.set_global, then apply any application-specific overrides through the existing Strings interface. Number/date adapters, search matching and layout direction stay caller-owned.",
+      "variants": [
+        "English",
+        "SimplifiedChinese"
+      ],
+      "construct": [],
+      "options": [
+        "text(key: StringKey) -> &'static str",
+        "strings() -> Strings"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TransportDuration",
@@ -146004,6 +146624,18 @@
       "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    let scene = stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor);\n    #[cfg(feature = \"syntax\")]\n    let scene = scene\n        .child(caption(\n            &theme,\n            \"JSON fixture · in-process incremental syntax, no language server\",\n        ))\n        .child(cx.global::<SceneEditor>().syntax.clone());\n    scene.into_any_element()\n}"
     },
     {
+      "name": "editor-multicursor",
+      "capture": "cargo run -p xtask -- headless capture editor-multicursor",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMulticursorEditor>() {\n        let source = \"let alpha = 1;\\nlet beta  = 2;\\nlet gamma = 3;\";\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.editor.multiple\",\n                \"Multicursor source fixture\",\n                source,\n                window,\n                cx,\n            )\n            .rows(4)\n        });\n        editor.update(cx, |editor, cx| {\n            let selections = [\"gamma\", \"alpha\", \"beta\"].map(|name| {\n                let start = source.find(name).expect(\"fixture variable\");\n                (start..start + name.len(), false)\n            });\n            editor.set_selections(selections, cx);\n        });\n        window.focus(&editor.read(cx).text_area().read(cx).focus_handle(cx), cx);\n        cx.set_global(SceneMulticursorEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · type in three selections; undo restores all · Alt-click adds a caret · Alt-Shift-drag selects columns\"))\n        .child(cx.global::<SceneMulticursorEditor>().0.clone())\n        .into_any_element()\n}"
+    },
+    {
       "name": "mention-input",
       "capture": "cargo run -p xtask -- headless capture mention-input",
       "kind": "exhibit",
@@ -146794,6 +147426,17 @@
         "SettingsList"
       ],
       "example": "fn settings_page(window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let search = window.use_keyed_state(\"scene.settings-page.search\", cx, |window, cx| {\n        SearchInput::new(\"scene.settings-page.query\", window, cx).placeholder(\"Search settings\")\n    });\n    let category = window.use_keyed_state(\"scene.settings-page.category\", cx, |_, _| {\n        SharedString::from(\"all\")\n    });\n    let selected = category.read(cx).clone();\n    let query = search.read(cx).value(cx);\n    let general = SettingsSection::new(\"scene.settings-page.general\", \"General\")\n        .label_width(px(150.0))\n        .row(SettingsRow::new(\"scene.settings-page.autosave\", \"Automatic save\").value(\"On\"))\n        .row(\n            SettingsRow::new(\"scene.settings-page.telemetry\", \"Usage reporting\")\n                .value(\"Off\")\n                .managed(\"fixture administrator\"),\n        );\n    let appearance = SettingsSection::new(\"scene.settings-page.appearance\", \"Appearance\")\n        .label_width(px(150.0))\n        .row(SettingsRow::new(\"scene.settings-page.theme\", \"Theme\").value(\"Studio\"))\n        .row(SettingsRow::new(\"scene.settings-page.density\", \"Density\").value(\"Comfortable\"));\n    let sections = match selected.as_ref() {\n        \"general\" => vec![general],\n        \"appearance\" => vec![appearance],\n        _ => vec![general, appearance],\n    };\n    let header_search = search.clone();\n    stack(&theme).w(px(840.0))\n        .child(caption(&theme, \"Fixture settings page: category navigation and search remain available when there are no matches\"))\n        .child(SettingsList::new(\"scene.settings-page.list\").query(query).sections(sections)\n            .slot(\"header\", move |_, cx| {\n                let theme = cx.theme();\n                div().column().gap_token(theme, Space::Sm)\n                    .child(crate::foundation::text(theme, TypeScale::Title, \"Settings\"))\n                    .child(header_search.clone()).into_any_element()\n            })\n            .slot(\"sidebar\", move |_, _| {\n                let category = category.clone();\n                Sidebar::new(\"scene.settings-page.categories\")\n                    .section(SidebarSection::new(\"sections\").items([\n                        SidebarItem::new(\"all\", \"All settings\"), SidebarItem::new(\"general\", \"General\"),\n                        SidebarItem::new(\"appearance\", \"Appearance\")]))\n                    .active(selected.clone()).on_select(move |id, _, cx| category.update(cx, |value, cx| {\n                        *value = id; cx.notify();\n                    })).into_any_element()\n            })\n            .slot(\"footer\", move |_, _| {\n                let search = search.clone();\n                Button::new(\"scene.settings-page.reset\").label(\"Reset search\")\n                    .on_click(move |_, cx| search.update(cx, |search, cx| search.set_value(\"\", cx)))\n                    .into_any_element()\n            }))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "translation-packs",
+      "capture": "cargo run -p xtask -- headless capture translation-packs",
+      "kind": "composition",
+      "subjects": [],
+      "uses": [
+        "Card",
+        "Button"
+      ],
+      "example": "fn translation_packs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::strings::TranslationPack;\n    use gpui_kit_semantics::{NodeSpec, Role, Semantic};\n    let theme = cx.theme().clone();\n    let mut columns = row(&theme).items_start();\n    for &pack in TranslationPack::ALL {\n        let strings = pack.strings();\n        let prefix = format!(\"scene.translations.{}\", pack.language_tag());\n        let mut card = Card::new()\n            .id(prefix.clone())\n            .padding(Space::Md)\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Title,\n                pack.language_tag(),\n            ))\n            .child(\n                Button::new(format!(\"{prefix}.copy\"))\n                    .label(strings.text(StringKey::Copy))\n                    .disabled(true),\n            );\n        for (key, values) in [\n            (StringKey::SettingsManagedBy, &[\"fixture administrator\"][..]),\n            (StringKey::GridSelectionCounts, &[\"2\", \"7\", \"19\"][..]),\n            (StringKey::AttachmentReady, &[][..]),\n            (StringKey::AttachmentProcessing, &[][..]),\n            (StringKey::BrowserEmpty, &[][..]),\n            (StringKey::BrowserUnavailable, &[][..]),\n            (StringKey::CopyFailedDetail, &[][..]),\n            (StringKey::ApprovalAlwaysPath, &[\"/work\"][..]),\n            (StringKey::RangeInverted, &[\"2026-09-01\", \"2026-09-09\"][..]),\n        ] {\n            let text = strings.format(key, values);\n            card = card.child(\n                div()\n                    .py_token(&theme, Space::Xs)\n                    .child(crate::foundation::text(\n                        &theme,\n                        TypeScale::Body,\n                        text.clone(),\n                    ))\n                    .semantic_in(\n                        cx,\n                        NodeSpec::new(format!(\"{prefix}.{}\", key.name()), Role::Text).text(text),\n                    ),\n            );\n        }\n        columns = columns.child(div().w(px(390.0)).child(card));\n    }\n    stack(&theme).w(px(840.0))\n        .child(caption(&theme, \"Built-in vocabulary fixture: disabled action previews, distinct states, and reordered template arguments. Caller data is not translated.\"))\n        .child(columns).into_any_element()\n}"
     },
     {
       "name": "detail",

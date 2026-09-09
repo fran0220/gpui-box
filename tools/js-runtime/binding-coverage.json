@@ -1743,6 +1743,7 @@
         ],
         "options": [
           "panel(panel: DockPanel) -> Self",
+          "floating(tiles: impl IntoIterator<Item = FloatingDock>) -> Result<Self, DockRecordError>",
           "panels(panels: impl IntoIterator<Item = DockPanel>) -> Self",
           "on_event(handler: impl Fn(DockTreeEvent, &mut Window, &mut App) + 'static) -> Self"
         ],
@@ -1839,6 +1840,9 @@
           "syntax(syntax: EditorSyntax) -> Self"
         ],
         "commands": [
+          "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+          "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
+          "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
           "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
         ],
@@ -1847,6 +1851,7 @@
           "text_area() -> &Entity<TextArea>",
           "snapshot(cx: &App) -> TextAreaSnapshot",
           "selected_range(cx: &App) -> Range<usize>",
+          "selections(cx: &App) -> Vec<(Range<usize>, bool)>",
           "geometry(cx: &App) -> Option<EditorGeometry>"
         ],
         "slots": []
@@ -5048,7 +5053,10 @@
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
           "set_read_only(read_only: bool, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
-          "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)"
+          "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)",
+          "replace_ranges(edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
+          "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+          "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool"
         ],
         "queries": [
           "arrows_claimed() -> bool",
@@ -5063,6 +5071,7 @@
           "is_read_only() -> bool",
           "selected_range() -> Range<usize>",
           "cursor_offset() -> usize",
+          "selections() -> Vec<(Range<usize>, bool)>",
           "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
           "caret_bounds() -> Option<Bounds<Pixels>>",
           "cursor_row() -> usize",
