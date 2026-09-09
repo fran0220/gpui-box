@@ -10,6 +10,7 @@ use gpui_kit::controls::keymap_editor::{
     KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
 };
 use gpui_kit::controls::number_input::{NumberInput, NumberInputEvent};
+use gpui_kit::controls::search::{FindReplace, SearchField};
 use gpui_kit::controls::split_button::SplitButton;
 use gpui_kit::overlay::MenuEvent;
 use gpui_kit::state::ValidationState;
@@ -18,6 +19,7 @@ use gpui_kit_theme::{ActiveTheme, ColorChoice, SemanticColor, Surface, Variant};
 
 mod auth;
 mod recorder;
+mod search;
 
 #[cfg(all(test, feature = "capture"))]
 mod tests;
@@ -45,6 +47,8 @@ pub(super) const COMPONENTS: &[&str] = &[
     "KeybindingRecorder",
     "PasswordInput",
     "OneTimeCodeInput",
+    "SearchField",
+    "FindReplace",
 ];
 
 pub(super) fn settings_section(
@@ -183,6 +187,8 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    search_fields: RefCell<HashMap<Key, Rc<Entry<SearchField>>>>,
+    find_replaces: RefCell<HashMap<Key, Rc<Entry<FindReplace>>>>,
     passwords: RefCell<HashMap<Key, Rc<Entry<PasswordInput>>>>,
     codes: RefCell<HashMap<Key, Rc<Entry<OneTimeCodeInput>>>>,
     recorders: RefCell<HashMap<Key, Rc<Entry<KeybindingRecorder>>>>,
@@ -198,6 +204,16 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "SearchField" => self
+                .search_fields
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
+            "FindReplace" => self
+                .find_replaces
+                .borrow()
+                .get(&key)
+                .map(|entry| entry.entity.entity_id()),
             "PasswordInput" => self
                 .passwords
                 .borrow()
@@ -255,6 +271,12 @@ impl State {
         cx: &App,
         refs: &crate::references::Registration<'_>,
     ) -> Option<anyhow::Result<Value>> {
+        if matches!(
+            node.component.as_deref(),
+            Some("SearchField" | "FindReplace")
+        ) {
+            return self.search_reference_query(node, method, args, cx, refs);
+        }
         let component = node.component.as_deref()?;
         if component == "SplitButton" && method == "menu" {
             return Some((|| {
@@ -339,6 +361,12 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.search_fields
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "SearchField"));
+        self.find_replaces
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "FindReplace"));
         self.passwords
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "PasswordInput"));
@@ -377,6 +405,12 @@ impl State {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        if node.component.as_deref() == Some("SearchField") {
+            return self.render_search_field(node, window, cx, emit);
+        }
+        if node.component.as_deref() == Some("FindReplace") {
+            return self.render_find_replace(node, window, cx, emit);
+        }
         if node.component.as_deref() == Some("PasswordInput") {
             return self.render_password(node, window, cx, emit);
         }
@@ -485,6 +519,12 @@ impl State {
         _window: &mut Window,
         cx: &mut App,
     ) -> anyhow::Result<Value> {
+        if matches!(
+            node.component.as_deref(),
+            Some("SearchField" | "FindReplace")
+        ) {
+            return self.invoke_search(node, method, args, query, _window, cx);
+        }
         if node.component.as_deref() == Some("PasswordInput") {
             return self.invoke_password(node, method, args, query, cx);
         }

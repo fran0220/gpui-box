@@ -25,6 +25,15 @@ const authCommands = {
   set_control_size: method({ size: common.size }, choice(null)),
 };
 const authQueries = { focus_handle: focusQuery, value: method({}, string), is_disabled: method({}, boolean) };
+const hitCount = { oneOf: [
+  object({state:choice('unsearched','counting','none')},['state']),
+  object({state:choice('known'),total:integer,current:{...integer,nullable:true}},['state','total','current']),
+  object({state:choice('tooMany'),counted:integer},['state','counted']),
+  object({state:choice('unavailable'),reason:string},['state','reason']),
+] };
+const searchEvents = { queryChanged:string,next:choice(null),previous:choice(null),cancelled:choice(null),matchCaseToggled:boolean,wholeWordToggled:boolean };
+const searchEvent = { oneOf:Object.entries(searchEvents).map(([kind,value])=>object({kind:choice(kind),value},['kind','value'])) };
+const textInputQuery = method({},object({$nativeRef:identity,type:choice('TextInput')},['$nativeRef','type']));
 const ground = choice('backdrop', 'canvas', 'sunken', 'panel', 'raised', 'overlay');
 const variant = choice('primary', 'secondary', 'ghost', 'danger', 'link');
 const join = choice('alone', 'leading', 'middle', 'trailing');
@@ -44,6 +53,8 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  SearchField: { props:object({...common,placeholder:string,query:string,matchCase:boolean,wholeWord:boolean,count:hitCount}),events:searchEvents },
+  FindReplace: { props:object({...common,count:hitCount}),events:{search:searchEvent,replacementChanged:string,replaceOne:choice(null),replaceAll:object({count:integer},['count']),close:choice(null)} },
   PasswordInput: { props: object({ ...authProps, placeholder: string }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null) } },
   OneTimeCodeInput: { props: object({ ...authProps, slots: { ...integer, min: 1, max: 12 } }), events: { change: string, submit: choice(null) } },
   KeybindingRecorder: { props: object({ ...common, label: string, placeholder: string, binding: string, conflict: string, allowEscape: boolean }), events: { started: choice(null), captured: string, cancelled: choice(null) } },
@@ -68,6 +79,14 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  SearchField: {
+    invoke:{set_query:method({text:string},choice(null)),set_count:method({count:hitCount},choice(null)),set_match_case:method({on:{...boolean,nullable:true}},choice(null)),set_whole_word:method({on:{...boolean,nullable:true}},choice(null)),set_placeholder:method({placeholder:{...string,nullable:true}},choice(null)),set_disabled:method({disabled:boolean},choice(null)),set_control_size:method({size:common.size},choice(null)),focus:method({},choice(null))},
+    query:{count:method({},hitCount),query_text:method({},string),is_disabled:method({},boolean),query_input:textInputQuery,focus_handle:focusQuery},
+  },
+  FindReplace: {
+    invoke:{set_count:method({count:hitCount},choice(null)),set_disabled:method({disabled:boolean},choice(null)),set_control_size:method({size:common.size},choice(null))},
+    query:{count:method({},hitCount),replacement_text:method({},string),is_disabled:method({},boolean),replacement_input:textInputQuery,search_field:method({},object({$nativeRef:identity,type:choice('SearchField')},['$nativeRef','type'])),focus_handle:focusQuery},
+  },
   PasswordInput: { invoke: { ...authCommands, set_placeholder: method({ placeholder: { ...string, nullable: true } }, choice(null)) }, query: { ...authQueries, is_revealed: method({}, boolean), selected_range: method({}, object({start:integer,end:integer},['start','end'])) } },
   OneTimeCodeInput: { invoke: { ...authCommands, set_slots: method({ slots: { ...integer, min:1, max:12 } }, choice(null)) }, query: { ...authQueries, len: method({}, integer), is_empty: method({},boolean), is_complete: method({},boolean), slot_count: method({},integer) } },
   KeybindingRecorder: {

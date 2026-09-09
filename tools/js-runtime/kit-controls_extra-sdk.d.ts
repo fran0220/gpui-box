@@ -8,6 +8,8 @@ export type NativeSettingsSectionNode = Omit<KitNode, 'component'> & { component
 export interface KitColor { h: number; s: number; l: number; a: number }
 export interface ControlsExtraBindingValues { Toggle: boolean; ToggleGroup: string[]; NumberInput: number; PasswordInput: string; OneTimeCodeInput: string }
 export interface SensitiveInputProps extends ControlProps { name?: string; value?: string; required?: boolean; invalid?: boolean; readOnly?: boolean }
+export type HitCount = {state:'unsearched'|'counting'|'none'} | {state:'known';total:number;current:number|null} | {state:'tooMany';counted:number} | {state:'unavailable';reason:string};
+export type SearchFieldEvent = {kind:'queryChanged';value:string} | {kind:'next'|'previous'|'cancelled';value:null} | {kind:'matchCaseToggled'|'wholeWordToggled';value:boolean};
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 export type ButtonStyle = ButtonVariant | 'filled' | 'light' | 'subtle' | 'default' | 'transparent' | 'white';
 export type ControlGround = 'backdrop' | 'canvas' | 'sunken' | 'panel' | 'raised' | 'overlay';
@@ -21,6 +23,8 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  SearchField(id: string, props?: ControlProps & { placeholder?: string; query?: string; matchCase?: boolean; wholeWord?: boolean; count?: HitCount }, events?: { queryChanged?(value:string):void;next?():void;previous?():void;cancelled?():void;matchCaseToggled?(value:boolean):void;wholeWordToggled?(value:boolean):void }): KitNode;
+  FindReplace(id: string, props?: ControlProps & { count?: HitCount }, events?: { search?(event:SearchFieldEvent):void;replacementChanged?(value:string):void;replaceOne?():void;replaceAll?(value:{count:number}):void;close?():void }): KitNode;
   PasswordInput(id: string, props?: SensitiveInputProps & { placeholder?: string }, events?: { change?(value: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void }): KitNode;
   OneTimeCodeInput(id: string, props?: SensitiveInputProps & { slots?: number }, events?: { change?(value: string): void; submit?(): void }): KitNode;
   KeybindingRecorder(id: string, props?: ControlProps & { label?: string; placeholder?: string; binding?: string; conflict?: string; allowEscape?: boolean }, events?: { started?(): void; captured?(keystroke: string): void; cancelled?(): void }): KitNode;
@@ -59,6 +63,23 @@ interface SensitiveInputQueries extends FocusQueries {
   is_disabled: { args: Record<string, never>; result: boolean };
 }
 export interface ControlsExtraMethodContracts {
+  SearchField: {
+    invoke: {
+      set_query: {args:{text:string};result:null};
+      set_count: {args:{count:HitCount};result:null};
+      set_match_case: {args:{on:boolean|null};result:null};
+      set_whole_word: {args:{on:boolean|null};result:null};
+      set_placeholder: {args:{placeholder:string|null};result:null};
+      set_disabled: {args:{disabled:boolean};result:null};
+      set_control_size: {args:{size:'xs'|'sm'|'md'|'lg'};result:null};
+      focus: {args:Record<string,never>;result:null};
+    };
+    query: FocusQueries & {count:{args:Record<string,never>;result:HitCount};query_text:{args:Record<string,never>;result:string};is_disabled:{args:Record<string,never>;result:boolean};query_input:{args:Record<string,never>;result:NativeRef<'TextInput'>}};
+  };
+  FindReplace: {
+    invoke: {set_count:{args:{count:HitCount};result:null};set_disabled:{args:{disabled:boolean};result:null};set_control_size:{args:{size:'xs'|'sm'|'md'|'lg'};result:null}};
+    query: FocusQueries & {count:{args:Record<string,never>;result:HitCount};replacement_text:{args:Record<string,never>;result:string};is_disabled:{args:Record<string,never>;result:boolean};replacement_input:{args:Record<string,never>;result:NativeRef<'TextInput'>};search_field:{args:Record<string,never>;result:NativeRef<'SearchField'>}};
+  };
   PasswordInput: {
     invoke: SensitiveInputCommands & { set_placeholder: { args: { placeholder: string | null }; result: null } };
     query: SensitiveInputQueries & { is_revealed: { args: Record<string, never>; result: boolean }; selected_range: { args: Record<string, never>; result: {start:number;end:number} } };

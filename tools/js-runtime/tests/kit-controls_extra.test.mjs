@@ -8,6 +8,18 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('search counts preserve unavailable and incomplete answers and nested native events', () => {
+  for (const count of [{state:'unsearched'},{state:'counting'},{state:'none'},{state:'known',total:7,current:2},{state:'tooMany',counted:500},{state:'unavailable',reason:'Refused'}]) {
+    validateValue({count},familyMethods.SearchField.invoke.set_count.args);
+    validateValue(count,familyMethods.FindReplace.query.count.result);
+  }
+  for (const count of [{state:'known',total:7},{state:'tooMany',total:500},{state:'unavailable'},{state:'none',total:0}]) assert.throws(() => validateValue({count},familySchemas.SearchField.props));
+  validateValue({kind:'queryChanged',value:'fixture'},familySchemas.FindReplace.events.search);
+  assert.throws(() => validateValue({kind:'next',value:'wrong'},familySchemas.FindReplace.events.search));
+  validateValue({$nativeRef:'native-1',type:'SearchField'},familyMethods.FindReplace.query.search_field.result);
+  assert.throws(() => validateValue({query:'fixture'},familyMethods.FindReplace.query.search_field.result));
+});
+
 test('sensitive controls reject invented authority and close their value/slot contracts', () => {
   for (const kind of ['PasswordInput','OneTimeCodeInput']) {
     validateValue({value:'fixture',readOnly:true},familySchemas[kind].props);
@@ -213,6 +225,12 @@ kit.ColorSwatch('swatch', {color:{h:0,s:1,l:0.5,a:1}});
 kit.FormField('field', {label:'Name',validation:'validating'}, {}, {content:[]});
 kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remove(id) { const key: string = id; }});
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
+kit.SearchField('searchfield', {count:{state:'known',total:7,current:null},matchCase:true}, {next() {}});
+kit.FindReplace('find', {}, {search(event) { if(event.kind==='queryChanged') {const value:string=event.value;} }});
+// @ts-expect-error an incomplete count is not an exact total
+kit.SearchField('bad', {count:{state:'tooMany',total:50}});
+// @ts-expect-error an entity getter cannot be replaced with a value snapshot
+const searchSnapshot:ControlsExtraMethodContracts['FindReplace']['query']['search_field']['result'] = {query:'text'};
 kit.PasswordInput('password', {placeholder:'Fixture',readOnly:true}, {change(value) { const text:string = value; }});
 kit.OneTimeCodeInput('code', {slots:6}, {submit() {}});
 // @ts-expect-error native sensitive controls cannot be made non-secret

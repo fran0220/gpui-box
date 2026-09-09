@@ -455,6 +455,21 @@ impl SearchField {
         &self.query
     }
 
+    /// Restores the localized query label when absent, preserving the editor.
+    pub fn set_placeholder(&mut self, placeholder: Option<SharedString>, cx: &mut Context<Self>) {
+        self.placeholder = placeholder;
+        cx.notify();
+    }
+
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_query(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.query.update(cx, |query, cx| query.set_value(text, cx));
     }
@@ -750,6 +765,16 @@ impl FindReplace {
 
     pub fn replacement_text(&self, cx: &App) -> SharedString {
         self.replacement.read(cx).value().clone()
+    }
+
+    /// Updates the outer action sizing without replacing either input.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
