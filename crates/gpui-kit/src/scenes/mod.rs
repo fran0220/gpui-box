@@ -59,8 +59,8 @@ use content::{
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
     dropzone, editor, filter_bar, find_replace, form, inline_edit, input, keybinding,
-    keymap_editor, mention_input, multi_select, rich_text_editor, search_field, settings, textarea,
-    toggle, transfer_list, upload_list,
+    keymap_editor, mention_input, multi_select, rich_text_editor, search_field, search_input,
+    settings, textarea, toggle, transfer_list, upload_list,
 };
 use data::{
     data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, image_list, kanban,
@@ -854,6 +854,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "document-tabs",
             build: document_tabs,
             shows: Shows::Subjects(&["Tabs"]),
+        },
+        Scene {
+            name: "search-input",
+            build: search_input,
+            shows: Shows::Subjects(&["SearchInput"]),
         },
         Scene {
             name: "search-field",

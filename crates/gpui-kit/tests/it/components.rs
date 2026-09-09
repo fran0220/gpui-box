@@ -187,6 +187,30 @@ fn decorative_badges_stay_out_of_the_semantic_tree(cx: &mut TestAppContext) {
     text(&snapshot, "row.state", "Stale").expect("identified badges publish their label");
 }
 
+#[gpui::test]
+fn a_count_reports_the_formatted_value_not_status_severity(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, _| {
+        div()
+            .flex()
+            .flex_row()
+            .child(Badge::new("1,248").count().id("projects.count"))
+            .child(Badge::new("111").count().id("narrow.count"))
+            .child(Badge::new("888").count().id("wide.count"))
+            .into_any_element()
+    });
+    let snapshot = harness.snapshot();
+    let count = visible(&snapshot, "projects.count").expect("count");
+    assert_eq!(count.role, Role::Text);
+    assert_eq!(count.value.as_deref(), Some("1,248"));
+    text(&snapshot, "projects.count", "1,248").expect("caller formatting retained");
+    let narrow = visible(&snapshot, "narrow.count").expect("narrow glyphs");
+    let wide = visible(&snapshot, "wide.count").expect("wide glyphs");
+    assert_eq!(
+        narrow.bounds.width, wide.bounds.width,
+        "tabular figure advances"
+    );
+}
+
 /// A tint answers whose the mark is; the tone still answers how it is going.
 /// Painting cannot edit the claim, which is the only thing that makes a
 /// caller-owned colour safe on a status surface.

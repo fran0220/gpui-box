@@ -8,12 +8,12 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Radius, SemanticColor, Surface, Theme,
-    TypeScale, Variant, VariantColors,
+    ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Elevation, Radius, SemanticColor,
+    SemanticWash, Surface, Theme, TypeScale, Variant, VariantColors,
 };
 use gpui_kit_tokens::{Color, contrast::SEPARATION_MINIMUM};
 
-use crate::display::icon::{Icon as IconView, IconTone, flips, paint as paint_icon};
+use crate::display::icon::{flips, paint as paint_icon};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
@@ -260,6 +260,17 @@ impl Button {
         });
         let colors = match tier {
             Variant::Default => neutral_colors_on(theme, self.ground),
+            Variant::White => {
+                let fill = theme.colors.on_media_background;
+                let foreground = theme.colors.on_media_foreground;
+                VariantColors {
+                    background: fill,
+                    background_hover: fill.blend(theme.color_wash(foreground, SemanticWash::Faint)),
+                    background_active: fill
+                        .blend(theme.color_wash(foreground, SemanticWash::Standard)),
+                    text: foreground,
+                }
+            }
             _ => theme.variant_colors(tier, &color),
         };
         Some((tier, colors))
@@ -371,7 +382,7 @@ impl RenderOnce for Button {
         // ladder's strongest step instead, which is the same answer the rest
         // of the library gives — a stronger fill of the paint already there.
         let unified = self.unified(&theme);
-        let paint = if self.disabled {
+        let paint = if self.disabled && self.tier != Some(Variant::White) {
             theme.colors.text_disabled
         } else if let Some((_, resolved)) = &unified {
             resolved.text
@@ -384,26 +395,17 @@ impl RenderOnce for Button {
         let mut content: Vec<AnyElement> = Vec::new();
         let on_shared_tiers = unified.is_some();
         if self.loading {
-            let tone = if let Some((tier, _)) = &unified {
-                match tier {
-                    Variant::Filled => IconTone::OnAccent,
-                    _ => IconTone::Muted,
-                }
-            } else {
-                match self.variant {
-                    ButtonVariant::Primary => IconTone::OnAccent,
-                    ButtonVariant::Danger => IconTone::Danger,
-                    ButtonVariant::Link => IconTone::Accent,
-                    _ => IconTone::Muted,
-                }
-            };
-            content.push(
-                IconView::new(Icon::Refresh)
-                    .control_size(self.size)
-                    .tone(tone)
-                    .spinning(self.ident.child("busy"))
-                    .into_any_element(),
-            );
+            content.push(crate::motion::spin(
+                paint_icon(
+                    Icon::Refresh,
+                    metrics.icon_size,
+                    paint,
+                    flips(Icon::Refresh, direction),
+                ),
+                self.ident.child("busy").element_id(),
+                &theme,
+                cx,
+            ));
         }
         let glyph = self.glyph.filter(|_| !self.loading).map(|glyph| {
             let glyph = if self.selected { glyph.filled() } else { glyph };
@@ -479,7 +481,7 @@ impl RenderOnce for Button {
             .role(gpui::Role::Button)
             .when(self.full_width, |element| element.w_full())
             .when(actionable, |element| {
-                element
+                let element = element
                     .cursor_pointer()
                     .tab_index(0)
                     // Against the page, not against the button's own fill. The
@@ -489,8 +491,17 @@ impl RenderOnce for Button {
                     // readable on it returned near-black on a dark theme and pure
                     // white on a light one. Both were drawn onto a dialog of very
                     // nearly that colour and could not be seen at all.
-                    .focus_ring(&theme)
-                    .pressable(cx)
+                    .focus_ring(&theme);
+                match unified {
+                    Some((tier, colors)) if tier != Variant::Transparent => {
+                        element.pressable_with(cx, move |style| style.bg(colors.background_active))
+                    }
+                    None if self.variant == ButtonVariant::Secondary => {
+                        let colors = neutral_colors_on(&theme, self.ground);
+                        element.pressable_with(cx, move |style| style.bg(colors.background_active))
+                    }
+                    _ => element.pressable(cx),
+                }
             })
             .children(content);
 
@@ -577,14 +588,19 @@ fn foreground(theme: &Theme, variant: ButtonVariant) -> Hsla {
 /// The neutral control tier resolved against the surface that actually holds
 /// it.
 ///
-/// `raised` remains the normal answer wherever it gains the same CIE L* floor
+/// `control` is the normal answer wherever it gains the same CIE L* floor
 /// required of authored surface nestings. If a theme has no room for that
 /// step — most visibly an overlay at a light theme's white ceiling — the
 /// shared Light recipe supplies a text-coloured wash whose resting, hover and
 /// active strengths remain on the theme's existing tier ladder.
 fn neutral_colors_on(theme: &Theme, ground: Surface) -> VariantColors {
-    let default = theme.variant_colors(Variant::Default, &ColorChoice::Custom(theme.colors.text));
-    let raised = token_color(theme.colors.raised).lightness();
+    let default = VariantColors {
+        background: theme.colors.control,
+        background_hover: theme.colors.control_hover,
+        background_active: theme.colors.control_pressed,
+        text: theme.colors.text,
+    };
+    let raised = token_color(theme.colors.control).lightness();
     let behind = token_color(theme.surface(ground)).lightness();
     if raised - behind >= SEPARATION_MINIMUM {
         default
@@ -620,9 +636,25 @@ fn frame(
         .h(px(metrics.height))
         .gap(px(metrics.gap))
         .px(px(metrics.padding_x))
-        .radius(theme, Radius::Control)
-        // No variant carries an outline any more, so none of them needs a
-        // transparent one to keep the run of heights even.
+        .radius(
+            theme,
+            if button.size == ControlSize::Lg {
+                Radius::Pill
+            } else {
+                Radius::Control
+            },
+        )
+        .when(
+            unified
+                .map(|(tier, _)| tier == Variant::Default)
+                .unwrap_or(button.variant == ButtonVariant::Secondary),
+            |element| element.control_surface(theme, Elevation::Flat),
+        )
+        .when(button.tier == Some(Variant::White), |element| {
+            element
+                .border(px(theme.borders.hairline))
+                .border_color(theme.colors.on_media_hairline)
+        })
         .when(button.disabled, |element| {
             element.opacity(theme.opacity.disabled)
         });
@@ -633,11 +665,12 @@ fn frame(
     // different answers — drawn as the same chip.
     if button.disabled {
         let neutral = neutral_colors_on(theme, button.ground).background;
-        if let Some((tier, _)) = unified {
+        if let Some((tier, colors)) = unified {
             // Same rule as the weights: a surfaceless tier stays bare, and a
             // tier that had a surface trades it for the neutral one.
             return match tier {
                 Variant::Subtle | Variant::Transparent => base,
+                Variant::White => base.bg(colors.background),
                 _ => base.bg(neutral),
             };
         }
@@ -660,10 +693,8 @@ fn frame(
         ButtonVariant::Primary => base.bg(theme.colors.primary_fill).when(!inert, |element| {
             element.hover(|style| style.opacity(theme.effects.primary_hover_opacity))
         }),
-        // A tonal fill and no outline. A secondary action is the second
-        // strongest thing in its area, which a surface step says on its own;
-        // the outline it used to carry made it the most drawn-around thing on
-        // the page and put a box beside every primary button.
+        // Definition belongs to the control material, below the contrast of
+        // a focus report. Selection remains a tonal step, not another edge.
         ButtonVariant::Secondary => {
             let neutral = neutral_colors_on(theme, button.ground);
             base.bg(neutral.background).when(!inert, |element| {
@@ -980,18 +1011,65 @@ mod tests {
         }
     }
 
-    /// The implicit panel ground is the historical path. Its authored raised
-    /// step already clears the floor, so a button that says nothing new keeps
-    /// exactly the old resting and hover paints.
+    /// A fill that has to become a wash still retains the defining material.
     #[test]
-    fn an_undeclared_ground_keeps_the_existing_secondary_paint() {
+    fn a_secondary_keeps_its_material_when_its_ground_needs_a_wash() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
             let button = Button::new("save").secondary();
             assert_eq!(button.ground, Surface::Panel);
             let colors = neutral_colors_on(&theme, button.ground);
-            assert_eq!(colors.background, theme.colors.raised);
-            assert_eq!(colors.background_hover, theme.colors.active);
+            assert!(distance_from(colors.background, theme.colors.panel) >= SEPARATION_MINIMUM);
+            assert_ne!(colors.background, colors.background_hover);
+            assert_ne!(colors.background, colors.background_active);
+            let mut frame = frame(
+                &theme,
+                &button,
+                None,
+                theme.control.md,
+                LayoutDirection::LeftToRight,
+            );
+            assert_eq!(
+                frame.style().border_color,
+                Some(theme.colors.control_hairline)
+            );
+            let highlight = frame
+                .style()
+                .box_shadow
+                .as_ref()
+                .expect("control highlight");
+            assert!(
+                highlight
+                    .iter()
+                    .any(|shadow| shadow.style == gpui::ShadowStyle::Inset
+                        && shadow.color == theme.colors.control_highlight)
+            );
         }
+    }
+
+    #[test]
+    fn white_buttons_use_the_same_on_media_paints_in_both_appearances() {
+        let mut paints = Vec::new();
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let (_, colors) = Button::new("media")
+                .variant(Variant::White)
+                .unified(&theme)
+                .expect("white tier");
+            assert_eq!(colors.text, theme.colors.on_media_foreground);
+            assert_eq!(colors.background, theme.colors.on_media_background);
+            let mut frame = frame(
+                &theme,
+                &Button::new("media").variant(Variant::White),
+                Some((Variant::White, colors)),
+                theme.control.md,
+                LayoutDirection::LeftToRight,
+            );
+            assert_eq!(
+                frame.style().border_color,
+                Some(theme.colors.on_media_hairline)
+            );
+            paints.push(colors);
+        }
+        assert_eq!(paints[0], paints[1]);
     }
 
     /// A button that reports `checked` has to have something on screen behind

@@ -79,6 +79,7 @@ pub struct Badge {
     size: ControlSize,
     glyph: Option<Glyph>,
     dot: bool,
+    count: bool,
 }
 
 impl Badge {
@@ -93,7 +94,15 @@ impl Badge {
             size: ControlSize::Sm,
             glyph: None,
             dot: false,
+            count: false,
         }
+    }
+
+    /// A quiet count rather than a status wash: Caption text with tabular
+    /// digits and a hairline. The caller supplies the formatted value.
+    pub fn count(mut self) -> Self {
+        self.count = true;
+        self
     }
 
     /// A glyph before the word, for a badge whose meaning has a picture.
@@ -184,11 +193,8 @@ impl Sizable for Badge {
 impl RenderOnce for Badge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        // A badge is the tone itself, as a block. The tint is carried far
-        // enough that the block reads on any surface the badge can land on,
-        // which is what lets the outline go: an outline around a shape that
-        // is already a colour was only ever compensating for a tint too weak
-        // to see.
+        // Status badges carry their tone in a wash. Counts below replace
+        // that wash with a quiet definition edge and make no severity claim.
         // The wash is carried far enough to read and no further. A badge is a
         // word, and a word sitting in a saturated pill is a word that has to
         // be read through its own background; what identifies it is the
@@ -235,6 +241,16 @@ impl RenderOnce for Badge {
             .type_scale(&theme, TypeScale::Caption)
             .font_weight(gpui::FontWeight(theme.typography.label.weight))
             .text_color(foreground)
+            .when(self.count, |element| {
+                element
+                    .bg(background.opacity(0.0))
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.control_hairline)
+                    .font_weight(gpui::FontWeight(theme.typography.caption.weight))
+                    .font_features(gpui::FontFeatures(vec![("tnum".into(), 1)].into()))
+                    .min_w(px(step.height * 0.72))
+                    .justify_center()
+            })
             .children(self.glyph.map(|glyph| {
                 crate::display::icon::paint(glyph, step.icon_size * 0.8, foreground, false)
             }))
@@ -252,12 +268,19 @@ impl RenderOnce for Badge {
             Some(ident) => element
                 .semantic_in(
                     cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Status)
-                        .text(self.label.clone())
-                        // The severity by name, because a tint can paint this
-                        // badge a colour no tone maps to and a reader would
-                        // then have no way to ask what it claimed.
-                        .value(self.tone.name()),
+                    NodeSpec::new(
+                        ident.semantic_id(),
+                        if self.count { Role::Text } else { Role::Status },
+                    )
+                    .text(self.label.clone())
+                    // The severity by name, because a tint can paint this
+                    // badge a colour no tone maps to and a reader would
+                    // then have no way to ask what it claimed.
+                    .value(if self.count {
+                        self.label.clone()
+                    } else {
+                        self.tone.name().into()
+                    }),
                 )
                 .into_any_element(),
             None => element.into_any_element(),

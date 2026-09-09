@@ -29,6 +29,7 @@ medium action controls use `Radius::Control`; large controls use capsules.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `Button` | builder | click | No handler is installed while disabled or loading |
+| `SearchInput` | view | `SearchInputEvent` (change, submit, cancel, backspace at start, focus, blur) | Query-only input with a magnifier and conditional clear action; no result count or find/replace controls. Xs, Sm and Md share field metrics. `input()` exposes the single underlying TextInput for bindings; clearing restores its focus |
 | `TextInput` | view | change, submit, cancel, focus, blur | Grapheme-aware editing, input-method composition, masking, length limit |
 | `PasswordInput` | view | change, submit, cancel, backspace at start, focus, blur | One sensitive `TextInput` editor plus a keyboard-operable reveal action. Reveal changes only the visual mask: semantic and AccessKit values/text runs, Debug, and clipboard copy/cut remain redacted |
 | `OneTimeCodeInput` | view | change, submit | One sensitive `TextInput` editor rendered as 1–12 caller-chosen slots (six by default), not one field per slot. A slot accepts one Unicode grapheme; semantics and AccessKit publish only redaction plus the current/target length shape |
@@ -78,6 +79,26 @@ knobs instead of adding another shadow token. Segmented strips have equal
 widths and neutral selected text unless a segment explicitly supplies tint;
 Xs–Md use Control corners and Lg uses capsules. Switches retain accent on-state
 tracks, with a definition edge and a Raised knob shadow.
+
+Default/Secondary buttons use this bordered control family (Control corners
+for Xs–Md, capsule for Lg). The `ground` hint still permits a neutral wash
+where the authored control step cannot separate from its parent. On Button,
+`Variant::White` now means **on-media**: `color.onMediaBackground`,
+`color.onMediaForeground`, and `color.onMediaHairline`, not an opaque white
+pill and not a second Glass surface. Its glyph and loading mark use the same
+foreground as its label, including under a light theme.
+
+`FocusRing` appends its halo to the existing material shadows. A pressed
+button combines its fill and travel with `Pressable::pressable_with`; Reduce
+motion removes travel without removing the pressed colour report.
+
+`Badge::new(value).count()` is a formatted-data mark, not a status: Caption
+type, tabular OpenType figures, a fine control hairline, and no status wash.
+The caller supplies the formatted value; an identified count publishes
+`Role::Text` and that value rather than a severity. In-content Tabs use a
+Sunken hairline track and a raised control face for the selected tab; badge
+values use the count form. `Tabs::capsules()` retains its floating Regular
+Liquid material and caller-owned selection contract.
 
 ### Sensitive text remains one editor
 

@@ -193,6 +193,77 @@ fn a_hidden_tab_can_still_be_reached_from_the_keyboard(cx: &mut TestAppContext) 
 
 // ---------------------------------------------------------------------- search
 
+#[gpui::test]
+fn a_query_clears_only_when_enabled_and_reports_the_edit(cx: &mut TestAppContext) {
+    let held = Rc::new(RefCell::new(None::<Entity<SearchInput>>));
+    let sink = held.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        sink.borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    SearchInput::new("query", window, cx)
+                        .xs()
+                        .placeholder("Search projects")
+                })
+            })
+            .clone()
+            .into_any_element()
+    });
+    let query = held.borrow().clone().expect("built");
+    assert!(harness.node("query.clear").is_none());
+    let empty_height = harness.node("query").expect("query frame").bounds.height;
+    let (calls, sink) = recorder::<SearchInputEvent>();
+    let input = query.clone();
+    harness.update(move |_, cx| {
+        cx.subscribe(&input, move |_, event: &SearchInputEvent, _| {
+            sink.borrow_mut().push(event.clone());
+        })
+        .detach();
+        input.update(cx, |input, cx| {
+            input.set_value("设计 review", cx);
+            input.set_disabled(true, cx);
+        });
+    });
+    assert!(
+        harness
+            .node("query.clear")
+            .expect("disabled clear")
+            .disabled
+    );
+    assert_eq!(
+        harness.node("query").expect("query frame").bounds.height,
+        empty_height,
+        "the clear target must not resize a compact query field"
+    );
+    harness.click("query.clear");
+    assert_eq!(
+        harness.node("query.query").expect("input").value.as_deref(),
+        Some("设计 review")
+    );
+    let input = query.clone();
+    harness.update(move |_, cx| input.update(cx, |input, cx| input.set_disabled(false, cx)));
+    harness.click("query.clear");
+    assert!(harness.node("query.clear").is_none());
+    assert_eq!(
+        harness.update(move |_, cx| query.read(cx).value(cx)),
+        SharedString::default()
+    );
+    assert_eq!(
+        calls
+            .borrow()
+            .iter()
+            .filter(|event| matches!(event,
+        SearchInputEvent::Change(value) if value.is_empty()))
+            .count(),
+        1
+    );
+    harness.keystrokes("enter");
+    assert!(
+        calls.borrow().contains(&SearchInputEvent::Submit),
+        "clear restores input focus"
+    );
+}
+
 fn search(cx: &mut TestAppContext, count: HitCount) -> (Harness, Entity<SearchField>) {
     let held: Rc<RefCell<Option<Entity<SearchField>>>> = Rc::new(RefCell::new(None));
     let sink = held.clone();

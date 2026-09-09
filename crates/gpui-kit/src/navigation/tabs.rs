@@ -32,17 +32,15 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlMetrics, ControlSize, Radius, SemanticWash, Space, Surface, Theme,
-    TypeScale,
+    ActiveTheme, ControlMetrics, ControlSize, Elevation, Radius, SemanticWash, Space, Surface,
+    Theme, TypeScale,
 };
 
 use crate::display::badge::Badge;
 use crate::display::icon::{flips, paint as paint_icon};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, SelectedFill, Sizable, StyledExt, text,
-};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
@@ -664,8 +662,8 @@ impl Tabs {
             )
             // Capsules wear their face on the glass mount, so a selected fill
             // here would be a second layer on top of the wash.
-            .when(!self.capsules, |element| {
-                element.selected_fill(theme, selected)
+            .when(!self.capsules && selected, |element| {
+                element.control_surface(theme, Elevation::Raised)
             })
             .when(self.capsules && selected, |element| {
                 let wash = tint
@@ -705,7 +703,7 @@ impl Tabs {
                                 })
                             }),
                     )
-                    .children(tab.badge.clone().map(|badge| Badge::new(badge).neutral()))
+                    .children(tab.badge.clone().map(|badge| Badge::new(badge).count()))
                     .children(self.save_mark(tab, &ident, theme, cx))
                     .children(self.close_control(tab, &ident, theme, cx)),
             )
@@ -903,7 +901,15 @@ impl RenderOnce for Tabs {
             .id(self.ident.element_id())
             .row_reading(direction)
             .when(self.capsules, |element| element.items_center())
-            .when(!self.capsules, |element| element.items_end())
+            .when(!self.capsules, |element| {
+                element
+                    .items_center()
+                    .surface(&theme, Surface::Sunken)
+                    .radius(&theme, Radius::Control)
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.control_hairline)
+                    .p(px(theme.borders.hairline * 2.0))
+            })
             .gap(px(theme.space(Space::Xs)))
             // Wrapping and scrolling are contradictory answers to the same
             // question: a strip that wraps never has a second screenful to

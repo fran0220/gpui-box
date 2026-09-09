@@ -303,20 +303,100 @@ impl<T: gpui::InteractiveElement + Sized> Hoverable for T {}
 ///
 /// The ring answers "the keyboard is here", so it is drawn for keyboard focus
 /// and not for a pointer that landed on the same element. A person who just
-/// clicked a strip knows where they clicked; outlining it tells them nothing
-/// and reads as chrome the borderless catalogue does not otherwise draw. An
+/// clicked a strip knows where they clicked. The halo appends to the resting
+/// material's shadows, preserving its inner highlight and elevation. An
 /// editable control is the case this does not cover, and it does not go
-/// through here: a field says where the caret is with [`StyledExt::well`] and
+/// through here: a field says where the caret is with its control material and
 /// its own focused state, which a click must show.
-pub trait FocusRing: InteractiveElement + Sized {
+pub trait FocusRing: InteractiveElement + Styled {
     fn focus_ring(self, theme: &Theme) -> Self {
-        self.focus_visible(|style| style.shadow(theme.focus_ring()))
+        self.focus_ring_on(theme, theme.colors.canvas)
     }
 
-    /// The same halo resolved against a control-owned resting fill.
-    fn focus_ring_on(self, theme: &Theme, background: gpui::Hsla) -> Self {
-        self.focus_visible(|style| style.shadow(theme.focus_ring_on(background)))
+    /// The same additive halo resolved against the ground behind the control.
+    fn focus_ring_on(mut self, theme: &Theme, background: gpui::Hsla) -> Self {
+        let mut shadows = self.style().box_shadow.clone().unwrap_or_default();
+        shadows.extend(theme.focus_ring_on(background));
+        self.focus_visible(|style| style.shadow(shadows))
     }
 }
 
-impl<T: InteractiveElement + Sized> FocusRing for T {}
+impl<T: InteractiveElement + Styled> FocusRing for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::foundation::Pressable;
+
+    #[derive(Default)]
+    struct RecordedStyle {
+        style: gpui::StyleRefinement,
+        focused: gpui::StyleRefinement,
+        pressed: gpui::StyleRefinement,
+    }
+
+    impl Styled for RecordedStyle {
+        fn style(&mut self) -> &mut gpui::StyleRefinement {
+            &mut self.style
+        }
+    }
+
+    impl InteractiveElement for RecordedStyle {
+        fn interactivity(&mut self) -> &mut gpui::Interactivity {
+            unreachable!("this fixture captures style refinements directly")
+        }
+
+        fn focus_visible(
+            mut self,
+            refine: impl FnOnce(gpui::StyleRefinement) -> gpui::StyleRefinement,
+        ) -> Self {
+            self.focused = refine(gpui::StyleRefinement::default());
+            self
+        }
+    }
+
+    impl gpui::StatefulInteractiveElement for RecordedStyle {
+        fn active(
+            mut self,
+            refine: impl FnOnce(gpui::StyleRefinement) -> gpui::StyleRefinement,
+        ) -> Self {
+            self.pressed = refine(gpui::StyleRefinement::default());
+            self
+        }
+    }
+
+    #[gpui::test]
+    fn reduced_motion_keeps_pressed_paint_without_travel(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            crate::install(cx);
+            let theme = gpui_kit_theme::ActiveTheme::theme(cx).clone();
+            let paint = theme.colors.control_pressed;
+            cx.set_reduce_motion(false);
+            let normal = RecordedStyle::default().pressable_with(cx, |style| style.bg(paint));
+            cx.set_reduce_motion(true);
+            let reduced = RecordedStyle::default().pressable_with(cx, |style| style.bg(paint));
+            assert_eq!(normal.pressed.background, Some(paint.into()));
+            assert_eq!(reduced.pressed.background, Some(paint.into()));
+            assert_eq!(
+                normal.pressed.inset.top,
+                gpui::StyleRefinement::default()
+                    .top(px(theme.motion.press_offset))
+                    .inset
+                    .top
+            );
+            assert_eq!(reduced.pressed.inset.top, None);
+        });
+    }
+
+    #[test]
+    fn keyboard_focus_appends_without_erasing_the_control_material() {
+        let theme = Theme::studio_dark();
+        let material = theme.control_shadows(Elevation::Raised);
+        let focused = RecordedStyle::default()
+            .shadow(material.clone())
+            .focus_ring(&theme);
+        let shadows = focused.focused.box_shadow.expect("focus material");
+        assert_eq!(&shadows[..material.len()], material.as_slice());
+        assert_eq!(&shadows[material.len()..], theme.focus_ring().as_slice());
+    }
+}

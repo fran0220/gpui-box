@@ -667,6 +667,7 @@ string_keys! {
     OutlineMarks => "outline.marks", "{0} places";
 
     // Search, and find and replace.
+    QueryPlaceholder => "search.query-placeholder", "Search";
     SearchPlaceholder => "search.placeholder", "Find";
     SearchNoHits => "search.no-hits", "No results";
     SearchCounting => "search.counting", "Counting…";

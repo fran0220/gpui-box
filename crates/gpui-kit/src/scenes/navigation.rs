@@ -44,6 +44,10 @@ pub(super) fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(520.0))
+        .child(caption(
+            &theme,
+            "In-content tabs: raised control, quiet track, tabular count",
+        ))
         .child(
             Tabs::new("scene.tabs.workspace")
                 .tabs([

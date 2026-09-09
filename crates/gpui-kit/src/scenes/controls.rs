@@ -70,10 +70,59 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(caption(&theme, "the control scale, smallest to largest"))
         .child(
             row(&theme)
-                .child(Button::new("scene.button.xs").label("Extra small").xs())
-                .child(Button::new("scene.button.sm").label("Small").small())
-                .child(Button::new("scene.button.md").label("Medium").medium())
-                .child(Button::new("scene.button.lg").label("Large").large()),
+                .child(
+                    Button::new("scene.button.xs")
+                        .label("Extra small")
+                        .secondary()
+                        .xs(),
+                )
+                .child(
+                    Button::new("scene.button.sm")
+                        .label("Small")
+                        .secondary()
+                        .small(),
+                )
+                .child(
+                    Button::new("scene.button.md")
+                        .label("Medium")
+                        .secondary()
+                        .medium(),
+                )
+                .child(
+                    Button::new("scene.button.lg")
+                        .label("Large")
+                        .secondary()
+                        .large(),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "White is on-media: a bright-background fixture",
+        ))
+        .child(
+            row(&theme)
+                .p(px(theme.spacing.md))
+                .radius(&theme, Radius::Card)
+                .bg(theme.colors.on_media_foreground)
+                .child(
+                    Button::new("scene.button.media")
+                        .label("Play")
+                        .icon(Icon::Play)
+                        .variant(Variant::White)
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    Button::new("scene.button.media-busy")
+                        .label("Loading")
+                        .variant(Variant::White)
+                        .loading(true),
+                )
+                .child(
+                    Button::new("scene.button.media-disabled")
+                        .label("Unavailable")
+                        .variant(Variant::White)
+                        .disabled(true),
+                ),
         )
         .child(caption(
             &theme,
@@ -129,6 +178,7 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// Both hold a [`TextInput`], which owns a caret and a selection that outlive
 /// a frame, so they are built once and driven once.
 pub(super) struct SceneSearch {
+    queries: Vec<Entity<SearchInput>>,
     field: Entity<SearchField>,
     counting: Entity<SearchField>,
     none: Entity<SearchField>,
@@ -142,6 +192,24 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
     if cx.has_global::<SceneSearch>() {
         return;
     }
+    let queries = [
+        ("xs", ControlSize::Xs, "", false),
+        ("sm", ControlSize::Sm, "Local projects", false),
+        ("md", ControlSize::Md, "设计 review", false),
+        ("disabled", ControlSize::Md, "Unavailable query", true),
+    ]
+    .into_iter()
+    .map(|(id, size, value, disabled)| {
+        cx.new(|cx| {
+            let mut input = SearchInput::new(format!("scene.search-input.{id}"), window, cx)
+                .placeholder("Search projects")
+                .control_size(size)
+                .disabled(disabled);
+            input.set_value(value, cx);
+            input
+        })
+    })
+    .collect();
     let field = cx.new(|cx| SearchField::new("scene.search.field", window, cx));
     field.update(cx, |field, cx| {
         field.set_query("transport", cx);
@@ -196,12 +264,26 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
     });
 
     cx.set_global(SceneSearch {
+        queries,
         field,
         counting,
         none,
         too_many,
         replace,
     });
+}
+
+pub(super) fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_search(window, cx);
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(480.0))
+        .child(caption(
+            &theme,
+            "Queries: Xs empty, Sm and Md populated, disabled",
+        ))
+        .children(cx.global::<SceneSearch>().queries.clone())
+        .into_any_element()
 }
 
 pub(super) fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {

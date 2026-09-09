@@ -174,6 +174,16 @@ pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(Badge::new("Medium").medium().id("scene.badge.md"))
                 .child(Badge::new("Large").large().id("scene.badge.lg")),
         )
+        .child(caption(
+            &theme,
+            "Counts: tabular figures without a status wash",
+        ))
+        .child(
+            row(&theme)
+                .child(Badge::new("3").count().id("scene.badge.count-single"))
+                .child(Badge::new("111").count().id("scene.badge.count-narrow"))
+                .child(Badge::new("888").count().id("scene.badge.count-wide")),
+        )
         // A tint says whose the badge is. The colours come from the theme's
         // own palette rather than from literals, so a retinted document
         // retints these too, and the tone underneath still reports itself.

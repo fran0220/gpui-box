@@ -23,8 +23,21 @@ pub trait Pressable: StatefulInteractiveElement + Styled + Sized {
         if !MotionPolicy::resolve(MotionRole::StateChange, cx).animates() {
             return self;
         }
+        self.pressable_with(cx, |style| style)
+    }
+
+    /// Combines a pressed fill with the press motion in GPUI's single active
+    /// style. The fill remains visible when Reduce motion removes travel.
+    fn pressable_with(
+        self,
+        cx: &App,
+        wash: impl FnOnce(StyleRefinement) -> StyleRefinement,
+    ) -> Self {
+        if !MotionPolicy::resolve(MotionRole::StateChange, cx).animates() {
+            return self.active(wash);
+        }
         let sink = px(cx.theme().motion.press_offset);
-        self.active(|style| style.top(sink))
+        self.active(|style| wash(style).top(sink))
     }
 }
 

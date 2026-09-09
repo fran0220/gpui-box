@@ -427,8 +427,11 @@ impl TextInput {
         placeholder: impl Into<SharedString>,
         cx: &mut Context<Self>,
     ) {
-        self.placeholder = placeholder.into();
-        cx.notify();
+        let placeholder = placeholder.into();
+        if self.placeholder != placeholder {
+            self.placeholder = placeholder;
+            cx.notify();
+        }
     }
 
     /// Replaces the text without reporting a change.
@@ -500,8 +503,10 @@ impl TextInput {
     }
 
     pub(crate) fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
-        self.size = size;
-        cx.notify();
+        if self.size != size {
+            self.size = size;
+            cx.notify();
+        }
     }
 
     pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {

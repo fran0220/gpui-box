@@ -1096,7 +1096,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4234
+      "symbolCount": 4243
     },
     {
       "name": "gpui-box-kit-assets",
@@ -61976,6 +61976,124 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::search::SearchInput",
+      "name": "SearchInput",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "An in-content query with a magnifier and a clear action when nonempty.",
+      "documentation": "An in-content query with a magnifier and a clear action when nonempty.\n\nFor project filters and similar queries, not document find/replace.\nOwns only the edit buffer and reports `SearchInputEvent`; the host owns\nmatching, results and debounce. Sizes use the same field metrics as inputs.",
+      "signature": "# [doc = \" An in-content query with a magnifier and a clear action when nonempty.\"] # [doc = \"\"] # [doc = \" For project filters and similar queries, not document find/replace.\"] # [doc = \" Owns only the edit buffer and reports `SearchInputEvent`; the host owns\"] # [doc = \" matching, results and debounce. Sizes use the same field metrics as inputs.\"] pub struct SearchInput { ident : Ident, input : Entity<TextInput>, placeholder : Option<SharedString>, size : ControlSize, disabled : bool, _subscription : Subscription, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::input",
+      "name": "input",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "The underlying editable control, for bindings and selection access.",
+      "documentation": "The underlying editable control, for bindings and selection access.",
+      "signature": "pub fn input (& self) -> & Entity<TextInput>",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (ident : impl Into<Ident>, window : & mut Window, cx : & mut Context<Self>) -> Self",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::placeholder",
+      "name": "placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Supplies both the empty hint and the accessible name.",
+      "documentation": "Supplies both the empty hint and the accessible name.",
+      "signature": "pub fn placeholder (mut self, placeholder : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::set_disabled",
+      "name": "set_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::set_value",
+      "name": "set_value",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Updates the query and reports the same Change event as editing.",
+      "documentation": "Updates the query and reports the same Change event as editing.",
+      "signature": "pub fn set_value (& mut self, value : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::value",
+      "name": "value",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn value (& self, cx : & App) -> SharedString",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInputEvent",
+      "name": "SearchInputEvent",
+      "kind": "enum",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "The query edit and focus events reported to the host; no search is run here.",
+      "documentation": "The query edit and focus events reported to the host; no search is run here.",
+      "signature": "# [doc = \" The query edit and focus events reported to the host; no search is run here.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub enum SearchInputEvent { Change (SharedString), Submit, Cancel, BackspaceAtStart, Focus, Blur, }",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit::controls::segmented::Segment",
       "name": "Segment",
       "kind": "struct",
@@ -72005,7 +72123,7 @@
       "source": "crates/gpui-kit/src/display/badge.rs",
       "summary": "A compact status label.",
       "documentation": "A compact status label.\n\nA badge only carries a semantic node when the caller gives it an id, so\ndecorative badges do not add noise to assertion snapshots.",
-      "signature": "# [doc = \" A compact status label.\"] # [doc = \"\"] # [doc = \" A badge only carries a semantic node when the caller gives it an id, so\"] # [doc = \" decorative badges do not add noise to assertion snapshots.\"] # [derive (Debug, IntoElement)] pub struct Badge { ident : Option<Ident>, label : SharedString, tone : Tone, tint : Option<Hsla>, variant : Option<Variant>, color : Option<ColorChoice>, size : ControlSize, glyph : Option<Glyph>, dot : bool, }",
+      "signature": "# [doc = \" A compact status label.\"] # [doc = \"\"] # [doc = \" A badge only carries a semantic node when the caller gives it an id, so\"] # [doc = \" decorative badges do not add noise to assertion snapshots.\"] # [derive (Debug, IntoElement)] pub struct Badge { ident : Option<Ident>, label : SharedString, tone : Tone, tint : Option<Hsla>, variant : Option<Variant>, color : Option<ColorChoice>, size : ControlSize, glyph : Option<Glyph>, dot : bool, count : bool, }",
       "cfg": []
     },
     {
@@ -72035,6 +72153,21 @@
       "summary": "The colour the shared tiers resolve against, when the badge is on them. Without one, the tone's own colour (or the tint) is used.",
       "documentation": "The colour the shared tiers resolve against, when the badge is on\nthem. Without one, the tone's own colour (or the tint) is used.",
       "signature": "pub fn color (mut self, color : impl Into<ColorChoice>) -> Self",
+      "cfg": [],
+      "target": "Badge"
+    },
+    {
+      "id": "gpui_kit::display::badge::Badge::count",
+      "name": "count",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "display::badge",
+      "path": "gpui_kit::display::badge",
+      "source": "crates/gpui-kit/src/display/badge.rs",
+      "summary": "A quiet count rather than a status wash: Caption text with tabular digits and a hairline. The caller supplies the formatted value.",
+      "documentation": "A quiet count rather than a status wash: Caption text with tabular\ndigits and a hairline. The caller supplies the formatted value.",
+      "signature": "pub fn count (mut self) -> Self",
       "cfg": [],
       "target": "Badge"
     },
@@ -79696,7 +79829,7 @@
       "source": "crates/gpui-kit/src/foundation/interaction.rs",
       "summary": "The response a control gives while the pointer is held on it.",
       "documentation": "The response a control gives while the pointer is held on it.",
-      "signature": "# [doc = \" The response a control gives while the pointer is held on it.\"] pub trait Pressable : StatefulInteractiveElement + Styled + Sized { # [doc = \" Sinks the control by `motion.pressOffsetPx` while it is held.\"] # [doc = \"\"] # [doc = \" This is a downward shift, not a scale: the GPUI revision this library\"] # [doc = \" pins offers a transform on `svg` alone, so there is no way to scale a\"] # [doc = \" div and pretending otherwise would mean redrawing the control at a\"] # [doc = \" different size, which is a layout change wearing a costume. A press is\"] # [doc = \" therefore reported the way a physical key reports one — it goes down.\"] fn pressable (self, cx : & App) -> Self { if ! MotionPolicy::resolve (MotionRole::StateChange, cx) . animates () { return self; } let sink = px (cx . theme () . motion . press_offset); self . active (| style | style . top (sink)) } }",
+      "signature": "# [doc = \" The response a control gives while the pointer is held on it.\"] pub trait Pressable : StatefulInteractiveElement + Styled + Sized { # [doc = \" Sinks the control by `motion.pressOffsetPx` while it is held.\"] # [doc = \"\"] # [doc = \" This is a downward shift, not a scale: the GPUI revision this library\"] # [doc = \" pins offers a transform on `svg` alone, so there is no way to scale a\"] # [doc = \" div and pretending otherwise would mean redrawing the control at a\"] # [doc = \" different size, which is a layout change wearing a costume. A press is\"] # [doc = \" therefore reported the way a physical key reports one — it goes down.\"] fn pressable (self, cx : & App) -> Self { if ! MotionPolicy::resolve (MotionRole::StateChange, cx) . animates () { return self; } self . pressable_with (cx, | style | style) } # [doc = \" Combines a pressed fill with the press motion in GPUI's single active\"] # [doc = \" style. The fill remains visible when Reduce motion removes travel.\"] fn pressable_with (self, cx : & App, wash : impl FnOnce (StyleRefinement) -> StyleRefinement,) -> Self { if ! MotionPolicy::resolve (MotionRole::StateChange, cx) . animates () { return self . active (wash); } let sink = px (cx . theme () . motion . press_offset); self . active (| style | wash (style) . top (sink)) } }",
       "cfg": []
     },
     {
@@ -79994,8 +80127,8 @@
       "path": "gpui_kit::foundation::styled_ext",
       "source": "crates/gpui-kit/src/foundation/styled_ext.rs",
       "summary": "The one focus treatment in the library.",
-      "documentation": "The one focus treatment in the library.\n\nEvery keyboard-reachable element wears the same ring from the same tokens,\nso \"the keyboard is here\" looks identical whether it is on a button, a\ntable header, or a tree row. It is a shadow rather than a border so turning\nfocus on never reflows what is around it.\n\nThe ring answers \"the keyboard is here\", so it is drawn for keyboard focus\nand not for a pointer that landed on the same element. A person who just\nclicked a strip knows where they clicked; outlining it tells them nothing\nand reads as chrome the borderless catalogue does not otherwise draw. An\neditable control is the case this does not cover, and it does not go\nthrough here: a field says where the caret is with [`StyledExt::well`] and\nits own focused state, which a click must show.",
-      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked; outlining it tells them nothing\"] # [doc = \" and reads as chrome the borderless catalogue does not otherwise draw. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with [`StyledExt::well`] and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Sized { fn focus_ring (self, theme : & Theme) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring ())) } # [doc = \" The same halo resolved against a control-owned resting fill.\"] fn focus_ring_on (self, theme : & Theme, background : gpui::Hsla) -> Self { self . focus_visible (| style | style . shadow (theme . focus_ring_on (background))) } }",
+      "documentation": "The one focus treatment in the library.\n\nEvery keyboard-reachable element wears the same ring from the same tokens,\nso \"the keyboard is here\" looks identical whether it is on a button, a\ntable header, or a tree row. It is a shadow rather than a border so turning\nfocus on never reflows what is around it.\n\nThe ring answers \"the keyboard is here\", so it is drawn for keyboard focus\nand not for a pointer that landed on the same element. A person who just\nclicked a strip knows where they clicked. The halo appends to the resting\nmaterial's shadows, preserving its inner highlight and elevation. An\neditable control is the case this does not cover, and it does not go\nthrough here: a field says where the caret is with its control material and\nits own focused state, which a click must show.",
+      "signature": "# [doc = \" The one focus treatment in the library.\"] # [doc = \"\"] # [doc = \" Every keyboard-reachable element wears the same ring from the same tokens,\"] # [doc = \" so \\\"the keyboard is here\\\" looks identical whether it is on a button, a\"] # [doc = \" table header, or a tree row. It is a shadow rather than a border so turning\"] # [doc = \" focus on never reflows what is around it.\"] # [doc = \"\"] # [doc = \" The ring answers \\\"the keyboard is here\\\", so it is drawn for keyboard focus\"] # [doc = \" and not for a pointer that landed on the same element. A person who just\"] # [doc = \" clicked a strip knows where they clicked. The halo appends to the resting\"] # [doc = \" material's shadows, preserving its inner highlight and elevation. An\"] # [doc = \" editable control is the case this does not cover, and it does not go\"] # [doc = \" through here: a field says where the caret is with its control material and\"] # [doc = \" its own focused state, which a click must show.\"] pub trait FocusRing : InteractiveElement + Styled { fn focus_ring (self, theme : & Theme) -> Self { self . focus_ring_on (theme, theme . colors . canvas) } # [doc = \" The same additive halo resolved against the ground behind the control.\"] fn focus_ring_on (mut self, theme : & Theme, background : gpui::Hsla) -> Self { let mut shadows = self . style () . box_shadow . clone () . unwrap_or_default (); shadows . extend (theme . focus_ring_on (background)); self . focus_visible (| style | style . shadow (shadows)) } }",
       "cfg": []
     },
     {
@@ -119465,6 +119598,7 @@
         "new(label: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "count() -> Self",
         "icon(glyph: Glyph) -> Self",
         "dot(dot: bool) -> Self",
         "id(ident: impl Into<Ident>) -> Self",
@@ -123150,6 +123284,39 @@
       ],
       "scenes": [
         "search-field"
+      ]
+    },
+    {
+      "name": "SearchInput",
+      "kind": "view",
+      "path": "gpui_kit::controls::SearchInput",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "An in-content query with a magnifier and a clear action when nonempty.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "placeholder(placeholder: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [
+        "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "value(cx: &App) -> SharedString",
+        "input() -> &Entity<TextInput>"
+      ],
+      "slots": [],
+      "reports": [
+        "Change",
+        "Submit",
+        "Cancel",
+        "BackspaceAtStart",
+        "Focus",
+        "Blur"
+      ],
+      "scenes": [
+        "search-input"
       ]
     },
     {
@@ -132019,6 +132186,23 @@
         "Cancelled",
         "MatchCaseToggled",
         "WholeWordToggled"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SearchInputEvent",
+      "path": "gpui_kit::controls::SearchInputEvent",
+      "summary": "The query edit and focus events reported to the host; no search is run here.",
+      "variants": [
+        "Change",
+        "Submit",
+        "Cancel",
+        "BackspaceAtStart",
+        "Focus",
+        "Blur"
       ],
       "construct": [],
       "options": [],
@@ -143058,7 +143242,7 @@
       "uses": [
         "Button"
       ],
-      "example": "fn button(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"how much weight the action carries\"))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.primary\")\n                        .label(\"Primary\")\n                        .primary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.secondary\")\n                        .label(\"Secondary\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.ghost\")\n                        .label(\"Ghost\")\n                        .ghost()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.danger\")\n                        .label(\"Delete\")\n                        .danger()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.link\")\n                        .label(\"Learn more\")\n                        .link()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"refused is not in flight, and neither is the current answer\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.disabled\")\n                        .label(\"Unavailable\")\n                        .primary()\n                        .disabled(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.loading\")\n                        .label(\"Saving\")\n                        .primary()\n                        .loading(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.selected\")\n                        .label(\"Selected\")\n                        .secondary()\n                        .selected(true)\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(&theme, \"the control scale, smallest to largest\"))\n        .child(\n            row(&theme)\n                .child(Button::new(\"scene.button.xs\").label(\"Extra small\").xs())\n                .child(Button::new(\"scene.button.sm\").label(\"Small\").small())\n                .child(Button::new(\"scene.button.md\").label(\"Medium\").medium())\n                .child(Button::new(\"scene.button.lg\").label(\"Large\").large()),\n        )\n        .child(caption(\n            &theme,\n            \"the shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"indigo\", \"teal\", \"red\"].map(|group| {\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Subtle,\n                    Variant::Default,\n                    Variant::Transparent,\n                ]\n                .map(|tier| {\n                    Button::new(format!(\"scene.button.{group}.{}\", tier.name()))\n                        .label(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .on_click(|_, _| {})\n                }),\n            )\n        }))\n        .child(caption(\n            &theme,\n            \"the same tiers, chosen: selection is a stronger step of the ladder the \\\n             caller picked, so the colour survives being the current answer\",\n        ))\n        .child(\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Subtle,\n                    Variant::Default,\n                    Variant::Transparent,\n                ]\n                .map(|tier| {\n                    Button::new(format!(\"scene.button.chosen.{}\", tier.name()))\n                        .label(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(\"indigo\"))\n                        .selected(true)\n                        .on_click(|_, _| {})\n                }),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn button(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"how much weight the action carries\"))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.primary\")\n                        .label(\"Primary\")\n                        .primary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.secondary\")\n                        .label(\"Secondary\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.ghost\")\n                        .label(\"Ghost\")\n                        .ghost()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.danger\")\n                        .label(\"Delete\")\n                        .danger()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.link\")\n                        .label(\"Learn more\")\n                        .link()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"refused is not in flight, and neither is the current answer\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.disabled\")\n                        .label(\"Unavailable\")\n                        .primary()\n                        .disabled(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.loading\")\n                        .label(\"Saving\")\n                        .primary()\n                        .loading(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.selected\")\n                        .label(\"Selected\")\n                        .secondary()\n                        .selected(true)\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(&theme, \"the control scale, smallest to largest\"))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.xs\")\n                        .label(\"Extra small\")\n                        .secondary()\n                        .xs(),\n                )\n                .child(\n                    Button::new(\"scene.button.sm\")\n                        .label(\"Small\")\n                        .secondary()\n                        .small(),\n                )\n                .child(\n                    Button::new(\"scene.button.md\")\n                        .label(\"Medium\")\n                        .secondary()\n                        .medium(),\n                )\n                .child(\n                    Button::new(\"scene.button.lg\")\n                        .label(\"Large\")\n                        .secondary()\n                        .large(),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"White is on-media: a bright-background fixture\",\n        ))\n        .child(\n            row(&theme)\n                .p(px(theme.spacing.md))\n                .radius(&theme, Radius::Card)\n                .bg(theme.colors.on_media_foreground)\n                .child(\n                    Button::new(\"scene.button.media\")\n                        .label(\"Play\")\n                        .icon(Icon::Play)\n                        .variant(Variant::White)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.media-busy\")\n                        .label(\"Loading\")\n                        .variant(Variant::White)\n                        .loading(true),\n                )\n                .child(\n                    Button::new(\"scene.button.media-disabled\")\n                        .label(\"Unavailable\")\n                        .variant(Variant::White)\n                        .disabled(true),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"the shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"indigo\", \"teal\", \"red\"].map(|group| {\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Subtle,\n                    Variant::Default,\n                    Variant::Transparent,\n                ]\n                .map(|tier| {\n                    Button::new(format!(\"scene.button.{group}.{}\", tier.name()))\n                        .label(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .on_click(|_, _| {})\n                }),\n            )\n        }))\n        .child(caption(\n            &theme,\n            \"the same tiers, chosen: selection is a stronger step of the ladder the \\\n             caller picked, so the colour survives being the current answer\",\n        ))\n        .child(\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Subtle,\n                    Variant::Default,\n                    Variant::Transparent,\n                ]\n                .map(|tier| {\n                    Button::new(format!(\"scene.button.chosen.{}\", tier.name()))\n                        .label(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(\"indigo\"))\n                        .selected(true)\n                        .on_click(|_, _| {})\n                }),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "badge",
@@ -143070,7 +143254,7 @@
       "uses": [
         "Badge"
       ],
-      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        .child(caption(\n            &theme,\n            \"A glyph or a mark, for a badge whose claim has a picture\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Passed\")\n                        .success()\n                        .icon(Icon::Check)\n                        .id(\"scene.badge.icon\"),\n                )\n                .child(Badge::new(\"Live\").success().dot(true).id(\"scene.badge.dot\"))\n                .child(\n                    Badge::new(\"Refused\")\n                        .danger()\n                        .icon(Icon::CloseCircle)\n                        .id(\"scene.badge.refused\"),\n                ),\n        )\n        .child(caption(&theme, \"The size ramp\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Extra small\").xs().id(\"scene.badge.xs\"))\n                .child(Badge::new(\"Small\").small().id(\"scene.badge.sm\"))\n                .child(Badge::new(\"Medium\").medium().id(\"scene.badge.md\"))\n                .child(Badge::new(\"Large\").large().id(\"scene.badge.lg\")),\n        )\n        // A tint says whose the badge is. The colours come from the theme's\n        // own palette rather than from literals, so a retinted document\n        // retints these too, and the tone underneath still reports itself.\n        .child(caption(\n            &theme,\n            \"An identity tint, which says whose and not how it is going\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .id(\"scene.badge.tinted-neutral\"),\n                )\n                .child(\n                    Badge::new(\"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .warning()\n                        .id(\"scene.badge.tinted-warning\"),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"The shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"grape\", \"cyan\"].map(|group| {\n            row(&theme).children(\n                [Variant::Filled, Variant::Light, Variant::Subtle].map(|tier| {\n                    Badge::new(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .id(format!(\"scene.badge.{group}.{}\", tier.name()))\n                }),\n            )\n        }))\n        .into_any_element()\n}"
+      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        .child(caption(\n            &theme,\n            \"A glyph or a mark, for a badge whose claim has a picture\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Passed\")\n                        .success()\n                        .icon(Icon::Check)\n                        .id(\"scene.badge.icon\"),\n                )\n                .child(Badge::new(\"Live\").success().dot(true).id(\"scene.badge.dot\"))\n                .child(\n                    Badge::new(\"Refused\")\n                        .danger()\n                        .icon(Icon::CloseCircle)\n                        .id(\"scene.badge.refused\"),\n                ),\n        )\n        .child(caption(&theme, \"The size ramp\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Extra small\").xs().id(\"scene.badge.xs\"))\n                .child(Badge::new(\"Small\").small().id(\"scene.badge.sm\"))\n                .child(Badge::new(\"Medium\").medium().id(\"scene.badge.md\"))\n                .child(Badge::new(\"Large\").large().id(\"scene.badge.lg\")),\n        )\n        .child(caption(\n            &theme,\n            \"Counts: tabular figures without a status wash\",\n        ))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"3\").count().id(\"scene.badge.count-single\"))\n                .child(Badge::new(\"111\").count().id(\"scene.badge.count-narrow\"))\n                .child(Badge::new(\"888\").count().id(\"scene.badge.count-wide\")),\n        )\n        // A tint says whose the badge is. The colours come from the theme's\n        // own palette rather than from literals, so a retinted document\n        // retints these too, and the tone underneath still reports itself.\n        .child(caption(\n            &theme,\n            \"An identity tint, which says whose and not how it is going\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .id(\"scene.badge.tinted-neutral\"),\n                )\n                .child(\n                    Badge::new(\"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .warning()\n                        .id(\"scene.badge.tinted-warning\"),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"The shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"grape\", \"cyan\"].map(|group| {\n            row(&theme).children(\n                [Variant::Filled, Variant::Light, Variant::Subtle].map(|tier| {\n                    Badge::new(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .id(format!(\"scene.badge.{group}.{}\", tier.name()))\n                }),\n            )\n        }))\n        .into_any_element()\n}"
     },
     {
       "name": "card",
@@ -143566,7 +143750,7 @@
       "uses": [
         "Tabs"
       ],
-      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"places, not documents: Regular Liquid capsules, \\\n             with a translucent selected fill on the material\",\n        ))\n        .child(\n            Tabs::new(\"scene.tabs.capsules\")\n                .capsules()\n                .control_size(ControlSize::Sm)\n                .tabs([\n                    TabItem::new(\"code\", \"Portal\")\n                        .icon(Icon::Terminal)\n                        .tint(theme.colors.accent),\n                    TabItem::new(\"game\", \"Harbour\")\n                        .icon(Icon::Play)\n                        .tint(theme.colors.warning),\n                    TabItem::new(\"design\", \"notes\")\n                        .icon(Icon::Pen)\n                        .tint(theme.colors.info),\n                ])\n                .selected(\"code\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"In-content tabs: raised control, quiet track, tabular count\",\n        ))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"places, not documents: Regular Liquid capsules, \\\n             with a translucent selected fill on the material\",\n        ))\n        .child(\n            Tabs::new(\"scene.tabs.capsules\")\n                .capsules()\n                .control_size(ControlSize::Sm)\n                .tabs([\n                    TabItem::new(\"code\", \"Portal\")\n                        .icon(Icon::Terminal)\n                        .tint(theme.colors.accent),\n                    TabItem::new(\"game\", \"Harbour\")\n                        .icon(Icon::Play)\n                        .tint(theme.colors.warning),\n                    TabItem::new(\"design\", \"notes\")\n                        .icon(Icon::Pen)\n                        .tint(theme.colors.info),\n                ])\n                .selected(\"code\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "carousel",
@@ -144718,6 +144902,18 @@
         "Tabs"
       ],
       "example": "fn document_tabs(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneDocumentTabs>() {\n        // An icon-only trigger still has to be nameable, so it carries the\n        // strip's own word for what moved into it.\n        let name = cx.strings().text(StringKey::TabMoreTabs);\n        let overflow = cx.new(|cx| {\n            Menu::new(\"scene.document-tabs.overflow\", window, cx)\n                .trigger_icon(Icon::AltArrowDown)\n                .trigger_name(name)\n        });\n        cx.set_global(SceneDocumentTabs { overflow });\n    }\n    let overflow = cx.global::<SceneDocumentTabs>().overflow.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"clean, unsaved, saving, save failed — three marks, and silence for the fourth\",\n        ))\n        .child(\n            Tabs::new(\"scene.document-tabs.editor\")\n                .tabs([\n                    TabItem::new(\"readme\", \"README.md\").closable(true),\n                    TabItem::new(\"main\", \"main.rs\").dirty().closable(true),\n                    TabItem::new(\"theme\", \"theme.json\").saving().closable(true),\n                    TabItem::new(\"notes\", \"notes.md\")\n                        .save_failed(\"The workspace is read-only.\")\n                        .closable(true),\n                ])\n                .selected(\"main\")\n                .on_select(|_, _, _| {})\n                .on_close(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"past the declared limit the rest go to a menu, which stays reachable from the keyboard\",\n        ))\n        .child(\n            Tabs::new(\"scene.document-tabs.overflowing\")\n                .tabs([\n                    TabItem::new(\"one\", \"adapter.rs\").closable(true),\n                    TabItem::new(\"two\", \"catalog.rs\").dirty().closable(true),\n                    TabItem::new(\"three\", \"harness.rs\").closable(true),\n                    TabItem::new(\"four\", \"registry.rs\").closable(true),\n                    TabItem::new(\"five\", \"transport.rs\").dirty().closable(true),\n                ])\n                .selected(\"two\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_select(|_, _, _| {})\n                .on_close(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "search-input",
+      "capture": "cargo run -p xtask -- headless capture search-input",
+      "kind": "exhibit",
+      "subjects": [
+        "SearchInput"
+      ],
+      "uses": [
+        "SearchInput"
+      ],
+      "example": "fn search_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"Queries: Xs empty, Sm and Md populated, disabled\",\n        ))\n        .children(cx.global::<SceneSearch>().queries.clone())\n        .into_any_element()\n}"
     },
     {
       "name": "search-field",

@@ -197,7 +197,8 @@ pub mod prelude {
         RichTextDiagnostic, RichTextDiagnosticSeverity, RichTextEditor, RichTextEditorEvent,
     };
     pub use crate::controls::search::{
-        FindReplace, FindReplaceEvent, HitCount, SearchField, SearchFieldEvent,
+        FindReplace, FindReplaceEvent, HitCount, SearchField, SearchFieldEvent, SearchInput,
+        SearchInputEvent,
     };
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};

@@ -1,5 +1,6 @@
-//! Find, and find and replace, over text this crate does not hold.
+//! Query, find, and find and replace, over text this crate does not hold.
 //!
+//! [`SearchInput`] is a query-only control reporting [`SearchInputEvent`].
 //! [`SearchField`] is a query field, a hit count, and a way to step between
 //! hits. [`FindReplace`] puts a replacement field and two replace actions on
 //! top of the same field.
@@ -20,6 +21,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
+use crate::controls::field::{FieldState, field_shell, nested_control_size};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
@@ -27,6 +29,172 @@ use crate::foundation::{
 };
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
+
+/// The query edit and focus events reported to the host; no search is run here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SearchInputEvent {
+    Change(SharedString),
+    Submit,
+    Cancel,
+    BackspaceAtStart,
+    Focus,
+    Blur,
+}
+
+/// An in-content query with a magnifier and a clear action when nonempty.
+///
+/// For project filters and similar queries, not document find/replace.
+/// Owns only the edit buffer and reports `SearchInputEvent`; the host owns
+/// matching, results and debounce. Sizes use the same field metrics as inputs.
+pub struct SearchInput {
+    ident: Ident,
+    input: Entity<TextInput>,
+    placeholder: Option<SharedString>,
+    size: ControlSize,
+    disabled: bool,
+    _subscription: Subscription,
+}
+
+impl SearchInput {
+    pub fn new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let ident = ident.into();
+        let input = cx.new(|cx| TextInput::new(ident.child("query"), window, cx).bare(true));
+        let subscription = cx.subscribe(&input, |_, _, event: &TextInputEvent, cx| {
+            cx.emit(match event {
+                TextInputEvent::Change(value) => SearchInputEvent::Change(value.clone()),
+                TextInputEvent::Submit => SearchInputEvent::Submit,
+                TextInputEvent::Cancel => SearchInputEvent::Cancel,
+                TextInputEvent::BackspaceAtStart => SearchInputEvent::BackspaceAtStart,
+                TextInputEvent::Focus => SearchInputEvent::Focus,
+                TextInputEvent::Blur => SearchInputEvent::Blur,
+            });
+            cx.notify();
+        });
+        Self {
+            ident,
+            input,
+            placeholder: None,
+            size: ControlSize::Md,
+            disabled: false,
+            _subscription: subscription,
+        }
+    }
+
+    /// Supplies both the empty hint and the accessible name.
+    pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
+        self.placeholder = Some(placeholder.into());
+        self
+    }
+
+    pub fn value(&self, cx: &App) -> SharedString {
+        self.input.read(cx).value().clone()
+    }
+
+    /// Updates the query and reports the same Change event as editing.
+    pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.input
+            .update(cx, |input, cx| input.set_value(value, cx));
+    }
+
+    /// The underlying editable control, for bindings and selection access.
+    pub fn input(&self) -> &Entity<TextInput> {
+        &self.input
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        self.input
+            .update(cx, |input, cx| input.set_disabled(disabled, cx));
+        cx.notify();
+    }
+}
+
+impl Sizable for SearchInput {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Disableable for SearchInput {
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Focusable for SearchInput {
+    fn focus_handle(&self, cx: &App) -> FocusHandle {
+        self.input.read(cx).focus_handle(cx)
+    }
+}
+
+impl EventEmitter<SearchInputEvent> for SearchInput {}
+
+impl Render for SearchInput {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let placeholder = self
+            .placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::QueryPlaceholder));
+        self.input.update(cx, |input, cx| {
+            input.set_control_size(self.size, cx);
+            input.set_placeholder(placeholder.clone(), cx);
+            if input.is_disabled() != self.disabled {
+                input.set_disabled(self.disabled, cx);
+            }
+        });
+        let focus = self.focus_handle(cx);
+        let clear = (!self.input.read(cx).is_empty()).then(|| {
+            let input = self.input.downgrade();
+            IconButton::new(
+                self.ident.child("clear"),
+                Icon::Close,
+                cx.strings().text(StringKey::SearchClear),
+            )
+            .control_size(nested_control_size(self.size))
+            .disabled(self.disabled)
+            .on_click(move |window, cx| {
+                input
+                    .update(cx, |input, cx| {
+                        input.set_value("", cx);
+                        window.focus(&input.focus_handle(cx), cx);
+                    })
+                    .ok();
+            })
+        });
+        field_shell(
+            &theme,
+            self.size,
+            FieldState::default()
+                .focused(focus.is_focused(window))
+                .disabled(self.disabled),
+        )
+        .id(self.ident.element_id())
+        .row_reading(cx.layout_direction())
+        .child(
+            icon(Icon::Magnifier)
+                .size(px(theme.control.get(self.size).icon_size))
+                .flex_none()
+                .text_color(theme.colors.text_muted),
+        )
+        .child(div().flex_1().min_w_0().child(self.input.clone()))
+        .children(clear)
+        .child(
+            div().absolute().size_0().semantic_in(
+                cx,
+                NodeSpec::new(self.ident.child("label").semantic_id(), Role::Text)
+                    .labels(self.ident.child("query").semantic_id())
+                    .text(placeholder),
+            ),
+        )
+        .semantic_in(
+            cx,
+            NodeSpec::new(self.ident.semantic_id(), Role::Group).disabled(self.disabled),
+        )
+    }
+}
 
 /// How many hits the host says the query has.
 ///
