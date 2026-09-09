@@ -377,6 +377,14 @@
                   },
                   "disabled": {
                     "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "group": {
+                    "type": "string",
+                    "max": 16384
                   }
                 },
                 "required": [

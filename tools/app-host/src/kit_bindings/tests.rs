@@ -159,7 +159,7 @@ fn select_preserves_menu_and_caller_refusal(cx: &mut TestAppContext) {
     let descriptor = node(
         "Select",
         "select",
-        json!({"options":[{"id":"alpha","label":"Alpha"},{"id":"beta","label":"Beta"}],"selected":"alpha"}),
+        json!({"options":[{"id":"alpha","label":"Alpha","description":"First description","group":"Primary"},{"id":"beta","label":"Beta","description":"Second description","group":"Secondary"}],"selected":"alpha"}),
         json!({"change":"selected"}),
     );
     let output = Rc::new(RefCell::new(Vec::new()));
@@ -176,6 +176,8 @@ fn select_preserves_menu_and_caller_refusal(cx: &mut TestAppContext) {
     });
     harness.click("select");
     harness.frame();
+    assert!(harness.node("select.group.Primary").is_some());
+    assert!(harness.node("select.group.Secondary").is_some());
     harness.click("select.beta");
     assert_eq!(&*output.borrow(), &[("selected".into(), json!("beta"))]);
     assert_eq!(
@@ -456,7 +458,7 @@ fn native_methods_preserve_typed_results_and_actual_disabled_refusal(cx: &mut Te
     let select = node(
         "Select",
         "methods.select",
-        json!({"options":[{"id":"alpha","label":"Alpha"},{"id":"beta","label":"Beta"}],"selected":"alpha"}),
+        json!({"options":[{"id":"alpha","label":"Alpha"},{"id":"beta","label":"Beta","description":"Chosen description","group":"Secondary"}],"selected":"alpha"}),
         json!({}),
     );
     let build_state = state.clone();
@@ -520,8 +522,10 @@ fn native_methods_preserve_typed_results_and_actual_disabled_refusal(cx: &mut Te
             state
                 .invoke(&select, "selected_option", &json!({}), true, window, cx)
                 .expect("query option"),
-            json!({"id":"beta","label":"Beta","disabled":false,"description":null,"group":null})
+            json!({"id":"beta","label":"Beta","disabled":false,"description":"Chosen description","group":"Secondary"})
         );
+        state.invoke(&select,"set_options",&json!({"options":[{"id":"beta","label":"Updated Beta","description":"Updated description","group":"Updated group"}]}),false,window,cx).expect("update option metadata");
+        assert_eq!(state.invoke(&select,"selected_option",&json!({}),true,window,cx).expect("updated metadata"),json!({"id":"beta","label":"Updated Beta","disabled":false,"description":"Updated description","group":"Updated group"}));
     });
     assert_eq!(&*events.borrow(), &[("changed".into(), json!("é🙂"))]);
     harness.click("methods.input");

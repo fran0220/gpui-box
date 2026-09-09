@@ -106,18 +106,24 @@ fn size(node: &Node) -> ControlSize {
         _ => ControlSize::Md,
     }
 }
-fn options(node: &Node) -> Vec<SelectOption> {
-    node.props
-        .get("options")
+fn options(value: Option<&Value>) -> Vec<SelectOption> {
+    value
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .map(|item| {
-            SelectOption::new(
+            let mut option = SelectOption::new(
                 item["id"].as_str().unwrap_or_default().to_owned(),
                 item["label"].as_str().unwrap_or_default().to_owned(),
             )
-            .disabled(item["disabled"].as_bool().unwrap_or(false))
+            .disabled(item["disabled"].as_bool().unwrap_or(false));
+            if let Some(description) = item["description"].as_str() {
+                option = option.description(description.to_owned());
+            }
+            if let Some(group) = item["group"].as_str() {
+                option = option.group(group.to_owned());
+            }
+            option
         })
         .collect()
 }
@@ -422,7 +428,7 @@ impl KitState {
                     Control::Select(entity) => {
                         entity.update(cx, |select, cx| {
                             if previous_props.get("options") != node.props.get("options") {
-                                select.set_options(options(node), cx);
+                                select.set_options(options(node.props.get("options")), cx);
                             }
                             let selected = node
                                 .props

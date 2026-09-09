@@ -12,5 +12,9 @@ gpui.mount(() => gpui.column('overlay-fixture', [
   gpui.kit.Dialog('overlay-dialog', { title: 'Native retained dialog', description: 'Close and reopen without replacing the input.', confirmLabel: 'Confirm', cancelLabel: 'Cancel' }, {}, {
     content: [gpui.kit.TextInput('dialog-field', { placeholder: 'Retained dialog input' })],
   }),
+  gpui.kit.Select('grouped-select', { placeholder: 'Open grouped native select', options: [
+    { id: 'alpha', label: 'Alpha', description: 'First option description', group: 'Primary' },
+    { id: 'beta', label: 'Beta', description: 'Second option description', group: 'Secondary' },
+  ] }, { open() { result.set('Grouped native select opened'); } }),
   gpui.text('overlay-result', result.get()),
 ]));

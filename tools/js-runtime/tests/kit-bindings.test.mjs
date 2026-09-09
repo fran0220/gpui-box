@@ -121,6 +121,8 @@ invoke(input, 'set_value', {value:'next',path:'/etc/passwd'});
 kit.Checkbox('check', {checked:null}, {change(value) { const checked: boolean = value; }});
 kit.Slider('range', {min:-10,max:20,value:-3,high:17}, {rangeChange(value) { const high: number = value.high; }});
 kit.Select('select', {selected:null}, {change(value) { const selected: string|null = value; }});
+kit.Select('grouped', {options:[{id:'a',label:'A',description:'Detail',group:'Group'}]});
+invoke(kit.Select('grouped'), 'set_options', {options:[{id:'b',label:'B',description:'Other',group:'Other group'}]});
 kit.SplitPane('panes', {ratio:0.3}, {collapse(side) { const value: 'start'|'end' = side; }}, {start:[kit.Radio('nested')]});
 kit.TextInput('secure', {}, {clipboardDenied(reason) { const refusal: 'missingOwner'|'denied' = reason; }});
 kit.List('list', {rows:[{id:'a',label:'A'}]}, {select(id) { const selected:string=id; }}, {a:[kit.Radio('row')]});

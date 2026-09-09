@@ -11,6 +11,7 @@ const object = (fields, required = []) => ({ type: 'object', fields, required })
 const common = { disabled: boolean, size: choice('xs', 'sm', 'md', 'lg') };
 const labeled = { ...common, label: string, description: string };
 const selectionItem = object({ id: identity, label: string, disabled: boolean }, ['id', 'label']);
+const selectOption = object({ ...selectionItem.fields, description: string, group: string }, ['id', 'label']);
 
 export const kitSchemas = Object.freeze({
   Checkbox: { props: object({ ...labeled, checked: choice(true, false, null) }), events: { change: boolean } },
@@ -19,7 +20,7 @@ export const kitSchemas = Object.freeze({
   Slider: { props: object({ ...common, label: string, min: number, max: number, value: number, high: number, step: positive, length: positive, display: string, orientation: choice('horizontal', 'vertical'), marks: array(number) }), events: { change: number, rangeChange: object({ low: number, high: number }, ['low', 'high']) } },
   SegmentedControl: { props: object({ ...common, label: string, segments: array(selectionItem), selected: identity }), events: { select: identity } },
   TextInput: { props: object({ ...common, text: string, name: string, placeholder: string, invalid: boolean, required: boolean, readOnly: boolean, secret: boolean, bare: boolean, maxLength: integer }), events: { change: string, submit: choice(null), cancel: choice(null), backspaceAtStart: choice(null), focus: choice(null), blur: choice(null), clipboardDenied: choice('missingOwner', 'denied') } },
-  Select: { props: object({ ...common, options: array(selectionItem), selected: { ...identity, nullable: true }, name: string, placeholder: string, invalid: boolean, clearable: boolean }), events: { change: { ...identity, nullable: true }, open: choice(null), close: choice(null) } },
+  Select: { props: object({ ...common, options: array(selectOption), selected: { ...identity, nullable: true }, name: string, placeholder: string, invalid: boolean, clearable: boolean }), events: { change: { ...identity, nullable: true }, open: choice(null), close: choice(null) } },
   Pagination: { props: object({ ...common, page: { ...integer, min: 1 }, totalPages: { ...integer, min: 1 }, hasNext: boolean, siblings: integer }), events: { select: { ...integer, min: 1 } } },
   Tabs: { props: object({ ...common, tabs: array(object({ ...selectionItem.fields, badge: string, closable: boolean }, ['id', 'label'])), selected: identity, capsules: boolean, scrolling: boolean, overflowAfter: integer }), events: { select: identity, close: identity } },
   Accordion: { props: object({ size: common.size, sections: array(object({ id: identity, title: string, description: string, disabled: boolean }, ['id', 'title'])), expanded: array(identity), exclusive: boolean }), events: { toggle: object({ id: identity, expanded: boolean }, ['id', 'expanded']) }, slotIds: 'sections' },
@@ -128,7 +129,7 @@ export const kitMethods = Object.freeze({
   Select: {
     invoke: {
       set_name: method({ name: string }), set_placeholder: method({ placeholder: { ...string, nullable: true } }),
-      set_options: method({ options: array(selectionItem) }), set_selected: method({ id: { ...identity, nullable: true } }),
+      set_options: method({ options: array(selectOption) }), set_selected: method({ id: { ...identity, nullable: true } }),
       set_disabled: method({ disabled: boolean }), set_invalid: method({ invalid: boolean }),
       set_clearable: method({ clearable: boolean }), set_control_size: method({ size: common.size }),
     },

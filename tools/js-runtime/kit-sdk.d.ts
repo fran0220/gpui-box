@@ -2,6 +2,7 @@ export type KitSize = 'xs' | 'sm' | 'md' | 'lg';
 export interface ControlProps { disabled?: boolean; size?: KitSize }
 export interface ChoiceProps extends ControlProps { label?: string; description?: string }
 export interface SelectionItem { id: string; label: string; disabled?: boolean }
+export interface SelectOption extends SelectionItem { description?: string; group?: string }
 export interface SlotNode { kind: string; id: string }
 export type KitSlots = Record<string, SlotNode[]>;
 export interface KitNode<C extends keyof KitFactories = keyof KitFactories> { kind: 'kit'; component: C; id: string; props: object; slots: KitSlots; events: Record<string, string> }
@@ -13,7 +14,7 @@ export interface KitFactories {
   Slider(id: string, props?: ControlProps & { label?: string; min?: number; max?: number; value?: number; high?: number; step?: number; length?: number; display?: string; orientation?: 'horizontal' | 'vertical'; marks?: number[] }, events?: { change?(value: number): void; rangeChange?(value: { low: number; high: number }): void }): KitNode;
   SegmentedControl(id: string, props?: ControlProps & { label?: string; segments?: SelectionItem[]; selected?: string }, events?: { select?(id: string): void }): KitNode;
   TextInput(id: string, props?: ControlProps & { text?: string; name?: string; placeholder?: string; invalid?: boolean; required?: boolean; readOnly?: boolean; secret?: boolean; bare?: boolean; maxLength?: number }, events?: { change?(text: string): void; submit?(): void; cancel?(): void; backspaceAtStart?(): void; focus?(): void; blur?(): void; clipboardDenied?(reason: 'missingOwner' | 'denied'): void }): KitNode;
-  Select(id: string, props?: ControlProps & { options?: SelectionItem[]; selected?: string | null; name?: string; placeholder?: string; invalid?: boolean; clearable?: boolean }, events?: { change?(id: string | null): void; open?(): void; close?(): void }): KitNode;
+  Select(id: string, props?: ControlProps & { options?: SelectOption[]; selected?: string | null; name?: string; placeholder?: string; invalid?: boolean; clearable?: boolean }, events?: { change?(id: string | null): void; open?(): void; close?(): void }): KitNode;
   Pagination(id: string, props?: ControlProps & { page?: number; totalPages?: number; hasNext?: boolean; siblings?: number }, events?: { select?(page: number): void }): KitNode;
   Tabs(id: string, props?: ControlProps & { tabs?: (SelectionItem & { badge?: string; closable?: boolean })[]; selected?: string; capsules?: boolean; scrolling?: boolean; overflowAfter?: number }, events?: { select?(id: string): void; close?(id: string): void }): KitNode;
   Accordion(id: string, props?: { size?: KitSize; sections?: { id: string; title: string; description?: string; disabled?: boolean }[]; expanded?: string[]; exclusive?: boolean }, events?: { toggle?(value: { id: string; expanded: boolean }): void }, slots?: KitSlots): KitNode;
@@ -55,7 +56,7 @@ export interface KitMethodContracts {
     invoke: {
       set_name: { args: { "name": string }; result: null };
       set_placeholder: { args: { "placeholder": string | null }; result: null };
-      set_options: { args: { "options": Array<{ "id": string; "label": string; "disabled"?: boolean }> }; result: null };
+      set_options: { args: { "options": Array<{ "id": string; "label": string; "disabled"?: boolean; "description"?: string; "group"?: string }> }; result: null };
       set_selected: { args: { "id": string | null }; result: null };
       set_disabled: { args: { "disabled": boolean }; result: null };
       set_invalid: { args: { "invalid": boolean }; result: null };

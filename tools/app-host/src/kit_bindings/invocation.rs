@@ -110,24 +110,7 @@ impl KitState {
                             args["id"].as_str().map(|value| value.to_owned().into()),
                             cx,
                         ),
-                        "set_options" => select.set_options(
-                            args["options"]
-                                .as_array()
-                                .expect("validated options")
-                                .iter()
-                                .map(|option| {
-                                    SelectOption::new(
-                                        option["id"].as_str().expect("validated id").to_owned(),
-                                        option["label"]
-                                            .as_str()
-                                            .expect("validated label")
-                                            .to_owned(),
-                                    )
-                                    .disabled(option["disabled"].as_bool().unwrap_or(false))
-                                })
-                                .collect(),
-                            cx,
-                        ),
+                        "set_options" => select.set_options(options(args.get("options")), cx),
                         "set_disabled" => {
                             select.set_disabled(boolean("disabled"), cx);
                             entry.route.borrow_mut().disabled = boolean("disabled");

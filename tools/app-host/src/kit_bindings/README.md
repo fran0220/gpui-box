@@ -33,11 +33,17 @@ the host checks mounted generation/revision and applies owner policy. Explicit
 controlled text/selection props win on the next render. Argument-free methods
 accept omitted arguments; other methods require their declared named fields.
 
+Every mount rerender cancels pending requests for the old worker revision.
+Cancellation does not roll back an already executed setter. In particular,
+`set_value` can emit a change handler that rerenders before an awaited follow-up
+query; this is not an atomic setter/event transaction. The method fixture uses
+`set_text_quietly` to avoid that echo while testing the native round trip.
+
 ## Explicit remaining gaps
 
 - Only declared commands and queries are bound; other public methods, reactive
   bindings, arbitrary callbacks, and native entity references remain unsupported.
-- Segment icons/tints, Select option description/groups, token/style options,
+- Segment icons/tints, token/style options,
   Tabs reorder/overflow-menu/save-state, Pagination page-size entity, and
   ScrollArea bound scroll targets are not yet adapted. List currently supports
   native same-list reorder intent but not caller-supplied cross-list acceptance
