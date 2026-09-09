@@ -5926,6 +5926,27 @@ impl Window {
             .request_measured_layout(style, rem_size, scale_factor, measure)
     }
 
+    /// Request a leaf with natural content dimensions, such as an image.
+    /// Authored or parent-assigned dimensions win; the natural aspect ratio
+    /// derives only an unassigned axis. This is distinct from arbitrary text
+    /// measurement and never imposes a minimum aspect-ratio height on a box
+    /// whose two dimensions have already been resolved.
+    ///
+    /// Natural dimensions must be finite and non-negative; a zero-size asset
+    /// has no natural aspect ratio. Call during layout
+    /// request or prepaint, as with [`Self::request_measured_layout`].
+    pub fn request_intrinsic_layout(&mut self, style: Style, intrinsic: Size<Pixels>) -> LayoutId {
+        self.invalidator.debug_assert_prepaint();
+        assert!(intrinsic.width.0.is_finite() && intrinsic.width >= Pixels::ZERO);
+        assert!(intrinsic.height.0.is_finite() && intrinsic.height >= Pixels::ZERO);
+        let rem_size = self.rem_size();
+        let scale_factor = self.scale_factor();
+        self.layout_engine
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .request_intrinsic_layout(style, intrinsic, rem_size, scale_factor)
+    }
+
     /// Compute the layout for the given id within the given available space.
     /// This method is called for its side effect, typically by the framework prior to painting.
     /// After calling it, you can request the bounds of the given layout node id or any descendant.

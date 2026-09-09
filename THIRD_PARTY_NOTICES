@@ -56,6 +56,9 @@ original GPUI Box lifecycle corrections; no additional source is imported.
 Unicode line-breaking integration is original GPUI Box work using the existing
 unicode-linebreak 0.1.5 dependency (Apache-2.0, Unicode 15.0 UAX #14).
 No source is copied into the frozen import receipt.
+Intrinsic image sizing and the local layout view are original GPUI Box
+integration using Taffy 0.12.2's existing public APIs. No dependency source,
+renderer code, or additional visual assets are imported for this change.
 The primitive-aware scroll-edge fade for filled paths, shadows, SVG masks,
 images, and sprite instances is GPUI Box work over those existing paint and
 shader contracts and imports no additional source, shader, or visual asset.

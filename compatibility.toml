@@ -49,6 +49,10 @@ limitations = ["application context menus use the in-window fallback", "native m
 [framework_context_menu]
 contract = "Window::show_context_menu consumes the shared Menu action tree, presents it natively on macOS and Windows after the current GPUI borrow yields, dispatches through the focus context captured at open, and reports unsupported so components can retain an in-window fallback."
 
+[framework_intrinsic_layout]
+contract = "Window::request_intrinsic_layout distinguishes natural content dimensions from authored aspect ratio. Assigned axes and size constraints win; only missing axes derive from the natural ratio. Block intrinsic widths, flex/grid stretch, absolute insets and unresolved percentages share one local layout result authority. Ordinary measured text retains the stock leaf algorithm; no Taffy vendor or patch and no renderer ABI change."
+tests = ["image_intrinsic_measurement_matrix", "measured_leaf_stretch_is_not_forced_by_the_flex_parent", "cover_image_rounds_all_corners_in_a_clipped_media_card"]
+
 [framework_line_breaking]
 contract = "Unshaped fragments, shaped glyph runs and wrapped truncation use Unicode 15.0 UAX #14 opportunities from unicode-linebreak 0.1.5. Inline objects use U+FFFC for classification while retaining caller UTF-8 byte lengths. Continuation indentation and emergency character wrapping remain supported. No host text preprocessing or width expansion."
 tests = ["unicode_wrap_keeps_punctuation_with_its_text", "unicode_wrap_crosses_fragments_and_maps_inline_element_bytes", "unicode_wrap_preserves_words_and_mixed_script_opportunities", "unicode_mandatory_breaks_and_truncation_share_wrap_boundaries", "shaped_unicode_wrap_respects_punctuation_across_runs"]

@@ -481,6 +481,93 @@ mod imp {
         use image::{Rgba, RgbaImage};
 
         #[test]
+        fn cover_image_rounds_all_corners_in_a_clipped_media_card() -> Result<()> {
+            use gpui::{DevicePixels, ObjectFit, RenderImage, img, rgb};
+            use gpui_kit::prelude::{Glass, GlassPreset};
+            use gpui_kit_theme::{Elevation, Radius};
+
+            struct ImageHost {
+                width: f32,
+            }
+            impl Render for ImageHost {
+                fn render(
+                    &mut self,
+                    window: &mut Window,
+                    cx: &mut Context<Self>,
+                ) -> impl IntoElement {
+                    SemanticCoordinator::global(cx).begin_frame(window);
+                    let media = Arc::new(
+                        RenderImage::from_rgba(
+                            size(DevicePixels(480), DevicePixels(144)),
+                            [40, 180, 90, 255].repeat(480 * 144),
+                        )
+                        .expect("fixture dimensions"),
+                    );
+                    div().size_full().bg(rgb(0x101010)).child(
+                        div()
+                            .relative()
+                            .w(px(self.width))
+                            .h(px(220.))
+                            .rounded(px(12.))
+                            .overflow_hidden()
+                            .child(
+                                img(media)
+                                    .size_full()
+                                    .rounded(px(12.))
+                                    .object_fit(ObjectFit::Cover),
+                            )
+                            .child(
+                                div().absolute().left_0().right_0().bottom_0().child(
+                                    Glass::new("test.image-caption")
+                                        .preset(GlassPreset::Clear)
+                                        .dimmed(true)
+                                        .radius(Radius::Card)
+                                        .elevation(Elevation::Flat)
+                                        .child(div().w_full().h(px(60.)).child("Media caption")),
+                                ),
+                            ),
+                    )
+                }
+            }
+            for width in [480., 880.] {
+                let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                    "Geist",
+                ));
+                let mut cx = HeadlessAppContext::with_platform(
+                    text_system,
+                    Arc::new(gpui_kit::assets::Assets),
+                    gpui_platform::current_headless_renderer,
+                );
+                cx.update(|cx| {
+                    gpui_kit::install(cx);
+                    cx.set_reduce_motion(true);
+                    activate_theme("studio-dark", cx);
+                });
+                let window: AnyWindowHandle = cx
+                    .open_window(size(px(width + 20.), px(240.)), |_, cx| {
+                        cx.new(|_| ImageHost { width })
+                    })?
+                    .into();
+                let frame = settled_image(&mut cx, window)?;
+                frame.save(
+                    repo_root().join(format!("target/headless-rounded-cover-image-{width}.png")),
+                )?;
+                let scale = frame.width() as f32 / (width + 20.);
+                let sample =
+                    |x: f32, y: f32| *frame.get_pixel((x * scale) as u32, (y * scale) as u32);
+                for (x, y) in [(1., 1.), (width - 2., 1.), (1., 218.), (width - 2., 218.)] {
+                    assert_eq!(
+                        sample(x, y),
+                        sample(width + 10., 230.),
+                        "width {width}: outside rounded corner ({x}, {y})"
+                    );
+                }
+                assert_eq!(sample(240., 110.), Rgba([40, 180, 90, 255]));
+            }
+            Ok(())
+        }
+
+        #[test]
         fn clear_pill_dims_media_inside_a_clipped_card() -> Result<()> {
             use gpui::{DevicePixels, ObjectFit, RenderImage, img};
             use gpui_kit::foundation::Sizable;

@@ -564,7 +564,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2529
+      "symbolCount": 2531
     },
     {
       "name": "gpui-box-browser-gallery",
@@ -33381,7 +33381,7 @@
       "source": "crates/gpui/src/taffy.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub struct TaffyLayoutEngine { taffy : TaffyTree<NodeContext>, absolute_layout_bounds : FxHashMap<LayoutId, Bounds<Pixels>>, # [doc = \" Unrounded absolute border-box top-left per-node coordinate in device pixels.\"] absolute_outer_origins : FxHashMap<LayoutId, Point<f32>>, computed_layouts : FxHashSet<LayoutId>, layout_bounds_scratch_space : Vec<LayoutId>, }",
+      "signature": "pub struct TaffyLayoutEngine { taffy : TaffyTree<NodeContext>, layouts : FxHashMap<NodeId, taffy::Layout>, absolute_layout_bounds : FxHashMap<LayoutId, Bounds<Pixels>>, # [doc = \" Unrounded absolute border-box top-left per-node coordinate in device pixels.\"] absolute_outer_origins : FxHashMap<LayoutId, Point<f32>>, computed_layouts : FxHashSet<LayoutId>, layout_bounds_scratch_space : Vec<LayoutId>, }",
       "cfg": []
     },
     {
@@ -33441,6 +33441,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn new () -> Self",
+      "cfg": [],
+      "target": "TaffyLayoutEngine"
+    },
+    {
+      "id": "gpui::taffy::TaffyLayoutEngine::request_intrinsic_layout",
+      "name": "request_intrinsic_layout",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "taffy",
+      "path": "gpui::taffy",
+      "source": "crates/gpui/src/taffy.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn request_intrinsic_layout (& mut self, style : Style, intrinsic : Size<Pixels>, rem_size : Pixels, scale_factor : f32,) -> LayoutId",
       "cfg": [],
       "target": "TaffyLayoutEngine"
     },
@@ -38615,6 +38630,21 @@
       "summary": "request a certain window decoration (Wayland)",
       "documentation": "request a certain window decoration (Wayland)",
       "signature": "pub fn request_decorations (& self, decorations : WindowDecorations)",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::request_intrinsic_layout",
+      "name": "request_intrinsic_layout",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Request a leaf with natural content dimensions, such as an image. Authored or parent-assigned dimensions win; the natural aspect ratio derives only an unassigned axis. This is distinct from arbitrary text measurement and never imposes a minimum aspect-ratio height on a box whose two dimensions have already been resolved.",
+      "documentation": "Request a leaf with natural content dimensions, such as an image.\nAuthored or parent-assigned dimensions win; the natural aspect ratio\nderives only an unassigned axis. This is distinct from arbitrary text\nmeasurement and never imposes a minimum aspect-ratio height on a box\nwhose two dimensions have already been resolved.\n\nNatural dimensions must be finite and non-negative; a zero-size asset\nhas no natural aspect ratio. Call during layout\nrequest or prepaint, as with [`Self::request_measured_layout`].",
+      "signature": "pub fn request_intrinsic_layout (& mut self, style : Style, intrinsic : Size<Pixels>) -> LayoutId",
       "cfg": [],
       "target": "Window"
     },
@@ -142010,10 +142040,10 @@
       "anchor": "media"
     },
     {
-      "id": "coverage-media-caption-image-sizing-gap",
-      "title": "Media-caption image sizing gap",
+      "id": "coverage-media-caption-image-sizing-correction",
+      "title": "Media-caption image sizing correction",
       "guide": "coverage",
-      "anchor": "media-caption-image-sizing-gap"
+      "anchor": "media-caption-image-sizing-correction"
     },
     {
       "id": "coverage-covered",
@@ -142086,6 +142116,12 @@
       "title": "Unicode line breaks across text and inline objects",
       "guide": "coverage",
       "anchor": "unicode-line-breaks-across-text-and-inline-objects"
+    },
+    {
+      "id": "coverage-intrinsic-image-sizing-is-separate-from-object-fitting",
+      "title": "Intrinsic image sizing is separate from object fitting",
+      "guide": "coverage",
+      "anchor": "intrinsic-image-sizing-is-separate-from-object-fitting"
     },
     {
       "id": "datetime-why-the-seam-is-here",
@@ -145010,6 +145046,14 @@
         "rounded_optical_profiles_flatten_before_the_arc_normal_collapses",
         "glass_corner_medial_axis_does_not_invent_a_specular_normal",
         "glass_menu_corner_does_not_concentrate_light_at_the_arc_centre"
+      ]
+    },
+    "framework_intrinsic_layout": {
+      "contract": "Window::request_intrinsic_layout distinguishes natural content dimensions from authored aspect ratio. Assigned axes and size constraints win; only missing axes derive from the natural ratio. Block intrinsic widths, flex/grid stretch, absolute insets and unresolved percentages share one local layout result authority. Ordinary measured text retains the stock leaf algorithm; no Taffy vendor or patch and no renderer ABI change.",
+      "tests": [
+        "image_intrinsic_measurement_matrix",
+        "measured_leaf_stretch_is_not_forced_by_the_flex_parent",
+        "cover_image_rounds_all_corners_in_a_clipped_media_card"
       ]
     },
     "framework_layout": {

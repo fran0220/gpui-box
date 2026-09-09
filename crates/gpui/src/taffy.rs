@@ -17,6 +17,8 @@ use taffy::{
     tree::NodeId,
 };
 
+mod intrinsic;
+
 type NodeMeasureFn = StackSafe<
     Box<
         dyn FnMut(
@@ -28,11 +30,13 @@ type NodeMeasureFn = StackSafe<
     >,
 >;
 
-struct NodeContext {
-    measure: NodeMeasureFn,
+enum NodeContext {
+    Measured(NodeMeasureFn),
+    Intrinsic(TaffySize<f32>),
 }
 pub struct TaffyLayoutEngine {
     taffy: TaffyTree<NodeContext>,
+    layouts: FxHashMap<NodeId, taffy::Layout>,
     absolute_layout_bounds: FxHashMap<LayoutId, Bounds<Pixels>>,
     /// Unrounded absolute border-box top-left per-node coordinate in device pixels.
     absolute_outer_origins: FxHashMap<LayoutId, Point<f32>>,
@@ -48,6 +52,7 @@ impl TaffyLayoutEngine {
         taffy.disable_rounding();
         TaffyLayoutEngine {
             taffy,
+            layouts: FxHashMap::default(),
             absolute_layout_bounds: FxHashMap::default(),
             absolute_outer_origins: FxHashMap::default(),
             computed_layouts: FxHashSet::default(),
@@ -57,6 +62,7 @@ impl TaffyLayoutEngine {
 
     pub fn clear(&mut self) {
         self.taffy.clear();
+        self.layouts.clear();
         self.absolute_layout_bounds.clear();
         self.absolute_outer_origins.clear();
         self.computed_layouts.clear();
@@ -103,9 +109,28 @@ impl TaffyLayoutEngine {
         self.taffy
             .new_leaf_with_context(
                 taffy_style,
-                NodeContext {
-                    measure: StackSafe::new(Box::new(measure)),
-                },
+                NodeContext::Measured(StackSafe::new(Box::new(measure))),
+            )
+            .expect(EXPECT_MESSAGE)
+            .into()
+    }
+
+    pub fn request_intrinsic_layout(
+        &mut self,
+        style: Style,
+        intrinsic: Size<Pixels>,
+        rem_size: Pixels,
+        scale_factor: f32,
+    ) -> LayoutId {
+        let mut style = style.to_taffy(rem_size, scale_factor);
+        style.item_is_replaced = true;
+        self.taffy
+            .new_leaf_with_context(
+                style,
+                NodeContext::Intrinsic(TaffySize {
+                    width: intrinsic.width.0 * scale_factor,
+                    height: intrinsic.height.0 * scale_factor,
+                }),
             )
             .expect(EXPECT_MESSAGE)
             .into()
@@ -237,39 +262,17 @@ impl TaffyLayoutEngine {
             transform(available_space.height),
         );
 
-        self.taffy
-            .compute_layout_with_measure(
-                id.into(),
-                available_space.into(),
-                |known_dimensions, available_space, _id, node_context, _style| {
-                    let Some(node_context) = node_context else {
-                        return taffy::geometry::Size::default();
-                    };
-
-                    let known_dimensions = Size {
-                        width: known_dimensions.width.map(|e| Pixels(e / scale_factor)),
-                        height: known_dimensions.height.map(|e| Pixels(e / scale_factor)),
-                    };
-
-                    let available_space: Size<AvailableSpace> = available_space.into();
-                    let untransform = |ev: AvailableSpace| match ev {
-                        AvailableSpace::Definite(pixels) => {
-                            AvailableSpace::Definite(Pixels(pixels.0 / scale_factor))
-                        }
-                        AvailableSpace::MinContent => AvailableSpace::MinContent,
-                        AvailableSpace::MaxContent => AvailableSpace::MaxContent,
-                    };
-                    let available_space = size(
-                        untransform(available_space.width),
-                        untransform(available_space.height),
-                    );
-
-                    let measured_size: Size<Pixels> =
-                        (node_context.measure)(known_dimensions, available_space, window, cx);
-                    snap_measured_size_to_device_pixels(measured_size, scale_factor).into()
-                },
-            )
-            .expect(EXPECT_MESSAGE);
+        taffy::compute_root_layout(
+            &mut intrinsic::LayoutView {
+                tree: &mut self.taffy,
+                layouts: &mut self.layouts,
+                window,
+                cx,
+                scale_factor,
+            },
+            id.into(),
+            available_space.into(),
+        );
     }
 
     // Pixel snapping
@@ -352,7 +355,7 @@ impl TaffyLayoutEngine {
             return layout;
         }
 
-        let layout = self.taffy.layout(id.into()).expect(EXPECT_MESSAGE);
+        let layout = self.layouts.get(&id.0).expect(EXPECT_MESSAGE);
         let layout_location = layout.location;
         let layout_size = layout.size;
         let parent = self.taffy.parent(id.0);
@@ -750,6 +753,70 @@ impl From<Size<Pixels>> for Size<AvailableSpace> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use taffy::prelude::TaffyMaxContent;
+
+    #[test]
+    fn measured_leaf_stretch_is_not_forced_by_the_flex_parent() {
+        for aspect_ratio in [None, Some(480. / 144.)] {
+            let mut tree = TaffyTree::<()>::new();
+            tree.disable_rounding();
+            let leaf = tree
+                .new_leaf_with_context(
+                    taffy::Style {
+                        size: TaffySize {
+                            width: taffy::style::Dimension::length(240.),
+                            height: taffy::style::Dimension::auto(),
+                        },
+                        aspect_ratio,
+                        ..Default::default()
+                    },
+                    (),
+                )
+                .expect("create the measured leaf");
+            let parent = tree
+                .new_with_children(
+                    taffy::Style {
+                        display: taffy::Display::Flex,
+                        size: TaffySize {
+                            width: taffy::style::Dimension::length(800.),
+                            height: taffy::style::Dimension::length(48.),
+                        },
+                        ..Default::default()
+                    },
+                    &[leaf],
+                )
+                .expect("create the flex parent");
+            tree.compute_layout_with_measure(
+                parent,
+                TaffySize::MAX_CONTENT,
+                |known, _, _, _, _| match (known.width, known.height) {
+                    (Some(width), Some(height)) => TaffySize { width, height },
+                    (Some(width), None) => TaffySize {
+                        width,
+                        height: width * 144. / 480.,
+                    },
+                    (None, Some(height)) => TaffySize {
+                        width: height * 480. / 144.,
+                        height,
+                    },
+                    (None, None) => TaffySize {
+                        width: 480.,
+                        height: 144.,
+                    },
+                },
+            )
+            .expect("compute the measured flex layout");
+            let actual = tree.layout(leaf).expect("read the measured leaf").size;
+            println!("aspect={aspect_ratio:?}: {actual:?}");
+            assert_eq!(
+                actual,
+                TaffySize {
+                    width: 240.,
+                    height: 48.
+                }
+            );
+        }
+    }
 
     #[test]
     fn border_widths_to_taffy_use_stroke_snapping() {

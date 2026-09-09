@@ -91,3 +91,12 @@
   never exercises punctuation at wrap boundaries. Add a narrow mixed-script
   specimen, verify the bundled fallback family directly, and inspect both
   themes. Keep existing exhibit states visible when adding the specimen.
+
+## 2026-09-09: prove final layout before changing a renderer
+
+- Test both sides of the source/container aspect ratio. A correct rounded
+  shader cannot show corners located beyond an oversized image's parent clip.
+- A measure callback's parameter names and an advisor's algorithm reading do
+  not prove its final-layout inputs. Compare block/flex/grid results with
+  explicit axes, auto axes, percentages, stretch and min/max constraints;
+  retain the failure that justifies any additional layout integration.

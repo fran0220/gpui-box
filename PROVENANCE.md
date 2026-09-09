@@ -749,3 +749,12 @@ lockfiles through cosmic-text. Wrapped truncation reuses the fragment wrapper.
 The fragment/object byte mapping and layout integration are original GPUI Box
 work, not a new upstream source import. The historical import receipt remains
 unchanged; both workspaces continue to resolve local GPUI Box packages.
+
+### Intrinsic image layout
+
+`Window::request_intrinsic_layout` and the local Taffy layout view are original
+GPUI Box integration over the existing Taffy 0.12.2 public tree/cache and
+container algorithm APIs. Intrinsic content dimensions are distinct from
+caller-authored aspect ratio. No dependency source is vendored or patched,
+and the frozen import receipt and both workspaces' package authority remain
+unchanged. Shader code and image atlas formats are unchanged.

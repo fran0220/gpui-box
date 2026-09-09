@@ -1,9 +1,9 @@
 use crate::{
-    AnyElement, AnyImageCache, App, Asset, AssetLogger, Bounds, DefiniteLength, Element, ElementId,
-    Entity, GlobalElementId, Hitbox, Image, ImageCache, InspectorElementId, InteractiveElement,
-    Interactivity, IntoElement, LayoutId, Length, ObjectFit, Pixels, RenderImage, Resource,
-    SharedString, SharedUri, StyleRefinement, Styled, Task, Window, decode_static_image,
-    decode_static_image_from_decoder, px,
+    AnyElement, AnyImageCache, App, Asset, AssetLogger, Bounds, Element, ElementId, Entity,
+    GlobalElementId, Hitbox, Image, ImageCache, InspectorElementId, InteractiveElement,
+    Interactivity, IntoElement, LayoutId, ObjectFit, Pixels, RenderImage, Resource, SharedString,
+    SharedUri, StyleRefinement, Styled, Task, Window, decode_static_image,
+    decode_static_image_from_decoder,
 };
 use anyhow::Result;
 
@@ -302,8 +302,9 @@ impl Element for Img {
                 inspector_id,
                 window,
                 cx,
-                |mut style, window, cx| {
+                |style, window, cx| {
                     let mut replacement_id = None;
+                    let mut intrinsic = None;
 
                     match self.source.use_data(
                         self.image_cache
@@ -345,36 +346,7 @@ impl Element for Img {
                                 frame_index = state.frame_index;
                             }
 
-                            let image_size = data.render_size(frame_index);
-                            style.aspect_ratio = Some(image_size.width / image_size.height);
-
-                            if let Length::Auto = style.size.width {
-                                style.size.width = match style.size.height {
-                                    Length::Definite(DefiniteLength::Absolute(abs_length)) => {
-                                        let height_px = abs_length.to_pixels(window.rem_size());
-                                        Length::Definite(
-                                            px(image_size.width.0 * height_px.0
-                                                / image_size.height.0)
-                                            .into(),
-                                        )
-                                    }
-                                    _ => Length::Definite(image_size.width.into()),
-                                };
-                            }
-
-                            if let Length::Auto = style.size.height {
-                                style.size.height = match style.size.width {
-                                    Length::Definite(DefiniteLength::Absolute(abs_length)) => {
-                                        let width_px = abs_length.to_pixels(window.rem_size());
-                                        Length::Definite(
-                                            px(image_size.height.0 * width_px.0
-                                                / image_size.width.0)
-                                            .into(),
-                                        )
-                                    }
-                                    _ => Length::Definite(image_size.height.into()),
-                                };
-                            }
+                            intrinsic = Some(data.render_size(frame_index));
 
                             if global_id.is_some()
                                 && data.frame_count() > 1
@@ -419,7 +391,11 @@ impl Element for Img {
                         }
                     }
 
-                    window.request_layout(style, replacement_id, cx)
+                    if let Some(intrinsic) = intrinsic {
+                        window.request_intrinsic_layout(style, intrinsic)
+                    } else {
+                        window.request_layout(style, replacement_id, cx)
+                    }
                 },
             );
 
@@ -998,6 +974,92 @@ mod tests {
         window.update(|window, _| {
             assert!(window.rendered_frame.scene.polychrome_sprites.is_empty());
         });
+    }
+
+    #[gpui::test]
+    fn image_intrinsic_measurement_matrix(cx: &mut TestAppContext) {
+        use crate::prelude::*;
+        let window = cx.add_empty_window();
+        let mut failures = Vec::new();
+        for (case, expected) in [
+            ("wide-full", (880., 220.)),
+            ("narrow-full", (480., 220.)),
+            ("row-stretch", (240., 48.)),
+            ("column-auto-height", (240., 72.)),
+            ("natural", (480., 144.)),
+            ("explicit-ratio", (240., 120.)),
+            ("percentage-width", (800., 240.)),
+            ("column-stretch", (800., 72.)),
+            ("block-auto-height", (240., 72.)),
+            ("max-auto-height", (240., 36.)),
+            ("block-auto-width", (240., 72.)),
+            ("max-width", (120., 36.)),
+            ("padding", (240., 86.)),
+            ("grid-full", (240., 48.)),
+            ("absolute-insets", (800., 48.)),
+            ("unresolved-height", (480., 144.)),
+        ] {
+            window.draw(point(px(0.), px(0.)), size(px(900.), px(500.)), |_, _| {
+                let image = img(ImageSource::Render(test_image_with_size(480, 144)))
+                    .object_fit(ObjectFit::Fill);
+                let parent = div().w(px(800.)).h(px(400.));
+                match case {
+                    "wide-full" => parent.w(px(880.)).h(px(220.)).child(image.size_full()),
+                    "narrow-full" => parent.w(px(480.)).h(px(220.)).child(image.size_full()),
+                    "row-stretch" => parent.flex().h(px(48.)).child(image.w(px(240.))),
+                    "column-auto-height" => parent
+                        .flex()
+                        .flex_col()
+                        .items_start()
+                        .child(image.w(px(240.))),
+                    "natural" => parent.child(image),
+                    "explicit-ratio" => parent.child(image.w(px(240.)).aspect_ratio(2.)),
+                    "percentage-width" => parent.child(image.w_full()),
+                    "column-stretch" => parent.flex().flex_col().child(image.h(px(72.))),
+                    "block-auto-height" => parent.child(image.w(px(240.))),
+                    "max-auto-height" => parent.child(image.w(px(240.)).max_h(px(36.))),
+                    "block-auto-width" => parent.child(image.h(px(72.))),
+                    "max-width" => parent.child(image.w(px(240.)).max_w(px(120.))),
+                    "padding" => parent.child(image.w(px(240.)).p(px(10.))),
+                    "grid-full" => parent
+                        .grid()
+                        .grid_cols(1)
+                        .w(px(240.))
+                        .h(px(48.))
+                        .child(image.size_full()),
+                    "absolute-insets" => parent
+                        .relative()
+                        .child(image.absolute().left_0().right_0().h(px(48.))),
+                    "unresolved-height" => parent.child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .items_start()
+                            .w_full()
+                            .child(image.h_full()),
+                    ),
+                    _ => unreachable!(),
+                }
+                .into_any_element()
+            });
+            let actual = window.update(|window, _| {
+                let sprite = window
+                    .rendered_frame
+                    .scene
+                    .polychrome_sprites
+                    .last()
+                    .expect("the loaded image paints a sprite");
+                (
+                    sprite.bounds.size.width.0 / window.scale_factor(),
+                    sprite.bounds.size.height.0 / window.scale_factor(),
+                )
+            });
+            println!("{case}: actual={actual:?}, expected={expected:?}");
+            if actual != expected {
+                failures.push((case, actual, expected));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:?}");
     }
 
     #[gpui::test]

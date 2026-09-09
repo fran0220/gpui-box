@@ -8,19 +8,15 @@ fact, a locale fact, a transport, or a platform chrome the OS already
 owns. `docs/components.md` describes the components themselves; this file
 exists so a gap is a recorded decision rather than an oversight.
 
-## Media-caption image sizing gap
+## Media-caption image sizing correction
 
-The `media-caption` exhibit currently records a known framework defect, not
-correct bottom-corner rendering. `Img::request_layout` applies the image's
-intrinsic aspect ratio even when both dimensions are constrained. For an
-880×220 logical card holding a 480×144 image, the image becomes 880×264;
-the parent's overflow clip cuts off the image's bottom rounded corners.
-This was reproduced on Metal; the narrower 480×220 fixture passes on both
-Metal and Linux WGPU. The Clear caption itself has the expected rounded
-shape. U1 is fixing the generic image sizing contract; Kit deliberately adds
-no mask or component-specific sizing workaround. The current Linux baseline
-records this known defect. Reinspect and accept both `media-caption` theme
-frames after the framework fix lands.
+The generic intrinsic leaf contract now keeps the `media-caption` image at
+its assigned 880×220 size instead of expanding it to 880×264 and clipping
+away the bottom corners. The 480×220 and 880×220 Metal pixel regression
+checks all four corners; Kit adds no mask or component-specific workaround.
+See “Intrinsic image sizing is separate from object fitting” below for the
+layout contract and the rejected alternatives. Linux's previously accepted
+defect frames must be revalidated on its real WGPU adapter after this change.
 
 A component counts as covered only when it has all four of: a public builder or
 view, a scene in `gpui_kit::scenes`, behaviour tests driven through simulated
@@ -1161,3 +1157,36 @@ for complex scripts, or a locale-tailored Japanese typography engine. The
 `markdown` exhibit includes a narrow mixed Chinese/Latin paragraph, rendered
 with the bundled Noto Sans SC fallback, to review punctuation and word wrapping
 in both themes without depending on system fonts.
+
+## Intrinsic image sizing is separate from object fitting
+
+The apparent missing image corner mask was a layout error shared by Metal and
+WGPU: a 480×144 image in an 880×220 `size_full` card acquired an 880×264
+layout box. Its lower rounded corners fell below the parent's rectangular
+clip. The atlas upload and shader coverage retained the correct radii.
+
+`Window::request_intrinsic_layout` supplies natural dimensions separately
+from authored styles. An Intrinsic node is a replaced leaf: its content has
+a natural size independent of text flow, currently an already-loaded `Img`.
+Loading/error image replacements remain ordinary elements; text and other
+arbitrary measure callbacks remain stock measured leaves. The GPUI layout
+view uses Taffy's existing container
+algorithms and cache, but resolves intrinsic leaves before the stock leaf's
+aspect-ratio height floor can overwrite a determined axis. Ordinary measured
+text still uses the stock leaf. There is one active result map, retained with
+the tree cache and cleared with it; no stock high-level layout call runs in
+parallel with this view. No renderer format or dependency authority changes.
+
+The sizing matrix exercises block, row/column flex, grid, absolute insets,
+resolved and unresolved percentages, explicit aspect ratio, natural sizes,
+padding and size constraints. A pure measure callback was insufficient in
+block final layout: width 240 with auto height became 240×144 instead of
+240×72. Injecting the natural ratio only for one auto axis fixed that case,
+but width 240 with max-height 36 became 120×36. Both are regression targets,
+not accepted approximations. A zero-size asset has no natural ratio.
+
+The cross-platform headless pixel regression uses 480×220 and 880×220 Cover
+cards with rounded images and a bottom Clear caption. It checks all four
+corners against the outside ground. `cinematic-effects` additionally reviews
+Contain: a 240×140 frame in a 372×154 slot remains centered at 264×154 rather
+than forcing the slot to the image's intrinsic ratio.
