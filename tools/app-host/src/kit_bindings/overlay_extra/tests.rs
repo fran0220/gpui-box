@@ -247,25 +247,6 @@ fn capacity_updates_preserve_notification_reads_and_toast_timers(cx: &mut TestAp
 
 #[gpui::test]
 fn palette_query_input_registers_the_actual_child_not_a_snapshot(cx: &mut TestAppContext) {
-    fn dispatch(
-        input: &Entity<TextInput>,
-        method: &str,
-        args: &Value,
-        query: bool,
-        _: &mut Window,
-        cx: &mut App,
-        _: &crate::references::Registration<'_>,
-    ) -> Result<Value> {
-        match (method, query) {
-            ("value", true) => Ok(json!(input.read(cx).value().as_ref())),
-            ("set_value", false) => {
-                ensure!(!input.read(cx).is_disabled(), "disabled input");
-                input.update(cx, |input, cx| input.set_value(s(args, "value"), cx));
-                Ok(Value::Null)
-            }
-            _ => bail!("test dispatcher only exercises value"),
-        }
-    }
     let descriptor = node("CommandPalette", json!({"query":"First"}));
     let source = descriptor.clone();
     let state = Rc::new(State::default());
@@ -278,7 +259,12 @@ fn palette_query_input_registers_the_actual_child_not_a_snapshot(cx: &mut TestAp
     h.update(|w, c| {
         let refs = registry.registration(&descriptor, owner);
         let reference = state
-            .query_input(&descriptor, c, &refs, dispatch)
+            .query_input(
+                &descriptor,
+                c,
+                &refs,
+                super::super::reference_dispatch::text_input,
+            )
             .expect("query real palette input");
         assert_eq!(
             registry
@@ -303,22 +289,60 @@ fn palette_query_input_registers_the_actual_child_not_a_snapshot(cx: &mut TestAp
                 .expect("palette reads child"),
             "Changed child"
         );
-        let palette = {
-            let entries = state.entries.borrow();
-            let Control::Palette(palette) = &entries
-                .get(&(0, "overlay".into()))
-                .expect("retained palette")
-                .control
-            else {
-                panic!()
-            };
-            palette.clone()
-        };
-        palette
-            .read(c)
-            .query_input()
-            .clone()
-            .update(c, |input, c| input.set_disabled(true, c));
+        assert!(
+            registry
+                .invoke(
+                    owner,
+                    &reference,
+                    "set_value",
+                    &json!({"value":"Invalid","extra":true}),
+                    false,
+                    w,
+                    c
+                )
+                .is_err()
+        );
+        assert!(
+            registry
+                .invoke(
+                    owner,
+                    &reference,
+                    "set_value",
+                    &json!({"value":"Wrong mode"}),
+                    true,
+                    w,
+                    c
+                )
+                .is_err()
+        );
+        let focus = registry
+            .invoke(owner, &reference, "focus_handle", &json!({}), true, w, c)
+            .expect("real child focus reference");
+        registry
+            .invoke(owner, &focus, "focus", &json!({}), false, w, c)
+            .expect("focus actual input");
+        assert_eq!(
+            registry
+                .invoke(owner, &focus, "is_focused", &json!({}), true, w, c)
+                .expect("input focused"),
+            true
+        );
+        registry
+            .invoke(
+                owner,
+                &reference,
+                "set_disabled",
+                &json!({"disabled":true}),
+                false,
+                w,
+                c,
+            )
+            .expect("disable via shared dispatcher");
+        assert!(
+            registry
+                .invoke(owner, &focus, "focus", &json!({}), false, w, c)
+                .is_err()
+        );
         assert!(
             registry
                 .invoke(

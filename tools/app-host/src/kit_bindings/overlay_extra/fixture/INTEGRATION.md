@@ -24,7 +24,8 @@ Tooltip. Popover/Dialog and shared DnD remain separately owned.
 - With the shared `references::Registration` scoped by the mounted node:
   route `focus_handle` and `set_focus_stops` through `invoke_reference`;
   route CommandPalette `query_input` through `query_input`, supplying the
-  input binding owner's fixed native TextInput `EntityDispatch`.
+  input binding owner's fixed native TextInput `EntityDispatch`:
+  `crate::kit_bindings::reference_dispatch::text_input`.
 - Call `apply_reference_props` after Drawer render on every frame, even when
   the option did not change. It revalidates both builder and imperative focus
   stops and removes invalid native stops rather than retaining old handles.
@@ -32,9 +33,11 @@ Tooltip. Popover/Dialog and shared DnD remain separately owned.
   reconciliation anchors. Never substitute a family-local reference registry.
 
 The temporary checkout hooks additionally declare the borrowed top-level
-`references` module. The reference tests use that owner's registry preview;
-production transport registration and the shared full TextInput dispatcher
-still require the runtime owner's final integration. The family schemas use
+`references` and `kit_bindings::reference_dispatch` modules. The reference tests
+use that owner's registry and real shared TextInput dispatcher, including closed
+arguments, wrong-mode refusal, nested focus registration, and native disabled
+checks. Production transport registration still requires the runtime owner's
+final integration. The family schemas use
 the agreed closed `$nativeRef`/literal `type` marker shape; strings alone grant
 no authority. The SDK currently expresses that wire shape structurally; a shared
 nominal TypeScript brand can replace it at the central generator boundary.
