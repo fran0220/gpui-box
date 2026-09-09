@@ -32,46 +32,146 @@ export const kitSchemas = Object.freeze({
   Dialog: { props: object({ title: string, description: string, confirmLabel: string, cancelLabel: string, destructive: boolean, dismissable: boolean }), events: { open: choice(null), close: choice(null), confirm: choice(null), cancel: choice(null), dismiss: choice(null) }, slots: ['content'] },
 });
 
+// Budgets count data edges separately from schema/ref/union work. A failed
+// oneOf branch consumes work too; exceeding either limit is never a mismatch.
+export const schemaLimits = Object.freeze({ dataDepth: 32, work: 100000, schemaNodes: 4096, schemaDepth: 128, validationStack: 256 });
+const definitionName = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+
+function schemaDocument(root) {
+  const plain = value => {
+    if (!value || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError('Expected plain schema object');
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string' || !Object.hasOwn(Object.getOwnPropertyDescriptor(value, key), 'value')) throw new TypeError('Schema accessors not permitted');
+    }
+  };
+  plain(root);
+  const defs = root.$defs === undefined ? {} : root.$defs;
+  plain(defs);
+  for (const name of Object.keys(defs)) if (!definitionName.test(name)) throw new TypeError('Invalid local definition name');
+  const nodes = new Set(), ancestors = new Set();
+  let count = 0;
+  const arrayValues = value => {
+    if (!Array.isArray(value) || value.length > schemaLimits.schemaNodes) throw new TypeError('Invalid schema array');
+    for (const key of Reflect.ownKeys(value)) {
+      if (key !== 'length' && (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key))) throw new TypeError('Invalid schema array field');
+    }
+    return Array.from({ length: value.length }, (_, index) => {
+      const item = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!item || !Object.hasOwn(item, 'value')) throw new TypeError('Schema accessors not permitted');
+      return item.value;
+    });
+  };
+  const visit = (schema, depth) => {
+    plain(schema);
+    if (depth > schemaLimits.schemaDepth) throw new TypeError('Schema depth exceeded');
+    if (ancestors.has(schema)) throw new TypeError('Cyclic schema object; use local refs');
+    ancestors.add(schema);
+    nodes.add(schema);
+    if (++count > schemaLimits.schemaNodes) throw new TypeError('Schema size exceeded');
+    if (schema !== root && Object.hasOwn(schema, '$defs')) throw new TypeError('Definitions must belong to document root');
+    if (Object.hasOwn(schema, '$ref')) {
+      if (typeof schema.$ref !== 'string' || !definitionName.test(schema.$ref) || !Object.hasOwn(defs, schema.$ref)) throw new TypeError('Unknown local schema ref');
+      if (Object.keys(schema).some(key => key !== '$ref' && key !== 'nullable' && !(schema === root && key === '$defs'))) throw new TypeError('Ref cannot have sibling constraints except nullable');
+    } else if (schema.oneOf !== undefined) {
+      if (!Array.isArray(schema.oneOf) || !schema.oneOf.length) throw new TypeError('Invalid oneOf schema');
+      for (const branch of arrayValues(schema.oneOf)) visit(branch, depth + 1);
+    } else if (schema.enum !== undefined) {
+      if (!arrayValues(schema.enum).every(value => value === null || ['string', 'boolean', 'number'].includes(typeof value))) throw new TypeError('Expected primitive enum choices');
+    } else if (schema.type === 'object') {
+      plain(schema.fields);
+      if (!arrayValues(schema.required).every(key => typeof key === 'string' && Object.hasOwn(schema.fields, key))) throw new TypeError('Invalid required fields');
+      for (const field of Object.values(schema.fields)) visit(field, depth + 1);
+    } else if (schema.type === 'array') {
+      if (!Number.isSafeInteger(schema.max) || schema.max < 0) throw new TypeError('Invalid array max');
+      visit(schema.items, depth + 1);
+    }
+    ancestors.delete(schema);
+  };
+  visit(root, 0);
+  for (const schema of Object.values(defs)) visit(schema, 0);
+  // Only refs and unions keep the same data value. Cycles along these edges
+  // can never make progress, even if another branch would otherwise match.
+  const active = new Set(), finished = new Set();
+  const progress = (schema, depth) => {
+    if (active.has(schema)) throw new TypeError('Non-progressing schema ref cycle');
+    if (finished.has(schema)) return;
+    if (depth > schemaLimits.schemaDepth) throw new TypeError('Schema ref depth exceeded');
+    active.add(schema);
+    if (schema.$ref !== undefined) progress(defs[schema.$ref], depth + 1);
+    else for (const branch of schema.oneOf ?? []) progress(branch, depth + 1);
+    active.delete(schema);
+    finished.add(schema);
+  };
+  for (const schema of nodes) progress(schema, 0);
+  return defs;
+}
+
+class SchemaLimitError extends TypeError {}
+
 export function validateValue(value, schema, path = 'value') {
+  const context = { defs: schemaDocument(schema), work: 0, stack: 0 };
+  validateData(value, schema, path, context, 0);
+}
+
+function validateData(value, schema, path, context, depth) {
+  if (depth > schemaLimits.dataDepth || ++context.work > schemaLimits.work || ++context.stack > schemaLimits.validationStack) throw new SchemaLimitError(`${path}: schema validation budget exceeded`);
+  try { return validateDataInner(value, schema, path, context, depth); }
+  finally { context.stack--; }
+}
+
+function validateDataInner(value, schema, path, context, depth) {
+  if (value === null && schema.nullable === true) return;
+  if (schema.$ref !== undefined) return validateData(value, context.defs[schema.$ref], path, context, depth);
   if (schema.oneOf !== undefined) {
     if (!Array.isArray(schema.oneOf) || !schema.oneOf.length) throw new TypeError(`${path}: invalid oneOf schema`);
     let matches = 0;
     for (const branch of schema.oneOf) {
-      try { validateValue(value, branch, path); matches++; } catch (error) {
-        if (!(error instanceof TypeError)) throw error;
+      try { validateData(value, branch, path, context, depth); matches++; } catch (error) {
+        if (!(error instanceof TypeError) || error instanceof SchemaLimitError) throw error;
       }
     }
     if (matches !== 1) throw new TypeError(`${path}: expected exactly one matching branch`);
     return;
   }
-  if (value === null && schema.nullable) return;
   if (schema.enum) {
     if (!schema.enum.includes(value)) throw new TypeError(`${path}: invalid choice`);
     return;
   }
   if (schema.type === 'array') {
     if (!Array.isArray(value) || value.length > schema.max) throw new TypeError(`${path}: invalid array`);
+    let itemSchema = schema.items;
+    while (itemSchema.$ref !== undefined) itemSchema = context.defs[itemSchema.$ref];
+    const ids = new Set();
     for (let i = 0; i < value.length; i++) {
       const item = Object.getOwnPropertyDescriptor(value, String(i));
       if (!item || !Object.hasOwn(item, 'value')) throw new TypeError(`${path}: sparse arrays and accessors not permitted`);
-      validateValue(item.value, schema.items, `${path}[${i}]`);
+      validateData(item.value, schema.items, `${path}[${i}]`, context, depth + 1);
+      if (itemSchema.fields?.id) {
+        const id = item.value && Object.getOwnPropertyDescriptor(item.value, 'id')?.value;
+        if (typeof id !== 'string' || ids.has(id)) throw new TypeError(`${path}: invalid or duplicate identity`);
+        ids.add(id);
+      }
     }
-    if (schema.items.fields?.id && new Set(value.map(item => item.id)).size !== value.length) throw new TypeError(`${path}: duplicate identity`);
     return;
   }
   if (schema.type === 'object') {
     if (!value || Object.getPrototypeOf(value) !== Object.prototype) throw new TypeError(`${path}: expected plain object`);
-    for (const key of Reflect.ownKeys(value)) {
+    const keys = Reflect.ownKeys(value);
+    if (keys.some(key => typeof key !== 'string')) throw new TypeError(`${path}: unknown symbol field`);
+    for (const key of keys.sort()) {
       if (typeof key !== 'string' || !Object.hasOwn(schema.fields, key)) throw new TypeError(`${path}: unknown field ${String(key)}`);
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!Object.hasOwn(descriptor, 'value')) throw new TypeError(`${path}.${key}: accessor not permitted`);
-      validateValue(descriptor.value, schema.fields[key], `${path}.${key}`);
+      validateData(descriptor.value, schema.fields[key], `${path}.${key}`, context, depth + 1);
     }
     for (const key of schema.required) if (!Object.hasOwn(value, key)) throw new TypeError(`${path}.${key}: required`);
     return;
   }
   if (typeof value !== schema.type) throw new TypeError(`${path}: expected ${schema.type}`);
-  if (schema.type === 'string' && (value.length > schema.max || value.length < (schema.min ?? 0))) throw new TypeError(`${path}: invalid string length`);
+  if (schema.type === 'string') {
+    if (!value.isWellFormed()) throw new TypeError(`${path}: invalid Unicode`);
+    if (value.length > schema.max || value.length < (schema.min ?? 0)) throw new TypeError(`${path}: invalid string length`);
+  }
   if (schema.type === 'number' && (!Number.isFinite(value) || value < schema.min || value > schema.max || (schema.integer && !Number.isSafeInteger(value)))) throw new TypeError(`${path}: invalid number`);
 }
 
@@ -175,23 +275,45 @@ export function validateInvocation(component, name, args, mode) {
 }
 
 /** Prints the shared data schema grammar for family props and method contracts. */
-export function schemaType(schema) {
-  if (schema.oneOf) return schema.oneOf.map(schemaType).join(' | ');
+export function schemaType(schema, definitionsName) {
+  const defs = schemaDocument(schema);
+  if (Object.keys(defs).length && (typeof definitionsName !== 'string' || !definitionName.test(definitionsName))) throw new TypeError('Named TypeScript definitions required');
+  return printSchemaType(schema, definitionsName);
+}
+
+/** Emits each local definition once; recursive references remain named types. */
+export function schemaDefinitions(schema, definitionsName) {
+  const defs = schemaDocument(schema);
+  if (!definitionName.test(definitionsName ?? '')) throw new TypeError('Invalid TypeScript definitions name');
+  return `export interface ${definitionsName} {\n${Object.entries(defs).map(([name, value]) => `  ${JSON.stringify(name)}: ${printSchemaType(value, definitionsName)};`).join('\n')}\n}`;
+}
+
+function printSchemaType(schema, definitionsName) {
   let result;
-  if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
-  else if (schema.type === 'array') result = `Array<${schemaType(schema.items)}>`;
+  if (schema.$ref !== undefined) result = `${definitionsName}[${JSON.stringify(schema.$ref)}]`;
+  else if (schema.oneOf) result = schema.oneOf.map(value => printSchemaType(value, definitionsName)).join(' | ');
+  else if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
+  else if (schema.type === 'array') result = `Array<${printSchemaType(schema.items, definitionsName)}>`;
   else if (schema.type === 'object') result = Object.keys(schema.fields).length
-    ? `{ ${Object.entries(schema.fields).map(([key, value]) => `${JSON.stringify(key)}${schema.required.includes(key) ? '' : '?'}: ${schemaType(value)}`).join('; ')} }`
+    ? `{ ${Object.entries(schema.fields).map(([key, value]) => `${JSON.stringify(key)}${schema.required.includes(key) ? '' : '?'}: ${printSchemaType(value, definitionsName)}`).join('; ')} }`
     : 'Record<string, never>';
   else result = schema.type;
-  return schema.nullable ? `${result} | null` : result;
+  return schema.nullable === true ? `${result} | null` : result;
 }
 
 /** Source-derived method contracts for kit-sdk.d.ts; no catalog-only methods. */
 export function generateKitMethodTypes(methods = kitMethods) {
-  const contracts = Object.entries(methods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${schemaType(schema.args)}; result: ${schemaType(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
+  const definitions = [];
+  const type = schema => {
+    if (!schema.$defs) return schemaType(schema);
+    const name = `KitMethodDefinitions${definitions.length}`;
+    definitions.push(schemaDefinitions(schema, name));
+    return schemaType(schema, name);
+  };
+  const contracts = Object.entries(methods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${type(schema.args)}; result: ${type(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
   return [
     '// Generated from kitMethods by generateKitMethodTypes.',
+    ...definitions,
     `export interface KitMethodContracts {\n${contracts}\n}`,
     'type MethodArguments<S> = S extends { args: infer A } ? {} extends A ? [args?: A] : [args: A] : never;',
     'type MethodResult<S> = S extends { result: infer R } ? R : never;',

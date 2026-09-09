@@ -84,3 +84,35 @@ target/debug/gpui-box-app-host tools/app-host/runner.mjs \
 This requires the runtime owner's untrusted Linux sandbox dependencies, and
 does not authorize a fallback to trusted execution. An offscreen frame is not
 evidence that the live Xvfb window works.
+
+## Local recursive schema documents
+
+Each props, event, predicate, method-args, or method-result schema is its own
+document. Only that document's root may declare `$defs: {Name: schema}`.
+`{$ref: 'Name'}` resolves an exact local name matching
+`[A-Za-z_][A-Za-z0-9_]{0,63}`. No URI, JSON pointer, file, network lookup, nested
+definition scope, or sibling ref constraint other than `nullable` is supported.
+`nullable: true` accepts null before data dispatch, including refs and unions;
+document validation still rejects unknown refs and non-progressing cycles.
+
+Definitions are serialized once and references remain references in the native
+JSON catalog. Do not unfold them to a fixed-depth approximation. Unknown refs
+and cycles made only of refs/union branches fail document validation, including
+unused definitions. Recursion is valid only after an object field or array item
+advances to a child data value. Except for the explicit nullable override,
+`oneOf` still requires exactly one matching branch; it is not a first-match union.
+
+JS/native validators enforce root data depth 0 through 32 inclusive, 100,000
+validation steps shared by all branches (including failed branches and refs),
+and a 256-call validation stack limit. Documents allow 4,096 schema nodes and
+128 nested schema/ref edges. Budget exhaustion aborts validation; another union
+branch cannot turn it into a success. Existing host payload/descriptor limits
+remain independent. JS reads data descriptors without executing accessors.
+
+For generated TypeScript, emit `schemaDefinitions(document, 'FamilyDefs')`
+once, then `schemaType(document, 'FamilyDefs')` for its root type. Recursive
+members use `FamilyDefs['Name']`, retaining linear declaration size. Plain
+schemas still use `schemaType(schema)`; `generateKitMethodTypes` emits named
+definitions automatically when args/results need them. TypeScript describes
+the structural union; exact-one overlap, depth and budgets remain runtime
+checks. Family relational/topology validation runs after structural validation.

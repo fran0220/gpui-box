@@ -12,20 +12,213 @@ static METHODS: LazyLock<Value> = LazyLock::new(|| {
     serde_json::from_str(include_str!("methods.json")).expect("generated Kit method schemas")
 });
 
+const DATA_DEPTH: usize = 32;
+const WORK_LIMIT: usize = 100_000;
+const SCHEMA_NODES: usize = 4096;
+const SCHEMA_DEPTH: usize = 128;
+const VALIDATION_STACK: usize = 256;
+
+fn definition_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name.bytes().enumerate().all(|(index, byte)| {
+            byte == b'_' || byte.is_ascii_alphabetic() || (index > 0 && byte.is_ascii_digit())
+        })
+}
+
+fn schema_document(root: &Value) -> Result<()> {
+    ensure!(root.is_object(), "expected schema object");
+    if let Some(defs) = root.get("$defs") {
+        let defs = defs
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("expected definitions object"))?;
+        ensure!(
+            defs.keys().all(|key| definition_name(key)),
+            "invalid definition name"
+        );
+    }
+    fn visit<'a>(
+        root: &'a Value,
+        schema: &'a Value,
+        depth: usize,
+        nodes: &mut Vec<&'a Value>,
+    ) -> Result<()> {
+        ensure!(depth <= SCHEMA_DEPTH, "schema depth exceeded");
+        ensure!(nodes.len() < SCHEMA_NODES, "schema size exceeded");
+        let object = schema
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("expected schema object"))?;
+        nodes.push(schema);
+        ensure!(
+            std::ptr::eq(root, schema) || !object.contains_key("$defs"),
+            "definitions must belong to document root"
+        );
+        if let Some(reference) = schema.get("$ref") {
+            let name = reference
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("invalid local ref"))?;
+            ensure!(
+                definition_name(name) && root["$defs"].get(name).is_some(),
+                "unknown local schema ref"
+            );
+            ensure!(
+                object.keys().all(|key| key == "$ref"
+                    || key == "nullable"
+                    || (std::ptr::eq(root, schema) && key == "$defs")),
+                "ref cannot have sibling constraints except nullable"
+            );
+        } else if let Some(branches) = schema.get("oneOf") {
+            let branches = branches
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("invalid oneOf schema"))?;
+            ensure!(!branches.is_empty(), "invalid oneOf schema");
+            for branch in branches {
+                visit(root, branch, depth + 1, nodes)?;
+            }
+        } else if let Some(choices) = schema.get("enum") {
+            let choices = choices
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("invalid schema enum"))?;
+            ensure!(
+                choices.len() <= SCHEMA_NODES
+                    && choices
+                        .iter()
+                        .all(|value| !value.is_array() && !value.is_object()),
+                "expected primitive enum choices"
+            );
+        } else if schema["type"] == "object" {
+            let fields = schema["fields"]
+                .as_object()
+                .ok_or_else(|| anyhow::anyhow!("invalid schema fields"))?;
+            let required = schema["required"]
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("invalid required fields"))?;
+            ensure!(
+                required.len() <= SCHEMA_NODES
+                    && required
+                        .iter()
+                        .all(|key| key.as_str().is_some_and(|key| fields.contains_key(key))),
+                "invalid required fields"
+            );
+            for field in fields.values() {
+                visit(root, field, depth + 1, nodes)?;
+            }
+        } else if schema["type"] == "array" {
+            ensure!(
+                schema["max"]
+                    .as_u64()
+                    .is_some_and(|max| max <= 9_007_199_254_740_991),
+                "invalid array max"
+            );
+            visit(root, &schema["items"], depth + 1, nodes)?;
+        }
+        Ok(())
+    }
+    fn progress(
+        root: &Value,
+        schema: &Value,
+        depth: usize,
+        active: &mut HashSet<*const Value>,
+        finished: &mut HashSet<*const Value>,
+    ) -> Result<()> {
+        let pointer = schema as *const Value;
+        ensure!(
+            !active.contains(&pointer),
+            "non-progressing schema ref cycle"
+        );
+        if finished.contains(&pointer) {
+            return Ok(());
+        }
+        ensure!(depth <= SCHEMA_DEPTH, "schema ref depth exceeded");
+        active.insert(pointer);
+        if let Some(name) = schema["$ref"].as_str() {
+            progress(root, &root["$defs"][name], depth + 1, active, finished)?;
+        } else if let Some(branches) = schema["oneOf"].as_array() {
+            for branch in branches {
+                progress(root, branch, depth + 1, active, finished)?;
+            }
+        }
+        active.remove(&pointer);
+        finished.insert(pointer);
+        Ok(())
+    }
+    let mut nodes = Vec::new();
+    visit(root, root, 0, &mut nodes)?;
+    if let Some(defs) = root["$defs"].as_object() {
+        for schema in defs.values() {
+            visit(root, schema, 0, &mut nodes)?;
+        }
+    }
+    let mut active = HashSet::new();
+    let mut finished = HashSet::new();
+    for schema in nodes {
+        progress(root, schema, 0, &mut active, &mut finished)?;
+    }
+    Ok(())
+}
+
+struct Validation<'a> {
+    document: &'a Value,
+    work: usize,
+    stack: usize,
+    exhausted: bool,
+}
+
 pub(super) fn validate(value: &Value, schema: &Value) -> Result<()> {
+    schema_document(schema)?;
+    validate_data(
+        value,
+        schema,
+        &mut Validation {
+            document: schema,
+            work: 0,
+            stack: 0,
+            exhausted: false,
+        },
+        0,
+    )
+}
+
+fn validate_data(
+    value: &Value,
+    schema: &Value,
+    context: &mut Validation<'_>,
+    depth: usize,
+) -> Result<()> {
+    context.work += 1;
+    context.stack += 1;
+    if depth > DATA_DEPTH || context.work > WORK_LIMIT || context.stack > VALIDATION_STACK {
+        context.exhausted = true;
+        bail!("schema validation budget exceeded");
+    }
+    let result = validate_data_inner(value, schema, context, depth);
+    context.stack -= 1;
+    result
+}
+
+fn validate_data_inner(
+    value: &Value,
+    schema: &Value,
+    context: &mut Validation<'_>,
+    depth: usize,
+) -> Result<()> {
+    if value.is_null() && schema["nullable"] == true {
+        return Ok(());
+    }
+    if let Some(name) = schema["$ref"].as_str() {
+        return validate_data(value, &context.document["$defs"][name], context, depth);
+    }
     if let Some(branches) = schema.get("oneOf") {
         let branches = branches
             .as_array()
             .ok_or_else(|| anyhow::anyhow!("invalid oneOf schema"))?;
         ensure!(!branches.is_empty(), "invalid oneOf schema");
-        let matches = branches
-            .iter()
-            .filter(|branch| validate(value, branch).is_ok())
-            .count();
+        let mut matches = 0;
+        for branch in branches {
+            matches += usize::from(validate_data(value, branch, context, depth).is_ok());
+            ensure!(!context.exhausted, "schema validation budget exceeded");
+        }
         ensure!(matches == 1, "expected exactly one matching branch");
-        return Ok(());
-    }
-    if value.is_null() && schema["nullable"] == true {
         return Ok(());
     }
     if let Some(choices) = schema["enum"].as_array() {
@@ -66,11 +259,13 @@ pub(super) fn validate(value: &Value, schema: &Value) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("expected object"))?;
             let fields = schema["fields"].as_object().expect("schema fields");
             for (key, value) in object {
-                validate(
+                validate_data(
                     value,
                     fields
                         .get(key)
                         .ok_or_else(|| anyhow::anyhow!("unknown property: {key}"))?,
+                    context,
+                    depth + 1,
                 )?;
             }
             for key in schema["required"].as_array().expect("required fields") {
@@ -89,13 +284,17 @@ pub(super) fn validate(value: &Value, schema: &Value) -> Result<()> {
                 "array exceeds limits"
             );
             let mut ids = HashSet::new();
+            let mut item_schema = &schema["items"];
+            while let Some(name) = item_schema["$ref"].as_str() {
+                item_schema = &context.document["$defs"][name];
+            }
             for item in items {
-                validate(item, &schema["items"])?;
-                if schema["items"]["fields"].get("id").is_some() {
-                    ensure!(
-                        ids.insert(item["id"].as_str().expect("validated identity")),
-                        "duplicate item identity"
-                    );
+                validate_data(item, &schema["items"], context, depth + 1)?;
+                if item_schema["fields"].get("id").is_some() {
+                    let id = item["id"]
+                        .as_str()
+                        .ok_or_else(|| anyhow::anyhow!("invalid item identity"))?;
+                    ensure!(ids.insert(id), "duplicate item identity");
                 }
             }
         }
@@ -222,6 +421,45 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn local_refs_and_budgets_match_js_cases() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../../js-runtime/tests/schema-fixtures.json"
+        ))
+        .expect("schema parity fixtures");
+        for fixture in fixtures["references"]
+            .as_array()
+            .expect("reference fixtures")
+        {
+            for case in fixture["cases"].as_array().expect("reference cases") {
+                assert_eq!(
+                    validate(&case[0], &fixture["schema"]).is_ok(),
+                    case[1].as_bool().expect("verdict"),
+                    "{}: {}",
+                    fixture["name"],
+                    case[0]
+                );
+            }
+        }
+        for schema in fixtures["invalidReferences"]
+            .as_array()
+            .expect("invalid references")
+        {
+            assert!(validate(&Value::Null, schema).is_err(), "{schema}");
+        }
+        let mut value = Value::Null;
+        for _ in 0..32 {
+            value = json!({"next": value});
+        }
+        assert!(validate(&value, &fixtures["depthSchema"]).is_ok());
+        assert!(validate(&json!({"next": value}), &fixtures["depthSchema"]).is_err());
+        // Root = 1; each item = union + ref + boolean + failed null branch.
+        assert!(validate(&json!(vec![true; 24_999]), &fixtures["workSchema"]).is_ok());
+        let error = validate(&json!(vec![true; 25_000]), &fixtures["workSchema"])
+            .expect_err("aggregate budget");
+        assert!(error.to_string().contains("budget"));
+    }
 
     #[test]
     fn schema_primitives_match_shared_js_cases() {

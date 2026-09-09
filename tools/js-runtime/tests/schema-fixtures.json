@@ -47,6 +47,72 @@
       "cases": [[null, false], [true, false]]
     }
   ],
+  "references": [
+    {
+      "name": "recursive tagged tree",
+      "schema": {
+        "$defs": {
+          "Node": {
+            "oneOf": [
+              { "type": "object", "fields": { "kind": { "enum": ["leaf"] }, "text": { "type": "string", "max": 40 } }, "required": ["kind", "text"] },
+              { "type": "object", "fields": { "kind": { "enum": ["branch"] }, "children": { "type": "array", "max": 1024, "items": { "$ref": "Node" } } }, "required": ["kind", "children"] }
+            ]
+          }
+        },
+        "type": "object", "fields": { "value": { "$ref": "Node" } }, "required": ["value"]
+      },
+      "cases": [
+        [{ "value": { "kind": "branch", "children": [{ "kind": "leaf", "text": "Alpha" }, { "kind": "branch", "children": [] }] } }, true],
+        [{ "value": { "kind": "branch", "children": [{ "kind": "wrong", "text": "Alpha" }] } }, false],
+        [{ "value": { "kind": "leaf", "children": [] } }, false],
+        [{ "value": null }, false]
+      ]
+    },
+    {
+      "name": "nullable definition and mutual progress",
+      "schema": { "$defs": { "A": { "type": "object", "nullable": true, "fields": { "next": { "$ref": "B" } }, "required": ["next"] }, "B": { "type": "array", "max": 2, "items": { "$ref": "A" } } }, "$ref": "A" },
+      "cases": [[null, true], [{ "next": [null, { "next": [] }] }, true], [{ "next": [false] }, false]]
+    },
+    {
+      "name": "overlap through reference",
+      "schema": { "$defs": { "Number": { "type": "number", "min": 0, "max": 10 } }, "oneOf": [{ "$ref": "Number" }, { "type": "number", "min": 5, "max": 15 }] },
+      "cases": [[4, true], [5, false], [11, true]]
+    },
+    {
+      "name": "referenced item identities stay unique",
+      "schema": { "$defs": { "Row": { "type": "object", "fields": { "id": { "type": "string", "min": 1, "max": 20 } }, "required": ["id"] } }, "type": "array", "max": 4, "items": { "$ref": "Row" } },
+      "cases": [[[ { "id": "alpha" }, { "id": "beta" } ], true], [[ { "id": "alpha" }, { "id": "alpha" } ], false], [[{}], false]]
+    },
+    {
+      "name": "nullable union accepts cleared result without weakening overlap",
+      "schema": { "nullable": true, "oneOf": [{ "type": "number", "min": 0, "max": 10 }, { "type": "number", "min": 5, "max": 15 }] },
+      "cases": [[null, true], [4, true], [5, false], [11, true], [false, false]]
+    },
+    {
+      "name": "nullable local reference",
+      "schema": { "$defs": { "Flag": { "type": "boolean" } }, "$ref": "Flag", "nullable": true },
+      "cases": [[null, true], [false, true], ["false", false]]
+    }
+  ],
+  "invalidReferences": [
+    { "$ref": "Missing" },
+    { "$defs": { "A": { "$ref": "A" } }, "$ref": "A" },
+    { "$defs": { "A": { "$ref": "B" }, "B": { "oneOf": [{ "enum": [null] }, { "$ref": "A" }] } }, "$ref": "A" },
+    { "$defs": { "Unused": { "$ref": "Unknown" } }, "enum": [null] },
+    { "$defs": { "A": { "enum": [null] } }, "$ref": "https://example.com/A" },
+    { "$defs": { "A": { "enum": [null] } }, "$ref": "#/A" },
+    { "$defs": { "A": { "enum": [null] } }, "$ref": "../A" },
+    { "$defs": { "A": { "enum": [null] } }, "$ref": "A", "type": "string" },
+    { "$ref": "Missing", "nullable": true },
+    { "type": "object", "fields": { "child": { "$defs": { "A": { "enum": [null] } }, "$ref": "A" } }, "required": [] }
+  ],
+  "depthSchema": {
+    "$defs": { "Link": { "type": "object", "nullable": true, "fields": { "next": { "$ref": "Link" } }, "required": ["next"] } }, "$ref": "Link"
+  },
+  "workSchema": {
+    "$defs": { "Boolean": { "type": "boolean" } },
+    "type": "array", "max": 100000, "items": { "oneOf": [{ "$ref": "Boolean" }, { "enum": [null] }] }
+  },
   "slots": [
     {
       "schema": { "slotIds": "nodes", "slotSuffixes": ["content", "thumbnail"], "slots": ["toolbar"] },
