@@ -1223,7 +1223,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4522
+      "symbolCount": 4547
     },
     {
       "name": "gpui-box-kit-assets",
@@ -59281,6 +59281,21 @@
       "target": "Cascader"
     },
     {
+      "id": "gpui_kit::controls::cascader::Cascader::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::cascader",
+      "path": "gpui_kit::controls::cascader",
+      "source": "crates/gpui-kit/src/controls/cascader.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "Cascader"
+    },
+    {
       "id": "gpui_kit::controls::cascader::Cascader::is_open",
       "name": "is_open",
       "kind": "method",
@@ -59412,6 +59427,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn selected_id (& self) -> Option<& SharedString>",
+      "cfg": [],
+      "target": "Cascader"
+    },
+    {
+      "id": "gpui_kit::controls::cascader::Cascader::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::cascader",
+      "path": "gpui_kit::controls::cascader",
+      "source": "crates/gpui-kit/src/controls/cascader.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Cascader"
     },
@@ -59831,6 +59861,21 @@
       "target": "Combobox"
     },
     {
+      "id": "gpui_kit::controls::combobox::Combobox::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::combobox",
+      "path": "gpui_kit::controls::combobox",
+      "source": "crates/gpui-kit/src/controls/combobox.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "Combobox"
+    },
+    {
       "id": "gpui_kit::controls::combobox::Combobox::is_open",
       "name": "is_open",
       "kind": "method",
@@ -59996,6 +60041,36 @@
       "target": "Combobox"
     },
     {
+      "id": "gpui_kit::controls::combobox::Combobox::set_allow_custom",
+      "name": "set_allow_custom",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::combobox",
+      "path": "gpui_kit::controls::combobox",
+      "source": "crates/gpui-kit/src/controls/combobox.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_allow_custom (& mut self, allow : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Combobox"
+    },
+    {
+      "id": "gpui_kit::controls::combobox::Combobox::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::combobox",
+      "path": "gpui_kit::controls::combobox",
+      "source": "crates/gpui-kit/src/controls/combobox.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Combobox"
+    },
+    {
       "id": "gpui_kit::controls::combobox::Combobox::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -60052,6 +60127,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_options (& mut self, options : Vec<SelectOption>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Combobox"
+    },
+    {
+      "id": "gpui_kit::controls::combobox::Combobox::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::combobox",
+      "path": "gpui_kit::controls::combobox",
+      "source": "crates/gpui-kit/src/controls/combobox.rs",
+      "summary": "Restore the localized default with `None`, retaining the query editor.",
+      "documentation": "Restore the localized default with `None`, retaining the query editor.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Combobox"
     },
@@ -64175,6 +64265,21 @@
       "target": "MultiSelect"
     },
     {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
       "id": "gpui_kit::controls::multi_select::MultiSelect::is_open",
       "name": "is_open",
       "kind": "method",
@@ -64265,6 +64370,21 @@
       "target": "MultiSelect"
     },
     {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::query_input",
+      "name": "query_input",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn query_input (& self) -> & Entity<TextInput>",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
       "id": "gpui_kit::controls::multi_select::MultiSelect::selected",
       "name": "selected",
       "kind": "method",
@@ -64295,6 +64415,81 @@
       "target": "MultiSelect"
     },
     {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_clearable",
+      "name": "set_clearable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_clearable (& mut self, clearable : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_disabled",
+      "name": "set_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_invalid",
+      "name": "set_invalid",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_name",
+      "name": "set_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_name (& mut self, name : SharedString, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
       "id": "gpui_kit::controls::multi_select::MultiSelect::set_options",
       "name": "set_options",
       "kind": "method",
@@ -64306,6 +64501,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_options (& mut self, options : Vec<SelectOption>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "MultiSelect"
+    },
+    {
+      "id": "gpui_kit::controls::multi_select::MultiSelect::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::multi_select",
+      "path": "gpui_kit::controls::multi_select",
+      "source": "crates/gpui-kit/src/controls/multi_select.rs",
+      "summary": "`None` restores the localized selection placeholder without resetting text.",
+      "documentation": "`None` restores the localized selection placeholder without resetting text.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "MultiSelect"
     },
@@ -65488,6 +65698,21 @@
       "target": "FindReplace"
     },
     {
+      "id": "gpui_kit::controls::search::FindReplace::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "FindReplace"
+    },
+    {
       "id": "gpui_kit::controls::search::FindReplace::new",
       "name": "new",
       "kind": "method",
@@ -65544,6 +65769,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn search_field (& self) -> & Entity<SearchField>",
+      "cfg": [],
+      "target": "FindReplace"
+    },
+    {
+      "id": "gpui_kit::controls::search::FindReplace::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Updates the outer action sizing without replacing either input.",
+      "documentation": "Updates the outer action sizing without replacing either input.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "FindReplace"
     },
@@ -65680,6 +65920,21 @@
       "target": "SearchField"
     },
     {
+      "id": "gpui_kit::controls::search::SearchField::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "SearchField"
+    },
+    {
       "id": "gpui_kit::controls::search::SearchField::match_case",
       "name": "match_case",
       "kind": "method",
@@ -65755,6 +66010,21 @@
       "target": "SearchField"
     },
     {
+      "id": "gpui_kit::controls::search::SearchField::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchField"
+    },
+    {
       "id": "gpui_kit::controls::search::SearchField::set_count",
       "name": "set_count",
       "kind": "method",
@@ -65796,6 +66066,21 @@
       "summary": "The count the host established. The field counts nothing itself. Offers the match-case toggle, or withdraws it, after construction. The state stays the host's; the field only draws it.",
       "documentation": "The count the host established. The field counts nothing itself.\nOffers the match-case toggle, or withdraws it, after construction.\nThe state stays the host's; the field only draws it.",
       "signature": "pub fn set_match_case (& mut self, on : Option<bool>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "SearchField"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchField::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Restores the localized query label when absent, preserving the editor.",
+      "documentation": "Restores the localized query label when absent, preserving the editor.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "SearchField"
     },
@@ -67735,6 +68020,21 @@
       "target": "TagInput"
     },
     {
+      "id": "gpui_kit::controls::tag_input::TagInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
       "id": "gpui_kit::controls::tag_input::TagInput::max",
       "name": "max",
       "kind": "method",
@@ -67810,6 +68110,36 @@
       "target": "TagInput"
     },
     {
+      "id": "gpui_kit::controls::tag_input::TagInput::set_collapse_at",
+      "name": "set_collapse_at",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_collapse_at (& mut self, visible : Option<usize>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
+      "id": "gpui_kit::controls::tag_input::TagInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
       "id": "gpui_kit::controls::tag_input::TagInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -67836,6 +68166,51 @@
       "summary": "Draws the control as refused after it was built, for an owner that learns the answer is wrong later — a host that rejected it, or a form that found a required answer missing. Without it the message and the control it is about disagree.",
       "documentation": "Draws the control as refused after it was built, for an owner that\nlearns the answer is wrong later — a host that rejected it, or a form\nthat found a required answer missing. Without it the message and the\ncontrol it is about disagree.",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
+      "id": "gpui_kit::controls::tag_input::TagInput::set_max",
+      "name": "set_max",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "Change future acceptance; never truncate existing caller-owned tags.",
+      "documentation": "Change future acceptance; never truncate existing caller-owned tags.",
+      "signature": "pub fn set_max (& mut self, max : Option<usize>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
+      "id": "gpui_kit::controls::tag_input::TagInput::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "Restore the localized default without replacing the draft editor.",
+      "documentation": "Restore the localized default without replacing the draft editor.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TagInput"
+    },
+    {
+      "id": "gpui_kit::controls::tag_input::TagInput::set_reorderable",
+      "name": "set_reorderable",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::tag_input",
+      "path": "gpui_kit::controls::tag_input",
+      "source": "crates/gpui-kit/src/controls/tag_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_reorderable (& mut self, reorderable : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TagInput"
     },
@@ -126810,11 +127185,13 @@
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(cx: &mut Context<Self>)"
       ],
       "queries": [
         "selected_id() -> Option<&SharedString>",
+        "is_disabled() -> bool",
         "is_open() -> bool",
         "open_path() -> &[SharedString]"
       ],
@@ -127056,6 +127433,9 @@
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_allow_custom(allow: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "open(cx: &mut Context<Self>)",
         "toggle(window: &mut Window, cx: &mut Context<Self>)"
@@ -127065,7 +127445,8 @@
         "selected_option() -> Option<&SelectOption>",
         "is_open() -> bool",
         "query_text(cx: &App) -> SharedString",
-        "query_input() -> &Entity<TextInput>"
+        "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool"
       ],
       "slots": [
         "empty"
@@ -127913,13 +128294,15 @@
       "options": [],
       "commands": [
         "set_count(count: HitCount, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "search_field() -> &Entity<SearchField>",
         "replacement_input() -> &Entity<TextInput>",
         "count(cx: &App) -> HitCount",
-        "replacement_text(cx: &App) -> SharedString"
+        "replacement_text(cx: &App) -> SharedString",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -128989,10 +129372,18 @@
       "commands": [
         "set_selected(selected: impl IntoIterator<Item = impl Into<SharedString>>, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_name(name: SharedString, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_clearable(clearable: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)"
       ],
       "queries": [
         "selected_ids() -> &[SharedString]",
+        "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool",
         "is_open() -> bool"
       ],
       "slots": [],
@@ -130179,6 +130570,8 @@
         "set_match_case(on: Option<bool>, cx: &mut Context<Self>)",
         "set_whole_word(on: Option<bool>, cx: &mut Context<Self>)",
         "set_count(count: HitCount, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
@@ -130186,6 +130579,7 @@
         "count() -> &HitCount",
         "query_text(cx: &App) -> SharedString",
         "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool",
         "focus(window: &mut Window, cx: &mut Context<Self>)"
       ],
       "slots": [],
@@ -130998,10 +131392,16 @@
       "commands": [
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_tags(tags: Vec<SharedString>, cx: &mut Context<Self>)",
-        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_max(max: Option<usize>, cx: &mut Context<Self>)",
+        "set_reorderable(reorderable: bool, cx: &mut Context<Self>)",
+        "set_collapse_at(visible: Option<usize>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)"
       ],
       "queries": [
         "current() -> &[SharedString]",
+        "is_disabled() -> bool",
         "field() -> &Entity<TextInput>",
         "targeted() -> Option<&SharedString>",
         "refusal() -> Option<&SharedString>"

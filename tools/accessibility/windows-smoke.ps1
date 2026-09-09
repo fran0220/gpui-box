@@ -39,7 +39,7 @@ function Find-All {
         )
     )
     return @(
-        [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+        $script:TargetRoot.FindAll(
             [System.Windows.Automation.TreeScope]::Descendants,
             $condition
         )
@@ -158,6 +158,18 @@ function Activate-Target {
 [Console]::Error.WriteLine("UIA ${Mode}: activating target process $TargetProcessId")
 Activate-Target
 [Console]::Error.WriteLine("UIA ${Mode}: target activated")
+# A PID predicate filters results, not traversal: searching desktop descendants
+# still enters unrelated providers. Start at the same HWND we activated.
+[Console]::Error.WriteLine("UIA ${Mode}: acquiring target window provider")
+$targetHwnd = [GpuiBox.Accessibility.NativeWindow]::TopLevelWindow($TargetProcessId)
+if ($targetHwnd -eq [IntPtr]::Zero) {
+    throw "target window disappeared after activation"
+}
+$script:TargetRoot = [System.Windows.Automation.AutomationElement]::FromHandle($targetHwnd)
+if ($script:TargetRoot.Current.ProcessId -ne $TargetProcessId) {
+    throw "target window provider belongs to a different process"
+}
+[Console]::Error.WriteLine("UIA ${Mode}: target window provider acquired")
 
 switch ($Mode) {
     "editable" {
@@ -254,7 +266,7 @@ switch ($Mode) {
                         [System.Windows.Automation.ControlType]::MenuItem
                     )
                 )
-                foreach ($item in @([System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+                foreach ($item in @($script:TargetRoot.FindAll(
                     [System.Windows.Automation.TreeScope]::Descendants,
                     $condition
                 ))) {
@@ -264,12 +276,13 @@ switch ($Mode) {
             }
             Start-Sleep -Milliseconds 100
         }
-        [Console]::Error.WriteLine("UIA menu: focus agreed; acquiring Copy link InvokePattern")
+        [Console]::Error.WriteLine("UIA menu: focus agreed; finding Copy link")
         $copyLink = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::MenuItem) -Name "Copy link"
+        [Console]::Error.WriteLine("UIA menu: Copy link found; acquiring InvokePattern")
         $invoke = [System.Windows.Automation.InvokePattern](
             Pattern -Element $copyLink -Pattern ([System.Windows.Automation.InvokePattern]::Pattern)
         )
-        [Console]::Error.WriteLine("UIA menu: invoking Copy link")
+        [Console]::Error.WriteLine("UIA menu: InvokePattern acquired; invoking Copy link")
         $invoke.Invoke()
         [Console]::Error.WriteLine("UIA menu: invoke returned; waiting for Run actions dismissal")
         Wait-Until -Failure "Run actions UIA Menu remained after invoking Copy link" -Predicate {

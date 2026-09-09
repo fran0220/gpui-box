@@ -26,7 +26,7 @@ test('central contracts preserve every frozen family member, method and register
     }
   }
   assert.equal(names.size, 126);
-  assert.equal(Object.keys(kitSchemas).length, 188);
+  assert.equal(Object.keys(kitSchemas).length, 194);
   assert.equal(bindings.CinematicEffect.status, 'fallback-only');
   assert.equal(bindings.Drawer.referenceIntegration, 'registered');
   assert.ok(bindings.AgentRoster.props.includes('agents'));

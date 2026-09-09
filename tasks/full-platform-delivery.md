@@ -395,3 +395,37 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   from 171,817,986 to 126,832,351, but the first cold draw increases. Warm
   static bytes remain 1,841,017; metadata indexes still scale with source.
   Full native Value/AXValue and folded source remain; total work is not bounded.
+
+### Eighth-stage packaged resources and retained input verification
+
+- Seventh-stage source `8c7c58bf8de41b52403d8aeda22baa9b4aab7f3d` was pushed
+  and deployed; both domains verified 8,355 symbols and the same complete
+  component/scene/tool identities. The next stage registers SearchField,
+  FindReplace, Combobox, MultiSelect, TagInput and Cascader, including actual
+  nested reference contracts, for 194 partial adapters.
+- CLI-built asset receipts activate only after mounted permission consent and
+  native registration acknowledgements. Explicit packaged-runner/isolated-worker
+  E2E passed: deleting the raw asset after build still renders receipt pixels;
+  deny registers nothing; revoke removes pixels; retry registers again; corrupt
+  receipt reload retains the verified old image; successful reload requires new
+  consent. Ready and revoked captures were inspected. The packaged host payload
+  in this test is the test executable, not a signed installer or native OS
+  package-execution claim. Resource fixtures now select the actual native
+  sandbox backend instead of hardcoding Linux.
+- Actual native button checks passed the three retained editor draft queries,
+  FindReplace → SearchField → TextInput query, and Cascader open/query. Their
+  affected rendered states were inspected, including the localized MultiSelect
+  no-match popup and all six Cascader branch rows. The fixed-size search capture
+  cuts off the bottom host plugin hint; affected controls remain readable.
+- UIA smoke searches now start at the activated target HWND rather than desktop
+  descendants, with distinct lookup/pattern/Invoke/dismissal diagnostics. This
+  is a client correction, not proof of a provider deadlock fix. Real Windows
+  execution remains required; action assertions and timeout are unchanged.
+- Combined `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` passed with
+  336 matching Linux images in 405.16 seconds, 576 all-feature framework tests,
+  143 host tests and six explicit ignores, strict Clippy, wasm32, rustdoc,
+  generated checks and performance budgets. Combined JS passed 192 with
+  15 OS skips; packaged native E2E was explicitly run and passed separately.
+  Later debug cancellation and bare DragItem deliveries are not included in
+  this result. External dropped-file/pasted-image authority remains refused,
+  not represented by fake readable references.

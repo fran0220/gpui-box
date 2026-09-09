@@ -38,7 +38,7 @@ export interface KitBindingCatalog {
   readonly "CanvasToolbar": { readonly source: "crates/gpui-kit/src/canvas/toolbar.rs"; readonly status: "partial" };
   readonly "Card": { readonly source: "crates/gpui-kit/src/display/card.rs"; readonly status: "partial" };
   readonly "Carousel": { readonly source: "crates/gpui-kit/src/navigation/carousel.rs"; readonly status: "partial" };
-  readonly "Cascader": { readonly source: "crates/gpui-kit/src/controls/cascader.rs"; readonly status: "unbound" };
+  readonly "Cascader": { readonly source: "crates/gpui-kit/src/controls/cascader.rs"; readonly status: "partial" };
   readonly "ChartLegend": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "Checkbox": { readonly source: "crates/gpui-kit/src/controls/toggle.rs"; readonly status: "partial" };
   readonly "CinematicEffect": { readonly source: "crates/gpui-kit/src/effects/dotlottie.rs"; readonly status: "fallback-only" };
@@ -47,7 +47,7 @@ export interface KitBindingCatalog {
   readonly "Collapsible": { readonly source: "crates/gpui-kit/src/navigation/collapsible.rs"; readonly status: "partial" };
   readonly "ColorPicker": { readonly source: "crates/gpui-kit/src/controls/color_picker.rs"; readonly status: "partial" };
   readonly "ColorSwatch": { readonly source: "crates/gpui-kit/src/controls/color_picker.rs"; readonly status: "partial" };
-  readonly "Combobox": { readonly source: "crates/gpui-kit/src/controls/combobox.rs"; readonly status: "unbound" };
+  readonly "Combobox": { readonly source: "crates/gpui-kit/src/controls/combobox.rs"; readonly status: "partial" };
   readonly "CommandPalette": { readonly source: "crates/gpui-kit/src/overlay/palette.rs"; readonly status: "partial" };
   readonly "Container": { readonly source: "crates/gpui-kit/src/layout/grid.rs"; readonly status: "partial" };
   readonly "ContextGauge": { readonly source: "crates/gpui-kit/src/agent/cost.rs"; readonly status: "partial" };
@@ -72,7 +72,7 @@ export interface KitBindingCatalog {
   readonly "FailurePanel": { readonly source: "crates/gpui-kit/src/display/failure_panel.rs"; readonly status: "partial" };
   readonly "FeedbackRating": { readonly source: "crates/gpui-kit/src/agent/feedback.rs"; readonly status: "partial" };
   readonly "FilterBar": { readonly source: "crates/gpui-kit/src/controls/filter_bar.rs"; readonly status: "partial" };
-  readonly "FindReplace": { readonly source: "crates/gpui-kit/src/controls/search.rs"; readonly status: "unbound" };
+  readonly "FindReplace": { readonly source: "crates/gpui-kit/src/controls/search.rs"; readonly status: "partial" };
   readonly "Flow": { readonly source: "crates/gpui-kit/src/data/flow.rs"; readonly status: "partial" };
   readonly "FormField": { readonly source: "crates/gpui-kit/src/controls/form_field.rs"; readonly status: "partial" };
   readonly "Frost": { readonly source: "crates/gpui-kit/src/overlay/frost.rs"; readonly status: "partial" };
@@ -108,7 +108,7 @@ export interface KitBindingCatalog {
   readonly "MicroMark": { readonly source: "crates/gpui-kit/src/motion/micro.rs"; readonly status: "partial" };
   readonly "Minimap": { readonly source: "crates/gpui-kit/src/canvas/minimap.rs"; readonly status: "partial" };
   readonly "ModelViewer": { readonly source: "crates/gpui-kit/src/media/model_viewer.rs"; readonly status: "partial" };
-  readonly "MultiSelect": { readonly source: "crates/gpui-kit/src/controls/multi_select.rs"; readonly status: "unbound" };
+  readonly "MultiSelect": { readonly source: "crates/gpui-kit/src/controls/multi_select.rs"; readonly status: "partial" };
   readonly "NavStack": { readonly source: "crates/gpui-kit/src/navigation/nav_stack.rs"; readonly status: "partial" };
   readonly "NodeGraph": { readonly source: "crates/gpui-kit/src/canvas/graph.rs"; readonly status: "partial" };
   readonly "NodeGroup": { readonly source: "crates/gpui-kit/src/canvas/group.rs"; readonly status: "partial" };
@@ -148,7 +148,7 @@ export interface KitBindingCatalog {
   readonly "ScrollArea": { readonly source: "crates/gpui-kit/src/layout/scroll.rs"; readonly status: "partial" };
   readonly "ScrollEdgeEffect": { readonly source: "crates/gpui-kit/src/layout/scroll_edge.rs"; readonly status: "partial" };
   readonly "ScrollFade": { readonly source: "crates/gpui-kit/src/layout/scroll_fade.rs"; readonly status: "partial" };
-  readonly "SearchField": { readonly source: "crates/gpui-kit/src/controls/search.rs"; readonly status: "unbound" };
+  readonly "SearchField": { readonly source: "crates/gpui-kit/src/controls/search.rs"; readonly status: "partial" };
   readonly "SearchInput": { readonly source: "crates/gpui-kit/src/controls/search.rs"; readonly status: "partial" };
   readonly "SegmentedControl": { readonly source: "crates/gpui-kit/src/controls/segmented.rs"; readonly status: "partial" };
   readonly "Select": { readonly source: "crates/gpui-kit/src/controls/select.rs"; readonly status: "partial" };
@@ -177,7 +177,7 @@ export interface KitBindingCatalog {
   readonly "Table": { readonly source: "crates/gpui-kit/src/data/table.rs"; readonly status: "partial" };
   readonly "Tabs": { readonly source: "crates/gpui-kit/src/navigation/tabs.rs"; readonly status: "partial" };
   readonly "Tag": { readonly source: "crates/gpui-kit/src/display/tag.rs"; readonly status: "partial" };
-  readonly "TagInput": { readonly source: "crates/gpui-kit/src/controls/tag_input.rs"; readonly status: "unbound" };
+  readonly "TagInput": { readonly source: "crates/gpui-kit/src/controls/tag_input.rs"; readonly status: "partial" };
   readonly "Terminal": { readonly source: "crates/gpui-kit/src/content/terminal/view.rs"; readonly status: "partial" };
   readonly "TextArea": { readonly source: "crates/gpui-kit/src/controls/textarea/mod.rs"; readonly status: "unbound" };
   readonly "TextInput": { readonly source: "crates/gpui-kit/src/controls/input/mod.rs"; readonly status: "partial" };

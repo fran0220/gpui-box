@@ -363,7 +363,14 @@ namespace GpuiBox.Accessibility
             IUIAutomationCondition named = automation.CreatePropertyCondition(NameProperty, name);
             IUIAutomationCondition identity = automation.CreateAndCondition(process, controlType);
             IUIAutomationCondition condition = automation.CreateAndCondition(identity, named);
-            IUIAutomationElement element = automation.GetRootElement().FindFirst(
+            // The condition filters matches, not the desktop traversal. Never
+            // query unrelated providers to inspect this gallery's controls.
+            IntPtr hwnd = NativeWindow.TopLevelWindow(processId);
+            if (hwnd == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("Native UIA target window disappeared.");
+            }
+            IUIAutomationElement element = automation.ElementFromHandle(hwnd).FindFirst(
                 TreeScope.Descendants,
                 condition
             );

@@ -1014,11 +1014,13 @@
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
         "close(cx: &mut Context<Self>)"
       ],
       "queries": [
         "selected_id() -> Option<&SharedString>",
+        "is_disabled() -> bool",
         "is_open() -> bool",
         "open_path() -> &[SharedString]"
       ],
@@ -1260,6 +1262,9 @@
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_allow_custom(allow: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "open(cx: &mut Context<Self>)",
         "toggle(window: &mut Window, cx: &mut Context<Self>)"
@@ -1269,7 +1274,8 @@
         "selected_option() -> Option<&SelectOption>",
         "is_open() -> bool",
         "query_text(cx: &App) -> SharedString",
-        "query_input() -> &Entity<TextInput>"
+        "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool"
       ],
       "slots": [
         "empty"
@@ -2117,13 +2123,15 @@
       "options": [],
       "commands": [
         "set_count(count: HitCount, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "search_field() -> &Entity<SearchField>",
         "replacement_input() -> &Entity<TextInput>",
         "count(cx: &App) -> HitCount",
-        "replacement_text(cx: &App) -> SharedString"
+        "replacement_text(cx: &App) -> SharedString",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -3193,10 +3201,18 @@
       "commands": [
         "set_selected(selected: impl IntoIterator<Item = impl Into<SharedString>>, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_name(name: SharedString, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_clearable(clearable: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)"
       ],
       "queries": [
         "selected_ids() -> &[SharedString]",
+        "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool",
         "is_open() -> bool"
       ],
       "slots": [],
@@ -4383,6 +4399,8 @@
         "set_match_case(on: Option<bool>, cx: &mut Context<Self>)",
         "set_whole_word(on: Option<bool>, cx: &mut Context<Self>)",
         "set_count(count: HitCount, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
@@ -4390,6 +4408,7 @@
         "count() -> &HitCount",
         "query_text(cx: &App) -> SharedString",
         "query_input() -> &Entity<TextInput>",
+        "is_disabled() -> bool",
         "focus(window: &mut Window, cx: &mut Context<Self>)"
       ],
       "slots": [],
@@ -5202,10 +5221,16 @@
       "commands": [
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_tags(tags: Vec<SharedString>, cx: &mut Context<Self>)",
-        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_max(max: Option<usize>, cx: &mut Context<Self>)",
+        "set_reorderable(reorderable: bool, cx: &mut Context<Self>)",
+        "set_collapse_at(visible: Option<usize>, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)"
       ],
       "queries": [
         "current() -> &[SharedString]",
+        "is_disabled() -> bool",
         "field() -> &Entity<TextInput>",
         "targeted() -> Option<&SharedString>",
         "refusal() -> Option<&SharedString>"

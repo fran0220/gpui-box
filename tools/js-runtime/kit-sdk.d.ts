@@ -51,7 +51,127 @@ export interface KitFactories extends ControlsExtraFactories, NavigationExtraFac
 }
 export declare function createKitBindings(registerHandler: (id: string, event: string, handler: (payload: unknown) => unknown) => string, registerPredicate?: (id: string, component: string, name: string, callback: (payload: unknown) => boolean | Promise<boolean>) => string): Readonly<KitAPI>;
 // Generated from kitMethods by generateKitMethodTypes.
+export interface KitMethodDefinitions0 {
+  "CascaderOption": { "id": string; "label": string; "disabled"?: boolean; "children"?: { "state": "idle" | "loading" | "empty" } | { "state": "unavailable" | "error"; "reason": string } | { "state": "ready"; "value": Array<KitMethodDefinitions0["CascaderOption"]> } };
+}
 export interface KitMethodContracts {
+  Cascader: {
+    invoke: {
+      set_options: { args: { "options": Array<KitMethodDefinitions0["CascaderOption"]> }; result: null };
+      set_selected: { args: { "selected": string | null }; result: null };
+      set_name: { args: { "name": string }; result: null };
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      open: { args: Record<string, never>; result: null };
+      close: { args: Record<string, never>; result: null };
+    };
+    query: {
+      is_disabled: { args: Record<string, never>; result: boolean };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      is_open: { args: Record<string, never>; result: boolean };
+      selected_id: { args: Record<string, never>; result: string | null };
+      open_path: { args: Record<string, never>; result: Array<string> };
+    };
+  };
+  Combobox: {
+    invoke: {
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      set_options: { args: { "options": Array<{ "id": string; "label": string; "disabled"?: boolean; "description"?: string; "group"?: string }> }; result: null };
+      set_name: { args: { "name": string }; result: null };
+      set_selected: { args: { "selected": string | null }; result: null };
+      set_query: { args: { "text": string }; result: null };
+      set_allow_custom: { args: { "allow": boolean }; result: null };
+      open: { args: Record<string, never>; result: null };
+      toggle: { args: Record<string, never>; result: null };
+    };
+    query: {
+      is_disabled: { args: Record<string, never>; result: boolean };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      query_input: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextInput" } };
+      is_open: { args: Record<string, never>; result: boolean };
+      query_text: { args: Record<string, never>; result: string };
+      selected_id: { args: Record<string, never>; result: string | null };
+      selected_option: { args: Record<string, never>; result: { "id": string; "label": string; "disabled": boolean; "description": string | null; "group": string | null } | null };
+    };
+  };
+  MultiSelect: {
+    invoke: {
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      set_options: { args: { "options": Array<{ "id": string; "label": string; "disabled"?: boolean; "description"?: string; "group"?: string }> }; result: null };
+      set_name: { args: { "name": string }; result: null };
+      set_selected: { args: { "selected": Array<string> }; result: null };
+      set_clearable: { args: { "clearable": boolean }; result: null };
+      open: { args: Record<string, never>; result: null };
+    };
+    query: {
+      is_disabled: { args: Record<string, never>; result: boolean };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      query_input: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextInput" } };
+      selected_ids: { args: Record<string, never>; result: Array<string> };
+      is_open: { args: Record<string, never>; result: boolean };
+    };
+  };
+  TagInput: {
+    invoke: {
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      set_tags: { args: { "tags": Array<string> }; result: null };
+      set_max: { args: { "max": number | null }; result: null };
+      set_collapse_at: { args: { "visible": number | null }; result: null };
+      set_reorderable: { args: { "reorderable": boolean }; result: null };
+    };
+    query: {
+      is_disabled: { args: Record<string, never>; result: boolean };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      field: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextInput" } };
+      current: { args: Record<string, never>; result: Array<string> };
+      targeted: { args: Record<string, never>; result: string | null };
+      refusal: { args: Record<string, never>; result: string | null };
+    };
+  };
+  SearchField: {
+    invoke: {
+      set_query: { args: { "text": string }; result: null };
+      set_count: { args: { "count": { "state": "unsearched" | "counting" | "none" } | { "state": "known"; "total": number; "current": number | null } | { "state": "tooMany"; "counted": number } | { "state": "unavailable"; "reason": string } }; result: null };
+      set_match_case: { args: { "on": boolean | null }; result: null };
+      set_whole_word: { args: { "on": boolean | null }; result: null };
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      focus: { args: Record<string, never>; result: null };
+    };
+    query: {
+      count: { args: Record<string, never>; result: { "state": "unsearched" | "counting" | "none" } | { "state": "known"; "total": number; "current": number | null } | { "state": "tooMany"; "counted": number } | { "state": "unavailable"; "reason": string } };
+      query_text: { args: Record<string, never>; result: string };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      query_input: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextInput" } };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+    };
+  };
+  FindReplace: {
+    invoke: {
+      set_count: { args: { "count": { "state": "unsearched" | "counting" | "none" } | { "state": "known"; "total": number; "current": number | null } | { "state": "tooMany"; "counted": number } | { "state": "unavailable"; "reason": string } }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+    };
+    query: {
+      count: { args: Record<string, never>; result: { "state": "unsearched" | "counting" | "none" } | { "state": "known"; "total": number; "current": number | null } | { "state": "tooMany"; "counted": number } | { "state": "unavailable"; "reason": string } };
+      replacement_text: { args: Record<string, never>; result: string };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      replacement_input: { args: Record<string, never>; result: { "$nativeRef": string; "type": "TextInput" } };
+      search_field: { args: Record<string, never>; result: { "$nativeRef": string; "type": "SearchField" } };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+    };
+  };
   PasswordInput: {
     invoke: {
       set_value: { args: { "value": string }; result: null };

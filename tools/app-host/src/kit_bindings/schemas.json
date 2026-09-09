@@ -1,4 +1,843 @@
 {
+  "Cascader": {
+    "props": {
+      "$defs": {
+        "CascaderOption": {
+          "type": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "max": 256,
+              "min": 1
+            },
+            "label": {
+              "type": "string",
+              "max": 16384
+            },
+            "disabled": {
+              "type": "boolean"
+            },
+            "children": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "fields": {
+                    "state": {
+                      "enum": [
+                        "idle",
+                        "loading",
+                        "empty"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "fields": {
+                    "state": {
+                      "enum": [
+                        "unavailable",
+                        "error"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "max": 16384
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "reason"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "fields": {
+                    "state": {
+                      "enum": [
+                        "ready"
+                      ]
+                    },
+                    "value": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "CascaderOption"
+                      },
+                      "max": 1024
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "value"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ]
+        }
+      },
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "selected": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "CascaderOption"
+          },
+          "max": 1024
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "selected": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "expanded": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "retry": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "opened": {
+        "enum": [
+          null
+        ]
+      },
+      "closed": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "Combobox": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "selected": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "query": {
+          "type": "string",
+          "max": 16384
+        },
+        "allowCustom": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "queryChanged": {
+        "type": "string",
+        "max": 16384
+      },
+      "selected": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "custom": {
+        "type": "string",
+        "max": 16384
+      },
+      "opened": {
+        "enum": [
+          null
+        ]
+      },
+      "closed": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "MultiSelect": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "max": 1024
+        },
+        "clearable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "queryChanged": {
+        "type": "string",
+        "max": 16384
+      },
+      "toggled": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "removed": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "cleared": {
+        "enum": [
+          null
+        ]
+      },
+      "opened": {
+        "enum": [
+          null
+        ]
+      },
+      "closed": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "TagInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "max": 1024
+        },
+        "max": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        },
+        "collapseAt": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        },
+        "reorderable": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "added": {
+        "type": "string",
+        "max": 16384
+      },
+      "removed": {
+        "type": "string",
+        "max": 16384
+      },
+      "duplicate": {
+        "type": "string",
+        "max": 16384
+      },
+      "refused": {
+        "type": "string",
+        "max": 16384
+      },
+      "editRequested": {
+        "type": "string",
+        "max": 16384
+      },
+      "moved": {
+        "type": "object",
+        "fields": {
+          "from": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          },
+          "to": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      }
+    }
+  },
+  "SearchField": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "query": {
+          "type": "string",
+          "max": 16384
+        },
+        "matchCase": {
+          "type": "boolean"
+        },
+        "wholeWord": {
+          "type": "boolean"
+        },
+        "count": {
+          "oneOf": [
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "unsearched",
+                    "counting",
+                    "none"
+                  ]
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "known"
+                  ]
+                },
+                "total": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                },
+                "current": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000,
+                  "nullable": true
+                }
+              },
+              "required": [
+                "state",
+                "total",
+                "current"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "tooMany"
+                  ]
+                },
+                "counted": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                }
+              },
+              "required": [
+                "state",
+                "counted"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "queryChanged": {
+        "type": "string",
+        "max": 16384
+      },
+      "next": {
+        "enum": [
+          null
+        ]
+      },
+      "previous": {
+        "enum": [
+          null
+        ]
+      },
+      "cancelled": {
+        "enum": [
+          null
+        ]
+      },
+      "matchCaseToggled": {
+        "type": "boolean"
+      },
+      "wholeWordToggled": {
+        "type": "boolean"
+      }
+    }
+  },
+  "FindReplace": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "count": {
+          "oneOf": [
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "unsearched",
+                    "counting",
+                    "none"
+                  ]
+                }
+              },
+              "required": [
+                "state"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "known"
+                  ]
+                },
+                "total": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                },
+                "current": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000,
+                  "nullable": true
+                }
+              },
+              "required": [
+                "state",
+                "total",
+                "current"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "tooMany"
+                  ]
+                },
+                "counted": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 1000000
+                }
+              },
+              "required": [
+                "state",
+                "counted"
+              ]
+            },
+            {
+              "type": "object",
+              "fields": {
+                "state": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "state",
+                "reason"
+              ]
+            }
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "search": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "queryChanged"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "next"
+                ]
+              },
+              "value": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "previous"
+                ]
+              },
+              "value": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "cancelled"
+                ]
+              },
+              "value": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "matchCaseToggled"
+                ]
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "wholeWordToggled"
+                ]
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          }
+        ]
+      },
+      "replacementChanged": {
+        "type": "string",
+        "max": 16384
+      },
+      "replaceOne": {
+        "enum": [
+          null
+        ]
+      },
+      "replaceAll": {
+        "type": "object",
+        "fields": {
+          "count": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 1000000
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "close": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
   "PasswordInput": {
     "props": {
       "type": "object",

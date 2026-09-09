@@ -2354,8 +2354,336 @@
       "source": "crates/gpui-kit/src/controls/cascader.rs",
       "path": "gpui_kit::controls::Cascader",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Cascader",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "name",
+          "placeholder",
+          "selected",
+          "options"
+        ],
+        "events": [
+          "selected",
+          "expanded",
+          "retry",
+          "opened",
+          "closed"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_options": {
+              "args": {
+                "$defs": {
+                  "CascaderOption": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "max": 256,
+                        "min": 1
+                      },
+                      "label": {
+                        "type": "string",
+                        "max": 16384
+                      },
+                      "disabled": {
+                        "type": "boolean"
+                      },
+                      "children": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "fields": {
+                              "state": {
+                                "enum": [
+                                  "idle",
+                                  "loading",
+                                  "empty"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "state"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "fields": {
+                              "state": {
+                                "enum": [
+                                  "unavailable",
+                                  "error"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "max": 16384
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "reason"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "fields": {
+                              "state": {
+                                "enum": [
+                                  "ready"
+                                ]
+                              },
+                              "value": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "CascaderOption"
+                                },
+                                "max": 1024
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "value"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label"
+                    ]
+                  }
+                },
+                "type": "object",
+                "fields": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "CascaderOption"
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "options"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selected": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "selected": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "selected"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "close": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "selected_id": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 256,
+                "min": 1,
+                "nullable": true
+              }
+            },
+            "open_path": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "max": 256,
+                  "min": 1
+                },
+                "max": 1024
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2373,11 +2701,13 @@
           "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "open(window: &mut Window, cx: &mut Context<Self>)",
           "close(cx: &mut Context<Self>)"
         ],
         "queries": [
           "selected_id() -> Option<&SharedString>",
+          "is_disabled() -> bool",
           "is_open() -> bool",
           "open_path() -> &[SharedString]"
         ],
@@ -2988,8 +3318,401 @@
       "source": "crates/gpui-kit/src/controls/combobox.rs",
       "path": "gpui_kit::controls::Combobox",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Combobox",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "placeholder",
+          "invalid",
+          "name",
+          "options",
+          "selected",
+          "query",
+          "allowCustom"
+        ],
+        "events": [
+          "queryChanged",
+          "selected",
+          "custom",
+          "opened",
+          "closed"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_options": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "min": 1,
+                          "max": 256
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "disabled": {
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "group": {
+                          "type": "string",
+                          "max": 16384
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "options"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selected": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "selected": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "selected"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_query": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_allow_custom": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "allow": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "allow"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "toggle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "query_input": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextInput"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "query_text": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "selected_id": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 256,
+                "min": 1,
+                "nullable": true
+              }
+            },
+            "selected_option": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  },
+                  "group": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "disabled",
+                  "description",
+                  "group"
+                ],
+                "nullable": true
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -3009,6 +3732,9 @@
           "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
           "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
           "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
+          "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_allow_custom(allow: bool, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
           "open(cx: &mut Context<Self>)",
           "toggle(window: &mut Window, cx: &mut Context<Self>)"
@@ -3018,7 +3744,8 @@
           "selected_option() -> Option<&SelectOption>",
           "is_open() -> bool",
           "query_text(cx: &App) -> SharedString",
-          "query_input() -> &Entity<TextInput>"
+          "query_input() -> &Entity<TextInput>",
+          "is_disabled() -> bool"
         ],
         "slots": [
           "empty"
@@ -9443,8 +10170,361 @@
       "source": "crates/gpui-kit/src/controls/search.rs",
       "path": "gpui_kit::controls::FindReplace",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.FindReplace",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "count"
+        ],
+        "events": [
+          "search",
+          "replacementChanged",
+          "replaceOne",
+          "replaceAll",
+          "close"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_count": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "count": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "unsearched",
+                              "counting",
+                              "none"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "known"
+                            ]
+                          },
+                          "total": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          },
+                          "current": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000,
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "total",
+                          "current"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "tooMany"
+                            ]
+                          },
+                          "counted": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "counted"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "unavailable"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "max": 16384
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "count"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "count": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "unsearched",
+                          "counting",
+                          "none"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "known"
+                        ]
+                      },
+                      "total": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "current": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "total",
+                      "current"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "tooMany"
+                        ]
+                      },
+                      "counted": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "counted"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "unavailable"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "max": 16384
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "reason"
+                    ]
+                  }
+                ]
+              }
+            },
+            "replacement_text": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "replacement_input": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextInput"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "search_field": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "SearchField"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -9453,13 +10533,15 @@
         "options": [],
         "commands": [
           "set_count(count: HitCount, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)"
         ],
         "queries": [
           "search_field() -> &Entity<SearchField>",
           "replacement_input() -> &Entity<TextInput>",
           "count(cx: &App) -> HitCount",
-          "replacement_text(cx: &App) -> SharedString"
+          "replacement_text(cx: &App) -> SharedString",
+          "is_disabled() -> bool"
         ],
         "slots": []
       }
@@ -20183,8 +21265,323 @@
       "source": "crates/gpui-kit/src/controls/multi_select.rs",
       "path": "gpui_kit::controls::MultiSelect",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.MultiSelect",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "placeholder",
+          "invalid",
+          "name",
+          "options",
+          "selected",
+          "clearable"
+        ],
+        "events": [
+          "queryChanged",
+          "toggled",
+          "removed",
+          "cleared",
+          "opened",
+          "closed"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_options": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "min": 1,
+                          "max": 256
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "disabled": {
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "group": {
+                          "type": "string",
+                          "max": 16384
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "options"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selected": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "selected": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 256,
+                      "min": 1
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "selected"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_clearable": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "clearable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "clearable"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "query_input": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextInput"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "selected_ids": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "max": 256,
+                  "min": 1
+                },
+                "max": 1024
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -20201,10 +21598,18 @@
         "commands": [
           "set_selected(selected: impl IntoIterator<Item = impl Into<SharedString>>, cx: &mut Context<Self>)",
           "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
+          "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+          "set_name(name: SharedString, cx: &mut Context<Self>)",
+          "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+          "set_clearable(clearable: bool, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "open(window: &mut Window, cx: &mut Context<Self>)"
         ],
         "queries": [
           "selected_ids() -> &[SharedString]",
+          "query_input() -> &Entity<TextInput>",
+          "is_disabled() -> bool",
           "is_open() -> bool"
         ],
         "slots": []
@@ -24758,8 +26163,429 @@
       "source": "crates/gpui-kit/src/controls/search.rs",
       "path": "gpui_kit::controls::SearchField",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.SearchField",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "placeholder",
+          "query",
+          "matchCase",
+          "wholeWord",
+          "count"
+        ],
+        "events": [
+          "queryChanged",
+          "next",
+          "previous",
+          "cancelled",
+          "matchCaseToggled",
+          "wholeWordToggled"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_query": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "text": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_count": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "count": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "unsearched",
+                              "counting",
+                              "none"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "known"
+                            ]
+                          },
+                          "total": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          },
+                          "current": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000,
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "total",
+                          "current"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "tooMany"
+                            ]
+                          },
+                          "counted": {
+                            "type": "number",
+                            "integer": true,
+                            "min": 0,
+                            "max": 1000000
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "counted"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "fields": {
+                          "state": {
+                            "enum": [
+                              "unavailable"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "max": 16384
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "count"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_match_case": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "on": {
+                    "type": "boolean",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "on"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_whole_word": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "on": {
+                    "type": "boolean",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "on"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "focus": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "count": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "unsearched",
+                          "counting",
+                          "none"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "known"
+                        ]
+                      },
+                      "total": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "current": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "total",
+                      "current"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "tooMany"
+                        ]
+                      },
+                      "counted": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 1000000
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "counted"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "state": {
+                        "enum": [
+                          "unavailable"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "max": 16384
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "reason"
+                    ]
+                  }
+                ]
+              }
+            },
+            "query_text": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "query_input": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextInput"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -24774,6 +26600,8 @@
           "set_match_case(on: Option<bool>, cx: &mut Context<Self>)",
           "set_whole_word(on: Option<bool>, cx: &mut Context<Self>)",
           "set_count(count: HitCount, cx: &mut Context<Self>)",
+          "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)"
         ],
@@ -24781,6 +26609,7 @@
           "count() -> &HitCount",
           "query_text(cx: &App) -> SharedString",
           "query_input() -> &Entity<TextInput>",
+          "is_disabled() -> bool",
           "focus(window: &mut Window, cx: &mut Context<Self>)"
         ],
         "slots": []
@@ -30567,8 +32396,302 @@
       "source": "crates/gpui-kit/src/controls/tag_input.rs",
       "path": "gpui_kit::controls::TagInput",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.TagInput",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "placeholder",
+          "invalid",
+          "tags",
+          "max",
+          "collapseAt",
+          "reorderable"
+        ],
+        "events": [
+          "added",
+          "removed",
+          "duplicate",
+          "refused",
+          "editRequested",
+          "moved"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_tags": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 256,
+                      "min": 1
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "tags"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_max": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "max": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "max"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_collapse_at": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "visible": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 1000000,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "visible"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_reorderable": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "reorderable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "reorderable"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "focus_handle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "FocusHandle"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "field": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "$nativeRef": {
+                    "type": "string",
+                    "max": 256,
+                    "min": 1
+                  },
+                  "type": {
+                    "enum": [
+                      "TextInput"
+                    ]
+                  }
+                },
+                "required": [
+                  "$nativeRef",
+                  "type"
+                ]
+              }
+            },
+            "current": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "max": 256,
+                  "min": 1
+                },
+                "max": 1024
+              }
+            },
+            "targeted": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384,
+                "nullable": true
+              }
+            },
+            "refusal": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384,
+                "nullable": true
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "focus_handle": "gpui::window::Focusable::focus_handle"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -30586,10 +32709,16 @@
         "commands": [
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
           "set_tags(tags: Vec<SharedString>, cx: &mut Context<Self>)",
-          "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+          "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+          "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+          "set_max(max: Option<usize>, cx: &mut Context<Self>)",
+          "set_reorderable(reorderable: bool, cx: &mut Context<Self>)",
+          "set_collapse_at(visible: Option<usize>, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)"
         ],
         "queries": [
           "current() -> &[SharedString]",
+          "is_disabled() -> bool",
           "field() -> &Entity<TextInput>",
           "targeted() -> Option<&SharedString>",
           "refusal() -> Option<&SharedString>"
