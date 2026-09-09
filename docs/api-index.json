@@ -1889,6 +1889,9 @@
         "syntax(syntax: EditorSyntax) -> Self"
       ],
       "commands": [
+        "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+        "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool",
+        "apply_edits(revision: u64, edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_highlights(highlights: EditorHighlights, cx: &mut Context<Self>) -> bool"
       ],
@@ -1897,6 +1900,7 @@
         "text_area() -> &Entity<TextArea>",
         "snapshot(cx: &App) -> TextAreaSnapshot",
         "selected_range(cx: &App) -> Range<usize>",
+        "selections(cx: &App) -> Vec<(Range<usize>, bool)>",
         "geometry(cx: &App) -> Option<EditorGeometry>"
       ],
       "slots": [],
@@ -1913,7 +1917,8 @@
         "SyntaxUnavailable"
       ],
       "scenes": [
-        "editor"
+        "editor",
+        "editor-multicursor"
       ]
     },
     {
@@ -5156,7 +5161,10 @@
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
-        "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)"
+        "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)",
+        "replace_ranges(edits: impl IntoIterator<Item = (Range<usize>, SharedString)>, cx: &mut Context<Self>) -> bool",
+        "set_selections(selections: impl IntoIterator<Item = (Range<usize>, bool)>, cx: &mut Context<Self>) -> bool",
+        "select_rectangle(anchor: Point<Pixels>, focus: Point<Pixels>, cx: &mut Context<Self>) -> bool"
       ],
       "queries": [
         "arrows_claimed() -> bool",
@@ -5171,6 +5179,7 @@
         "is_read_only() -> bool",
         "selected_range() -> Range<usize>",
         "cursor_offset() -> usize",
+        "selections() -> Vec<(Range<usize>, bool)>",
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
         "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
@@ -15403,6 +15412,18 @@
         "Editor"
       ],
       "example": "fn editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_editor(window, cx);\n    let editor = cx.global::<SceneEditor>().editor.clone();\n    let theme = cx.theme().clone();\n    let scene = stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"one text/IME/history geometry; caller-owned revision highlights and indentation\",\n        ))\n        .child(editor);\n    #[cfg(feature = \"syntax\")]\n    let scene = scene\n        .child(caption(\n            &theme,\n            \"JSON fixture · in-process incremental syntax, no language server\",\n        ))\n        .child(cx.global::<SceneEditor>().syntax.clone());\n    scene.into_any_element()\n}"
+    },
+    {
+      "name": "editor-multicursor",
+      "capture": "cargo run -p xtask -- headless capture editor-multicursor",
+      "kind": "exhibit",
+      "subjects": [
+        "Editor"
+      ],
+      "uses": [
+        "Editor"
+      ],
+      "example": "fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneMulticursorEditor>() {\n        let source = \"let alpha = 1;\\nlet beta  = 2;\\nlet gamma = 3;\";\n        let editor = cx.new(|cx| {\n            Editor::new(\n                \"scene.editor.multiple\",\n                \"Multicursor source fixture\",\n                source,\n                window,\n                cx,\n            )\n            .rows(4)\n        });\n        editor.update(cx, |editor, cx| {\n            let selections = [\"gamma\", \"alpha\", \"beta\"].map(|name| {\n                let start = source.find(name).expect(\"fixture variable\");\n                (start..start + name.len(), false)\n            });\n            editor.set_selections(selections, cx);\n        });\n        window.focus(&editor.read(cx).text_area().read(cx).focus_handle(cx), cx);\n        cx.set_global(SceneMulticursorEditor(editor));\n    }\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(760.0))\n        .child(caption(&theme, \"fixture · type in three selections; undo restores all · Alt-click adds a caret · Alt-Shift-drag selects columns\"))\n        .child(cx.global::<SceneMulticursorEditor>().0.clone())\n        .into_any_element()\n}"
     },
     {
       "name": "mention-input",

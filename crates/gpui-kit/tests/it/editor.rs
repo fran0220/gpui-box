@@ -12,6 +12,82 @@ use gpui_kit_testkit::harness::Harness;
 type EditorSlot = Rc<RefCell<Option<Entity<Editor>>>>;
 
 #[gpui::test]
+fn multicursor_typing_deletion_and_history_share_the_real_input_surface(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "é middle 😀 end", |editor| editor.rows(3));
+    let entity = slot.borrow().clone().expect("editor");
+    harness.click("source.input");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().clone();
+        area.update(cx, |area, cx| {
+            assert!(area.set_selections([(10..14, true), (0..2, false)], cx))
+        });
+    });
+    harness.keystrokes("q");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.value().as_ref(), "q middle q end");
+        assert_eq!(area.selections(), vec![(10..10, false), (1..1, false)]);
+    });
+    harness.keystrokes("backspace");
+    harness.update(|_, cx| assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), " middle  end"));
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-z cmd-z"
+    } else {
+        "ctrl-z ctrl-z"
+    });
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.value().as_ref(), "é middle 😀 end");
+        assert_eq!(area.selections(), vec![(10..14, true), (0..2, false)]);
+    });
+}
+
+#[gpui::test]
+fn rectangular_selection_uses_painted_columns_and_clamps_short_rows(cx: &mut TestAppContext) {
+    let (mut harness, slot) = editor(cx, "abcdef\nxy\n123456", |editor| editor.rows(4));
+    let entity = slot.borrow().clone().expect("editor");
+    harness.click("source.input");
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().clone();
+        let anchor = area.read(cx).bounds_for_range(1..2).expect("b")[0];
+        let focus = area.read(cx).bounds_for_range(14..15).expect("5")[0];
+        let short_column = area.read(cx).bounds_for_range(8..9).expect("y")[0];
+        assert_eq!(
+            anchor.left(),
+            short_column.left(),
+            "monospaced columns: {anchor:?}, {short_column:?}"
+        );
+        area.update(cx, |area, cx| {
+            assert!(area.select_rectangle(
+                point(anchor.left(), anchor.center().y),
+                point(focus.left(), focus.center().y),
+                cx
+            ))
+        });
+        assert_eq!(
+            area.read(cx).selections(),
+            vec![(11..14, false), (8..9, false), (1..4, false)]
+        );
+    });
+    harness.keystrokes("x");
+    harness
+        .update(|_, cx| assert_eq!(entity.read(cx).snapshot(cx).text.as_ref(), "axef\nxx\n1x56"));
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-z"
+    } else {
+        "ctrl-z"
+    });
+    harness.update(|_, cx| {
+        let area = entity.read(cx).text_area().read(cx);
+        assert_eq!(area.value().as_ref(), "abcdef\nxy\n123456");
+        assert_eq!(
+            area.selections(),
+            vec![(11..14, false), (8..9, false), (1..4, false)]
+        );
+    });
+}
+
+#[gpui::test]
 fn wheel_returns_unused_native_axes_to_the_parent(cx: &mut TestAppContext) {
     let slot = EditorSlot::default();
     let build_slot = slot.clone();

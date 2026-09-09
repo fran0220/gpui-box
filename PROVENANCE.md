@@ -844,3 +844,8 @@ start unowned unless the continuation explicitly restores a retained token.
 Clipboard, Linux/FreeBSD primary selection and macOS find pasteboard legacy
 wrappers enforce the same policy. No source was imported; the historical
 receipt, renderer ABI and shared local package authority remain unchanged.
+
+Primary-first multiple selections, grouped replacement/history, rectangular
+painted hit testing, and nearest final-glyph caret correction are original
+GPUI Box framework/Kit work. Native IME retains one authoritative replacement
+range; no platform protocol or third-party source was changed.

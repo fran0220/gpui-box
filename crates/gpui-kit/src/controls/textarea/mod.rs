@@ -475,7 +475,9 @@ pub struct TextArea {
     /// The horizontal position vertical motion aims for, so a run of up or
     /// down keys through a short line does not drag the caret leftwards.
     goal_x: Option<Pixels>,
+    multi_goal_x: Vec<Pixels>,
     is_selecting: bool,
+    rectangular_anchor: Option<Point<Pixels>>,
     last_layout: Option<EditableTextLayout>,
     last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
@@ -538,7 +540,9 @@ impl TextArea {
             scroll_dirty: false,
             known_text_width: px(0.0),
             goal_x: None,
+            multi_goal_x: Vec::new(),
             is_selecting: false,
+            rectangular_anchor: None,
             last_layout: None,
             last_layout_text: SharedString::default(),
             last_bounds: None,
@@ -889,6 +893,89 @@ impl TextArea {
         self.select_range(range, cx);
     }
 
+    /// Applies disjoint original-document replacements as one undo step.
+    /// Invalid ranges and disabled/read-only controls are refused atomically.
+    /// The first replacement's resulting caret is primary.
+    pub fn replace_ranges(
+        &mut self,
+        edits: impl IntoIterator<Item = (Range<usize>, SharedString)>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.disabled || self.read_only {
+            return false;
+        }
+        let before = self.edit.text().clone();
+        let selection_before = self.edit.selection();
+        let Some(outcome) = self.edit.replace_many(edits, text_edit::Cause::Paste) else {
+            return false;
+        };
+        self.finish_edit(outcome, &before, selection_before, cx);
+        true
+    }
+
+    /// Primary-first, non-overlapping Unicode selections, including carets.
+    pub fn selections(&self) -> Vec<(Range<usize>, bool)> {
+        self.edit.selections()
+    }
+
+    /// Sets primary-first selections. Overlaps and duplicate carets merge;
+    /// offsets follow the shared grapheme-clamping rules. Empty input is refused.
+    pub fn set_selections(
+        &mut self,
+        selections: impl IntoIterator<Item = (Range<usize>, bool)>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if !self.edit.set_selections(selections) {
+            return false;
+        }
+        self.goal_x = None;
+        self.multi_goal_x.clear();
+        self.reveal_caret = true;
+        cx.emit(TextAreaEvent::SelectionChanged(self.edit.selection()));
+        cx.notify();
+        true
+    }
+
+    /// Selects one source range per visual row between two window positions.
+    /// Glyph hit testing, tabs and wrapping use the same painted layout as the
+    /// input method. The focus row is primary; short rows clamp to their ends.
+    pub fn select_rectangle(
+        &mut self,
+        anchor: Point<Pixels>,
+        focus: Point<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let (Some(layout), Some(bounds)) = (&self.last_layout, self.last_bounds) else {
+            return false;
+        };
+        let origin = self.text_origin(bounds);
+        let first = (((anchor.y.min(focus.y) - origin.y) / layout.line_height())
+            .floor()
+            .max(0.0) as usize)
+            .min(layout.total_rows() - 1);
+        let last = (((anchor.y.max(focus.y) - origin.y) / layout.line_height())
+            .floor()
+            .max(0.0) as usize)
+            .min(layout.total_rows() - 1);
+        let mut rows: Vec<_> = (first..=last).collect();
+        if focus.y >= anchor.y {
+            rows.reverse();
+        }
+        let mut seen = std::collections::HashSet::new();
+        let selections: Vec<_> = rows
+            .into_iter()
+            .filter_map(|row| {
+                let y = layout.line_height() * (row as f32 + 0.5);
+                let a = layout.offset_for_position(point(anchor.x - origin.x, y));
+                let b = layout.offset_for_position(point(focus.x - origin.x, y));
+                let range = a.min(b)..a.max(b);
+                seen.insert((range.start, range.end))
+                    .then_some((range, b < a))
+            })
+            .collect();
+        self.set_selections(selections, cx)
+    }
+
     /// Painted rectangles for a byte range in window coordinates.
     ///
     /// Nothing is returned until the current value has been shaped. Wrapped
@@ -1164,6 +1251,19 @@ impl TextArea {
         cause: text_edit::Cause,
         cx: &mut Context<Self>,
     ) {
+        if range_utf16.is_none()
+            && self.edit.marked().is_none()
+            && self.edit.has_multiple_selections()
+        {
+            if self.disabled || self.read_only {
+                return;
+            }
+            let before = self.edit.text().clone();
+            let selection_before = self.edit.selection();
+            let outcome = self.edit.replace_selections(new_text, cause);
+            self.finish_edit(outcome, &before, selection_before, cx);
+            return;
+        }
         let range = self.edit_range(range_utf16);
         self.apply_byte_edit(range, new_text, cause, cx);
     }
@@ -1185,9 +1285,19 @@ impl TextArea {
         // follows it.
         self.edit.end_composition();
         let outcome = self.edit.replace(range, new_text, cause);
+        self.finish_edit(outcome, &before, selection_before, cx);
+    }
+
+    fn finish_edit(
+        &mut self,
+        outcome: gpui::EditOutcome,
+        before: &str,
+        selection_before: Range<usize>,
+        cx: &mut Context<Self>,
+    ) {
         self.goal_x = None;
         if outcome.changed {
-            self.record_edit(&before, cx);
+            self.record_edit(before, cx);
             cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         }
         self.emit_selection_if_changed(selection_before, cx);
@@ -1240,6 +1350,7 @@ impl TextArea {
         cx: &mut Context<Self>,
     ) {
         self.reveal_caret = true;
+        self.multi_goal_x.clear();
         let selection = self.edit.selection();
         if selection != selection_before {
             cx.emit(TextAreaEvent::SelectionChanged(selection));
@@ -1270,12 +1381,45 @@ impl TextArea {
         cx.notify();
     }
 
+    fn move_selections(
+        &mut self,
+        extend: bool,
+        target: impl Fn(&Self, usize, Range<usize>) -> usize,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.edit.has_multiple_selections() {
+            let offset = target(self, self.cursor_offset(), self.edit.selection());
+            if extend {
+                self.select_to(offset, cx);
+            } else {
+                self.move_to(offset, cx);
+            }
+            return;
+        }
+        let selections: Vec<_> = self
+            .edit
+            .selections()
+            .into_iter()
+            .map(|(range, reversed)| {
+                let focus = if reversed { range.start } else { range.end };
+                let anchor = if reversed { range.end } else { range.start };
+                let offset = target(self, focus, range);
+                if extend {
+                    (anchor.min(offset)..anchor.max(offset), offset < anchor)
+                } else {
+                    (offset..offset, false)
+                }
+            })
+            .collect();
+        self.set_selections(selections, cx);
+    }
+
     fn previous_boundary(&self, offset: usize) -> usize {
-        text_edit::previous_boundary(self.edit.text(), offset)
+        self.document().previous_grapheme_boundary(offset)
     }
 
     fn next_boundary(&self, offset: usize) -> usize {
-        text_edit::next_boundary(self.edit.text(), offset)
+        self.document().next_grapheme_boundary(offset)
     }
 
     fn previous_word_boundary(&self, offset: usize) -> usize {
@@ -1305,6 +1449,42 @@ impl TextArea {
         let Some(layout) = self.last_layout.as_ref() else {
             return;
         };
+        if self.edit.has_multiple_selections() {
+            let selections = self.edit.selections();
+            let mut goals = Vec::with_capacity(selections.len());
+            let moved: Vec<_> = selections
+                .into_iter()
+                .enumerate()
+                .map(|(index, (range, reversed))| {
+                    let focus = if reversed { range.start } else { range.end };
+                    let anchor = if reversed { range.end } else { range.start };
+                    let goal = self
+                        .multi_goal_x
+                        .get(index)
+                        .copied()
+                        .unwrap_or_else(|| layout.position_for_offset(focus).x);
+                    goals.push(goal);
+                    let row = layout.row_for_offset(focus) as isize + delta;
+                    let offset = if row < 0 {
+                        0
+                    } else if row as usize >= layout.total_rows() {
+                        self.document().len()
+                    } else {
+                        layout.offset_at_row(row as usize, goal)
+                    };
+                    if extend {
+                        (anchor.min(offset)..anchor.max(offset), offset < anchor)
+                    } else {
+                        (offset..offset, false)
+                    }
+                })
+                .collect();
+            self.set_selections(moved, cx);
+            if self.edit.selections().len() == goals.len() {
+                self.multi_goal_x = goals;
+            }
+            return;
+        }
         let caret = self.cursor_offset();
         let position = layout.position_for_offset(caret);
         let goal = self.goal_x.unwrap_or(position.x);
@@ -1328,28 +1508,44 @@ impl TextArea {
 
     /// The bounds of the visual row the caret sits on, in content offsets.
     fn caret_row_range(&self) -> Range<usize> {
+        self.row_range_for_offset(self.cursor_offset())
+    }
+
+    fn row_range_for_offset(&self, offset: usize) -> Range<usize> {
         let Some(layout) = self.last_layout.as_ref() else {
             return 0..self.edit.text().len();
         };
-        let row = layout.row_for_offset(self.cursor_offset());
+        let row = layout.row_for_offset(offset);
         let range = layout.row_range(row);
         range.start.min(self.edit.text().len())..range.end.min(self.edit.text().len())
     }
 
     fn left(&mut self, _: &Left, _: &mut Window, cx: &mut Context<Self>) {
-        if self.edit.selection().is_empty() {
-            self.move_to(self.previous_boundary(self.cursor_offset()), cx);
-        } else {
-            self.move_to(self.edit.selection().start, cx);
-        }
+        self.move_selections(
+            false,
+            |area, focus, range| {
+                if range.is_empty() {
+                    area.previous_boundary(focus)
+                } else {
+                    range.start
+                }
+            },
+            cx,
+        );
     }
 
     fn right(&mut self, _: &Right, _: &mut Window, cx: &mut Context<Self>) {
-        if self.edit.selection().is_empty() {
-            self.move_to(self.next_boundary(self.cursor_offset()), cx);
-        } else {
-            self.move_to(self.edit.selection().end, cx);
-        }
+        self.move_selections(
+            false,
+            |area, focus, range| {
+                if range.is_empty() {
+                    area.next_boundary(focus)
+                } else {
+                    range.end
+                }
+            },
+            cx,
+        );
     }
 
     fn up(&mut self, _: &Up, _: &mut Window, cx: &mut Context<Self>) {
@@ -1369,19 +1565,23 @@ impl TextArea {
     }
 
     fn word_left(&mut self, _: &WordLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.previous_word_boundary(self.cursor_offset()), cx);
+        self.move_selections(
+            false,
+            |area, focus, _| area.previous_word_boundary(focus),
+            cx,
+        );
     }
 
     fn word_right(&mut self, _: &WordRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.next_word_boundary(self.cursor_offset()), cx);
+        self.move_selections(false, |area, focus, _| area.next_word_boundary(focus), cx);
     }
 
     fn select_left(&mut self, _: &SelectLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.previous_boundary(self.cursor_offset()), cx);
+        self.move_selections(true, |area, focus, _| area.previous_boundary(focus), cx);
     }
 
     fn select_right(&mut self, _: &SelectRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.next_boundary(self.cursor_offset()), cx);
+        self.move_selections(true, |area, focus, _| area.next_boundary(focus), cx);
     }
 
     fn select_up(&mut self, _: &SelectUp, _: &mut Window, cx: &mut Context<Self>) {
@@ -1393,11 +1593,15 @@ impl TextArea {
     }
 
     fn select_word_left(&mut self, _: &SelectWordLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.previous_word_boundary(self.cursor_offset()), cx);
+        self.move_selections(
+            true,
+            |area, focus, _| area.previous_word_boundary(focus),
+            cx,
+        );
     }
 
     fn select_word_right(&mut self, _: &SelectWordRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.next_word_boundary(self.cursor_offset()), cx);
+        self.move_selections(true, |area, focus, _| area.next_word_boundary(focus), cx);
     }
 
     fn select_to_line_start(
@@ -1406,11 +1610,19 @@ impl TextArea {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.select_to(self.caret_row_range().start, cx);
+        self.move_selections(
+            true,
+            |area, focus, _| area.row_range_for_offset(focus).start,
+            cx,
+        );
     }
 
     fn select_to_line_end(&mut self, _: &SelectToLineEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.caret_row_range().end, cx);
+        self.move_selections(
+            true,
+            |area, focus, _| area.row_range_for_offset(focus).end,
+            cx,
+        );
     }
 
     fn select_to_document_start(
@@ -1419,7 +1631,7 @@ impl TextArea {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.select_to(0, cx);
+        self.move_selections(true, |_, _, _| 0, cx);
     }
 
     fn select_to_document_end(
@@ -1428,7 +1640,7 @@ impl TextArea {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.select_to(self.edit.text().len(), cx);
+        self.move_selections(true, |area, _, _| area.document().len(), cx);
     }
 
     fn select_all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
@@ -1436,19 +1648,27 @@ impl TextArea {
     }
 
     fn line_start(&mut self, _: &LineStart, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.caret_row_range().start, cx);
+        self.move_selections(
+            false,
+            |area, focus, _| area.row_range_for_offset(focus).start,
+            cx,
+        );
     }
 
     fn line_end(&mut self, _: &LineEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.caret_row_range().end, cx);
+        self.move_selections(
+            false,
+            |area, focus, _| area.row_range_for_offset(focus).end,
+            cx,
+        );
     }
 
     fn document_start(&mut self, _: &DocumentStart, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(0, cx);
+        self.move_selections(false, |_, _, _| 0, cx);
     }
 
     fn document_end(&mut self, _: &DocumentEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.edit.text().len(), cx);
+        self.move_selections(false, |area, _, _| area.document().len(), cx);
     }
 
     fn newline(&mut self, _: &Newline, _window: &mut Window, cx: &mut Context<Self>) {
@@ -1456,6 +1676,10 @@ impl TextArea {
     }
 
     fn backspace(&mut self, _: &Backspace, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.has_multiple_selections() {
+            self.delete_multiple(true, cx);
+            return;
+        }
         if self.edit.selection().is_empty() {
             self.select_to(self.previous_boundary(self.cursor_offset()), cx);
         }
@@ -1463,10 +1687,24 @@ impl TextArea {
     }
 
     fn delete(&mut self, _: &Delete, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.has_multiple_selections() {
+            self.delete_multiple(false, cx);
+            return;
+        }
         if self.edit.selection().is_empty() {
             self.select_to(self.next_boundary(self.cursor_offset()), cx);
         }
         self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
+    }
+
+    fn delete_multiple(&mut self, backward: bool, cx: &mut Context<Self>) {
+        if self.disabled || self.read_only {
+            return;
+        }
+        let before = self.edit.text().clone();
+        let selection_before = self.edit.selection();
+        let outcome = self.edit.delete_selections(backward);
+        self.finish_edit(outcome, &before, selection_before, cx);
     }
 
     fn delete_word_left(
@@ -1475,6 +1713,10 @@ impl TextArea {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.edit.has_multiple_selections() {
+            self.delete_expanded(|area, offset| area.previous_word_boundary(offset), cx);
+            return;
+        }
         if self.edit.selection().is_empty() {
             self.select_to(self.previous_word_boundary(self.cursor_offset()), cx);
         }
@@ -1487,6 +1729,10 @@ impl TextArea {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.edit.has_multiple_selections() {
+            self.delete_expanded(|area, offset| area.next_word_boundary(offset), cx);
+            return;
+        }
         if self.edit.selection().is_empty() {
             self.select_to(self.next_word_boundary(self.cursor_offset()), cx);
         }
@@ -1499,10 +1745,40 @@ impl TextArea {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.edit.has_multiple_selections() {
+            self.delete_expanded(|area, offset| area.row_range_for_offset(offset).start, cx);
+            return;
+        }
         if self.edit.selection().is_empty() {
             self.select_to(self.caret_row_range().start, cx);
         }
         self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
+    }
+
+    fn delete_expanded(
+        &mut self,
+        boundary: impl Fn(&Self, usize) -> usize,
+        cx: &mut Context<Self>,
+    ) {
+        if self.disabled || self.read_only {
+            return;
+        }
+        let ranges: Vec<_> = self
+            .selections()
+            .into_iter()
+            .map(|(range, _)| {
+                if range.is_empty() {
+                    let end = boundary(self, range.start);
+                    range.start.min(end)..range.end.max(end)
+                } else {
+                    range
+                }
+            })
+            .collect();
+        let before = self.edit.text().clone();
+        let selection_before = self.edit.selection();
+        let outcome = self.edit.delete_ranges(ranges);
+        self.finish_edit(outcome, &before, selection_before, cx);
     }
 
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
@@ -1591,7 +1867,24 @@ impl TextArea {
         window.focus(&self.focus_handle, cx);
         self.is_selecting = true;
         let offset = self.index_for_position(event.position);
-        if event.modifiers.shift {
+        if event.modifiers.alt && event.modifiers.shift {
+            self.rectangular_anchor = Some(event.position);
+            self.select_rectangle(event.position, event.position, cx);
+        } else if event.modifiers.alt {
+            self.is_selecting = false;
+            let mut selections = self.edit.selections();
+            if let Some(index) = selections
+                .iter()
+                .position(|(range, _)| *range == (offset..offset))
+            {
+                if selections.len() > 1 {
+                    selections.remove(index);
+                }
+            } else {
+                selections.push((offset..offset, false));
+            }
+            self.set_selections(selections, cx);
+        } else if event.modifiers.shift {
             self.select_to(offset, cx);
         } else if event.click_count >= 3 {
             self.select_range(text_edit::paragraph_at(self.edit.text(), offset), cx);
@@ -1604,12 +1897,17 @@ impl TextArea {
 
     fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
         if self.is_selecting {
-            self.select_to(self.index_for_position(event.position), cx);
+            if let Some(anchor) = self.rectangular_anchor {
+                self.select_rectangle(anchor, event.position, cx);
+            } else {
+                self.select_to(self.index_for_position(event.position), cx);
+            }
         }
     }
 
     fn on_mouse_up(&mut self, _: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
         self.is_selecting = false;
+        self.rectangular_anchor = None;
     }
 
     fn offset_to_utf16(&self, offset: usize) -> usize {

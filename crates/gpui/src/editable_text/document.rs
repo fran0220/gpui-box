@@ -136,6 +136,39 @@ impl EditSnapshot {
         self.contiguous.take();
     }
 
+    /// Previous extended-grapheme boundary, traversing borrowed rope chunks.
+    pub fn previous_grapheme_boundary(&self, offset: usize) -> usize {
+        self.floor_grapheme(offset.min(self.len()).saturating_sub(1))
+    }
+
+    /// Next extended-grapheme boundary, without materializing a hard line.
+    pub fn next_grapheme_boundary(&self, offset: usize) -> usize {
+        let offset = self.floor_grapheme(offset);
+        if offset == self.len() {
+            return offset;
+        }
+        let mut cursor = GraphemeCursor::new(offset, self.len(), true);
+        let (mut chunk, mut start, _, _) = self.rope.chunk_at_byte(offset);
+        loop {
+            match cursor.next_boundary(chunk, start) {
+                Ok(boundary) => return boundary.unwrap_or(self.len()),
+                Err(GraphemeIncomplete::PreContext(end)) => {
+                    let (context, context_start, _, _) = self.rope.chunk_at_byte(end - 1);
+                    cursor.provide_context(&context[..end - context_start], context_start);
+                }
+                Err(GraphemeIncomplete::PrevChunk) => {
+                    (chunk, start, _, _) = self.rope.chunk_at_byte(start - 1);
+                }
+                Err(GraphemeIncomplete::NextChunk) => {
+                    (chunk, start, _, _) = self.rope.chunk_at_byte(start + chunk.len());
+                }
+                Err(GraphemeIncomplete::InvalidOffset) => {
+                    unreachable!("rope chunks contain the cursor")
+                }
+            }
+        }
+    }
+
     pub(super) fn floor_grapheme(&self, offset: usize) -> usize {
         let offset = offset.min(self.len());
         if offset == self.len() {

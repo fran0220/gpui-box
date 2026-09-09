@@ -28,6 +28,7 @@ use std::ops::Range;
 pub(super) struct EditSelection {
     pub(super) range: Range<usize>,
     pub(super) reversed: bool,
+    pub(super) secondary: Vec<(Range<usize>, bool)>,
 }
 
 impl EditSelection {
@@ -37,6 +38,7 @@ impl EditSelection {
         Self {
             range: offset..offset,
             reversed: false,
+            secondary: Vec::new(),
         }
     }
 }
@@ -108,8 +110,9 @@ pub(super) struct EditStep {
 /// The transactions of one editable control.
 #[derive(Clone, Debug, Default)]
 pub(super) struct EditHistory {
-    done: Vec<EditTransaction>,
-    undone: Vec<EditTransaction>,
+    done: Vec<HistoryEntry>,
+    undone: Vec<HistoryEntry>,
+    pending: Option<Vec<EditTransaction>>,
     /// A history that refuses to record. A secret field sets this and never
     /// unsets it, so no credential can be recovered by walking backwards.
     disabled: bool,
@@ -117,6 +120,12 @@ pub(super) struct EditHistory {
     /// marked run many times before it means anything, so the run is recorded
     /// once, when it ends.
     composing: Option<CompositionStart>,
+}
+
+#[derive(Clone, Debug)]
+struct HistoryEntry {
+    edits: Vec<EditTransaction>,
+    mergeable: bool,
 }
 
 /// Where a composition began, so the whole run can be recorded as one step.
@@ -154,6 +163,24 @@ impl EditHistory {
         self.done.clear();
         self.undone.clear();
         self.composing = None;
+        self.pending = None;
+    }
+
+    pub(super) fn begin_group(&mut self) {
+        self.pending = Some(Vec::new());
+    }
+
+    pub(super) fn end_group(&mut self, before: EditSelection, after: EditSelection) {
+        if let Some(mut edits) = self.pending.take()
+            && let Some(last) = edits.last_mut()
+        {
+            last.selection_after = after;
+            edits[0].selection_before = before;
+            self.done.push(HistoryEntry {
+                edits,
+                mergeable: false,
+            });
+        }
     }
 
     /// Notes that an input method has started composing at `range`, whose
@@ -187,13 +214,16 @@ impl EditHistory {
         if start.before == after {
             return;
         }
-        self.done.push(EditTransaction {
-            start: start.start,
-            before: start.before,
-            after: after.to_owned(),
-            cause: EditCause::Typing,
-            selection_before: start.selection,
-            selection_after: selection,
+        self.done.push(HistoryEntry {
+            edits: vec![EditTransaction {
+                start: start.start,
+                before: start.before,
+                after: after.to_owned(),
+                cause: EditCause::Typing,
+                selection_before: start.selection,
+                selection_after: selection,
+            }],
+            mergeable: true,
         });
         self.undone.clear();
     }
@@ -230,7 +260,9 @@ impl EditHistory {
         }
         self.undone.clear();
 
-        if let Some(last) = self.done.last_mut()
+        if self.pending.is_none()
+            && let Some(entry) = self.done.last_mut().filter(|entry| entry.mergeable)
+            && let Some(last) = entry.edits.last_mut()
             && merges(last, start, before, after, cause)
         {
             last.after.push_str(after);
@@ -238,38 +270,55 @@ impl EditHistory {
             return;
         }
 
-        self.done.push(EditTransaction {
+        let transaction = EditTransaction {
             start,
             before: before.to_owned(),
             after: after.to_owned(),
             cause,
             selection_before,
             selection_after,
-        });
+        };
+        if let Some(pending) = &mut self.pending {
+            pending.push(transaction);
+        } else {
+            self.done.push(HistoryEntry {
+                edits: vec![transaction],
+                mergeable: true,
+            });
+        }
     }
 
     /// The step that takes the last transaction back.
-    pub(super) fn undo(&mut self) -> Option<EditStep> {
-        let transaction = self.done.pop()?;
-        let step = EditStep {
-            range: transaction.range_after(),
-            text: transaction.before.clone(),
-            selection: transaction.selection_before.clone(),
-        };
-        self.undone.push(transaction);
-        Some(step)
+    pub(super) fn undo(&mut self) -> Option<Vec<EditStep>> {
+        let entry = self.done.pop()?;
+        let steps = entry
+            .edits
+            .iter()
+            .rev()
+            .map(|transaction| EditStep {
+                range: transaction.range_after(),
+                text: transaction.before.clone(),
+                selection: transaction.selection_before.clone(),
+            })
+            .collect();
+        self.undone.push(entry);
+        Some(steps)
     }
 
     /// The step that puts it back.
-    pub(super) fn redo(&mut self) -> Option<EditStep> {
-        let transaction = self.undone.pop()?;
-        let step = EditStep {
-            range: transaction.range_before(),
-            text: transaction.after.clone(),
-            selection: transaction.selection_after.clone(),
-        };
-        self.done.push(transaction);
-        Some(step)
+    pub(super) fn redo(&mut self) -> Option<Vec<EditStep>> {
+        let entry = self.undone.pop()?;
+        let steps = entry
+            .edits
+            .iter()
+            .map(|transaction| EditStep {
+                range: transaction.range_before(),
+                text: transaction.after.clone(),
+                selection: transaction.selection_after.clone(),
+            })
+            .collect();
+        self.done.push(entry);
+        Some(steps)
     }
 }
 
@@ -326,7 +375,7 @@ mod tests {
         typed(&mut history, 1, "b");
         typed(&mut history, 2, "c");
 
-        let step = history.undo().expect("one step");
+        let step = history.undo().expect("one step").remove(0);
         assert_eq!(step.range, 0..3);
         assert_eq!(step.text, "");
         assert!(!history.can_undo(), "the run was a single step");
@@ -339,7 +388,7 @@ mod tests {
         typed(&mut history, 1, " ");
         typed(&mut history, 2, "b");
 
-        let step = history.undo().expect("the second word");
+        let step = history.undo().expect("the second word").remove(0);
         assert_eq!(step.range, 2..3, "undo lands between words");
         assert!(history.can_undo());
     }
@@ -350,8 +399,8 @@ mod tests {
         typed(&mut history, 0, "a");
         typed(&mut history, 5, "b");
 
-        assert_eq!(history.undo().expect("the far edit").range, 5..6);
-        assert_eq!(history.undo().expect("the first edit").range, 0..1);
+        assert_eq!(history.undo().expect("the far edit")[0].range, 5..6);
+        assert_eq!(history.undo().expect("the first edit")[0].range, 0..1);
     }
 
     #[test]
@@ -374,8 +423,8 @@ mod tests {
             EditSelection::caret(29),
         );
 
-        assert_eq!(history.undo().expect("the second paste").range, 17..29);
-        assert_eq!(history.undo().expect("the first paste").range, 0..17);
+        assert_eq!(history.undo().expect("the second paste")[0].range, 17..29);
+        assert_eq!(history.undo().expect("the first paste")[0].range, 0..17);
     }
 
     #[test]
@@ -391,8 +440,8 @@ mod tests {
             EditSelection::caret(0),
         );
 
-        assert_eq!(history.undo().expect("the deletion").text, "a");
-        assert_eq!(history.undo().expect("the typing").text, "");
+        assert_eq!(history.undo().expect("the deletion")[0].text, "a");
+        assert_eq!(history.undo().expect("the typing")[0].text, "");
     }
 
     #[test]
@@ -407,11 +456,11 @@ mod tests {
             EditSelection::caret(11),
         );
 
-        let undo = history.undo().expect("a step");
+        let undo = history.undo().expect("a step").remove(0);
         assert_eq!(undo.range, 2..11);
         assert_eq!(undo.text, "old");
 
-        let redo = history.redo().expect("a step back");
+        let redo = history.redo().expect("a step back").remove(0);
         assert_eq!(redo.range, 2..5);
         assert_eq!(redo.text, "new value");
     }
@@ -488,7 +537,10 @@ mod tests {
         );
         history.end_composition("日本", EditSelection::caret(9));
 
-        let step = history.undo().expect("one step for the whole run");
+        let step = history
+            .undo()
+            .expect("one step for the whole run")
+            .remove(0);
         assert_eq!(step.text, "");
         assert!(!history.can_undo());
     }

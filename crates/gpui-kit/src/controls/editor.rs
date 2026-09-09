@@ -17,7 +17,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, AppContext as _, Bounds, Context, Entity, EventEmitter, Focusable, HighlightStyle,
-    InteractiveElement, IntoElement, ParentElement, Pixels, Render, SharedString, Styled,
+    InteractiveElement, IntoElement, ParentElement, Pixels, Point, Render, SharedString, Styled,
     Subscription, Window, div, point, prelude::FluentBuilder as _, px, size,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -300,6 +300,45 @@ impl Editor {
 
     pub fn selected_range(&self, cx: &App) -> Range<usize> {
         self.area.read(cx).selected_range()
+    }
+
+    /// Primary-first selections owned by the shared input/history surface.
+    pub fn selections(&self, cx: &App) -> Vec<(Range<usize>, bool)> {
+        self.area.read(cx).selections()
+    }
+
+    pub fn set_selections(
+        &mut self,
+        selections: impl IntoIterator<Item = (Range<usize>, bool)>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.area
+            .update(cx, |area, cx| area.set_selections(selections, cx))
+    }
+
+    pub fn select_rectangle(
+        &mut self,
+        anchor: Point<Pixels>,
+        focus: Point<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.area
+            .update(cx, |area, cx| area.select_rectangle(anchor, focus, cx))
+    }
+
+    /// Applies caller-supplied changes only to the revision they describe.
+    /// Overlapping or invalid edits are refused before any text/history change.
+    pub fn apply_edits(
+        &mut self,
+        revision: u64,
+        edits: impl IntoIterator<Item = (Range<usize>, SharedString)>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if revision != self.area.read(cx).revision() {
+            return false;
+        }
+        self.area
+            .update(cx, |area, cx| area.replace_ranges(edits, cx))
     }
 
     pub fn geometry(&self, cx: &App) -> Option<EditorGeometry> {

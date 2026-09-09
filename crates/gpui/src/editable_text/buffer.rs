@@ -49,6 +49,7 @@ pub struct EditBuffer {
     /// A caret is an empty selection, so one range describes both.
     selection: Range<usize>,
     reversed: bool,
+    secondary: Vec<(Range<usize>, bool)>,
     /// The range an input method is composing, underlined and replaced whole
     /// as composition continues.
     marked: Option<Range<usize>>,
@@ -62,6 +63,7 @@ impl Default for EditBuffer {
             text: EditSnapshot::default(),
             selection: 0..0,
             reversed: false,
+            secondary: Vec::new(),
             marked: None,
             history: EditHistory::default(),
             rules: EditRules::default(),
@@ -145,7 +147,192 @@ impl EditBuffer {
         EditSelection {
             range: self.selection.clone(),
             reversed: self.reversed,
+            secondary: self.secondary.clone(),
         }
+    }
+
+    /// Selections in primary-first order. Secondary ranges do not overlap.
+    pub fn selections(&self) -> Vec<(Range<usize>, bool)> {
+        std::iter::once((self.selection(), self.reversed))
+            .chain(self.secondary.iter().cloned())
+            .collect()
+    }
+
+    /// Returns whether secondary selections accompany the primary selection.
+    pub fn has_multiple_selections(&self) -> bool {
+        !self.secondary.is_empty()
+    }
+
+    /// Deletes selections, extending empty carets by one grapheme. Overlapping
+    /// deletion spans merge, so shared text is deleted only once. Undo restores
+    /// the original primary-first selections, not the expanded deletion spans.
+    pub fn delete_selections(&mut self, backward: bool) -> EditOutcome {
+        let ranges: Vec<_> = self
+            .selections()
+            .into_iter()
+            .map(|(mut range, _)| {
+                if range.is_empty() {
+                    if backward {
+                        range.start = self.text.previous_grapheme_boundary(range.start);
+                    } else {
+                        range.end = self.text.next_grapheme_boundary(range.end);
+                    }
+                }
+                range
+            })
+            .collect();
+        self.delete_ranges(ranges)
+    }
+
+    /// Deletes primary-first ranges as one transaction, merging overlaps and
+    /// clamping to graphemes. Undo restores the selections before expansion.
+    pub fn delete_ranges(&mut self, ranges: impl IntoIterator<Item = Range<usize>>) -> EditOutcome {
+        let mut ranges: Vec<_> = ranges
+            .into_iter()
+            .enumerate()
+            .map(|(index, range)| (self.clamp(range), index == 0))
+            .collect();
+        if ranges.is_empty() {
+            return EditOutcome { changed: false };
+        }
+        ranges.sort_by_key(|(range, _)| (range.start, range.end));
+        let mut merged: Vec<(Range<usize>, bool)> = Vec::new();
+        for (range, primary) in ranges {
+            if let Some(last) = merged.last_mut()
+                && last.0.end >= range.start
+            {
+                last.0.end = last.0.end.max(range.end);
+                last.1 |= primary;
+            } else {
+                merged.push((range, primary));
+            }
+        }
+        let primary = merged
+            .iter()
+            .position(|(_, primary)| *primary)
+            .expect("primary deletion");
+        merged.swap(0, primary);
+        self.replace_many(
+            merged
+                .into_iter()
+                .map(|(range, _)| (range, SharedString::default())),
+            EditCause::Deleting,
+        )
+        .expect("merged deletion ranges are disjoint")
+    }
+
+    /// Sets primary-first selections, clamped to graphemes. Overlaps and
+    /// duplicate carets merge, preserving primary direction. Empty input is refused.
+    pub fn set_selections(
+        &mut self,
+        selections: impl IntoIterator<Item = (Range<usize>, bool)>,
+    ) -> bool {
+        let mut selections: Vec<_> = selections
+            .into_iter()
+            .enumerate()
+            .map(|(index, (range, reversed))| (index, self.clamp(range), reversed))
+            .collect();
+        if selections.is_empty() {
+            return false;
+        }
+        selections.sort_by_key(|(_, range, _)| (range.start, range.end));
+        let mut merged: Vec<(usize, Range<usize>, bool)> = Vec::new();
+        for (index, range, reversed) in selections {
+            if let Some(last) = merged.last_mut()
+                && (last.1.end > range.start || last.1 == range)
+            {
+                last.1.end = last.1.end.max(range.end);
+                if index < last.0 {
+                    last.0 = index;
+                    last.2 = reversed;
+                }
+            } else {
+                merged.push((index, range, reversed));
+            }
+        }
+        merged.sort_by_key(|(index, _, _)| *index);
+        self.end_composition();
+        self.selection = merged[0].1.clone();
+        self.reversed = merged[0].2;
+        self.secondary = merged
+            .into_iter()
+            .skip(1)
+            .map(|(_, range, reversed)| (range, reversed))
+            .collect();
+        true
+    }
+
+    /// Replaces all selections atomically in original source coordinates.
+    /// One call is one undo transaction; single-caret typing keeps its normal
+    /// coalescing. Each insertion follows the control's ordinary edit rules.
+    pub fn replace_selections(&mut self, text: &str, cause: EditCause) -> EditOutcome {
+        if self.secondary.is_empty() {
+            return self.replace(self.selection(), text, cause);
+        }
+        let text = SharedString::from(text.to_owned());
+        let edits = self
+            .selections()
+            .into_iter()
+            .map(|(range, _)| (range, text.clone()));
+        self.replace_many(edits, cause)
+            .expect("selections do not overlap")
+    }
+
+    /// Applies original-document replacements as one undo transaction. Invalid
+    /// grapheme boundaries, overlaps and duplicate insertions are refused
+    /// before mutation. Each edit produces a caret; the first is primary.
+    pub fn replace_many(
+        &mut self,
+        edits: impl IntoIterator<Item = (Range<usize>, SharedString)>,
+        cause: EditCause,
+    ) -> Option<EditOutcome> {
+        let mut ordered: Vec<_> = edits.into_iter().enumerate().collect();
+        if ordered.is_empty()
+            || ordered.iter().any(|(_, (range, _))| {
+                range.start > range.end
+                    || range.end > self.text.len()
+                    || self.text.floor_grapheme(range.start) != range.start
+                    || self.text.floor_grapheme(range.end) != range.end
+            })
+        {
+            return None;
+        }
+        ordered.sort_by_key(|(_, (range, _))| (range.start, range.end));
+        if ordered
+            .windows(2)
+            .any(|pair| pair[0].1.0.end > pair[1].1.0.start || pair[0].1.0 == pair[1].1.0)
+        {
+            return None;
+        }
+        self.end_composition();
+        let before = self.selection_state();
+        self.history.begin_group();
+        let mut inserted = vec![0; ordered.len()];
+        let mut changed = false;
+        for (index, (range, text)) in ordered.iter().rev() {
+            changed |= self.replace_clamped(range.clone(), text, cause).changed;
+            inserted[*index] = self.selection.end - range.start;
+        }
+        let mut selections = vec![(0..0, false); ordered.len()];
+        let mut added = 0;
+        let mut removed = 0;
+        for (index, (range, _)) in ordered {
+            let caret = range.start + added - removed + inserted[index];
+            let caret = self.text.floor_grapheme(caret);
+            selections[index] = (caret..caret, false);
+            added += inserted[index];
+            removed += range.len();
+        }
+        self.selection = selections[0].0.clone();
+        self.reversed = false;
+        let mut seen = std::collections::HashSet::from([self.selection.start]);
+        self.secondary = selections
+            .into_iter()
+            .skip(1)
+            .filter(|(range, _)| seen.insert(range.start))
+            .collect();
+        self.history.end_group(before, self.selection_state());
+        Some(EditOutcome { changed })
     }
 
     /// Collapses the selection to the nearest valid offset at or before `offset`.
@@ -153,17 +340,20 @@ impl EditBuffer {
         let offset = self.text.floor_grapheme(offset);
         self.selection = offset..offset;
         self.reversed = false;
+        self.secondary.clear();
     }
 
     /// Sets a normalized selection and which endpoint carries focus.
     pub fn set_selection(&mut self, range: Range<usize>, reversed: bool) {
         self.selection = self.clamp(range);
         self.reversed = reversed;
+        self.secondary.clear();
     }
 
     /// Moves the end that is moving, keeping the other one anchored.
     pub fn extend_selection(&mut self, offset: usize) {
         let offset = self.text.floor_grapheme(offset);
+        self.secondary.clear();
         if self.reversed {
             self.selection.start = offset;
         } else {
@@ -182,6 +372,17 @@ impl EditBuffer {
     /// offered.
     pub fn replace(&mut self, range: Range<usize>, text: &str, cause: EditCause) -> EditOutcome {
         let range = self.clamp(range);
+        self.replace_clamped(range, text, cause)
+    }
+
+    // A batch's ranges were clamped in the original document. Re-clamping
+    // after a neighbouring insertion can consume a newly joined grapheme.
+    fn replace_clamped(
+        &mut self,
+        range: Range<usize>,
+        text: &str,
+        cause: EditCause,
+    ) -> EditOutcome {
         let insertion = self.fit(&range, text);
 
         let before = self.text.slice(range.clone()).expect("clamped edit range");
@@ -190,7 +391,9 @@ impl EditBuffer {
             // pointed, which is what makes a delete over an empty selection
             // still move nothing rather than mis-report a change.
             let caret = range.start + insertion.len();
-            self.set_caret(caret);
+            self.selection = caret..caret;
+            self.reversed = false;
+            self.secondary.clear();
             self.marked = None;
             return EditOutcome { changed: false };
         }
@@ -200,6 +403,7 @@ impl EditBuffer {
         let caret = range.start + insertion.len();
         self.selection = caret..caret;
         self.reversed = false;
+        self.secondary.clear();
         self.marked = None;
 
         self.history.record(
@@ -237,6 +441,9 @@ impl EditBuffer {
                 .expect("clamped composition range"),
             self.selection_state(),
         );
+        // Native IME protocols designate one replacement range. Keep that
+        // primary composition authoritative; undo restores the prior set.
+        self.secondary.clear();
 
         let before = self
             .text
@@ -299,14 +506,17 @@ impl EditBuffer {
         self.apply(step)
     }
 
-    fn apply(&mut self, step: super::history::EditStep) -> bool {
+    fn apply(&mut self, steps: Vec<super::history::EditStep>) -> bool {
         // History stores exact byte replacements, including insertions that
         // joined an adjacent grapheme. Re-clamping would delete its neighbour.
-        self.text.replace(step.range, &step.text);
-        self.marked = None;
-        let end = self.text.len();
-        self.selection = step.selection.range.start.min(end)..step.selection.range.end.min(end);
-        self.reversed = step.selection.reversed;
+        for step in steps {
+            self.text.replace(step.range, &step.text);
+            self.marked = None;
+            let end = self.text.len();
+            self.selection = step.selection.range.start.min(end)..step.selection.range.end.min(end);
+            self.reversed = step.selection.reversed;
+            self.secondary = step.selection.secondary;
+        }
         true
     }
 
@@ -326,6 +536,7 @@ impl EditBuffer {
         let end = self.text.len();
         self.selection = end..end;
         self.reversed = false;
+        self.secondary.clear();
         self.marked = None;
         self.history.clear();
         EditOutcome { changed }
@@ -382,6 +593,130 @@ pub(crate) fn clamp_grapheme_range(text: &str, range: Range<usize>) -> Range<usi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_composition_keeps_primary_authority_and_undo_restores_secondary() {
+        let mut buffer = buffer("é middle 😀 end");
+        let initial = vec![(10..14, true), (0..2, false)];
+        buffer.set_selections(initial.clone());
+        buffer.replace_and_mark(10..14, "界", Some(3..3));
+        assert_eq!(buffer.selections(), vec![(13..13, false)]);
+        buffer.replace_and_mark(10..13, "日本", Some(6..6));
+        buffer.end_composition();
+        assert_eq!(buffer.text().as_ref(), "é middle 日本 end");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "é middle 😀 end");
+        assert_eq!(buffer.selections(), initial);
+        assert!(!buffer.can_undo());
+        assert!(buffer.redo());
+        assert_eq!(buffer.selections(), vec![(16..16, false)]);
+    }
+
+    #[test]
+    fn multiple_selections_replay_as_one_atomic_edit_with_primary_identity() {
+        let mut buffer = buffer("é middle 😀 end");
+        let initial = vec![(10..14, true), (0..2, false)];
+        assert!(buffer.set_selections(initial.clone()));
+        assert!(buffer.replace_selections("Q", EditCause::Typing).changed);
+        assert_eq!(buffer.text().as_ref(), "Q middle Q end");
+        assert_eq!(buffer.selections(), vec![(10..10, false), (1..1, false)]);
+        assert!(buffer.replace_selections("R", EditCause::Typing).changed);
+        assert_eq!(buffer.text().as_ref(), "QR middle QR end");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "Q middle Q end");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "é middle 😀 end");
+        assert_eq!(buffer.selections(), initial);
+        assert!(!buffer.can_undo());
+        assert!(buffer.redo());
+        assert_eq!(buffer.text().as_ref(), "Q middle Q end");
+        assert_eq!(buffer.selections(), vec![(10..10, false), (1..1, false)]);
+    }
+
+    #[test]
+    fn multiple_deletions_merge_shared_text_and_restore_unexpanded_carets() {
+        let mut buffer = buffer("a😀bc");
+        let initial = vec![(5..5, false), (0..5, true), (7..7, false)];
+        assert!(buffer.set_selections(initial.clone()));
+        assert!(buffer.delete_selections(true).changed);
+        assert_eq!(buffer.text().as_ref(), "b");
+        assert_eq!(buffer.selections(), vec![(0..0, false), (1..1, false)]);
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "a😀bc");
+        assert_eq!(buffer.selections(), initial);
+        assert!(buffer.set_selections([(1..1, false), (6..6, false)]));
+        buffer.delete_selections(false);
+        assert_eq!(buffer.text().as_ref(), "ab");
+    }
+
+    #[test]
+    fn different_batch_replacements_are_atomic_and_invalid_ranges_are_refused() {
+        let mut buffer = buffer("é middle 😀 end");
+        assert!(
+            buffer
+                .replace_many([(0..1, "x".into()), (10..14, "Q".into())], EditCause::Paste)
+                .is_none()
+        );
+        assert_eq!(buffer.text().as_ref(), "é middle 😀 end");
+        assert!(!buffer.can_undo());
+        assert!(
+            buffer
+                .replace_many(
+                    [(10..14, "two".into()), (0..2, "1".into())],
+                    EditCause::Paste
+                )
+                .expect("valid batch")
+                .changed
+        );
+        assert_eq!(buffer.text().as_ref(), "1 middle two end");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "é middle 😀 end");
+        assert!(buffer.redo());
+        assert_eq!(buffer.text().as_ref(), "1 middle two end");
+    }
+
+    #[test]
+    fn batch_noop_prefix_keeps_original_selections_and_does_not_merge_next_typing() {
+        let mut buffer = buffer("aZ");
+        let initial = vec![(0..1, true), (1..2, false)];
+        assert!(buffer.set_selections(initial.clone()));
+        buffer.replace_selections("Z", EditCause::Typing);
+        assert_eq!(buffer.text().as_ref(), "ZZ");
+        buffer.set_caret(1);
+        buffer.replace(1..1, "t", EditCause::Typing);
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "ZZ");
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "aZ");
+        assert_eq!(buffer.selections(), initial);
+    }
+
+    #[test]
+    fn batch_uses_original_grapheme_boundaries_and_coalesces_coincident_carets() {
+        let mut buffer = buffer("ab");
+        assert!(buffer.set_selections([(0..1, false), (1..2, false)]));
+        buffer.replace_selections("\u{301}", EditCause::Paste);
+        assert_eq!(buffer.text().as_ref(), "\u{301}\u{301}");
+        assert_eq!(buffer.selections(), vec![(0..0, false), (4..4, false)]);
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "ab");
+        buffer.replace_selections("", EditCause::Deleting);
+        assert_eq!(buffer.text().as_ref(), "");
+        assert_eq!(buffer.selections(), vec![(0..0, false)]);
+        buffer.replace_selections("x", EditCause::Typing);
+        assert_eq!(buffer.text().as_ref(), "x");
+    }
+
+    #[test]
+    fn multiselections_merge_overlaps_without_losing_primary_direction() {
+        let mut buffer = buffer("a😀b");
+        assert!(buffer.set_selections([(2..5, true), (0..5, false)]));
+        assert_eq!(buffer.selections(), vec![(0..5, true)]);
+        assert!(buffer.set_selections([(1..1, false), (1..1, false)]));
+        assert_eq!(buffer.selections(), vec![(1..1, false)]);
+        assert!(!buffer.set_selections([]));
+        assert_eq!(buffer.selections(), vec![(1..1, false)]);
+    }
 
     fn buffer(text: &str) -> EditBuffer {
         let mut buffer = EditBuffer::new(EditRules {

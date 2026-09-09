@@ -550,3 +550,14 @@ source snapshot: this removes quadratic segmentation, not all linear costs.
 The platform-independent tests include mixed Unicode and 1,000/10,000-row
 JSON fixtures with a byte-visit budget. Native accessibility adapter behavior
 is unchanged; macOS and Windows execution remains a separate validation lane.
+
+TextArea and Editor expose primary-first `selections`/`set_selections`, painted
+`select_rectangle`, and atomic original-document range replacements. Overlaps
+and duplicate carets merge; invalid batch boundaries are refused before edits.
+Alt-click toggles a caret; Alt-Shift-drag selects painted columns and clamps
+short rows to their ends. Navigation and typing operate on every selection;
+one multicursor edit is one undo step. IME uses only the primary selection,
+clears secondary carets during composition, and restores the previous set on
+undo. Accessibility selection continues to describe the primary native caret.
+Final-glyph hit testing now chooses the nearest start/end caret, including
+multibyte single-glyph lines, instead of always choosing end-of-line.

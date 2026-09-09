@@ -28,7 +28,7 @@ impl TextAreaElement {
 pub struct PrepaintState {
     layout: Option<EditableTextLayout>,
     source_text: gpui::SharedString,
-    cursor: Option<PaintQuad>,
+    cursors: Vec<PaintQuad>,
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
     horizontal_scroll_offset: Pixels,
@@ -84,7 +84,7 @@ impl Element for TextAreaElement {
         let area = self.area.read(cx);
         let content = area.value().clone();
         let source_text = content.clone();
-        let selected = area.selected_range();
+        let selections = area.selections();
         let cursor = area.cursor_offset();
         let marked = area.marked_range();
         let (min_rows, max_rows) = area.row_limits();
@@ -189,29 +189,42 @@ impl Element for TextAreaElement {
             .accessible_geometry
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
-        let caret_paintable = wrap == TextAreaWrap::Soft
-            || empty
-            || layout
-                .painted_source_ranges()
-                .iter()
-                .any(|range| range.start <= cursor && cursor <= range.end);
-        let cursor = (selected.is_empty() && caret_paintable).then(|| {
-            fill(
-                layout.caret_bounds(cursor, origin, px(theme.measures.caret_width)),
-                theme.colors.accent,
-            )
-        });
+        let visible = layout.painted_source_ranges();
+        let cursors = selections
+            .iter()
+            .filter(|(range, _)| range.is_empty())
+            .filter(|(range, _)| {
+                wrap == TextAreaWrap::Soft
+                    || empty
+                    || visible
+                        .iter()
+                        .any(|visible| visible.start <= range.start && range.start <= visible.end)
+            })
+            .map(|(range, _)| {
+                fill(
+                    layout.caret_bounds(range.start, origin, px(theme.measures.caret_width)),
+                    theme.colors.accent,
+                )
+            })
+            .collect();
 
-        let selection = layout
-            .painted_bounds_for_range(selected, origin, gpui::TextAlign::Left, bounds.size.width)
-            .into_iter()
+        let selection = selections
+            .iter()
+            .flat_map(|(range, _)| {
+                layout.painted_bounds_for_range(
+                    range.clone(),
+                    origin,
+                    gpui::TextAlign::Left,
+                    bounds.size.width,
+                )
+            })
             .map(|bounds| fill(bounds, theme.colors.selected))
             .collect();
 
         PrepaintState {
             layout: Some(layout),
             source_text,
-            cursor,
+            cursors,
             selection,
             scroll_offset,
             horizontal_scroll_offset,
@@ -292,11 +305,10 @@ impl Element for TextAreaElement {
                     }
                 });
             }
-            if !disabled
-                && focus_handle.is_focused(window)
-                && let Some(cursor) = prepaint.cursor.take()
-            {
-                window.paint_quad(cursor);
+            if !disabled && focus_handle.is_focused(window) {
+                for cursor in prepaint.cursors.drain(..) {
+                    window.paint_quad(cursor);
+                }
             }
         });
     }

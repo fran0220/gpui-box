@@ -470,3 +470,6 @@ Inherited effect-owner tokens, scoped callback/IME/overlay attribution and
 host-authorized clipboard operations are original GPUI Box modifications.
 No additional third-party source or license was introduced; the frozen
 historical import receipt and upstream notices remain unchanged.
+
+Multiple selection transactions and final-glyph caret hit testing are original
+GPUI Box changes to the local framework, with no additional imported source.

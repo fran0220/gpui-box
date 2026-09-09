@@ -1483,6 +1483,40 @@ pub(super) fn editor(window: &mut Window, cx: &mut App) -> AnyElement {
     scene.into_any_element()
 }
 
+struct SceneMulticursorEditor(Entity<Editor>);
+
+impl Global for SceneMulticursorEditor {}
+
+pub(super) fn editor_multicursor(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneMulticursorEditor>() {
+        let source = "let alpha = 1;\nlet beta  = 2;\nlet gamma = 3;";
+        let editor = cx.new(|cx| {
+            Editor::new(
+                "scene.editor.multiple",
+                "Multicursor source fixture",
+                source,
+                window,
+                cx,
+            )
+            .rows(4)
+        });
+        editor.update(cx, |editor, cx| {
+            let selections = ["gamma", "alpha", "beta"].map(|name| {
+                let start = source.find(name).expect("fixture variable");
+                (start..start + name.len(), false)
+            });
+            editor.set_selections(selections, cx);
+        });
+        window.focus(&editor.read(cx).text_area().read(cx).focus_handle(cx), cx);
+        cx.set_global(SceneMulticursorEditor(editor));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme).w(px(760.0))
+        .child(caption(&theme, "fixture · type in three selections; undo restores all · Alt-click adds a caret · Alt-Shift-drag selects columns"))
+        .child(cx.global::<SceneMulticursorEditor>().0.clone())
+        .into_any_element()
+}
+
 pub(super) struct SceneMentionInput {
     input: Entity<MentionInput>,
 }

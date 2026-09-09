@@ -94,15 +94,11 @@ impl LineLayout {
             }
         }
 
-        if self.len == 1 {
-            if x > self.width / 2. {
-                return 1;
-            } else {
-                return 0;
-            }
+        if self.width - x < x - prev_x {
+            self.len
+        } else {
+            prev_index
         }
-
-        self.len
     }
 
     /// The x position of the character at the given index
@@ -1188,6 +1184,20 @@ mod tests {
             }],
             len: 0,
         }
+    }
+
+    #[test]
+    fn closest_final_glyph_uses_both_caret_boundaries() {
+        let mut layout = make_layout(vec![glyph_at(0.0, 0), glyph_at(7.0, 3)]);
+        layout.width = px(20.0);
+        layout.len = 7;
+        for (x, expected) in [(7.001, 3), (13.4, 3), (13.6, 7), (21.0, 7)] {
+            assert_eq!(layout.closest_index_for_x(px(x)), expected);
+        }
+        layout.runs[0].glyphs.truncate(1);
+        layout.len = 3;
+        assert_eq!(layout.closest_index_for_x(px(9.9)), 0);
+        assert_eq!(layout.closest_index_for_x(px(10.1)), 3);
     }
 
     #[test]
