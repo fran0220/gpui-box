@@ -351,3 +351,47 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   four explicit ignores. Later soft-wrap and KeybindingRecorder deliveries
   are not part of this source or this result. Native candidates still require
   actual macOS/Windows execution; no publication is implied by this local gate.
+
+### Sixth-stage publication and seventh-stage verification
+
+- The sixth stage was pushed and deployed as
+  `8939172a6c3ae1c18f0cb22c8989d14d280413f3`. Both hosted domains verified
+  that revision, 32 packages, 8,332 symbols, 200 components, 168 scenes and
+  all ten MCP tools with matching schemas and structured component identities.
+- Source-bound Platforms run 34406540756 passed actual browser smoke on both
+  native platforms: a 900x650 DOM CSS viewport, IPC/evaluation, navigation,
+  history/reload, prohibited-navigation refusal and offline error. Those are
+  not physical-pixel, DPI, clipping, IME or accessibility proofs. Both actual
+  OS menu tracking smokes passed cancellation, replacement, stale-owner,
+  teardown and surviving/new-owner phases. Windows native UIA still timed out
+  separately; the last log precedes both target lookup and pattern acquisition,
+  so it does not establish a provider wait cycle or an Invoke failure.
+- macOS native sandbox probes passed, but four resource-transport fixtures
+  hardcoded Linux and failed that runtime job. Windows now executes real
+  payloads but its runtime job still failed six probes. The next owned Windows
+  candidate tightens profile paths and corrects launch/probe handling without
+  relaxing access-denied assertions; it needs another actual native run.
+- That run rendered 336 Metal and 336 WARP images. Ten audited candidates
+  comprise two Metal editor-options frames and eight WARP frames; six existing
+  WARP differences total 49 pixels over tolerance, at most two channel steps.
+  The four new editor-options frames retain known default-font emoji tofu.
+  Acceptance uses only this run's hash-bound actuals; tolerance is unchanged.
+- Seventh-stage code integrates exact incremental paragraph wrapping, same-
+  prepaint native row topology, release-time List/Tabs/Tree worker predicates,
+  KeybindingRecorder, PasswordInput and OneTimeCodeInput, for 188 partial
+  adapters. SearchField/FindReplace and their shared reference follow-up are
+  later deliveries, not part of this result. Packaged asset activation and
+  Windows evaluator cancellation remain open.
+- `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` passed with 336 matching
+  Linux images in 428.59 seconds, 576 all-feature framework tests, 138 host
+  tests with five explicit ignores, strict Clippy, wasm32, rustdoc, generated
+  checks and unchanged performance budgets. The combined JS suite passed
+  186 tests with 15 OS skips. Explicit isolated native pointer E2E passed all
+  nine accept/refuse/timeout/revision/removal scenarios; accepted and revoked
+  captures were inspected. Actual recorder click reported `Native recording
+  started`; recording, masked-input and actual reveal captures were inspected.
+- Worker unchanged 63-phase measurements show wrapped 10k edit plus settle
+  requested bytes fall from 108,499,972 to 12,104,718. Cold plus settle falls
+  from 171,817,986 to 126,832,351, but the first cold draw increases. Warm
+  static bytes remain 1,841,017; metadata indexes still scale with source.
+  Full native Value/AXValue and folded source remain; total work is not bounded.

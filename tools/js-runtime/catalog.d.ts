@@ -91,7 +91,7 @@ export interface KitBindingCatalog {
   readonly "JsonView": { readonly source: "crates/gpui-kit/src/structured/json_view.rs"; readonly status: "partial" };
   readonly "KanbanBoard": { readonly source: "crates/gpui-kit/src/data/kanban.rs"; readonly status: "partial" };
   readonly "Kbd": { readonly source: "crates/gpui-kit/src/overlay/kbd.rs"; readonly status: "partial" };
-  readonly "KeybindingRecorder": { readonly source: "crates/gpui-kit/src/controls/keybinding_recorder.rs"; readonly status: "unbound" };
+  readonly "KeybindingRecorder": { readonly source: "crates/gpui-kit/src/controls/keybinding_recorder.rs"; readonly status: "partial" };
   readonly "KeymapEditor": { readonly source: "crates/gpui-kit/src/controls/keymap_editor.rs"; readonly status: "partial" };
   readonly "LineChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "List": { readonly source: "crates/gpui-kit/src/data/list.rs"; readonly status: "partial" };
@@ -116,13 +116,13 @@ export interface KitBindingCatalog {
   readonly "NumberInput": { readonly source: "crates/gpui-kit/src/controls/number_input.rs"; readonly status: "partial" };
   readonly "ObjectiveTracker": { readonly source: "crates/gpui-kit/src/game/presentation.rs"; readonly status: "partial" };
   readonly "OfferingCatalog": { readonly source: "crates/gpui-kit/src/agent/offering_catalog.rs"; readonly status: "partial" };
-  readonly "OneTimeCodeInput": { readonly source: "crates/gpui-kit/src/controls/auth.rs"; readonly status: "unbound" };
+  readonly "OneTimeCodeInput": { readonly source: "crates/gpui-kit/src/controls/auth.rs"; readonly status: "partial" };
   readonly "OutcomePanel": { readonly source: "crates/gpui-kit/src/display/outcome.rs"; readonly status: "partial" };
   readonly "Outline": { readonly source: "crates/gpui-kit/src/content/outline.rs"; readonly status: "partial" };
   readonly "Overlay": { readonly source: "crates/gpui-kit/src/overlay/layer.rs"; readonly status: "partial" };
   readonly "Pagination": { readonly source: "crates/gpui-kit/src/navigation/pagination.rs"; readonly status: "partial" };
   readonly "PartyRoster": { readonly source: "crates/gpui-kit/src/game/presentation.rs"; readonly status: "partial" };
-  readonly "PasswordInput": { readonly source: "crates/gpui-kit/src/controls/auth.rs"; readonly status: "unbound" };
+  readonly "PasswordInput": { readonly source: "crates/gpui-kit/src/controls/auth.rs"; readonly status: "partial" };
   readonly "PerformanceHud": { readonly source: "crates/gpui-kit/src/display/performance_hud.rs"; readonly status: "partial" };
   readonly "PermissionMatrix": { readonly source: "crates/gpui-kit/src/agent/permission.rs"; readonly status: "partial" };
   readonly "PersonaDialogue": { readonly source: "crates/gpui-kit/src/agent/persona.rs"; readonly status: "partial" };

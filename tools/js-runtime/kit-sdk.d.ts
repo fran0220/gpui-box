@@ -52,6 +52,65 @@ export interface KitFactories extends ControlsExtraFactories, NavigationExtraFac
 export declare function createKitBindings(registerHandler: (id: string, event: string, handler: (payload: unknown) => unknown) => string, registerPredicate?: (id: string, component: string, name: string, callback: (payload: unknown) => boolean | Promise<boolean>) => string): Readonly<KitAPI>;
 // Generated from kitMethods by generateKitMethodTypes.
 export interface KitMethodContracts {
+  PasswordInput: {
+    invoke: {
+      set_value: { args: { "value": string }; result: null };
+      set_name: { args: { "name": string | null }; result: null };
+      set_required: { args: { "required": boolean }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_read_only: { args: { "read_only": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+    };
+    query: {
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      value: { args: Record<string, never>; result: string };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      is_revealed: { args: Record<string, never>; result: boolean };
+      selected_range: { args: Record<string, never>; result: { "start": number; "end": number } };
+    };
+  };
+  OneTimeCodeInput: {
+    invoke: {
+      set_value: { args: { "value": string }; result: null };
+      set_name: { args: { "name": string | null }; result: null };
+      set_required: { args: { "required": boolean }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+      set_read_only: { args: { "read_only": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+      set_slots: { args: { "slots": number }; result: null };
+    };
+    query: {
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      value: { args: Record<string, never>; result: string };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      len: { args: Record<string, never>; result: number };
+      is_empty: { args: Record<string, never>; result: boolean };
+      is_complete: { args: Record<string, never>; result: boolean };
+      slot_count: { args: Record<string, never>; result: number };
+    };
+  };
+  KeybindingRecorder: {
+    invoke: {
+      start: { args: Record<string, never>; result: null };
+      cancel: { args: Record<string, never>; result: null };
+      set_binding: { args: { "binding": string | null }; result: null };
+      set_conflict: { args: { "reason": string | null }; result: null };
+      set_label: { args: { "label": string | null }; result: null };
+      set_placeholder: { args: { "placeholder": string | null }; result: null };
+      set_allow_escape: { args: { "allow": boolean }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_control_size: { args: { "size": "xs" | "sm" | "md" | "lg" }; result: null };
+    };
+    query: {
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+      is_recording: { args: Record<string, never>; result: boolean };
+      current_binding: { args: Record<string, never>; result: string | null };
+      is_disabled: { args: Record<string, never>; result: boolean };
+    };
+  };
   SplitButton: {
     invoke: {
       open_menu: { args: Record<string, never>; result: null };

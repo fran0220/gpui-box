@@ -1,4 +1,182 @@
 {
+  "PasswordInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "change": {
+        "type": "string",
+        "max": 16384
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      },
+      "cancel": {
+        "enum": [
+          null
+        ]
+      },
+      "backspaceAtStart": {
+        "enum": [
+          null
+        ]
+      },
+      "focus": {
+        "enum": [
+          null
+        ]
+      },
+      "blur": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "OneTimeCodeInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "slots": {
+          "type": "number",
+          "integer": true,
+          "min": 1,
+          "max": 12
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "change": {
+        "type": "string",
+        "max": 16384
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "KeybindingRecorder": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "binding": {
+          "type": "string",
+          "max": 16384
+        },
+        "conflict": {
+          "type": "string",
+          "max": 16384
+        },
+        "allowEscape": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "started": {
+        "enum": [
+          null
+        ]
+      },
+      "captured": {
+        "type": "string",
+        "max": 16384
+      },
+      "cancelled": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
   "InlineEdit": {
     "props": {
       "type": "object",

@@ -2682,10 +2682,16 @@
       "commands": [
         "set_binding(binding: Option<SharedString>, cx: &mut Context<Self>)",
         "set_conflict(reason: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_allow_escape(allow: bool, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "start(window: &mut Window, cx: &mut Context<Self>)",
         "cancel(cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "is_recording() -> bool",
         "current_binding() -> Option<&SharedString>"
       ],
@@ -3467,6 +3473,10 @@
         "read_only(read_only: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_slots(slots: usize, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -3477,7 +3487,8 @@
         "len(cx: &App) -> usize",
         "is_empty(cx: &App) -> bool",
         "is_complete(cx: &App) -> bool",
-        "slot_count() -> usize"
+        "slot_count() -> usize",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -3632,6 +3643,10 @@
         "read_only(read_only: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -3640,7 +3655,8 @@
       "queries": [
         "value(cx: &App) -> SharedString",
         "is_revealed() -> bool",
-        "selected_range(cx: &App) -> Range<usize>"
+        "selected_range(cx: &App) -> Range<usize>",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [

@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2628
+      "symbolCount": 2634
     },
     {
       "name": "gpui-box-app-host",
@@ -1223,7 +1223,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4505
+      "symbolCount": 4522
     },
     {
       "name": "gpui-box-kit-assets",
@@ -13464,7 +13464,7 @@
       "source": "crates/gpui/src/editable_text/layout.rs",
       "summary": "The shaped geometry of one editable UTF-8 document.",
       "documentation": "The shaped geometry of one editable UTF-8 document.",
-      "signature": "# [doc = \" The shaped geometry of one editable UTF-8 document.\"] pub struct EditableTextLayout { lines : Vec<Arc<WrappedLine>>, # [doc = \" Where each hard line starts in the source text.\"] starts : Vec<usize>, # [doc = \" The first visual row of each hard line.\"] rows : Vec<usize>, total_rows : usize, text_len : usize, line_height : Pixels, source : Option<SourceLines>, }",
+      "signature": "# [doc = \" The shaped geometry of one editable UTF-8 document.\"] # [derive (Clone)] pub struct EditableTextLayout { lines : Arc<[Arc<WrappedLine>]>, # [doc = \" Where each hard line starts in the source text.\"] starts : Arc<[usize]>, # [doc = \" The first visual row of each hard line.\"] rows : Arc<[usize]>, total_rows : usize, text_len : usize, line_height : Pixels, source : Option<Rc<SourceLines>>, paint_rows : Option<Range<usize>>, work : Option<EditableTextWork>, width : Pixels, }",
       "cfg": []
     },
     {
@@ -13798,6 +13798,21 @@
       "target": "EditableTextLayout"
     },
     {
+      "id": "gpui::editable_text::layout::EditableTextLayout::set_painted_rows",
+      "name": "set_painted_rows",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "Restricts painting and painted-range geometry to these visual rows. Logical geometry and native text remain complete. Rows are clamped to the exact index, so this can be applied after scrolling/caret reveal.",
+      "documentation": "Restricts painting and painted-range geometry to these visual rows.\nLogical geometry and native text remain complete. Rows are clamped to\nthe exact index, so this can be applied after scrolling/caret reveal.",
+      "signature": "pub fn set_painted_rows (& mut self, rows : Range<usize>)",
+      "cfg": [],
+      "target": "EditableTextLayout"
+    },
+    {
       "id": "gpui::editable_text::layout::EditableTextLayout::shaping_work",
       "name": "shaping_work",
       "kind": "method",
@@ -13915,6 +13930,79 @@
       "documentation": "Actual shaping input consumed by one layout, including on-demand geometry.\nBytes count UTF-8 input, not allocation calls or a guessed glyph count.",
       "signature": "# [doc = \" Actual shaping input consumed by one layout, including on-demand geometry.\"] # [doc = \" Bytes count UTF-8 input, not allocation calls or a guessed glyph count.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq)] pub struct EditableTextWork { # [doc = \" Number of hard lines actually passed to the shaper.\"] pub shaped_lines : usize, # [doc = \" Sum of UTF-8 bytes actually passed to the shaper.\"] pub shaped_bytes : usize, }",
       "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::layout::reexport-1",
+      "name": "wrapped :: EditableWrappedCache",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout",
+      "path": "gpui::editable_text::layout",
+      "source": "crates/gpui/src/editable_text/layout.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use wrapped::EditableWrappedCache;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::layout::wrapped::EditableWrappedCache",
+      "name": "EditableWrappedCache",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout::wrapped",
+      "path": "gpui::editable_text::layout::wrapped",
+      "source": "crates/gpui/src/editable_text/layout/wrapped.rs",
+      "summary": "Retains exact hard-paragraph layouts for one editable surface. Initial layout and width/font changes shape every paragraph; later edits shape only changed paragraphs or changed style partitions. Static/scroll updates reuse the complete row index. A text edit still rebuilds line-index metadata, and a single exceptionally long paragraph is still one shaping input.",
+      "documentation": "Retains exact hard-paragraph layouts for one editable surface. Initial\nlayout and width/font changes shape every paragraph; later edits shape only\nchanged paragraphs or changed style partitions. Static/scroll updates reuse\nthe complete row index. A text edit still rebuilds line-index metadata, and\na single exceptionally long paragraph is still one shaping input.",
+      "signature": "# [doc = \" Retains exact hard-paragraph layouts for one editable surface. Initial\"] # [doc = \" layout and width/font changes shape every paragraph; later edits shape only\"] # [doc = \" changed paragraphs or changed style partitions. Static/scroll updates reuse\"] # [doc = \" the complete row index. A text edit still rebuilds line-index metadata, and\"] # [doc = \" a single exceptionally long paragraph is still one shaping input.\"] # [derive (Default)] pub struct EditableWrappedCache { state : Option<State>, indexed_lines : usize, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::editable_text::layout::wrapped::EditableWrappedCache::clear",
+      "name": "clear",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout::wrapped",
+      "path": "gpui::editable_text::layout::wrapped",
+      "source": "crates/gpui/src/editable_text/layout/wrapped.rs",
+      "summary": "Drops retained layouts, for example after the host changes available font faces without changing the requested font/style identities.",
+      "documentation": "Drops retained layouts, for example after the host changes available\nfont faces without changing the requested font/style identities.",
+      "signature": "pub fn clear (& mut self)",
+      "cfg": [],
+      "target": "EditableWrappedCache"
+    },
+    {
+      "id": "gpui::editable_text::layout::wrapped::EditableWrappedCache::indexed_lines",
+      "name": "indexed_lines",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout::wrapped",
+      "path": "gpui::editable_text::layout::wrapped",
+      "source": "crates/gpui/src/editable_text/layout/wrapped.rs",
+      "summary": "Number of hard-line metadata entries built by the most recent update. Separate from `EditableTextLayout::shaping_work`: an edit may reuse almost every shaped paragraph while rebuilding the exact row index.",
+      "documentation": "Number of hard-line metadata entries built by the most recent update.\nSeparate from `EditableTextLayout::shaping_work`: an edit may reuse\nalmost every shaped paragraph while rebuilding the exact row index.",
+      "signature": "pub fn indexed_lines (& self) -> usize",
+      "cfg": [],
+      "target": "EditableWrappedCache"
+    },
+    {
+      "id": "gpui::editable_text::layout::wrapped::EditableWrappedCache::update",
+      "name": "update",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "editable_text::layout::wrapped",
+      "path": "gpui::editable_text::layout::wrapped",
+      "source": "crates/gpui/src/editable_text/layout/wrapped.rs",
+      "summary": "Updates exact wrapping with the same text system and byte-style partition used to paint. Viewport restriction is applied afterward via `EditableTextLayout::set_painted_rows`, including after caret reveal.",
+      "documentation": "Updates exact wrapping with the same text system and byte-style\npartition used to paint. Viewport restriction is applied afterward via\n`EditableTextLayout::set_painted_rows`, including after caret reveal.",
+      "signature": "pub fn update (& mut self, document : EditSnapshot, text_system : Arc<WindowTextSystem>, font_size : Pixels, line_height : Pixels, runs : Vec<TextRun>, width : Pixels,) -> EditableTextLayout",
+      "cfg": [],
+      "target": "EditableWrappedCache"
     },
     {
       "id": "gpui::editable_text::next_grapheme_boundary",
@@ -14218,7 +14306,7 @@
     },
     {
       "id": "gpui::editable_text::reexport-4",
-      "name": "layout :: { EditableTextLayout , EditableTextWork }",
+      "name": "layout :: { EditableTextLayout , EditableTextWork , EditableWrappedCache }",
       "kind": "reexport",
       "package": "gpui-box",
       "crate": "gpui",
@@ -14227,7 +14315,7 @@
       "source": "crates/gpui/src/editable_text/mod.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub use layout::{ EditableTextLayout, EditableTextWork };",
+      "signature": "pub use layout::{ EditableTextLayout, EditableTextWork, EditableWrappedCache };",
       "cfg": []
     },
     {
@@ -57869,6 +57957,21 @@
       "target": "OneTimeCodeInput"
     },
     {
+      "id": "gpui_kit::controls::auth::OneTimeCodeInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "OneTimeCodeInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::OneTimeCodeInput::is_empty",
       "name": "is_empty",
       "kind": "method",
@@ -57959,6 +58062,21 @@
       "target": "OneTimeCodeInput"
     },
     {
+      "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "OneTimeCodeInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -57989,6 +58107,21 @@
       "target": "OneTimeCodeInput"
     },
     {
+      "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_name",
+      "name": "set_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "`None` removes the accessible name without replacing the sensitive editor.",
+      "documentation": "`None` removes the accessible name without replacing the sensitive editor.",
+      "signature": "pub fn set_name (& mut self, name : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "OneTimeCodeInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_read_only",
       "name": "set_read_only",
       "kind": "method",
@@ -58000,6 +58133,36 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_read_only (& mut self, read_only : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "OneTimeCodeInput"
+    },
+    {
+      "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "OneTimeCodeInput"
+    },
+    {
+      "id": "gpui_kit::controls::auth::OneTimeCodeInput::set_slots",
+      "name": "set_slots",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "Changes the visual slots and future input limit. Existing text is retained.",
+      "documentation": "Changes the visual slots and future input limit. Existing text is retained.",
+      "signature": "pub fn set_slots (& mut self, slots : usize, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "OneTimeCodeInput"
     },
@@ -58137,6 +58300,21 @@
       "target": "PasswordInput"
     },
     {
+      "id": "gpui_kit::controls::auth::PasswordInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "PasswordInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::PasswordInput::is_revealed",
       "name": "is_revealed",
       "kind": "method",
@@ -58242,6 +58420,21 @@
       "target": "PasswordInput"
     },
     {
+      "id": "gpui_kit::controls::auth::PasswordInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "PasswordInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::PasswordInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -58272,6 +58465,36 @@
       "target": "PasswordInput"
     },
     {
+      "id": "gpui_kit::controls::auth::PasswordInput::set_name",
+      "name": "set_name",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "`None` removes the name without replacing the sensitive editor.",
+      "documentation": "`None` removes the name without replacing the sensitive editor.",
+      "signature": "pub fn set_name (& mut self, name : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "PasswordInput"
+    },
+    {
+      "id": "gpui_kit::controls::auth::PasswordInput::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "`None` restores the native empty placeholder.",
+      "documentation": "`None` restores the native empty placeholder.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "PasswordInput"
+    },
+    {
       "id": "gpui_kit::controls::auth::PasswordInput::set_read_only",
       "name": "set_read_only",
       "kind": "method",
@@ -58283,6 +58506,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_read_only (& mut self, read_only : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "PasswordInput"
+    },
+    {
+      "id": "gpui_kit::controls::auth::PasswordInput::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::auth",
+      "path": "gpui_kit::controls::auth",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "PasswordInput"
     },
@@ -62898,6 +63136,21 @@
       "target": "KeybindingRecorder"
     },
     {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
       "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::is_recording",
       "name": "is_recording",
       "kind": "method",
@@ -62958,6 +63211,21 @@
       "target": "KeybindingRecorder"
     },
     {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_allow_escape",
+      "name": "set_allow_escape",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "Changes how the next escape is handled, preserving the current session.",
+      "documentation": "Changes how the next escape is handled, preserving the current session.",
+      "signature": "pub fn set_allow_escape (& mut self, allow : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
       "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_binding",
       "name": "set_binding",
       "kind": "method",
@@ -62984,6 +63252,66 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_conflict (& mut self, reason : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "Updates presentation without replacing the focus handle or recording session.",
+      "documentation": "Updates presentation without replacing the focus handle or recording session.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_disabled",
+      "name": "set_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "Refuses input and cancels any active recording; reenabling does not start one.",
+      "documentation": "Refuses input and cancels any active recording; reenabling does not start one.",
+      "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_label",
+      "name": "set_label",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "Replaces or removes the accessible label without ending recording.",
+      "documentation": "Replaces or removes the accessible label without ending recording.",
+      "signature": "pub fn set_label (& mut self, label : Option<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "KeybindingRecorder"
+    },
+    {
+      "id": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder::set_placeholder",
+      "name": "set_placeholder",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::keybinding_recorder",
+      "path": "gpui_kit::controls::keybinding_recorder",
+      "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
+      "summary": "`None` restores the localized unbound placeholder.",
+      "documentation": "`None` restores the localized unbound placeholder.",
+      "signature": "pub fn set_placeholder (& mut self, placeholder : Option<SharedString>, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "KeybindingRecorder"
     },
@@ -67651,7 +67979,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "documentation": "Wrapped, multi-line editable text.\n\nEnter inserts a line and the platform modifier plus enter submits. Motion\nfollows visual rows with a preserved goal column, and the frame grows from\n`rows` to `max_rows` before it scrolls rather than pushing the page around.",
-      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, line_projection : Option<gpui::EditableLineProjection>, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, last_layout_text : SharedString, last_layout_rows : Arc<[Range<usize>]>, hard_rows : Option<(u64, Arc<[Range<usize>]>)>, row_index_work : usize, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
+      "signature": "# [doc = \" Wrapped, multi-line editable text.\"] # [doc = \"\"] # [doc = \" Enter inserts a line and the platform modifier plus enter submits. Motion\"] # [doc = \" follows visual rows with a preserved goal column, and the frame grows from\"] # [doc = \" `rows` to `max_rows` before it scrolls rather than pushing the page around.\"] pub struct TextArea { ident : Ident, focus_handle : FocusHandle, placeholder : SharedString, # [doc = \" The value, the caret, the composition in flight, and the transactions\"] # [doc = \" that got here. Every mutation goes through it, so undo describes the\"] # [doc = \" value the area is actually showing.\"] edit : text_edit::EditBuffer, size : ControlSize, disabled : bool, invalid : bool, required : bool, read_only : bool, max_length : Option<usize>, rows : usize, max_rows : Option<usize>, enter : Enter, frame : Frame, wrap : TextAreaWrap, line_projection : Option<gpui::EditableLineProjection>, # [doc = \" Whether the vertical arrows belong to something other than the caret.\"] # [doc = \" Set from the host's render while a surface over the area is listing\"] # [doc = \" options, because that is the only thing that knows there is one.\"] arrows_claimed : bool, # [doc = \" Whether enter and escape belong to the open completion surface.\"] completion_claimed : bool, # [doc = \" Whether tab belongs to a source editor wrapped around this area.\"] indentation_claimed : bool, # [doc = \" The rows the frame decided to occupy, which grows with the text until\"] # [doc = \" `max_rows` and is measured rather than guessed.\"] visible_rows : usize, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, reveal_caret : bool, scroll_dirty : bool, known_text_width : Pixels, # [doc = \" The horizontal position vertical motion aims for, so a run of up or\"] # [doc = \" down keys through a short line does not drag the caret leftwards.\"] goal_x : Option<Pixels>, multi_goal_x : Vec<Pixels>, is_selecting : bool, rectangular_anchor : Option<Point<Pixels>>, last_layout : Option<EditableTextLayout>, wrapped_cache : RefCell<gpui::EditableWrappedCache>, last_layout_text : SharedString, last_layout_rows : Arc<[Range<usize>]>, hard_rows : Option<(u64, Arc<[Range<usize>]>)>, row_index_work : usize, last_bounds : Option<Bounds<Pixels>>, caret_width : Pixels, # [doc = \" Bumped once per layout pass, so a host that resizes the frame around\"] # [doc = \" this area can tell a measurement taken after its last change from one\"] # [doc = \" taken before it.\"] layout_pass : u64, revision : u64, highlight_revision : Option<u64>, highlights : Vec<(Range<usize>, HighlightStyle)>, accessibility_revision : u64, accessible_snapshot : Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>, accessible_geometry : Arc<Mutex<Option<AccessibleLayout>>>, accessible_cache : Arc<Mutex<gpui::AccessibleTextCache>>, # [doc = \" Held so the focus listeners live as long as the area does.\"] _subscriptions : Vec<Subscription>, }",
       "cfg": []
     },
     {
@@ -68540,6 +68868,21 @@
       "target": "TextArea"
     },
     {
+      "id": "gpui_kit::controls::textarea::TextArea::wrapped_index_work",
+      "name": "wrapped_index_work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::textarea",
+      "path": "gpui_kit::controls::textarea",
+      "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
+      "summary": "Hard-line metadata rebuilt by the latest soft-wrap update. Static updates reuse the index; source edits currently rebuild its metadata.",
+      "documentation": "Hard-line metadata rebuilt by the latest soft-wrap update. Static\nupdates reuse the index; source edits currently rebuild its metadata.",
+      "signature": "pub fn wrapped_index_work (& self) -> usize",
+      "cfg": [],
+      "target": "TextArea"
+    },
+    {
       "id": "gpui_kit::controls::textarea::TextAreaEdit",
       "name": "TextAreaEdit",
       "kind": "struct",
@@ -68606,7 +68949,7 @@
       "source": "crates/gpui-kit/src/controls/textarea/element.rs",
       "summary": "",
       "documentation": "",
-      "signature": "pub struct PrepaintState { layout : Option<EditableTextLayout>, source_text : gpui::SharedString, cursors : Vec<PaintQuad>, selection : Vec<PaintQuad>, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, visible_rows : usize, }",
+      "signature": "pub struct PrepaintState { layout : Option<EditableTextLayout>, source_text : gpui::SharedString, rows : std::sync::Arc<[std::ops::Range<usize>]>, indexed_rows : usize, cursors : Vec<PaintQuad>, selection : Vec<PaintQuad>, scroll_offset : Pixels, horizontal_scroll_offset : Pixels, visible_rows : usize, }",
       "cfg": []
     },
     {
@@ -128135,10 +128478,16 @@
       "commands": [
         "set_binding(binding: Option<SharedString>, cx: &mut Context<Self>)",
         "set_conflict(reason: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_label(label: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_allow_escape(allow: bool, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "start(window: &mut Window, cx: &mut Context<Self>)",
         "cancel(cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "is_recording() -> bool",
         "current_binding() -> Option<&SharedString>"
       ],
@@ -128920,6 +129269,10 @@
         "read_only(read_only: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_slots(slots: usize, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -128930,7 +129283,8 @@
         "len(cx: &App) -> usize",
         "is_empty(cx: &App) -> bool",
         "is_complete(cx: &App) -> bool",
-        "slot_count() -> usize"
+        "slot_count() -> usize",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -129085,6 +129439,10 @@
         "read_only(read_only: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
@@ -129093,7 +129451,8 @@
       "queries": [
         "value(cx: &App) -> SharedString",
         "is_revealed() -> bool",
-        "selected_range(cx: &App) -> Range<usize>"
+        "selected_range(cx: &App) -> Range<usize>",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -130763,6 +131122,7 @@
         "shaping_work() -> Option<gpui::EditableTextWork>",
         "accessibility_work() -> gpui::AccessibleTextWork",
         "row_index_work() -> usize",
+        "wrapped_index_work() -> usize",
         "measured() -> Option<Measured>",
         "horizontal_scroll_offset() -> Pixels"
       ],
@@ -152559,7 +152919,8 @@
       "logical_caches": "TextArea retains no-wrap row arrays by persistent document/projection identity and grapheme representability by immutable source storage. Static and selection-only frames construct zero row entries and check zero grapheme bytes. Edits invalidate both; wrap geometry changes invalidate rows. Native tree metadata remains document-wide.",
       "resolved_element_focus": "InteractiveElement::on_focus_resolved observes the exact explicit or framework-generated handle after subtree prepaint; non-focusable elements report no handle, and Kit diagnostics use this authority without changing AccessKit focus.",
       "shared_values": "Element::write_a11y_info_shared defers complete Value materialization until final node properties change. Static parents and identical visible TextRuns are retained; changed selection, value, bounds and reactivation publish complete values. Legacy mutable parent access and relationship naming retain full-value semantics.",
-      "value_work": "Window::accessibility_value_work reports producer materialized, retained, debug-cloned and relationship UTF-8 bytes. It excludes source flattening, child metadata, stock native consumer/adapter copies and explicit full-value queries; neither selection-only nor text-edit total work is claimed bounded. Native macOS/Windows evidence requires the on-demand platform lane."
+      "value_work": "Window::accessibility_value_work reports producer materialized, retained, debug-cloned and relationship UTF-8 bytes. It excludes source flattening, child metadata, stock native consumer/adapter copies and explicit full-value queries; neither selection-only nor text-edit total work is claimed bounded. Native macOS/Windows evidence requires the on-demand platform lane.",
+      "wrapped_publication": "TextArea publishes current prepaint wrapped rows with current cell geometry, avoiding a transient hard-row topology on edits. Folded views preserve full-source accessibility rows. A local wrapped edit segments its changed paragraph; subsequent unchanged draws publish no text runs. Complete native Value and document-wide metadata costs remain."
     },
     "framework_context_menu": {
       "contract": "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability.",
@@ -152580,11 +152941,13 @@
       "limitations": [
         "contiguous compatibility callers still copy the whole document",
         "unbounded Unicode grapheme context may require traversing many chunks without copying them",
-        "soft-wrap layout still shapes the full document",
-        "logical accessibility publication and visual-row enumeration remain document-wide",
+        "cold soft-wrap layout and font/width reflow still shape the full document",
+        "a giant hard paragraph remains one shaping input and its paint path may traverse offscreen glyphs",
+        "new revisions rebuild wrap/visual/native metadata; unchanged row arrays are retained",
         "no-wrap width reports measured lines rather than unseen lines",
         "native macOS and Windows evidence requires the on-demand platform lane"
       ],
+      "soft_wrap": "EditableWrappedCache retains exact paragraph shapes and row indices across static/scroll/selection frames, reshaping changed source/style paragraphs. TextArea applies exact viewport rows after caret reveal. Initial layout and font/width reflow shape all paragraphs; source changes rebuild hard-line metadata. The same shapes govern paint, hit tests, IME and native visual rows.",
       "tests": [
         "indexed_lines_survive_asymmetric_edits_and_persistent_snapshots",
         "large_file_edits_do_not_materialize_document_and_lines_stay_indexed",
