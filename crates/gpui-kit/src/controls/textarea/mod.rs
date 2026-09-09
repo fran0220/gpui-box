@@ -1249,13 +1249,21 @@ impl TextArea {
         changed
     }
 
-    fn accessible_rows(&self) -> Option<Vec<Range<usize>>> {
-        (self.last_layout_text == *self.edit.text()).then(|| {
-            self.last_layout
-                .as_ref()
-                .map(|layout| layout.visual_rows(self.edit.text()))
-                .unwrap_or_else(|| std::iter::once(0..0).collect())
-        })
+    fn accessible_rows(&self) -> Vec<Range<usize>> {
+        if self.last_layout_text == *self.edit.text()
+            && let Some(layout) = &self.last_layout
+        {
+            return layout.visual_rows(self.edit.text());
+        }
+        // A stale painted layout withholds geometry, not logical text. Dropping
+        // the children for one frame disconnects every native text run, making
+        // the next frame republish the complete document and briefly hiding it
+        // from assistive technology. Wrapped visual rows arrive after prepaint;
+        // current hard rows preserve the same content and selection meanwhile.
+        let document = self.document();
+        (0..document.line_count())
+            .filter_map(|line| document.line_range(line))
+            .collect()
     }
 
     /// The range an edit covers when the caller did not name one: whatever an
@@ -2252,91 +2260,80 @@ impl Render for TextArea {
                     }))
                     .cursor(CursorStyle::IBeam)
             })
-            .when_some(accessible_rows.clone(), move |element, accessible_rows| {
-                element.a11y_synthetic_children(move |builder| {
-                    let geometry = accessible_geometry
+            .a11y_synthetic_children(move |builder| {
+                let geometry = accessible_geometry
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .take();
+                let geometry = geometry
+                    .as_ref()
+                    .filter(|geometry| geometry.matches(&content));
+                let snapshot = accessible_cache
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .publish_document(
+                        builder,
+                        &document,
+                        anchor,
+                        focus,
+                        accessible_direction,
+                        &accessible_rows,
+                        accessibility_revision,
+                        geometry.map_or(0..0, |geometry| geometry.visible_range()),
+                        geometry.map_or(1.0, |geometry| geometry.scale_factor),
+                        |range| {
+                            geometry
+                                .map_or_else(Vec::new, |geometry| geometry.bounds_for_range(range))
+                        },
+                    );
+                *accessible_snapshot
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = snapshot;
+            })
+            .when(!self.disabled && selection_representable, |element| {
+                let selection_entity = entity.clone();
+                let selection_snapshot = self.accessible_snapshot.clone();
+                element.on_a11y_action(AccessibleAction::SetTextSelection, move |data, _, cx| {
+                    let Some(ActionData::SetTextSelection(selection)) = data else {
+                        return;
+                    };
+                    let published = selection_snapshot
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .take();
-                    let geometry = geometry
-                        .as_ref()
-                        .filter(|geometry| geometry.matches(&content));
-                    let snapshot = accessible_cache
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .publish_document(
-                            builder,
-                            &document,
-                            anchor,
-                            focus,
-                            accessible_direction,
-                            &accessible_rows,
-                            accessibility_revision,
-                            geometry.map_or(0..0, |geometry| geometry.visible_range()),
-                            geometry.map_or(1.0, |geometry| geometry.scale_factor),
-                            |range| {
-                                geometry.map_or_else(Vec::new, |geometry| {
-                                    geometry.bounds_for_range(range)
-                                })
-                            },
-                        );
-                    *accessible_snapshot
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = snapshot;
+                        .clone();
+                    selection_entity.update(cx, |area, cx| {
+                        if area.disabled {
+                            return;
+                        }
+                        let Some(published) = published.as_ref() else {
+                            return;
+                        };
+                        let Some(anchor) = text_edit::byte_offset_for_published_position(
+                            area.edit.text(),
+                            area.accessibility_revision,
+                            published,
+                            selection.anchor,
+                        ) else {
+                            return;
+                        };
+                        let Some(focus) = text_edit::byte_offset_for_published_position(
+                            area.edit.text(),
+                            area.accessibility_revision,
+                            published,
+                            selection.focus,
+                        ) else {
+                            return;
+                        };
+                        let selection_before = area.edit.selection();
+                        area.edit
+                            .set_selection(anchor.min(focus)..anchor.max(focus), focus < anchor);
+                        area.edit.set_marked(None);
+                        area.goal_x = None;
+                        area.emit_selection_if_changed(selection_before, cx);
+                        cx.notify();
+                    });
                 })
             })
-            .when(
-                !self.disabled && selection_representable && accessible_rows.is_some(),
-                |element| {
-                    let selection_entity = entity.clone();
-                    let selection_snapshot = self.accessible_snapshot.clone();
-                    element.on_a11y_action(
-                        AccessibleAction::SetTextSelection,
-                        move |data, _, cx| {
-                            let Some(ActionData::SetTextSelection(selection)) = data else {
-                                return;
-                            };
-                            let published = selection_snapshot
-                                .lock()
-                                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                                .clone();
-                            selection_entity.update(cx, |area, cx| {
-                                if area.disabled {
-                                    return;
-                                }
-                                let Some(published) = published.as_ref() else {
-                                    return;
-                                };
-                                let Some(anchor) = text_edit::byte_offset_for_published_position(
-                                    area.edit.text(),
-                                    area.accessibility_revision,
-                                    published,
-                                    selection.anchor,
-                                ) else {
-                                    return;
-                                };
-                                let Some(focus) = text_edit::byte_offset_for_published_position(
-                                    area.edit.text(),
-                                    area.accessibility_revision,
-                                    published,
-                                    selection.focus,
-                                ) else {
-                                    return;
-                                };
-                                let selection_before = area.edit.selection();
-                                area.edit.set_selection(
-                                    anchor.min(focus)..anchor.max(focus),
-                                    focus < anchor,
-                                );
-                                area.edit.set_marked(None);
-                                area.goal_x = None;
-                                area.emit_selection_if_changed(selection_before, cx);
-                                cx.notify();
-                            });
-                        },
-                    )
-                },
-            )
             .when(!self.disabled && !self.read_only, |element| {
                 element.on_a11y_action(AccessibleAction::SetValue, move |data, _window, cx| {
                     let Some(ActionData::Value(value)) = data else {

@@ -652,3 +652,11 @@ Windows Value-pattern support and macOS AXValue when a multiline input omits
 its own value, even when all TextRun descendants remain available. Linux
 platform-independent tests cover incremental native trees and Unicode
 equivalence; macOS/Windows execution remains the separate platform lane.
+
+TextArea keeps current logical text children connected on the first edit
+relayout frame. Stale layout withholds painted geometry, not document content;
+soft wrapping temporarily publishes complete hard rows until its new measured
+rows are available. The mounted first-draw regression checks native value and
+all 1,003 text runs before any settling frame, plus the combined former/current
+viewport publication budget. This continuity is required for retained native
+ids to remain reusable across real edits.

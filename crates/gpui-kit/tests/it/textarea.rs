@@ -15,6 +15,67 @@ use unicode_segmentation::UnicodeSegmentation;
 const WIDTH: f32 = 200.0;
 
 #[gpui::test]
+fn native_document_stays_connected_during_the_first_edit_relayout_frame(cx: &mut TestAppContext) {
+    let source = format!(
+        "[\n{}{{\"tail\":7}}\n]",
+        "{\"asymmetric\":\"界\",\"value\":13},\n".repeat(1000)
+    );
+    let at = source.find("13").expect("fixture number");
+    let (mut harness, slot) = area(cx, move |area| {
+        area.text(source.clone())
+            .wrap(TextAreaWrap::None)
+            .rows(8)
+            .max_rows(8)
+    });
+    let entity = slot.borrow().clone().expect("area");
+    harness.frame();
+    harness.update(|window, cx| {
+        entity.update(cx, |area, cx| {
+            area.replace_range(at..at + 1, "987", cx);
+        });
+        // Inspect the FIRST draw, before the geometry-change notification can
+        // schedule a second one and hide a disconnected intermediate tree.
+        window.refresh();
+        window.draw(cx).clear(cx);
+        let tree: serde_json::Value =
+            serde_json::from_str(&window.debug_a11y_tree_json().expect("native tree"))
+                .expect("tree JSON");
+        let nodes = tree["nodes"].as_object().expect("nodes");
+        let field = nodes
+            .values()
+            .find(|node| node["aria"]["role"] == "MultilineTextInput")
+            .expect("field");
+        assert_eq!(
+            field["children"]
+                .as_array()
+                .expect("logical children")
+                .len(),
+            1003
+        );
+        assert_eq!(
+            nodes
+                .values()
+                .filter(|node| node["aria"]["role"] == "TextRun")
+                .count(),
+            1003
+        );
+        assert!(
+            field["aria"]["value"]
+                .as_str()
+                .expect("native value")
+                .contains("9873")
+        );
+        let work = entity.read(cx).accessibility_work();
+        // Initial selection is at EOF; the edit moves to the first viewport.
+        // Both the former and current eight-row viewports refresh geometry,
+        // with at most one partially intersecting row at each boundary.
+        assert!(work.retained_runs >= 1003 - 2 * (8 + 1), "{work:?}");
+        assert!(work.published_runs <= 2 * (8 + 1), "{work:?}");
+        assert!(work.segmented_bytes < 40, "{work:?}");
+    });
+}
+
+#[gpui::test]
 fn denied_clipboard_preserves_multiselection_and_history(cx: &mut TestAppContext) {
     let owner = gpui::EffectOwner::new();
     let slot: Rc<RefCell<Option<Entity<TextArea>>>> = Rc::new(RefCell::new(None));
