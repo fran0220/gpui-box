@@ -1,6 +1,11 @@
 import { cp, lstat, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execute = promisify(execFile);
 
 // Copy only ordinary files/directories. In particular, never grant an
 // AppContainer access through a package-provided junction or symlink.
@@ -33,7 +38,13 @@ export async function windowsSandbox(root, runtimeRoot, {
     throw new Error('Windows sandbox roots must be directories');
   }
   const instance = await mkdtemp(path.join(tmpdir(), 'gpui-js-'));
-  const cleanup = () => rm(instance, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  const profile = `gpui-js-${randomUUID()}`;
+  const cleanup = async () => {
+    // Also handles abrupt helper death: the host retains the unique profile
+    // name independently of the helper. Never delete while the worker runs.
+    await execute(helper, ['--delete-profile', profile], { windowsHide: true, timeout: 15000 });
+    await rm(instance, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  };
   try {
     await copyTree(sourceRoot, path.join(instance, 'package'));
     await copyTree(sourceRuntime, path.join(instance, 'runtime'));
@@ -47,6 +58,7 @@ export async function windowsSandbox(root, runtimeRoot, {
         '--root', sourceRoot,
         '--runtime', sourceRuntime,
         '--parent', String(process.pid),
+        '--profile', profile,
         '--',
         ...(node ? [
           '--disable-wasm-trap-handler', '--max-old-space-size=64', '--permission',
@@ -58,7 +70,8 @@ export async function windowsSandbox(root, runtimeRoot, {
       cleanup,
     };
   } catch (error) {
-    await cleanup();
+    // No helper has run yet, hence no profile exists on staging failure.
+    await rm(instance, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
     throw error;
   }
 }

@@ -30,11 +30,11 @@ mkdir -p target/js-runtime-windows
 x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -municode \
   tools/js-runtime/native/windows-launch.c \
   -o target/js-runtime-windows/gpui-sandbox-launch.exe \
-  -luserenv -ladvapi32 -lrpcrt4 -lws2_32
+  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32
 x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror -municode \
   -DGPUI_SANDBOX_PROBE tools/js-runtime/native/windows-launch.c \
   -o target/js-runtime-windows/windows-probe.exe \
-  -luserenv -ladvapi32 -lrpcrt4 -lws2_32
+  -luserenv -ladvapi32 -lrpcrt4 -lws2_32 -lole32
 ```
 
 Only the launcher ships, as `runtime/gpui-sandbox-launch.exe`. Packaging sets
@@ -56,7 +56,8 @@ The exact helper invocation is:
 ```text
 gpui-sandbox-launch.exe --instance <private-copy-directory>
   --root <original-package-root> --runtime <original-runtime-root>
-  --parent <host-process-id> -- <Node options> <worker> <entry> <generation> <mode>
+  --parent <host-process-id> --profile <gpui-js-UUID>
+  -- <Node options> <worker> <entry> <generation> <mode>
 ```
 
 The helper remaps original absolute package/runtime path arguments and
@@ -68,14 +69,24 @@ inside package code do not become grants.
 Before launch, the helper applies protected ACLs recursively to the **copies
 only**: SYSTEM and the host user retain full access; one random AppContainer SID
 gets read/execute. It never changes ACLs on package sources, the installed Node,
-the original runtime, Windows system files, or the user's profile. Reparse points
+the original runtime, Windows system files, or existing user files. Reparse points
 are checked again before ACL changes. No broad group gets a new grant.
 
-The SID is derived without creating a persistent AppContainer profile. There
-are no capability SIDs, network exemptions, or writable profile directories
-created for the worker. The child receives a clean environment containing only
+The host allocates a unique profile name; the helper provisions it with
+`CreateAppContainerProfile`, never reusing an existing profile. Merely deriving
+a SID does not provision the documented unpackaged AppContainer environment.
+The newly-created profile directory is protected with the same RX-only ACL
+before any worker starts. No capability SIDs or network exemptions are added.
+Windows also creates per-instance registry profile state; this is not a claim
+of a filesystem/registry namespace with no backing state.
+The child receives a clean environment containing only
 Windows directory variables and `NODE_NO_WARNINGS`. An explicit handle list
 passes only duplicated standard pipes; no job or host-process handle leaks.
+`DETACHED_PROCESS` avoids requesting an invisible console. Staging paths are
+expanded to long backslash paths, and image/cwd existence plus host image-open
+are checked before launch. On failure, diagnostics report those exact paths,
+attributes, creation flags and the original Win32 error, without dumping
+payload arguments or host environment values.
 
 `PROC_THREAD_ATTRIBUTE_JOB_LIST` assigns the job atomically at process creation.
 The job handle is private to the helper, so killing the helper also kills its
@@ -85,11 +96,22 @@ security API aborts launch with exit code 125; there is no unrestricted fallback
 
 The session **must call `cleanup()` after the child `close` event**, including
 launch failure, and before resolving stop/exit. Do not call it from `afterSpawn`.
-Cleanup is idempotent and retries transient Windows file locks. An abrupt death
-of both host and helper, OS crash, or power loss can leave read-only copies in
-the temporary directory; no process, persistent profile, or host ACL grant is
-left alive. Deleting such crash leftovers is host maintenance, not a relaxation
-of the sandbox. The host must not reuse an old staging directory.
+The helper kills/reaps its worker before deleting its owned AppContainer
+profile, including normal failure and observed host death. Deferred host
+cleanup invokes `--delete-profile <gpui-js-UUID>` as well, covering abrupt
+helper death, then removes staging. Cleanup is idempotent and reports profile
+deletion refusal; it does not silently report successful cleanup.
+An abrupt death of both host and helper, OS crash, or power loss can leave
+read-only copies and registered per-instance profile state. No worker survives
+job-handle closure, and no source ACL grant was made. Such crash leftovers need
+host maintenance; the host must never reuse an old staging/profile identity.
+
+The first native lane returned error 2 from `CreateProcessW` for both C probes
+and Node. Profile provisioning, console mode and staging path interpretation
+are shared launch concerns; the old log did not identify which lookup failed.
+These corrections remain candidates until native execution confirms startup
+and all containment assertions. The test ACL reader now calls Win32 APIs from
+the native probe, so missing PowerShell modules cannot erase ACL assertions.
 
 ## Resource semantics and remaining differences
 

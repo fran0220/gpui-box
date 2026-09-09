@@ -19,14 +19,48 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include <stdint.h>
+#include <objbase.h>
 
 #define MEMORY_LIMIT ((SIZE_T)256 * 1024 * 1024)
 #define CPU_SECONDS 30
 #define CPU_RATE 2500
 #define PATH_CAP 32768
 
+#ifndef GPUI_SANDBOX_PROBE
+static const wchar_t *owned_profile;
+static HANDLE owned_job, owned_worker;
+static DWORD delete_profile(const wchar_t *name) {
+    HRESULT result;
+    for (int attempt = 0;; attempt++) {
+        result = DeleteAppContainerProfile(name);
+        if (SUCCEEDED(result) || result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) ||
+            result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND)) return 0;
+        if (attempt == 20 || (result != HRESULT_FROM_WIN32(ERROR_SHARING_VIOLATION) &&
+            result != E_ACCESSDENIED && result != HRESULT_FROM_WIN32(ERROR_BUSY))) break;
+        Sleep(100); // job termination can release profile handles asynchronously
+    }
+    fprintf(stderr, "Windows sandbox: DeleteAppContainerProfile failed (0x%08lx)\n", (DWORD)result);
+    return 125;
+}
+static DWORD cleanup_owned(void) {
+    if (owned_job) { CloseHandle(owned_job); owned_job = NULL; }
+    if (owned_worker) {
+        WaitForSingleObject(owned_worker, INFINITE);
+        CloseHandle(owned_worker); owned_worker = NULL;
+    }
+    if (owned_profile) {
+        DWORD result = delete_profile(owned_profile);
+        owned_profile = NULL;
+        return result;
+    }
+    return 0;
+}
+#endif
 static void fail(const char *operation) {
     fprintf(stderr, "Windows sandbox: %s failed (%lu)\n", operation, GetLastError());
+#ifndef GPUI_SANDBOX_PROBE
+    cleanup_owned();
+#endif
     ExitProcess(125);
 }
 #define CHECK(expr) do { if (!(expr)) fail(#expr); } while (0)
@@ -35,6 +69,33 @@ static void fail(const char *operation) {
 /* Native adversarial probe: no Node permission model can mask OS failures. */
 int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 3);
+    if (!wcscmp(argv[1], L"--profile-exists")) {
+        PSID sid = NULL; LPWSTR text = NULL, folder = NULL;
+        CHECK(SUCCEEDED(DeriveAppContainerSidFromAppContainerName(argv[2], &sid)));
+        CHECK(ConvertSidToStringSidW(sid, &text));
+        HRESULT result = GetAppContainerFolderPath(text, &folder);
+        BOOL exists = FALSE;
+        if (SUCCEEDED(result)) {
+            DWORD attributes = GetFileAttributesW(folder);
+            exists = attributes != INVALID_FILE_ATTRIBUTES;
+            CHECK(exists || GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND);
+        } else {
+            CHECK(result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND) || result == HRESULT_FROM_WIN32(ERROR_PATH_NOT_FOUND));
+        }
+        CoTaskMemFree(folder); LocalFree(text); FreeSid(sid);
+        puts(exists ? "true" : "false"); return 0;
+    }
+    if (!wcscmp(argv[1], L"--acl")) {
+        PSECURITY_DESCRIPTOR descriptor = NULL;
+        SECURITY_INFORMATION requested = OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION;
+        DWORD error = GetNamedSecurityInfoW(argv[2], SE_FILE_OBJECT, requested, NULL, NULL, NULL, NULL, &descriptor);
+        if (error) { SetLastError(error); fail("GetNamedSecurityInfoW"); }
+        LPWSTR text = NULL;
+        CHECK(ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor, SDDL_REVISION_1, requested, &text, NULL));
+        wprintf(L"%ls\n", text);
+        LocalFree(text); LocalFree(descriptor);
+        return 0;
+    }
     if (!wcscmp(argv[1], L"spin")) {
         volatile uint64_t counter = 0;
         puts("spinning"); fflush(stdout);
@@ -58,6 +119,17 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(groups && GetTokenInformation(token, TokenCapabilities, groups, size, &size));
     CHECK(groups->GroupCount == 0);
     free(groups);
+    GetTokenInformation(token, TokenAppContainerSid, NULL, 0, &size);
+    TOKEN_APPCONTAINER_INFORMATION *container = malloc(size);
+    CHECK(container && GetTokenInformation(token, TokenAppContainerSid, container, size, &size));
+    LPWSTR package_sid = NULL, profile_folder = NULL;
+    CHECK(ConvertSidToStringSidW(container->TokenAppContainer, &package_sid));
+    CHECK(SUCCEEDED(GetAppContainerFolderPath(package_sid, &profile_folder)));
+    wchar_t profile_file[PATH_CAP];
+    CHECK(swprintf(profile_file, PATH_CAP, L"%ls\\forbidden.txt", profile_folder) > 0);
+    HANDLE profile_write = CreateFileW(profile_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    CHECK(profile_write == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED);
+    CoTaskMemFree(profile_folder); LocalFree(package_sid); free(container);
     CloseHandle(token);
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
     JOBOBJECT_CPU_RATE_CONTROL_INFORMATION cpu;
@@ -205,27 +277,34 @@ static void append_argument(wchar_t *command, const wchar_t *argument) {
 }
 
 int wmain(int argc, wchar_t **argv) {
-    CHECK(argc >= 10 && !wcscmp(argv[1], L"--instance") &&
+    if (argc == 3 && !wcscmp(argv[1], L"--delete-profile")) {
+        UUID uuid;
+        CHECK(wcslen(argv[2]) == 44 && !wcsncmp(argv[2], L"gpui-js-", 8) &&
+            UuidFromStringW(argv[2] + 8, &uuid) == RPC_S_OK);
+        return (int)delete_profile(argv[2]);
+    }
+    CHECK(argc >= 12 && !wcscmp(argv[1], L"--instance") &&
         !wcscmp(argv[3], L"--root") && !wcscmp(argv[5], L"--runtime") &&
-        !wcscmp(argv[7], L"--parent") && !wcscmp(argv[9], L"--"));
-    wchar_t *instance = argv[2];
+        !wcscmp(argv[7], L"--parent") && !wcscmp(argv[9], L"--profile") && !wcscmp(argv[11], L"--"));
+    wchar_t instance[PATH_CAP];
+    DWORD instance_length = GetLongPathNameW(argv[2], instance, PATH_CAP);
+    CHECK(instance_length && instance_length < PATH_CAP);
+    for (wchar_t *p = instance; *p; p++) if (*p == L'/') *p = L'\\';
     CHECK(wcslen(instance) > 3 && GetFileAttributesW(instance) != INVALID_FILE_ATTRIBUTES);
     HANDLE parent = OpenProcess(SYNCHRONIZE, FALSE, wcstoul(argv[8], NULL, 10));
     CHECK(parent);
     CHECK(WaitForSingleObject(parent, 0) == WAIT_TIMEOUT);
 
-    // A random, derived SID has no registered profile, persistent writable
-    // storage, network exemptions, or profile cleanup race after abrupt death.
+    // Unpackaged AppContainers need profile provisioning, not just a SID hash.
+    // The host keeps this unique name for cleanup if the helper is terminated.
     UUID uuid;
-    CHECK(UuidCreate(&uuid) == RPC_S_OK);
-    RPC_WSTR uuidText = NULL;
-    CHECK(UuidToStringW(&uuid, &uuidText) == RPC_S_OK);
-    wchar_t name[128];
-    swprintf(name, 128, L"gpui-js-%ls", uuidText);
-    RpcStringFreeW(&uuidText);
+    const wchar_t *name = argv[10];
+    CHECK(wcslen(name) == 44 && !wcsncmp(name, L"gpui-js-", 8) &&
+        UuidFromStringW((RPC_WSTR)(name + 8), &uuid) == RPC_S_OK);
     PSID sid = NULL;
-    HRESULT result = DeriveAppContainerSidFromAppContainerName(name, &sid);
-    if (FAILED(result)) { SetLastError((DWORD)result); fail("derive AppContainer SID"); }
+    HRESULT result = CreateAppContainerProfile(name, name, L"GPUI Box isolated runtime", NULL, 0, &sid);
+    if (FAILED(result)) { SetLastError((DWORD)result); fail("CreateAppContainerProfile"); }
+    owned_profile = name;
     HANDLE token;
     DWORD size;
     CHECK(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
@@ -243,10 +322,16 @@ int wmain(int argc, wchar_t **argv) {
     BOOL present, defaulted;
     CHECK(GetSecurityDescriptorDacl(descriptor, &present, &acl, &defaulted) && present);
     protect_tree(instance, acl);
+    LPWSTR profile_path = NULL;
+    result = GetAppContainerFolderPath(sidText, &profile_path);
+    if (FAILED(result)) { SetLastError((DWORD)result); fail("GetAppContainerFolderPath"); }
+    protect_tree(profile_path, acl); // only the newly-created per-instance storage
+    CoTaskMemFree(profile_path);
     LocalFree(descriptor); LocalFree(userText); LocalFree(sidText); free(user); CloseHandle(token);
 
     HANDLE job = CreateJobObjectW(NULL, NULL);
     CHECK(job);
+    owned_job = job;
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {0};
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_ACTIVE_PROCESS |
         JOB_OBJECT_LIMIT_PROCESS_MEMORY | JOB_OBJECT_LIMIT_JOB_MEMORY |
@@ -295,7 +380,7 @@ int wmain(int argc, wchar_t **argv) {
     wchar_t *command = calloc(PATH_CAP, sizeof(wchar_t));
     CHECK(command);
     append_argument(command, executable);
-    for (int i = 10; i < argc; i++) {
+    for (int i = 12; i < argc; i++) {
         wchar_t *argument = remap(argv[i], argv[4], argv[6], instance);
         CHECK(argument);
         append_argument(command, argument);
@@ -311,10 +396,26 @@ int wmain(int argc, wchar_t **argv) {
     int written = swprintf(environment, envSize, L"NODE_NO_WARNINGS=1");
     written += 1 + swprintf(environment + written + 1, envSize - written - 1, L"SystemRoot=%ls", windows);
     swprintf(environment + written + 1, envSize - written - 1, L"WINDIR=%ls", windows);
+    DWORD executable_attributes = GetFileAttributesW(executable);
+    DWORD cwd_attributes = GetFileAttributesW(cwd);
+    CHECK(executable_attributes != INVALID_FILE_ATTRIBUTES && !(executable_attributes & FILE_ATTRIBUTE_DIRECTORY));
+    CHECK(cwd_attributes != INVALID_FILE_ATTRIBUTES && (cwd_attributes & FILE_ATTRIBUTE_DIRECTORY));
+    HANDLE image = CreateFileW(executable, GENERIC_READ | GENERIC_EXECUTE,
+        FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+    CHECK(image != INVALID_HANDLE_VALUE);
+    CloseHandle(image);
     PROCESS_INFORMATION process = {0};
-    CHECK(CreateProcessW(executable, command, NULL, NULL, TRUE,
-        EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
-        environment, cwd, &startup.StartupInfo, &process));
+    // No console is needed: all three standard handles are explicit pipes.
+    // CREATE_NO_WINDOW still requests an invisible console on Windows.
+    DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | DETACHED_PROCESS;
+    if (!CreateProcessW(executable, command, NULL, NULL, TRUE,
+        flags, environment, cwd, &startup.StartupInfo, &process)) {
+        DWORD error = GetLastError();
+        fprintf(stderr, "Windows sandbox: launch exe=%ls cwd=%ls exeAttributes=0x%lx cwdAttributes=0x%lx flags=0x%lx profile=%ls env=NODE_NO_WARNINGS,SystemRoot,WINDIR\n",
+            executable, cwd, executable_attributes, cwd_attributes, flags, name);
+        SetLastError(error); fail("CreateProcessW");
+    }
+    owned_worker = process.hProcess;
     for (int i = 0; i < 3; i++) CloseHandle(inherited[i]);
     DeleteProcThreadAttributeList(startup.lpAttributeList);
     free(startup.lpAttributeList); FreeSid(sid);
@@ -323,10 +424,9 @@ int wmain(int argc, wchar_t **argv) {
     DWORD waited = WaitForMultipleObjects(2, wait, FALSE, INFINITE), exitCode = 125;
     CHECK(waited == WAIT_OBJECT_0 || waited == WAIT_OBJECT_0 + 1);
     if (waited == WAIT_OBJECT_0) CHECK(GetExitCodeProcess(process.hProcess, &exitCode));
-    CloseHandle(job); // kills the worker if its host exited
-    CHECK(WaitForSingleObject(process.hProcess, INFINITE) == WAIT_OBJECT_0);
-    CloseHandle(process.hProcess); CloseHandle(parent);
+    DWORD cleanup_error = cleanup_owned(); // kills/reaps before deleting profile
+    CloseHandle(parent);
     free(command); free(environment); free(executable); free(cwd);
-    return (int)exitCode;
+    return cleanup_error ? (int)cleanup_error : (int)exitCode;
 }
 #endif

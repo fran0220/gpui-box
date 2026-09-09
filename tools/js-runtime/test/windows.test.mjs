@@ -37,17 +37,21 @@ function launch(t, config, args, extra = {}) {
   t.after(async () => {
     if (child.exitCode === null && child.signalCode === null) child.kill();
     await closed;
-    await config.cleanup();
+    await config.cleanup?.();
   });
   return { child, closed, output: () => ({ stdout, stderr }) };
 }
 
-async function waitUntil(predicate, message) {
+async function waitUntil(predicate, message, run) {
   for (let i = 0; i < 200; i++) {
     if (predicate()) return;
+    if (run && (run.child.exitCode !== null || run.child.signalCode !== null)) {
+      const [code, signal] = await run.closed;
+      assert.fail(`${message}: child exited code=${code} signal=${signal}; ${JSON.stringify(run.output())}`);
+    }
     await delay(25);
   }
-  assert.fail(message);
+  assert.fail(`${message}${run ? `: ${JSON.stringify(run.output())}` : ''}`);
 }
 
 function exists(pid) {
@@ -56,9 +60,19 @@ function exists(pid) {
 }
 
 function acl(path) {
-  return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    `(Get-Acl -LiteralPath '${path.replaceAll("'", "''")}').Sddl`], { encoding: 'utf8' }).trim();
+  assert.ok(process.env.GPUI_WINDOWS_SANDBOX_PROBE, 'native ACL reader must be built');
+  return execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE, ['--acl', path], { encoding: 'utf8', timeout: 10000 }).trim();
 }
+
+function profileExists(name) {
+  return JSON.parse(execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE,
+    ['--profile-exists', name], { encoding: 'utf8', timeout: 10000 }));
+}
+
+test('Windows readiness observer reports an early launcher exit with stderr', async t => {
+  const run = launch(t, { execPath: process.execPath, execArgv: ['-e', "process.stderr.write('launch failed');process.exit(125)"], stdio: ['pipe', 'pipe', 'pipe'] }, []);
+  await assert.rejects(waitUntil(() => false, 'not ready', run), /child exited code=125.*launch failed/);
+});
 
 test('Windows factory refuses execution on another OS', { skip: windows }, async () => {
   await assert.rejects(windowsSandbox('.', '.'), /requires Windows/);
@@ -90,6 +104,7 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   assert.equal(await readFile(secret, 'utf8'), 'host-only-sentinel');
   await config.cleanup();
   await assert.rejects(access(config.execArgv[1]), { code: 'ENOENT' });
+  assert.equal(profileExists(config.execArgv[10]), false);
 });
 
 test('native committed allocation is refused before 256 MiB', nativeOptions, async t => {
@@ -135,15 +150,14 @@ test('real runtime worker renders TypeScript and the inspector remains contained
   await writeFile(entry, "const label: string = 'Windows ready'; gpui.mount(() => gpui.text('result', label));");
   const config = await windowsSandbox(root, runtime);
   const run = launch(t, config, ['--allow-inspector', join(runtime, 'worker.mjs'), entry, '7', 'debug']);
-  await waitUntil(() => run.output().stdout.includes('"kind":"ready"') || run.child.exitCode !== null,
-    `worker did not become ready: ${JSON.stringify(run.output())}`);
+  await waitUntil(() => run.output().stdout.includes('"kind":"ready"'), 'worker did not become ready', run);
   const frames = () => {
     const output = run.output().stdout;
     return output.slice(0, output.lastIndexOf('\n') + 1).split('\n').filter(Boolean).map(line => JSON.parse(line));
   };
   assert.ok(frames().some(frame => frame.kind === 'render' && frame.generation === 7 && frame.tree.text === 'Windows ready'), JSON.stringify(run.output()));
   run.child.stdin.write(JSON.stringify({ kind: 'debug-evaluate', generation: 7, id: 1, expression: `process.getBuiltinModule('fs').readFileSync(${JSON.stringify(secret)}, 'utf8')` }) + '\n');
-  await waitUntil(() => frames().some(frame => frame.kind === 'debug-response'), 'no inspector response');
+  await waitUntil(() => frames().some(frame => frame.kind === 'debug-response'), 'no inspector response', run);
   assert.ok(frames().find(frame => frame.kind === 'debug-response').value.exceptionDetails);
   run.child.stdin.write(JSON.stringify({ kind: 'dispose', generation: 7 }) + '\n');
   assert.equal((await run.closed)[0], 0, run.output().stderr);
@@ -153,15 +167,17 @@ test('killing the helper kills the worker, then deferred cleanup removes staging
   const { root, minimalRuntime } = await fixture(t);
   const config = await windowsSandbox(root, minimalRuntime);
   const run = launch(t, config, ['-e', 'console.log(process.pid); setInterval(() => {}, 1000)']);
-  await waitUntil(() => run.output().stdout.includes('\n') || run.child.exitCode !== null, 'worker did not start');
+  await waitUntil(() => run.output().stdout.includes('\n'), 'worker did not start', run);
   const pid = Number(run.output().stdout.trim());
   assert.ok(Number.isInteger(pid) && pid > 0, JSON.stringify(run.output()));
   assert.ok(exists(pid));
+  assert.equal(profileExists(config.execArgv[10]), true);
   run.child.kill();
   await run.closed;
   await waitUntil(() => !exists(pid), 'worker survived helper death');
   await config.cleanup();
   await assert.rejects(access(config.execArgv[1]), { code: 'ENOENT' });
+  assert.equal(profileExists(config.execArgv[10]), false);
 });
 
 test('host death terminates the helper and worker without their cooperation', nativeOptions, async t => {
@@ -173,8 +189,10 @@ test('host death terminates the helper and worker without their cooperation', na
     import { spawn } from 'node:child_process';
     const config = await windowsSandbox(${JSON.stringify(root)}, ${JSON.stringify(minimalRuntime)});
     const helper = spawn(config.execPath, [...config.execArgv, '-e', 'console.log(process.pid); setInterval(() => {}, 1000)'], { stdio: config.stdio });
-    console.log(JSON.stringify({ helper: helper.pid, instance: config.execArgv[1] }));
+    console.log(JSON.stringify({ helper: helper.pid, instance: config.execArgv[1], profile: config.execArgv[10] }));
     helper.stdout.pipe(process.stdout); helper.stderr.pipe(process.stderr);
+    helper.on('error', error => { console.error(error.message); process.exit(125); });
+    helper.on('close', (code, signal) => { console.error('helper exited', code, signal); process.exit(code || 125); });
     setInterval(() => {}, 1000);
   `);
   const host = spawn(process.execPath, [hostScript], { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -185,9 +203,17 @@ test('host death terminates the helper and worker without their cooperation', na
   t.after(async () => {
     if (host.exitCode === null && host.signalCode === null) host.kill();
     await closed;
+    // Metadata is emitted before payload readiness, including failed launch.
+    const metadata = output.includes('\n') ? JSON.parse(output.split('\n')[0]) : null;
+    if (metadata) {
+      instance = metadata.instance;
+      execFileSync(process.env.GPUI_SANDBOX_LAUNCHER, ['--delete-profile', metadata.profile], { timeout: 15000 });
+    }
     if (instance) await rm(instance, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
-  await waitUntil(() => output.split('\n').length >= 3 || host.exitCode !== null, 'nested host did not start');
+  await waitUntil(() => output.split('\n').length >= 3, 'nested host did not start', {
+    child: host, closed, output: () => ({ stdout: output, stderr: errors }),
+  });
   const lines = output.trim().split('\n');
   assert.ok(lines.length >= 2, errors);
   const metadata = JSON.parse(lines[0]);
@@ -196,6 +222,18 @@ test('host death terminates the helper and worker without their cooperation', na
   assert.ok(worker > 0 && exists(worker), errors);
   host.kill(); await closed;
   await waitUntil(() => !exists(worker) && !exists(metadata.helper), 'process survived host death');
+  assert.equal(profileExists(metadata.profile), false);
+});
+
+test('failed image creation cleans its provisioned profile without executing a payload', nativeOptions, async t => {
+  const { root, minimalRuntime } = await fixture(t);
+  const config = await windowsSandbox(root, minimalRuntime);
+  await writeFile(join(config.execArgv[1], 'worker.exe'), 'not a PE executable');
+  const run = launch(t, config, []);
+  assert.equal((await run.closed)[0], 125);
+  assert.match(run.output().stderr, /CreateProcessW failed \(193\)/);
+  assert.equal(run.output().stdout, '');
+  assert.equal(profileExists(config.execArgv[10]), false);
 });
 
 test('junction packages and missing launcher fail closed', nativeOptions, async t => {
