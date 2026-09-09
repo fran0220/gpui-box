@@ -6,6 +6,9 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
+import { createSocket } from 'node:dgram';
+import { setTimeout as delay } from 'node:timers/promises';
 import { macosSandbox } from '../macos-sandbox.mjs';
 import { Session } from '../session.mjs';
 
@@ -68,10 +71,27 @@ test('macOS minimal native payload reaches main through the real Seatbelt launch
 });
 test('macOS Seatbelt denies native filesystem/network/fork/spawn, permits threads and applies kernel limits', { skip: !native }, async t => {
   const f = await fixture(t);
+  let connections = 0, datagrams = 0;
+  const tcp = createServer(socket => { connections++; socket.destroy(); });
+  const udp = createSocket('udp4');
+  udp.on('message', () => datagrams++);
+  t.after(() => new Promise(resolve => tcp.close(resolve)));
+  t.after(() => new Promise(resolve => udp.close(resolve)));
+  tcp.listen(0, '127.0.0.1'); await once(tcp, 'listening');
+  udp.bind(0, '127.0.0.1'); await once(udp, 'listening');
+  const ports = [String(tcp.address().port), String(udp.address().port)];
+  const control = await run(t, { execPath: f.probe, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] }, f.root, ['--network-control', ...ports]).done;
+  assert.equal(control.code, 0, JSON.stringify(control));
+  assert.deepEqual(JSON.parse(control.stdout), { tcp: 0, udp: 0, inbound: 0 });
+  for (let i = 0; i < 100 && (connections !== 1 || datagrams !== 1); i++) await delay(10);
+  assert.deepEqual({ connections, datagrams }, { connections: 1, datagrams: 1 }, 'unconfined control must reach both live listeners');
   const config = await macosSandbox(f.root, runtime, { executable: f.probe, node: false, launcher: f.launcher });
-  const result = await run(t, config, f.root, [f.hostFile]).done;
+  const result = await run(t, config, f.root, [f.hostFile, ...ports]).done;
   assert.equal(result.code, 0, JSON.stringify(result));
   assert.deepEqual(JSON.parse(result.stdout), { writes: 1, reads: 1, hostReads: 1, inherited: 0, network: 1, fork: 1, spawn: 1, threads: 1, cpu: 30, files: 64, bytes: 1048576 });
+  await delay(50);
+  assert.deepEqual({ connections, datagrams }, { connections: 1, datagrams: 1 }, 'sandbox must not reach either live listener');
+  t.diagnostic(result.stderr.trim());
   t.diagnostic(`macOS native probe: ${result.stdout.trim()}`);
 });
 test('macOS footprint budget kills oversized native allocation; malformed policy never executes payload', { skip: !native }, async t => {
