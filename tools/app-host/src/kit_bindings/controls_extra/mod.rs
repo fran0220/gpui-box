@@ -22,6 +22,7 @@ mod cascader;
 mod editor;
 mod mention;
 mod recorder;
+mod rich_text;
 mod search;
 mod selection;
 mod text_area;
@@ -66,6 +67,7 @@ pub(super) const COMPONENTS: &[&str] = &[
     "MentionInput",
     "Dropzone",
     "UploadList",
+    "RichTextEditor",
 ];
 
 pub(super) fn settings_section(
@@ -204,6 +206,7 @@ fn focus_reference<T: gpui::Focusable + 'static>(
 
 #[derive(Default)]
 pub(super) struct State {
+    rich_editors: RefCell<HashMap<Key, Rc<rich_text::RichEntry>>>,
     mentions: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::mention::MentionInput>>>>,
     editors: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::editor::Editor>>>>,
     text_areas: RefCell<HashMap<Key, Rc<Entry<gpui_kit::controls::textarea::TextArea>>>>,
@@ -228,6 +231,11 @@ impl State {
     pub(super) fn native_entity_id(&self, node: &Node) -> Option<gpui::EntityId> {
         let key = (node.instance, node.id.clone());
         match node.component.as_deref()? {
+            "RichTextEditor" => self
+                .rich_editors
+                .borrow()
+                .get(&key)
+                .map(|e| e.entry.entity.entity_id()),
             "MentionInput" => self
                 .mentions
                 .borrow()
@@ -330,6 +338,9 @@ impl State {
         cx: &App,
         refs: &crate::references::Registration<'_>,
     ) -> Option<anyhow::Result<Value>> {
+        if node.component.as_deref() == Some("RichTextEditor") {
+            return self.rich_reference_query(node, method, args, cx, refs);
+        }
         if node.component.as_deref() == Some("MentionInput") {
             return self.mention_reference_query(node, method, args, cx, refs);
         }
@@ -440,6 +451,9 @@ impl State {
         }
         let mut live = HashMap::new();
         visit(root, &mut live);
+        self.rich_editors
+            .borrow_mut()
+            .retain(|key, _| live.get(key).is_some_and(|kind| kind == "RichTextEditor"));
         self.mentions
             .borrow_mut()
             .retain(|key, _| live.get(key).is_some_and(|kind| kind == "MentionInput"));
@@ -506,6 +520,7 @@ impl State {
         emit: Emit,
     ) -> AnyElement {
         match node.component.as_deref() {
+            Some("RichTextEditor") => return self.render_rich(node, window, cx, emit),
             Some("Dropzone") => return upload::dropzone(node, emit).into_any_element(),
             Some("UploadList") => return upload::list(node, slots, emit).into_any_element(),
             Some("MentionInput") => return self.render_mention(node, window, cx, emit),
@@ -632,6 +647,7 @@ impl State {
         cx: &mut App,
     ) -> anyhow::Result<Value> {
         match node.component.as_deref() {
+            Some("RichTextEditor") => return self.invoke_rich(node, method, args, query, cx),
             Some("UploadList") if query && method == "overall" => return Ok(upload::overall(node)),
             Some("MentionInput") => return self.invoke_mention(node, method, args, query, cx),
             Some("Editor") => return self.invoke_editor(node, method, args, query, _window, cx),
@@ -1455,6 +1471,14 @@ impl State {
 
 /// Relational checks supplement the shared closed shape grammar.
 pub(super) fn validate(node: &Node) -> anyhow::Result<()> {
+    if node.component.as_deref() == Some("RichTextEditor") {
+        anyhow::ensure!(
+            node.props["document"]["blocks"]
+                .as_array()
+                .is_some_and(|b| !b.is_empty()),
+            "a rich-text document needs one block"
+        );
+    }
     if node.component.as_deref() == Some("Cascader") {
         cascader::validate_options(node.props.get("options"))?;
     }

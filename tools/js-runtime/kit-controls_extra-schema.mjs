@@ -3,6 +3,7 @@ import { iconSchema } from './kit-icon-schema.mjs';
 import { menuItemsSchema, validateMenuItems } from './kit-overlay-schema.mjs';
 import { selectOptionSchema } from './kit-select-option-schema.mjs';
 import { dragItemSchema } from './kit-drag-schema.mjs';
+import { richTextSchema, richTextMethods } from './kit-rich-text-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { ...string, min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -86,6 +87,7 @@ export const familyBindings = Object.freeze({
 });
 
 export const familySchemas = Object.freeze({
+  RichTextEditor:richTextSchema,
   Dropzone:{props:object({disabled:boolean,invalid:boolean,label:string,hint:string,refusal:string,accepts:array(string),icon:iconSchema,state:choice('idle','accepting','refusing')},['label']),events:{drop:dragItemSchema,filesRefused:object({state:choice('unavailable'),reason:string},['state','reason'])}},
   UploadList:{props:object({...common,uploads:array(uploadItem),showOverall:boolean}),events:{retry:identity,cancel:identity,remove:identity},slots:['dropzone','empty']},
   MentionInput:{props:object({disabled:boolean,readOnly:boolean,value:string,placeholder:string,rows:rowCount,suggestions:mentionSuggestions}),events:{changed:string,submitted:choice(null),cancelled:choice(null),focused:choice(null),blurred:choice(null),pasteRefused:pasteRefusal,queryChanged:mentionQuery,accepted:object({id:identity,range:byteRange},['id','range'])}},
@@ -121,6 +123,7 @@ export const familySchemas = Object.freeze({
   FilterBar: { props: object({ ...common, conditions: array(object({ id: identity, field: string, operator: string, value: string, tone: choice('neutral', 'accent', 'success', 'warning', 'danger', 'info') }, ['id', 'field', 'operator', 'value'])), countState: choice('unknown', 'counting', 'known', 'unavailable'), count: integer, countReason: string, noun: string, addLabel: string, clearLabel: string }), events: { add: choice(null), remove: identity, clear: choice(null) }, slots: ['add_control'] },
 });
 export const familyMethods = Object.freeze({
+  RichTextEditor:richTextMethods,
   UploadList:{invoke:{},query:{overall:method({},{oneOf:[object({state:choice('known'),fraction:unit},['state','fraction']),object({state:choice('indeterminate','settled')},['state'])]})}},
   MentionInput:{invoke:{set_suggestions:method({suggestions:mentionSuggestions},choice(null))},query:{editor:method({},object({$nativeRef:identity,type:choice('TextArea')},['$nativeRef','type'])),active_query:method({},mentionQuery),is_open:method({},boolean)}},
   Editor:{invoke:{
@@ -221,6 +224,7 @@ export const familyMethods = Object.freeze({
 
 // Called after closed-shape validation, in both worker and native host.
 export function validateFamilyProps(component, props) {
+  if(component==='RichTextEditor' && !props.document.blocks.length) throw new TypeError('a rich-text document needs one block');
   if(component==='Cascader') {
     const ids=new Set();
     const visit=options=>{for(const option of options??[]){if(ids.has(option.id))throw new TypeError('duplicate Cascader identity');ids.add(option.id);if(option.children?.state==='ready')visit(option.children.value);}};

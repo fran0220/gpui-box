@@ -35,6 +35,7 @@ export interface KeymapBinding { id: string; keystroke: string; conflict?: strin
 export interface KeymapCommand { id: string; label: string; context?: string; defaults?: string[]; bindings?: KeymapBinding[]; searchText?: string; keywords?: string[]; refusal?: string }
 export interface KeymapCommandResult { id: string; label: string; context: string | null; defaults: string[]; bindings: { id: string; keystroke: string; conflict: string | null; provenance: string | null }[]; searchText: string; keywords: string[]; refusal: string | null }
 export interface ControlsExtraFactories {
+  RichTextEditor(id:string,props:{document:KitMethodContracts['RichTextEditor']['invoke']['replace_document']['args']['document'];name?:string;placeholder?:string;frame?:'own'|'host';toolbar?:boolean;rows?:number;maxRows?:number;disabled?:boolean;readOnly?:boolean;required?:boolean;invalid?:boolean},events?:{intentApplied?(event:{intent:KitMethodContracts['RichTextEditor']['invoke']['apply_intent']['args']['intent'];result:{documentChanged:boolean;selectionChanged:boolean;pendingStyleChanged:boolean}}):void;intentRefused?(event:{intent:KitMethodContracts['RichTextEditor']['invoke']['apply_intent']['args']['intent'];reason:string}):void;linkRequested?(selection:KitMethodContracts['RichTextEditor']['query']['selection']['result']):void;focus?():void;blur?():void}):KitNode;
   Dropzone(id:string,props:{label:string;disabled?:boolean;invalid?:boolean;hint?:string;refusal?:string;accepts?:string[];icon?:BuiltinIconDescriptor;state?:'idle'|'accepting'|'refusing'},events?:{drop?(item:KitDragItem):void;filesRefused?(refusal:{state:'unavailable';reason:string}):void}):Omit<KitNode,'component'> & {component:'Dropzone'};
   UploadList(id:string,props?:ControlProps & {showOverall?:boolean;uploads?:{id:string;name:string;size?:string;state:{state:'queued'|'done'|'cancelled'}|{state:'uploading';fraction:number|null}|{state:'failed'|'refused';reason:string}}[]},events?:{retry?(id:string):void;cancel?(id:string):void;remove?(id:string):void},slots?:{dropzone?:[Omit<KitNode,'component'> & {component:'Dropzone'}];empty?:SlotNode[]}):KitNode;
   MentionInput(id:string,props?:{disabled?:boolean;readOnly?:boolean;value?:string;placeholder?:string;rows?:number;suggestions?:KitMethodContracts['MentionInput']['invoke']['set_suggestions']['args']['suggestions']},events?:{changed?(text:string):void;submitted?():void;cancelled?():void;focused?():void;blurred?():void;pasteRefused?(refusal:PasteRefusal):void;queryChanged?(query:{text:string;range:ByteRange}|null):void;accepted?(value:{id:string;range:ByteRange}):void}):KitNode;
@@ -97,6 +98,7 @@ interface OptionCommands {
 }
 interface SelectionQueries extends FocusQueries {is_disabled:SelectionQuery<boolean>}
 export interface ControlsExtraMethodContracts {
+  RichTextEditor: KitMethodContracts['RichTextEditor'];
   UploadList: KitMethodContracts['UploadList'];
   MentionInput: KitMethodContracts['MentionInput'];
   Editor: KitMethodContracts['Editor'];

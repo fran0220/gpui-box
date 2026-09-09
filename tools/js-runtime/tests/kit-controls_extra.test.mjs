@@ -8,6 +8,21 @@ import { spawnSync } from 'node:child_process';
 import { familySchemas, familyMethods, validateFamilyProps } from '../kit-controls_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 
+test('rich text contracts preserve complete documents and reject fake editor snapshots',()=>{
+ const document={blocks:[{id:'first',text:'AλZ',styles:[{range:{start:1,end:3},style:{bold:true,link:'caller:destination'}}],paragraph:{alignment:'center',list:{kind:'ordered',depth:2}}}]};
+ validateValue({document},familySchemas.RichTextEditor.props);validateFamilyProps('RichTextEditor',{document});
+ assert.throws(()=>validateFamilyProps('RichTextEditor',{document:{blocks:[]}}));
+ assert.throws(()=>validateValue({document:{blocks:[document.blocks[0],document.blocks[0]]}},familySchemas.RichTextEditor.props));
+ assert.throws(()=>validateValue({document:{text:'plain fallback'}},familySchemas.RichTextEditor.props));
+ assert.throws(()=>validateValue({revision:1,text:'metadata'},familyMethods.RichTextEditor.query.document.result));
+ validateValue({intent:{kind:'replaceMultiline',text:'a\nb',newBlocks:['next'],input:'paste'}},familyMethods.RichTextEditor.invoke.apply_intent.args);
+ validateValue({intent:{kind:'setLink',destination:null}},familyMethods.RichTextEditor.invoke.apply_intent.args);
+ assert.throws(()=>validateValue({intent:{kind:'hardBreak'}},familyMethods.RichTextEditor.invoke.apply_intent.args));
+ assert.throws(()=>validateValue({intent:{kind:'compose',text:'x',selection:{start:0,end:1},html:'<b>x</b>'}},familyMethods.RichTextEditor.invoke.apply_intent.args));
+ validateValue({$nativeRef:'native-1',type:'RichTextEditSession'},familyMethods.RichTextEditor.query.session.result);
+ assert.throws(()=>validateValue({$nativeRef:'native-1',type:'Editor'},familyMethods.RichTextEditor.query.session.result));
+});
+
 test('uploads preserve unknown progress and refuse invented external file authority',()=>{
  for(const state of [{state:'queued'},{state:'done'},{state:'cancelled'},{state:'uploading',fraction:null},{state:'uploading',fraction:0.2},{state:'failed',reason:'Failed'},{state:'refused',reason:'Policy'}])validateValue({uploads:[{id:'a',name:'Caller fixture',state}]},familySchemas.UploadList.props);
  for(const state of [{state:'uploading'},{state:'uploading',fraction:1.1},{state:'failed'},{state:'refused',fraction:0}])assert.throws(()=>validateValue({uploads:[{id:'a',name:'Caller fixture',state}]},familySchemas.UploadList.props));
@@ -297,6 +312,11 @@ kit.FilterBar('filter', {countState:'unavailable',countReason:'Refused'}, {remov
 kit.SearchInput('search', {}, {change(value) { const query: string = value; }});
 kit.TextArea('area',{wrap:'none',autosize:{min:2,max:5}},{edited(edit){const inserted:string=edit.inserted;},change(text){const full:string=text;}});
 kit.Editor('editor',{languageServices:true},{serviceRequested(request){const full:string=request.document;}});
+kit.RichTextEditor('rich',{document:{blocks:[{id:'first',text:'Rich fixture',styles:[{range:{start:0,end:4},style:{bold:true}}]}]}},{intentApplied(event){const changed:boolean=event.result.documentChanged;}});
+// @ts-expect-error actual rich documents are not a plain-text fallback
+kit.RichTextEditor('bad',{document:{text:'fallback'}});
+// @ts-expect-error rich editor emits native intents, not a fabricated changed event
+kit.RichTextEditor('bad',{document:{blocks:[{id:'b',text:''}]}},{changed(text:string){}});
 const zone=kit.Dropzone('zone',{label:'Drop',accepts:['row']},{drop(item){const key:string=item.id;}});
 kit.UploadList('uploads',{uploads:[{id:'pending',name:'Pending',state:{state:'uploading',fraction:null}}]}, {retry(id){const key:string=id;}},{dropzone:[zone]});
 // @ts-expect-error dropzone requires an actual typed Dropzone descriptor
