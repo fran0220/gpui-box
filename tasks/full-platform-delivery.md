@@ -154,11 +154,24 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   including rejection of a uniform slowdown in both workloads. No measured
   speedup is claimed. Worker same-revision software Vulkan measurements are
   controls, not hardware GPU budgets or Metal/WARP evidence.
-- Combined API check and two setup runs pass. Full combined Linux gate and
-  native platform evidence remain pending at this checkpoint; independent
-  worker gates do not certify the combined tree.
-- Still open: editor wheel integration, soft-wrap/event/accessibility costs,
+- Combined API check and two setup runs pass. The first combined full run then
+  caught six missing syntax diagnostic/panic allowlist entries. After reviewing
+  and regenerating them, the retry passed `CARGO_INCREMENTAL=0 cargo run -p xtask
+  -- gate full`: 322 images match, 422.94 seconds for the visual comparison.
+  Source remained frozen throughout this successful run, including editor wheel
+  browsing and the SettingsList page-chrome stage.
+- Combined native X11 WebView smoke passed CSS/viewport, IPC/script, HTTP
+  navigation/history/reload, policy refusal and a real connection-refused error.
+  NavStack push, attachment states and settings default/no-match/reset were
+  exercised in the combined headless host; audits returned no findings and
+  screenshots were inspected. No baselines were accepted by the coordinator.
+- Still open: soft-wrap/event/accessibility costs,
   multicursor/folding/services; background document coalescing/stale rejection;
   remaining component/resource scope; complete runtime bindings, native OS
   sandbox parity, packaging and native browser/renderer execution. Further
   cross-stream document/editor performance fixtures must use their real APIs.
+- The Windows sandbox candidate has a separate implementation owner:
+  https://ampcode.com/threads/T-01a086b0-d0e2-7491-b7bb-70b73c3825dc.
+  The framework scrolling owner now owns inherited effect/clipboard context;
+  native clipboard gestures must not silently bypass an owner's capability
+  denial. Existing verified CopyButton success still requires readback.
