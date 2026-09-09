@@ -903,3 +903,8 @@ changes; no renderer ABI, native event translator, imported source, package
 authority or frozen historical receipt changed. Kit's exact-owner keyed
 registry retirement and explicitly retained follow/glide continuations are
 original component infrastructure over those primitives.
+
+Owner cache lifetime uses explicit positive host mount registration rather
+than historical tombstones. Active-owner and owner-group tables shrink after
+removals; delayed callbacks never register owners. This original Kit change
+introduces no upstream source or additional dependency.

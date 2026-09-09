@@ -506,3 +506,5 @@ was added; upstream notices and the frozen import receipt remain intact.
 Typed effect-owner scopes, independent horizontal/vertical wheel consumption,
 and exact-owner Kit keyed-cache retirement are original GPUI Box work. No new
 third-party source or license was introduced; historical notices are intact.
+Positive mount registration and bounded owner-cache lifetime are original Kit
+infrastructure, with no additional third-party source or dependency.

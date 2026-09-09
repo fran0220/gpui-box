@@ -465,6 +465,7 @@ mod tests {
         let ident = Ident::from("retired-glide");
         let state = window.update(|window, cx| {
             crate::install(cx);
+            window_state::register_owner_state(owner, cx);
             cx.with_effect_owner(Some(owner), |cx| {
                 let state = list_state(
                     &ident,
@@ -485,6 +486,15 @@ mod tests {
         });
         cx.dispatcher.advance_clock(Duration::from_secs(3));
         cx.run_until_parked();
+        window.update(|window, cx| {
+            for owner in [owner, gpui::EffectOwner::new()] {
+                cx.with_effect_owner(Some(owner), |cx| {
+                    glide_to_row(&ident, 43, window, cx);
+                    assert!(!window_state::owner_state_is_live(owner, cx));
+                    assert!(flow_state(&ident, window.window_handle().window_id(), cx).is_none());
+                });
+            }
+        });
         assert_eq!(
             state.logical_scroll_top().item_ix,
             0,

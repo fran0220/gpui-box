@@ -467,6 +467,7 @@ mod tests {
         let window = cx.add_empty_window();
         let state = window.update(|window, cx| {
             crate::install(cx);
+            window_state::register_owner_state(owner, cx);
             cx.with_effect_owner(Some(owner), |cx| {
                 let state = crate::data::viewport::list_state(
                     &ident,
@@ -501,6 +502,25 @@ mod tests {
                     "wheel release updates the original owner's follower"
                 )
             })
+        });
+        window.update(|_, cx| {
+            window_state::release_owner_state(owner, cx);
+        });
+        // The mounted view still retains its old callback, as a late native
+        // dispatch can. Its deferred follow lookup must not activate the token.
+        window.simulate_event(ScrollWheelEvent {
+            position: point(px(5.), px(5.)),
+            delta: ScrollDelta::Pixels(point(px(0.), px(17.))),
+            ..Default::default()
+        });
+        window.update(|window, cx| {
+            cx.with_effect_owner(Some(owner), |cx| {
+                assert!(!window_state::owner_state_is_live(owner, cx));
+                assert!(
+                    window_state::keyed_ids::<Follower>(window.window_handle().window_id(), cx)
+                        .is_empty()
+                );
+            });
         });
     }
 

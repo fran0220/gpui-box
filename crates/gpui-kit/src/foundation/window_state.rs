@@ -50,22 +50,35 @@ type ReleaseKeyed = fn(EffectOwner, &mut App) -> usize;
 #[derive(Default)]
 struct OwnerStates {
     release: HashMap<TypeId, ReleaseKeyed>,
-    // Copyable tokens can be retained by arbitrarily late continuations.
-    // Tombstones live for the App lifetime so release cannot be undone.
-    retired: HashSet<EffectOwner>,
+    // Only an explicit host mount operation registers authority to retain state.
+    // Ambient scopes and late callbacks never insert here.
+    active: HashSet<EffectOwner>,
 }
 
 impl Global for OwnerStates {}
+
+/// Registers a freshly minted mount owner before constructing its Kit state.
+/// Only the host mount lifecycle calls this; never call it from a component,
+/// render, or delayed callback. Preserve registration across ordinary renders,
+/// release on unmount, and mint a new token for a subsequent mount.
+/// This grants cache lifetime only, not clipboard or other effect permission.
+pub fn register_owner_state(owner: EffectOwner, cx: &mut App) {
+    if !cx.has_global::<OwnerStates>() {
+        cx.set_global(OwnerStates::default());
+    }
+    cx.global_mut::<OwnerStates>().active.insert(owner);
+}
 
 /// Whether an owner may still retain Kit keyed state. This is cache lifetime,
 /// not permission to perform effects. Native unowned state remains compatible.
 pub fn owner_state_is_live(owner: EffectOwner, cx: &App) -> bool {
     cx.try_global::<OwnerStates>()
-        .is_none_or(|state| !state.retired.contains(&owner))
+        .is_some_and(|state| state.active.contains(&owner))
 }
 
 /// Immediately drops all typed keyed-registry entries belonging to this exact
-/// owner, across windows, and permanently rejects recreation under its token.
+/// owner, across windows, and removes its registration. Ambient owner scopes
+/// cannot recreate it; no retired-token tombstones are retained.
 /// Returns the number of removed keys. No semantic-id parsing is involved.
 ///
 /// Hosts use one owner per actual mount, preserve it across ordinary renders,
@@ -74,11 +87,20 @@ pub fn owner_state_is_live(owner: EffectOwner, cx: &App) -> bool {
 /// Entity handles, and does not partition window-wide overlay coordination.
 pub fn release_owner_state(owner: EffectOwner, cx: &mut App) -> usize {
     if !cx.has_global::<OwnerStates>() {
-        cx.set_global(OwnerStates::default());
+        return 0;
     }
     let callbacks = {
         let states = cx.global_mut::<OwnerStates>();
-        states.retired.insert(owner);
+        if !states.active.remove(&owner) {
+            return 0;
+        }
+        // Shrink geometrically, not once per removal; keep neither history nor
+        // an unbounded high-water allocation after a large mount batch exits.
+        if states.active.capacity() > states.active.len().saturating_mul(4) {
+            states
+                .active
+                .shrink_to(states.active.len().saturating_mul(2));
+        }
         states.release.values().copied().collect::<Vec<_>>()
     };
     callbacks
@@ -95,8 +117,16 @@ fn release_keyed<T: 'static>(owner: EffectOwner, cx: &mut App) -> usize {
         .0
         .borrow_mut()
         .values_mut()
-        .filter_map(|keys| keys.0.remove(&Some(owner)))
-        .map(|removed| removed.len())
+        .map(|keys| {
+            let removed = keys
+                .0
+                .remove(&Some(owner))
+                .map_or(0, |entries| entries.len());
+            if keys.0.capacity() > keys.0.len().saturating_mul(4) {
+                keys.0.shrink_to(keys.0.len().saturating_mul(2));
+            }
+            removed
+        })
         .sum()
 }
 
@@ -327,6 +357,8 @@ mod tests {
         let left = WindowId::from(31);
         let right = WindowId::from(32);
         cx.update(|cx| {
+            register_owner_state(owner, cx);
+            register_owner_state(sibling, cx);
             let composite: SharedString = "effect-particles:unrelated-prefix".into();
             let removed = cx.with_effect_owner(Some(owner), |cx| {
                 with_key(&composite, left, cx, |state: &mut Rc<()>| {
@@ -389,6 +421,7 @@ mod tests {
         let owner = EffectOwner::new();
         let window = WindowId::from(41);
         cx.update(|cx| {
+            register_owner_state(owner, cx);
             cx.with_effect_owner(Some(owner), |cx| {
                 with_key(&"late".into(), window, cx, |state: &mut Remembered| {
                     state.0 = 17
@@ -407,6 +440,69 @@ mod tests {
                 })
             });
             assert_eq!(release_owner_state(owner, cx), 1);
+        });
+    }
+
+    #[gpui::test]
+    fn owner_churn_retains_no_history_or_peak_table_with_a_live_peer(cx: &mut TestAppContext) {
+        let window = WindowId::from(51);
+        let key = SharedString::from("same-composite:key");
+        cx.update(|cx| {
+            let peer = EffectOwner::new();
+            register_owner_state(peer, cx);
+            cx.with_effect_owner(Some(peer), |cx| {
+                with_key(&key, window, cx, |state: &mut Remembered| state.0 = 73);
+            });
+            for index in 0..100_000 {
+                let owner = EffectOwner::new();
+                assert!(!owner_state_is_live(owner, cx));
+                cx.with_effect_owner(Some(owner), |cx| {
+                    with_key(&key, window, cx, |state: &mut Remembered| state.0 = 91);
+                    assert!(read_key(&key, window, cx, |_: &Remembered| ()).is_none());
+                });
+                register_owner_state(owner, cx);
+                cx.with_effect_owner(Some(owner), |cx| {
+                    with_key(&key, window, cx, |state: &mut Remembered| {
+                        assert_eq!(state.0, 0);
+                        state.0 = 19;
+                    });
+                });
+                assert_eq!(release_owner_state(owner, cx), 1);
+                cx.with_effect_owner(Some(owner), |cx| {
+                    with_key(&key, window, cx, |state: &mut Remembered| state.0 = 97);
+                    assert!(!owner_state_is_live(owner, cx));
+                    assert!(read_key(&key, window, cx, |_: &Remembered| ()).is_none());
+                });
+                if index == 9_999 || index == 99_999 {
+                    let active = &cx.global::<OwnerStates>().active;
+                    let (groups, capacity) = read(window, cx, |keys: &KeyedStates<Remembered>| {
+                        (keys.0.len(), keys.0.capacity())
+                    }).expect("registered state type");
+                    assert_eq!(active.len(), 1);
+                    assert_eq!(groups, 1);
+                    assert!(active.capacity() <= 4);
+                    assert!(capacity <= 4);
+                    println!("retirements={} peak_live=2 active_len={} active_capacity={} groups={} group_capacity={}", index + 1, active.len(), active.capacity(), groups, capacity);
+                }
+            }
+            // A burst, unlike sequential churn, grows table capacity. Removal
+            // must shrink that high water while preserving the live peer.
+            let burst: Vec<_> = (0..10_000).map(|_| EffectOwner::new()).collect();
+            for &owner in &burst {
+                register_owner_state(owner, cx);
+                cx.with_effect_owner(Some(owner), |cx| {
+                    with_key(&key, window, cx, |_: &mut Remembered| ());
+                });
+            }
+            for owner in burst { release_owner_state(owner, cx); }
+            assert!(cx.global::<OwnerStates>().active.capacity() <= 4);
+            assert!(read(window, cx, |keys: &KeyedStates<Remembered>| keys.0.capacity()).expect("state") <= 4);
+            cx.with_effect_owner(Some(peer), |cx| {
+                assert_eq!(read_key(&key, window, cx, |state: &Remembered| state.0), Some(73));
+            });
+            assert_eq!(release_owner_state(peer, cx), 1);
+            assert_eq!(cx.global::<OwnerStates>().active.capacity(), 0);
+            assert_eq!(read(window, cx, |keys: &KeyedStates<Remembered>| keys.0.capacity()), Some(0));
         });
     }
 
