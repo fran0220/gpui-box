@@ -174,20 +174,22 @@ export function validateInvocation(component, name, args, mode) {
   return methods[name];
 }
 
+/** Prints the shared data schema grammar for family props and method contracts. */
+export function schemaType(schema) {
+  if (schema.oneOf) return schema.oneOf.map(schemaType).join(' | ');
+  let result;
+  if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
+  else if (schema.type === 'array') result = `Array<${schemaType(schema.items)}>`;
+  else if (schema.type === 'object') result = Object.keys(schema.fields).length
+    ? `{ ${Object.entries(schema.fields).map(([key, value]) => `${JSON.stringify(key)}${schema.required.includes(key) ? '' : '?'}: ${schemaType(value)}`).join('; ')} }`
+    : 'Record<string, never>';
+  else result = schema.type;
+  return schema.nullable ? `${result} | null` : result;
+}
+
 /** Source-derived method contracts for kit-sdk.d.ts; no catalog-only methods. */
 export function generateKitMethodTypes(methods = kitMethods) {
-  function type(schema) {
-    if (schema.oneOf) return schema.oneOf.map(type).join(' | ');
-    let result;
-    if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
-    else if (schema.type === 'array') result = `Array<${type(schema.items)}>`;
-    else if (schema.type === 'object') result = Object.keys(schema.fields).length
-      ? `{ ${Object.entries(schema.fields).map(([key, value]) => `${JSON.stringify(key)}${schema.required.includes(key) ? '' : '?'}: ${type(value)}`).join('; ')} }`
-      : 'Record<string, never>';
-    else result = schema.type;
-    return schema.nullable ? `${result} | null` : result;
-  }
-  const contracts = Object.entries(methods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${type(schema.args)}; result: ${type(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
+  const contracts = Object.entries(methods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${schemaType(schema.args)}; result: ${schemaType(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
   return [
     '// Generated from kitMethods by generateKitMethodTypes.',
     `export interface KitMethodContracts {\n${contracts}\n}`,

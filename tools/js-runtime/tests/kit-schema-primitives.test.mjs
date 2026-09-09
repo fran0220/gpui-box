@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { validateValue, validateSlots, generateKitMethodTypes } from '../kit-schema.mjs';
+import { validateValue, validateSlots, generateKitMethodTypes, schemaType } from '../kit-schema.mjs';
 
 const fixtures = JSON.parse(readFileSync(new URL('./schema-fixtures.json', import.meta.url), 'utf8'));
 
@@ -46,8 +46,13 @@ test('generated method types compile nested discriminated unions and reject wron
     const sdk = fileURLToPath(new URL('../kit-sdk', import.meta.url));
     const generated = generateKitMethodTypes({ TextInput: { invoke: { probe: { args: fixtures.unions[0].schema, result: { enum: [null] } } }, query: {} } });
     writeFileSync(path, `import type { KitNode } from ${JSON.stringify(sdk)};\n${generated}
+type FamilyProps = ${schemaType(fixtures.unions[0].schema)};
+const props: FamilyProps = {value:{kind:'counts',values:[-3,'unknown',7]}};
+// @ts-expect-error family props preserve nested union branches
+const invalidProps: FamilyProps = {value:{kind:'counts',values:[false]}};
 declare const invoke: KitInvoke;
 declare const target: KitNode<'TextInput'>;
+invoke(target, 'probe', props);
 const answer: Promise<null> = invoke(target, 'probe', {value:{kind:'counts',values:[-3,'unknown',7]}});
 invoke(target, 'probe', {value:{kind:'text',text:'Ready'}});
 // @ts-expect-error wrong branch field
