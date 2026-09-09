@@ -65,7 +65,7 @@ export interface KitBindingCatalog {
   readonly "Dock": { readonly source: "crates/gpui-kit/src/layout/dock.rs"; readonly status: "partial" };
   readonly "DockTree": { readonly source: "crates/gpui-kit/src/layout/dock_tree.rs"; readonly status: "partial" };
   readonly "Drawer": { readonly source: "crates/gpui-kit/src/overlay/drawer.rs"; readonly status: "partial" };
-  readonly "Dropzone": { readonly source: "crates/gpui-kit/src/controls/dropzone.rs"; readonly status: "unbound" };
+  readonly "Dropzone": { readonly source: "crates/gpui-kit/src/controls/dropzone.rs"; readonly status: "partial" };
   readonly "Editor": { readonly source: "crates/gpui-kit/src/controls/editor.rs"; readonly status: "partial" };
   readonly "EffectParticles": { readonly source: "crates/gpui-kit/src/effects.rs"; readonly status: "partial" };
   readonly "EmptyState": { readonly source: "crates/gpui-kit/src/display/empty.rs"; readonly status: "partial" };
@@ -141,7 +141,7 @@ export interface KitBindingCatalog {
   readonly "RefreshVeil": { readonly source: "crates/gpui-kit/src/display/loading.rs"; readonly status: "partial" };
   readonly "Responsive": { readonly source: "crates/gpui-kit/src/layout/responsive.rs"; readonly status: "partial" };
   readonly "RewardReveal": { readonly source: "crates/gpui-kit/src/game/presentation.rs"; readonly status: "partial" };
-  readonly "RichTextEditor": { readonly source: "crates/gpui-kit/src/controls/rich_text_editor/mod.rs"; readonly status: "unbound" };
+  readonly "RichTextEditor": { readonly source: "crates/gpui-kit/src/controls/rich_text_editor/mod.rs"; readonly status: "partial" };
   readonly "SankeyChart": { readonly source: "crates/gpui-kit/src/display/plot.rs"; readonly status: "partial" };
   readonly "ScatterChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "SchemaForm": { readonly source: "crates/gpui-kit/src/structured/schema_form.rs"; readonly status: "partial" };
@@ -196,7 +196,7 @@ export interface KitBindingCatalog {
   readonly "Tree": { readonly source: "crates/gpui-kit/src/data/tree.rs"; readonly status: "partial" };
   readonly "TreeGrid": { readonly source: "crates/gpui-kit/src/data/tree_grid.rs"; readonly status: "partial" };
   readonly "UndoHistory": { readonly source: "crates/gpui-kit/src/navigation/undo_history.rs"; readonly status: "partial" };
-  readonly "UploadList": { readonly source: "crates/gpui-kit/src/controls/upload_list.rs"; readonly status: "unbound" };
+  readonly "UploadList": { readonly source: "crates/gpui-kit/src/controls/upload_list.rs"; readonly status: "partial" };
   readonly "VideoPlayer": { readonly source: "crates/gpui-kit/src/media/video_player.rs"; readonly status: "partial" };
   readonly "VoiceReactive": { readonly source: "crates/gpui-kit/src/agent/persona.rs"; readonly status: "partial" };
   readonly "Wizard": { readonly source: "crates/gpui-kit/src/navigation/wizard.rs"; readonly status: "partial" };

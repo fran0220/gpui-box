@@ -429,3 +429,54 @@ hosted revision and catalog. No PRs and no ordinary crates.io MCP publication.
   Later debug cancellation and bare DragItem deliveries are not included in
   this result. External dropped-file/pasted-image authority remains refused,
   not represented by fake readable references.
+
+### Complete constructor catalog and remaining native acceptance
+
+- Ninth-stage source `101cffd3134a0a8d41b9b5445897dfe6567b9f47` was pushed and
+  deployed with matching hosted catalogs. Its frozen full gate passed 336 Linux
+  images (429.69 seconds), 576 all-feature framework tests, 147 host tests and
+  199 JS tests with 15 OS skips. Actual Editor → TextArea → FocusHandle and
+  MentionInput child-reference clicks and inspected renders passed.
+- Combined feature validation caught optional syntax event variants absent
+  from single-package checks. App-host now explicitly compiles existing Kit
+  syntax support and ignores the two parser events outside its closed schema;
+  no grammar is installed or loading authority granted. Native harness modules
+  consistently require capture, and still run in all-feature workspace tests.
+  TextArea focus and rich session methods name their exact native authorities
+  in the generated binding catalog rather than inventing component methods.
+- All 200 catalog components now have declared adapters, including all 34
+  controls. Status remains partial or fallback-only where appropriate; this
+  is not full method parity, untrusted Cinematic playback, grammar loading,
+  external dropped-file/image access, or bounded total native text work.
+  UploadList constructs its typed Dropzone with the child's effect scope and
+  parent disabled guard. RichTextEditor uses a real session, complete styled
+  documents and a non-recycling ID allocator; exposed session references have
+  six read-only queries, with mutations routed through editor policy.
+- Final combined `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` passed:
+  336 Linux images in 409.44 seconds, 576 all-feature framework tests, 151 host
+  tests with six explicit ignores, strict Clippy, wasm32, rustdoc, generated
+  checks and performance budgets. Combined JS passed 202 tests with 15 OS
+  skips and catalog 200/200. Actual buttons verified indeterminate upload
+  progress and complete native rich bold styling; their images were inspected.
+- Run 34413155692 at source 0703 passed both full native jobs, macOS runtime
+  and all Metal/WARP lanes (336 images each, no changed/new artifacts). Windows
+  UIA now reached actual Invoke and dismissal, with editable/form checks also
+  passing. That success does not identify which old desktop traversal stalled.
+- Run 34415773540 at source 101cff still failed two Windows runtime probes.
+  Exact private environment paths and all three ACCESS_DENIED writes passed;
+  file/ACL and normal/breakaway spawn refusals passed. TCP returned timeout,
+  not permission denial, so network remains unaccepted; later independent
+  assertions were not reached. Host-death killed processes but left the profile.
+  macOS runtime passed 200 tests with 14 skips. Debug helper was not built and
+  its suite never ran after the Windows sandbox abort, so no native debug
+  cancellation success is inferred.
+- The next candidate keeps the worker's atomic isolation Job while detaching
+  only its trusted cleanup supervisor from Node's host-death Job. Session
+  preserves stdio/reap ownership. Native positive network controls and exact
+  SID/PID/port diagnostics precede strict network assertions; handle checks run
+  earlier. Workflow builds/tests the Windows debug helper independently and
+  captures WFP drop evidence without changing rules, capabilities or exemptions.
+  These changes need fresh Windows execution. Timeout remains a failing probe,
+  not an accepted network-isolation result. Debug cancel/timeout retires and
+  reaps the isolated session; explicit Reload recovers, without claiming to
+  undo arbitrary evaluated JavaScript in a surviving worker.

@@ -44,7 +44,7 @@ test('merged family factories validate required data, relational rules and typed
   assert.throws(() => validateInvocation('DateInput', 'calendar', {}, 'query'), /Unsupported/);
   assert.throws(() => validateInvocation('Calendar', 'adapter', {}, 'query'), /Unsupported/);
   assert.equal(validateInvocation('DateInput', 'calendar_snapshot', {}, 'query'), kitMethods.DateInput.query.calendar_snapshot);
-  assert.equal(Object.keys(kitSchemas).length, 197);
+  assert.equal(Object.keys(kitSchemas).length, 200);
   assert.deepEqual(Object.keys(kit).sort(), [...Object.keys(kitSchemas), 'bind', 'bind_value'].sort());
 });
 

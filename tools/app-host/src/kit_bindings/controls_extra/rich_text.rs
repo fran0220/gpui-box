@@ -492,7 +492,7 @@ fn session_dispatch(
     Ok(value)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "capture"))]
 mod tests {
     use super::*;
     use gpui::TestAppContext;

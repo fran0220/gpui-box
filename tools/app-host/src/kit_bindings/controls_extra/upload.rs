@@ -145,7 +145,7 @@ pub(super) fn overall(node: &Node) -> Value {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "capture"))]
 mod tests {
     use super::*;
     use gpui::{Styled, TestAppContext};

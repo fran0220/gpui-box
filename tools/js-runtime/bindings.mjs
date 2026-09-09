@@ -33,6 +33,12 @@ const nativeMethodSources = {
   DateInput: { field_snapshot: 'field', calendar_snapshot: 'calendar' },
   RangePicker: { calendar_snapshot: 'calendar' },
   TextArea: { focus_handle: 'gpui::window::Focusable::focus_handle', focus: 'gpui::window::FocusHandle::focus' },
+  RichTextEditor: {
+    focus_handle: 'gpui::window::Focusable::focus_handle',
+    ...Object.fromEntries(['replace_document', 'forbid_history', 'document', 'selection',
+      'pending_style', 'marked_range', 'can_undo', 'can_redo'].map(name =>
+      [name, `gpui_kit::content::rich_text::RichTextEditSession::${name}`])),
+  },
   SankeyChart: { layout: 'gpui_kit::display::plot::SankeyData::layout' },
   Sparkline: { published_points: 'gpui_kit::display::sparkline::SparklineReading::published_points' },
 };

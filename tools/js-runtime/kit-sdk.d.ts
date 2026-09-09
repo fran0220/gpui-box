@@ -56,6 +56,44 @@ export interface KitMethodDefinitions0 {
   "CascaderOption": { "id": string; "label": string; "disabled"?: boolean; "children"?: { "state": "idle" | "loading" | "empty" } | { "state": "unavailable" | "error"; "reason": string } | { "state": "ready"; "value": Array<KitMethodDefinitions0["CascaderOption"]> } };
 }
 export interface KitMethodContracts {
+  RichTextEditor: {
+    invoke: {
+      set_diagnostics: { args: { "diagnostics": Array<{ "range": { "start": { "block": string; "offset": number }; "end": { "block": string; "offset": number } }; "severity": "info" | "warning" | "error" }> }; result: null };
+      apply_intent: { args: { "intent": { "kind": "select"; "selection": { "anchor": { "block": string; "offset": number }; "head": { "block": string; "offset": number } } } | { "kind": "replace"; "text": string; "input": "typing" | "deleting" | "paste" | "cut" } | { "kind": "replaceMultiline"; "text": string; "newBlocks": Array<string>; "input": "typing" | "deleting" | "paste" | "cut" } | { "kind": "hardBreak"; "newBlock": string } | { "kind": "softBreak" | "backspaceAtStart" | "endComposition" | "undo" | "redo" } | { "kind": "toggleFormat"; "format": "bold" | "italic" | "underline" | "strike" | "code" } | { "kind": "setLink"; "destination": string | null } | { "kind": "setAlignment"; "alignment": "start" | "center" | "end" } | { "kind": "setList"; "list": "ordered" | "unordered" | null } | { "kind": "changeListDepth"; "delta": number } | { "kind": "compose"; "text": string; "selection": { "start": number; "end": number } | null } }; result: null };
+      replace_document: { args: { "document": { "blocks": Array<{ "id": string; "text": string; "styles"?: Array<{ "range": { "start": number; "end": number }; "style": { "bold"?: boolean; "italic"?: boolean; "underline"?: boolean; "strike"?: boolean; "code"?: boolean; "link"?: string | null } }>; "paragraph"?: { "alignment"?: "start" | "center" | "end"; "list"?: { "kind": "ordered" | "unordered"; "depth": number } | null } }> }; "selection": { "anchor": { "block": string; "offset": number }; "head": { "block": string; "offset": number } } }; result: null };
+      forbid_history: { args: Record<string, never>; result: null };
+      set_name: { args: { "name": string }; result: null };
+      set_placeholder: { args: { "placeholder": string }; result: null };
+      set_frame: { args: { "frame": "own" | "host" }; result: null };
+      set_toolbar: { args: { "visible": boolean }; result: null };
+      set_rows: { args: { "rows": number }; result: null };
+      set_max_rows: { args: { "max_rows": number | null }; result: null };
+      set_disabled: { args: { "disabled": boolean }; result: null };
+      set_read_only: { args: { "read_only": boolean }; result: null };
+      set_required: { args: { "required": boolean }; result: null };
+      set_invalid: { args: { "invalid": boolean }; result: null };
+    };
+    query: {
+      document: { args: Record<string, never>; result: { "blocks": Array<{ "id": string; "text": string; "styles": Array<{ "range": { "start": number; "end": number }; "style": { "bold": boolean; "italic": boolean; "underline": boolean; "strike": boolean; "code": boolean; "link": string | null } }>; "paragraph": { "alignment": "start" | "center" | "end"; "list": { "kind": "ordered" | "unordered"; "depth": number } | null } }> } };
+      selection: { args: Record<string, never>; result: { "anchor": { "block": string; "offset": number }; "head": { "block": string; "offset": number } } };
+      pending_style: { args: Record<string, never>; result: { "bold": boolean; "italic": boolean; "underline": boolean; "strike": boolean; "code": boolean; "link": string | null } };
+      marked_range: { args: Record<string, never>; result: { "start": { "block": string; "offset": number }; "end": { "block": string; "offset": number } } | null };
+      can_undo: { args: Record<string, never>; result: boolean };
+      can_redo: { args: Record<string, never>; result: boolean };
+      is_disabled: { args: Record<string, never>; result: boolean };
+      is_read_only: { args: Record<string, never>; result: boolean };
+      session: { args: Record<string, never>; result: { "$nativeRef": string; "type": "RichTextEditSession" } };
+      focus_handle: { args: Record<string, never>; result: { "$nativeRef": string; "type": "FocusHandle" } };
+    };
+  };
+  UploadList: {
+    invoke: {
+
+    };
+    query: {
+      overall: { args: Record<string, never>; result: { "state": "known"; "fraction": number } | { "state": "indeterminate" | "settled" } };
+    };
+  };
   MentionInput: {
     invoke: {
       set_suggestions: { args: { "suggestions": { "state": "idle" | "loading" | "empty"; "attempts"?: number } | { "state": "ready" | "refreshing"; "value": Array<{ "id": string; "label": string; "description"?: string; "replacement"?: string; "searchTerms"?: Array<string>; "refusal"?: string }>; "attempts"?: number } | { "state": "error" | "unavailable"; "reason": string; "value"?: Array<{ "id": string; "label": string; "description"?: string; "replacement"?: string; "searchTerms"?: Array<string>; "refusal"?: string }>; "attempts"?: number } }; result: null };

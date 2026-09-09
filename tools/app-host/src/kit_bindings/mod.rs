@@ -278,6 +278,9 @@ impl KitState {
             Some("SettingsList") => {
                 controls_extra::settings_list(node, context, window, cx)?.into_any_element()
             }
+            Some("UploadList") => {
+                controls_extra::upload_list(node, context, window, cx, emit)?.into_any_element()
+            }
             _ => self.render(node, context.slots, window, cx, emit),
         })
     }
