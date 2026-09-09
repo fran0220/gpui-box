@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Div, FocusHandle, Hsla, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    AnyElement, App, Div, EffectScoped, FocusHandle, Hsla, InteractiveElement, IntoElement,
+    ParentElement, RenderOnce, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
@@ -872,7 +872,7 @@ impl RenderOnce for IconButton {
 #[derive(IntoElement)]
 pub struct ButtonGroup {
     ident: Ident,
-    buttons: Vec<Button>,
+    buttons: Vec<EffectScoped<Button>>,
     size: ControlSize,
     disabled: bool,
 }
@@ -898,13 +898,16 @@ impl ButtonGroup {
         }
     }
 
-    pub fn child(mut self, button: Button) -> Self {
-        self.buttons.push(button);
+    pub fn child(mut self, button: impl Into<EffectScoped<Button>>) -> Self {
+        self.buttons.push(button.into());
         self
     }
 
-    pub fn children(mut self, buttons: impl IntoIterator<Item = Button>) -> Self {
-        self.buttons.extend(buttons);
+    pub fn children<B: Into<EffectScoped<Button>>>(
+        mut self,
+        buttons: impl IntoIterator<Item = B>,
+    ) -> Self {
+        self.buttons.extend(buttons.into_iter().map(Into::into));
         self
     }
 }
@@ -942,15 +945,17 @@ impl RenderOnce for ButtonGroup {
                 };
                 // One frame means one scale: a run of mismatched heights is
                 // not a shared frame, it is a row of buttons.
-                let button = button
-                    .join(join)
-                    .control_size(size)
-                    .semantic_parent(parent.clone());
-                if group_disabled {
-                    button.disabled(true)
-                } else {
-                    button
-                }
+                button.map(|button| {
+                    let button = button
+                        .join(join)
+                        .control_size(size)
+                        .semantic_parent(parent.clone());
+                    if group_disabled {
+                        button.disabled(true)
+                    } else {
+                        button
+                    }
+                })
             })
             .collect::<Vec<_>>();
 

@@ -28,8 +28,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, EffectScoped, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -241,7 +241,7 @@ pub enum OverallProgress {
 pub struct UploadList {
     ident: Ident,
     uploads: Vec<Upload>,
-    zone: Option<Dropzone>,
+    zone: Option<EffectScoped<Dropzone>>,
     size: ControlSize,
     disabled: bool,
     show_overall: bool,
@@ -294,8 +294,8 @@ impl UploadList {
     /// Sharing the surface is the point: a payload the zone refuses while it
     /// is being dragged and a file the host refused after it landed are the
     /// same refusal, said in the same place.
-    pub fn dropzone(mut self, zone: Dropzone) -> Self {
-        self.zone = Some(zone);
+    pub fn dropzone(mut self, zone: impl Into<EffectScoped<Dropzone>>) -> Self {
+        self.zone = Some(zone.into());
         self
     }
 

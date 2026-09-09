@@ -2,6 +2,71 @@ use super::*;
 use gpui::{Styled, TestAppContext, div, px};
 use gpui_kit_testkit::harness::Harness;
 
+#[gpui::test]
+fn typed_containers_preserve_child_effect_owners_after_native_transforms(cx: &mut TestAppContext) {
+    use gpui::{EffectOwner, EffectScoped};
+    use gpui_kit::controls::button::ButtonGroup;
+    use gpui_kit::controls::settings_row::{SettingsList, SettingsSection};
+    let first = EffectOwner::new();
+    let second = EffectOwner::new();
+    let section_owner = EffectOwner::new();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let button = |id: &'static str| {
+            let output = output.clone();
+            Button::new(id).label(id).on_click(move |_, cx| {
+                output.borrow_mut().push((id, cx.current_effect_owner()));
+            })
+        };
+        div()
+            .flex()
+            .flex_col()
+            .child(ButtonGroup::new("group").children([
+                EffectScoped::new(first, button("first")),
+                EffectScoped::new(second, button("second")),
+            ]))
+            .child(
+                ButtonGroup::new("disabled-group")
+                    .disabled(true)
+                    .child(EffectScoped::new(first, button("disabled-child"))),
+            )
+            .child(
+                SettingsList::new("settings")
+                    .query("needle")
+                    .section(EffectScoped::new(
+                        section_owner,
+                        SettingsSection::new("section", "General").rows([
+                            EffectScoped::new(
+                                second,
+                                SettingsRow::new("matching", "Needle")
+                                    .control(button("row-action")),
+                            ),
+                            EffectScoped::new(
+                                first,
+                                SettingsRow::new("excluded", "Unrelated")
+                                    .control(button("excluded-action")),
+                            ),
+                        ]),
+                    )),
+            )
+            .into_any_element()
+    });
+    harness.click("first");
+    harness.click("second");
+    harness.click("row-action");
+    harness.click("disabled-child");
+    assert!(harness.node("excluded-action").is_none());
+    assert_eq!(
+        *events.borrow(),
+        vec![
+            ("first", Some(first)),
+            ("second", Some(second)),
+            ("row-action", Some(second)),
+        ]
+    );
+}
+
 fn node(component: &str, id: &str, props: Value, events: Value) -> Node {
     serde_json::from_value(
         json!({"kind":"kit","component":component,"id":id,"props":props,"events":events}),

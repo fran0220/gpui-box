@@ -15,8 +15,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, Pixels, RenderOnce,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, EffectScoped, InteractiveElement, IntoElement, ParentElement, Pixels,
+    RenderOnce, SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -308,7 +308,7 @@ impl RenderOnce for SettingsRow {
 type ActionSlot = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 enum SectionContent {
-    Row(Box<SettingsRow>),
+    Row(Box<EffectScoped<SettingsRow>>),
     Block(AnyElement),
 }
 
@@ -364,15 +364,18 @@ impl SettingsSection {
         self
     }
 
-    pub fn row(mut self, row: SettingsRow) -> Self {
-        self.content.push(SectionContent::Row(Box::new(row)));
+    pub fn row(mut self, row: impl Into<EffectScoped<SettingsRow>>) -> Self {
+        self.content.push(SectionContent::Row(Box::new(row.into())));
         self
     }
 
-    pub fn rows(mut self, rows: impl IntoIterator<Item = SettingsRow>) -> Self {
+    pub fn rows<R: Into<EffectScoped<SettingsRow>>>(
+        mut self,
+        rows: impl IntoIterator<Item = R>,
+    ) -> Self {
         self.content.extend(
             rows.into_iter()
-                .map(|row| SectionContent::Row(Box::new(row))),
+                .map(|row| SectionContent::Row(Box::new(row.into()))),
         );
         self
     }
@@ -410,12 +413,7 @@ impl SettingsSection {
         self
     }
 
-    fn filtered(
-        mut self,
-        query: &str,
-        matcher: &dyn SearchMatcher,
-        cx: &App,
-    ) -> Option<(Self, usize)> {
+    fn filtered(&mut self, query: &str, matcher: &dyn SearchMatcher, cx: &App) -> Option<usize> {
         let query_is_empty = query.trim().is_empty();
         let section_matches = query_is_empty
             || [
@@ -429,15 +427,15 @@ impl SettingsSection {
 
         if section_matches {
             let count = self.row_count();
-            return Some((self, count));
+            return Some(count);
         }
 
         self.content.retain(|item| match item {
-            SectionContent::Row(row) => row.matches(query, matcher, cx),
+            SectionContent::Row(row) => row.as_ref().as_ref().matches(query, matcher, cx),
             SectionContent::Block(_) => false,
         });
         let count = self.row_count();
-        (count > 0).then_some((self, count))
+        (count > 0).then_some(count)
     }
 }
 
@@ -504,14 +502,15 @@ impl RenderOnce for SettingsSection {
         let mut content = Vec::new();
         for item in self.content {
             let item = match item {
-                SectionContent::Row(row) => {
-                    let mut row = *row;
-                    row.label_width.get_or_insert(label_width);
-                    if let Some(reason) = dimmed.clone() {
-                        row = row.inapplicable(reason);
-                    }
-                    row.render_in(&theme, cx)
-                }
+                SectionContent::Row(row) => (*row)
+                    .map(|mut row| {
+                        row.label_width.get_or_insert(label_width);
+                        if let Some(reason) = dimmed.clone() {
+                            row = row.inapplicable(reason);
+                        }
+                        row
+                    })
+                    .into_any_element(),
                 SectionContent::Block(block) if dimmed.is_none() => div()
                     .w_full()
                     .min_w_0()
@@ -571,7 +570,7 @@ impl RenderOnce for SettingsSection {
 pub struct SettingsList {
     ident: Ident,
     query: SharedString,
-    sections: Vec<SettingsSection>,
+    sections: Vec<EffectScoped<SettingsSection>>,
     slots: Slots,
 }
 
@@ -601,13 +600,16 @@ impl SettingsList {
         self
     }
 
-    pub fn section(mut self, section: SettingsSection) -> Self {
-        self.sections.push(section);
+    pub fn section(mut self, section: impl Into<EffectScoped<SettingsSection>>) -> Self {
+        self.sections.push(section.into());
         self
     }
 
-    pub fn sections(mut self, sections: impl IntoIterator<Item = SettingsSection>) -> Self {
-        self.sections.extend(sections);
+    pub fn sections<S: Into<EffectScoped<SettingsSection>>>(
+        mut self,
+        sections: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.sections.extend(sections.into_iter().map(Into::into));
         self
     }
 }
@@ -689,9 +691,12 @@ impl SettingsList {
             .sections
             .into_iter()
             .filter_map(|section| {
-                let (section, matched) =
-                    section.filtered(self.query.as_ref(), matcher.as_ref(), cx)?;
-                count += matched;
+                let mut matched = None;
+                let section = section.map(|mut section| {
+                    matched = section.filtered(self.query.as_ref(), matcher.as_ref(), cx);
+                    section
+                });
+                count += matched?;
                 Some(section)
             })
             .collect();
