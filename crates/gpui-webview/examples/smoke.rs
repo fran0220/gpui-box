@@ -62,7 +62,10 @@ fn main() {
         }, |window, cx| cx.new(|cx: &mut Context<Smoke>| {
             let host = BrowserHost::new(window, cx, BrowserOptions { receive_messages: true, ..Default::default() }).expect("create native host");
             assert!(host.navigate("file:///etc/passwd").is_err());
+            assert!(host.navigate("data:text/html,<script>alert(1)</script>").is_err());
             host.load_html(include_str!("browser.html")).expect("load HTML fixture");
+            // A pending internal HTML load must not relax the public URL policy.
+            assert!(host.navigate("data:text/html;charset=utf-8;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==").is_err());
             cx.spawn(async move |weak, cx| {
                 let start = Instant::now();
                 let mut phase = 0;

@@ -70,6 +70,18 @@ origins, not string prefixes. This is a navigation policy, **not** a subresource
 network sandbox. `load_html` is caller-owned HTML with no application base URL.
 Scripts run with ordinary web engine privileges, never shell/plugin authority.
 
+On Windows, WebView2 can report `NavigateToString` as a base64 `data:` URL in
+NavigationStarting even though the committed document is `about:blank`. The
+host arms a per-view, single-use permit for exactly the caller's HTML bytes
+before that command. It consumes the permit at the next navigation callback
+(a different URL fails closed), and clears it on completion, synchronous error
+or a subsequent accepted URL/history/reload command. A new HTML command replaces
+the permit. Public `navigate` never uses it: arbitrary `data:` URLs remain
+denied even while HTML is pending. This is content authorization, not proof of
+which script initiated an identical navigation, and never grants IPC authority.
+Other WebView2 encodings fail closed; the exact encoding must be validated by
+the Windows native smoke, not inferred from Linux/macOS execution.
+
 Popups, downloads and permissions are denied and reported. They do not
 implicitly launch system applications, select a download path, grant devices,
 or persist permission grants. Wry's permission hook has no requesting-frame

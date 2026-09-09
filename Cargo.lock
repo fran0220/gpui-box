@@ -3239,6 +3239,7 @@ name = "gpui-box-webview"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "base64 0.23.1",
  "gdkx11",
  "gpui-box",
  "gpui-box-platform",

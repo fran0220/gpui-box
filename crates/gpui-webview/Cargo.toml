@@ -25,6 +25,7 @@ webkit2gtk = "=2.0.2"
 gdkx11 = "0.18"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+base64.workspace = true
 windows.workspace = true
 windows-native = { package = "windows", version = "0.62", features = ["Win32_Foundation"] }
 webview2-com = "0.39"
@@ -34,6 +35,7 @@ objc.workspace = true
 objc2 = "0.6.4"
 
 [dev-dependencies]
+base64.workspace = true
 gpui_platform = { package = "gpui-box-platform", path = "../gpui_platform" }
 serde_json.workspace = true
 

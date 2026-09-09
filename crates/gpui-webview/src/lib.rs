@@ -2,6 +2,32 @@
 
 use url::Url;
 
+/// WebView2 may report NavigateToString as a data URL at NavigationStarting.
+/// Authorize only the exact caller-supplied bytes, once, not a scheme or the
+/// next arbitrary navigation. This does not authenticate a page or grant IPC.
+#[cfg(any(target_os = "windows", test))]
+#[derive(Default)]
+struct PendingHtmlNavigation(Option<String>);
+
+#[cfg(any(target_os = "windows", test))]
+impl PendingHtmlNavigation {
+    fn set(&mut self, html: &str) {
+        use base64::Engine as _;
+        self.0 = Some(format!(
+            "data:text/html;charset=utf-8;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(html)
+        ));
+    }
+
+    fn consume(&mut self, url: &str) -> bool {
+        self.0.take().is_some_and(|expected| expected == url)
+    }
+
+    fn clear(&mut self) {
+        self.0 = None;
+    }
+}
+
 /// Synchronous navigation policy. This governs navigation, not subresource
 /// networking; it is not a network sandbox or an IPC authorization policy.
 #[derive(Clone, Debug, Default)]
@@ -114,6 +140,37 @@ pub use native::{BrowserHost, BrowserOptions};
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authored_html_permit_is_exact_single_use_and_revocable() {
+        let mut pending = PendingHtmlNavigation::default();
+        // Independently encoded fixture, not derived from the permit's encoder.
+        let approved = "data:text/html;charset=utf-8;base64,PGgxPm9rPC9oMT4=";
+        assert!(!NavigationPolicy::default().allows(approved));
+        assert!(!pending.consume(approved));
+        pending.set("<h1>ok</h1>");
+        assert!(pending.consume(approved));
+        assert!(!pending.consume(approved));
+        for wrong in [
+            "data:text/html;charset=utf-8;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+            "data:text/html,<h1>ok</h1>",
+            "data:text/html;charset=utf-8;base64,PGgxPm9rPC9oMT4=#fragment",
+            "https://example.test/",
+        ] {
+            pending.set("<h1>ok</h1>");
+            assert!(!pending.consume(wrong), "{wrong}");
+            assert!(
+                !pending.consume(approved),
+                "a competing navigation revokes the permit"
+            );
+        }
+        pending.set("<h1>ok</h1>");
+        pending.set("replacement");
+        assert!(!pending.consume(approved));
+        pending.set("<h1>ok</h1>");
+        pending.clear();
+        assert!(!pending.consume(approved));
+    }
 
     #[test]
     fn page_event_flood_is_bounded_nonblocking_and_reported() {

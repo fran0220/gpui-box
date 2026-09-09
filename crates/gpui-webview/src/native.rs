@@ -36,6 +36,8 @@ pub struct BrowserHost {
     events: EventInbox,
     sender: EventSender,
     navigation: NavigationPolicy,
+    #[cfg(target_os = "windows")]
+    pending_html: Rc<std::cell::RefCell<crate::PendingHtmlNavigation>>,
 }
 
 impl BrowserHost {
@@ -58,10 +60,18 @@ impl BrowserHost {
         let (sender, events) = EventSender::channel();
         let send = sender.clone();
         let policy = options.navigation.clone();
+        #[cfg(target_os = "windows")]
+        let pending_html = Rc::new(std::cell::RefCell::new(
+            crate::PendingHtmlNavigation::default(),
+        ));
+        #[cfg(target_os = "windows")]
+        let pending = pending_html.clone();
         let mut builder = WebViewBuilder::new().with_navigation_handler(move |url| {
             // about:blank is needed for the initial empty document and
             // caller-supplied HTML. It never grants IPC privileges.
             let allowed = url == "about:blank" || policy.allows(&url);
+            #[cfg(target_os = "windows")]
+            let allowed = pending.borrow_mut().consume(&url) || allowed;
             let event = if allowed {
                 BrowserEvent::NavigationStarted(url)
             } else {
@@ -71,8 +81,12 @@ impl BrowserHost {
             allowed
         });
         let send = sender.clone();
+        #[cfg(target_os = "windows")]
+        let pending = pending_html.clone();
         builder = builder.with_on_page_load_handler(move |event, url| {
             if matches!(event, wry::PageLoadEvent::Finished) {
+                #[cfg(target_os = "windows")]
+                pending.borrow_mut().clear();
                 let _ = send.send(BrowserEvent::PageFinished(url));
             }
         });
@@ -116,6 +130,8 @@ impl BrowserHost {
             events,
             sender,
             navigation: options.navigation,
+            #[cfg(target_os = "windows")]
+            pending_html,
         })
     }
 
@@ -137,21 +153,36 @@ impl BrowserHost {
                 .send(BrowserEvent::NavigationRefused(url.into()));
             anyhow::bail!("navigation refused by host policy");
         }
+        #[cfg(target_os = "windows")]
+        self.pending_html.borrow_mut().clear();
         Ok(self.engine.view.load_url(url)?)
     }
 
     /// Loads caller-owned HTML with the engine's complete HTML/CSS support.
     /// Relative URLs have no application base URL. Content is not trusted by IPC.
     pub fn load_html(&self, html: &str) -> anyhow::Result<()> {
-        Ok(self.engine.view.load_html(html)?)
+        #[cfg(target_os = "windows")]
+        self.pending_html.borrow_mut().set(html);
+        let result = self.engine.view.load_html(html);
+        #[cfg(target_os = "windows")]
+        if result.is_err() {
+            self.pending_html.borrow_mut().clear();
+        }
+        Ok(result?)
     }
     pub fn back(&self) -> anyhow::Result<()> {
+        #[cfg(target_os = "windows")]
+        self.pending_html.borrow_mut().clear();
         Ok(self.engine.view.go_back()?)
     }
     pub fn forward(&self) -> anyhow::Result<()> {
+        #[cfg(target_os = "windows")]
+        self.pending_html.borrow_mut().clear();
         Ok(self.engine.view.go_forward()?)
     }
     pub fn reload(&self) -> anyhow::Result<()> {
+        #[cfg(target_os = "windows")]
+        self.pending_html.borrow_mut().clear();
         Ok(self.engine.view.reload()?)
     }
     pub fn can_go_back(&self) -> anyhow::Result<bool> {
