@@ -129,6 +129,7 @@ ModelViewer
 MultiSelect
 NO
 NULL
+NavStack
 No
 NodeGraph
 None

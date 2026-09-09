@@ -37,6 +37,7 @@ mod it {
     mod menu;
     mod messages;
     mod motion;
+    mod nav_stack;
     mod navigation;
     mod navigation_extra;
     mod offering_catalog;

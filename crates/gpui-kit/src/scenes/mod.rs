@@ -83,8 +83,8 @@ use layout::{
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
 use navigation::{
-    accordion, anchor_list, breadcrumb, carousel, collapsible, document_tabs, pagination, sidebar,
-    tabs, undo_history, wizard,
+    accordion, anchor_list, breadcrumb, carousel, collapsible, document_tabs, nav_stack,
+    pagination, sidebar, tabs, undo_history, wizard,
 };
 use overlay::{
     command_palette, context_menu, dialog, drawer, frost, glass, hover_card, kbd, media_caption,
@@ -376,6 +376,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "carousel",
             build: carousel,
             shows: Shows::Subjects(&["Carousel"]),
+        },
+        Scene {
+            name: "nav-stack",
+            build: nav_stack,
+            shows: Shows::Subjects(&["NavStack"]),
         },
         Scene {
             name: "accordion",

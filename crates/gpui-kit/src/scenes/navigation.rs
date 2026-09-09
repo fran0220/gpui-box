@@ -2,6 +2,48 @@
 
 use super::support::*;
 
+pub(super) fn nav_stack(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::navigation::nav_stack::{NavHistory, NavStack};
+    let theme = cx.theme().clone();
+    let state = window.use_keyed_state("scene.nav-stack.state", cx, |_, cx| {
+        (
+            NavHistory::new("overview"),
+            cx.focus_handle(),
+            cx.focus_handle(),
+            cx.focus_handle(),
+        )
+    });
+    let (history, overview, details, replacement) = state.read(cx).clone();
+    let focus = match history.current().as_ref() {
+        "details" => details,
+        "replacement" => replacement,
+        _ => overview,
+    };
+    let back = state.clone();
+    let forward = state.clone();
+    let push = state.clone();
+    let replace = state.clone();
+    stack(&theme).w(px(620.0))
+        .child(caption(&theme, "Caller-owned visit history; back retains forward visits, push forks, replace preserves branches"))
+        .child(row(&theme)
+            .child(Button::new("scene.nav-stack.back").label("Back").disabled(!history.can_pop())
+                .on_click(move |_, cx| back.update(cx, |state, cx| { state.0.pop(); cx.notify(); })))
+            .child(Button::new("scene.nav-stack.forward").label("Forward").disabled(!history.can_forward())
+                .on_click(move |_, cx| forward.update(cx, |state, cx| { state.0.forward(); cx.notify(); })))
+            .child(Button::new("scene.nav-stack.push").label("Push details")
+                .disabled(history.entries().iter().any(|id| id.as_ref() == "details"))
+                .on_click(move |_, cx| push.update(cx, |state, cx| { state.0.push("details"); cx.notify(); })))
+            .child(Button::new("scene.nav-stack.replace").label("Replace")
+                .disabled(history.entries().iter().any(|id| id.as_ref() == "replacement"))
+                .on_click(move |_, cx| replace.update(cx, |state, cx| { state.0.replace("replacement"); cx.notify(); }))))
+        .child(NavStack::new("scene.nav-stack", &history, history.current().clone(), focus,
+            Card::new().padding(Space::Xl)
+                .child(crate::foundation::text(&theme, TypeScale::Title, history.current().clone()))
+                .child(crate::foundation::text(&theme, TypeScale::Body,
+                    "Only the active page is mounted. Return visits restore focus without keeping inactive controls live."))))
+        .into_any_element()
+}
+
 pub(super) fn carousel(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let page = |id: &'static str, label: &'static str, text: &'static str| {

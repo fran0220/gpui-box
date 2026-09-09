@@ -3087,6 +3087,24 @@
       ]
     },
     {
+      "name": "NavStack",
+      "kind": "builder",
+      "path": "gpui_kit::navigation::NavStack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Active navigation content. Inactive pages are not mounted, so their input handlers and accessibility nodes cannot remain active during a transition. Uses a token-backed fade on each accepted history change; reduced motion settles immediately. It restores the last focused descendant on revisits when focus was inside the outgoing page, and never steals external focus.",
+      "construct": [
+        "new(ident: impl Into<Ident>, history: &NavHistory, label: impl Into<SharedString>, focus: FocusHandle, content: impl IntoElement) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "nav-stack"
+      ]
+    },
+    {
       "name": "NodeGraph",
       "kind": "builder",
       "path": "gpui_kit::canvas::NodeGraph",
@@ -11279,6 +11297,30 @@
       "queries": []
     },
     {
+      "name": "NavHistory",
+      "path": "gpui_kit::navigation::NavHistory",
+      "summary": "Durable visit identities. Store this data at the call site, not in a component; serialization and route resolution belong to the host.",
+      "variants": [],
+      "construct": [
+        "new(root: impl Into<SharedString>) -> Self",
+        "restore(entries: Vec<SharedString>, cursor: usize) -> Option<Self>"
+      ],
+      "options": [],
+      "commands": [
+        "push(visit: impl Into<SharedString>) -> bool",
+        "pop() -> bool",
+        "forward() -> bool",
+        "replace(visit: impl Into<SharedString>) -> bool"
+      ],
+      "queries": [
+        "current() -> &SharedString",
+        "entries() -> &[SharedString]",
+        "cursor() -> usize",
+        "can_pop() -> bool",
+        "can_forward() -> bool"
+      ]
+    },
+    {
       "name": "NodeGraphEvent",
       "path": "gpui_kit::canvas::NodeGraphEvent",
       "summary": "A proposed controlled graph change.",
@@ -15519,6 +15561,18 @@
         "Carousel"
       ],
       "example": "fn carousel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let page = |id: &'static str, label: &'static str, text: &'static str| {\n        CarouselItem::new(\n            id,\n            label,\n            Card::new()\n                .id(format!(\"scene.carousel.card.{id}\"))\n                .padding(Space::Xl)\n                .child(crate::foundation::text(&theme, TypeScale::Title, label))\n                .child(crate::foundation::text(&theme, TypeScale::Body, text)),\n        )\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"A controlled, focusable page track with direct selection and reduced-motion-aware transitions\",\n        ))\n        .child(\n            Carousel::new(\"scene.carousel.ready\")\n                .items([\n                    page(\"overview\", \"Overview\", \"The first page is active.\"),\n                    page(\"details\", \"Details\", \"The caller owns the page content.\"),\n                    page(\"history\", \"History\", \"The track reports page intents.\"),\n                ])\n                .active(\"details\")\n                .looped(true)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Carousel::new(\"scene.carousel.empty\")\n                .phase(Phase::Empty)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "nav-stack",
+      "capture": "cargo run -p xtask -- headless capture nav-stack",
+      "kind": "exhibit",
+      "subjects": [
+        "NavStack"
+      ],
+      "uses": [
+        "NavStack"
+      ],
+      "example": "fn nav_stack(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::navigation::nav_stack::{NavHistory, NavStack};\n    let theme = cx.theme().clone();\n    let state = window.use_keyed_state(\"scene.nav-stack.state\", cx, |_, cx| {\n        (\n            NavHistory::new(\"overview\"),\n            cx.focus_handle(),\n            cx.focus_handle(),\n            cx.focus_handle(),\n        )\n    });\n    let (history, overview, details, replacement) = state.read(cx).clone();\n    let focus = match history.current().as_ref() {\n        \"details\" => details,\n        \"replacement\" => replacement,\n        _ => overview,\n    };\n    let back = state.clone();\n    let forward = state.clone();\n    let push = state.clone();\n    let replace = state.clone();\n    stack(&theme).w(px(620.0))\n        .child(caption(&theme, \"Caller-owned visit history; back retains forward visits, push forks, replace preserves branches\"))\n        .child(row(&theme)\n            .child(Button::new(\"scene.nav-stack.back\").label(\"Back\").disabled(!history.can_pop())\n                .on_click(move |_, cx| back.update(cx, |state, cx| { state.0.pop(); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.forward\").label(\"Forward\").disabled(!history.can_forward())\n                .on_click(move |_, cx| forward.update(cx, |state, cx| { state.0.forward(); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.push\").label(\"Push details\")\n                .disabled(history.entries().iter().any(|id| id.as_ref() == \"details\"))\n                .on_click(move |_, cx| push.update(cx, |state, cx| { state.0.push(\"details\"); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.replace\").label(\"Replace\")\n                .disabled(history.entries().iter().any(|id| id.as_ref() == \"replacement\"))\n                .on_click(move |_, cx| replace.update(cx, |state, cx| { state.0.replace(\"replacement\"); cx.notify(); }))))\n        .child(NavStack::new(\"scene.nav-stack\", &history, history.current().clone(), focus,\n            Card::new().padding(Space::Xl)\n                .child(crate::foundation::text(&theme, TypeScale::Title, history.current().clone()))\n                .child(crate::foundation::text(&theme, TypeScale::Body,\n                    \"Only the active page is mounted. Return visits restore focus without keeping inactive controls live.\"))))\n        .into_any_element()\n}"
     },
     {
       "name": "accordion",

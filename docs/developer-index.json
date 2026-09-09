@@ -93400,6 +93400,214 @@
       "target": "Collapsible"
     },
     {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory",
+      "name": "NavHistory",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Durable visit identities. Store this data at the call site, not in a component; serialization and route resolution belong to the host.",
+      "documentation": "Durable visit identities. Store this data at the call site, not in a\ncomponent; serialization and route resolution belong to the host.",
+      "signature": "# [doc = \" Durable visit identities. Store this data at the call site, not in a\"] # [doc = \" component; serialization and route resolution belong to the host.\"] # [derive (Debug, Clone, PartialEq, Eq)] pub struct NavHistory { entries : Vec<SharedString>, cursor : usize, revision : u64, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::can_forward",
+      "name": "can_forward",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn can_forward (& self) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::can_pop",
+      "name": "can_pop",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn can_pop (& self) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::current",
+      "name": "current",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn current (& self) -> & SharedString",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::cursor",
+      "name": "cursor",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn cursor (& self) -> usize",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::entries",
+      "name": "entries",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn entries (& self) -> & [SharedString]",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::forward",
+      "name": "forward",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn forward (& mut self) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (root : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::pop",
+      "name": "pop",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Back by one visit, retaining the forward branch. Root cannot be popped.",
+      "documentation": "Back by one visit, retaining the forward branch. Root cannot be popped.",
+      "signature": "pub fn pop (& mut self) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::push",
+      "name": "push",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Reject duplicate visit ids without modifying history. Pushing after back discards only the abandoned forward branch.",
+      "documentation": "Reject duplicate visit ids without modifying history. Pushing after\nback discards only the abandoned forward branch.",
+      "signature": "pub fn push (& mut self, visit : impl Into<SharedString>) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::replace",
+      "name": "replace",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Replace the current visit without discarding either history branch. The same id is a no-op; ids used by another visit are rejected.",
+      "documentation": "Replace the current visit without discarding either history branch.\nThe same id is a no-op; ids used by another visit are rejected.",
+      "signature": "pub fn replace (& mut self, visit : impl Into<SharedString>) -> bool",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavHistory::restore",
+      "name": "restore",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Validate caller-restored history atomically. No page is invented when persisted state is empty, duplicated, or points outside the entries.",
+      "documentation": "Validate caller-restored history atomically. No page is invented when\npersisted state is empty, duplicated, or points outside the entries.",
+      "signature": "pub fn restore (entries : Vec<SharedString>, cursor : usize) -> Option<Self>",
+      "cfg": [],
+      "target": "NavHistory"
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavStack",
+      "name": "NavStack",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Active navigation content. Inactive pages are not mounted, so their input handlers and accessibility nodes cannot remain active during a transition. Uses a token-backed fade on each accepted history change; reduced motion settles immediately. It restores the last focused descendant on revisits when focus was inside the outgoing page, and never steals external focus.",
+      "documentation": "Active navigation content. Inactive pages are not mounted, so their input\nhandlers and accessibility nodes cannot remain active during a transition.\nUses a token-backed fade on each accepted history change; reduced motion\nsettles immediately. It restores the last focused descendant on revisits\nwhen focus was inside the outgoing page, and never steals external focus.",
+      "signature": "# [doc = \" Active navigation content. Inactive pages are not mounted, so their input\"] # [doc = \" handlers and accessibility nodes cannot remain active during a transition.\"] # [doc = \" Uses a token-backed fade on each accepted history change; reduced motion\"] # [doc = \" settles immediately. It restores the last focused descendant on revisits\"] # [doc = \" when focus was inside the outgoing page, and never steals external focus.\"] # [derive (IntoElement)] pub struct NavStack { ident : Ident, history : NavHistory, label : SharedString, focus : FocusHandle, content : AnyElement, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::navigation::nav_stack::NavStack::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation::nav_stack",
+      "path": "gpui_kit::navigation::nav_stack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "`focus` is the active page's initial focus target and remains owned by the caller. It must be stable while that visit is in history.",
+      "documentation": "`focus` is the active page's initial focus target and remains owned by\nthe caller. It must be stable while that visit is in history.",
+      "signature": "pub fn new (ident : impl Into<Ident>, history : & NavHistory, label : impl Into<SharedString>, focus : FocusHandle, content : impl IntoElement,) -> Self",
+      "cfg": [],
+      "target": "NavStack"
+    },
+    {
       "id": "gpui_kit::navigation::pagination::PageTotal",
       "name": "PageTotal",
       "kind": "enum",
@@ -93593,6 +93801,20 @@
     },
     {
       "id": "gpui_kit::navigation::reexport-10",
+      "name": "undo_history :: { HistoryEntry , UndoHistory }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation",
+      "path": "gpui_kit::navigation",
+      "source": "crates/gpui-kit/src/navigation/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use undo_history::{ HistoryEntry, UndoHistory };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::navigation::reexport-11",
       "name": "wizard :: { StepStatus , Wizard , WizardIntent , WizardLayout , WizardStep }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -93663,6 +93885,20 @@
     },
     {
       "id": "gpui_kit::navigation::reexport-6",
+      "name": "nav_stack :: { NavHistory , NavStack }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "navigation",
+      "path": "gpui_kit::navigation",
+      "source": "crates/gpui-kit/src/navigation/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use nav_stack::{ NavHistory, NavStack };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::navigation::reexport-7",
       "name": "pagination :: { PageTotal , Pagination }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -93676,7 +93912,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::navigation::reexport-7",
+      "id": "gpui_kit::navigation::reexport-8",
       "name": "sidebar :: { Sidebar , SidebarItem , SidebarSection }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -93690,7 +93926,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::navigation::reexport-8",
+      "id": "gpui_kit::navigation::reexport-9",
       "name": "tabs :: { SaveState , TabItem , Tabs }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -93701,20 +93937,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use tabs::{ SaveState, TabItem, Tabs };",
-      "cfg": []
-    },
-    {
-      "id": "gpui_kit::navigation::reexport-9",
-      "name": "undo_history :: { HistoryEntry , UndoHistory }",
-      "kind": "reexport",
-      "package": "gpui-box-kit",
-      "crate": "gpui_kit",
-      "module": "navigation",
-      "path": "gpui_kit::navigation",
-      "source": "crates/gpui-kit/src/navigation/mod.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use undo_history::{ HistoryEntry, UndoHistory };",
       "cfg": []
     },
     {
@@ -122811,6 +123033,24 @@
       ]
     },
     {
+      "name": "NavStack",
+      "kind": "builder",
+      "path": "gpui_kit::navigation::NavStack",
+      "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
+      "summary": "Active navigation content. Inactive pages are not mounted, so their input handlers and accessibility nodes cannot remain active during a transition. Uses a token-backed fade on each accepted history change; reduced motion settles immediately. It restores the last focused descendant on revisits when focus was inside the outgoing page, and never steals external focus.",
+      "construct": [
+        "new(ident: impl Into<Ident>, history: &NavHistory, label: impl Into<SharedString>, focus: FocusHandle, content: impl IntoElement) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "slots": [],
+      "reports": [],
+      "scenes": [
+        "nav-stack"
+      ]
+    },
+    {
       "name": "NodeGraph",
       "kind": "builder",
       "path": "gpui_kit::canvas::NodeGraph",
@@ -131001,6 +131241,30 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "NavHistory",
+      "path": "gpui_kit::navigation::NavHistory",
+      "summary": "Durable visit identities. Store this data at the call site, not in a component; serialization and route resolution belong to the host.",
+      "variants": [],
+      "construct": [
+        "new(root: impl Into<SharedString>) -> Self",
+        "restore(entries: Vec<SharedString>, cursor: usize) -> Option<Self>"
+      ],
+      "options": [],
+      "commands": [
+        "push(visit: impl Into<SharedString>) -> bool",
+        "pop() -> bool",
+        "forward() -> bool",
+        "replace(visit: impl Into<SharedString>) -> bool"
+      ],
+      "queries": [
+        "current() -> &SharedString",
+        "entries() -> &[SharedString]",
+        "cursor() -> usize",
+        "can_pop() -> bool",
+        "can_forward() -> bool"
+      ]
     },
     {
       "name": "NodeGraphEvent",
@@ -144511,6 +144775,18 @@
         "Carousel"
       ],
       "example": "fn carousel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let page = |id: &'static str, label: &'static str, text: &'static str| {\n        CarouselItem::new(\n            id,\n            label,\n            Card::new()\n                .id(format!(\"scene.carousel.card.{id}\"))\n                .padding(Space::Xl)\n                .child(crate::foundation::text(&theme, TypeScale::Title, label))\n                .child(crate::foundation::text(&theme, TypeScale::Body, text)),\n        )\n    };\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"A controlled, focusable page track with direct selection and reduced-motion-aware transitions\",\n        ))\n        .child(\n            Carousel::new(\"scene.carousel.ready\")\n                .items([\n                    page(\"overview\", \"Overview\", \"The first page is active.\"),\n                    page(\"details\", \"Details\", \"The caller owns the page content.\"),\n                    page(\"history\", \"History\", \"The track reports page intents.\"),\n                ])\n                .active(\"details\")\n                .looped(true)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Carousel::new(\"scene.carousel.empty\")\n                .phase(Phase::Empty)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "nav-stack",
+      "capture": "cargo run -p xtask -- headless capture nav-stack",
+      "kind": "exhibit",
+      "subjects": [
+        "NavStack"
+      ],
+      "uses": [
+        "NavStack"
+      ],
+      "example": "fn nav_stack(window: &mut Window, cx: &mut App) -> AnyElement {\n    use crate::navigation::nav_stack::{NavHistory, NavStack};\n    let theme = cx.theme().clone();\n    let state = window.use_keyed_state(\"scene.nav-stack.state\", cx, |_, cx| {\n        (\n            NavHistory::new(\"overview\"),\n            cx.focus_handle(),\n            cx.focus_handle(),\n            cx.focus_handle(),\n        )\n    });\n    let (history, overview, details, replacement) = state.read(cx).clone();\n    let focus = match history.current().as_ref() {\n        \"details\" => details,\n        \"replacement\" => replacement,\n        _ => overview,\n    };\n    let back = state.clone();\n    let forward = state.clone();\n    let push = state.clone();\n    let replace = state.clone();\n    stack(&theme).w(px(620.0))\n        .child(caption(&theme, \"Caller-owned visit history; back retains forward visits, push forks, replace preserves branches\"))\n        .child(row(&theme)\n            .child(Button::new(\"scene.nav-stack.back\").label(\"Back\").disabled(!history.can_pop())\n                .on_click(move |_, cx| back.update(cx, |state, cx| { state.0.pop(); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.forward\").label(\"Forward\").disabled(!history.can_forward())\n                .on_click(move |_, cx| forward.update(cx, |state, cx| { state.0.forward(); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.push\").label(\"Push details\")\n                .disabled(history.entries().iter().any(|id| id.as_ref() == \"details\"))\n                .on_click(move |_, cx| push.update(cx, |state, cx| { state.0.push(\"details\"); cx.notify(); })))\n            .child(Button::new(\"scene.nav-stack.replace\").label(\"Replace\")\n                .disabled(history.entries().iter().any(|id| id.as_ref() == \"replacement\"))\n                .on_click(move |_, cx| replace.update(cx, |state, cx| { state.0.replace(\"replacement\"); cx.notify(); }))))\n        .child(NavStack::new(\"scene.nav-stack\", &history, history.current().clone(), focus,\n            Card::new().padding(Space::Xl)\n                .child(crate::foundation::text(&theme, TypeScale::Title, history.current().clone()))\n                .child(crate::foundation::text(&theme, TypeScale::Body,\n                    \"Only the active page is mounted. Return visits restore focus without keeping inactive controls live.\"))))\n        .into_any_element()\n}"
     },
     {
       "name": "accordion",
