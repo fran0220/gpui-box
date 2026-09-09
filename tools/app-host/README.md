@@ -121,6 +121,15 @@ views, stale callbacks, permission denial, isolated plugins, command/keymap rout
 upgrade failure/rollback and cleanup. The Linux syscall probe bypasses JS entirely.
 See the runtime and plugin READMEs for the threat model and incomplete scope.
 
+For native drag review, set `GPUI_CAPTURE_DRAG=x1,y1,x2,y2` instead of
+`GPUI_CAPTURE_CLICK`. Coordinates must be finite and inside the 980×760 viewport;
+the drag must travel at least 16 pixels. The harness dispatches left-button down,
+16 held-button moves with native draws, then button up and the usual response pump.
+`GPUI_CAPTURE_DRAG_PRE_RELEASE=1` additionally saves `<capture-path>.drag.png`
+before releasing, so drag previews can be inspected. `<capture-path>.after.png`
+shows the released state. A drag need not emit a JS frame (local selection is valid);
+use `GPUI_CAPTURE_EXPECT` to assert an expected resulting descriptor text.
+
 Linux offscreen rendering, native click-to-state, permission prompts and the
 directory-packaged app were rendered and inspected in the orb. The Xvfb live-window
 probe presented a black client area despite correct offscreen rendering; live X11

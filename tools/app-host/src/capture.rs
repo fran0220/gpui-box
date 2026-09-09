@@ -1,7 +1,54 @@
 //! Offscreen review uses the same native Host and the real process supervisor.
 use super::*;
-use gpui::{HeadlessAppContext, InputEvent, MouseButton, MouseDownEvent, MouseUpEvent, point};
+use gpui::{
+    HeadlessAppContext, InputEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    point,
+};
 use std::{path::Path, sync::Arc, time::Instant};
+
+fn coordinates(value: &str, count: usize) -> Result<Vec<f32>> {
+    let values = value
+        .split(',')
+        .map(str::parse)
+        .collect::<std::result::Result<Vec<f32>, _>>()?;
+    ensure!(
+        values.len() == count,
+        "native input needs {count} comma-separated coordinates"
+    );
+    ensure!(
+        values.iter().enumerate().all(|(i, value)| value.is_finite()
+            && *value >= 0.0
+            && *value < if i % 2 == 0 { 980.0 } else { 760.0 }),
+        "native input coordinates must be inside the 980x760 viewport"
+    );
+    Ok(values)
+}
+
+fn pump(cx: &mut HeadlessAppContext, handle: gpui::WindowHandle<Host>) -> Result<bool> {
+    let mut received = false;
+    cx.update(|cx| {
+        handle.update(cx, |host, window, cx| {
+            while let Ok(frame) = host.bridge.incoming.try_recv() {
+                host.frame = Some(frame?);
+                received = true;
+                cx.notify();
+            }
+            if host
+                .frame
+                .as_ref()
+                .is_some_and(|frame| frame.revision == host.rendered_revision.get())
+            {
+                while let Ok(request) = host.bridge.requests.try_recv() {
+                    host.invoke_request(request, window, cx);
+                }
+            }
+            Ok::<_, anyhow::Error>(())
+        })
+    })??;
+    cx.run_until_parked();
+    cx.update_window(handle.into(), |_, window, cx| window.draw(cx).clear(cx))?;
+    Ok(received)
+}
 
 pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
     let mut frame = None;
@@ -54,13 +101,24 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
     cx.capture_screenshot(window)?.save(Path::new(path))?;
     // Optional actual native mouse event, useful for both template state and
     // host-owned permission controls. Coordinates are reviewed from the image.
-    if let Ok(click) = std::env::var("GPUI_CAPTURE_CLICK") {
-        let values: Vec<f32> = click
-            .split(',')
-            .map(str::parse)
-            .collect::<std::result::Result<_, _>>()?;
-        ensure!(values.len() == 2, "GPUI_CAPTURE_CLICK needs x,y");
+    let click = std::env::var("GPUI_CAPTURE_CLICK").ok();
+    let drag = std::env::var("GPUI_CAPTURE_DRAG").ok();
+    ensure!(
+        click.is_none() || drag.is_none(),
+        "choose either native click or drag"
+    );
+    if let Some(input) = drag.as_ref().or(click.as_ref()) {
+        let values = coordinates(input, if drag.is_some() { 4 } else { 2 })?;
         let at = point(px(values[0]), px(values[1]));
+        let end = if drag.is_some() {
+            ensure!(
+                (values[2] - values[0]).hypot(values[3] - values[1]) >= 16.0,
+                "native drag must travel at least 16 pixels"
+            );
+            point(px(values[2]), px(values[3]))
+        } else {
+            at
+        };
         cx.update_window(window, |_, window, cx| {
             window.dispatch_event(
                 MouseDownEvent {
@@ -73,9 +131,39 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                 .to_platform_input(),
                 cx,
             );
+        })?;
+        if drag.is_some() {
+            // Fixed work bound. Draw after each held-button move so threshold
+            // activation, hit testing and the native drag preview all run.
+            for step in 1..=16 {
+                let position = at + (end - at) * (step as f32 / 16.0);
+                cx.update_window(window, |_, window, cx| {
+                    window.dispatch_event(
+                        MouseMoveEvent {
+                            position,
+                            pressed_button: Some(MouseButton::Left),
+                            modifiers: gpui::Modifiers::none(),
+                        }
+                        .to_platform_input(),
+                        cx,
+                    );
+                })?;
+                // Controlled props may round-trip through the worker while
+                // dragging. Poll twice per step, with 10ms between polls.
+                for _ in 0..2 {
+                    std::thread::sleep(Duration::from_millis(10));
+                    pump(&mut cx, handle)?;
+                }
+            }
+            if std::env::var("GPUI_CAPTURE_DRAG_PRE_RELEASE").as_deref() == Ok("1") {
+                cx.capture_screenshot(window)?
+                    .save(Path::new(&format!("{path}.drag.png")))?;
+            }
+        }
+        cx.update_window(window, |_, window, cx| {
             window.dispatch_event(
                 MouseUpEvent {
-                    position: at,
+                    position: end,
                     modifiers: gpui::Modifiers::none(),
                     button: MouseButton::Left,
                     click_count: 1,
@@ -88,27 +176,7 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
         // awaits a native query, rather than sleeping with requests queued.
         let mut received = false;
         for _ in 0..50 {
-            cx.update(|cx| {
-                handle.update(cx, |host, window, cx| {
-                    while let Ok(frame) = host.bridge.incoming.try_recv() {
-                        host.frame = Some(frame?);
-                        received = true;
-                        cx.notify();
-                    }
-                    if host
-                        .frame
-                        .as_ref()
-                        .is_some_and(|frame| frame.revision == host.rendered_revision.get())
-                    {
-                        while let Ok(request) = host.bridge.requests.try_recv() {
-                            host.invoke_request(request, window, cx);
-                        }
-                    }
-                    Ok::<_, anyhow::Error>(())
-                })
-            })??;
-            cx.run_until_parked();
-            cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))?;
+            received |= pump(&mut cx, handle)?;
             std::thread::sleep(Duration::from_millis(10));
         }
         cx.update(|cx| {
@@ -118,7 +186,10 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                     host.frame = Some(next?);
                     changed = true;
                 }
-                ensure!(changed, "native click produced no runtime frame");
+                ensure!(
+                    drag.is_some() || changed,
+                    "native click produced no runtime frame"
+                );
                 if let Ok(expected) = std::env::var("GPUI_CAPTURE_EXPECT") {
                     fn contains(node: &Node, expected: &str) -> bool {
                         node.text == expected
@@ -132,7 +203,7 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
                         host.frame
                             .as_ref()
                             .is_some_and(|frame| contains(&frame.tree, &expected)),
-                        "native click did not produce expected text"
+                        "native input did not produce expected text"
                     );
                     println!("Native input verified: {expected}");
                 }
@@ -148,4 +219,20 @@ pub(super) fn run(bridge: Bridge, path: &str) -> Result<()> {
             .save(Path::new(&format!("{path}.after.png")))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_input_coordinates_are_finite_bounded_and_exact_arity() {
+        assert_eq!(
+            coordinates("0,759,979,1", 4).expect("viewport edges"),
+            vec![0.0, 759.0, 979.0, 1.0]
+        );
+        for input in ["NaN,2", "1,inf", "-1,20", "980,20", "20,760", "1,2,3", "1"] {
+            assert!(coordinates(input, 2).is_err(), "{input}");
+        }
+    }
 }
