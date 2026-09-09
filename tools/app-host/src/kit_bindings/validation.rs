@@ -13,6 +13,18 @@ static METHODS: LazyLock<Value> = LazyLock::new(|| {
 });
 
 pub(super) fn validate(value: &Value, schema: &Value) -> Result<()> {
+    if let Some(branches) = schema.get("oneOf") {
+        let branches = branches
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("invalid oneOf schema"))?;
+        ensure!(!branches.is_empty(), "invalid oneOf schema");
+        let matches = branches
+            .iter()
+            .filter(|branch| validate(value, branch).is_ok())
+            .count();
+        ensure!(matches == 1, "expected exactly one matching branch");
+        return Ok(());
+    }
     if value.is_null() && schema["nullable"] == true {
         return Ok(());
     }
@@ -108,27 +120,31 @@ pub(super) fn invocation(
     Ok(&method["result"])
 }
 
-pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
-    let component = node.component.as_deref().unwrap_or_default();
-    let schema = SCHEMAS
-        .get(component)
-        .ok_or_else(|| anyhow::anyhow!("unsupported Kit component"))?;
-    validate(&Value::Object(node.props.clone()), &schema["props"])?;
-    let mut slots: HashSet<&str> = schema["slots"]
+fn validate_slots(schema: &Value, node: &Node) -> Result<()> {
+    let mut slots: HashSet<String> = schema["slots"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(Value::as_str)
+        .map(str::to_owned)
         .collect();
     if let Some(property) = schema["slotIds"].as_str() {
-        slots.extend(
-            node.props
-                .get(property)
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(|item| item["id"].as_str()),
-        );
+        for id in node
+            .props
+            .get(property)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|item| item["id"].as_str())
+        {
+            if let Some(suffixes) = schema["slotSuffixes"].as_array() {
+                for suffix in suffixes.iter().filter_map(Value::as_str) {
+                    slots.insert(format!("{id}:{suffix}"));
+                }
+            } else {
+                slots.insert(id.to_owned());
+            }
+        }
     }
     for (name, children) in &node.slots {
         ensure!(
@@ -136,6 +152,16 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
             "unknown slot or slot limit exceeded"
         );
     }
+    Ok(())
+}
+
+pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
+    let component = node.component.as_deref().unwrap_or_default();
+    let schema = SCHEMAS
+        .get(component)
+        .ok_or_else(|| anyhow::anyhow!("unsupported Kit component"))?;
+    validate(&Value::Object(node.props.clone()), &schema["props"])?;
+    validate_slots(schema, node)?;
     for (event, action) in &node.events {
         ensure!(schema["events"].get(event).is_some(), "unknown Kit event");
         ensure!(
@@ -196,6 +222,43 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn schema_primitives_match_shared_js_cases() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../../js-runtime/tests/schema-fixtures.json"
+        ))
+        .expect("schema parity fixtures");
+        for fixture in fixtures["unions"].as_array().expect("union fixtures") {
+            for case in fixture["cases"].as_array().expect("union cases") {
+                assert_eq!(
+                    validate(&case[0], &fixture["schema"]).is_ok(),
+                    case[1].as_bool().expect("verdict"),
+                    "{}: {}",
+                    fixture["name"],
+                    case[0]
+                );
+            }
+        }
+        assert!(validate(&Value::Null, &serde_json::json!({"oneOf":[]})).is_err());
+        assert!(validate(&Value::Null, &serde_json::json!({"oneOf":{}})).is_err());
+        for fixture in fixtures["slots"].as_array().expect("slot fixtures") {
+            for case in fixture["cases"].as_array().expect("slot cases") {
+                let mut node: Node = serde_json::from_value(
+                    serde_json::json!({"kind":"column","id":"fixture","props":fixture["props"]}),
+                )
+                .expect("slot fixture node");
+                node.slots
+                    .insert(case[0].as_str().expect("slot name").into(), vec![]);
+                assert_eq!(
+                    validate_slots(&fixture["schema"], &node).is_ok(),
+                    case[1].as_bool().expect("verdict"),
+                    "slot {}",
+                    case[0]
+                );
+            }
+        }
+    }
 
     #[test]
     fn native_contract_rejects_unknown_properties_and_asymmetric_ranges() {

@@ -1,0 +1,62 @@
+{
+  "unions": [
+    {
+      "name": "nested tagged values",
+      "schema": {
+        "type": "object",
+        "fields": {
+          "value": {
+            "oneOf": [
+              {
+                "type": "object",
+                "fields": {
+                  "kind": { "enum": ["counts"] },
+                  "values": { "type": "array", "max": 4, "items": { "oneOf": [{ "type": "number", "min": -10, "max": 10 }, { "enum": ["unknown"] }] } }
+                },
+                "required": ["kind", "values"]
+              },
+              {
+                "type": "object",
+                "fields": { "kind": { "enum": ["text"] }, "text": { "type": "string", "max": 40 } },
+                "required": ["kind", "text"]
+              }
+            ]
+          }
+        },
+        "required": ["value"]
+      },
+      "cases": [
+        [{ "value": { "kind": "counts", "values": [-3, "unknown", 7] } }, true],
+        [{ "value": { "kind": "text", "text": "Ready" } }, true],
+        [{ "value": { "kind": "counts", "values": [11] } }, false],
+        [{ "value": { "kind": "counts", "values": [false] } }, false],
+        [{ "value": { "kind": "counts", "text": "Wrong branch" } }, false],
+        [{ "value": { "kind": "text", "text": "Ready", "path": "/etc/passwd" } }, false],
+        [{ "value": null }, false],
+        [{}, false]
+      ]
+    },
+    {
+      "name": "overlapping numeric branches",
+      "schema": { "oneOf": [{ "type": "number", "min": 0, "max": 10 }, { "type": "number", "min": 5, "max": 15 }] },
+      "cases": [[4, true], [5, false], [10, false], [11, true], [-1, false], ["5", false]]
+    },
+    {
+      "name": "duplicate matching branches",
+      "schema": { "oneOf": [{ "enum": [null] }, { "enum": [null] }] },
+      "cases": [[null, false], [true, false]]
+    }
+  ],
+  "slots": [
+    {
+      "schema": { "slotIds": "nodes", "slotSuffixes": ["content", "thumbnail"], "slots": ["toolbar"] },
+      "props": { "nodes": [{ "id": "alpha" }, { "id": "beta" }] },
+      "cases": [["alpha:content", true], ["alpha:thumbnail", true], ["beta:content", true], ["beta:thumbnail", true], ["toolbar", true], ["alpha", false], ["missing:content", false], ["alpha:unknown", false], ["alpha:content:thumbnail", false]]
+    },
+    {
+      "schema": { "slotIds": "rows" },
+      "props": { "rows": [{ "id": "alpha" }] },
+      "cases": [["alpha", true], ["alpha:content", false], ["missing", false]]
+    }
+  ]
+}

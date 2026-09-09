@@ -33,6 +33,17 @@ export const kitSchemas = Object.freeze({
 });
 
 export function validateValue(value, schema, path = 'value') {
+  if (schema.oneOf !== undefined) {
+    if (!Array.isArray(schema.oneOf) || !schema.oneOf.length) throw new TypeError(`${path}: invalid oneOf schema`);
+    let matches = 0;
+    for (const branch of schema.oneOf) {
+      try { validateValue(value, branch, path); matches++; } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+      }
+    }
+    if (matches !== 1) throw new TypeError(`${path}: expected exactly one matching branch`);
+    return;
+  }
   if (value === null && schema.nullable) return;
   if (schema.enum) {
     if (!schema.enum.includes(value)) throw new TypeError(`${path}: invalid choice`);
@@ -86,10 +97,16 @@ export function validateKitProps(component, id, props) {
 
 // The tree validator owns recursive slots, semantic-id uniqueness and aggregate budgets.
 export function validateKitSlots(component, props, slots) {
+  validateSlots(kitSchemas[component], props, slots);
+}
+
+export function validateSlots(schema, props, slots) {
   if (!slots || Object.getPrototypeOf(slots) !== Object.prototype) throw new TypeError('Expected slots object');
-  const schema = kitSchemas[component];
   const allowed = new Set(schema.slots ?? []);
-  if (schema.slotIds) for (const item of props[schema.slotIds] ?? []) allowed.add(item.id);
+  if (schema.slotIds) for (const item of props[schema.slotIds] ?? []) {
+    if (schema.slotSuffixes) for (const suffix of schema.slotSuffixes) allowed.add(`${item.id}:${suffix}`);
+    else allowed.add(item.id);
+  }
   for (const name of Reflect.ownKeys(slots)) {
     const value = Object.getOwnPropertyDescriptor(slots, name)?.value;
     if (!allowed.has(name) || !Array.isArray(value) || value.length > 1024) throw new TypeError(`slots: unknown field or invalid slot ${String(name)}`);
@@ -158,8 +175,9 @@ export function validateInvocation(component, name, args, mode) {
 }
 
 /** Source-derived method contracts for kit-sdk.d.ts; no catalog-only methods. */
-export function generateKitMethodTypes() {
+export function generateKitMethodTypes(methods = kitMethods) {
   function type(schema) {
+    if (schema.oneOf) return schema.oneOf.map(type).join(' | ');
     let result;
     if (schema.enum) result = schema.enum.map(value => JSON.stringify(value)).join(' | ');
     else if (schema.type === 'array') result = `Array<${type(schema.items)}>`;
@@ -169,7 +187,7 @@ export function generateKitMethodTypes() {
     else result = schema.type;
     return schema.nullable ? `${result} | null` : result;
   }
-  const contracts = Object.entries(kitMethods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${type(schema.args)}; result: ${type(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
+  const contracts = Object.entries(methods).map(([component, modes]) => `  ${component}: {\n${Object.entries(modes).map(([mode, methods]) => `    ${mode}: {\n${Object.entries(methods).map(([name, schema]) => `      ${name}: { args: ${type(schema.args)}; result: ${type(schema.result)} };`).join('\n')}\n    };`).join('\n')}\n  };`).join('\n');
   return [
     '// Generated from kitMethods by generateKitMethodTypes.',
     `export interface KitMethodContracts {\n${contracts}\n}`,
