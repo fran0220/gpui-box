@@ -29,6 +29,7 @@ members = [
   "crates/gpui-kit",
   "examples/browser-gallery",
   "examples/gallery",
+  "tools/app-host",
   "tools/mcp",
   "tools/performance-check",
   "xtask",

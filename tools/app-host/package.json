@@ -1,0 +1,19 @@
+{
+  "name": "@gpui-box/app-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gpui-app": "./cli.mjs"
+  },
+  "engines": {
+    "node": ">=26.5.1"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --test ../js-runtime/test/*.test.mjs ../js-runtime/tests/*.test.mjs ../plugin-platform/test/*.test.mjs test/*.test.mjs && node ../js-runtime/catalog.mjs --check"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "counter-app",
+  "version": "1.0.0",
+  "entry": "main.mts",
+  "permissions": ["storage"],
+  "dependencies": {},
+  "contributes": { "commands": [], "keymaps": [], "panels": [] }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@gpui-box/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=26.5.1" },
+  "exports": { ".": "./session.mjs", "./types": "./sdk.d.ts" },
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "sample-panel",
+  "version": "1.0.0",
+  "entry": "main.mjs",
+  "permissions": [],
+  "dependencies": {},
+  "contributes": {
+    "commands": [{ "id": "increment", "title": "Increment plugin counter" }],
+    "keymaps": [{ "key": "ctrl-j", "command": "increment" }],
+    "panels": [{ "id": "counter-panel", "title": "Isolated plugin panel" }]
+  }
+}

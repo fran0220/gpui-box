@@ -6,6 +6,7 @@ cd "$repo_root"
 
 packages=(
   build-essential
+  bubblewrap
   clang
   cmake
   pkg-config
@@ -88,6 +89,10 @@ fi
 
 echo "Installing locked browser-gallery tools."
 npm --prefix examples/browser-gallery ci
+
+echo "Installing locked native JS host typechecking tools."
+npm --prefix tools/app-host ci
+node tools/app-host/cli.mjs --help >/dev/null
 
 if [[ -n "${ORIGINGAME_SSH_PRIVATE_KEY_B64:-}" && -n "${ORIGINGAME_BWG_SSH_HOST:-}" ]]; then
   echo "BWG deployment identity is available; tools/site/deploy-main.sh can deploy after a push."
