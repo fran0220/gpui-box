@@ -1096,7 +1096,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4252
+      "symbolCount": 4260
     },
     {
       "name": "gpui-box-kit-assets",
@@ -51529,7 +51529,7 @@
       "source": "crates/gpui-kit/src/content/markdown.rs",
       "summary": "A rendered Markdown document.",
       "documentation": "A rendered Markdown document.",
-      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, code_presentation : MarkdownCodePresentation, streaming : bool, }",
+      "signature": "# [doc = \" A rendered Markdown document.\"] # [derive (IntoElement)] pub struct Markdown { ident : Ident, source : SharedString, parsed : Option<Rc<Document>>, max_lines : Option<usize>, # [doc = \" The first reading-order value this document may claim when it is\"] # [doc = \" embedded in a larger document.\"] selection_order_start : u64, on_event : Option<EventHandler>, image : Option<ImageSource>, highlighter : Option<Highlighter>, code_presentation : MarkdownCodePresentation, streaming : bool, }",
       "cfg": []
     },
     {
@@ -52467,6 +52467,123 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use parse::{ Block, CellAlign, Document, Inline, ListEntry };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::content::markdown::reexport-2",
+      "name": "stream :: { MarkdownStream , MarkdownWork }",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown",
+      "path": "gpui_kit::content::markdown",
+      "source": "crates/gpui-kit/src/content/markdown.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use stream::{ MarkdownStream, MarkdownWork };",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream",
+      "name": "MarkdownStream",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "A document being read as it arrives.",
+      "documentation": "A document being read as it arrives.",
+      "signature": "# [doc = \" A document being read as it arrives.\"] # [derive (Debug, Default)] pub struct MarkdownStream { source : String, document : Document, # [doc = \" Where each block of [`Self::document`] begins in [`Self::source`].\"] # [doc = \"\"] # [doc = \" Empty when the parser cannot map its events to top-level blocks.\"] starts : Vec<usize>, # [doc = \" Whether this source contains something whose meaning is not local.\"] whole : bool, # [doc = \" How many leading blocks the last update left untouched.\"] stable : usize, # [doc = \" How many bytes the last update actually parsed, which is the claim this\"] # [doc = \" module makes and therefore the one its tests check.\"] parsed : usize, revision : u64, work : Cell<MarkdownWork>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream::append",
+      "name": "append",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "Append a delta without scanning or copying the settled source prefix. Reference definitions can still require a complete parser pass.",
+      "documentation": "Append a delta without scanning or copying the settled source prefix.\nReference definitions can still require a complete parser pass.",
+      "signature": "pub fn append (& mut self, delta : & str)",
+      "cfg": [],
+      "target": "MarkdownStream"
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream::document",
+      "name": "document",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "The document as it is, with every marker read literally.",
+      "documentation": "The document as it is, with every marker read literally.",
+      "signature": "pub fn document (& self) -> & Document",
+      "cfg": [],
+      "target": "MarkdownStream"
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream::read",
+      "name": "read",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "Reads `source`, doing as little work as it can to be correct about it.",
+      "documentation": "Reads `source`, doing as little work as it can to be correct about it.\n\nAppending takes the incremental path. Anything else — an edit, a\nreplacement, a different document under the same identity — is parsed\nwhole, because only an append has the property this relies on.",
+      "signature": "pub fn read (& mut self, source : & str)",
+      "cfg": [],
+      "target": "MarkdownStream"
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream::revision",
+      "name": "revision",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "The revision of the retained source; unchanged reads do not advance it.",
+      "documentation": "The revision of the retained source; unchanged reads do not advance it.",
+      "signature": "pub fn revision (& self) -> u64",
+      "cfg": [],
+      "target": "MarkdownStream"
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownStream::work",
+      "name": "work",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "Cumulative work since creation, including fallback and mending parses.",
+      "documentation": "Cumulative work since creation, including fallback and mending parses.",
+      "signature": "pub fn work (& self) -> MarkdownWork",
+      "cfg": [],
+      "target": "MarkdownStream"
+    },
+    {
+      "id": "gpui_kit::content::markdown::stream::MarkdownWork",
+      "name": "MarkdownWork",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "content::markdown::stream",
+      "path": "gpui_kit::content::markdown::stream",
+      "source": "crates/gpui-kit/src/content/markdown/stream.rs",
+      "summary": "Cumulative parser and source-buffer work, not a CPU-time estimate. Parsed bytes include boundary discovery and display-mending passes. Copied bytes count source-buffer writes, not allocations inside the syntax tree.",
+      "documentation": "Cumulative parser and source-buffer work, not a CPU-time estimate.\nParsed bytes include boundary discovery and display-mending passes.\nCopied bytes count source-buffer writes, not allocations inside the syntax tree.",
+      "signature": "# [doc = \" Cumulative parser and source-buffer work, not a CPU-time estimate.\"] # [doc = \" Parsed bytes include boundary discovery and display-mending passes.\"] # [doc = \" Copied bytes count source-buffer writes, not allocations inside the syntax tree.\"] # [derive (Debug, Default, Clone, Copy, PartialEq, Eq)] pub struct MarkdownWork { pub parser_passes : usize, pub parsed_bytes : usize, pub copied_bytes : usize, }",
       "cfg": []
     },
     {
@@ -129652,6 +129769,33 @@
         "CodeCopied",
         "MoreRequested"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MarkdownStream",
+      "path": "gpui_kit::content::MarkdownStream",
+      "summary": "A document being read as it arrives.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [
+        "append(delta: &str)",
+        "read(source: &str)"
+      ],
+      "queries": [
+        "revision() -> u64",
+        "work() -> MarkdownWork",
+        "document() -> &Document"
+      ]
+    },
+    {
+      "name": "MarkdownWork",
+      "path": "gpui_kit::content::MarkdownWork",
+      "summary": "Cumulative parser and source-buffer work, not a CPU-time estimate. Parsed bytes include boundary discovery and display-mending passes. Copied bytes count source-buffer writes, not allocations inside the syntax tree.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],

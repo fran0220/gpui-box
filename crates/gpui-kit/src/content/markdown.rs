@@ -25,7 +25,7 @@
 pub mod doc;
 mod mend;
 pub mod parse;
-mod stream;
+pub(crate) mod stream;
 mod veil;
 
 use std::cell::RefCell;
@@ -57,6 +57,7 @@ use stream::Stream;
 use veil::Veil;
 
 pub use parse::{Block, CellAlign, Document, Inline, ListEntry};
+pub use stream::{MarkdownStream, MarkdownWork};
 
 /// What a rendered document reports. It applies none of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +129,7 @@ type Highlighter = Rc<dyn Fn(&CodeBlock) -> Vec<CodeSpan>>;
 pub struct Markdown {
     ident: Ident,
     source: SharedString,
+    parsed: Option<Rc<Document>>,
     max_lines: Option<usize>,
     /// The first reading-order value this document may claim when it is
     /// embedded in a larger document.
@@ -155,10 +157,16 @@ impl std::fmt::Debug for Markdown {
 }
 
 impl Markdown {
+    pub(crate) fn parsed(mut self, document: Rc<Document>) -> Self {
+        self.parsed = Some(document);
+        self
+    }
+
     pub fn new(ident: impl Into<Ident>, source: impl Into<SharedString>) -> Self {
         Self {
             ident: ident.into(),
             source: source.into(),
+            parsed: None,
             max_lines: None,
             selection_order_start: 0,
             on_event: None,
@@ -274,17 +282,21 @@ impl RenderOnce for Markdown {
             window.window_handle().window_id(),
             cx,
         );
-        let parsed = {
-            let mut reader = reader.borrow_mut();
+        let mut reader = reader.borrow_mut();
+        if self.parsed.is_none() {
             reader.read(self.source.as_ref());
-            if self.streaming {
-                reader.mended().unwrap_or_else(|| reader.document().clone())
-            } else {
-                reader.document().clone()
-            }
-        };
-        let (document, hidden) = match self.max_lines {
-            Some(max) => parsed.truncate(max),
+        }
+        let mended = (self.streaming && self.parsed.is_none())
+            .then(|| reader.mended())
+            .flatten();
+        let parsed = self
+            .parsed
+            .as_deref()
+            .or(mended.as_ref())
+            .unwrap_or_else(|| reader.document());
+        let truncated = self.max_lines.map(|max| parsed.truncate(max));
+        let (document, hidden) = match &truncated {
+            Some((document, hidden)) => (document, *hidden),
             None => (parsed, 0),
         };
 

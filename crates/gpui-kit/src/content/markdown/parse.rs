@@ -189,23 +189,32 @@ impl Document {
     /// answer is `None`, and the caller parses the whole thing rather than
     /// splitting it in a place that might not be one.
     pub(crate) fn block_starts(source: &str) -> Option<Vec<usize>> {
+        Self::parse_indexed(source).1
+    }
+
+    /// Build the tree and its boundaries in one parser traversal.
+    pub(crate) fn parse_indexed(source: &str) -> (Self, Option<Vec<usize>>) {
         let mut starts = Vec::new();
         let mut depth = 0usize;
-        for (event, range) in Parser::new_ext(source, options()).into_offset_iter() {
-            match event {
-                Event::Start(_) => {
-                    if depth == 0 {
-                        starts.push(range.start);
+        let document = build(Parser::new_ext(source, options()).into_offset_iter().map(
+            |(event, range)| {
+                match &event {
+                    Event::Start(_) => {
+                        if depth == 0 {
+                            starts.push(range.start);
+                        }
+                        depth += 1;
                     }
-                    depth += 1;
+                    Event::End(_) => depth = depth.saturating_sub(1),
+                    // A rule is a block with no contents and so no container.
+                    Event::Rule if depth == 0 => starts.push(range.start),
+                    _ => {}
                 }
-                Event::End(_) => depth = depth.saturating_sub(1),
-                // A rule is a block with no contents and so no container.
-                Event::Rule if depth == 0 => starts.push(range.start),
-                _ => {}
-            }
-        }
-        (starts.len() == Self::parse(source).blocks.len()).then_some(starts)
+                event
+            },
+        ));
+        let starts = (starts.len() == document.blocks.len()).then_some(starts);
+        (document, starts)
     }
 
     /// The source ranges of the top-level blocks of `source`, or `None` when

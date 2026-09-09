@@ -10445,6 +10445,33 @@
       "queries": []
     },
     {
+      "name": "MarkdownStream",
+      "path": "gpui_kit::content::MarkdownStream",
+      "summary": "A document being read as it arrives.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [
+        "append(delta: &str)",
+        "read(source: &str)"
+      ],
+      "queries": [
+        "revision() -> u64",
+        "work() -> MarkdownWork",
+        "document() -> &Document"
+      ]
+    },
+    {
+      "name": "MarkdownWork",
+      "path": "gpui_kit::content::MarkdownWork",
+      "summary": "Cumulative parser and source-buffer work, not a CPU-time estimate. Parsed bytes include boundary discovery and display-mending passes. Copied bytes count source-buffer writes, not allocations inside the syntax tree.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "MasonryItem",
       "path": "gpui_kit::data::MasonryItem",
       "summary": "A measured masonry item.",

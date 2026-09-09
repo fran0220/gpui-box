@@ -1513,8 +1513,8 @@ fn a_virtualized_document_draws_a_long_answer_as_a_row_per_block(cx: &mut TestAp
     });
 
     assert!(
-        harness.node("report.block.answer").is_none(),
-        "a split block is published as the rows it was drawn as, not as itself as well"
+        harness.node("report.block.answer").is_some(),
+        "the caller's block stays addressable around its first mounted row"
     );
     let starts = answer_starts();
     assert_eq!(starts.len(), 4, "the fixture answer has four blocks");

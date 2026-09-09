@@ -10,7 +10,7 @@
 //! with the identity of the block that produced them. A reconnect therefore
 //! updates the same block rather than appending another anonymous message.
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, StyledText,
@@ -19,13 +19,14 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
-use crate::content::markdown::{Markdown, MarkdownEvent, parse};
+use crate::content::markdown::{Markdown, MarkdownEvent, parse, stream::Stream};
 use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusLine;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
+use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -534,7 +535,12 @@ impl RenderOnce for AgentDocument {
             AgentDocumentState::Ready => match self.visible_rows {
                 Some(rows) => {
                     let blocks = Rc::new(self.blocks);
-                    let plan = Rc::new(plan_rows(&blocks));
+                    let retained = keyed::slot::<RowPlans>(
+                        &ident.child("row-plans").semantic_id(),
+                        window.window_handle().window_id(),
+                        cx,
+                    );
+                    let plan = Rc::new(retained.borrow_mut().read(&blocks));
                     // Ids rather than a count, so a block that grew re-measures
                     // itself alone instead of discarding every height the list
                     // had learned.
@@ -640,6 +646,8 @@ struct Part {
     /// still writing into.
     last: bool,
     range: std::ops::Range<usize>,
+    document: Rc<parse::Document>,
+    revision: u64,
 }
 
 impl Part {
@@ -690,34 +698,105 @@ impl PlannedRow {
 ///
 /// A source this reader cannot cut at trustworthy boundaries stays one row,
 /// because a fence split across two rows is worse than a long row.
-fn plan_rows(blocks: &[AgentDocumentBlock]) -> Vec<PlannedRow> {
-    let mut plan = Vec::with_capacity(blocks.len());
-    for (index, block) in blocks.iter().enumerate() {
-        let ranges = match &block.body {
-            AgentBlockBody::Markdown(source) => parse::Document::block_ranges(source),
-            _ => None,
-        };
-        match ranges {
-            Some(ranges) if ranges.len() > 1 => {
-                let last = ranges.len() - 1;
-                for (part, range) in ranges.into_iter().enumerate() {
-                    plan.push(PlannedRow {
-                        block: index,
-                        part: Some(Part {
-                            index: part,
-                            last: part == last,
-                            range,
-                        }),
-                    });
-                }
-            }
-            _ => plan.push(PlannedRow {
-                block: index,
-                part: None,
-            }),
+#[derive(Default)]
+struct RowPlans {
+    markdown: HashMap<SharedString, MarkdownPlan>,
+}
+
+#[derive(Default)]
+struct MarkdownPlan {
+    source: Option<SharedString>,
+    streaming: bool,
+    reader: Stream,
+    parts: Vec<Part>,
+    generation: u64,
+}
+
+impl MarkdownPlan {
+    fn read(&mut self, source: &SharedString, streaming: bool) {
+        if self.source.as_ref() == Some(source) && self.streaming == streaming {
+            return;
         }
+        self.reader.read(source);
+        self.generation += 1;
+        let mended = streaming.then(|| self.reader.mended()).flatten();
+        let document = mended.as_ref().unwrap_or_else(|| self.reader.document());
+        let starts = self.reader.starts();
+        let split = starts.len() == document.blocks.len();
+        let count = if split { starts.len() } else { 1 };
+        let old = std::mem::take(&mut self.parts);
+        self.parts = (0..count)
+            .map(|index| {
+                let range = if split {
+                    starts[index]..starts.get(index + 1).copied().unwrap_or(source.len())
+                } else {
+                    0..source.len()
+                };
+                let last = index + 1 == count;
+                if index < self.reader.stable()
+                    && let Some(part) = old.get(index)
+                    && part.range == range
+                    && part.last == last
+                    && !(last && self.streaming != streaming)
+                {
+                    return part.clone();
+                }
+                let parsed = if split {
+                    parse::Document {
+                        blocks: vec![document.blocks[index].clone()],
+                    }
+                } else {
+                    document.clone()
+                };
+                let unchanged = old.get(index).filter(|part| {
+                    part.range == range && part.last == last && *part.document == parsed
+                });
+                Part {
+                    index,
+                    last,
+                    range,
+                    document: unchanged
+                        .map_or_else(|| Rc::new(parsed), |part| part.document.clone()),
+                    revision: unchanged.map_or(self.generation, |part| part.revision),
+                }
+            })
+            .collect();
+        self.source = Some(source.clone());
+        self.streaming = streaming;
     }
-    plan
+}
+
+impl RowPlans {
+    fn read(&mut self, blocks: &[AgentDocumentBlock]) -> Vec<PlannedRow> {
+        self.markdown
+            .retain(|id, _| blocks.iter().any(|block| &block.id == id));
+        let mut plan = Vec::with_capacity(blocks.len());
+        for (index, block) in blocks.iter().enumerate() {
+            let parts = match &block.body {
+                AgentBlockBody::Markdown(source) => {
+                    let retained = self.markdown.entry(block.id.clone()).or_default();
+                    retained.read(source, block.streaming);
+                    Some(&retained.parts)
+                }
+                _ => None,
+            };
+            match parts {
+                Some(parts) => {
+                    for part in parts {
+                        plan.push(PlannedRow {
+                            block: index,
+                            part: Some(part.clone()),
+                        });
+                    }
+                }
+                _ => plan.push(PlannedRow {
+                    block: index,
+                    part: None,
+                }),
+            }
+        }
+        plan
+    }
 }
 
 fn render_block(
@@ -768,11 +847,10 @@ fn render_block(
             .into_any_element(),
         AgentBlockBody::Markdown(source) => {
             let block_id = block.id.clone();
-            let source = match part {
-                Some(part) => SharedString::from(source[part.range.clone()].to_string()),
-                None => source.clone(),
-            };
-            Markdown::new(ident.child("markdown"), source)
+            Markdown::new(ident.child("markdown"), source.clone())
+                .when_some(part, |markdown, part| {
+                    markdown.parsed(part.document.clone())
+                })
                 .selection_order_start(selection_order)
                 .streaming(streaming)
                 .when_some(on_event, |markdown, on_event| {
@@ -838,7 +916,7 @@ fn render_block(
         )
         .child(body);
 
-    div()
+    let rendered = div()
         .w_full()
         .child(frame)
         .semantic_in(
@@ -848,7 +926,31 @@ fn render_block(
                 .value(state)
                 .busy(streaming),
         )
-        .into_any_element()
+        .into_any_element();
+    if part.is_some_and(|part| part.index == 0) {
+        // The caller's block remains addressable when its first paragraph
+        // becomes several virtual rows. Part identities belong underneath it.
+        div()
+            .w_full()
+            .child(rendered)
+            .semantic_in(
+                cx,
+                NodeSpec::new(
+                    document.child(format!("block.{}", block.id)).semantic_id(),
+                    Role::Group,
+                )
+                .parent(document.semantic_id())
+                .value(format!(
+                    "{}:revision-{}",
+                    block.kind.as_str(),
+                    block.revision
+                ))
+                .busy(block.streaming),
+            )
+            .into_any_element()
+    } else {
+        rendered
+    }
 }
 
 #[cfg(test)]
@@ -870,6 +972,63 @@ mod tests {
 
         assert_eq!(document.blocks.len(), 2);
         assert_eq!(document.duplicate_ids(), vec![SharedString::from("same")]);
+    }
+
+    #[test]
+    fn static_long_document_reuses_plans_without_parser_work() {
+        let source: SharedString = (0..2000)
+            .map(|i| format!("Paragraph {i}.\n\n"))
+            .collect::<String>()
+            .into();
+        let mut plan = MarkdownPlan::default();
+        plan.read(&source, false);
+        let first = plan.parts[0].document.clone();
+        let work = plan.reader.work();
+        assert_eq!(work.parser_passes, 1);
+        for _ in 0..100 {
+            plan.read(&source, false);
+        }
+        assert_eq!(plan.reader.work(), work);
+        assert!(Rc::ptr_eq(&first, &plan.parts[0].document));
+        let grown = format!("{source}A new tail.").into();
+        plan.read(&grown, true);
+        assert!(Rc::ptr_eq(&first, &plan.parts[0].document));
+        assert!(plan.reader.work().parsed_bytes - work.parsed_bytes < 100);
+        assert_eq!(plan.parts[0].revision, 1);
+    }
+
+    #[test]
+    fn planned_rows_preserve_reference_context_and_replacement() {
+        let mut plan = MarkdownPlan::default();
+        for source in [
+            "See [home].\n\nOther paragraph.\n\n[home]: /index\n",
+            "See [home].\n\nOther paragraph.\n\n[home]: /changed\n",
+        ] {
+            plan.read(&source.into(), false);
+            let blocks: Vec<_> = plan
+                .parts
+                .iter()
+                .flat_map(|part| part.document.blocks.clone())
+                .collect();
+            assert_eq!(blocks, parse::Document::parse(source).blocks);
+            assert_eq!(plan.parts[0].name(), "part-at-0");
+        }
+        assert_eq!(plan.parts[0].revision, 2);
+    }
+
+    #[test]
+    fn streaming_plan_settles_hanging_markers_without_renaming_rows() {
+        let mut plan = MarkdownPlan::default();
+        let source: SharedString = "Stable.\n\n**hanging".into();
+        plan.read(&source, true);
+        let first = plan.parts[0].document.clone();
+        let last = plan.parts.last().expect("hanging paragraph").clone();
+        plan.read(&source, false);
+        assert!(Rc::ptr_eq(&first, &plan.parts[0].document));
+        let settled = plan.parts.last().expect("settled paragraph");
+        assert_eq!(last.name(), settled.name());
+        assert_ne!(last.document, settled.document);
+        assert_ne!(last.revision, settled.revision);
     }
 }
 

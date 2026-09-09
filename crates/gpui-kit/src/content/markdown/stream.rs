@@ -20,16 +20,26 @@
 
 use super::mend;
 use super::parse::{Block, Document};
+use std::cell::Cell;
+
+/// Cumulative parser and source-buffer work, not a CPU-time estimate.
+/// Parsed bytes include boundary discovery and display-mending passes.
+/// Copied bytes count source-buffer writes, not allocations inside the syntax tree.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct MarkdownWork {
+    pub parser_passes: usize,
+    pub parsed_bytes: usize,
+    pub copied_bytes: usize,
+}
 
 /// A document being read as it arrives.
 #[derive(Debug, Default)]
-pub(crate) struct Stream {
+pub struct MarkdownStream {
     source: String,
     document: Document,
     /// Where each block of [`Self::document`] begins in [`Self::source`].
     ///
-    /// Empty when the source has to be parsed whole, which is also what makes
-    /// that state unrepresentable as a stale set of boundaries.
+    /// Empty when the parser cannot map its events to top-level blocks.
     starts: Vec<usize>,
     /// Whether this source contains something whose meaning is not local.
     whole: bool,
@@ -38,29 +48,83 @@ pub(crate) struct Stream {
     /// How many bytes the last update actually parsed, which is the claim this
     /// module makes and therefore the one its tests check.
     parsed: usize,
+    revision: u64,
+    work: Cell<MarkdownWork>,
 }
 
-impl Stream {
+pub(crate) type Stream = MarkdownStream;
+
+impl MarkdownStream {
+    /// The revision of the retained source; unchanged reads do not advance it.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Cumulative work since creation, including fallback and mending parses.
+    pub fn work(&self) -> MarkdownWork {
+        self.work.get()
+    }
+
+    fn record_parse(&self, bytes: usize) {
+        let mut work = self.work.get();
+        work.parser_passes += 1;
+        work.parsed_bytes += bytes;
+        self.work.set(work);
+    }
+
+    fn record_copy(&self, bytes: usize) {
+        let mut work = self.work.get();
+        work.copied_bytes += bytes;
+        self.work.set(work);
+    }
+
+    /// Append a delta without scanning or copying the settled source prefix.
+    /// Reference definitions can still require a complete parser pass.
+    pub fn append(&mut self, delta: &str) {
+        if delta.is_empty() {
+            self.parsed = 0;
+            self.stable = self.document.blocks.len();
+            return;
+        }
+        let mut source = std::mem::take(&mut self.source);
+        let old_len = source.len();
+        source.push_str(delta);
+        self.record_copy(delta.len());
+        self.revision += 1;
+        self.read_append(&source, old_len);
+        self.source = source;
+    }
+
     /// Reads `source`, doing as little work as it can to be correct about it.
     ///
     /// Appending takes the incremental path. Anything else — an edit, a
     /// replacement, a different document under the same identity — is parsed
     /// whole, because only an append has the property this relies on.
-    pub(crate) fn read(&mut self, source: &str) {
+    pub fn read(&mut self, source: &str) {
         if source == self.source {
             self.parsed = 0;
             self.stable = self.document.blocks.len();
             return;
         }
+        self.revision += 1;
         let appended = source.len() > self.source.len() && source.starts_with(&self.source);
         if !appended {
             self.reset(source);
+            self.source.clear();
+            self.source.push_str(source);
+            self.record_copy(source.len());
             return;
         }
+        let old_len = self.source.len();
+        self.read_append(source, old_len);
+        self.source.push_str(&source[old_len..]);
+        self.record_copy(source.len() - old_len);
+    }
 
+    fn read_append(&mut self, source: &str, old_len: usize) {
         // A definition may be completed by the bytes that just arrived, so the
         // scan starts at the beginning of the line the source ended in.
-        let line = self.source.rfind('\n').map_or(0, |index| index + 1);
+        let line = source[..old_len].rfind('\n').map_or(0, |index| index + 1);
         if !self.whole && has_reference_definition(&source[line..]) {
             self.whole = true;
         }
@@ -79,7 +143,9 @@ impl Stream {
         let boundary = source[..boundary].rfind('\n').map_or(0, |index| index + 1);
 
         let tail = &source[boundary..];
-        let Some(tail_starts) = Document::block_starts(tail) else {
+        self.record_parse(tail.len());
+        let (document, starts) = Document::parse_indexed(tail);
+        let Some(tail_starts) = starts else {
             self.reset(source);
             return;
         };
@@ -89,29 +155,23 @@ impl Stream {
         self.starts.truncate(kept);
         self.stable = kept;
         self.parsed = tail.len();
-        self.document.blocks.extend(Document::parse(tail).blocks);
+        self.document.blocks.extend(document.blocks);
         self.starts
             .extend(tail_starts.into_iter().map(|start| start + boundary));
-        self.source.clear();
-        self.source.push_str(source);
     }
 
     fn reset(&mut self, source: &str) {
-        self.source.clear();
-        self.source.push_str(source);
         self.whole = has_reference_definition(source);
-        self.document = Document::parse(source);
-        self.starts = if self.whole {
-            Vec::new()
-        } else {
-            Document::block_starts(source).unwrap_or_default()
-        };
+        self.record_parse(source.len());
+        let (document, starts) = Document::parse_indexed(source);
+        self.document = document;
+        self.starts = starts.unwrap_or_default();
         self.stable = 0;
         self.parsed = source.len();
     }
 
     /// The document as it is, with every marker read literally.
-    pub(crate) fn document(&self) -> &Document {
+    pub fn document(&self) -> &Document {
         &self.document
     }
 
@@ -126,6 +186,9 @@ impl Stream {
     /// out never to close settles honestly, once, instead of being asserted
     /// forever.
     pub(crate) fn mended(&self) -> Option<Document> {
+        if self.whole {
+            return None;
+        }
         let start = *self.starts.last()?;
         let last = self.document.blocks.last()?;
         // A fence renders its own contents verbatim and is stable already; a
@@ -136,14 +199,19 @@ impl Stream {
         let mended = mend::close_hanging(&self.source[start..])?;
 
         let mut blocks = self.document.blocks[..self.document.blocks.len() - 1].to_vec();
+        self.record_parse(mended.len());
         blocks.extend(Document::parse(&mended).blocks);
         Some(Document { blocks })
     }
 
     /// How many leading blocks the last read left alone.
-    #[cfg(test)]
     pub(crate) fn stable(&self) -> usize {
         self.stable
+    }
+
+    /// Retained offsets, including documents whose references require a full parse.
+    pub(crate) fn starts(&self) -> &[usize] {
+        &self.starts
     }
 
     /// How many bytes the last read parsed.
@@ -159,15 +227,50 @@ impl Stream {
 /// a document that did not need one; being wrong in the other direction means
 /// a link that silently stops resolving partway through a document.
 fn has_reference_definition(text: &str) -> bool {
-    text.lines().any(|line| {
-        let trimmed = line.trim_start();
-        line.len() - trimmed.len() <= 3 && trimmed.starts_with('[') && trimmed.contains("]:")
-    })
+    // Labels may span lines. Restricting this scan to lines starting with '['
+    // misses a closing label on a subsequent line.
+    text.contains("]:")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delta_input_copies_only_arriving_bytes_and_counts_every_parser_pass() {
+        let mut stream = Stream::default();
+        let prefix = "Settled paragraph.\n\n".repeat(2000);
+        stream.append(&prefix);
+        assert_eq!(stream.work().parser_passes, 1);
+        let before = stream.work();
+        stream.append("```rust\nlet x = 1;");
+        assert_eq!(stream.work().copied_bytes - before.copied_bytes, 18);
+        assert_eq!(stream.work().parser_passes - before.parser_passes, 1);
+        assert!(stream.work().parsed_bytes - before.parsed_bytes < 100);
+        stream.append("\n```\n");
+        assert_eq!(
+            stream.document(),
+            &Document::parse(&format!("{prefix}```rust\nlet x = 1;\n```\n"))
+        );
+        let before = stream.work();
+        let revision = stream.revision();
+        stream.append("");
+        assert_eq!(stream.work(), before);
+        assert_eq!(stream.revision(), revision);
+    }
+
+    #[test]
+    fn multiline_reference_labels_resolve_every_prefix() {
+        let source = "See [long label].\n\nSettled.\n\n[long\nlabel]: /home\n";
+        let mut stream = Stream::default();
+        for (index, character) in source.char_indices() {
+            stream.append(&source[index..index + character.len_utf8()]);
+            assert_eq!(
+                stream.document(),
+                &Document::parse(&source[..index + character.len_utf8()])
+            );
+        }
+    }
 
     /// Feeds `text` through in `chunks` pieces, the way it would arrive.
     fn streamed(text: &str, chunks: usize) -> Stream {
