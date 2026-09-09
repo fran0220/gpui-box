@@ -1204,3 +1204,22 @@ soft-wrap still uses full-document layout. A very long visible hard line is
 shaped whole. Those remaining paths must be migrated before advertising a
 viewport-bounded large-file editor; multicursor, folding and caller language
 services are not implied by this foundation.
+
+## Native browser engines remain independent of Kit
+
+`gpui-box-webview` supplies caller-owned Wry engine hosts: WKWebView, WebView2,
+and WebKitGTK on X11/XWayland. It renders full browser HTML/CSS, independently
+of native Markdown/HTML text rendering. BrowserPanel remains a caller-owned
+shell; no browser transport enters Kit. The native example and executable
+smoke live in `crates/gpui-webview/examples`; see [the host contract](webview.md).
+
+The Linux framework now attaches real X11 children, crops native pixels and
+input through a separate rectangular parent, allocates the full toolkit
+viewport, and restores the child on detach. X11 native tests cover geometry,
+DPI, pointer hit testing, stacking and ownership. Native Wayland embedding,
+X11 GPUI scene overlays above native children, arbitrary subtree transforms,
+rounded native masks and alpha compositing are deferred framework gaps, not
+emulated browser support. macOS/Windows native focus, IME, accessibility and
+overlay behavior still need platform-run evidence. Origin-aware asynchronous
+permission approvals are not represented by Wry's kind-only callback; current
+host policy refuses surfaced permission, popup and download requests.

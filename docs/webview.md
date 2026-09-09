@@ -80,8 +80,11 @@ approval with origin/gesture identity requires native request responders, not
 the current synchronous kind-only Wry hook.
 
 IPC is absent by default. Opt-in messages are untrusted data and are limited to
-64 KiB per message. The reported URL is informational: Linux Wry substitutes the
-main-frame URL for iframe senders. Never authorize commands from it. This is
+64 KiB per message. Event delivery is bounded to 256 queued events and never
+blocks native callbacks. `EventsDropped` reports overflow; mark state unverified
+instead of inferring success from an incomplete stream. The reported URL is
+informational: Linux Wry substitutes the main-frame URL for iframe senders.
+Never authorize commands from it. This is
 not a capability bridge, per-origin RPC mechanism, or defense against all
 resource exhaustion by an adversarial page. Host-authored `evaluate_script`
 must not interpolate untrusted input as JavaScript source.
@@ -103,8 +106,8 @@ a caller-created URL stack.
 ```sh
 cargo test -p gpui-box-webview
 cargo test -p gpui-box --features test-support platform_view
-xvfb-run cargo test -p gpui-box-linux x11_native_children -- --ignored
-env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run cargo run -p gpui-box-webview --example smoke
+xvfb-run -a cargo test -p gpui-box-linux x11_native_children -- --ignored
+env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a cargo run -p gpui-box-webview --example smoke
 cargo run -p xtask -- dependencies check
 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 cargo run -p gpui-box-webview --example browser
 ```
@@ -120,3 +123,12 @@ macOS and Windows need their native compile/test lanes and a logged-in native
 host to validate WK delegate forwarding, WebView2 runtime installation, focus,
 IME, accessibility bounds and native overlays. A Linux Xvfb pass proves none of
 those. Cross-platform source support is not a claim of completed native evidence.
+
+The Linux orb's inspected native capture shows all three CSS grid cards,
+gradient/rounded corners, authored keyboard input and an untrusted-message
+result. Under this Xvfb session the GPUI GPU surface itself is invisible (the
+unchanged `hello_world` control has the same symptom, with and without an X11
+compositor/window manager). Native browser pixels and X11 geometry/input tests
+are therefore evidence; a correct GPUI-toolbar/browser composite and real IME
+are still desktop validation requirements. No native desktop capture is used
+as a headless baseline.

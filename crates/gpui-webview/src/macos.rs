@@ -1,4 +1,4 @@
-use crate::BrowserEvent;
+use crate::{BrowserEvent, EventSender};
 use gpui::{App, PlatformViewHandle};
 use objc::{
     class,
@@ -8,10 +8,7 @@ use objc::{
     sel, sel_impl,
 };
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use std::{
-    ffi::CStr,
-    sync::{OnceLock, mpsc::Sender},
-};
+use std::{ffi::CStr, sync::OnceLock};
 use wry::{WebView, WebViewBuilder, WebViewExtMacOS};
 
 // WKNavigationDelegate is weak. Keep the forwarding proxy and Wry's original
@@ -20,7 +17,7 @@ pub(super) struct Lifetime {
     view: *mut Object,
     proxy: *mut Object,
     original: *mut Object,
-    _sender: Box<Sender<BrowserEvent>>,
+    _sender: Box<EventSender>,
 }
 
 impl Drop for Lifetime {
@@ -49,7 +46,7 @@ unsafe fn string(object: *mut Object) -> String {
 
 extern "C" fn failed(this: &Object, _: Sel, view: *mut Object, _: *mut Object, error: *mut Object) {
     unsafe {
-        let sender = &*(*this.get_ivar::<usize>("sender") as *const Sender<BrowserEvent>);
+        let sender = &*(*this.get_ivar::<usize>("sender") as *const EventSender);
         let url: *mut Object = msg_send![view, URL];
         let address: *mut Object = msg_send![url, absoluteString];
         let description: *mut Object = msg_send![error, localizedDescription];
@@ -62,7 +59,7 @@ extern "C" fn failed(this: &Object, _: Sel, view: *mut Object, _: *mut Object, e
 
 extern "C" fn terminated(this: &Object, _: Sel, _: *mut Object) {
     unsafe {
-        let sender = &*(*this.get_ivar::<usize>("sender") as *const Sender<BrowserEvent>);
+        let sender = &*(*this.get_ivar::<usize>("sender") as *const EventSender);
         let _ = sender.send(BrowserEvent::ProcessTerminated(
             "WebKit content process terminated".into(),
         ));
@@ -135,7 +132,7 @@ impl HasWindowHandle for Parent {
 pub(super) fn build(
     builder: WebViewBuilder<'_>,
     raw: RawWindowHandle,
-    sender: Sender<BrowserEvent>,
+    sender: EventSender,
     _: &App,
 ) -> anyhow::Result<(WebView, PlatformViewHandle, Lifetime)> {
     let parent = Parent(raw);
@@ -147,7 +144,7 @@ pub(super) fn build(
         let original: *mut Object = msg_send![pointer, navigationDelegate];
         let _: *mut Object = msg_send![original, retain];
         let proxy: *mut Object = msg_send![delegate_class(), new];
-        (*proxy).set_ivar("sender", &*sender as *const Sender<BrowserEvent> as usize);
+        (*proxy).set_ivar("sender", &*sender as *const EventSender as usize);
         (*proxy).set_ivar("original", original);
         let _: () = msg_send![pointer, setNavigationDelegate: proxy];
         (

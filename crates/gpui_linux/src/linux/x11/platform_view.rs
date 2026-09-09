@@ -157,7 +157,7 @@ mod tests {
     use std::{cell::Cell, rc::Rc};
 
     #[test]
-    #[ignore = "requires an X11 server: xvfb-run cargo test -p gpui-box-linux x11_native_children -- --ignored"]
+    #[ignore = "requires an X11 server: xvfb-run -a cargo test -p gpui-box-linux x11_native_children -- --ignored"]
     fn x11_native_children_clip_resize_stack_detach_and_retain() -> anyhow::Result<()> {
         let (connection, screen) = XCBConnection::connect(None)?;
         let root = connection.setup().roots[screen].root;

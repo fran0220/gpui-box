@@ -1,8 +1,8 @@
-use crate::BrowserEvent;
+use crate::{BrowserEvent, EventSender};
 use gpui::{App, PlatformViewHandle, Task};
 use gtk::prelude::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use std::{sync::mpsc::Sender, time::Duration};
+use std::time::Duration;
 use webkit2gtk::WebViewExt;
 use wry::{WebView, WebViewBuilder, WebViewExtUnix};
 
@@ -33,7 +33,7 @@ impl HasWindowHandle for Parent {
 pub(super) fn build(
     builder: WebViewBuilder<'_>,
     raw: RawWindowHandle,
-    sender: Sender<BrowserEvent>,
+    sender: EventSender,
     cx: &App,
 ) -> anyhow::Result<(WebView, PlatformViewHandle, Lifetime)> {
     let parent = Parent(match raw {

@@ -127,9 +127,8 @@ fn main() {
                                                 this.failed = false
                                             }
                                             BrowserEvent::LoadFailed { .. }
-                                            | BrowserEvent::NavigationRefused(_) => {
-                                                this.failed = true
-                                            }
+                                            | BrowserEvent::NavigationRefused(_)
+                                            | BrowserEvent::EventsDropped(_) => this.failed = true,
                                             BrowserEvent::PageFinished(_) if this.failed => {
                                                 continue;
                                             }

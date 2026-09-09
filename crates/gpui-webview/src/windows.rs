@@ -1,7 +1,6 @@
-use crate::BrowserEvent;
+use crate::{BrowserEvent, EventSender};
 use gpui::{App, PlatformViewHandle};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use std::sync::mpsc::Sender;
 use webview2_com::{
     Microsoft::Web::WebView2::Win32::*, NavigationCompletedEventHandler, ProcessFailedEventHandler,
     take_pwstr,
@@ -26,7 +25,7 @@ impl HasWindowHandle for Parent {
 pub(super) fn build(
     builder: WebViewBuilder<'_>,
     raw: RawWindowHandle,
-    sender: Sender<BrowserEvent>,
+    sender: EventSender,
     _: &App,
 ) -> anyhow::Result<(WebView, PlatformViewHandle, Lifetime)> {
     let parent = Parent(raw);

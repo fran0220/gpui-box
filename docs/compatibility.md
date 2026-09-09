@@ -511,3 +511,20 @@ through `EditorEvent::Parsed`, not silently converted to language diagnostics.
 repeated reads, and records whether a prior tree was reused. It does not
 measure the parser's internal allocations or claim constant-time parsing.
 The editor scene includes a JSON fixture when this feature is enabled.
+
+## Native browser host evidence
+
+The independent `gpui-box-webview` package uses Wry 0.57.0 with the installed
+native browser engines. Linux X11/XWayland uses WebKitGTK 4.1 and GTK3; fresh
+orbs and the release Linux gate install `libwebkit2gtk-4.1-dev`. Root and
+headless workspaces continue to use the same local GPUI framework packages;
+Kit/headless do not acquire a browser-engine dependency.
+
+Linux native smoke has exercised full CSS layout, actual browser viewport,
+script IPC/evaluation, HTTP navigation, back/forward/reload and native
+connection-refused errors. X11 attachment tests separately cover clipping,
+native pointer bounds, stacking and lifecycle. Windows GNU cross-compilation
+passes; macOS compilation and both platforms' interactive browser validation
+remain required. This is not native Wayland parity. See [webview.md](webview.md)
+for the XWayland product route, unsupported composition operations, permission
+policy constraints and exact reproduction commands.

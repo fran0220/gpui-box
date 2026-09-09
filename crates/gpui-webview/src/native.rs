@@ -1,10 +1,7 @@
-use crate::{BrowserEvent, NavigationPolicy};
+use crate::{BrowserEvent, EventInbox, EventSender, NavigationPolicy};
 use gpui::{App, PlatformViewHandle, Window};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use std::{
-    rc::Rc,
-    sync::mpsc::{self, Receiver, Sender},
-};
+use std::rc::Rc;
 use wry::{WebView, WebViewBuilder};
 
 #[cfg(target_os = "linux")]
@@ -36,8 +33,8 @@ struct Engine {
 pub struct BrowserHost {
     engine: Rc<Engine>,
     handle: PlatformViewHandle,
-    events: Receiver<BrowserEvent>,
-    sender: Sender<BrowserEvent>,
+    events: EventInbox,
+    sender: EventSender,
     navigation: NavigationPolicy,
 }
 
@@ -58,7 +55,7 @@ impl BrowserHost {
             "native WebView requires AppKit, Win32, or X11/XWayland; raw Wayland embedding is unavailable"
         );
         platform::initialize()?;
-        let (sender, events) = mpsc::channel();
+        let (sender, events) = EventSender::channel();
         let send = sender.clone();
         let policy = options.navigation.clone();
         let mut builder = WebViewBuilder::new().with_navigation_handler(move |url| {
@@ -130,7 +127,7 @@ impl BrowserHost {
 
     /// Drains notifications without reentering GPUI from a native callback.
     pub fn drain_events(&self) -> impl Iterator<Item = BrowserEvent> + '_ {
-        self.events.try_iter()
+        self.events.drain()
     }
 
     pub fn navigate(&self, url: &str) -> anyhow::Result<()> {
