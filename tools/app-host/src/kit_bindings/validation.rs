@@ -403,6 +403,18 @@ pub(crate) fn validate_descriptor(node: &Node) -> Result<()> {
         node.props.get("disabled") != Some(&Value::Bool(true)) || node.events.is_empty(),
         "disabled control has actions"
     );
+    if super::controls_extra::COMPONENTS.contains(&component) {
+        super::controls_extra::validate(node)?;
+    }
+    if super::navigation_extra::COMPONENTS.contains(&component) {
+        super::navigation_extra::validate(node)?;
+    }
+    if super::layout_extra::COMPONENTS.contains(&component) {
+        super::layout_extra::validate(node)?;
+    }
+    if super::datetime::COMPONENTS.contains(&component) {
+        super::datetime::validate(node)?;
+    }
     if component == "Slider" {
         let min = node.props.get("min").and_then(Value::as_f64).unwrap_or(0.);
         let max = node.props.get("max").and_then(Value::as_f64).unwrap_or(1.);

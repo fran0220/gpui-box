@@ -14,8 +14,13 @@ use std::{
 };
 
 mod collections;
+mod controls_extra;
+mod datetime;
+mod icon;
 mod invocation;
 mod layout;
+mod layout_extra;
+mod navigation_extra;
 mod overlays;
 mod validation;
 pub(super) use validation::validate_descriptor;
@@ -40,6 +45,41 @@ pub(super) const COMPONENTS: &[&str] = &[
     "List",
     "Popover",
     "Dialog",
+    "Button",
+    "IconButton",
+    "Toggle",
+    "ToggleGroup",
+    "ColorPicker",
+    "ColorSwatch",
+    "FormField",
+    "FilterBar",
+    "SearchInput",
+    "SettingsRow",
+    "TransferList",
+    "AnchorList",
+    "Breadcrumb",
+    "Carousel",
+    "Collapsible",
+    "NavStack",
+    "Sidebar",
+    "UndoHistory",
+    "Wizard",
+    "AspectRatio",
+    "Container",
+    "DesktopTitlebar",
+    "Dock",
+    "DockTree",
+    "Grid",
+    "Responsive",
+    "ScrollEdgeEffect",
+    "ScrollFade",
+    "SplitTree",
+    "StatusBar",
+    "Toolbar",
+    "Calendar",
+    "DateInput",
+    "RangePicker",
+    "TimeInput",
 ];
 type Emit = Rc<dyn Fn(&str, Value)>;
 type Key = (u64, String);
@@ -77,6 +117,10 @@ struct Retained {
 #[derive(Default)]
 pub(super) struct KitState {
     retained: RefCell<HashMap<Key, Rc<Retained>>>,
+    controls_extra: controls_extra::State,
+    navigation_extra: navigation_extra::State,
+    layout_extra: layout_extra::State,
+    datetime: datetime::State,
 }
 
 fn flag(node: &Node, key: &str) -> bool {
@@ -130,6 +174,10 @@ fn options(value: Option<&Value>) -> Vec<SelectOption> {
 
 impl KitState {
     pub(super) fn reconcile(&self, root: &Node, _cx: &mut App) {
+        self.controls_extra.reconcile(root, _cx);
+        self.navigation_extra.reconcile(root, _cx);
+        self.layout_extra.reconcile(root, _cx);
+        self.datetime.reconcile(root, _cx);
         fn visit(node: &Node, live: &mut HashMap<Key, String>) {
             if let Some(component) = &node.component {
                 live.insert((node.instance, node.id.clone()), component.clone());
@@ -161,6 +209,19 @@ impl KitState {
         cx: &mut App,
         emit: Emit,
     ) -> AnyElement {
+        let component = node.component.as_deref().unwrap_or_default();
+        if controls_extra::COMPONENTS.contains(&component) {
+            return self.controls_extra.render(node, slots, window, cx, emit);
+        }
+        if navigation_extra::COMPONENTS.contains(&component) {
+            return self.navigation_extra.render(node, slots, window, cx, emit);
+        }
+        if layout_extra::COMPONENTS.contains(&component) {
+            return self.layout_extra.render(node, slots, window, cx, emit);
+        }
+        if datetime::COMPONENTS.contains(&component) {
+            return self.datetime.render(node, slots, window, cx, emit);
+        }
         let id = SharedString::from(node.id.clone());
         let disabled = flag(node, "disabled");
         let event = |name: &str| {

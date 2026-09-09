@@ -1,4 +1,5237 @@
 {
+  "TransferList": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "source": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "max": 256,
+                "min": 1
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "target": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "max": 256,
+                "min": 1
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "sourceSelected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "max": 1024
+        },
+        "targetSelected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "max": 1024
+        },
+        "sourceLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "targetLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "query": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "toggleSource": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "toggleTarget": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "moveToTarget": {
+        "enum": [
+          null
+        ]
+      },
+      "moveToSource": {
+        "enum": [
+          null
+        ]
+      },
+      "queryChange": {
+        "type": "string",
+        "max": 16384
+      }
+    }
+  },
+  "SettingsRow": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "description": {
+          "type": "string",
+          "max": 16384
+        },
+        "labelWidth": {
+          "type": "number",
+          "min": 0,
+          "max": 100000
+        },
+        "badge": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        },
+        "searchTerms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 16384
+          },
+          "max": 1024
+        },
+        "managed": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "control"
+    ]
+  },
+  "SearchInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "max": 16384
+        },
+        "placeholder": {
+          "type": "string",
+          "max": 16384
+        },
+        "value": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "change": {
+        "type": "string",
+        "max": 16384
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      },
+      "cancel": {
+        "enum": [
+          null
+        ]
+      },
+      "backspaceAtStart": {
+        "enum": [
+          null
+        ]
+      },
+      "focus": {
+        "enum": [
+          null
+        ]
+      },
+      "blur": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "Button": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "accessibleName": {
+          "type": "string",
+          "max": 16384
+        },
+        "semanticParent": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "icon": {
+          "type": "object",
+          "fields": {
+            "key": {
+              "enum": [
+                "plus-circle",
+                "caret-down",
+                "caret-left",
+                "caret-right",
+                "archive",
+                "box-arrow-up",
+                "arrow-down",
+                "arrow-left",
+                "arrow-right",
+                "arrow-up",
+                "browser",
+                "calendar",
+                "calendar-dots",
+                "chat-circle-text",
+                "check",
+                "check-square",
+                "square",
+                "check-circle",
+                "list-checks",
+                "clock-countdown",
+                "x",
+                "x-circle",
+                "command",
+                "copy",
+                "corners-in",
+                "warning",
+                "file-text",
+                "file-plus",
+                "caret-double-left",
+                "caret-double-right",
+                "dots-six-vertical",
+                "arrow-square-out",
+                "funnel-simple",
+                "folder",
+                "prohibit",
+                "folders",
+                "git-branch",
+                "git-diff",
+                "globe",
+                "graph",
+                "house",
+                "image",
+                "info",
+                "key",
+                "keyboard",
+                "laptop",
+                "list",
+                "sign-out",
+                "magnifying-glass",
+                "minus",
+                "monitor",
+                "notebook",
+                "paperclip",
+                "pause",
+                "pencil-simple",
+                "note-pencil",
+                "play",
+                "plus",
+                "arrow-clockwise",
+                "arrows-counter-clockwise",
+                "arrow-bend-up-left",
+                "gear-six",
+                "sidebar",
+                "sidebar-simple",
+                "device-mobile",
+                "arrows-down-up",
+                "sparkle",
+                "spinner-gap",
+                "star",
+                "waveform",
+                "stop",
+                "terminal-window",
+                "trash",
+                "sliders-horizontal",
+                "video-camera",
+                "squares-four"
+              ]
+            },
+            "weight": {
+              "enum": [
+                "regular",
+                "fill"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        "variant": {
+          "enum": [
+            "primary",
+            "secondary",
+            "ghost",
+            "danger",
+            "link",
+            "filled",
+            "light",
+            "subtle",
+            "default",
+            "transparent",
+            "white"
+          ]
+        },
+        "color": {
+          "type": "object",
+          "fields": {
+            "palette": {
+              "type": "string",
+              "max": 256,
+              "min": 1
+            },
+            "semantic": {
+              "enum": [
+                "accent",
+                "accentStrong",
+                "danger",
+                "warning",
+                "success",
+                "info"
+              ]
+            },
+            "custom": {
+              "type": "object",
+              "fields": {
+                "h": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "s": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "l": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "a": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                }
+              },
+              "required": [
+                "h",
+                "s",
+                "l",
+                "a"
+              ]
+            }
+          },
+          "required": []
+        },
+        "ground": {
+          "enum": [
+            "backdrop",
+            "canvas",
+            "sunken",
+            "panel",
+            "raised",
+            "overlay"
+          ]
+        },
+        "join": {
+          "enum": [
+            "alone",
+            "leading",
+            "middle",
+            "trailing"
+          ]
+        },
+        "loading": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "accessibleDescription": {
+          "type": "string",
+          "max": 16384
+        },
+        "iconOnly": {
+          "type": "boolean"
+        },
+        "iconPosition": {
+          "enum": [
+            "leading",
+            "trailing"
+          ]
+        },
+        "fullWidth": {
+          "type": "boolean"
+        },
+        "checkedState": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "click": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "IconButton": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "accessibleName": {
+          "type": "string",
+          "max": 16384
+        },
+        "semanticParent": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "icon": {
+          "type": "object",
+          "fields": {
+            "key": {
+              "enum": [
+                "plus-circle",
+                "caret-down",
+                "caret-left",
+                "caret-right",
+                "archive",
+                "box-arrow-up",
+                "arrow-down",
+                "arrow-left",
+                "arrow-right",
+                "arrow-up",
+                "browser",
+                "calendar",
+                "calendar-dots",
+                "chat-circle-text",
+                "check",
+                "check-square",
+                "square",
+                "check-circle",
+                "list-checks",
+                "clock-countdown",
+                "x",
+                "x-circle",
+                "command",
+                "copy",
+                "corners-in",
+                "warning",
+                "file-text",
+                "file-plus",
+                "caret-double-left",
+                "caret-double-right",
+                "dots-six-vertical",
+                "arrow-square-out",
+                "funnel-simple",
+                "folder",
+                "prohibit",
+                "folders",
+                "git-branch",
+                "git-diff",
+                "globe",
+                "graph",
+                "house",
+                "image",
+                "info",
+                "key",
+                "keyboard",
+                "laptop",
+                "list",
+                "sign-out",
+                "magnifying-glass",
+                "minus",
+                "monitor",
+                "notebook",
+                "paperclip",
+                "pause",
+                "pencil-simple",
+                "note-pencil",
+                "play",
+                "plus",
+                "arrow-clockwise",
+                "arrows-counter-clockwise",
+                "arrow-bend-up-left",
+                "gear-six",
+                "sidebar",
+                "sidebar-simple",
+                "device-mobile",
+                "arrows-down-up",
+                "sparkle",
+                "spinner-gap",
+                "star",
+                "waveform",
+                "stop",
+                "terminal-window",
+                "trash",
+                "sliders-horizontal",
+                "video-camera",
+                "squares-four"
+              ]
+            },
+            "weight": {
+              "enum": [
+                "regular",
+                "fill"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        "variant": {
+          "enum": [
+            "primary",
+            "secondary",
+            "ghost",
+            "danger",
+            "link",
+            "filled",
+            "light",
+            "subtle",
+            "default",
+            "transparent",
+            "white"
+          ]
+        },
+        "color": {
+          "type": "object",
+          "fields": {
+            "palette": {
+              "type": "string",
+              "max": 256,
+              "min": 1
+            },
+            "semantic": {
+              "enum": [
+                "accent",
+                "accentStrong",
+                "danger",
+                "warning",
+                "success",
+                "info"
+              ]
+            },
+            "custom": {
+              "type": "object",
+              "fields": {
+                "h": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "s": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "l": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                },
+                "a": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1
+                }
+              },
+              "required": [
+                "h",
+                "s",
+                "l",
+                "a"
+              ]
+            }
+          },
+          "required": []
+        },
+        "ground": {
+          "enum": [
+            "backdrop",
+            "canvas",
+            "sunken",
+            "panel",
+            "raised",
+            "overlay"
+          ]
+        },
+        "join": {
+          "enum": [
+            "alone",
+            "leading",
+            "middle",
+            "trailing"
+          ]
+        },
+        "loading": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "icon",
+        "accessibleName"
+      ]
+    },
+    "events": {
+      "click": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "Toggle": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "accessibleName": {
+          "type": "string",
+          "max": 16384
+        },
+        "semanticParent": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "icon": {
+          "type": "object",
+          "fields": {
+            "key": {
+              "enum": [
+                "plus-circle",
+                "caret-down",
+                "caret-left",
+                "caret-right",
+                "archive",
+                "box-arrow-up",
+                "arrow-down",
+                "arrow-left",
+                "arrow-right",
+                "arrow-up",
+                "browser",
+                "calendar",
+                "calendar-dots",
+                "chat-circle-text",
+                "check",
+                "check-square",
+                "square",
+                "check-circle",
+                "list-checks",
+                "clock-countdown",
+                "x",
+                "x-circle",
+                "command",
+                "copy",
+                "corners-in",
+                "warning",
+                "file-text",
+                "file-plus",
+                "caret-double-left",
+                "caret-double-right",
+                "dots-six-vertical",
+                "arrow-square-out",
+                "funnel-simple",
+                "folder",
+                "prohibit",
+                "folders",
+                "git-branch",
+                "git-diff",
+                "globe",
+                "graph",
+                "house",
+                "image",
+                "info",
+                "key",
+                "keyboard",
+                "laptop",
+                "list",
+                "sign-out",
+                "magnifying-glass",
+                "minus",
+                "monitor",
+                "notebook",
+                "paperclip",
+                "pause",
+                "pencil-simple",
+                "note-pencil",
+                "play",
+                "plus",
+                "arrow-clockwise",
+                "arrows-counter-clockwise",
+                "arrow-bend-up-left",
+                "gear-six",
+                "sidebar",
+                "sidebar-simple",
+                "device-mobile",
+                "arrows-down-up",
+                "sparkle",
+                "spinner-gap",
+                "star",
+                "waveform",
+                "stop",
+                "terminal-window",
+                "trash",
+                "sliders-horizontal",
+                "video-camera",
+                "squares-four"
+              ]
+            },
+            "weight": {
+              "enum": [
+                "regular",
+                "fill"
+              ]
+            }
+          },
+          "required": [
+            "key"
+          ]
+        },
+        "iconOnly": {
+          "type": "boolean"
+        },
+        "variant": {
+          "enum": [
+            "primary",
+            "secondary",
+            "ghost",
+            "danger",
+            "link"
+          ]
+        },
+        "ground": {
+          "enum": [
+            "backdrop",
+            "canvas",
+            "sunken",
+            "panel",
+            "raised",
+            "overlay"
+          ]
+        },
+        "join": {
+          "enum": [
+            "alone",
+            "leading",
+            "middle",
+            "trailing"
+          ]
+        },
+        "pressed": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "press": {
+        "type": "boolean"
+      }
+    }
+  },
+  "ToggleGroup": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "max": 256,
+                "min": 1
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              },
+              "iconOnly": {
+                "type": "boolean"
+              },
+              "disabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "pressed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          },
+          "max": 1024
+        },
+        "selection": {
+          "enum": [
+            "any",
+            "atMostOne"
+          ]
+        },
+        "variant": {
+          "enum": [
+            "primary",
+            "secondary",
+            "ghost",
+            "danger",
+            "link"
+          ]
+        },
+        "ground": {
+          "enum": [
+            "backdrop",
+            "canvas",
+            "sunken",
+            "panel",
+            "raised",
+            "overlay"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "change": {
+        "type": "object",
+        "fields": {
+          "pressed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "max": 256,
+              "min": 1
+            },
+            "max": 1024
+          },
+          "changed": {
+            "type": "string",
+            "max": 256,
+            "min": 1
+          }
+        },
+        "required": [
+          "pressed",
+          "changed"
+        ]
+      }
+    }
+  },
+  "ColorPicker": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object",
+          "fields": {
+            "h": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "s": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "l": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "a": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            }
+          },
+          "required": [
+            "h",
+            "s",
+            "l",
+            "a"
+          ]
+        },
+        "alpha": {
+          "type": "boolean"
+        },
+        "presets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "h": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "s": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "l": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "a": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "h",
+              "s",
+              "l",
+              "a"
+            ]
+          },
+          "max": 1024
+        },
+        "recent": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "h": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "s": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "l": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "a": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "h",
+              "s",
+              "l",
+              "a"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": [
+        "value"
+      ]
+    },
+    "events": {
+      "change": {
+        "type": "object",
+        "fields": {
+          "h": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "s": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "l": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "a": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "required": [
+          "h",
+          "s",
+          "l",
+          "a"
+        ]
+      }
+    }
+  },
+  "ColorSwatch": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "color": {
+          "type": "object",
+          "fields": {
+            "h": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "s": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "l": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            },
+            "a": {
+              "type": "number",
+              "min": 0,
+              "max": 1
+            }
+          },
+          "required": [
+            "h",
+            "s",
+            "l",
+            "a"
+          ]
+        },
+        "selected": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "color"
+      ]
+    },
+    "events": {
+      "click": {
+        "type": "object",
+        "fields": {
+          "h": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "s": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "l": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "a": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "required": [
+          "h",
+          "s",
+          "l",
+          "a"
+        ]
+      }
+    }
+  },
+  "FormField": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "control": {
+          "type": "string",
+          "max": 256,
+          "min": 1
+        },
+        "description": {
+          "type": "string",
+          "max": 16384
+        },
+        "validation": {
+          "enum": [
+            "pending",
+            "validating",
+            "invalid",
+            "valid"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "max": 16384
+        },
+        "error": {
+          "type": "string",
+          "max": 16384
+        },
+        "hint": {
+          "type": "string",
+          "max": 16384
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "FilterBar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "max": 256,
+                "min": 1
+              },
+              "field": {
+                "type": "string",
+                "max": 16384
+              },
+              "operator": {
+                "type": "string",
+                "max": 16384
+              },
+              "value": {
+                "type": "string",
+                "max": 16384
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "field",
+              "operator",
+              "value"
+            ]
+          },
+          "max": 1024
+        },
+        "countState": {
+          "enum": [
+            "unknown",
+            "counting",
+            "known",
+            "unavailable"
+          ]
+        },
+        "count": {
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 1000000
+        },
+        "countReason": {
+          "type": "string",
+          "max": 16384
+        },
+        "noun": {
+          "type": "string",
+          "max": 16384
+        },
+        "addLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "clearLabel": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "add": {
+        "enum": [
+          null
+        ]
+      },
+      "remove": {
+        "type": "string",
+        "max": 256,
+        "min": 1
+      },
+      "clear": {
+        "enum": [
+          null
+        ]
+      }
+    },
+    "slots": [
+      "add_control"
+    ]
+  },
+  "AnchorList": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "anchors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "disabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "active": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "overflow": {
+          "type": "boolean"
+        },
+        "overflowAfter": {
+          "type": "number",
+          "min": 0,
+          "max": 1024,
+          "integer": true
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "navigate": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    }
+  },
+  "Breadcrumb": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "crumbs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "maxVisible": {
+          "type": "number",
+          "min": 0,
+          "max": 1024,
+          "integer": true
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "select": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      },
+      "reveal": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "max": 1024
+      }
+    }
+  },
+  "Collapsible": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "max": 16384
+        },
+        "description": {
+          "type": "string",
+          "max": 16384
+        },
+        "open": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "events": {
+      "toggle": {
+        "type": "boolean"
+      }
+    },
+    "slots": [
+      "body"
+    ]
+  },
+  "Carousel": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "active": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "phase": {
+          "enum": [
+            "idle",
+            "queued",
+            "blocked",
+            "loading",
+            "refreshing",
+            "ready",
+            "empty",
+            "unavailable",
+            "error",
+            "cancelled"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "max": 16384
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "looped": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "event": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "selected"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "previous"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "next"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "items"
+  },
+  "NavStack": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        },
+        "cursor": {
+          "type": "number",
+          "min": 0,
+          "max": 1024,
+          "integer": true
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": [
+        "entries",
+        "cursor",
+        "label"
+      ]
+    },
+    "events": {},
+    "slotIds": "entries"
+  },
+  "Sidebar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "section": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "within": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "section"
+            ]
+          },
+          "max": 1024
+        },
+        "active": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "collapsed": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "select": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    },
+    "slots": [
+      "header",
+      "footer"
+    ]
+  },
+  "UndoHistory": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "description": {
+                "type": "string",
+                "max": 16384
+              },
+              "time": {
+                "type": "string",
+                "max": 16384
+              },
+              "source": {
+                "type": "string",
+                "max": 16384
+              },
+              "unavailable": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        },
+        "current": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "events": {
+      "jump": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    }
+  },
+  "Wizard": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "description": {
+                "type": "string",
+                "max": 16384
+              },
+              "status": {
+                "enum": [
+                  "upcoming",
+                  "current",
+                  "complete",
+                  "blocked",
+                  "failed"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "max": 16384
+              },
+              "reachable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          },
+          "max": 1024
+        },
+        "layout": {
+          "enum": [
+            "horizontal",
+            "vertical"
+          ]
+        },
+        "backTo": {
+          "type": "string",
+          "min": 1,
+          "max": 256
+        },
+        "finish": {
+          "type": "boolean"
+        },
+        "canAdvance": {
+          "type": "boolean"
+        },
+        "backLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "nextLabel": {
+          "type": "string",
+          "max": 16384
+        },
+        "finishLabel": {
+          "type": "string",
+          "max": 16384
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "navigate": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "step"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "back"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "next"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "finish"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        ]
+      }
+    },
+    "slots": [
+      "body"
+    ]
+  },
+  "AspectRatio": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "ratio": {
+          "type": "number",
+          "min": 0.0001,
+          "max": 1000000
+        },
+        "fit": {
+          "enum": [
+            "width",
+            "height"
+          ]
+        }
+      },
+      "required": [
+        "ratio"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "Container": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "width": {
+          "enum": [
+            "full",
+            "readable",
+            "dialog",
+            "custom"
+          ]
+        },
+        "customWidth": {
+          "type": "number",
+          "min": 0.0001,
+          "max": 1000000
+        },
+        "padding": {
+          "enum": [
+            "xxs",
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "Grid": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "columns": {
+          "type": "number",
+          "min": 1,
+          "max": 65535,
+          "integer": true
+        },
+        "columnsAt": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "breakpoint": {
+                "enum": [
+                  "small",
+                  "medium",
+                  "large",
+                  "extraLarge"
+                ]
+              },
+              "columns": {
+                "type": "number",
+                "min": 1,
+                "max": 65535,
+                "integer": true
+              }
+            },
+            "required": [
+              "breakpoint",
+              "columns"
+            ]
+          },
+          "max": 4
+        },
+        "gap": {
+          "enum": [
+            "xxs",
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "span": {
+                "type": "number",
+                "min": 1,
+                "max": 65535,
+                "integer": true
+              },
+              "spanAt": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "breakpoint": {
+                      "enum": [
+                        "small",
+                        "medium",
+                        "large",
+                        "extraLarge"
+                      ]
+                    },
+                    "span": {
+                      "type": "number",
+                      "min": 1,
+                      "max": 65535,
+                      "integer": true
+                    }
+                  },
+                  "required": [
+                    "breakpoint",
+                    "span"
+                  ]
+                },
+                "max": 4
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slotIds": "items"
+  },
+  "Responsive": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "threshold": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "fill": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "threshold"
+      ]
+    },
+    "events": {},
+    "slots": [
+      "unmeasured",
+      "narrow",
+      "wide"
+    ]
+  },
+  "ScrollFade": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "top": {
+          "type": "boolean"
+        },
+        "bottom": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "boolean"
+        },
+        "right": {
+          "type": "boolean"
+        },
+        "band": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "fitHeight": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "ScrollEdgeEffect": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "top": {
+          "type": "boolean"
+        },
+        "bottom": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "boolean"
+        },
+        "right": {
+          "type": "boolean"
+        },
+        "band": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "blur": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000
+        },
+        "kind": {
+          "enum": [
+            "soft",
+            "hard"
+          ]
+        }
+      },
+      "required": []
+    },
+    "events": {},
+    "slots": [
+      "content"
+    ]
+  },
+  "SplitTree": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "parent": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "minWidth": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "minHeight": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "rail": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "kind": {
+                "enum": [
+                  "pane",
+                  "horizontal",
+                  "vertical"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": [
+        "records"
+      ]
+    },
+    "events": {
+      "change": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "ratio"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "ratio"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "collapsed"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "side": {
+                "enum": [
+                  "start",
+                  "end"
+                ]
+              },
+              "pane": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "side",
+              "pane"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "records"
+  },
+  "DockTree": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "parent": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "minWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "minHeight": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "rail": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "enum": [
+                      "stack"
+                    ]
+                  },
+                  "panels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "min": 1,
+                      "max": 256
+                    },
+                    "max": 1024
+                  },
+                  "active": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "fields": {
+                  "id": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "parent": {
+                    "type": "string",
+                    "min": 1,
+                    "max": 256
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "minWidth": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "minHeight": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "rail": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "enum": [
+                      "horizontal",
+                      "vertical"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ]
+              }
+            ]
+          },
+          "max": 1024
+        },
+        "floating": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "stack": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "parent": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "ratio": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "minWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "minHeight": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "rail": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "collapsed": {
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "enum": [
+                          "stack"
+                        ]
+                      },
+                      "panels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "min": 1,
+                          "max": 256
+                        },
+                        "max": 1024
+                      },
+                      "active": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "parent": {
+                        "type": "string",
+                        "min": 1,
+                        "max": 256
+                      },
+                      "ratio": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1
+                      },
+                      "minWidth": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "minHeight": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "rail": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 1000000
+                      },
+                      "collapsed": {
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  }
+                ]
+              },
+              "bounds": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              }
+            },
+            "required": [
+              "stack",
+              "bounds"
+            ]
+          },
+          "max": 1024
+        },
+        "panels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "unavailable": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": [
+        "records"
+      ]
+    },
+    "events": {
+      "event": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingRaised"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingCancelled"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "floatingChanged"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "bounds": {
+                "type": "object",
+                "fields": {
+                  "x": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "y": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "width": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  },
+                  "height": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ]
+              },
+              "finished": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "bounds",
+              "finished"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSelected"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "panel"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelMoved"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "toStack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "before": {
+                "type": "string",
+                "min": 1,
+                "max": 256,
+                "nullable": true
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "toStack",
+              "before"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSplit"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "targetStack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "placement": {
+                "enum": [
+                  "left",
+                  "right",
+                  "top",
+                  "bottom"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "targetStack",
+              "placement"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "splitResized"
+                ]
+              },
+              "split": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "split",
+              "ratio"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "stackCollapsed"
+                ]
+              },
+              "stack": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "collapsed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "stack",
+              "collapsed"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "panels"
+  },
+  "Dock": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "panels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "title": {
+                "type": "string",
+                "max": 16384
+              },
+              "badge": {
+                "type": "string",
+                "max": 16384
+              },
+              "unavailable": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "region"
+            ]
+          },
+          "max": 1024
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "active": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "collapsed": {
+                "type": "boolean"
+              },
+              "share": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "minSize": {
+                "type": "number",
+                "min": 0,
+                "max": 1000000
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 4
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "event": {
+        "oneOf": [
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelSelected"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "panel"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "panelMoved"
+                ]
+              },
+              "panel": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "toRegion": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "before": {
+                "type": "string",
+                "min": 1,
+                "max": 256,
+                "nullable": true
+              }
+            },
+            "required": [
+              "kind",
+              "panel",
+              "toRegion",
+              "before"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "regionCollapsed"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "collapsed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "collapsed"
+            ]
+          },
+          {
+            "type": "object",
+            "fields": {
+              "kind": {
+                "enum": [
+                  "regionResized"
+                ]
+              },
+              "region": {
+                "enum": [
+                  "left",
+                  "centre",
+                  "right",
+                  "bottom"
+                ]
+              },
+              "ratio": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              }
+            },
+            "required": [
+              "kind",
+              "region",
+              "ratio"
+            ]
+          }
+        ]
+      }
+    },
+    "slotIds": "panels"
+  },
+  "Toolbar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "spacer": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "max": 1024
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "shortcut": {
+                "type": "string",
+                "max": 16384
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "group"
+            ]
+          },
+          "max": 1024
+        },
+        "overflow": {
+          "type": "boolean"
+        },
+        "overflowAfter": {
+          "type": "number",
+          "min": 0,
+          "max": 1000000,
+          "integer": true
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "overflowSelect": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    },
+    "slotIds": "items"
+  },
+  "DesktopTitlebar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "title": {
+          "type": "string",
+          "max": 16384
+        },
+        "subtitle": {
+          "type": "string",
+          "max": 16384
+        },
+        "buttons": {
+          "type": "object",
+          "fields": {
+            "left": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "minimize",
+                  "maximize",
+                  "close"
+                ]
+              },
+              "max": 3
+            },
+            "right": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "minimize",
+                  "maximize",
+                  "close"
+                ]
+              },
+              "max": 3
+            }
+          },
+          "required": []
+        },
+        "controls": {
+          "type": "object",
+          "fields": {
+            "fullscreen": {
+              "type": "boolean"
+            },
+            "maximize": {
+              "type": "boolean"
+            },
+            "minimize": {
+              "type": "boolean"
+            },
+            "windowMenu": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "fullscreen",
+            "maximize",
+            "minimize",
+            "windowMenu"
+          ]
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "events": {
+      "event": {
+        "enum": [
+          "minimize",
+          "toggleMaximize",
+          "close"
+        ]
+      }
+    },
+    "slots": [
+      "left",
+      "right"
+    ]
+  },
+  "StatusBar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "label": {
+          "type": "string",
+          "max": 16384
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "id": {
+                "type": "string",
+                "min": 1,
+                "max": 256
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "group": {
+                "enum": [
+                  "start",
+                  "centre",
+                  "end"
+                ]
+              },
+              "kind": {
+                "enum": [
+                  "text",
+                  "state",
+                  "progress",
+                  "action",
+                  "element"
+                ]
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "stale": {
+                "type": "boolean"
+              },
+              "stateName": {
+                "type": "string",
+                "max": 16384
+              },
+              "fraction": {
+                "type": "number",
+                "min": 0,
+                "max": 1
+              },
+              "count": {
+                "type": "object",
+                "fields": {
+                  "done": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000,
+                    "integer": true
+                  },
+                  "total": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1000000,
+                    "integer": true
+                  }
+                },
+                "required": [
+                  "done",
+                  "total"
+                ]
+              },
+              "icon": {
+                "type": "object",
+                "fields": {
+                  "key": {
+                    "enum": [
+                      "plus-circle",
+                      "caret-down",
+                      "caret-left",
+                      "caret-right",
+                      "archive",
+                      "box-arrow-up",
+                      "arrow-down",
+                      "arrow-left",
+                      "arrow-right",
+                      "arrow-up",
+                      "browser",
+                      "calendar",
+                      "calendar-dots",
+                      "chat-circle-text",
+                      "check",
+                      "check-square",
+                      "square",
+                      "check-circle",
+                      "list-checks",
+                      "clock-countdown",
+                      "x",
+                      "x-circle",
+                      "command",
+                      "copy",
+                      "corners-in",
+                      "warning",
+                      "file-text",
+                      "file-plus",
+                      "caret-double-left",
+                      "caret-double-right",
+                      "dots-six-vertical",
+                      "arrow-square-out",
+                      "funnel-simple",
+                      "folder",
+                      "prohibit",
+                      "folders",
+                      "git-branch",
+                      "git-diff",
+                      "globe",
+                      "graph",
+                      "house",
+                      "image",
+                      "info",
+                      "key",
+                      "keyboard",
+                      "laptop",
+                      "list",
+                      "sign-out",
+                      "magnifying-glass",
+                      "minus",
+                      "monitor",
+                      "notebook",
+                      "paperclip",
+                      "pause",
+                      "pencil-simple",
+                      "note-pencil",
+                      "play",
+                      "plus",
+                      "arrow-clockwise",
+                      "arrows-counter-clockwise",
+                      "arrow-bend-up-left",
+                      "gear-six",
+                      "sidebar",
+                      "sidebar-simple",
+                      "device-mobile",
+                      "arrows-down-up",
+                      "sparkle",
+                      "spinner-gap",
+                      "star",
+                      "waveform",
+                      "stop",
+                      "terminal-window",
+                      "trash",
+                      "sliders-horizontal",
+                      "video-camera",
+                      "squares-four"
+                    ]
+                  },
+                  "weight": {
+                    "enum": [
+                      "regular",
+                      "fill"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          },
+          "max": 1024
+        }
+      },
+      "required": []
+    },
+    "events": {
+      "click": {
+        "type": "string",
+        "min": 1,
+        "max": 256
+      }
+    },
+    "slotIds": "items"
+  },
+  "Calendar": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "integer": true,
+            "min": -9007199254740991,
+            "max": 9007199254740991
+          },
+          "max": 4096
+        },
+        "multi": {
+          "type": "boolean"
+        },
+        "month": {
+          "type": "number",
+          "integer": true,
+          "min": -9007199254740991,
+          "max": 9007199254740991
+        },
+        "range": {
+          "type": "object",
+          "fields": {
+            "start": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991
+            },
+            "end": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            }
+          },
+          "required": [
+            "start"
+          ],
+          "nullable": true
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "day": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              }
+            },
+            "required": [
+              "day",
+              "label"
+            ]
+          },
+          "max": 4096
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "pick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "monthShown": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "hover": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991,
+        "nullable": true
+      }
+    },
+    "slots": [
+      "empty"
+    ]
+  },
+  "DateInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "integer": true,
+          "min": -9007199254740991,
+          "max": 9007199254740991,
+          "nullable": true
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "change": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "unparsable": {
+        "type": "object",
+        "fields": {
+          "text": {
+            "type": "string",
+            "max": 16384
+          },
+          "message": {
+            "type": "string",
+            "max": 16384
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "open": {
+        "enum": [
+          null
+        ]
+      },
+      "close": {
+        "enum": [
+          null
+        ]
+      },
+      "submit": {
+        "enum": [
+          null
+        ]
+      }
+    }
+  },
+  "RangePicker": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "range": {
+          "type": "object",
+          "fields": {
+            "start": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991
+            },
+            "end": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            }
+          },
+          "required": [
+            "start"
+          ],
+          "nullable": true
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "marks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "day": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991
+              },
+              "label": {
+                "type": "string",
+                "max": 16384
+              },
+              "tone": {
+                "enum": [
+                  "neutral",
+                  "accent",
+                  "success",
+                  "warning",
+                  "danger",
+                  "info"
+                ]
+              }
+            },
+            "required": [
+              "day",
+              "label"
+            ]
+          },
+          "max": 4096
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "startPick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      },
+      "endPick": {
+        "type": "number",
+        "integer": true,
+        "min": -9007199254740991,
+        "max": 9007199254740991
+      }
+    }
+  },
+  "TimeInput": {
+    "props": {
+      "type": "object",
+      "fields": {
+        "adapter": {
+          "type": "object",
+          "fields": {
+            "today": {
+              "type": "number",
+              "integer": true,
+              "min": -9007199254740991,
+              "max": 9007199254740991,
+              "nullable": true
+            },
+            "weekdays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "max": 16384
+              },
+              "max": 16
+            },
+            "months": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "weeks": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "fields": {
+                          "day": {
+                            "type": "number",
+                            "integer": true,
+                            "min": -9007199254740991,
+                            "max": 9007199254740991,
+                            "nullable": true
+                          },
+                          "adjacent": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": []
+                      },
+                      "max": 16
+                    },
+                    "max": 16
+                  }
+                },
+                "required": [
+                  "month",
+                  "label",
+                  "weeks"
+                ]
+              },
+              "max": 120
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "formatted": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 32
+                  },
+                  "blocked": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day",
+                  "month",
+                  "label",
+                  "formatted"
+                ]
+              },
+              "max": 4096
+            },
+            "parseError": {
+              "type": "string",
+              "max": 16384
+            },
+            "unknownDay": {
+              "type": "string",
+              "max": 16384
+            },
+            "completeRange": {
+              "type": "boolean"
+            },
+            "clock": {
+              "type": "object",
+              "fields": {
+                "hourMin": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "hourMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "minuteMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "secondMax": {
+                  "type": "number",
+                  "integer": true,
+                  "min": 0,
+                  "max": 99
+                },
+                "meridiem": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 2,
+                  "nullable": true
+                },
+                "hours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "minutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "seconds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "max": 100
+                },
+                "separator": {
+                  "type": "string",
+                  "max": 16384
+                },
+                "meridiemSeparator": {
+                  "type": "string",
+                  "max": 16384
+                }
+              },
+              "required": [
+                "hourMin",
+                "hourMax",
+                "minuteMax",
+                "secondMax",
+                "hours",
+                "minutes",
+                "seconds",
+                "separator",
+                "meridiemSeparator"
+              ]
+            }
+          },
+          "required": [
+            "weekdays",
+            "months",
+            "days",
+            "parseError",
+            "unknownDay",
+            "clock"
+          ]
+        },
+        "value": {
+          "type": "object",
+          "fields": {
+            "hour": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99
+            },
+            "minute": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99
+            },
+            "second": {
+              "type": "number",
+              "integer": true,
+              "min": 0,
+              "max": 99,
+              "nullable": true
+            },
+            "meridiem": {
+              "enum": [
+                0,
+                1,
+                null
+              ]
+            }
+          },
+          "required": [
+            "hour",
+            "minute"
+          ]
+        },
+        "seconds": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "size": {
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      },
+      "required": [
+        "adapter"
+      ]
+    },
+    "events": {
+      "change": {
+        "type": "object",
+        "fields": {
+          "hour": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99
+          },
+          "minute": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99
+          },
+          "second": {
+            "type": "number",
+            "integer": true,
+            "min": 0,
+            "max": 99,
+            "nullable": true
+          },
+          "meridiem": {
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          }
+        },
+        "required": [
+          "hour",
+          "minute"
+        ]
+      }
+    }
+  },
   "Checkbox": {
     "props": {
       "type": "object",

@@ -1216,7 +1216,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4371
+      "symbolCount": 4389
     },
     {
       "name": "gpui-box-kit-assets",
@@ -63873,6 +63873,21 @@
       "target": "SearchInput"
     },
     {
+      "id": "gpui_kit::controls::search::SearchInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
       "id": "gpui_kit::controls::search::SearchInput::name",
       "name": "name",
       "kind": "method",
@@ -63959,6 +63974,21 @@
       "summary": "Updates the empty hint without changing an explicit name or query.",
       "documentation": "Updates the empty hint without changing an explicit name or query.",
       "signature": "pub fn set_placeholder (& mut self, placeholder : impl Into<SharedString>, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "SearchInput"
+    },
+    {
+      "id": "gpui_kit::controls::search::SearchInput::set_presentation",
+      "name": "set_presentation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::search",
+      "path": "gpui_kit::controls::search",
+      "source": "crates/gpui-kit/src/controls/search.rs",
+      "summary": "Reconciles presentation without replacing the editable entity or its selection.",
+      "documentation": "Reconciles presentation without replacing the editable entity or its selection.",
+      "signature": "pub fn set_presentation (& mut self, name : Option<SharedString>, placeholder : Option<SharedString>, size : ControlSize, cx : & mut Context<Self>,)",
       "cfg": [],
       "target": "SearchInput"
     },
@@ -67543,6 +67573,21 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit::controls::transfer_list::TransferList::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
       "id": "gpui_kit::controls::transfer_list::TransferList::new",
       "name": "new",
       "kind": "method",
@@ -67558,6 +67603,66 @@
       "target": "TransferList"
     },
     {
+      "id": "gpui_kit::controls::transfer_list::TransferList::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
+      "id": "gpui_kit::controls::transfer_list::TransferList::set_disabled",
+      "name": "set_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_disabled (& mut self, disabled : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
+      "id": "gpui_kit::controls::transfer_list::TransferList::set_items",
+      "name": "set_items",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "Replaces caller-owned panes without replacing the query editor.",
+      "documentation": "Replaces caller-owned panes without replacing the query editor.",
+      "signature": "pub fn set_items (& mut self, source : Vec<TransferItem>, target : Vec<TransferItem>, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
+      "id": "gpui_kit::controls::transfer_list::TransferList::set_labels",
+      "name": "set_labels",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_labels (& mut self, source : SharedString, target : SharedString, cx : & mut Context<Self>,)",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
       "id": "gpui_kit::controls::transfer_list::TransferList::set_query",
       "name": "set_query",
       "kind": "method",
@@ -67569,6 +67674,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_query (& mut self, query : impl Into<SharedString>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TransferList"
+    },
+    {
+      "id": "gpui_kit::controls::transfer_list::TransferList::set_selection",
+      "name": "set_selection",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "controls::transfer_list",
+      "path": "gpui_kit::controls::transfer_list",
+      "source": "crates/gpui-kit/src/controls/transfer_list.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn set_selection (& mut self, source : Vec<SharedString>, target : Vec<SharedString>, cx : & mut Context<Self>,)",
       "cfg": [],
       "target": "TransferList"
     },
@@ -72684,6 +72804,21 @@
       "target": "Calendar"
     },
     {
+      "id": "gpui_kit::datetime::calendar::Calendar::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::calendar",
+      "path": "gpui_kit::datetime::calendar",
+      "source": "crates/gpui-kit/src/datetime/calendar.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "Calendar"
+    },
+    {
       "id": "gpui_kit::datetime::calendar::Calendar::month",
       "name": "month",
       "kind": "method",
@@ -72759,6 +72894,21 @@
       "target": "Calendar"
     },
     {
+      "id": "gpui_kit::datetime::calendar::Calendar::reset_navigation",
+      "name": "reset_navigation",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::calendar",
+      "path": "gpui_kit::datetime::calendar",
+      "source": "crates/gpui-kit/src/datetime/calendar.rs",
+      "summary": "Clears transient navigation after the caller replaces its calendar data. Focus and caller-owned selection are preserved.",
+      "documentation": "Clears transient navigation after the caller replaces its calendar data.\nFocus and caller-owned selection are preserved.",
+      "signature": "pub fn reset_navigation (& mut self, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Calendar"
+    },
+    {
       "id": "gpui_kit::datetime::calendar::Calendar::selected",
       "name": "selected",
       "kind": "method",
@@ -72815,6 +72965,21 @@
       "summary": "Pins what the pointer is over, so a range preview can be staged for review without a pointer in the window.",
       "documentation": "Pins what the pointer is over, so a range preview can be staged for\nreview without a pointer in the window.",
       "signature": "pub fn set_hovered_day (& mut self, day : Option<Day>, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "Calendar"
+    },
+    {
+      "id": "gpui_kit::datetime::calendar::Calendar::set_multi",
+      "name": "set_multi",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::calendar",
+      "path": "gpui_kit::datetime::calendar",
+      "source": "crates/gpui-kit/src/datetime/calendar.rs",
+      "summary": "Changes selection presentation without replacing focus or navigation.",
+      "documentation": "Changes selection presentation without replacing focus or navigation.",
+      "signature": "pub fn set_multi (& mut self, multi : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "Calendar"
     },
@@ -73056,6 +73221,21 @@
       "target": "DateInput"
     },
     {
+      "id": "gpui_kit::datetime::date_input::DateInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::date_input",
+      "path": "gpui_kit::datetime::date_input",
+      "source": "crates/gpui-kit/src/datetime/date_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "DateInput"
+    },
+    {
       "id": "gpui_kit::datetime::date_input::DateInput::is_invalid",
       "name": "is_invalid",
       "kind": "method",
@@ -73161,6 +73341,21 @@
       "target": "DateInput"
     },
     {
+      "id": "gpui_kit::datetime::date_input::DateInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::date_input",
+      "path": "gpui_kit::datetime::date_input",
+      "source": "crates/gpui-kit/src/datetime/date_input.rs",
+      "summary": "Reconfigures density without replacing the live editor or popover.",
+      "documentation": "Reconfigures density without replacing the live editor or popover.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "DateInput"
+    },
+    {
       "id": "gpui_kit::datetime::date_input::DateInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -73187,6 +73382,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "DateInput"
+    },
+    {
+      "id": "gpui_kit::datetime::date_input::DateInput::set_required",
+      "name": "set_required",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::date_input",
+      "path": "gpui_kit::datetime::date_input",
+      "source": "crates/gpui-kit/src/datetime/date_input.rs",
+      "summary": "Reconfigures validation without replacing the live editor or popover.",
+      "documentation": "Reconfigures validation without replacing the live editor or popover.",
+      "signature": "pub fn set_required (& mut self, required : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "DateInput"
     },
@@ -73530,6 +73740,21 @@
       "target": "RangePicker"
     },
     {
+      "id": "gpui_kit::datetime::range::RangePicker::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::range",
+      "path": "gpui_kit::datetime::range",
+      "source": "crates/gpui-kit/src/datetime/range.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "RangePicker"
+    },
+    {
       "id": "gpui_kit::datetime::range::RangePicker::new",
       "name": "new",
       "kind": "method",
@@ -73851,6 +74076,21 @@
       "target": "TimeInput"
     },
     {
+      "id": "gpui_kit::datetime::time_input::TimeInput::is_disabled",
+      "name": "is_disabled",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::time_input",
+      "path": "gpui_kit::datetime::time_input",
+      "source": "crates/gpui-kit/src/datetime/time_input.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_disabled (& self) -> bool",
+      "cfg": [],
+      "target": "TimeInput"
+    },
+    {
       "id": "gpui_kit::datetime::time_input::TimeInput::new",
       "name": "new",
       "kind": "method",
@@ -73881,6 +74121,21 @@
       "target": "TimeInput"
     },
     {
+      "id": "gpui_kit::datetime::time_input::TimeInput::set_control_size",
+      "name": "set_control_size",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::time_input",
+      "path": "gpui_kit::datetime::time_input",
+      "source": "crates/gpui-kit/src/datetime/time_input.rs",
+      "summary": "Changes density without resetting the active segment or typed digits.",
+      "documentation": "Changes density without resetting the active segment or typed digits.",
+      "signature": "pub fn set_control_size (& mut self, size : ControlSize, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TimeInput"
+    },
+    {
       "id": "gpui_kit::datetime::time_input::TimeInput::set_disabled",
       "name": "set_disabled",
       "kind": "method",
@@ -73907,6 +74162,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn set_invalid (& mut self, invalid : bool, cx : & mut Context<Self>)",
+      "cfg": [],
+      "target": "TimeInput"
+    },
+    {
+      "id": "gpui_kit::datetime::time_input::TimeInput::set_seconds",
+      "name": "set_seconds",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "datetime::time_input",
+      "path": "gpui_kit::datetime::time_input",
+      "source": "crates/gpui-kit/src/datetime/time_input.rs",
+      "summary": "Changes segment visibility while retaining the value and focus.",
+      "documentation": "Changes segment visibility while retaining the value and focus.",
+      "signature": "pub fn set_seconds (& mut self, seconds : bool, cx : & mut Context<Self>)",
       "cfg": [],
       "target": "TimeInput"
     },
@@ -123214,6 +123484,8 @@
         "range(range: DayRange) -> Self"
       ],
       "commands": [
+        "set_multi(multi: bool, cx: &mut Context<Self>)",
+        "reset_navigation(cx: &mut Context<Self>)",
         "set_selection(days: Vec<Day>, cx: &mut Context<Self>)",
         "set_overlay(overlay: impl Fn(Day) -> Option<DayMark> + 'static, cx: &mut Context<Self>)",
         "set_range(range: Option<DayRange>, cx: &mut Context<Self>)",
@@ -123223,6 +123495,7 @@
         "show_month(month: MonthKey, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "adapter() -> &SharedDateAdapter",
         "selection() -> &[Day]",
         "cursor() -> Option<Day>",
@@ -123904,6 +124177,8 @@
         "invalid(invalid: bool) -> Self"
       ],
       "commands": [
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_value(day: Option<Day>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
@@ -123912,6 +124187,7 @@
         "toggle(cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "field() -> &Entity<TextInput>",
         "calendar() -> &Entity<Calendar>",
         "current() -> Option<Day>",
@@ -126319,6 +126595,7 @@
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "calendar() -> &Entity<Calendar>",
         "current_range() -> Option<DayRange>",
         "state() -> RangeState",
@@ -126705,11 +126982,13 @@
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_presentation(name: Option<SharedString>, placeholder: Option<SharedString>, size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "value(cx: &App) -> SharedString",
-        "input() -> &Entity<TextInput>"
+        "input() -> &Entity<TextInput>",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -127706,10 +127985,13 @@
       ],
       "commands": [
         "set_value(value: TimeOfDay, cx: &mut Context<Self>)",
+        "set_seconds(seconds: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "current() -> TimeOfDay",
         "active_segment() -> Segment",
         "clock() -> Clock"
@@ -127954,9 +128236,16 @@
         "target_label(label: impl Into<SharedString>) -> Self"
       ],
       "commands": [
+        "set_items(source: Vec<TransferItem>, target: Vec<TransferItem>, cx: &mut Context<Self>)",
+        "set_selection(source: Vec<SharedString>, target: Vec<SharedString>, cx: &mut Context<Self>)",
+        "set_labels(source: SharedString, target: SharedString, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_query(query: impl Into<SharedString>, cx: &mut Context<Self>)"
       ],
-      "queries": [],
+      "queries": [
+        "is_disabled() -> bool"
+      ],
       "slots": [],
       "reports": [
         "ToggleSource",

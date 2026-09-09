@@ -15,6 +15,31 @@ impl KitState {
     ) -> Result<Value> {
         let component = node.component.as_deref().unwrap_or_default();
         let result_schema = validation::invocation(component, method, args, query)?;
+        let family_result = if controls_extra::COMPONENTS.contains(&component) {
+            Some(
+                self.controls_extra
+                    .invoke(node, method, args, query, window, cx),
+            )
+        } else if navigation_extra::COMPONENTS.contains(&component) {
+            Some(
+                self.navigation_extra
+                    .invoke(node, method, args, query, window, cx),
+            )
+        } else if layout_extra::COMPONENTS.contains(&component) {
+            Some(
+                self.layout_extra
+                    .invoke(node, method, args, query, window, cx),
+            )
+        } else if datetime::COMPONENTS.contains(&component) {
+            Some(self.datetime.invoke(node, method, args, query, window, cx))
+        } else {
+            None
+        };
+        if let Some(result) = family_result {
+            let result = result?;
+            validation::validate(&result, result_schema)?;
+            return Ok(result);
+        }
         let entry = self
             .retained
             .borrow()

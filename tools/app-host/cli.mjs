@@ -25,8 +25,14 @@ try {
     for (const name of await readdir(resolve(here, 'template'))) {
       await cp(resolve(here, 'template', name), resolve(destination, name), { recursive: true, force: false, errorOnExist: true });
     }
-    await cp(resolve(here, '../js-runtime/sdk.d.ts'), resolve(destination, 'gpui.d.ts'));
-    await cp(resolve(here, '../js-runtime/kit-sdk.d.ts'), resolve(destination, 'kit-sdk.d.ts'));
+    // The template entry re-exports the SDK so its global is declared only once.
+    await writeFile(resolve(destination, 'gpui.d.ts'), "export * from './sdk.js';\n");
+    // Keep all sibling declaration imports usable outside this checkout.
+    for (const name of await readdir(resolve(here, '../js-runtime'))) {
+      if (name.endsWith('.d.ts')) {
+        await cp(resolve(here, '../js-runtime', name), resolve(destination, name));
+      }
+    }
     console.log(`Created ${destination}. Run: gpui-app dev ${destination}`);
   } else if (command === 'dev' || command === 'run') {
     const binary = option('--host') ?? process.env.GPUI_APP_HOST ?? resolve(repo, 'target/debug/gpui-box-app-host');

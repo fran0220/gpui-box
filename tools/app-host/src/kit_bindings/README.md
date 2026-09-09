@@ -5,11 +5,18 @@ catalog. `schemas.json` is the data-only serialization of `kitSchemas` from
 `tools/js-runtime/kit-schema.mjs`. JS tests compare its entire contents; Rust
 tests compare its component keys with the native registration list.
 
-These **16 partial adapters** instantiate real Kit components: Checkbox, Radio,
+The original **16 partial adapters** instantiate real Kit components: Checkbox, Radio,
 Switch, Slider, SegmentedControl, TextInput, Select, Pagination, Tabs, Accordion,
 ScrollArea, SplitPane, Divider, List, Popover, and Dialog. They are not full catalog coverage. Supported
 props/events are exactly the schema fields and TypeScript `KitAPI` declarations;
 unknown fields fail closed in both JS and native validation.
+
+Central registration now includes **51 partial adapters**: those 16, the 11
+`controls_extra` adapters, and 24 navigation/layout/datetime adapters. Every
+family uses its own native render, retained state, reconcile, invoke, and
+supplemental validation hooks through the real host. This is data-only adapter
+integration, not full native binding coverage. The family contracts and limits
+are documented in [the family receipt](navigation_extra/fixture/README.md).
 
 The native entities for TextInput, Select, Popover, and Dialog persist by host-injected process
 instance and semantic identity. Reconciliation drops subscriptions for removed
@@ -26,8 +33,8 @@ Popover and Dialog retain a `content` factory across close/reopen.
 The host owns recursive node validation,
 aggregate budgets, revision/generation checks, namespaces, and permissions.
 
-`methods.json` exactly mirrors `kitMethods`: 39 commands and 14 queries across
-TextInput, Select, Popover, and Dialog. The typed target contains only id and
+`methods.json` exactly mirrors `kitMethods`: 76 commands and 45 queries across
+13 components. The typed target contains only id and
 component. Native dispatch checks retained identity and actual disabled state;
 the host checks mounted generation/revision and applies owner policy. Explicit
 controlled text/selection props win on the next render. Argument-free methods
@@ -41,6 +48,13 @@ query; this is not an atomic setter/event transaction. The method fixture uses
 
 ## Explicit remaining gaps
 
+- Native Entity/Focus references, typed native child composites, and arbitrary
+  locale callbacks remain unsupported. The four date `*_snapshot` wire queries
+  return data, not native references. Coverage metadata names the Rust getters
+  they read; it does not make the original reference getters callable.
+- `controls_extra.familyBindings` and `ControlsExtraBindingValues` await the
+  separately owned central `kit.bind` helper. This integration does not expose
+  family reactive bindings or add native predicate/construction-context plumbing.
 - Only declared commands and queries are bound; other public methods, reactive
   bindings, arbitrary callbacks, and native entity references remain unsupported.
 - Segment icons/tints, token/style options,
@@ -65,8 +79,14 @@ node --test tools/js-runtime/tests/kit-bindings.test.mjs
 cargo test -p gpui-box-app-host --features capture kit_bindings
 cargo test -p gpui-box-kit --lib retained_options_tests
 cargo clippy -p gpui-box-app-host --features capture --all-targets -- -D warnings
-node --input-type=module -e "import {kitSchemas} from './tools/js-runtime/kit-schema.mjs'; import {writeFileSync} from 'node:fs'; writeFileSync('tools/app-host/src/kit_bindings/schemas.json',JSON.stringify(kitSchemas,null,2)+'\n')"
+cargo run -p xtask -- api generate
+node tools/js-runtime/catalog.mjs
+node tools/js-runtime/catalog.mjs --check
 ```
+
+`catalog.mjs` generates binding coverage, native schemas/methods, and the central
+SDK method section together. Factory interfaces extend family declarations;
+`gpui-app init` copies all runtime sibling declarations into new projects.
 
 The GPUI tests dispatch simulated native input and verify semantic bounds,
 typed intents, refused selection, retained editing, and teardown. They are not

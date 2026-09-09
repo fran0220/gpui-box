@@ -635,9 +635,25 @@ fn native_methods_preserve_typed_results_and_actual_disabled_refusal(cx: &mut Te
 
 #[gpui::test]
 fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
+    fn props(component: &str) -> Value {
+        if datetime::COMPONENTS.contains(&component) {
+            let adapter: Value = serde_json::from_str(include_str!("datetime/fixture/data.json"))
+                .expect("asymmetric caller calendar");
+            json!({"adapter": adapter})
+        } else if component == "FormField" {
+            json!({"label":"Field"})
+        } else if component == "AspectRatio" {
+            json!({"ratio":1.75})
+        } else {
+            json!({})
+        }
+    }
     fn example(schema: &Value) -> Value {
         if schema["nullable"] == true {
             return Value::Null;
+        }
+        if let Some(branches) = schema["oneOf"].as_array() {
+            return example(&branches[0]);
         }
         if let Some(values) = schema["enum"].as_array() {
             return values[0].clone();
@@ -665,7 +681,11 @@ fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
         .as_object()
         .expect("components")
         .keys()
-        .map(|component| node(component, component, json!({}), json!({})))
+        .map(|component| {
+            let descriptor = node(component, component, props(component), json!({}));
+            validate_descriptor(&descriptor).expect("valid method fixture");
+            descriptor
+        })
         .collect::<Vec<_>>();
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         div()
@@ -680,11 +700,24 @@ fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
         for (component, modes) in methods.as_object().expect("components") {
             for (mode, methods) in modes.as_object().expect("modes") {
                 for (method, schema) in methods.as_object().expect("methods") {
-                    let descriptor = node(component, component, json!({}), json!({}));
+                    let descriptor = node(component, component, props(component), json!({}));
+                    let args = match (component.as_str(), method.as_str()) {
+                        ("TransferList", "set_items") => json!({"source":[{"id":"a","label":"Alpha"},{"id":"b","label":"Beta"}],"target":[{"id":"z","label":"Zulu"}]}),
+                        ("TransferList", "set_selection") => json!({"source":["b"],"target":["z"]}),
+                        ("Calendar", "set_selection") => json!({"days":[31,11]}),
+                        ("Calendar", "set_overlay") => json!({"marks":[{"day":31,"label":"Review","tone":"warning"}]}),
+                        ("Calendar", "set_hovered_day") => json!({"day":17}),
+                        ("Calendar", "show_month") => json!({"month":4}),
+                        ("Calendar", "shift") => json!({"delta":1}),
+                        ("DateInput", "set_value") => json!({"value":31}),
+                        ("Calendar" | "RangePicker", "set_range") => json!({"range":{"start":31,"end":11}}),
+                        ("TimeInput", "set_value") => json!({"value":{"hour":3,"minute":1,"second":2}}),
+                        _ => example(&schema["args"]),
+                    };
                     let result = state.invoke(
                         &descriptor,
                         method,
-                        &example(&schema["args"]),
+                        &args,
                         mode == "query",
                         window,
                         cx,
@@ -696,6 +729,105 @@ fn every_declared_method_has_native_dispatch(cx: &mut TestAppContext) {
                 }
             }
         }
+    });
+}
+
+#[gpui::test]
+fn merged_date_dispatch_validates_calls_routes_native_input_and_releases_owner(
+    cx: &mut TestAppContext,
+) {
+    let adapter: Value = serde_json::from_str(include_str!("datetime/fixture/data.json"))
+        .expect("caller date table");
+    let mut date = node(
+        "DateInput",
+        "date",
+        json!({"adapter":adapter}),
+        json!({"unparsable":"refused"}),
+    );
+    date.instance = 19;
+    let state = Rc::new(KitState::default());
+    let build = state.clone();
+    let descriptor = date.clone();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let output = output.clone();
+        build.render(
+            &descriptor,
+            KitSlots::new(),
+            window,
+            cx,
+            Rc::new(move |action, value| {
+                output.borrow_mut().push((action.to_owned(), value));
+            }),
+        )
+    });
+    harness.click("date.field");
+    harness.keystrokes("x");
+    assert_eq!(
+        events.borrow().last(),
+        Some(&(
+            "refused".into(),
+            json!({"text":"x","message":"unknown spelling"})
+        ))
+    );
+    harness.update(|window, cx| {
+        assert_eq!(
+            state
+                .invoke(&date, "shown_text", &json!({}), true, window, cx)
+                .expect("native edit"),
+            json!("x")
+        );
+        for args in [
+            json!({"value":"31"}),
+            json!({"value":999}),
+            json!({"value":31,"extra":true}),
+        ] {
+            assert!(
+                state
+                    .invoke(&date, "set_value", &args, false, window, cx)
+                    .is_err()
+            );
+        }
+        assert_eq!(
+            state
+                .invoke(&date, "shown_text", &json!({}), true, window, cx)
+                .expect("rejected calls preserve edit"),
+            json!("x")
+        );
+        assert!(
+            state
+                .invoke(&date, "calendar", &json!({}), true, window, cx)
+                .is_err()
+        );
+        let mut other_owner = date.clone();
+        other_owner.instance = 20;
+        assert!(
+            state
+                .invoke(&other_owner, "current", &json!({}), true, window, cx)
+                .is_err()
+        );
+        state
+            .invoke(&date, "set_value", &json!({"value":31}), false, window, cx)
+            .expect("valid setter");
+        assert_eq!(
+            state
+                .invoke(&date, "current", &json!({}), true, window, cx)
+                .expect("value query"),
+            json!(31)
+        );
+        assert_eq!(
+            state
+                .invoke(&date, "shown_text", &json!({}), true, window, cx)
+                .expect("formatted caller label"),
+            json!("second C")
+        );
+        state.reconcile(&node("Button", "replacement", json!({}), json!({})), cx);
+        assert!(
+            state
+                .invoke(&date, "current", &json!({}), true, window, cx)
+                .is_err()
+        );
     });
 }
 

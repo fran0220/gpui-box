@@ -22,6 +22,32 @@ test('caller state is copied, typed events report intent without mutating descri
   assert.throws(() => actions.get(node.events.change)('yes'), /expected boolean/);
 });
 
+test('merged family factories validate required data, relational rules and typed intents', () => {
+  const actions = new Map();
+  const kit = createKitBindings((id, event, handler) => { const action = `${id}.${event}`; actions.set(action, handler); return action; });
+  const adapter = JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/datetime/fixture/data.json', import.meta.url), 'utf8'));
+  let intent;
+  const wizard = kit.Wizard('flow', { steps: [{ id: 'review', title: 'Review' }] }, { navigate(value) { intent = value; } });
+  actions.get(wizard.events.navigate)({ kind: 'step', id: 'review' });
+  assert.deepEqual(intent, { kind: 'step', id: 'review' });
+  assert.throws(() => actions.get(wizard.events.navigate)({ kind: 'finish', id: 'review' }), /exactly one/);
+  const date = kit.DateInput('date', { adapter, value: 31 }, { change(value) { intent = value; } });
+  actions.get(date.events.change)(11);
+  assert.equal(intent, 11);
+  assert.equal(date.props.value, 31);
+  assert.throws(() => kit.DateInput('date', {}), /required/);
+  assert.throws(() => kit.DateInput('date', { adapter, value: 999 }), /unknown day/);
+  assert.throws(() => kit.FormField('field', { label: 'Name', validation: 'invalid' }), /requires reason/);
+  assert.throws(() => kit.Container('box', { width: 'custom' }), /custom width required/);
+  assert.throws(() => kit.NavStack('history', { entries: [{ id: 'one' }], cursor: 1, label: 'History' }), /invalid navigation history/);
+  assert.equal(kit.AspectRatio('ratio', { ratio: 1.75 }, {}, { content: [kit.SearchInput('search')] }).slots.content[0].component, 'SearchInput');
+  assert.throws(() => validateInvocation('DateInput', 'calendar', {}, 'query'), /Unsupported/);
+  assert.throws(() => validateInvocation('Calendar', 'adapter', {}, 'query'), /Unsupported/);
+  assert.equal(validateInvocation('DateInput', 'calendar_snapshot', {}, 'query'), kitMethods.DateInput.query.calendar_snapshot);
+  assert.equal(Object.keys(kitSchemas).length, 51);
+  assert.equal(Object.keys(kit).length, 51);
+});
+
 test('disabled controls register no callable handlers', () => {
   const kit = createKitBindings(() => assert.fail('disabled registrar called'));
   assert.deepEqual(kit.Switch('permission', { disabled: true }, { change() {} }).events, {});
@@ -110,6 +136,16 @@ const changed: Promise<null> = invoke(input, 'set_value', {value:'next'});
 const selection: Promise<string|null> = query(kit.Select('typed-select'), 'selected_id');
 const opened: Promise<null> = invoke(kit.Dialog('modal'), 'open');
 const isOpen: Promise<boolean> = query(kit.Popover('tip'), 'is_open');
+const searchValue: Promise<string> = query(kit.SearchInput('search'), 'value');
+const ratio: Promise<number> = query(kit.AspectRatio('ratio', {ratio:1.75}), 'ratio');
+kit.Wizard('wizard', {}, {navigate(intent) { if (intent.kind === 'step') { const id: string = intent.id; } }});
+kit.TransferList('transfer', {}, {toggleSource(id) { const selected: string = id; }});
+// @ts-expect-error required caller adapter cannot be omitted
+kit.DateInput('date', {});
+// @ts-expect-error native refs are not data snapshot aliases
+query({id:'date', component:'DateInput'}, 'calendar');
+// @ts-expect-error wrong family cannot widen native method target
+query(kit.SearchInput('search'), 'ratio');
 // @ts-expect-error wrong component's method cannot widen target inference
 query(input, 'selected_id');
 // @ts-expect-error query result is not arbitrary

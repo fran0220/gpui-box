@@ -832,6 +832,8 @@
         "range(range: DayRange) -> Self"
       ],
       "commands": [
+        "set_multi(multi: bool, cx: &mut Context<Self>)",
+        "reset_navigation(cx: &mut Context<Self>)",
         "set_selection(days: Vec<Day>, cx: &mut Context<Self>)",
         "set_overlay(overlay: impl Fn(Day) -> Option<DayMark> + 'static, cx: &mut Context<Self>)",
         "set_range(range: Option<DayRange>, cx: &mut Context<Self>)",
@@ -841,6 +843,7 @@
         "show_month(month: MonthKey, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "adapter() -> &SharedDateAdapter",
         "selection() -> &[Day]",
         "cursor() -> Option<Day>",
@@ -1522,6 +1525,8 @@
         "invalid(invalid: bool) -> Self"
       ],
       "commands": [
+        "set_required(required: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_value(day: Option<Day>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
@@ -1530,6 +1535,7 @@
         "toggle(cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "field() -> &Entity<TextInput>",
         "calendar() -> &Entity<Calendar>",
         "current() -> Option<Day>",
@@ -3938,6 +3944,7 @@
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "calendar() -> &Entity<Calendar>",
         "current_range() -> Option<DayRange>",
         "state() -> RangeState",
@@ -4324,11 +4331,13 @@
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_presentation(name: Option<SharedString>, placeholder: Option<SharedString>, size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "value(cx: &App) -> SharedString",
-        "input() -> &Entity<TextInput>"
+        "input() -> &Entity<TextInput>",
+        "is_disabled() -> bool"
       ],
       "slots": [],
       "reports": [
@@ -5327,10 +5336,13 @@
       ],
       "commands": [
         "set_value(value: TimeOfDay, cx: &mut Context<Self>)",
+        "set_seconds(seconds: bool, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "is_disabled() -> bool",
         "current() -> TimeOfDay",
         "active_segment() -> Segment",
         "clock() -> Clock"
@@ -5575,9 +5587,16 @@
         "target_label(label: impl Into<SharedString>) -> Self"
       ],
       "commands": [
+        "set_items(source: Vec<TransferItem>, target: Vec<TransferItem>, cx: &mut Context<Self>)",
+        "set_selection(source: Vec<SharedString>, target: Vec<SharedString>, cx: &mut Context<Self>)",
+        "set_labels(source: SharedString, target: SharedString, cx: &mut Context<Self>)",
+        "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_query(query: impl Into<SharedString>, cx: &mut Context<Self>)"
       ],
-      "queries": [],
+      "queries": [
+        "is_disabled() -> bool"
+      ],
       "slots": [],
       "reports": [
         "ToggleSource",

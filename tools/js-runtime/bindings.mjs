@@ -1,11 +1,19 @@
 /** Implemented adapters only. A name in the Rust catalog is not automatically a JS binding. */
 import { kitSchemas, kitMethods } from './kit-schema.mjs';
 
+// Wire snapshots read these native getters, but do not expose their Entity/Rc refs.
+const nativeMethodSources = {
+  Calendar: { adapter_snapshot: 'adapter' },
+  DateInput: { field_snapshot: 'field', calendar_snapshot: 'calendar' },
+  RangePicker: { calendar_snapshot: 'calendar' },
+};
+
 export const bindings = {
   Button: { api: 'gpui.button', status: 'partial', methods: ['new', 'label', 'disabled', 'on_click'] },
   ...Object.fromEntries(Object.entries(kitSchemas).map(([component, schema]) => [component, {
     api: `gpui.kit.${component}`, status: 'partial',
     props: Object.keys(schema.props.fields), events: Object.keys(schema.events),
     nativeMethods: kitMethods[component] ?? { invoke: {}, query: {} },
+    ...(nativeMethodSources[component] ? { nativeMethodSources: nativeMethodSources[component] } : {}),
   }])),
 };

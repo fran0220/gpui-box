@@ -281,8 +281,23 @@
       "source": "crates/gpui-kit/src/navigation/anchor_list.rs",
       "path": "gpui_kit::navigation::AnchorList",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.AnchorList",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "anchors",
+          "active",
+          "overflow",
+          "overflowAfter"
+        ],
+        "events": [
+          "navigate"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -412,8 +427,30 @@
       "source": "crates/gpui-kit/src/layout/aspect_ratio.rs",
       "path": "gpui_kit::layout::AspectRatio",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.AspectRatio",
+        "status": "partial",
+        "props": [
+          "ratio",
+          "fit"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {
+            "ratio": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "min": 0.0001,
+                "max": 1000000
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -663,8 +700,20 @@
       "source": "crates/gpui-kit/src/navigation/breadcrumb.rs",
       "path": "gpui_kit::navigation::Breadcrumb",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Breadcrumb",
+        "status": "partial",
+        "props": [
+          "crumbs",
+          "maxVisible"
+        ],
+        "events": [
+          "select",
+          "reveal"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -764,14 +813,33 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "path": "gpui_kit::controls::Button",
       "binding": {
-        "api": "gpui.button",
+        "api": "gpui.kit.Button",
         "status": "partial",
-        "methods": [
-          "new",
-          "label",
+        "props": [
           "disabled",
-          "on_click"
-        ]
+          "size",
+          "accessibleName",
+          "semanticParent",
+          "icon",
+          "variant",
+          "color",
+          "ground",
+          "join",
+          "loading",
+          "label",
+          "accessibleDescription",
+          "iconOnly",
+          "iconPosition",
+          "fullWidth",
+          "checkedState"
+        ],
+        "events": [
+          "click"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -831,8 +899,399 @@
       "source": "crates/gpui-kit/src/datetime/calendar.rs",
       "path": "gpui_kit::datetime::Calendar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Calendar",
+        "status": "partial",
+        "props": [
+          "adapter",
+          "selected",
+          "multi",
+          "month",
+          "range",
+          "disabled",
+          "marks"
+        ],
+        "events": [
+          "pick",
+          "monthShown",
+          "hover"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_overlay": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "marks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "day": {
+                          "type": "number",
+                          "integer": true,
+                          "min": -9007199254740991,
+                          "max": 9007199254740991
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "tone": {
+                          "enum": [
+                            "neutral",
+                            "accent",
+                            "success",
+                            "warning",
+                            "danger",
+                            "info"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "day",
+                        "label"
+                      ]
+                    },
+                    "max": 4096
+                  }
+                },
+                "required": [
+                  "marks"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "reset_navigation": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selection": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "days": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "integer": true,
+                      "min": -9007199254740991,
+                      "max": 9007199254740991
+                    },
+                    "max": 4096
+                  }
+                },
+                "required": [
+                  "days"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_multi": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "multi": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "multi"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_range": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": -9007199254740991,
+                        "max": 9007199254740991
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": -9007199254740991,
+                        "max": 9007199254740991,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "start"
+                    ],
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "range"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_hovered_day": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "day": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "day"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "shift": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "delta": {
+                    "type": "number",
+                    "min": -120,
+                    "max": 120,
+                    "integer": true
+                  }
+                },
+                "required": [
+                  "delta"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "show_month": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "month": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  }
+                },
+                "required": [
+                  "month"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "adapter_snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "today": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 16
+                  },
+                  "clock": {
+                    "type": "object",
+                    "fields": {
+                      "hourMin": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "hourMax": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "minuteMax": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "secondMax": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "meridiem": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "max": 2,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "hourMin",
+                      "hourMax",
+                      "minuteMax",
+                      "secondMax",
+                      "meridiem"
+                    ]
+                  }
+                },
+                "required": [
+                  "today",
+                  "weekdays",
+                  "clock"
+                ]
+              }
+            },
+            "selection": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "integer": true,
+                  "min": -9007199254740991,
+                  "max": 9007199254740991
+                },
+                "max": 4096
+              }
+            },
+            "cursor": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991,
+                "nullable": true
+              }
+            },
+            "hovered_day": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991,
+                "nullable": true
+              }
+            },
+            "shown_month": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991,
+                "nullable": true
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "adapter_snapshot": "adapter"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -846,6 +1305,8 @@
           "range(range: DayRange) -> Self"
         ],
         "commands": [
+          "set_multi(multi: bool, cx: &mut Context<Self>)",
+          "reset_navigation(cx: &mut Context<Self>)",
           "set_selection(days: Vec<Day>, cx: &mut Context<Self>)",
           "set_overlay(overlay: impl Fn(Day) -> Option<DayMark> + 'static, cx: &mut Context<Self>)",
           "set_range(range: Option<DayRange>, cx: &mut Context<Self>)",
@@ -855,6 +1316,7 @@
           "show_month(month: MonthKey, cx: &mut Context<Self>)"
         ],
         "queries": [
+          "is_disabled() -> bool",
           "adapter() -> &SharedDateAdapter",
           "selection() -> &[Day]",
           "cursor() -> Option<Day>",
@@ -967,8 +1429,24 @@
       "source": "crates/gpui-kit/src/navigation/carousel.rs",
       "path": "gpui_kit::navigation::Carousel",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Carousel",
+        "status": "partial",
+        "props": [
+          "size",
+          "items",
+          "active",
+          "phase",
+          "reason",
+          "stale",
+          "looped"
+        ],
+        "events": [
+          "event"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1176,8 +1654,22 @@
       "source": "crates/gpui-kit/src/navigation/collapsible.rs",
       "path": "gpui_kit::navigation::Collapsible",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Collapsible",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "title",
+          "description",
+          "open"
+        ],
+        "events": [
+          "toggle"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1201,8 +1693,22 @@
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
       "path": "gpui_kit::controls::ColorPicker",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.ColorPicker",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "value",
+          "alpha",
+          "presets",
+          "recent"
+        ],
+        "events": [
+          "change"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1224,8 +1730,20 @@
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
       "path": "gpui_kit::controls::ColorSwatch",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.ColorSwatch",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "color",
+          "selected"
+        ],
+        "events": [
+          "click"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1317,8 +1835,18 @@
       "source": "crates/gpui-kit/src/layout/grid.rs",
       "path": "gpui_kit::layout::Container",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Container",
+        "status": "partial",
+        "props": [
+          "width",
+          "customWidth",
+          "padding"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1505,8 +2033,354 @@
       "source": "crates/gpui-kit/src/datetime/date_input.rs",
       "path": "gpui_kit::datetime::DateInput",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.DateInput",
+        "status": "partial",
+        "props": [
+          "adapter",
+          "value",
+          "required",
+          "invalid",
+          "disabled",
+          "size"
+        ],
+        "events": [
+          "change",
+          "unparsable",
+          "open",
+          "close",
+          "submit"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_required": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "required"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "close": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "toggle": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "field_snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "cursor": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 16384,
+                    "integer": true
+                  },
+                  "selection": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 16384,
+                        "integer": true
+                      },
+                      "end": {
+                        "type": "number",
+                        "min": 0,
+                        "max": 16384,
+                        "integer": true
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "cursor",
+                  "selection",
+                  "disabled"
+                ]
+              }
+            },
+            "calendar_snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "selection": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "integer": true,
+                      "min": -9007199254740991,
+                      "max": 9007199254740991
+                    },
+                    "max": 4096
+                  },
+                  "cursor": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "hoveredDay": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "shownMonth": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "selection",
+                  "cursor",
+                  "hoveredDay",
+                  "shownMonth",
+                  "disabled"
+                ]
+              }
+            },
+            "current": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991,
+                "nullable": true
+              }
+            },
+            "parsed_day": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "integer": true,
+                "min": -9007199254740991,
+                "max": 9007199254740991,
+                "nullable": true
+              }
+            },
+            "message": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384,
+                "nullable": true
+              }
+            },
+            "is_open": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "shown_text": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "is_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "field_snapshot": "field",
+          "calendar_snapshot": "calendar"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1518,6 +2392,8 @@
           "invalid(invalid: bool) -> Self"
         ],
         "commands": [
+          "set_required(required: bool, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
           "set_value(day: Option<Day>, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
@@ -1526,6 +2402,7 @@
           "toggle(cx: &mut Context<Self>)"
         ],
         "queries": [
+          "is_disabled() -> bool",
           "field() -> &Entity<TextInput>",
           "calendar() -> &Entity<Calendar>",
           "current() -> Option<Day>",
@@ -1566,8 +2443,21 @@
       "source": "crates/gpui-kit/src/layout/titlebar.rs",
       "path": "gpui_kit::layout::DesktopTitlebar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.DesktopTitlebar",
+        "status": "partial",
+        "props": [
+          "title",
+          "subtitle",
+          "buttons",
+          "controls"
+        ],
+        "events": [
+          "event"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1941,8 +2831,20 @@
       "source": "crates/gpui-kit/src/layout/dock.rs",
       "path": "gpui_kit::layout::Dock",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Dock",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "panels",
+          "regions"
+        ],
+        "events": [
+          "event"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -1967,8 +2869,21 @@
       "source": "crates/gpui-kit/src/layout/dock_tree.rs",
       "path": "gpui_kit::layout::DockTree",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.DockTree",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "records",
+          "floating",
+          "panels"
+        ],
+        "events": [
+          "event"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2187,8 +3102,28 @@
       "source": "crates/gpui-kit/src/controls/filter_bar.rs",
       "path": "gpui_kit::controls::FilterBar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.FilterBar",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "conditions",
+          "countState",
+          "count",
+          "countReason",
+          "noun",
+          "addLabel",
+          "clearLabel"
+        ],
+        "events": [
+          "add",
+          "remove",
+          "clear"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2268,8 +3203,44 @@
       "source": "crates/gpui-kit/src/controls/form_field.rs",
       "path": "gpui_kit::controls::FormField",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.FormField",
+        "status": "partial",
+        "props": [
+          "label",
+          "control",
+          "description",
+          "validation",
+          "reason",
+          "error",
+          "hint",
+          "required"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {
+            "is_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "is_validating": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2419,8 +3390,19 @@
       "source": "crates/gpui-kit/src/layout/grid.rs",
       "path": "gpui_kit::layout::Grid",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Grid",
+        "status": "partial",
+        "props": [
+          "columns",
+          "columnsAt",
+          "gap",
+          "items"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -2566,8 +3548,27 @@
       "source": "crates/gpui-kit/src/controls/button.rs",
       "path": "gpui_kit::controls::IconButton",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.IconButton",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "accessibleName",
+          "semanticParent",
+          "icon",
+          "variant",
+          "color",
+          "ground",
+          "join",
+          "loading"
+        ],
+        "events": [
+          "click"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -3262,8 +4263,18 @@
       "source": "crates/gpui-kit/src/navigation/nav_stack.rs",
       "path": "gpui_kit::navigation::NavStack",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.NavStack",
+        "status": "partial",
+        "props": [
+          "entries",
+          "cursor",
+          "label"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4187,8 +5198,343 @@
       "source": "crates/gpui-kit/src/datetime/range.rs",
       "path": "gpui_kit::datetime::RangePicker",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.RangePicker",
+        "status": "partial",
+        "props": [
+          "adapter",
+          "range",
+          "disabled",
+          "invalid",
+          "marks"
+        ],
+        "events": [
+          "startPick",
+          "endPick"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_overlay": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "marks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "day": {
+                          "type": "number",
+                          "integer": true,
+                          "min": -9007199254740991,
+                          "max": 9007199254740991
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "tone": {
+                          "enum": [
+                            "neutral",
+                            "accent",
+                            "success",
+                            "warning",
+                            "danger",
+                            "info"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "day",
+                        "label"
+                      ]
+                    },
+                    "max": 4096
+                  }
+                },
+                "required": [
+                  "marks"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_range": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "range": {
+                    "type": "object",
+                    "fields": {
+                      "start": {
+                        "type": "number",
+                        "integer": true,
+                        "min": -9007199254740991,
+                        "max": 9007199254740991
+                      },
+                      "end": {
+                        "type": "number",
+                        "integer": true,
+                        "min": -9007199254740991,
+                        "max": 9007199254740991,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "start"
+                    ],
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "range"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "calendar_snapshot": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "selection": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "integer": true,
+                      "min": -9007199254740991,
+                      "max": 9007199254740991
+                    },
+                    "max": 4096
+                  },
+                  "cursor": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "hoveredDay": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "shownMonth": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "selection",
+                  "cursor",
+                  "hoveredDay",
+                  "shownMonth",
+                  "disabled"
+                ]
+              }
+            },
+            "current_range": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "start": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991
+                  },
+                  "end": {
+                    "type": "number",
+                    "integer": true,
+                    "min": -9007199254740991,
+                    "max": 9007199254740991,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "start"
+                ],
+                "nullable": true
+              }
+            },
+            "state": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  "unset",
+                  "incomplete",
+                  "complete",
+                  "end before start"
+                ]
+              }
+            },
+            "blocked": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "enum": [
+                          "notApplicable"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "enum": [
+                          "unchecked"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "enum": [
+                          "clear"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "fields": {
+                      "kind": {
+                        "enum": [
+                          "blocked"
+                        ]
+                      },
+                      "days": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "fields": {
+                            "day": {
+                              "type": "number",
+                              "integer": true,
+                              "min": -9007199254740991,
+                              "max": 9007199254740991
+                            },
+                            "reason": {
+                              "type": "string",
+                              "max": 16384
+                            }
+                          },
+                          "required": [
+                            "day",
+                            "reason"
+                          ]
+                        },
+                        "max": 4096
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "days"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "nativeMethodSources": {
+          "calendar_snapshot": "calendar"
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4205,6 +5551,7 @@
           "set_invalid(invalid: bool, cx: &mut Context<Self>)"
         ],
         "queries": [
+          "is_disabled() -> bool",
           "calendar() -> &Entity<Calendar>",
           "current_range() -> Option<DayRange>",
           "state() -> RangeState",
@@ -4263,8 +5610,17 @@
       "source": "crates/gpui-kit/src/layout/responsive.rs",
       "path": "gpui_kit::layout::Responsive",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Responsive",
+        "status": "partial",
+        "props": [
+          "threshold",
+          "fill"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4474,8 +5830,22 @@
       "source": "crates/gpui-kit/src/layout/scroll_edge.rs",
       "path": "gpui_kit::layout::ScrollEdgeEffect",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.ScrollEdgeEffect",
+        "status": "partial",
+        "props": [
+          "top",
+          "bottom",
+          "left",
+          "right",
+          "band",
+          "blur",
+          "kind"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4504,8 +5874,21 @@
       "source": "crates/gpui-kit/src/layout/scroll_fade.rs",
       "path": "gpui_kit::layout::ScrollFade",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.ScrollFade",
+        "status": "partial",
+        "props": [
+          "top",
+          "bottom",
+          "left",
+          "right",
+          "band",
+          "fitHeight"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4564,8 +5947,160 @@
       "source": "crates/gpui-kit/src/controls/search.rs",
       "path": "gpui_kit::controls::SearchInput",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.SearchInput",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "name",
+          "placeholder",
+          "value"
+        ],
+        "events": [
+          "change",
+          "submit",
+          "cancel",
+          "backspaceAtStart",
+          "focus",
+          "blur"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_name": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_placeholder": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "placeholder"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_presentation": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "name": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  },
+                  "placeholder": {
+                    "type": "string",
+                    "max": 16384,
+                    "nullable": true
+                  },
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "placeholder",
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "value": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "string",
+                "max": 16384
+              }
+            },
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -4579,11 +6114,13 @@
           "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+          "set_presentation(name: Option<SharedString>, placeholder: Option<SharedString>, size: ControlSize, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)"
         ],
         "queries": [
           "value(cx: &App) -> SharedString",
-          "input() -> &Entity<TextInput>"
+          "input() -> &Entity<TextInput>",
+          "is_disabled() -> bool"
         ],
         "slots": []
       }
@@ -5009,8 +6546,22 @@
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "path": "gpui_kit::controls::SettingsRow",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.SettingsRow",
+        "status": "partial",
+        "props": [
+          "label",
+          "description",
+          "labelWidth",
+          "badge",
+          "value",
+          "searchTerms",
+          "managed"
+        ],
+        "events": [],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -5061,8 +6612,23 @@
       "source": "crates/gpui-kit/src/navigation/sidebar.rs",
       "path": "gpui_kit::navigation::Sidebar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Sidebar",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "sections",
+          "items",
+          "active",
+          "collapsed"
+        ],
+        "events": [
+          "select"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -5320,8 +6886,19 @@
       "source": "crates/gpui-kit/src/layout/tree.rs",
       "path": "gpui_kit::layout::SplitTree",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.SplitTree",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "records"
+        ],
+        "events": [
+          "change"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -5432,8 +7009,19 @@
       "source": "crates/gpui-kit/src/layout/status_bar.rs",
       "path": "gpui_kit::layout::StatusBar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.StatusBar",
+        "status": "partial",
+        "props": [
+          "label",
+          "items"
+        ],
+        "events": [
+          "click"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6223,8 +7811,271 @@
       "source": "crates/gpui-kit/src/datetime/time_input.rs",
       "path": "gpui_kit::datetime::TimeInput",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.TimeInput",
+        "status": "partial",
+        "props": [
+          "adapter",
+          "value",
+          "seconds",
+          "disabled",
+          "invalid",
+          "size"
+        ],
+        "events": [
+          "change"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_invalid": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "invalid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "invalid"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_value": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "value": {
+                    "type": "object",
+                    "fields": {
+                      "hour": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "minute": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99
+                      },
+                      "second": {
+                        "type": "number",
+                        "integer": true,
+                        "min": 0,
+                        "max": 99,
+                        "nullable": true
+                      },
+                      "meridiem": {
+                        "enum": [
+                          0,
+                          1,
+                          null
+                        ]
+                      }
+                    },
+                    "required": [
+                      "hour",
+                      "minute"
+                    ]
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_seconds": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "seconds": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "seconds"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            },
+            "current": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "hour": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "minute": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "second": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99,
+                    "nullable": true
+                  },
+                  "meridiem": {
+                    "enum": [
+                      0,
+                      1,
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "hour",
+                  "minute"
+                ]
+              }
+            },
+            "active_segment": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "enum": [
+                  "hour",
+                  "minute",
+                  "second",
+                  "meridiem"
+                ]
+              }
+            },
+            "clock": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "object",
+                "fields": {
+                  "hourMin": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "hourMax": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "minuteMax": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "secondMax": {
+                    "type": "number",
+                    "integer": true,
+                    "min": 0,
+                    "max": 99
+                  },
+                  "meridiem": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 16384
+                    },
+                    "max": 2,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "hourMin",
+                  "hourMax",
+                  "minuteMax",
+                  "secondMax",
+                  "meridiem"
+                ]
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6237,10 +8088,13 @@
         ],
         "commands": [
           "set_value(value: TimeOfDay, cx: &mut Context<Self>)",
+          "set_seconds(seconds: bool, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)"
         ],
         "queries": [
+          "is_disabled() -> bool",
           "current() -> TimeOfDay",
           "active_segment() -> Segment",
           "clock() -> Clock"
@@ -6305,8 +8159,28 @@
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "path": "gpui_kit::controls::Toggle",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Toggle",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "label",
+          "accessibleName",
+          "semanticParent",
+          "icon",
+          "iconOnly",
+          "variant",
+          "ground",
+          "join",
+          "pressed"
+        ],
+        "events": [
+          "press"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6338,8 +8212,25 @@
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "path": "gpui_kit::controls::ToggleGroup",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.ToggleGroup",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "label",
+          "items",
+          "pressed",
+          "selection",
+          "variant",
+          "ground"
+        ],
+        "events": [
+          "change"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6394,8 +8285,37 @@
       "source": "crates/gpui-kit/src/layout/toolbar.rs",
       "path": "gpui_kit::layout::Toolbar",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Toolbar",
+        "status": "partial",
+        "props": [
+          "size",
+          "label",
+          "groups",
+          "items",
+          "overflow",
+          "overflowAfter"
+        ],
+        "events": [
+          "overflowSelect"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {
+            "item_count": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "number",
+                "min": 0,
+                "max": 1024,
+                "integer": true
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6467,8 +8387,226 @@
       "source": "crates/gpui-kit/src/controls/transfer_list.rs",
       "path": "gpui_kit::controls::TransferList",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.TransferList",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "source",
+          "target",
+          "sourceSelected",
+          "targetSelected",
+          "sourceLabel",
+          "targetLabel",
+          "query"
+        ],
+        "events": [
+          "toggleSource",
+          "toggleTarget",
+          "moveToTarget",
+          "moveToSource",
+          "queryChange"
+        ],
+        "nativeMethods": {
+          "invoke": {
+            "set_query": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "query": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_items": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "source": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "max": 256,
+                          "min": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "disabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "max": 1024
+                  },
+                  "target": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "fields": {
+                        "id": {
+                          "type": "string",
+                          "max": 256,
+                          "min": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "max": 16384
+                        },
+                        "disabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "source",
+                  "target"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_selection": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "source": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 256,
+                      "min": 1
+                    },
+                    "max": 1024
+                  },
+                  "target": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "max": 256,
+                      "min": 1
+                    },
+                    "max": 1024
+                  }
+                },
+                "required": [
+                  "source",
+                  "target"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_labels": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "source": {
+                    "type": "string",
+                    "max": 16384
+                  },
+                  "target": {
+                    "type": "string",
+                    "max": 16384
+                  }
+                },
+                "required": [
+                  "source",
+                  "target"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_control_size": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "size": {
+                    "enum": [
+                      "xs",
+                      "sm",
+                      "md",
+                      "lg"
+                    ]
+                  }
+                },
+                "required": [
+                  "size"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            },
+            "set_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ]
+              },
+              "result": {
+                "enum": [
+                  null
+                ]
+              }
+            }
+          },
+          "query": {
+            "is_disabled": {
+              "args": {
+                "type": "object",
+                "fields": {},
+                "required": []
+              },
+              "result": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6483,9 +8621,16 @@
           "target_label(label: impl Into<SharedString>) -> Self"
         ],
         "commands": [
+          "set_items(source: Vec<TransferItem>, target: Vec<TransferItem>, cx: &mut Context<Self>)",
+          "set_selection(source: Vec<SharedString>, target: Vec<SharedString>, cx: &mut Context<Self>)",
+          "set_labels(source: SharedString, target: SharedString, cx: &mut Context<Self>)",
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
+          "set_disabled(disabled: bool, cx: &mut Context<Self>)",
           "set_query(query: impl Into<SharedString>, cx: &mut Context<Self>)"
         ],
-        "queries": [],
+        "queries": [
+          "is_disabled() -> bool"
+        ],
         "slots": []
       }
     },
@@ -6603,8 +8748,21 @@
       "source": "crates/gpui-kit/src/navigation/undo_history.rs",
       "path": "gpui_kit::navigation::UndoHistory",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.UndoHistory",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "label",
+          "entries",
+          "current"
+        ],
+        "events": [
+          "jump"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [
@@ -6706,8 +8864,27 @@
       "source": "crates/gpui-kit/src/navigation/wizard.rs",
       "path": "gpui_kit::navigation::Wizard",
       "binding": {
-        "status": "unbound",
-        "reason": "Native adapter and behavioral tests not implemented"
+        "api": "gpui.kit.Wizard",
+        "status": "partial",
+        "props": [
+          "disabled",
+          "size",
+          "steps",
+          "layout",
+          "backTo",
+          "finish",
+          "canAdvance",
+          "backLabel",
+          "nextLabel",
+          "finishLabel"
+        ],
+        "events": [
+          "navigate"
+        ],
+        "nativeMethods": {
+          "invoke": {},
+          "query": {}
+        }
       },
       "rustSignatures": {
         "construct": [

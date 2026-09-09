@@ -1,4 +1,8 @@
 // Explicit adapter contracts, not the catalog. An absent component is unsupported.
+import { familySchemas as controlsSchemas, familyMethods as controlsMethods, validateFamilyProps as validateControls } from './kit-controls_extra-schema.mjs';
+import { familySchemas as navigationSchemas, familyMethods as navigationMethods, validateFamilyProps as validateNavigation } from './kit-navigation_extra-schema.mjs';
+import { familySchemas as layoutSchemas, familyMethods as layoutMethods, validateFamilyProps as validateLayout } from './kit-layout_extra-schema.mjs';
+import { familySchemas as dateSchemas, familyMethods as dateMethods, validateFamilyProps as validateDataFamily } from './kit-datetime-schema.mjs';
 const string = { type: 'string', max: 16384 };
 const identity = { type: 'string', min: 1, max: 256 };
 const boolean = { type: 'boolean' };
@@ -14,6 +18,7 @@ const selectionItem = object({ id: identity, label: string, disabled: boolean },
 const selectOption = object({ ...selectionItem.fields, description: string, group: string }, ['id', 'label']);
 
 export const kitSchemas = Object.freeze({
+  ...controlsSchemas, ...navigationSchemas, ...layoutSchemas, ...dateSchemas,
   Checkbox: { props: object({ ...labeled, checked: choice(true, false, null) }), events: { change: boolean } },
   Radio: { props: object({ ...labeled, selected: boolean }), events: { select: choice(null) } },
   Switch: { props: object({ ...labeled, name: string, on: boolean, invalid: boolean }), events: { change: boolean } },
@@ -179,6 +184,10 @@ export function validateKitProps(component, id, props) {
   if (!Object.hasOwn(kitSchemas, component)) throw new TypeError(`Unsupported Kit component: ${component}`);
   validateValue(id, identity, 'id');
   validateValue(props, kitSchemas[component].props, `${component}.props`);
+  if (Object.hasOwn(controlsSchemas, component)) validateControls(component, props);
+  if (Object.hasOwn(navigationSchemas, component)) validateNavigation(component, props);
+  if (Object.hasOwn(layoutSchemas, component)) validateLayout(component, props);
+  if (Object.hasOwn(dateSchemas, component)) validateDataFamily(component, props);
   if (component === 'Slider') {
     const { min = 0, max = 1, value = min, high } = props;
     if (min >= max || value < min || value > max || (high !== undefined && (high < value || high > max))) throw new TypeError('Slider: invalid range');
@@ -250,6 +259,7 @@ export function validateKitDescriptor(node) {
 // and Entity/Signal handles never cross this data-only boundary.
 const method = (fields, result = choice(null)) => ({ args: object(fields, Object.keys(fields)), result });
 export const kitMethods = Object.freeze({
+  ...controlsMethods, ...navigationMethods, ...layoutMethods, ...dateMethods,
   TextInput: {
     invoke: {
       set_name: method({ name: string }), set_placeholder: method({ placeholder: string }),
