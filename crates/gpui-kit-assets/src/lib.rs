@@ -33,6 +33,69 @@ impl AssetSource for Assets {
     }
 }
 
+/// One compile-time selected glyph. Use [`icon_bundle!`] to avoid linking the
+/// full runtime icon lookup table into an application that needs only a subset.
+#[derive(Debug, Clone, Copy)]
+pub struct IconAsset {
+    path: &'static str,
+    bytes: &'static [u8],
+}
+
+/// An asset source containing only an explicit static selection. Missing
+/// paths return `None`; this never falls back to the full bundled catalogue.
+/// Include the icons used by Kit components as well as your own direct icons.
+#[derive(Debug, Clone, Copy)]
+pub struct IconAssets {
+    selected: &'static [IconAsset],
+}
+
+impl IconAssets {
+    pub const fn new(selected: &'static [IconAsset]) -> Self {
+        Self { selected }
+    }
+}
+
+impl AssetSource for IconAssets {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        Ok(self
+            .selected
+            .iter()
+            .find(|asset| asset.path == path)
+            .map(|asset| Cow::Borrowed(asset.bytes)))
+    }
+
+    fn list(&self, prefix: &str) -> Result<Vec<SharedString>> {
+        let mut paths = Vec::new();
+        for asset in self.selected {
+            if asset.path.starts_with(prefix)
+                && !paths
+                    .iter()
+                    .any(|path: &SharedString| path.as_ref() == asset.path)
+            {
+                paths.push(SharedString::new_static(asset.path));
+            }
+        }
+        Ok(paths)
+    }
+}
+
+/// Selects individual names and weights at compile time, letting the linker
+/// discard all other SVG bytes. Expressions must be const-evaluable.
+///
+/// ```
+/// use gpui_kit_assets::{Icon, icon_bundle};
+/// let assets = icon_bundle![Icon::Copy, Icon::Check.filled()];
+/// ```
+/// Fonts are registered separately by `register_fonts`; selection changes
+/// neither font coverage nor the existing full [`Assets`] default.
+#[macro_export]
+macro_rules! icon_bundle {
+    ($($icon:expr),* $(,)?) => {{
+        const SELECTED: &[$crate::IconAsset] = &[$($icon.asset()),*];
+        $crate::IconAssets::new(SELECTED)
+    }};
+}
+
 pub fn icon(icon: Icon) -> Svg {
     svg().path(icon.path()).flex_none()
 }
@@ -121,6 +184,36 @@ pub fn register_fonts(cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_bundles_include_only_requested_names_and_weights() {
+        let selected = icon_bundle![Icon::Copy, Icon::Check.filled(), Icon::Copy];
+        assert_eq!(
+            selected.list("").expect("list selected"),
+            vec![
+                SharedString::from(Icon::Copy.path()),
+                Icon::Check.filled().path().into()
+            ]
+        );
+        assert_eq!(selected.list("icons/fill/").expect("list fill").len(), 1);
+        assert_eq!(
+            selected.load(Icon::Copy.path()).expect("selected lookup"),
+            Assets.load(Icon::Copy.path()).expect("full lookup")
+        );
+        assert!(
+            selected
+                .load(Icon::Check.path())
+                .expect("omitted weight")
+                .is_none()
+        );
+        assert!(
+            selected
+                .load(Icon::Graph.path())
+                .expect("omitted name")
+                .is_none()
+        );
+        assert!(icon_bundle![].list("").expect("empty selection").is_empty());
+    }
 
     #[test]
     fn every_registered_icon_is_embedded_svg() {

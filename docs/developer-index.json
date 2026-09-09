@@ -1160,7 +1160,7 @@
           "features": []
         }
       ],
-      "symbolCount": 24
+      "symbolCount": 29
     },
     {
       "name": "gpui-box-kit-semantics",
@@ -2437,7 +2437,7 @@
           "features": []
         }
       ],
-      "symbolCount": 16
+      "symbolCount": 17
     }
   ],
   "symbols": [
@@ -104379,6 +104379,49 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit_assets::IconAsset",
+      "name": "IconAsset",
+      "kind": "struct",
+      "package": "gpui-box-kit-assets",
+      "crate": "gpui_kit_assets",
+      "module": "",
+      "path": "gpui_kit_assets",
+      "source": "crates/gpui-kit-assets/src/lib.rs",
+      "summary": "One compile-time selected glyph. Use [`icon_bundle!`] to avoid linking the full runtime icon lookup table into an application that needs only a subset.",
+      "documentation": "One compile-time selected glyph. Use [`icon_bundle!`] to avoid linking the\nfull runtime icon lookup table into an application that needs only a subset.",
+      "signature": "# [doc = \" One compile-time selected glyph. Use [`icon_bundle!`] to avoid linking the\"] # [doc = \" full runtime icon lookup table into an application that needs only a subset.\"] # [derive (Debug, Clone, Copy)] pub struct IconAsset { path : & 'static str, bytes : & 'static [u8], }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit_assets::IconAssets",
+      "name": "IconAssets",
+      "kind": "struct",
+      "package": "gpui-box-kit-assets",
+      "crate": "gpui_kit_assets",
+      "module": "",
+      "path": "gpui_kit_assets",
+      "source": "crates/gpui-kit-assets/src/lib.rs",
+      "summary": "An asset source containing only an explicit static selection. Missing paths return `None`; this never falls back to the full bundled catalogue. Include the icons used by Kit components as well as your own direct icons.",
+      "documentation": "An asset source containing only an explicit static selection. Missing\npaths return `None`; this never falls back to the full bundled catalogue.\nInclude the icons used by Kit components as well as your own direct icons.",
+      "signature": "# [doc = \" An asset source containing only an explicit static selection. Missing\"] # [doc = \" paths return `None`; this never falls back to the full bundled catalogue.\"] # [doc = \" Include the icons used by Kit components as well as your own direct icons.\"] # [derive (Debug, Clone, Copy)] pub struct IconAssets { selected : & 'static [IconAsset], }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit_assets::IconAssets::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit-assets",
+      "crate": "gpui_kit_assets",
+      "module": "",
+      "path": "gpui_kit_assets",
+      "source": "crates/gpui-kit-assets/src/lib.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub const fn new (selected : & 'static [IconAsset]) -> Self",
+      "cfg": [],
+      "target": "IconAssets"
+    },
+    {
       "id": "gpui_kit_assets::KEY_SYMBOLS_FAMILY",
       "name": "KEY_SYMBOLS_FAMILY",
       "kind": "constant",
@@ -104421,6 +104464,20 @@
       "cfg": []
     },
     {
+      "id": "gpui_kit_assets::icon_bundle",
+      "name": "icon_bundle",
+      "kind": "macro",
+      "package": "gpui-box-kit-assets",
+      "crate": "gpui_kit_assets",
+      "module": "",
+      "path": "gpui_kit_assets",
+      "source": "crates/gpui-kit-assets/src/lib.rs",
+      "summary": "Selects individual names and weights at compile time, letting the linker discard all other SVG bytes. Expressions must be const-evaluable.",
+      "documentation": "Selects individual names and weights at compile time, letting the linker\ndiscard all other SVG bytes. Expressions must be const-evaluable.\n\n```\nuse gpui_kit_assets::{Icon, icon_bundle};\nlet assets = icon_bundle![Icon::Copy, Icon::Check.filled()];\n```\nFonts are registered separately by `register_fonts`; selection changes\nneither font coverage nor the existing full [`Assets`] default.",
+      "signature": "macro_rules! icon_bundle",
+      "cfg": []
+    },
+    {
       "id": "gpui_kit_assets::icons::Icon",
       "name": "Icon",
       "kind": "struct",
@@ -104433,6 +104490,21 @@
       "documentation": "",
       "signature": "# [derive (Clone, Copy, PartialEq, Eq, Hash)] pub struct Icon { name : IconName, weight : IconWeight, }",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit_assets::icons::Icon::asset",
+      "name": "asset",
+      "kind": "method",
+      "package": "gpui-box-kit-assets",
+      "crate": "gpui_kit_assets",
+      "module": "icons",
+      "path": "gpui_kit_assets::icons",
+      "source": "crates/gpui-kit-assets/src/icons.rs",
+      "summary": "A glyph record. Use icon_bundle! to evaluate selection at compile time.",
+      "documentation": "A glyph record. Use icon_bundle! to evaluate selection at compile time.",
+      "signature": "pub const fn asset (self) -> crate::IconAsset",
+      "cfg": [],
+      "target": "Icon"
     },
     {
       "id": "gpui_kit_assets::icons::Icon::filled",
@@ -120654,6 +120726,20 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn check (root : & Path) -> Result<()>",
+      "cfg": []
+    },
+    {
+      "id": "xtask::icons::generate",
+      "name": "generate",
+      "kind": "function",
+      "package": "xtask",
+      "crate": "xtask",
+      "module": "icons",
+      "path": "xtask::icons",
+      "source": "xtask/src/icons.rs",
+      "summary": "Regenerate Rust bindings from the frozen local catalogue without fetching or reimporting upstream assets.",
+      "documentation": "Regenerate Rust bindings from the frozen local catalogue without fetching\nor reimporting upstream assets.",
+      "signature": "pub fn generate (root : & Path) -> Result<()>",
       "cfg": []
     },
     {

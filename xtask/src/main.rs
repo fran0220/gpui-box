@@ -32,6 +32,7 @@ fn main() -> Result<()> {
         (Some("tokens"), Some("generate")) => tokens(false),
         (Some("tokens"), Some("check")) => tokens(true),
         (Some("icons"), Some("check")) => icons::check(&root()),
+        (Some("icons"), Some("generate")) => icons::generate(&root()),
         (Some("icons"), Some("import")) => {
             let source = rest
                 .first()
