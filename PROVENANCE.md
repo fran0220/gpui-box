@@ -908,3 +908,13 @@ Owner cache lifetime uses explicit positive host mount registration rather
 than historical tombstones. Active-owner and owner-group tables shrink after
 removals; delayed callbacks never register owners. This original Kit change
 introduces no upstream source or additional dependency.
+
+### Opt-in native emoji review fixture
+
+`fixtures/fonts/noto-color-emoji/NotoColorEmoji.ttf` is unmodified Noto Emoji
+v2.042 from googlefonts/noto-emoji commit
+`d79d23e6822e0f6e5731b114cbfb26b2a4e380da`, licensed under SIL OFL 1.1,
+Copyright 2022 Google Inc. Its adjacent README records exact byte hashes and
+source paths; OFL.txt preserves the upstream license. The original GPUI Box
+`tools/app-host/src/review_fonts.rs` helper registers it only when explicitly
+called for capture review. No default fonts or historical import receipt change.

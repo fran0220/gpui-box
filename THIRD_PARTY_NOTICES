@@ -508,3 +508,15 @@ and exact-owner Kit keyed-cache retirement are original GPUI Box work. No new
 third-party source or license was introduced; historical notices are intact.
 Positive mount registration and bounded owner-cache lifetime are original Kit
 infrastructure, with no additional third-party source or dependency.
+
+Noto Color Emoji — opt-in native capture review fixture
+--------------------------------------------------------------------------------
+Source: https://github.com/googlefonts/noto-emoji
+Revision: d79d23e6822e0f6e5731b114cbfb26b2a4e380da (v2.042)
+Copyright 2022 Google Inc.
+License: SIL Open Font License 1.1
+Files: fixtures/fonts/noto-color-emoji/NotoColorEmoji.ttf (unmodified upstream)
+License text: fixtures/fonts/noto-color-emoji/OFL.txt
+Exact font and license hashes: fixtures/fonts/noto-color-emoji/README.md
+This font is registered only by explicit native review helper calls; it does
+not change the default Kit or isolated test font set.
