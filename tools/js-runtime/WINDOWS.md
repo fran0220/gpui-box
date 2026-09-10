@@ -225,8 +225,27 @@ and stops in `finally`, retaining CAB and extracted evidence under
 capability or loopback-exemption configuration. Correlate the logged package SID
 and port with CLASSIFY_DROP and its filter before attributing a timeout to
 AppContainer policy. Documentation describing receive-layer loopback drops is
-not evidence that this specific run hit one. Capture and detached cleanup still
-require native execution; neither is verified by Linux compilation.
+not evidence that this specific run hit one.
+
+Run [34419428965](https://github.com/fran0220/gpui-box/actions/runs/34419428965)
+at [ed009d5f](https://github.com/fran0220/gpui-box/commit/ed009d5f6ec285410d4cc391eb97536fd65d6604)
+passed detached host-death cleanup, including exact profile-root absence, in
+both raw and combined suites. CAB/XML capture and extraction also executed.
+The raw probe stopped at its blanket rejection of disk handles, before network
+connect. That assertion did not distinguish Windows-created cwd/image handles
+from the intentionally inherited host sentinel; the log did not identify the
+particular handle. The revised check logs disk paths, flags and file identities,
+rejects the sentinel identity even if INHERIT was cleared, and rejects every
+inheritable disk handle. Native clean and deliberately leaking controls must
+respectively pass and fail with the exact sentinel assertion. The production
+stdio-only handle allowlist is unchanged; this test correction awaits native
+execution.
+
+The captured XML contains no events matching either sandbox probe SID
+(PIDs 1660 and 7832, destination ports 62271 and 62292). Those ports have
+PUBLIC_CLASSIFY_ALLOW events for the unsandboxed native positive controls
+(PIDs 5076 and 988) and host listeners. They are not sandbox drop evidence.
+Network remains unverified and its strict assertion remains in force.
 
 API references: [AppContainer launch](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer),
 [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),

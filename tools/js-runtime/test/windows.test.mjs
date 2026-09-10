@@ -107,8 +107,16 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   await waitUntil(() => connections === 1, 'native positive-control connection was not observed');
   const sentinel = await open(secret, 'r');
   t.after(() => sentinel.close());
+  const identity = execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE, ['--file-id', secret], { encoding: 'utf8', timeout: 10000 }).trim();
+  assert.match(identity, /^[0-9a-f]{8}:[0-9a-f]{8}:[0-9a-f]{8}$/);
+  const probe = { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] };
+  const clean = launch(t, probe, ['--leak-check', identity]);
+  assert.equal((await clean.closed)[0], 0, clean.output().stderr);
+  const leaked = launch(t, probe, ['--leak-check', identity], { stdio: [...probe.stdio, sentinel.fd] });
+  assert.equal((await leaked.closed)[0], 125, 'positive control must detect a real inherited sentinel');
+  assert.match(leaked.output().stderr, /wcscmp\(identity, sentinel\) != 0 failed/);
   const config = await windowsSandbox(root, minimalRuntime, { executable: process.env.GPUI_WINDOWS_SANDBOX_PROBE, node: false });
-  const run = launch(t, config, [String(server.address().port), secret], {
+  const run = launch(t, config, [String(server.address().port), secret, identity], {
     stdio: [...config.stdio, sentinel.fd],
     env: { ...process.env, GPUI_TEST_SECRET: 'must-not-inherit' },
   });

@@ -96,8 +96,41 @@ static void profile_root(const wchar_t *name, wchar_t *path) {
 
 #ifdef GPUI_SANDBOX_PROBE
 /* Native adversarial probe: no Node permission model can mask OS failures. */
+static void check_disk_handles(const wchar_t *sentinel) {
+    for (uintptr_t value = 4; value < 65536; value += 4) {
+        HANDLE handle = (HANDLE)value;
+        if (GetFileType(handle) != FILE_TYPE_DISK) continue;
+        BY_HANDLE_FILE_INFORMATION info;
+        DWORD flags;
+        CHECK(GetFileInformationByHandle(handle, &info));
+        CHECK(GetHandleInformation(handle, &flags));
+        wchar_t identity[64], path[PATH_CAP];
+        swprintf(identity, 64, L"%08lx:%08lx:%08lx", info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow);
+        DWORD length = GetFinalPathNameByHandleW(handle, path, PATH_CAP, 0);
+        CHECK(length && length < PATH_CAP);
+        fprintf(stderr, "Windows sandbox probe: disk handle=%llu flags=%lu id=%ls path=%ls\n",
+            (unsigned long long)value, flags, identity, path);
+        // Windows opens its own non-inherited cwd/image handles. Detect the
+        // host sentinel by file identity even if a duplicate cleared INHERIT.
+        CHECK(wcscmp(identity, sentinel) != 0);
+        CHECK(!(flags & HANDLE_FLAG_INHERIT));
+    }
+}
+
 int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 3);
+    if (!wcscmp(argv[1], L"--file-id")) {
+        HANDLE file = CreateFileW(argv[2], FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, 0, NULL);
+        CHECK(file != INVALID_HANDLE_VALUE);
+        BY_HANDLE_FILE_INFORMATION info;
+        CHECK(GetFileInformationByHandle(file, &info));
+        printf("%08lx:%08lx:%08lx\n", info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow);
+        CloseHandle(file); return 0;
+    }
+    if (!wcscmp(argv[1], L"--leak-check")) {
+        check_disk_handles(argv[2]); return 0;
+    }
     if (!wcscmp(argv[1], L"--connect-control")) {
         WSADATA wsa;
         CHECK(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
@@ -212,9 +245,8 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(!CreateProcessW(self, NULL, NULL, NULL, FALSE, CREATE_BREAKAWAY_FROM_JOB, NULL, NULL, &startup, &process));
     // Run independent handle assertions before the network probe, so a
     // blocked connection's timeout cannot hide their native result.
-    for (uintptr_t handle = 4; handle < 65536; handle += 4) {
-        CHECK(GetFileType((HANDLE)handle) != FILE_TYPE_DISK);
-    }
+    CHECK(argc >= 4);
+    check_disk_handles(argv[3]);
     fputs("Windows sandbox probe: filesystem, spawn, inherited-handle assertions passed\n", stderr);
     // A listener is established by the test parent: refusal is not a closed port.
     WSADATA wsa;
