@@ -319,7 +319,7 @@ nobody can read, and the first check passes it happily.
 ## Elevation, layers, and density
 
 `elevation` describes the shadow each surface casts. A step is an ordered
-set of layers, not a single offset: `flat` is empty, and `raised`,
+set of layers, not a single offset: in the bundled themes, `flat` is empty, and `raised`,
 `overlay` and `modal` each carry two downward casts. There is
 no horizontal offset; a close contact shadow is `y` plus `blur`.
 
@@ -335,7 +335,11 @@ and that is still the key's.
 
 Steps are ordered by reach — the farthest `y + blur` in the set — and
 `TokenDocument::validate` requires that reach to increase strictly from
-`flat` to `modal`. `zIndex` fixes the paint order of floating surfaces, and
+`flat` to `modal`, with one exception: a Light theme may leave both `flat`
+and `raised` empty, genuinely doing no shadow work at either step. Equal
+nonzero reaches and nonempty zero-reach layers do not qualify. Every other
+adjacent pair, and every pair in Dark, must still increase strictly.
+`zIndex` fixes the paint order of floating surfaces, and
 `density` scales spacing, control geometry and type independently. Density
 is applied when a `Theme` is built, and `gpui_kit::set_density` rebuilds the
 active theme and repaints every window. Colors and radii never change with
@@ -450,7 +454,8 @@ material wash says which answer is current without adding an ornamental line.
 - effect and opacity alpha outside 0–1, or a non-positive focus ring width;
 - crossed custom-colour readability or interaction ladders;
 - negative elevation blur, or elevation steps whose reach (`y + blur` of
-  the farthest layer) is not strictly increasing;
+  the farthest layer) is not strictly increasing, except for Light `flat`
+  and `raised` when both layer sets are empty;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1;
 - a non-positive identity rail width;

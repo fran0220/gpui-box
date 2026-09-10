@@ -138,10 +138,17 @@ impl TokenDocument {
             step_reach(&self.elevation.overlay),
             step_reach(&self.elevation.modal),
         ];
-        if reaches.windows(2).any(|window| window[0] >= window[1]) {
+        let empty_light_base = self.meta.appearance == Appearance::Light
+            && self.elevation.flat.is_empty()
+            && self.elevation.raised.is_empty();
+        if reaches
+            .windows(2)
+            .enumerate()
+            .any(|(index, window)| !(index == 0 && empty_light_base) && window[0] >= window[1])
+        {
             return invalid(
                 "elevation",
-                "steps must strictly increase in reach (y + blur of the farthest layer)",
+                "steps must strictly increase in reach (y + blur of the farthest layer), except when Light flat and raised are both empty",
             );
         }
 
@@ -3121,6 +3128,46 @@ decelerates on the way out, which reads as reluctance"
             .remove("backdrop");
         let error = TokenDocument::parse(&value.to_string()).expect_err("missing backdrop");
         assert!(error.to_string().contains("backdrop"));
+    }
+
+    #[test]
+    fn light_elevation_allows_empty_flat_and_raised() {
+        let mut tokens = studio_light().clone();
+        tokens.elevation.flat.clear();
+        tokens.elevation.raised.clear();
+        tokens.validate().expect("Light base casts no shadows");
+        assert!(tokens.elevation(Elevation::Raised).layers.is_empty());
+    }
+
+    #[test]
+    fn light_elevation_rejects_equal_nonzero_reaches() {
+        let mut tokens = studio_light().clone();
+        tokens.elevation.flat = tokens.elevation.raised.clone();
+        assert!(step_reach(&tokens.elevation.flat) > 0.0);
+        let error = tokens.validate().expect_err("equal nonzero reach");
+        assert!(error.to_string().contains("elevation"));
+    }
+
+    #[test]
+    fn light_elevation_rejects_reversed_overlay_with_empty_base() {
+        let mut tokens = studio_light().clone();
+        tokens.elevation.flat.clear();
+        tokens.elevation.raised.clear();
+        tokens.elevation.overlay = tokens.elevation.modal.clone();
+        tokens.elevation.overlay[0].blur += step_reach(&tokens.elevation.modal);
+        let error = tokens.validate().expect_err("overlay beyond modal");
+        assert!(error.to_string().contains("elevation"));
+    }
+
+    #[test]
+    fn dark_elevation_rejects_empty_flat_and_raised() {
+        let mut tokens = studio_dark().clone();
+        tokens.elevation.flat.clear();
+        tokens.elevation.raised.clear();
+        let error = tokens
+            .validate()
+            .expect_err("Dark requires increasing reach");
+        assert!(error.to_string().contains("elevation"));
     }
 
     #[test]
