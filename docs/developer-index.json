@@ -1225,7 +1225,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4547
+      "symbolCount": 4556
     },
     {
       "name": "gpui-box-kit-assets",
@@ -102817,6 +102817,21 @@
       "target": "Overlay"
     },
     {
+      "id": "gpui_kit::overlay::layer::Overlay::window_snap_margin",
+      "name": "window_snap_margin",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::layer",
+      "path": "gpui_kit::overlay::layer",
+      "source": "crates/gpui-kit/src/overlay/layer.rs",
+      "summary": "Keeps an already side-resolved anchored surface inside the window.",
+      "documentation": "Keeps an already side-resolved anchored surface inside the window.\n\nChoosing above or below remains the caller's policy because only the\ncaller knows the surface's effective height. This is the final collision\nguard for the window edges.",
+      "signature": "pub fn window_snap_margin (mut self, margin : Pixels) -> Self",
+      "cfg": [],
+      "target": "Overlay"
+    },
+    {
       "id": "gpui_kit::overlay::layer::OverlaySurface",
       "name": "OverlaySurface",
       "kind": "struct",
@@ -105812,6 +105827,20 @@
     },
     {
       "id": "gpui_kit::overlay::reexport-15",
+      "name": "stack :: ModalScope",
+      "kind": "reexport",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay",
+      "path": "gpui_kit::overlay",
+      "source": "crates/gpui-kit/src/overlay/mod.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use stack::ModalScope;",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::overlay::reexport-16",
       "name": "tail :: { TailSide , tail }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -105825,7 +105854,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::overlay::reexport-16",
+      "id": "gpui_kit::overlay::reexport-17",
       "name": "toast :: { Toast , ToastCorner , ToastLayer }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -105839,7 +105868,7 @@
       "cfg": []
     },
     {
-      "id": "gpui_kit::overlay::reexport-17",
+      "id": "gpui_kit::overlay::reexport-18",
       "name": "tooltip :: { Tooltip , Tooltipped }",
       "kind": "reexport",
       "package": "gpui-box-kit",
@@ -105963,6 +105992,110 @@
       "documentation": "",
       "signature": "pub use menu::{ ContextMenu, ContextMenuEvent, ContextMenuPresentation, Menu, MenuEvent, MenuItem };",
       "cfg": []
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope",
+      "name": "ModalScope",
+      "kind": "struct",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "A custom modal's membership in the same per-window stack as [`super::Dialog`] and [`super::Drawer`]. This handle owns no content or input policy.",
+      "documentation": "A custom modal's membership in the same per-window stack as [`super::Dialog`]\nand [`super::Drawer`]. This handle owns no content or input policy.\n\nCall `open` before moving focus into the surface and `close` on every removal\npath (after an exit animation, if any). Repeated calls are harmless. The id\nmust be unique among modal surfaces in a window. Gate Escape, scrim and Tab\nhandlers with `is_top`, and pass `depth` to [`super::Overlay::stack`]. Register\ncustom Tab stops with [`super::FocusTrap`], but do not engage/release its\nindependent restoration lifecycle: this stack owns focus restoration.",
+      "signature": "# [doc = \" A custom modal's membership in the same per-window stack as [`super::Dialog`]\"] # [doc = \" and [`super::Drawer`]. This handle owns no content or input policy.\"] # [doc = \"\"] # [doc = \" Call `open` before moving focus into the surface and `close` on every removal\"] # [doc = \" path (after an exit animation, if any). Repeated calls are harmless. The id\"] # [doc = \" must be unique among modal surfaces in a window. Gate Escape, scrim and Tab\"] # [doc = \" handlers with `is_top`, and pass `depth` to [`super::Overlay::stack`]. Register\"] # [doc = \" custom Tab stops with [`super::FocusTrap`], but do not engage/release its\"] # [doc = \" independent restoration lifecycle: this stack owns focus restoration.\"] # [derive (Debug, Clone)] pub struct ModalScope { id : SharedString, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::close",
+      "name": "close",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "Removes this surface. Only closing the top restores focus; removing a covered surface splices the return chain without moving focus.",
+      "documentation": "Removes this surface. Only closing the top restores focus; removing a\ncovered surface splices the return chain without moving focus.",
+      "signature": "pub fn close (& self, window : & mut Window, cx : & mut App)",
+      "cfg": [],
+      "target": "ModalScope"
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::depth",
+      "name": "depth",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "Zero-based paint depth, or zero when this surface is closed.",
+      "documentation": "Zero-based paint depth, or zero when this surface is closed.",
+      "signature": "pub fn depth (& self, window : & Window, cx : & App) -> usize",
+      "cfg": [],
+      "target": "ModalScope"
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::is_open",
+      "name": "is_open",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_open (& self, window : & Window, cx : & App) -> bool",
+      "cfg": [],
+      "target": "ModalScope"
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::is_top",
+      "name": "is_top",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn is_top (& self, window : & Window, cx : & App) -> bool",
+      "cfg": [],
+      "target": "ModalScope"
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn new (id : impl Into<SharedString>) -> Self",
+      "cfg": [],
+      "target": "ModalScope"
+    },
+    {
+      "id": "gpui_kit::overlay::stack::ModalScope::open",
+      "name": "open",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::stack",
+      "path": "gpui_kit::overlay::stack",
+      "source": "crates/gpui-kit/src/overlay/stack.rs",
+      "summary": "Captures the current focus once, before the surface receives focus.",
+      "documentation": "Captures the current focus once, before the surface receives focus.",
+      "signature": "pub fn open (& self, window : & Window, cx : & mut App)",
+      "cfg": [],
+      "target": "ModalScope"
     },
     {
       "id": "gpui_kit::overlay::stack::depth",
@@ -129765,6 +129898,7 @@
         "stack(depth: usize) -> Self",
         "placement(placement: Placement) -> Self",
         "hang(hang: Hang) -> Self",
+        "window_snap_margin(margin: Pixels) -> Self",
         "scrim(scrim: bool) -> Self",
         "progress(progress: f32) -> Self",
         "child(content: impl IntoElement) -> Self",
@@ -137722,6 +137856,24 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "ModalScope",
+      "path": "gpui_kit::overlay::ModalScope",
+      "summary": "A custom modal's membership in the same per-window stack as super::Dialog and super::Drawer. This handle owns no content or input policy.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "open(window: &Window, cx: &mut App)",
+        "close(window: &mut Window, cx: &mut App)",
+        "is_open(window: &Window, cx: &App) -> bool",
+        "is_top(window: &Window, cx: &App) -> bool",
+        "depth(window: &Window, cx: &App) -> usize"
+      ]
     },
     {
       "name": "ModelAabb",

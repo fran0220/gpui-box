@@ -3578,6 +3578,7 @@
         "stack(depth: usize) -> Self",
         "placement(placement: Placement) -> Self",
         "hang(hang: Hang) -> Self",
+        "window_snap_margin(margin: Pixels) -> Self",
         "scrim(scrim: bool) -> Self",
         "progress(progress: f32) -> Self",
         "child(content: impl IntoElement) -> Self",
@@ -11535,6 +11536,24 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "ModalScope",
+      "path": "gpui_kit::overlay::ModalScope",
+      "summary": "A custom modal's membership in the same per-window stack as super::Dialog and super::Drawer. This handle owns no content or input policy.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "open(window: &Window, cx: &mut App)",
+        "close(window: &mut Window, cx: &mut App)",
+        "is_open(window: &Window, cx: &App) -> bool",
+        "is_top(window: &Window, cx: &App) -> bool",
+        "depth(window: &Window, cx: &App) -> usize"
+      ]
     },
     {
       "name": "ModelAabb",

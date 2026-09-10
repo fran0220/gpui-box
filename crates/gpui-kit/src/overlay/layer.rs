@@ -251,7 +251,7 @@ impl Overlay {
     /// Choosing above or below remains the caller's policy because only the
     /// caller knows the surface's effective height. This is the final collision
     /// guard for the window edges.
-    pub(crate) fn window_snap_margin(mut self, margin: Pixels) -> Self {
+    pub fn window_snap_margin(mut self, margin: Pixels) -> Self {
         self.window_snap_margin = Some(margin);
         self
     }

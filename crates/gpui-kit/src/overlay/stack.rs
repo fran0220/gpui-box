@@ -9,6 +9,55 @@ use gpui::{App, FocusHandle, SharedString, Window};
 
 use crate::foundation::window_state;
 
+/// A custom modal's membership in the same per-window stack as [`super::Dialog`]
+/// and [`super::Drawer`]. This handle owns no content or input policy.
+///
+/// Call `open` before moving focus into the surface and `close` on every removal
+/// path (after an exit animation, if any). Repeated calls are harmless. The id
+/// must be unique among modal surfaces in a window. Gate Escape, scrim and Tab
+/// handlers with `is_top`, and pass `depth` to [`super::Overlay::stack`]. Register
+/// custom Tab stops with [`super::FocusTrap`], but do not engage/release its
+/// independent restoration lifecycle: this stack owns focus restoration.
+#[derive(Debug, Clone)]
+pub struct ModalScope {
+    id: SharedString,
+}
+
+impl ModalScope {
+    pub fn new(id: impl Into<SharedString>) -> Self {
+        Self { id: id.into() }
+    }
+
+    /// Captures the current focus once, before the surface receives focus.
+    pub fn open(&self, window: &Window, cx: &mut App) {
+        push(self.id.clone(), window, cx);
+    }
+
+    /// Removes this surface. Only closing the top restores focus; removing a
+    /// covered surface splices the return chain without moving focus.
+    pub fn close(&self, window: &mut Window, cx: &mut App) {
+        pop(&self.id, window, cx);
+    }
+
+    pub fn is_open(&self, window: &Window, cx: &App) -> bool {
+        window_state::read(
+            window.window_handle().window_id(),
+            cx,
+            |stack: &OpenModals| stack.0.iter().any(|held| held.id == self.id),
+        )
+        .unwrap_or(false)
+    }
+
+    pub fn is_top(&self, window: &Window, cx: &App) -> bool {
+        is_top(&self.id, window, cx)
+    }
+
+    /// Zero-based paint depth, or zero when this surface is closed.
+    pub fn depth(&self, window: &Window, cx: &App) -> usize {
+        depth(&self.id, window, cx)
+    }
+}
+
 #[derive(Default)]
 struct OpenModals(Vec<Modal>);
 
@@ -88,6 +137,37 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    #[gpui::test]
+    fn custom_scope_splices_focus_with_a_nested_dialog(cx: &mut TestAppContext) {
+        let window = cx.add_window(|_, _| Fixture);
+        cx.update_window(*window, |_, window, cx| {
+            let page_focus = cx.focus_handle();
+            let custom_focus = cx.focus_handle();
+            let dialog_focus = cx.focus_handle();
+            page_focus.focus(window, cx);
+            let custom = ModalScope::new("custom");
+            custom.open(window, cx);
+            custom_focus.focus(window, cx);
+            custom.open(window, cx); // Must not overwrite the return target.
+            let dialog = cx.new(|cx| super::super::Dialog::new("nested", window, cx));
+            dialog.update(cx, |dialog, cx| dialog.open(window, cx));
+            dialog_focus.focus(window, cx);
+            let nested = ModalScope::new("nested");
+            assert!(custom.is_open(window, cx));
+            assert!(!custom.is_top(window, cx));
+            assert!(nested.is_top(window, cx));
+            assert_eq!(nested.depth(window, cx), 1);
+            custom.close(window, cx);
+            assert_eq!(window.focused(cx), Some(dialog_focus));
+            assert_eq!(nested.depth(window, cx), 0);
+            dialog.update(cx, |dialog, cx| dialog.close(window, cx));
+            assert_eq!(window.focused(cx), Some(page_focus));
+            assert!(!custom.is_open(window, cx));
+            assert!(!nested.is_open(window, cx));
+        })
+        .expect("window");
     }
 
     #[test]

@@ -52,6 +52,7 @@ pub use notification_center::{
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
 pub use popover::{Popover, PopoverEvent};
 pub use positioner::{Positioner, Room, Side};
+pub use stack::ModalScope;
 pub use tail::{TailSide, tail};
 pub use toast::{Toast, ToastCorner, ToastLayer};
 pub use tooltip::{Tooltip, Tooltipped};
