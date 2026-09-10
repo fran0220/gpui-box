@@ -115402,8 +115402,8 @@
       "module": "contrast",
       "path": "gpui_kit_tokens::contrast",
       "source": "crates/gpui-kit-tokens/src/contrast.rs",
-      "summary": "The perceptual lightness a surface must gain over the one behind it.",
-      "documentation": "The perceptual lightness a surface must gain over the one behind it.\n\nTwo is about where a step stops being a rendering artifact and starts\nbeing a boundary a reader can point at, and it is what shipped light\nchrome actually uses: measured against a native window and against the\neditors people compare this library to, the step from the brightest plane\nto the one under it lands near 2.4 L\\*, not 3. A higher floor is not a\nstricter reading of the same rule, it is a house style — with five rungs\nunder one white ceiling, every extra tenth of a floor is subtracted from\nthe page, and a light theme built to clear it comes out visibly darker\nthan the platform it sits on.\n\nIt is deliberately modest: a floor under every theme, not a ladder. What\nit rules out is what it was written for — two planes a reader cannot tell\napart at all.",
+      "summary": "The perceptual lightness gain required for every Dark nesting and for Canvas and Panel over Sunken in Light. Other Light nestings have a zero minimum: structural and elevated surfaces may share white, but not descend.",
+      "documentation": "The perceptual lightness gain required for every Dark nesting and for\nCanvas and Panel over Sunken in Light. Other Light nestings have a zero\nminimum: structural and elevated surfaces may share white, but not descend.",
       "signature": "pub const SEPARATION_MINIMUM: f32",
       "cfg": []
     },
@@ -115473,8 +115473,8 @@
       "path": "gpui_kit_tokens::contrast",
       "source": "crates/gpui-kit-tokens/src/contrast.rs",
       "summary": "One nesting of two surfaces, and how far apart they read.",
-      "documentation": "One nesting of two surfaces, and how far apart they read.\n\n`distance` is signed: positive means `near` is the lighter of the two, so\none check answers both questions a stacked surface raises — whether the\nstep is visible at all, and whether it goes the direction the ramp claims.",
-      "signature": "# [doc = \" One nesting of two surfaces, and how far apart they read.\"] # [doc = \"\"] # [doc = \" `distance` is signed: positive means `near` is the lighter of the two, so\"] # [doc = \" one check answers both questions a stacked surface raises — whether the\"] # [doc = \" step is visible at all, and whether it goes the direction the ramp claims.\"] # [derive (Debug, Clone, PartialEq)] pub struct SeparationCheck { pub near : String, pub behind : String, pub distance : f32, pub minimum : f32, }",
+      "documentation": "One nesting of two surfaces, and how far apart they read.\n\n`distance` is signed: positive means `near` is the lighter of the two, so\none check enforces the direction of a stack and, where required by the\nappearance and nesting, a visible step.",
+      "signature": "# [doc = \" One nesting of two surfaces, and how far apart they read.\"] # [doc = \"\"] # [doc = \" `distance` is signed: positive means `near` is the lighter of the two, so\"] # [doc = \" one check enforces the direction of a stack and, where required by the\"] # [doc = \" appearance and nesting, a visible step.\"] # [derive (Debug, Clone, PartialEq)] pub struct SeparationCheck { pub near : String, pub behind : String, pub distance : f32, pub minimum : f32, }",
       "cfg": []
     },
     {
@@ -115656,7 +115656,7 @@
       "path": "gpui_kit_tokens::contrast",
       "source": "crates/gpui-kit-tokens/src/contrast.rs",
       "summary": "Evaluates every surface nesting for one theme.",
-      "documentation": "Evaluates every surface nesting for one theme.\n\nThis exists because the contrast report above cannot answer it. That\nreport asks whether a foreground is legible on a background and never\nwhether two backgrounds are distinguishable, which is why `studio-light`\nwas able to give `panel`, `raised` and `overlay` the same white and still\npass: a card, the code block inside it, and the popover over it were one\nundivided field of color, and nothing in the build said so.",
+      "documentation": "Evaluates every surface nesting for one theme.\n\nThis is independent of foreground readability. Equal Light backgrounds\nare intentional; recessed wells and the Dark ramp still need separation.",
       "signature": "pub fn separation_report (tokens : & TokenDocument) -> Vec<SeparationCheck>",
       "cfg": []
     },

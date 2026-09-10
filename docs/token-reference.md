@@ -1606,14 +1606,14 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
-| `color.surface.canvas` | `color.surface.backdrop` | 5.2 | 2.0 |
-| `color.surface.panel` | `color.surface.backdrop` | 8.7 | 2.0 |
+| `color.surface.canvas` | `color.surface.backdrop` | 5.2 | 0.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.7 | 0.0 |
 | `color.surface.canvas` | `color.surface.sunken` | 3.8 | 2.0 |
-| `color.surface.panel` | `color.surface.canvas` | 3.5 | 2.0 |
+| `color.surface.panel` | `color.surface.canvas` | 3.5 | 0.0 |
 | `color.surface.panel` | `color.surface.sunken` | 7.3 | 2.0 |
-| `color.surface.raised` | `color.surface.panel` | 3.4 | 2.0 |
-| `color.surface.overlay` | `color.surface.panel` | 3.4 | 2.0 |
-| `color.surface.overlay` | `color.surface.canvas` | 6.8 | 2.0 |
+| `color.surface.raised` | `color.surface.panel` | 3.4 | 0.0 |
+| `color.surface.overlay` | `color.surface.panel` | 3.4 | 0.0 |
+| `color.surface.overlay` | `color.surface.canvas` | 6.8 | 0.0 |
 
 ### Tone distinction
 
@@ -3228,14 +3228,14 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
-| `color.surface.canvas` | `color.surface.backdrop` | 6.0 | 2.0 |
-| `color.surface.panel` | `color.surface.backdrop` | 8.5 | 2.0 |
+| `color.surface.canvas` | `color.surface.backdrop` | 6.0 | 0.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.5 | 0.0 |
 | `color.surface.canvas` | `color.surface.sunken` | 2.8 | 2.0 |
-| `color.surface.panel` | `color.surface.canvas` | 2.5 | 2.0 |
+| `color.surface.panel` | `color.surface.canvas` | 2.5 | 0.0 |
 | `color.surface.panel` | `color.surface.sunken` | 5.3 | 2.0 |
-| `color.surface.raised` | `color.surface.panel` | 2.4 | 2.0 |
-| `color.surface.overlay` | `color.surface.panel` | 2.4 | 2.0 |
-| `color.surface.overlay` | `color.surface.canvas` | 4.9 | 2.0 |
+| `color.surface.raised` | `color.surface.panel` | 2.4 | 0.0 |
+| `color.surface.overlay` | `color.surface.panel` | 2.4 | 0.0 |
+| `color.surface.overlay` | `color.surface.canvas` | 4.9 | 0.0 |
 
 ### Tone distinction
 
@@ -8094,14 +8094,14 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
-| `color.surface.canvas` | `color.surface.backdrop` | 6.0 | 2.0 |
-| `color.surface.panel` | `color.surface.backdrop` | 8.5 | 2.0 |
+| `color.surface.canvas` | `color.surface.backdrop` | 6.0 | 0.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.5 | 0.0 |
 | `color.surface.canvas` | `color.surface.sunken` | 2.8 | 2.0 |
-| `color.surface.panel` | `color.surface.canvas` | 2.5 | 2.0 |
+| `color.surface.panel` | `color.surface.canvas` | 2.5 | 0.0 |
 | `color.surface.panel` | `color.surface.sunken` | 5.3 | 2.0 |
-| `color.surface.raised` | `color.surface.panel` | 3.0 | 2.0 |
-| `color.surface.overlay` | `color.surface.panel` | 2.3 | 2.0 |
-| `color.surface.overlay` | `color.surface.canvas` | 4.8 | 2.0 |
+| `color.surface.raised` | `color.surface.panel` | 3.0 | 0.0 |
+| `color.surface.overlay` | `color.surface.panel` | 2.3 | 0.0 |
+| `color.surface.overlay` | `color.surface.canvas` | 4.8 | 0.0 |
 
 ### Tone distinction
 

@@ -200,9 +200,11 @@ almost no range: `#050505` behind `#0a0a0a` reports 1.03:1, and so does a step
 a reader can point at. Near white it fails the other way, by reporting a
 comfortable-looking number for a step nobody can see.
 
-So surfaces are compared in CIE L\*, which is uniform across the range, and
-every nesting two surfaces can form must gain at least **2 L\*** over the one
-behind it:
+So surfaces are compared in signed CIE L\* lightness differences. In **Dark**,
+every checked nesting must gain at least **2 L\*** over the surface behind it.
+In **Light**, structural and elevated pairs must be non-descending (minimum
+**0 L\***); only `canvas` over `sunken` and `panel` over `sunken` retain the
+**2 L\*** minimum so recessed wells remain visible:
 
 | Surface | Behind |
 |---|---|
@@ -212,33 +214,22 @@ behind it:
 | `raised` | above `panel` |
 | `overlay` | above `panel`, and above `canvas` |
 
-The ramp climbs away from the page in **both** appearances: a well is below
-what holds it, a panel is above the page, and a block inside a panel is above
-the panel. A light theme therefore does not paint the page white and leave
-nothing above it. The page is tinted, and white is what the ramp climbs to,
-which is how a native window already separates its background from its
-content. `backdrop` is the substrate behind the page, the plane a card can
-sit on when the page itself is not dark enough to carry the shadow. It is
+Light may intentionally use the same white for `backdrop`, `canvas`, `panel`,
+`raised`, and `overlay`. Elevation need not be a tinted upward color ladder;
+equal backgrounds do not waive foreground, focus, nontext, or decorative-line
+readability. Reversed elevation is still invalid. Dark retains a visibly
+ascending ramp at every checked nesting.
+
+`backdrop` is the substrate behind the page. It is
 checked against `canvas` and `panel` and not against `sunken`: a well never
 sits on the substrate, it sits in a panel or on the page, and holding those
 two apart as well would collapse the dark ramp. `overlay` is
 checked against what it opens over rather than against `raised`, because a
 popover and a code block never touch.
 
-Two is a floor and not a ladder. Five rungs sit under one white ceiling, so
-every tenth added to this number is taken off the page: hold the step at three
-and the darkest plane of a light theme has to fall past 90 L\*, which is
-below where shipped chrome sits — a native window and the editors this
-library is compared to step about 2.4 L\* from their brightest plane to the
-one under it. A theme is free to spread its ramp wider; what the rule refuses
-is two planes a reader cannot tell apart at all.
-
-This rule exists because its absence was not theoretical. `studio-light` gave
-`panel`, `raised` and `overlay` the same `#ffffff`: a card, the code block
-inside it, and the popover over it were one undivided field of color, every
-contrast pair passed, and nothing in the build said so. `studio-dark` crammed
-its whole ramp between `#050505` and `#242424`, so a card sat on the page with
-1.08:1 between them and a black shadow that a near-black page absorbed.
+The 2 L\* floor prevents collapsed Dark planes and missing Light recesses.
+Themes may spread their ramps wider, as the bundled palettes do, without
+making that palette choice a requirement for every Light document.
 
 `ThemeRegistry::register_json` rejects a violation with `TokenError::Separation`,
 naming each nesting, its measured distance and its minimum.

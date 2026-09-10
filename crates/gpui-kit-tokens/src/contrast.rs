@@ -456,8 +456,8 @@ pub fn failures(tokens: &TokenDocument) -> Vec<ContrastCheck> {
 /// One nesting of two surfaces, and how far apart they read.
 ///
 /// `distance` is signed: positive means `near` is the lighter of the two, so
-/// one check answers both questions a stacked surface raises — whether the
-/// step is visible at all, and whether it goes the direction the ramp claims.
+/// one check enforces the direction of a stack and, where required by the
+/// appearance and nesting, a visible step.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SeparationCheck {
     pub near: String,
@@ -472,36 +472,21 @@ impl SeparationCheck {
     }
 }
 
-/// The perceptual lightness a surface must gain over the one behind it.
-///
-/// Two is about where a step stops being a rendering artifact and starts
-/// being a boundary a reader can point at, and it is what shipped light
-/// chrome actually uses: measured against a native window and against the
-/// editors people compare this library to, the step from the brightest plane
-/// to the one under it lands near 2.4 L\*, not 3. A higher floor is not a
-/// stricter reading of the same rule, it is a house style — with five rungs
-/// under one white ceiling, every extra tenth of a floor is subtracted from
-/// the page, and a light theme built to clear it comes out visibly darker
-/// than the platform it sits on.
-///
-/// It is deliberately modest: a floor under every theme, not a ladder. What
-/// it rules out is what it was written for — two planes a reader cannot tell
-/// apart at all.
+/// The perceptual lightness gain required for every Dark nesting and for
+/// Canvas and Panel over Sunken in Light. Other Light nestings have a zero
+/// minimum: structural and elevated surfaces may share white, but not descend.
 pub const SEPARATION_MINIMUM: f32 = 2.0;
 
 /// Every stack of two surfaces a component can actually build, in order.
 ///
-/// The ramp climbs away from the page in both appearances: a well is below
-/// the surface holding it, a panel is above the page, and a block inside a
-/// panel is above the panel. A light theme therefore does not put white on
-/// the page and leave nothing above it — the page is tinted and white is what
-/// the ramp climbs to, which is also how a native window separates its
-/// background from its content.
+/// Dark requires a visible upward step at every nesting. Light allows equal
+/// structural and elevated backgrounds, including white, while retaining a
+/// visible recessed well below both Canvas and Panel.
 ///
 /// `backdrop` is the substrate behind the page. It is checked against
 /// `canvas` and `panel` because those are the surfaces that can sit on it.
 /// It is not checked against `sunken`: a well never sits on the substrate,
-/// it sits in a panel or on the page, and requiring three L* between those
+/// it sits in a panel or on the page, and requiring separation between those
 /// two would collapse the dark ramp.
 ///
 /// `overlay` is checked against what it can open over rather than against
@@ -520,12 +505,8 @@ const NESTINGS: [(Surface, Surface); 8] = [
 
 /// Evaluates every surface nesting for one theme.
 ///
-/// This exists because the contrast report above cannot answer it. That
-/// report asks whether a foreground is legible on a background and never
-/// whether two backgrounds are distinguishable, which is why `studio-light`
-/// was able to give `panel`, `raised` and `overlay` the same white and still
-/// pass: a card, the code block inside it, and the popover over it were one
-/// undivided field of color, and nothing in the build said so.
+/// This is independent of foreground readability. Equal Light backgrounds
+/// are intentional; recessed wells and the Dark ramp still need separation.
 pub fn separation_report(tokens: &TokenDocument) -> Vec<SeparationCheck> {
     NESTINGS
         .into_iter()
@@ -533,7 +514,13 @@ pub fn separation_report(tokens: &TokenDocument) -> Vec<SeparationCheck> {
             near: surface_path(near).into(),
             behind: surface_path(behind).into(),
             distance: tokens.surface(near).lightness() - tokens.surface(behind).lightness(),
-            minimum: SEPARATION_MINIMUM,
+            minimum: if tokens.meta.appearance == crate::Appearance::Light
+                && !matches!(behind, Surface::Sunken)
+            {
+                0.0
+            } else {
+                SEPARATION_MINIMUM
+            },
         })
         .collect()
 }
@@ -1664,7 +1651,7 @@ mod tests {
         }
     }
 
-    /// The ramp is a claim about depth, so it has to hold in both appearances.
+    /// Bundled palettes choose a strict ramp even where Light permits equality.
     #[test]
     fn the_ramp_climbs_away_from_the_page_in_every_theme() {
         for tokens in crate::bundled() {
@@ -1683,25 +1670,65 @@ mod tests {
         }
     }
 
-    /// The regression the separation rule exists to catch. A theme that paints
-    /// a card, the block inside it, and the popover over it the same white
-    /// clears every contrast pair in `report` and is still unreadable.
-    #[test]
-    fn one_white_for_panel_raised_and_overlay_is_rejected() {
-        let mut tokens = crate::studio_light().clone();
-        tokens.color.surface.panel = "#ffffff".into();
-        tokens.color.surface.raised = "#ffffff".into();
-        tokens.color.surface.overlay = "#ffffff".into();
+    fn white_light_stack() -> serde_json::Value {
+        let mut value: serde_json::Value =
+            serde_json::from_str(crate::studio_light_json()).expect("bundled JSON");
+        for surface in ["backdrop", "canvas", "panel", "raised", "overlay"] {
+            value["color"]["surface"][surface] = serde_json::json!("#ffffff");
+        }
+        value
+    }
 
-        assert!(failures(&tokens).is_empty(), "contrast alone cannot see it");
-        let failures = separation_failures(&tokens);
-        assert!(
-            failures
-                .iter()
-                .any(|check| check.near == "color.surface.raised"
-                    && check.behind == "color.surface.panel"),
-            "{failures:#?}"
-        );
+    #[test]
+    fn equal_white_light_stack_parses_with_existing_foregrounds() {
+        TokenDocument::parse(&white_light_stack().to_string()).expect("intentional white stack");
+    }
+
+    #[test]
+    fn reversed_light_elevation_is_rejected() {
+        for surface in ["canvas", "panel", "raised", "overlay"] {
+            let mut value = white_light_stack();
+            value["color"]["surface"][surface] = serde_json::json!("#fefefe");
+            assert!(
+                matches!(
+                    TokenDocument::parse(&value.to_string()),
+                    Err(crate::TokenError::Separation(_))
+                ),
+                "{surface}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_light_recess_is_rejected() {
+        let mut value = white_light_stack();
+        value["color"]["surface"]["sunken"] = serde_json::json!("#ffffff");
+        assert!(matches!(
+            TokenDocument::parse(&value.to_string()),
+            Err(crate::TokenError::Separation(_))
+        ));
+    }
+
+    #[test]
+    fn collapsed_dark_stack_is_rejected() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(crate::studio_dark_json()).expect("bundled JSON");
+        value["color"]["surface"]["raised"] = value["color"]["surface"]["panel"].clone();
+        assert!(matches!(
+            TokenDocument::parse(&value.to_string()),
+            Err(crate::TokenError::Separation(_))
+        ));
+    }
+
+    #[test]
+    fn white_light_stack_still_rejects_bad_text_and_focus() {
+        for (group, role) in [("text", "primary"), ("interactive", "focus")] {
+            let mut value = white_light_stack();
+            value["color"][group][role] = serde_json::json!("#ffffff");
+            let error = TokenDocument::parse(&value.to_string()).expect_err("invisible foreground");
+            assert!(matches!(error, crate::TokenError::Contrast(_)), "{error}");
+            assert!(error.to_string().contains(&format!("color.{group}.{role}")));
+        }
     }
 
     #[test]
