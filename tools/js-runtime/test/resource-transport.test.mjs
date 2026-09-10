@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { Session } from '../session.mjs';
@@ -130,7 +131,7 @@ test('supervisor publishes grant revision before routing native resource envelop
       catch (error) { status.set(error.message); }
     })]));
   `);
-  const child = spawn(process.execPath, [new URL('../../app-host/runner.mjs', import.meta.url).pathname, root, '--data-dir', resolve(root, 'data')], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../../app-host/runner.mjs', import.meta.url)), root, '--data-dir', resolve(root, 'data')], { stdio: ['pipe', 'pipe', 'pipe'] });
   const frames = []; let diagnostic = '';
   child.stderr.on('data', bytes => { diagnostic += bytes; });
   readFrames(child.stdout, frame => frames.push(frame), error => { diagnostic += error.message; });

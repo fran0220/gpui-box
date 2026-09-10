@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { familySchemas, familyMethods } from '../kit-agent-schema.mjs';
 import { familySchemas as gameSchemas, familyMethods as gameMethods } from '../kit-game-effects-schema.mjs';
 import { validateValue, schemaType } from '../kit-schema.mjs';
@@ -40,8 +41,8 @@ test('family declarations exactly match the closed props/events/slots/method gra
 test('TypeScript refuses missing variant facts, native handles and wrong method results', () => {
   const directory = mkdtempSync(join(tmpdir(), 'kit-agent-types-'));
   try {
-    const agent = new URL('../kit-agent-sdk.d.ts', import.meta.url).pathname;
-    const game = new URL('../kit-game-effects-sdk.d.ts', import.meta.url).pathname;
+    const agent = fileURLToPath(new URL('../kit-agent-sdk.d.ts', import.meta.url));
+    const game = fileURLToPath(new URL('../kit-game-effects-sdk.d.ts', import.meta.url));
     writeFileSync(join(directory, 'test.ts'), `
       import type { AgentFactories, AgentMethodContracts } from ${JSON.stringify(agent)};
       import type { GameEffectsFactories } from ${JSON.stringify(game)};
@@ -59,7 +60,8 @@ test('TypeScript refuses missing variant facts, native handles and wrong method 
       // @ts-expect-error approve has named decision args
       const args: AgentMethodContracts['ApprovalPrompt']['invoke']['approve']['args'] = {always:true};
     `);
-    const result = spawnSync(process.execPath, [new URL('../../app-host/node_modules/typescript/bin/tsc', import.meta.url).pathname, '--noEmit', '--strict', '--skipLibCheck', '--target', 'ES2022', '--module', 'nodenext', '--moduleResolution', 'nodenext', join(directory, 'test.ts')], { encoding: 'utf8' });
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../app-host/node_modules/typescript/bin/tsc', import.meta.url)), '--noEmit', '--strict', '--skipLibCheck', '--target', 'ES2022', '--module', 'nodenext', '--moduleResolution', 'nodenext', join(directory, 'test.ts')], { encoding: 'utf8' });
+    assert.ifError(result.error);
     assert.equal(result.status, 0, result.stdout + result.stderr);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

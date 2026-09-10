@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { familySchemas, validateFamilyProps } from '../kit-navigation_extra-schema.mjs';
 import { validateValue } from '../kit-schema.mjs';
 import { artifacts, families } from '../../app-host/src/kit_bindings/navigation_extra/fixture/generate.mjs';
@@ -31,7 +32,7 @@ test('navigation event variants are exact, not kind plus optional fields', () =>
   for (const value of [{ kind: 'step' }, { kind: 'finish', id: 'unexpected' }, { kind: 'next', path: '/tmp/x' }]) assert.throws(() => validateValue(value, schema));
 });
 test('all family SDKs compile exact constructor, event and method types', () => {
-  const result = spawnSync(process.env.TSC_BIN ?? 'tsc', ['--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', new URL('../../app-host/src/kit_bindings/navigation_extra/fixture/types.mts', import.meta.url).pathname], { encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../app-host/node_modules/typescript/bin/tsc', import.meta.url)), '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', fileURLToPath(new URL('../../app-host/src/kit_bindings/navigation_extra/fixture/types.mts', import.meta.url))], { encoding: 'utf8' });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
