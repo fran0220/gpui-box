@@ -156,8 +156,15 @@ fills, with `color.interactive.controlHairline` below 3:1 and a one-pixel top
 inset `controlHighlight`. These are not plane-ladder surfaces and do not use
 backdrop glass. Labels retain their text contrast floors on every control
 state. Knobs reuse `elevation.raised` rather than introducing a duplicate
-`effect.controlKnobShadow` scale. Focus and invalidity add halos; selection
-remains tonal fill. Rules and dividers still do not carry the 3:1 floor.
+`effect.controlKnobShadow` scale. Required `effect.fieldFocus` is a typed
+`"ring" | "fill"` choice for editable fields only: ring adds the normal focus
+halo, while fill uses `surface.controlHover` with no focus shadow. The caret
+is unchanged. Disabled fields suppress focus treatment; invalid fields retain
+their danger wash and glow even when disabled or focused. Resting control
+shadows and `interactive.controlHairline` remain independent. All bundled
+themes select ring. Missing or unknown values fail parsing, with no fallback.
+Other controls retain their focus rings; selection remains tonal fill.
+Rules and dividers still do not carry the 3:1 floor.
 
 The 3:1 non-text floor asks whether a reader can find a boundary they have to
 aim at. It is the right question for `interactive.track` and

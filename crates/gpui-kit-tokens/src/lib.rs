@@ -2596,9 +2596,18 @@ pub struct EasingTokens {
     pub settle: [f32; 4],
 }
 
+/// Focus treatment for editable field frames only. Other controls retain rings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FieldFocus {
+    Ring,
+    Fill,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EffectTokens {
+    pub field_focus: FieldFocus,
     pub edge_fade_band: f32,
     /// How wide the ring around the focused control is drawn, in pixels.
     pub focus_ring_width: f32,
@@ -3289,6 +3298,33 @@ decelerates on the way out, which reads as reluctance"
                 .contains("color.text.primary on color.surface.canvas is 1.00:1; requires 4.5:1")
         );
         assert!(message.contains("color.text.primary on color.surface.overlay"));
+    }
+
+    #[test]
+    fn field_focus_is_required_and_typed() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        let schema: serde_json::Value = serde_json::from_str(TOKEN_SCHEMA_JSON).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        for (name, expected) in [("ring", FieldFocus::Ring), ("fill", FieldFocus::Fill)] {
+            value["effect"]["fieldFocus"] = serde_json::json!(name);
+            assert!(validator.is_valid(&value));
+            let tokens = TokenDocument::parse(&value.to_string()).expect("focus treatment");
+            assert_eq!(tokens.effect.field_focus, expected);
+            assert_eq!(
+                serde_json::to_value(&tokens).unwrap()["effect"]["fieldFocus"],
+                name
+            );
+        }
+        value["effect"]["fieldFocus"] = serde_json::json!("none");
+        assert!(TokenDocument::parse(&value.to_string()).is_err());
+        assert!(!validator.is_valid(&value));
+        value["effect"]
+            .as_object_mut()
+            .unwrap()
+            .remove("fieldFocus");
+        assert!(TokenDocument::parse(&value.to_string()).is_err());
+        assert!(!validator.is_valid(&value));
     }
 
     #[test]

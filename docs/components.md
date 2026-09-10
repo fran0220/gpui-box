@@ -69,8 +69,11 @@ medium action controls use `Radius::Control`; large controls use capsules.
 
 In-content fields and Select triggers share `StyledExt::control_surface`:
 `surface.control`, `interactive.controlHairline`, and a top inset
-`interactive.controlHighlight`. Focus and invalid halos append without
-replacing the highlight. This material is opaque, not Liquid Glass.
+`interactive.controlHighlight`. Invalid halos and ring-mode field focus append
+without replacing the highlight. `effect.fieldFocus: "fill"` instead focuses
+editable fields with `surface.controlHover` and no focus halo; disabled focus
+is suppressed and invalidity takes precedence. Select and button focus are
+unchanged. This material is opaque, not Liquid Glass.
 Owned TextArea frames (including MentionInput's editor) share the same field
 material and state policy without adopting single-line layout. `Frame::Host`
 continues to contribute no fill, border, padding, or halo of its own.

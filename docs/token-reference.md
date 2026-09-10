@@ -483,6 +483,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -1294,6 +1295,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.8 |
@@ -2105,6 +2107,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -2916,6 +2919,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
@@ -3727,6 +3731,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -4538,6 +4543,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -5349,6 +5355,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -6160,6 +6167,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
@@ -6971,6 +6979,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
@@ -7782,6 +7791,7 @@ Row stagger maximum items: `8`.
 
 | Token | Value |
 |---|---:|
+| `effect.fieldFocus` | ring |
 | `effect.edgeFadeBand` | 20 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |

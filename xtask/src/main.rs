@@ -2440,6 +2440,13 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     }
 
     output.push_str("\n### Effects\n\n| Token | Value |\n|---|---:|\n");
+    writeln!(
+        output,
+        "| `effect.fieldFocus` | {} |",
+        serde_json::to_value(tokens.effect.field_focus)?
+            .as_str()
+            .expect("field focus string")
+    )?;
     for (name, value) in [
         ("effect.edgeFadeBand", tokens.effect.edge_fade_band),
         ("effect.focusRingWidth", tokens.effect.focus_ring_width),

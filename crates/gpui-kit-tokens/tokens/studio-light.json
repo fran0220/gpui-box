@@ -704,6 +704,7 @@
     "rubberBandTension": 0.55
   },
   "effect": {
+    "fieldFocus": "ring",
     "edgeFadeBand": 20,
     "focusRingWidth": 2,
     "focusRingAlpha": 0.8,

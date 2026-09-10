@@ -39,7 +39,9 @@ Every line in the library has one of four meanings:
   tonal step from its container, and a one-pixel top inset highlight from
   `interactive.controlHighlight`. This material says “this can be operated”;
   it is not a high-contrast outline. The definition edge stays below 3:1.
-  Focus and invalidity remain paint-only halos, preserving resting geometry.
+  Focus and invalidity preserve resting geometry. Editable field focus follows
+  `effect.fieldFocus`: a halo (`ring`) or the hover fill without a focus shadow
+  (`fill`). Invalidity retains its danger halo; other control focus is unchanged.
 
 Content controls do not use Liquid Glass. Glass belongs to floating controls
 and media captions. Raised selection knobs use `elevation.raised` shadows;

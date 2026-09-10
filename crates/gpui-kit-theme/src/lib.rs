@@ -13,9 +13,9 @@ use gpui_kit_tokens::{
 };
 
 pub use gpui_kit_tokens::{
-    AgentColor, Appearance, ControlSize, Density, Elevation, Layer, LoaderColor, MotionDuration,
-    MotionEasing, NodeColor, Palette, Radius, SEQUENCE_LENGTH, SemanticColor, Space, SpringPreset,
-    SpringTokens, Surface, SyntaxColor, TextTone, TypeScale,
+    AgentColor, Appearance, ControlSize, Density, Elevation, FieldFocus, Layer, LoaderColor,
+    MotionDuration, MotionEasing, NodeColor, Palette, Radius, SEQUENCE_LENGTH, SemanticColor,
+    Space, SpringPreset, SpringTokens, Surface, SyntaxColor, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -716,6 +716,7 @@ impl ZIndices {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Effects {
+    pub field_focus: FieldFocus,
     pub edge_fade_band: f32,
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
@@ -1302,6 +1303,7 @@ impl Theme {
                 toast: tokens.z_index(Layer::Toast),
             },
             effects: Effects {
+                field_focus: tokens.effect.field_focus,
                 edge_fade_band: tokens.effect.edge_fade_band,
                 focus_ring_width: tokens.effect.focus_ring_width,
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,

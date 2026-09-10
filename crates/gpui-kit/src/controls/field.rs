@@ -4,7 +4,7 @@
 //! control wears. The editable surface itself arrives with `TextInput`.
 
 use gpui::{InteractiveElement, Styled, div, px};
-use gpui_kit_theme::{ControlSize, Elevation, Radius, SemanticWash, Space, Theme};
+use gpui_kit_theme::{ControlSize, Elevation, FieldFocus, Radius, SemanticWash, Space, Theme};
 
 use crate::foundation::StyledExt;
 
@@ -87,13 +87,15 @@ pub(crate) fn field_chrome<T: Styled + InteractiveElement>(
             .colors
             .control
             .blend(theme.color_wash(theme.colors.danger, SemanticWash::Faint))
+    } else if state.focused && !state.disabled && theme.effects.field_focus == FieldFocus::Fill {
+        theme.colors.control_hover
     } else {
         theme.colors.control
     };
     let mut shadows = theme.control_shadows(Elevation::Flat);
     if state.invalid {
         shadows.extend(theme.glow(theme.colors.danger));
-    } else if state.focused {
+    } else if state.focused && !state.disabled && theme.effects.field_focus == FieldFocus::Ring {
         shadows.extend(theme.focus_ring_on(fill));
     }
     let field = field
@@ -111,6 +113,56 @@ pub(crate) fn field_chrome<T: Styled + InteractiveElement>(
 mod tests {
     use super::*;
     use gpui_kit_theme::Theme;
+
+    #[test]
+    fn field_focus_treatment_preserves_invalid_disabled_and_hairline() {
+        for treatment in [FieldFocus::Ring, FieldFocus::Fill] {
+            let mut tokens = gpui_kit_tokens::studio_light().clone();
+            tokens.effect.field_focus = treatment;
+            let theme = Theme::from_tokens(&tokens, Default::default());
+            assert_eq!(theme.effects.field_focus, treatment);
+            for focused in [false, true] {
+                for invalid in [false, true] {
+                    for disabled in [false, true] {
+                        let state = FieldState {
+                            focused,
+                            invalid,
+                            disabled,
+                        };
+                        let mut field = field_shell(&theme, ControlSize::Md, state);
+                        let style = field.style();
+                        let fill = if invalid {
+                            theme
+                                .colors
+                                .control
+                                .blend(theme.color_wash(theme.colors.danger, SemanticWash::Faint))
+                        } else if focused && !disabled && treatment == FieldFocus::Fill {
+                            theme.colors.control_hover
+                        } else {
+                            theme.colors.control
+                        };
+                        assert_eq!(
+                            style.background,
+                            Some(fill.into()),
+                            "{treatment:?} {state:?}"
+                        );
+                        assert_eq!(style.border_color, Some(theme.colors.control_hairline));
+                        let mut shadows = theme.control_shadows(Elevation::Flat);
+                        if invalid {
+                            shadows.extend(theme.glow(theme.colors.danger));
+                        } else if focused && !disabled && treatment == FieldFocus::Ring {
+                            shadows.extend(theme.focus_ring_on(fill));
+                        }
+                        assert_eq!(
+                            style.box_shadow.as_deref(),
+                            Some(shadows.as_slice()),
+                            "{treatment:?} {state:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn interaction_halos_preserve_the_control_highlight() {

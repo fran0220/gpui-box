@@ -729,6 +729,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "fieldFocus",
         "edgeFadeBand",
         "focusRingWidth",
         "focusRingAlpha",
@@ -803,6 +804,7 @@
         "customColorActiveLightnessDelta"
       ],
       "properties": {
+        "fieldFocus": { "type": "string", "enum": ["ring", "fill"] },
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
         "focusRingWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
