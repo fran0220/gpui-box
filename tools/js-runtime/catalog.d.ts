@@ -78,6 +78,7 @@ export interface KitBindingCatalog {
   readonly "Frost": { readonly source: "crates/gpui-kit/src/overlay/frost.rs"; readonly status: "partial" };
   readonly "GaugeChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "Glass": { readonly source: "crates/gpui-kit/src/overlay/glass.rs"; readonly status: "partial" };
+  readonly "GlassGroup": { readonly source: "crates/gpui-kit/src/overlay/glass.rs"; readonly status: "unbound" };
   readonly "GraphNode": { readonly source: "crates/gpui-kit/src/canvas/node.rs"; readonly status: "partial" };
   readonly "Grid": { readonly source: "crates/gpui-kit/src/layout/grid.rs"; readonly status: "partial" };
   readonly "Heatmap": { readonly source: "crates/gpui-kit/src/display/heatmap.rs"; readonly status: "partial" };

@@ -203,7 +203,8 @@ jobs:
       - name: Run native media lifecycle tests
         run: cargo test -p gpui-box-media --all-features --locked
       - name: Run the remaining macOS platform tests
-        run: cargo test --workspace --all-features --locked --exclude gpui-box-media
+        # Keep renderer pixel evidence even when an earlier host suite fails.
+        run: cargo test --workspace --all-features --locked --exclude gpui-box-media --no-fail-fast
       - name: Execute native WKWebView browser smoke
         timeout-minutes: 10
         shell: bash
@@ -256,7 +257,8 @@ jobs:
       - name: Run native media lifecycle tests
         run: cargo test -p gpui-box-media --all-features --locked
       - name: Run the remaining Windows platform tests
-        run: cargo test --workspace --all-features --locked --exclude gpui-box-media
+        # Keep renderer pixel evidence even when an earlier host suite fails.
+        run: cargo test --workspace --all-features --locked --exclude gpui-box-media --no-fail-fast
       - name: Execute native WebView2 browser smoke
         timeout-minutes: 10
         shell: bash

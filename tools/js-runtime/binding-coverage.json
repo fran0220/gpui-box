@@ -12185,6 +12185,9 @@
           "radius_px(radius: f32) -> Self",
           "blur(blur: f32) -> Self",
           "preset(preset: GlassPreset) -> Self",
+          "thickness(thickness: f32) -> Self",
+          "refractive_index(refractive_index: f32) -> Self",
+          "backdrop_depth(backdrop_depth: f32) -> Self",
           "refraction(refraction: f32) -> Self",
           "dispersion(dispersion: f32) -> Self",
           "specular(specular: f32) -> Self",
@@ -12197,6 +12200,40 @@
           "tint(tint: impl Into<Hsla>) -> Self",
           "edge_mask(edge: GlassEdge, band: f32) -> Self",
           "child(child: impl IntoElement) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
+      "name": "GlassGroup",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "path": "gpui_kit::overlay::GlassGroup",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>) -> Self"
+        ],
+        "options": [
+          "surface(surface: Surface) -> Self",
+          "radius(radius: Radius) -> Self",
+          "blur(blur: f32) -> Self",
+          "preset(preset: GlassPreset) -> Self",
+          "thickness(thickness: f32) -> Self",
+          "refractive_index(refractive_index: f32) -> Self",
+          "backdrop_depth(backdrop_depth: f32) -> Self",
+          "merge(merge: f32) -> Self",
+          "gap(gap: f32) -> Self",
+          "pressable(pressable: bool) -> Self",
+          "adaptive(adaptive: bool) -> Self",
+          "adaptive_appearance(adaptive: bool) -> Self",
+          "dimmed(dimmed: bool) -> Self",
+          "tint(tint: impl Into<Hsla>) -> Self",
+          "pane(ident: impl Into<Ident>, child: impl IntoElement) -> Self"
         ],
         "commands": [],
         "queries": [],
@@ -24712,6 +24749,7 @@
           "stack(depth: usize) -> Self",
           "placement(placement: Placement) -> Self",
           "hang(hang: Hang) -> Self",
+          "window_snap_margin(margin: Pixels) -> Self",
           "scrim(scrim: bool) -> Self",
           "progress(progress: f32) -> Self",
           "child(content: impl IntoElement) -> Self",
