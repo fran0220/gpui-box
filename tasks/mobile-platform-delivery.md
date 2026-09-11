@@ -342,3 +342,46 @@ console stayed empty and launch/terminate timed out; a same-revision failed-job
 retry is running without relaxing the deadline or success markers. Native Kit
 reference rendering, keyboard/IME and persistence are not established by the
 successful small GPUI smoke.
+
+## Native reference inspection and final appearance correction
+
+Revision `26d4b4ae46981d4f9d65d936cd732c2aa99d1f9d` was pushed and verified on
+both BWG domains (208 components, 181 scenes, 8575 symbols, complete MCP schemas).
+Platforms `34640875517` passes Windows native workspace tests, runtime-macos
+and the complete Metal and WARP catalogs (all eight WARP shards and aggregation).
+macOS workspace tests now pass the previously failing editor undo assertions
+and mobile host linking. Two new WGPU lifecycle
+tests fail before assertions because Metal supplies no software fallback adapter.
+They are now limited to Linux/Windows, matching the adjacent strict headless
+tests; assertions and production rendering are unchanged. Runtime-windows still
+fails the unrelated AppContainer error 5. A macOS rerun remains required.
+
+iOS `34637692961`, attempt 2 at the unchanged `45228982` revision, passes all
+three fixtures with clean cleanup and both reference mount/completion markers.
+The inspected reference screenshot proves actual initial Kit rendering but
+exposes black inherited plain text on a dark panel. The reference root now
+sets its theme foreground and sans family, and the checkpoint toolbar uses the
+same inset as Back. No native host or framework styling policy changes.
+
+The capture runner preserves its 12 light/action checks and adds direct-mount
+dark library/detail/form frames. A measured notice crop uses independent RGB
+thresholds (dark <=64, bright >=192), actual image/viewport scale, a majority
+dark background and at least 32 bright pixels. The owner demonstrated failure
+before the fix (46800 dark, 0 bright) and success afterward (44053 dark, 1399
+bright). Parent inspection of both composites confirms readable Chinese and
+plain text, aligned toolbar and no unexpected clipping. The integrated parent
+capture run also passes all 15 frames/actions and all three contrast checks;
+parent inspected its dark library/detail/form and light library images.
+Corrected native iOS appearance still requires a new simulator run and
+screenshot inspection.
+
+The final integrated `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full`
+passes: workspace tests/strict Clippy, 606 all-feature core tests, wasm,
+performance, rustdoc, 362 matching Linux images in 534.50 seconds, all 15
+reference captures/actions and 13 mobile browser tests in 4.6 minutes.
+Log: `target/mobile-final-appearance-gate-full.log`. No Linux baseline or
+comparison tolerance changed.
+
+These initial frames do not establish native keyboard/IME, VoiceOver/TalkBack,
+gesture timing, background/recreation persistence or Android execution. No
+Android SDK licenses were accepted and no device evidence is fabricated.

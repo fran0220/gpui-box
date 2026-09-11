@@ -4086,6 +4086,9 @@ mod tests {
         Ok(())
     }
 
+    // Deterministic headless contexts require WARP or software Vulkan;
+    // Metal does not provide a fallback adapter.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn detached_renderer_skips_draw_and_preserves_gpu_resources() -> anyhow::Result<()> {
         let context = WgpuContext::new_headless()?;
@@ -4156,6 +4159,8 @@ mod tests {
         Ok(())
     }
 
+    // Use the same strict software-adapter hosts as the lifecycle test above.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn destroy_releases_resources_even_when_device_loss_prevents_confirmation() -> anyhow::Result<()>
     {
