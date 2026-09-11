@@ -1168,6 +1168,16 @@ fn gate(full: bool) -> Result<()> {
             ],
             None,
         )?;
+        for directory in [
+            "tools/liquid-glass-reference",
+            "tools/liquid-glass-reference/buttons",
+        ] {
+            step(
+                "python3",
+                &["-B", "-m", "unittest", "discover", "-s", directory, "-v"],
+                None,
+            )?;
+        }
     }
     // GPUI Box owns the complete framework and kit source. A warning anywhere
     // in the workspace is therefore a gate failure rather than upstream debt.
@@ -1197,6 +1207,20 @@ fn gate(full: bool) -> Result<()> {
             "cargo",
             &["doc", "--no-deps", "--workspace"],
             Some(("RUSTDOCFLAGS", "-D warnings")),
+        )?;
+        step(
+            "cargo",
+            &[
+                "test",
+                "--locked",
+                "--manifest-path",
+                "tools/headless-visual/Cargo.toml",
+                "--example",
+                "glass_reference",
+                "--",
+                "--test-threads=1",
+            ],
+            None,
         )?;
         headless("check", &[])?;
         step(

@@ -337,4 +337,8 @@ impl PlatformWindow for WindowHandle {
     fn backdrop_luminance(&self, id: u32) -> Option<f32> {
         self.0.renderer.borrow_mut().backdrop_luminance(id)
     }
+
+    fn backdrop_statistics(&self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.0.renderer.borrow_mut().backdrop_statistics(id)
+    }
 }

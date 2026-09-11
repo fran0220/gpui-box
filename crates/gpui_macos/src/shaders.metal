@@ -27,6 +27,25 @@ float quarter_ellipse_sdf(float2 point, float2 radii);
 float pick_corner_radius(float2 center_to_point, Corners_ScaledPixels corner_radii);
 float quad_sdf(float2 point, Bounds_ScaledPixels bounds,
                Corners_ScaledPixels corner_radii);
+
+// Parent-first scene construction makes this walk finite without a depth cap.
+float rounded_clip_coverage(float2 position, uint id, constant ClipNode *clips) {
+  float coverage = 1.;
+  while (id != 0) {
+    ClipNode node = clips[id - 1];
+    if (node.bounds.size.width <= 0. || node.bounds.size.height <= 0.) return 0.;
+    coverage = min(coverage, saturate(0.5 - quad_sdf(position, node.bounds, node.corner_radii)));
+    id = node.parent.index;
+  }
+  return coverage;
+}
+
+float4 clipped_color(float4 color, float2 position, uint id, constant ClipNode *clips, bool premultiplied = false) {
+  if (id == 0) return color;
+  float coverage = rounded_clip_coverage(position, id, clips);
+  return color * float4(premultiplied ? float3(coverage) : float3(1.), coverage);
+}
+
 float quad_sdf_impl(float2 center_to_point, float corner_radius);
 float2 quad_sdf_gradient(float2 point, Bounds_ScaledPixels bounds,
                          Corners_ScaledPixels corner_radii);
@@ -136,9 +155,7 @@ vertex QuadVertexOutput quad_vertex(uint unit_vertex_id [[vertex_id]],
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
-fragment float4 quad_fragment(QuadFragmentInput input [[stage_in]],
-                              constant Quad *quads
-                              [[buffer(QuadInputIndex_Quads)]]) {
+float4 quad_color(QuadFragmentInput input, constant Quad *quads) {
   Quad quad = quads[input.quad_id];
   float4 background_color = fill_color(quad.background, input.position.xy, quad.bounds,
     input.background_solid, input.background_color0, input.background_color1);
@@ -533,9 +550,7 @@ vertex ShadowVertexOutput shadow_vertex(
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
-fragment float4 shadow_fragment(ShadowFragmentInput input [[stage_in]],
-                                constant Shadow *shadows
-                                [[buffer(ShadowInputIndex_Shadows)]]) {
+float4 shadow_color(ShadowFragmentInput input, constant Shadow *shadows) {
   Shadow shadow = shadows[input.shadow_id];
 
   float2 origin = float2(shadow.bounds.origin.x, shadow.bounds.origin.y);
@@ -634,9 +649,7 @@ vertex UnderlineVertexOutput underline_vertex(
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
-fragment float4 underline_fragment(UnderlineFragmentInput input [[stage_in]],
-                                   constant Underline *underlines
-                                   [[buffer(UnderlineInputIndex_Underlines)]]) {
+float4 underline_color(UnderlineFragmentInput input, constant Underline *underlines) {
   const float WAVE_FREQUENCY = 2.0;
   const float WAVE_HEIGHT_RATIO = 0.8;
 
@@ -670,6 +683,7 @@ struct MonochromeSpriteVertexOutput {
   float2 tile_position;
   float4 color [[flat]];
   float4 clip_distance;
+  uint clip_id [[flat]];
 };
 
 struct MonochromeSpriteFragmentInput {
@@ -677,6 +691,7 @@ struct MonochromeSpriteFragmentInput {
   float2 tile_position;
   float4 color [[flat]];
   float4 clip_distance;
+  uint clip_id [[flat]];
 };
 
 vertex MonochromeSpriteVertexOutput monochrome_sprite_vertex(
@@ -699,15 +714,14 @@ vertex MonochromeSpriteVertexOutput monochrome_sprite_vertex(
       device_position,
       tile_position,
       color,
-      {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
+      {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w},
+      sprite.clip_id.index};
 }
 
-fragment float4 monochrome_sprite_fragment(
-    MonochromeSpriteFragmentInput input [[stage_in]],
-    constant MonochromeSprite *sprites [[buffer(SpriteInputIndex_Sprites)]],
-    constant TextGammaParams *gamma_params
-    [[buffer(SpriteInputIndex_GammaParams)]],
-    texture2d<float> atlas_texture [[texture(SpriteInputIndex_AtlasTexture)]]) {
+float4 monochrome_sprite_color(
+    MonochromeSpriteFragmentInput input,
+    constant TextGammaParams *gamma_params,
+    texture2d<float> atlas_texture) {
   if (any(input.clip_distance < float4(0.0))) {
     return float4(0.0);
   }
@@ -778,10 +792,10 @@ vertex PolychromeSpriteVertexOutput polychrome_sprite_vertex(
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
-fragment float4 polychrome_sprite_fragment(
-    PolychromeSpriteFragmentInput input [[stage_in]],
-    constant PolychromeSprite *sprites [[buffer(SpriteInputIndex_Sprites)]],
-    texture2d<float> atlas_texture [[texture(SpriteInputIndex_AtlasTexture)]]) {
+float4 polychrome_sprite_color(
+    PolychromeSpriteFragmentInput input,
+    constant PolychromeSprite *sprites,
+    texture2d<float> atlas_texture) {
   PolychromeSprite sprite = sprites[input.sprite_id];
   constexpr sampler atlas_texture_sampler(mag_filter::linear,
                                           min_filter::linear);
@@ -849,9 +863,9 @@ vertex PathRasterizationVertexOutput path_rasterization_vertex(
   };
 }
 
-fragment float4 path_rasterization_fragment(
-  PathRasterizationFragmentInput input [[stage_in]],
-  constant PathRasterizationVertex *vertices [[buffer(PathRasterizationInputIndex_Vertices)]]
+float4 path_rasterization_color(
+  PathRasterizationFragmentInput input,
+  constant PathRasterizationVertex *vertices
 ) {
   float2 dx = dfdx(input.st_position);
   float2 dy = dfdy(input.st_position);
@@ -931,11 +945,13 @@ struct SurfaceVertexOutput {
   float4 position [[position]];
   float2 texture_position;
   float clip_distance [[clip_distance]][4];
+  uint clip_id [[flat]];
 };
 
 struct SurfaceFragmentInput {
   float4 position [[position]];
   float2 texture_position;
+  uint clip_id [[flat]];
 };
 
 vertex SurfaceVertexOutput surface_vertex(
@@ -958,14 +974,13 @@ vertex SurfaceVertexOutput surface_vertex(
   return SurfaceVertexOutput{
       device_position,
       texture_position,
-      {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
+      {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w},
+      surface.clip_id.index};
 }
 
-fragment float4 surface_fragment(SurfaceFragmentInput input [[stage_in]],
-                                 texture2d<float> y_texture
-                                 [[texture(SurfaceInputIndex_YTexture)]],
-                                 texture2d<float> cb_cr_texture
-                                 [[texture(SurfaceInputIndex_CbCrTexture)]]) {
+float4 surface_color(SurfaceFragmentInput input,
+                     texture2d<float> y_texture,
+                     texture2d<float> cb_cr_texture) {
   constexpr sampler texture_sampler(mag_filter::linear, min_filter::linear);
   const float4x4 ycbcrToRGBTransform =
       float4x4(float4(+1.0000f, +1.0000f, +1.0000f, +0.0000f),
@@ -1591,15 +1606,12 @@ float2 glass_optical_displacement(float3 normal, float index, float distance) {
   return ray.xy / max(-ray.z, 1e-4) * distance;
 }
 
-fragment float4 backdrop_glass_fragment(
-    BackdropGlassFragmentInput input [[stage_in]],
-    constant BackdropGlass *surfaces [[buffer(BackdropGlassInputIndex_Surfaces)]],
-    constant Size_DevicePixels *viewport_size
-    [[buffer(BackdropGlassInputIndex_ViewportSize)]],
-    texture2d<float> source_texture
-    [[texture(BackdropGlassInputIndex_SourceTexture)]],
-    texture2d<float> sharp_texture
-    [[texture(BackdropGlassInputIndex_SharpTexture)]]) {
+float4 backdrop_glass_color(
+    BackdropGlassFragmentInput input,
+    constant BackdropGlass *surfaces,
+    constant Size_DevicePixels *viewport_size,
+    texture2d<float> source_texture,
+    texture2d<float> sharp_texture) {
   constexpr sampler source_sampler(coord::normalized, address::clamp_to_edge,
                                    filter::linear);
   BackdropGlass glass = surfaces[input.glass_id];
@@ -1718,4 +1730,40 @@ fragment float4 backdrop_glass_fragment(
   }
 
   return float4(saturate(color.rgb), color.a);
+}
+
+fragment float4 quad_fragment(QuadFragmentInput input [[stage_in]], constant Quad *quads [[buffer(QuadInputIndex_Quads)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(quad_color(input, quads), input.position.xy, quads[input.quad_id].clip_id.index, clips);
+}
+
+fragment float4 shadow_fragment(ShadowFragmentInput input [[stage_in]], constant Shadow *shadows [[buffer(ShadowInputIndex_Shadows)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(shadow_color(input, shadows), input.position.xy, shadows[input.shadow_id].clip_id.index, clips);
+}
+
+fragment float4 underline_fragment(UnderlineFragmentInput input [[stage_in]], constant Underline *underlines [[buffer(UnderlineInputIndex_Underlines)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(underline_color(input, underlines), input.position.xy, underlines[input.underline_id].clip_id.index, clips);
+}
+
+fragment float4 monochrome_sprite_fragment(MonochromeSpriteFragmentInput input [[stage_in]], constant TextGammaParams *gamma [[buffer(SpriteInputIndex_GammaParams)]], texture2d<float> atlas [[texture(SpriteInputIndex_AtlasTexture)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(monochrome_sprite_color(input, gamma, atlas), input.position.xy, input.clip_id, clips);
+}
+
+fragment float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input [[stage_in]], constant PolychromeSprite *sprites [[buffer(SpriteInputIndex_Sprites)]], texture2d<float> atlas [[texture(SpriteInputIndex_AtlasTexture)]], constant ClipNode *clips [[buffer(15)]]) {
+  PolychromeSprite sprite = sprites[input.sprite_id];
+  return clipped_color(polychrome_sprite_color(input, sprites, atlas), input.position.xy, sprite.clip_id.index, clips, (uint)sprite.blend_mode == 2);
+}
+
+fragment float4 path_rasterization_fragment(PathRasterizationFragmentInput input [[stage_in]], constant PathRasterizationVertex *vertices [[buffer(PathRasterizationInputIndex_Vertices)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(path_rasterization_color(input, vertices), input.position.xy, vertices[input.vertex_id].clip_id.index, clips, true);
+}
+
+fragment float4 surface_fragment(SurfaceFragmentInput input [[stage_in]], texture2d<float> y [[texture(SurfaceInputIndex_YTexture)]], texture2d<float> cbcr [[texture(SurfaceInputIndex_CbCrTexture)]], constant ClipNode *clips [[buffer(15)]]) {
+  return clipped_color(surface_color(input, y, cbcr), input.position.xy, input.clip_id, clips);
+}
+
+fragment float4 backdrop_glass_fragment(BackdropGlassFragmentInput input [[stage_in]], constant BackdropGlass *surfaces [[buffer(BackdropGlassInputIndex_Surfaces)]], constant Size_DevicePixels *viewport [[buffer(BackdropGlassInputIndex_ViewportSize)]], texture2d<float> source [[texture(BackdropGlassInputIndex_SourceTexture)]], texture2d<float> sharp [[texture(BackdropGlassInputIndex_SharpTexture)]], constant ClipNode *clips [[buffer(15)]]) {
+  float4 optical = backdrop_glass_color(input, surfaces, viewport, source, sharp);
+  uint id = surfaces[input.glass_id].clip_id.index;
+  if (id == 0) return optical;
+  return mix(sharp.read(uint2(input.position.xy)), optical, rounded_clip_coverage(input.position.xy, id, clips));
 }

@@ -42,6 +42,31 @@ struct Edges {
     float left;
 };
 
+struct ClipNode {
+    Bounds bounds;
+    Corners radii;
+    uint2 parent;
+};
+StructuredBuffer<ClipNode> rounded_clips: register(t2);
+float quad_sdf(float2 pt, Bounds bounds, Corners corner_radii);
+
+float rounded_clip_coverage(float2 position, uint id) {
+    float coverage = 1.;
+    [loop] while (id != 0u) {
+        ClipNode node = rounded_clips[id - 1u];
+        if (any(node.bounds.size <= 0.)) return 0.;
+        coverage = min(coverage, saturate(0.5 - quad_sdf(position, node.bounds, node.radii)));
+        id = node.parent.x;
+    }
+    return coverage;
+}
+
+float4 clipped_color(float4 color, float2 position, uint id, bool premultiplied) {
+    if (id == 0u) return color;
+    float coverage = rounded_clip_coverage(position, id);
+    return color * float4(premultiplied ? coverage.xxx : float3(1., 1., 1.), coverage);
+}
+
 struct Hsla {
     float h;
     float s;
@@ -658,6 +683,7 @@ struct Quad {
     Hsla border_color;
     Corners corner_radii;
     Edges border_widths;
+    uint2 clip_id;
 };
 
 struct QuadVertexOutput {
@@ -707,7 +733,7 @@ QuadVertexOutput quad_vertex(uint vertex_id: SV_VertexID, uint instance_id: SV_I
     return output;
 }
 
-float4 quad_fragment(QuadFragmentInput input): SV_Target {
+float4 quad_color(QuadFragmentInput input) {
     Quad quad = quads[input.quad_id];
     float4 background_color = gradient_color(quad.background, input.position.xy, quad.bounds,
     input.background_solid, input.background_color0, input.background_color1);
@@ -1017,6 +1043,7 @@ struct Shadow {
     // 1 = cut the element's own shape out of a drop shadow, so it rings the
     // element instead of painting under it.
     uint outer_only;
+    uint2 clip_id;
 };
 
 struct ShadowVertexOutput {
@@ -1063,7 +1090,7 @@ ShadowVertexOutput shadow_vertex(uint vertex_id: SV_VertexID, uint instance_id: 
     return output;
 }
 
-float4 shadow_fragment(ShadowFragmentInput input): SV_TARGET {
+float4 shadow_color(ShadowFragmentInput input) {
     Shadow shadow = shadows[input.shadow_id];
 
     float2 half_size = shadow.bounds.size / 2.;
@@ -1123,6 +1150,7 @@ struct PathRasterizationSprite {
     float2 st_position;
     Background color;
     Bounds bounds;
+    uint2 clip_id;
 };
 
 StructuredBuffer<PathRasterizationSprite> path_rasterization_sprites: register(t1);
@@ -1152,7 +1180,7 @@ PathVertexOutput path_rasterization_vertex(uint vertex_id: SV_VertexID) {
     return output;
 }
 
-float4 path_rasterization_fragment(PathFragmentInput input): SV_Target {
+float4 path_rasterization_color(PathFragmentInput input) {
     float2 dx = ddx(input.st_position);
     float2 dy = ddy(input.st_position);
     PathRasterizationSprite sprite = path_rasterization_sprites[input.vertex_id];
@@ -1229,6 +1257,7 @@ struct Underline {
     Hsla color;
     float thickness;
     uint wavy;
+    uint2 clip_id;
 };
 
 struct UnderlineVertexOutput {
@@ -1263,7 +1292,7 @@ UnderlineVertexOutput underline_vertex(uint vertex_id: SV_VertexID, uint instanc
     return output;
 }
 
-float4 underline_fragment(UnderlineFragmentInput input): SV_Target {
+float4 underline_color(UnderlineFragmentInput input) {
     const float WAVE_FREQUENCY = 2.0;
     const float WAVE_HEIGHT_RATIO = 0.8;
 
@@ -1304,6 +1333,7 @@ struct MonochromeSprite {
     Hsla color;
     AtlasTile tile;
     TransformationMatrix transformation;
+    uint2 clip_id;
 };
 
 struct MonochromeSpriteVertexOutput {
@@ -1311,6 +1341,7 @@ struct MonochromeSpriteVertexOutput {
     float2 tile_position: POSITION;
     nointerpolation float4 color: COLOR;
     float4 clip_distance: SV_ClipDistance;
+    nointerpolation uint clip_id: TEXCOORD2;
 };
 
 struct MonochromeSpriteFragmentInput {
@@ -1318,6 +1349,7 @@ struct MonochromeSpriteFragmentInput {
     float2 tile_position: POSITION;
     nointerpolation float4 color: COLOR;
     float4 clip_distance: SV_ClipDistance;
+    nointerpolation uint clip_id: TEXCOORD2;
 };
 
 StructuredBuffer<MonochromeSprite> mono_sprites: register(t1);
@@ -1337,10 +1369,11 @@ MonochromeSpriteVertexOutput monochrome_sprite_vertex(uint vertex_id: SV_VertexI
     output.tile_position = tile_position;
     output.color = color;
     output.clip_distance = clip_distance;
+    output.clip_id = sprite.clip_id.x;
     return output;
 }
 
-float4 monochrome_sprite_fragment(MonochromeSpriteFragmentInput input): SV_Target {
+float4 monochrome_sprite_color(MonochromeSpriteFragmentInput input) {
     float sample = t_sprite.Sample(s_sprite, input.tile_position).r;
     float alpha_corrected = apply_contrast_and_gamma_correction(sample, input.color.rgb, grayscale_enhanced_contrast, gamma_ratios);
     return float4(input.color.rgb, input.color.a * alpha_corrected);
@@ -1360,6 +1393,7 @@ SubpixelSpriteFragmentOutput subpixel_sprite_fragment(MonochromeSpriteFragmentIn
     SubpixelSpriteFragmentOutput output;
     output.foreground = float4(input.color.rgb, 1.0f);
     output.alpha = float4(input.color.a * alpha_corrected, 1.0f);
+    if (input.clip_id != 0u) output.alpha *= rounded_clip_coverage(input.position.xy, input.clip_id);
     return output;
 }
 
@@ -1374,7 +1408,7 @@ float4 overlay_subpixel_sprite_fragment(MonochromeSpriteFragmentInput input): SV
     }
     float3 alpha_corrected = apply_contrast_and_gamma_correction3(sample, input.color.rgb, subpixel_enhanced_contrast, gamma_ratios);
     float coverage = max(alpha_corrected.r, max(alpha_corrected.g, alpha_corrected.b));
-    return float4(input.color.rgb, input.color.a * coverage);
+    return clipped_color(float4(input.color.rgb, input.color.a * coverage), input.position.xy, input.clip_id, false);
 }
 
 /*
@@ -1396,6 +1430,7 @@ struct PolychromeSprite {
     Hsla tint;
     float opacity;
     uint pad;
+    uint2 clip_id;
 };
 
 struct PolychromeSpriteVertexOutput {
@@ -1436,7 +1471,7 @@ PolychromeSpriteVertexOutput polychrome_sprite_vertex(uint vertex_id: SV_VertexI
     return output;
 }
 
-float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input): SV_Target {
+float4 polychrome_sprite_color(PolychromeSpriteFragmentInput input) {
     PolychromeSprite sprite = poly_sprites[input.sprite_id];
     float4 sample = t_sprite.Sample(s_sprite, input.tile_position);
     float distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
@@ -1488,7 +1523,7 @@ cbuffer BackdropGlassParams: register(b2) {
     float backdrop_transmission_gain;
     float backdrop_hairline;
     float backdrop_saturation;
-    float backdrop_optical_pad;
+    uint backdrop_clip_id;
     float4 backdrop_wash;
     float4 backdrop_optical_lift;
     // x = edge (0 none, 1 top, 2 bottom, 3 left, 4 right), y = band in pixels.
@@ -1638,7 +1673,7 @@ float2 backdrop_optical_displacement(float3 normal, float index, float distance)
     return ray.xy / max(-ray.z, 1e-4) * distance;
 }
 
-float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
+float4 backdrop_glass_color(BackdropVertexOutput input) {
     float2 pt = input.position.xy;
     float2 mask_end = backdrop_mask.xy + backdrop_mask.zw;
     float3 field = backdrop_glass_field(pt);
@@ -1713,4 +1748,30 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     }
 
     return apply_backdrop_edge_mask(float4(saturate(color.rgb), color.a), pt);
+}
+
+float4 quad_fragment(QuadFragmentInput input): SV_Target {
+    return clipped_color(quad_color(input), input.position.xy, quads[input.quad_id].clip_id.x, false);
+}
+float4 shadow_fragment(ShadowFragmentInput input): SV_Target {
+    return clipped_color(shadow_color(input), input.position.xy, shadows[input.shadow_id].clip_id.x, false);
+}
+float4 underline_fragment(UnderlineFragmentInput input): SV_Target {
+    return clipped_color(underline_color(input), input.position.xy, underlines[input.underline_id].clip_id.x, false);
+}
+float4 monochrome_sprite_fragment(MonochromeSpriteFragmentInput input): SV_Target {
+    return clipped_color(monochrome_sprite_color(input), input.position.xy, input.clip_id, false);
+}
+float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input): SV_Target {
+    PolychromeSprite sprite = poly_sprites[input.sprite_id];
+    return clipped_color(polychrome_sprite_color(input), input.position.xy, sprite.clip_id.x, sprite.blend_mode == 2u);
+}
+float4 path_rasterization_fragment(PathFragmentInput input): SV_Target {
+    return clipped_color(path_rasterization_color(input), input.position.xy, path_rasterization_sprites[input.vertex_id].clip_id.x, true);
+}
+float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
+    float4 optical = backdrop_glass_color(input);
+    if (backdrop_clip_id == 0u) return optical;
+    float4 original = t_backdrop_sharp.Load(int3(int2(input.position.xy), 0));
+    return lerp(original, optical, rounded_clip_coverage(input.position.xy, backdrop_clip_id));
 }

@@ -1084,6 +1084,22 @@ impl PlatformWindow for WebWindow {
         self.inner.state.borrow().renderer.sprite_atlas().clone()
     }
 
+    fn backdrop_luminance(&self, id: u32) -> Option<f32> {
+        self.inner
+            .state
+            .borrow_mut()
+            .renderer
+            .backdrop_luminance(id)
+    }
+
+    fn backdrop_statistics(&self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.inner
+            .state
+            .borrow_mut()
+            .renderer
+            .backdrop_statistics(id)
+    }
+
     fn is_subpixel_rendering_supported(&self) -> bool {
         self.inner
             .state

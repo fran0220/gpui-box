@@ -78,6 +78,11 @@ not copied code. See PROVENANCE.md, Unified screen-space dielectric glass.
 The frozen historical import receipt and its exact revisions remain unchanged.
 Generation-aware luminance probe leasing and shared CPU completion caching are
 original GPUI Box lifecycle corrections; no additional source is imported.
+Five-texel BackdropStatistics decoding and rounded subtree geometry, input,
+accessibility, retained replay and Metal/Direct3D/WGPU clip transports are
+original GPUI Box framework work under the existing framework licenses.
+No additional third-party source or dependency is imported, and the frozen
+historical import receipt remains unchanged.
 Unicode line-breaking integration is original GPUI Box work using the existing
 unicode-linebreak 0.1.5 dependency (Apache-2.0, Unicode 15.0 UAX #14).
 No source is copied into the frozen import receipt.
@@ -564,3 +569,9 @@ Affinity-aware selection and transient IME rollback are original GPUI Box work
 under the existing framework license, with no additional third-party imports.
 Indexed incident-paragraph caret geometry is original GPUI Box work and keeps
 the existing local text-system and dependency license authority unchanged.
+
+Native SwiftUI/ScreenCaptureKit glass reference harnesses, evidence validators,
+GPUI comparison tools, colour-preserving material wash and Kit tint composition
+are independently authored GPUI Box work. Public Apple API documentation was
+consulted; no private implementation or Apple sample source was imported.
+No new third-party dependency or frozen import revision is introduced.

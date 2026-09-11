@@ -1,0 +1,20 @@
+{
+  "schema": "native-button-styles-fixture-1",
+  "canvas": [800, 520],
+  "coordinates": "top-left logical points",
+  "label": "Actions",
+  "label_frame": [144, 48],
+  "font": "system 15 semibold",
+  "control_size": "regular",
+  "tint": "no override; system default",
+  "cases": [
+    {"id": "glass", "center": [400, 112], "style": "Button.buttonStyle(.glass)"},
+    {"id": "glass-prominent", "center": [400, 256], "style": "Button.buttonStyle(.glassProminent)"},
+    {"id": "custom", "center": [400, 400], "style": "persistent ZStack containing plain Button; outer .glassEffect(.regular.interactive(), in: rect r24)"}
+  ],
+  "background": {"cell": 32, "colors": [[217,230,242],[242,204,153]], "grid": [128,144,160], "grid_width": 1},
+  "fiducials": [{"rect": [8,8,24,24], "rgb": [255,0,0]}, {"rect": [768,8,24,24], "rgb": [0,255,0]}, {"rect": [8,488,24,24], "rgb": [0,0,255]}],
+  "input": "synthetic NSEvent through NSApplication.postEvent; no HID, hover, cursor movement, or programmatic pressed-state changes",
+  "action": "acknowledgement only; no geometry, label, or application state mutation",
+  "samples": {"held": 4, "release": 9, "last_release_settle_seconds": 1}
+}

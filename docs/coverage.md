@@ -294,6 +294,20 @@ gain and optical lift. This applies before any probe response as well: a mean
 luminance cannot guarantee contrast at every text position. It does not add an
 opaque or source-over face, change large-panel appearance, or affect Clear.
 Caller-supplied text colours and optical overrides still require caller review.
+`Glass::protect_text_contrast(false)` and the matching group option explicitly
+retain the material's wash instead; the caller then owns foreground legibility.
+This is used for native material calibration, not enabled silently on existing
+reading surfaces. Explicit tints compose into the RGB material wash (including
+fused bridges) before its rim light, rather than disappearing behind a zero-alpha
+fill or being converted to an achromatic pole by framework sanitization.
+
+`tools/liquid-glass-reference` records native SwiftUI references and validates
+GPUI static candidates with independent colour, rim, bridge and held-out-size
+scores. The original GPUI candidate still marks its transition samples
+unsupported until real dynamic geometry is integrated. Native reference capture
+alone does not close GPUI's rounded-subtree clipping, continuous morph or
+native-button response gaps. Calibration trials are not accepted catalog
+baselines or proof of Apple's private implementation.
 
 Application-wide Reduce transparency belongs in `ThemeRegistry`, alongside
 density: call `set_reduce_transparency(reduce, cx)` to update it and repaint all

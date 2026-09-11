@@ -5,7 +5,7 @@ use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, DevicePixels, DrawOrder, GpuSpecs,
     LUMINANCE_PROBE_SAMPLES, LuminanceProbeCache, MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES,
     NO_LUMINANCE_PROBE, Path, Point, PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode,
-    get_gamma_correction_ratios, luminance_probe_slot, probe_sample_luminance,
+    get_gamma_correction_ratios, luminance_probe_slot,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
@@ -69,6 +69,8 @@ fn observe_shader_compilation(shader: &wgpu::ShaderModule, label: &'static str) 
 const STORAGE_BUFFER_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_storage.wgsl"),
+    include_str!("clip.wgsl"),
+    include_str!("clip_storage.wgsl"),
 );
 
 /// Shader variant for WebGL2, which has no storage buffers: the shared shader
@@ -76,13 +78,24 @@ const STORAGE_BUFFER_SHADERS: &str = concat!(
 const WEBGL_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_webgl.wgsl"),
+    include_str!("clip.wgsl"),
+    include_str!("clip_webgl.wgsl"),
 );
 
 /// The glass surface passes: the separable gaussian, the composite that paints
 /// the surface back through its shape and material, and the final copy to the
 /// swapchain. Named rather than included at the pipeline so that the tests can
 /// validate it without a device.
-const BACKDROP_GLASS_SHADERS: &str = include_str!("backdrop_glass.wgsl");
+const BACKDROP_GLASS_SHADERS: &str = concat!(
+    include_str!("backdrop_glass.wgsl"),
+    include_str!("clip.wgsl"),
+    include_str!("clip_storage.wgsl")
+);
+const WEBGL_BACKDROP_GLASS_SHADERS: &str = concat!(
+    include_str!("backdrop_glass.wgsl"),
+    include_str!("clip.wgsl"),
+    include_str!("clip_webgl.wgsl")
+);
 
 /// Subpixel text rendering requires dual-source blending, which WebGL2 lacks, so
 /// this variant only ever runs with the storage-buffer transport. The `enable`
@@ -92,6 +105,8 @@ const SUBPIXEL_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_storage.wgsl"),
     include_str!("shaders_subpixel.wgsl"),
+    include_str!("clip.wgsl"),
+    include_str!("clip_storage.wgsl"),
 );
 
 fn least_common_multiple(left: u64, right: u64) -> u64 {
@@ -134,6 +149,7 @@ impl From<Bounds<ScaledPixels>> for PodBounds {
 struct SurfaceParams {
     bounds: PodBounds,
     content_mask: PodBounds,
+    clip_id: [u32; 2],
 }
 
 #[repr(C)]
@@ -159,6 +175,7 @@ struct PathRasterizationVertex {
     st_position: Point<f32>,
     color: Background,
     bounds: Bounds<ScaledPixels>,
+    clip_id: gpui::ClipId,
 }
 
 pub struct WgpuSurfaceConfig {
@@ -280,7 +297,7 @@ struct BackdropParams {
     edge_mask_edge: f32,
     edge_mask_band: f32,
     saturation: f32,
-    _mask_pad: f32,
+    clip_id: u32,
     wash: [f32; 4],
     thickness: f32,
     refractive_index: f32,
@@ -368,6 +385,7 @@ struct WgpuResources {
     globals_buffer: wgpu::Buffer,
     globals_bind_group: wgpu::BindGroup,
     path_globals_bind_group: wgpu::BindGroup,
+    clip_bind_group: Option<wgpu::BindGroup>,
     instance_data: InstanceData,
     path_intermediate_texture: Option<wgpu::Texture>,
     path_intermediate_view: Option<wgpu::TextureView>,
@@ -631,11 +649,21 @@ impl WgpuRenderer {
             atlas,
             transparent_alpha_mode,
             opaque_alpha_mode,
+            context.uses_webgl_instance_data(),
         )
     }
 
     #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
     fn new_headless(context: &WgpuContext, atlas: Arc<WgpuAtlas>) -> anyhow::Result<Self> {
+        Self::new_headless_transport(context, atlas, context.uses_webgl_instance_data())
+    }
+
+    #[cfg(all(not(target_family = "wasm"), any(test, feature = "test-support")))]
+    fn new_headless_transport(
+        context: &WgpuContext,
+        atlas: Arc<WgpuAtlas>,
+        uses_webgl_instance_data: bool,
+    ) -> anyhow::Result<Self> {
         let required_usages = wgpu::TextureUsages::RENDER_ATTACHMENT
             | wgpu::TextureUsages::TEXTURE_BINDING
             | wgpu::TextureUsages::COPY_SRC;
@@ -679,6 +707,7 @@ impl WgpuRenderer {
             atlas,
             alpha_mode,
             alpha_mode,
+            uses_webgl_instance_data,
         )
     }
 
@@ -692,6 +721,7 @@ impl WgpuRenderer {
         atlas: Arc<WgpuAtlas>,
         transparent_alpha_mode: wgpu::CompositeAlphaMode,
         opaque_alpha_mode: wgpu::CompositeAlphaMode,
+        uses_webgl_instance_data: bool,
     ) -> anyhow::Result<Self> {
         let surface_format = surface_config.format;
         let alpha_mode = surface_config.alpha_mode;
@@ -702,7 +732,6 @@ impl WgpuRenderer {
         let initialization_scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let max_texture_size = device.limits().max_texture_dimension_2d;
         let rendering_params = RenderingParameters::new(&context.adapter, surface_format);
-        let uses_webgl_instance_data = context.uses_webgl_instance_data();
         let dual_source_blending =
             context.supports_dual_source_blending() && !uses_webgl_instance_data;
         let bind_group_layouts = Self::create_bind_group_layouts(&device, uses_webgl_instance_data);
@@ -855,6 +884,7 @@ impl WgpuRenderer {
             globals_buffer,
             globals_bind_group,
             path_globals_bind_group,
+            clip_bind_group: None,
             instance_data,
             // Defer intermediate texture creation to first draw call via ensure_intermediate_textures().
             // This avoids panics when the device/surface is in an invalid state during initialization.
@@ -1197,7 +1227,14 @@ impl WgpuRenderer {
         };
         let backdrop_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("backdrop_glass_shader"),
-            source: wgpu::ShaderSource::Wgsl(BACKDROP_GLASS_SHADERS.into()),
+            source: wgpu::ShaderSource::Wgsl(
+                if uses_webgl_instance_data {
+                    WEBGL_BACKDROP_GLASS_SHADERS
+                } else {
+                    BACKDROP_GLASS_SHADERS
+                }
+                .into(),
+            ),
         });
 
         let blend_mode = match alpha_mode {
@@ -1224,7 +1261,8 @@ impl WgpuRenderer {
                                sample_count: u32,
                                module: &wgpu::ShaderModule| {
             let mut bind_group_layouts = vec![Some(globals_layout), Some(data_layout)];
-            bind_group_layouts.extend(texture_layout.map(Some));
+            bind_group_layouts.push(texture_layout);
+            bind_group_layouts.push(Some(&layouts.instances));
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some(&format!("{name}_layout")),
                 bind_group_layouts: &bind_group_layouts,
@@ -1476,7 +1514,12 @@ impl WgpuRenderer {
         let create_backdrop_pipeline = |name, fragment_entry| {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some(&format!("{name}_layout")),
-                bind_group_layouts: &[Some(&layouts.backdrop)],
+                bind_group_layouts: &[
+                    Some(&layouts.backdrop),
+                    None,
+                    None,
+                    Some(&layouts.instances),
+                ],
                 immediate_size: 0,
             });
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -2185,6 +2228,19 @@ impl WgpuRenderer {
         timestamps: Option<&wgpu::QuerySet>,
     ) -> Result<wgpu::SubmissionIndex> {
         let mut instance_offset = 0;
+        // Clips are the first allocation, so their texture word indices are
+        // scene-relative on WebGL too. The binding retains the allocation even
+        // if subsequent instance uploads grow the backing buffer/texture.
+        let clips = self.write_instance_binding(
+            "rounded_clips",
+            &mut instance_offset,
+            scene.clip_nodes.nodes(),
+        )?;
+        assert_eq!(clips.first_instance, 0);
+        self.resources
+            .as_mut()
+            .expect("GPU resources")
+            .clip_bind_group = Some(clips.bind_group);
         let instance_bindings = self
             .write_instances(scene, &mut instance_offset)
             .with_context(|| {
@@ -2684,7 +2740,7 @@ impl WgpuRenderer {
             edge_mask_edge: material.edge_mask_edge,
             edge_mask_band: material.edge_mask_band.0,
             saturation: material.saturation,
-            _mask_pad: 0.0,
+            clip_id: glass.clip_id.as_u32(),
             wash: [
                 material.wash.r,
                 material.wash.g,
@@ -2864,23 +2920,14 @@ impl WgpuRenderer {
             .expect("successfully mapped probe buffer must remain readable until collection");
         for &id in &inflight.requests {
             let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
-            let mut total = 0.0;
-            for index in 0..LUMINANCE_PROBE_SAMPLES {
-                let offset = (slot * LUMINANCE_PROBE_SAMPLES + index) * PROBE_SAMPLE_STRIDE;
-                let texel = &data[offset..offset + 4];
-                let (red, green, blue) = if inflight.bgra {
-                    (texel[2], texel[1], texel[0])
-                } else {
-                    (texel[0], texel[1], texel[2])
-                };
-                total += probe_sample_luminance(
-                    red as f32 / 255.0,
-                    green as f32 / 255.0,
-                    blue as f32 / 255.0,
-                );
-            }
+            let offset = slot * LUMINANCE_PROBE_SAMPLES * PROBE_SAMPLE_STRIDE;
+            let statistics = gpui::BackdropStatistics::from_encoded_texels(
+                &data[offset..],
+                PROBE_SAMPLE_STRIDE,
+                inflight.bgra,
+            );
             self.probe_values
-                .publish(inflight.frame, id, total / LUMINANCE_PROBE_SAMPLES as f32);
+                .publish_statistics(inflight.frame, id, statistics);
         }
     }
 
@@ -2888,6 +2935,12 @@ impl WgpuRenderer {
     pub fn backdrop_luminance(&mut self, id: u32) -> Option<f32> {
         self.collect_probes();
         self.probe_values.get(id)
+    }
+
+    /// Statistics from the same completed optical-source readback as luminance.
+    pub fn backdrop_statistics(&mut self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.collect_probes();
+        self.probe_values.statistics(id)
     }
 
     fn draw_backdrop_blur_weights(
@@ -3026,6 +3079,14 @@ impl WgpuRenderer {
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, bind_group, &[]);
+        pass.set_bind_group(
+            3,
+            resources
+                .clip_bind_group
+                .as_ref()
+                .expect("scene clips uploaded"),
+            &[],
+        );
         pass.set_scissor_rect(
             scissor.origin.x.0 as u32,
             scissor.origin.y.0 as u32,
@@ -3112,6 +3173,14 @@ impl WgpuRenderer {
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &self.resources().globals_bind_group, &[]);
         pass.set_bind_group(1, &instances.bind_group, &[]);
+        pass.set_bind_group(
+            3,
+            self.resources()
+                .clip_bind_group
+                .as_ref()
+                .expect("scene clips uploaded"),
+            &[],
+        );
         pass.draw(
             0..4,
             instances.first_instance + range.start..instances.first_instance + range.end,
@@ -3135,6 +3204,14 @@ impl WgpuRenderer {
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &self.resources().globals_bind_group, &[]);
         pass.set_bind_group(1, &sprite_instances.bind_group, &[]);
+        pass.set_bind_group(
+            3,
+            self.resources()
+                .clip_bind_group
+                .as_ref()
+                .expect("scene clips uploaded"),
+            &[],
+        );
         pass.set_bind_group(2, &texture, &[]);
         pass.draw(
             0..4,
@@ -3186,6 +3263,14 @@ impl WgpuRenderer {
         );
         let resources = self.resources();
         pass.set_pipeline(&resources.pipelines.paths);
+        pass.set_bind_group(
+            3,
+            resources
+                .clip_bind_group
+                .as_ref()
+                .expect("scene clips uploaded"),
+            &[],
+        );
         pass.set_bind_group(0, &resources.globals_bind_group, &[]);
         pass.set_bind_group(1, &instances.bind_group, &[]);
         pass.set_bind_group(2, &texture, &[]);
@@ -3210,6 +3295,7 @@ impl WgpuRenderer {
                 st_position: v.st_position,
                 color: path.color,
                 bounds,
+                clip_id: path.clip_id,
             }));
         }
 
@@ -3251,6 +3337,14 @@ impl WgpuRenderer {
             });
 
             pass.set_pipeline(&resources.pipelines.path_rasterization);
+            pass.set_bind_group(
+                3,
+                resources
+                    .clip_bind_group
+                    .as_ref()
+                    .expect("scene clips uploaded"),
+                &[],
+            );
             pass.set_bind_group(0, &resources.path_globals_bind_group, &[]);
             pass.set_bind_group(1, &vertex_binding.bind_group, &[]);
             // The path rasterization shader loads records by vertex index
@@ -3971,6 +4065,10 @@ impl gpui::PlatformHeadlessRenderer for WgpuHeadlessRenderer {
     fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
         self.renderer.backdrop_luminance(slot)
     }
+
+    fn backdrop_statistics(&mut self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.renderer.backdrop_statistics(id)
+    }
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -4188,6 +4286,7 @@ mod tests {
 
     fn backdrop_glass_with_radius(radius: f32) -> BackdropGlass {
         BackdropGlass {
+            clip_id: gpui::ClipId::NONE,
             order: 0,
             bounds: Bounds::default(),
             content_mask: ContentMask {
@@ -4406,6 +4505,260 @@ mod tests {
         validate_wgsl(STORAGE_BUFFER_SHADERS, naga::valid::Capabilities::empty());
     }
 
+    #[test]
+    fn nested_rounded_clips_mask_every_primitive_without_changing_backdrop_samples() {
+        use gpui::{
+            AtlasKey, Background, ClipChain, FontId, GlyphId, Hsla, Path, PlatformHeadlessRenderer,
+            RenderGlyphParams, RoundedClip, point, px, size,
+        };
+        let _gpu = crate::serialised_gpu_test();
+        let context = WgpuContext::new_headless().expect("software adapter required");
+        for (webgl, premultiplied) in [(false, false), (true, false), (false, true), (true, true)] {
+            let atlas = Arc::new(WgpuAtlas::from_context(&context));
+            let mut renderer = WgpuHeadlessRenderer {
+                renderer: WgpuRenderer::new_headless_transport(&context, atlas, webgl)
+                    .expect("transport initializes"),
+                measurement_id: 0,
+            };
+            if premultiplied {
+                renderer.renderer.transparent_alpha_mode = wgpu::CompositeAlphaMode::PreMultiplied;
+                renderer.renderer.update_transparency(true);
+            }
+            let template = probed_scene(Hsla::black(), gpui::NO_LUMINANCE_PROBE);
+            let bounds = template.quads[0].bounds;
+            let mask = ContentMask { bounds };
+            let mut chain = ClipChain::default();
+            chain.push(RoundedClip::new(
+                Bounds::new(point(px(32.), px(32.)), size(px(192.), px(192.))),
+                Corners {
+                    top_left: px(80.),
+                    top_right: px(0.),
+                    bottom_right: px(60.),
+                    bottom_left: px(0.),
+                },
+            ));
+            // The ancestor's rounded corner must survive many square descendants.
+            for _ in 0..70 {
+                chain.push(RoundedClip::new(
+                    Bounds::new(point(px(34.), px(34.)), size(px(188.), px(188.))),
+                    Corners::default(),
+                ));
+            }
+            let mut tiles = Vec::new();
+            for kind in 0..3 {
+                let key = AtlasKey::Glyph(RenderGlyphParams {
+                    font_id: FontId(0),
+                    glyph_id: GlyphId(kind),
+                    font_size: px(16.),
+                    subpixel_variant: point(0, 0),
+                    scale_factor: 1.,
+                    is_emoji: kind == 2,
+                    subpixel_rendering: kind == 1,
+                    dilation: 0,
+                });
+                tiles.push(
+                    renderer
+                        .sprite_atlas()
+                        .get_or_insert_with(&key, &mut || {
+                            Ok(Some((
+                                size(DevicePixels(16), DevicePixels(16)),
+                                std::borrow::Cow::Owned(vec![
+                                    255;
+                                    16 * 16
+                                        * if kind == 0 { 1 } else { 4 }
+                                ]),
+                            )))
+                        })
+                        .expect("atlas upload succeeds")
+                        .expect("nonempty fixture tile"),
+                );
+            }
+            let mut quad_image = None;
+            for kind in 0..7 {
+                let mut scene = Scene::default();
+                scene.insert_primitive(template.quads[0]);
+                scene.with_clip_chain(&chain, 1., |scene| match kind {
+                    0 => {
+                        let mut quad = template.quads[0];
+                        quad.background = Background::from(Hsla::white());
+                        scene.insert_primitive(quad);
+                    }
+                    1 => scene.insert_primitive(Shadow {
+                        order: 0,
+                        blur_radius: ScaledPixels(0.),
+                        bounds,
+                        corner_radii: Corners::default(),
+                        content_mask: mask,
+                        color: Hsla::white(),
+                        element_bounds: bounds,
+                        element_corner_radii: Corners::default(),
+                        inset: 0,
+                        outer_only: 0,
+                        clip_id: gpui::ClipId::NONE,
+                    }),
+                    2 => scene.insert_primitive(Underline {
+                        order: 0,
+                        pad: 0,
+                        bounds,
+                        content_mask: mask,
+                        color: Hsla::white(),
+                        thickness: ScaledPixels(256.),
+                        wavy: false.into(),
+                        clip_id: gpui::ClipId::NONE,
+                    }),
+                    3 => {
+                        let mut path = Path::new(point(px(0.), px(0.)));
+                        path.line_to(point(px(256.), px(0.)));
+                        path.line_to(point(px(256.), px(256.)));
+                        path.line_to(point(px(0.), px(256.)));
+                        let mut path = path.scale(1.);
+                        path.content_mask = mask;
+                        path.color = Background::from(Hsla::white());
+                        scene.insert_primitive(path);
+                    }
+                    4 => scene.insert_primitive(MonochromeSprite {
+                        order: 0,
+                        pad: 0,
+                        bounds,
+                        content_mask: mask,
+                        color: Hsla::white(),
+                        tile: tiles[0],
+                        transformation: Default::default(),
+                        clip_id: gpui::ClipId::NONE,
+                    }),
+                    5 => scene.insert_primitive(SubpixelSprite {
+                        order: 0,
+                        pad: 0,
+                        bounds,
+                        content_mask: mask,
+                        color: Hsla::white(),
+                        tile: tiles[1],
+                        transformation: Default::default(),
+                        clip_id: gpui::ClipId::NONE,
+                    }),
+                    _ => scene.insert_primitive(PolychromeSprite {
+                        order: 0,
+                        blend_mode: Default::default(),
+                        color_mode: Default::default(),
+                        sample_inset: false.into(),
+                        bounds,
+                        content_mask: mask,
+                        corner_radii: Corners::default(),
+                        tile: tiles[2],
+                        transformation: Default::default(),
+                        tint: Hsla::white(),
+                        opacity: 1.,
+                        pad: 0,
+                        clip_id: gpui::ClipId::NONE,
+                    }),
+                });
+                scene.finish();
+                let image = renderer
+                    .render_scene_to_image(&scene, size(DevicePixels(256), DevicePixels(256)))
+                    .expect("clipped primitive renders");
+                for (x, y) in [(35, 35), (218, 218), (15, 120)] {
+                    assert_eq!(
+                        image.get_pixel(x, y).0,
+                        [0, 0, 0, 255],
+                        "primitive {kind}, outside {x},{y}"
+                    );
+                }
+                for (x, y) in [(128, 128), (215, 40), (40, 215)] {
+                    assert!(
+                        image.get_pixel(x, y)[0] > 240,
+                        "primitive {kind}, inside {x},{y}: {:?}",
+                        image.get_pixel(x, y)
+                    );
+                }
+                if kind == 0 {
+                    quad_image = Some(image.clone());
+                    if let Ok(directory) = std::env::var("GPUI_CLIP_CAPTURE_DIR") {
+                        image
+                            .save(
+                                std::path::Path::new(&directory)
+                                    .join(format!("rounded-clip-webgl-{webgl}.png")),
+                            )
+                            .expect("save requested clip capture");
+                    }
+                }
+                if kind == 3 {
+                    let reference = quad_image.as_ref().expect("quad rendered before path");
+                    let mut edges = 0;
+                    for y in 35..110 {
+                        for x in 35..110 {
+                            let expected = reference.get_pixel(x, y)[0];
+                            if expected > 30 && expected < 220 {
+                                edges += 1;
+                                assert!(
+                                    (image.get_pixel(x, y)[0] as i16 - expected as i16).abs() <= 2,
+                                    "path mask must apply once at the antialiased edge {x},{y}"
+                                );
+                            }
+                        }
+                    }
+                    assert!(edges > 10, "exercise partially covered pixels");
+                }
+            }
+            // Compare glass on a ramp with and without the chain. Its source pixels
+            // outside the chain must remain available to blur/refraction and probes.
+            let make_glass = |clipped: bool| {
+                let mut scene = Scene::default();
+                for x in 0..256 {
+                    let mut stripe = template.quads[0];
+                    stripe.bounds.origin.x = ScaledPixels(x as f32);
+                    stripe.bounds.size.width = ScaledPixels(1.);
+                    stripe.background = Background::from(gpui::hsla(0., 0., x as f32 / 255., 1.));
+                    scene.insert_primitive(stripe);
+                }
+                // Earlier glass is part of the later surface's original backdrop.
+                scene.insert_backdrop_glass(template.backdrop_glass[0]);
+                let paint = |scene: &mut Scene| {
+                    let mut glass = template.backdrop_glass[0];
+                    glass.bounds = bounds;
+                    glass.material.blur_radius = ScaledPixels(24.);
+                    glass.material.refraction = 1.;
+                    glass.material.probe = 0;
+                    scene.insert_backdrop_glass(glass);
+                };
+                if clipped {
+                    scene.with_clip_chain(&chain, 1., paint);
+                } else {
+                    paint(&mut scene);
+                }
+                scene.finish();
+                scene
+            };
+            let unmasked = renderer
+                .render_scene_to_image(
+                    &make_glass(false),
+                    size(DevicePixels(256), DevicePixels(256)),
+                )
+                .expect("unmasked glass renders");
+            let probe = renderer
+                .backdrop_luminance(0)
+                .expect("unmasked probe completes");
+            let masked = renderer
+                .render_scene_to_image(
+                    &make_glass(true),
+                    size(DevicePixels(256), DevicePixels(256)),
+                )
+                .expect("masked glass renders");
+            assert_eq!(
+                renderer.backdrop_luminance(0),
+                Some(probe),
+                "clips do not restrict optical probes"
+            );
+            for (x, y) in [(128, 128), (215, 40), (40, 215)] {
+                assert_eq!(
+                    masked.get_pixel(x, y),
+                    unmasked.get_pixel(x, y),
+                    "optical source unchanged at {x},{y}"
+                );
+            }
+            assert_eq!(masked.get_pixel(35, 35).0, [35, 35, 35, 255]);
+        }
+    }
+
     /// A scene that paints one full-viewport quad of `background` and lays a
     /// probed glass surface over the middle of it.
     fn probed_scene(background: gpui::Hsla, slot: u32) -> Scene {
@@ -4416,6 +4769,7 @@ mod tests {
             size: size(ScaledPixels(256.), ScaledPixels(256.)),
         };
         scene.insert_primitive(Quad {
+            clip_id: gpui::ClipId::NONE,
             order: 0,
             border_style: BorderStyle::default(),
             bounds: viewport,
@@ -4426,6 +4780,7 @@ mod tests {
             border_widths: Edges::default(),
         });
         scene.insert_backdrop_glass(BackdropGlass {
+            clip_id: gpui::ClipId::NONE,
             order: 0,
             bounds: Bounds {
                 origin: point(ScaledPixels(64.), ScaledPixels(64.)),
@@ -4539,6 +4894,45 @@ mod tests {
             None,
             "an unprobed slot stays empty"
         );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[test]
+    fn coloured_backdrop_statistics_use_the_existing_optical_readback() {
+        use gpui::{Hsla, PlatformHeadlessRenderer, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut renderer = WgpuHeadlessRenderer::new().expect("software adapter required");
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        assert_eq!(renderer.backdrop_statistics(7), None);
+        // Asymmetric RGB also detects RGBA/BGRA reversal. Both sharp and
+        // scattered optical sources must measure the backdrop, not the tint.
+        for blur in [0.0, 16.0] {
+            let mut scene = probed_scene(gpui::rgb(0xcc6633).into(), 7);
+            scene.backdrop_glass[0].material.blur_radius = ScaledPixels(blur);
+            let image = renderer
+                .render_scene_to_image(&scene, extent)
+                .expect("render");
+            assert_eq!(&image.get_pixel(16, 16).0[..3], &[204, 102, 51]);
+            let value = renderer
+                .backdrop_statistics(7)
+                .expect("completed statistics");
+            for (actual, expected) in value.mean_rgb.into_iter().zip([0.8, 0.4, 0.2]) {
+                assert!((actual - expected).abs() <= 1.0 / 255.0, "{value:?}");
+            }
+            assert!(
+                (value.mean_luminance - 0.4706).abs() <= 1.0 / 255.0,
+                "{value:?}"
+            );
+            assert!((value.min_luminance - 0.4706).abs() <= 1.0 / 255.0);
+            assert!((value.max_luminance - 0.4706).abs() <= 1.0 / 255.0);
+            assert!(value.luminance_variance < 1e-6);
+            assert_eq!(renderer.backdrop_luminance(7), Some(value.mean_luminance));
+            assert_eq!(renderer.backdrop_statistics(6), None);
+        }
+        renderer
+            .render_scene_to_image(&probed_scene(Hsla::black(), 6), extent)
+            .expect("next frame");
+        assert_eq!(renderer.backdrop_statistics(7), None);
     }
 
     #[test]
@@ -4765,10 +5159,19 @@ mod tests {
 
     #[test]
     fn backdrop_glass_shader_is_valid_wgsl() {
-        // WebGL2 runs this shader too, so it may not reach for anything past
-        // the baseline capabilities.
         validate_wgsl(BACKDROP_GLASS_SHADERS, naga::valid::Capabilities::empty());
-        assert!(!BACKDROP_GLASS_SHADERS.contains("var<storage"));
+        validate_wgsl(
+            WEBGL_BACKDROP_GLASS_SHADERS,
+            naga::valid::Capabilities::empty(),
+        );
+        let module = naga::front::wgsl::parse_str(WEBGL_BACKDROP_GLASS_SHADERS)
+            .expect("valid WebGL glass WGSL");
+        assert!(
+            module
+                .global_variables
+                .iter()
+                .all(|(_, variable)| !matches!(variable.space, naga::AddressSpace::Storage { .. }))
+        );
     }
 
     #[test]
@@ -4810,13 +5213,14 @@ mod tests {
 
     #[test]
     fn record_sizes_match_shader_word_strides() {
-        assert_eq!(std::mem::size_of::<Quad>(), 74 * 4);
-        assert_eq!(std::mem::size_of::<Shadow>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 60 * 4);
+        assert_eq!(std::mem::size_of::<Quad>(), 76 * 4);
+        assert_eq!(std::mem::size_of::<Shadow>(), 30 * 4);
+        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 62 * 4);
         assert_eq!(std::mem::size_of::<PathSprite>(), 4 * 4);
-        assert_eq!(std::mem::size_of::<Underline>(), 16 * 4);
-        assert_eq!(std::mem::size_of::<MonochromeSprite>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<SubpixelSprite>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 36 * 4);
+        assert_eq!(std::mem::size_of::<Underline>(), 18 * 4);
+        assert_eq!(std::mem::size_of::<MonochromeSprite>(), 30 * 4);
+        assert_eq!(std::mem::size_of::<SubpixelSprite>(), 30 * 4);
+        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 38 * 4);
+        assert_eq!(std::mem::size_of::<gpui::ClipNode>(), 10 * 4);
     }
 }

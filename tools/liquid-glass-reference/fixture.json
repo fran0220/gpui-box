@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "canvas": [960, 640],
+  "coordinates": "logical points, top-left origin; rectangles exclude optical outsets",
+  "background": {"cell": 32, "colors": ["#D9E6F2", "#F2CC99"], "grid": "#8090A0", "text": "Glass reference 012345", "font": "system monospaced 12", "text_origin": [480, 608]},
+  "fiducials": [{"rect": [8, 8, 24, 24], "rgb": [255, 0, 0]}, {"rect": [928, 8, 24, 24], "rgb": [0, 255, 0]}, {"rect": [8, 608, 24, 24], "rgb": [0, 0, 255]}],
+  "pills": [
+    {"id": "regular-small", "rect": [64, 80, 144, 40], "material": "regular", "label": "Regular"},
+    {"id": "clear-small", "rect": [304, 80, 144, 40], "material": "clear", "label": "Clear"},
+    {"id": "regular-large", "rect": [64, 160, 208, 72], "material": "regular", "label": "Regular large"},
+    {"id": "clear-large", "rect": [304, 160, 208, 72], "material": "clear", "label": "Clear large"},
+    {"id": "tinted", "rect": [592, 80, 208, 56], "material": "tinted", "label": "Tinted interactive"}
+  ],
+  "fusion": {"container_spacing": 32, "pane_size": [128, 72], "corner_radius": 20, "near": [[64, 304, 128, 72], [204, 304, 128, 72]], "far": [[448, 304, 128, 72], [640, 304, 128, 72]]},
+  "transition": {"identity": "menu", "button": [64, 448, 144, 48], "menu": [64, 448, 272, 128], "corner_radius": 24, "duration_seconds": 0.8, "samples": 16, "requested_interval_seconds": 0.08, "dispatch": "programmatic-state-change", "menu_labels": ["Copy", "Share", "Delete"]}
+}

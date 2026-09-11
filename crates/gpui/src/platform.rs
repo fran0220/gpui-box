@@ -1162,6 +1162,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn backdrop_luminance(&self, _slot: u32) -> Option<f32> {
         None
     }
+
+    /// Five-sample optical-source statistics for an active probe lease.
+    /// Unsupported renderers and probes without completed readings return `None`.
+    fn backdrop_statistics(&self, _id: u32) -> Option<crate::BackdropStatistics> {
+        None
+    }
 }
 
 /// A renderer for headless windows that can produce real rendered output.
@@ -1203,6 +1209,11 @@ pub trait PlatformHeadlessRenderer {
     /// The luminance this renderer read back for a probe slot, with the same
     /// meaning as [`PlatformWindow::backdrop_luminance`].
     fn backdrop_luminance(&mut self, _slot: u32) -> Option<f32> {
+        None
+    }
+
+    /// Same measurement and availability as [`PlatformWindow::backdrop_statistics`].
+    fn backdrop_statistics(&mut self, _id: u32) -> Option<crate::BackdropStatistics> {
         None
     }
 }

@@ -19,6 +19,7 @@ fn workload(count: u32) -> Scene {
     };
     for index in 0..count {
         scene.insert_primitive(Quad {
+            clip_id: gpui::ClipId::NONE,
             order: index,
             border_style: BorderStyle::default(),
             bounds: Bounds {

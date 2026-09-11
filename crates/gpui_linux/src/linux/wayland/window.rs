@@ -1796,6 +1796,14 @@ impl PlatformWindow for WaylandWindow {
         state.renderer.sprite_atlas().clone()
     }
 
+    fn backdrop_luminance(&self, id: u32) -> Option<f32> {
+        self.borrow_mut().renderer.backdrop_luminance(id)
+    }
+
+    fn backdrop_statistics(&self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.borrow_mut().renderer.backdrop_statistics(id)
+    }
+
     fn show_window_menu(&self, position: Point<Pixels>) {
         let state = self.borrow();
         let serial = state.client.get_serial(SerialKind::MousePress);

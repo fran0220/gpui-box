@@ -10,7 +10,7 @@ use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
     LUMINANCE_PROBE_SAMPLES, LuminanceProbeCache, MAX_LUMINANCE_PROBES, PaintSurface, Path, Point,
     PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, TextGammaParams,
-    luminance_probe_slot, point, probe_sample_luminance, size,
+    luminance_probe_slot, point, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -161,19 +161,18 @@ fn read_probe_values(
     let data = buffer.contents() as *const u8;
     for &id in requests {
         let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
-        let mut total = 0.0;
-        for index in 0..LUMINANCE_PROBE_SAMPLES {
-            // The drawable and every scratch texture are BGRA8Unorm.
-            let texel = unsafe {
-                slice::from_raw_parts(data.add((slot * LUMINANCE_PROBE_SAMPLES + index) * 4), 4)
-            };
-            total += probe_sample_luminance(
-                texel[2] as f32 / 255.0,
-                texel[1] as f32 / 255.0,
-                texel[0] as f32 / 255.0,
-            );
-        }
-        values.publish(frame, id, total / LUMINANCE_PROBE_SAMPLES as f32);
+        // The drawable and every scratch texture are BGRA8Unorm.
+        let texels = unsafe {
+            slice::from_raw_parts(
+                data.add(slot * LUMINANCE_PROBE_SAMPLES * 4),
+                LUMINANCE_PROBE_SAMPLES * 4,
+            )
+        };
+        values.publish_statistics(
+            frame,
+            id,
+            gpui::BackdropStatistics::from_encoded_texels(texels, 4, true),
+        );
     }
 }
 
@@ -224,6 +223,7 @@ pub(crate) struct MetalRenderer {
     path_intermediate_msaa_texture: Option<metal::Texture>,
     path_sample_count: u32,
     text_gamma_params: TextGammaParams,
+    rounded_clips: Option<InstanceBinding>,
     /// Offscreen render target reused across `render_scene` calls when
     /// rendering headlessly without reading pixels back.
     #[cfg(any(test, feature = "test-support"))]
@@ -236,6 +236,7 @@ pub struct PathRasterizationVertex {
     pub st_position: Point<f32>,
     pub color: Background,
     pub bounds: Bounds<ScaledPixels>,
+    pub clip_id: gpui::ClipId,
 }
 
 impl MetalRenderer {
@@ -490,6 +491,7 @@ impl MetalRenderer {
         Self {
             device,
             layer,
+            rounded_clips: None,
             presents_with_transaction: false,
             is_apple_gpu,
             is_unified_memory,
@@ -858,6 +860,7 @@ impl MetalRenderer {
         texture: &metal::TextureRef,
         viewport_size: Size<DevicePixels>,
     ) -> Result<metal::CommandBuffer> {
+        self.rounded_clips = Some(writer.write(scene.clip_nodes.nodes())?);
         let command_queue = self.command_queue.clone();
         let command_buffer = command_queue.new_command_buffer();
         let alpha = if self.opaque { 1. } else { 0. };
@@ -1078,6 +1081,11 @@ impl MetalRenderer {
         Ok(command_buffer.to_owned())
     }
 
+    fn bind_rounded_clips(&self, encoder: &metal::RenderCommandEncoderRef) {
+        let clips = self.rounded_clips.as_ref().expect("scene clips uploaded");
+        encoder.set_fragment_buffer(15, Some(&clips.buffer), clips.offset as u64);
+    }
+
     fn draw_paths_to_intermediate(
         &self,
         paths: &[Path<ScaledPixels>],
@@ -1100,6 +1108,7 @@ impl MetalRenderer {
                 st_position: v.st_position,
                 color: path.color,
                 bounds: path.bounds.intersect(&path.content_mask.bounds),
+                clip_id: path.clip_id,
             }));
         }
         let vertex_instance_bindings = writer.write(&vertices)?;
@@ -1123,6 +1132,7 @@ impl MetalRenderer {
 
         let command_encoder = command_buffer.new_render_command_encoder(render_pass_descriptor);
         command_encoder.set_render_pipeline_state(&self.paths_rasterization_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             PathRasterizationInputIndex::Vertices as u64,
             Some(&vertex_instance_bindings.buffer),
@@ -1229,6 +1239,10 @@ impl MetalRenderer {
         self.probe_values.lock().get(id)
     }
 
+    pub fn backdrop_statistics(&mut self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.probe_values.lock().statistics(id)
+    }
+
     /// The cached `MPSImageGaussianBlur` for `sigma` (device px) — Apple's
     /// optimized true gaussian; hand-rolled sparse taps ghosted on text.
     fn ensure_gaussian_kernel(&mut self, sigma: f32) -> *mut objc::runtime::Object {
@@ -1271,6 +1285,7 @@ impl MetalRenderer {
         let instance_binding = writer.write(&[optical_glass])?;
 
         command_encoder.set_render_pipeline_state(&self.backdrop_glass_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             BackdropGlassInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1328,6 +1343,7 @@ impl MetalRenderer {
         }
 
         command_encoder.set_render_pipeline_state(&self.shadows_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             ShadowInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1370,6 +1386,7 @@ impl MetalRenderer {
         }
 
         command_encoder.set_render_pipeline_state(&self.quads_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             QuadInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1488,6 +1505,7 @@ impl MetalRenderer {
         }
 
         command_encoder.set_render_pipeline_state(&self.underlines_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             UnderlineInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1536,6 +1554,7 @@ impl MetalRenderer {
             DevicePixels(texture.height() as i32),
         );
         command_encoder.set_render_pipeline_state(&self.monochrome_sprites_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             SpriteInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1601,6 +1620,7 @@ impl MetalRenderer {
             SpriteBlendMode::Screen => &self.polychrome_sprites_screen_pipeline_state,
         };
         command_encoder.set_render_pipeline_state(pipeline);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             SpriteInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1650,6 +1670,7 @@ impl MetalRenderer {
         }
 
         command_encoder.set_render_pipeline_state(&self.surfaces_pipeline_state);
+        self.bind_rounded_clips(command_encoder);
         command_encoder.set_vertex_buffer(
             SurfaceInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -2031,6 +2052,7 @@ fn write_instances(scene: &Scene, writer: &mut InstanceBufferWriter) -> Result<I
         surfaces: writer.write_iter(scene.surfaces.iter().map(|surface| SurfaceBounds {
             bounds: surface.bounds,
             content_mask: surface.content_mask,
+            clip_id: surface.clip_id,
         }))?,
     })
 }
@@ -2233,6 +2255,7 @@ pub struct PathSprite {
 pub struct SurfaceBounds {
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
+    pub clip_id: gpui::ClipId,
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -2348,6 +2371,10 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
     fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
         self.renderer.backdrop_luminance(slot)
     }
+
+    fn backdrop_statistics(&mut self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.renderer.backdrop_statistics(id)
+    }
 }
 
 #[cfg(test)]
@@ -2397,6 +2424,7 @@ mod tests {
         };
         scene.insert_primitive(Quad {
             order: 0,
+            clip_id: gpui::ClipId::NONE,
             border_style: BorderStyle::default(),
             bounds: viewport,
             content_mask: ContentMask { bounds: viewport },
@@ -2407,6 +2435,7 @@ mod tests {
         });
         scene.insert_backdrop_glass(gpui::BackdropGlass {
             order: 0,
+            clip_id: gpui::ClipId::NONE,
             bounds: Bounds {
                 origin: point(ScaledPixels(64.), ScaledPixels(64.)),
                 size: size(ScaledPixels(128.), ScaledPixels(128.)),

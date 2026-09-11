@@ -1257,6 +1257,10 @@ impl PlatformWindow for WindowsWindow {
         self.state.renderer.borrow_mut().backdrop_luminance(slot)
     }
 
+    fn backdrop_statistics(&self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.state.renderer.borrow_mut().backdrop_statistics(id)
+    }
+
     fn draw_layered(&self, scene: &Scene, overlay_start: usize) {
         self.state
             .renderer

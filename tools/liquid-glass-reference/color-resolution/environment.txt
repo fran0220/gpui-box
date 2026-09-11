@@ -1,0 +1,6 @@
+ProductName:		macOS
+ProductVersion:		27.0
+BuildVersion:		26A5416b
+Xcode 26.2
+Build version 17C52
+26.2

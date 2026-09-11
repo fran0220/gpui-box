@@ -573,7 +573,7 @@
           "features": []
         }
       ],
-      "symbolCount": 2699
+      "symbolCount": 2727
     },
     {
       "name": "gpui-box-app-host",
@@ -1225,7 +1225,7 @@
           "features": []
         }
       ],
-      "symbolCount": 4674
+      "symbolCount": 4676
     },
     {
       "name": "gpui-box-kit-assets",
@@ -1557,7 +1557,7 @@
           "features": []
         }
       ],
-      "symbolCount": 58
+      "symbolCount": 59
     },
     {
       "name": "gpui-box-macros",
@@ -2383,7 +2383,7 @@
           "features": []
         }
       ],
-      "symbolCount": 58
+      "symbolCount": 59
     },
     {
       "name": "gpui-box-windows",
@@ -23890,6 +23890,20 @@
     },
     {
       "id": "gpui::gpui::reexport-42",
+      "name": "subtree_clip :: *",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use subtree_clip::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-43",
       "name": "svg_renderer :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23903,7 +23917,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-43",
+      "id": "gpui::gpui::reexport-44",
       "name": "taffy :: { AvailableSpace , LayoutId }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23917,7 +23931,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-44",
+      "id": "gpui::gpui::reexport-45",
       "name": "test :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23933,7 +23947,7 @@
       ]
     },
     {
-      "id": "gpui::gpui::reexport-45",
+      "id": "gpui::gpui::reexport-46",
       "name": "text_system :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23947,7 +23961,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-46",
+      "id": "gpui::gpui::reexport-47",
       "name": "util :: { FutureExt , Timeout }",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23961,7 +23975,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-47",
+      "id": "gpui::gpui::reexport-48",
       "name": "view :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23975,7 +23989,7 @@
       "cfg": []
     },
     {
-      "id": "gpui::gpui::reexport-48",
+      "id": "gpui::gpui::reexport-49",
       "name": "window :: *",
       "kind": "reexport",
       "package": "gpui-box",
@@ -23986,20 +24000,6 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use window::*;",
-      "cfg": []
-    },
-    {
-      "id": "gpui::gpui::reexport-49",
-      "name": "pollster :: block_on",
-      "kind": "reexport",
-      "package": "gpui-box",
-      "crate": "gpui",
-      "module": "gpui",
-      "path": "gpui::gpui",
-      "source": "crates/gpui/src/gpui.rs",
-      "summary": "",
-      "documentation": "",
-      "signature": "pub use pollster::block_on;",
       "cfg": []
     },
     {
@@ -24014,6 +24014,20 @@
       "summary": "",
       "documentation": "",
       "signature": "pub use action::*;",
+      "cfg": []
+    },
+    {
+      "id": "gpui::gpui::reexport-50",
+      "name": "pollster :: block_on",
+      "kind": "reexport",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "gpui",
+      "path": "gpui::gpui",
+      "source": "crates/gpui/src/gpui.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub use pollster::block_on;",
       "cfg": []
     },
     {
@@ -26375,6 +26389,35 @@
       "cfg": []
     },
     {
+      "id": "gpui::luminance::BackdropStatistics",
+      "name": "BackdropStatistics",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Statistics of the five optical-source texels copied by a glass probe: center and diagonal quarter points, after scattering when enabled and before glass compositing. These are encoded RGB measurements, not linear light, exhaustive backdrop extrema, or exhaustive backdrop variance. Alpha is ignored: stored RGB is neither unpremultiplied nor alpha-weighted.",
+      "documentation": "Statistics of the five optical-source texels copied by a glass probe:\ncenter and diagonal quarter points, after scattering when enabled and\nbefore glass compositing. These are encoded RGB measurements, not linear\nlight, exhaustive backdrop extrema, or exhaustive backdrop variance.\nAlpha is ignored: stored RGB is neither unpremultiplied nor alpha-weighted.",
+      "signature": "# [doc = \" Statistics of the five optical-source texels copied by a glass probe:\"] # [doc = \" center and diagonal quarter points, after scattering when enabled and\"] # [doc = \" before glass compositing. These are encoded RGB measurements, not linear\"] # [doc = \" light, exhaustive backdrop extrema, or exhaustive backdrop variance.\"] # [doc = \" Alpha is ignored: stored RGB is neither unpremultiplied nor alpha-weighted.\"] # [derive (Clone, Copy, Debug, PartialEq)] pub struct BackdropStatistics { # [doc = \" Arithmetic mean of stored encoded red, green, and blue, in `0..=1`.\"] pub mean_rgb : [f32; 3], # [doc = \" Mean encoded luminance; identical to the legacy probe reading.\"] pub mean_luminance : f32, # [doc = \" Minimum encoded luminance among the five sampled texels only.\"] pub min_luminance : f32, # [doc = \" Maximum encoded luminance among the five sampled texels only.\"] pub max_luminance : f32, # [doc = \" Population variance of the five encoded luminances (divisor five).\"] pub luminance_variance : f32, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::luminance::BackdropStatistics::from_encoded_texels",
+      "name": "from_encoded_texels",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Decode five RGBA8 or BGRA8 texels at `stride` byte intervals. The caller supplies the slice beginning at the probe's first texel; row padding and other probes are never included in the measurement. Panics if the slice cannot contain all five texels or stride is below four.",
+      "documentation": "Decode five RGBA8 or BGRA8 texels at `stride` byte intervals.\nThe caller supplies the slice beginning at the probe's first texel;\nrow padding and other probes are never included in the measurement.\nPanics if the slice cannot contain all five texels or stride is below four.",
+      "signature": "pub fn from_encoded_texels (data : & [u8], stride : usize, bgra : bool) -> Self",
+      "cfg": [],
+      "target": "BackdropStatistics"
+    },
+    {
       "id": "gpui::luminance::LuminanceProbeCache",
       "name": "LuminanceProbeCache",
       "kind": "struct",
@@ -26430,6 +26473,36 @@
       "summary": "Publish a completed sample only for its still-active owner and activation. Late older submissions cannot overwrite a newer sample; an older frame of the same continuously active owner remains usable.",
       "documentation": "Publish a completed sample only for its still-active owner and\nactivation. Late older submissions cannot overwrite a newer sample;\nan older frame of the same continuously active owner remains usable.",
       "signature": "pub fn publish (& mut self, frame : u64, id : u32, luminance : f32)",
+      "cfg": [],
+      "target": "LuminanceProbeCache"
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache::publish_statistics",
+      "name": "publish_statistics",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Publish statistics atomically with their legacy mean, using the same owner, activation, and completion-order checks as scalar readings.",
+      "documentation": "Publish statistics atomically with their legacy mean, using the same\nowner, activation, and completion-order checks as scalar readings.",
+      "signature": "pub fn publish_statistics (& mut self, frame : u64, id : u32, statistics : BackdropStatistics)",
+      "cfg": [],
+      "target": "LuminanceProbeCache"
+    },
+    {
+      "id": "gpui::luminance::LuminanceProbeCache::statistics",
+      "name": "statistics",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "luminance",
+      "path": "gpui::luminance",
+      "source": "crates/gpui/src/luminance.rs",
+      "summary": "Latest statistics for the exact active lease, with the same freshness rules as [`Self::get`]. A scalar-only publication has no statistics.",
+      "documentation": "Latest statistics for the exact active lease, with the same freshness\nrules as [`Self::get`]. A scalar-only publication has no statistics.",
+      "signature": "pub fn statistics (& self, id : u32) -> Option<BackdropStatistics>",
       "cfg": [],
       "target": "LuminanceProbeCache"
     },
@@ -28014,7 +28087,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "A renderer for headless windows that can produce real rendered output.",
       "documentation": "A renderer for headless windows that can produce real rendered output.",
-      "signature": "# [doc = \" A renderer for headless windows that can produce real rendered output.\"] # [cfg (any (test, feature = \"test-support\"))] pub trait PlatformHeadlessRenderer { # [doc = \" Render a scene and return the result as an RGBA image.\"] fn render_scene_to_image (& mut self, scene : & Scene, size : Size<DevicePixels>,) -> Result<RgbaImage>; # [doc = \" Render a scene to an offscreen target without reading the result back.\"] # [doc = \"\"] # [doc = \" This is the headless analogue of presenting a frame: it performs the\"] # [doc = \" same CPU-side scene encoding and GPU submission as drawing to a real\"] # [doc = \" window, but doesn't block on GPU completion or copy pixels back.\"] fn render_scene (& mut self, scene : & Scene, size : Size<DevicePixels>) -> Result<()>; # [doc = \" Opt-in, blocking measurement of one offscreen submission. Ordinary rendering\"] # [doc = \" stays nonblocking. Completion is not presentation, and pixel capture is not\"] # [doc = \" GPU execution. Unsupported implementations return an error, not zero time.\"] fn measure_scene (& mut self, _scene : & Scene, _size : Size<DevicePixels>,) -> Result<crate::RendererFrameTiming> { anyhow::bail ! (\"renderer timing is unsupported by this backend\") } # [doc = \" Adapter/backend identity for same-host evidence, not a portability promise.\"] fn timing_identity (& self) -> String { \"unsupported\" . into () } # [doc = \" Returns the sprite atlas used by this renderer.\"] fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; # [doc = \" The luminance this renderer read back for a probe slot, with the same\"] # [doc = \" meaning as [`PlatformWindow::backdrop_luminance`].\"] fn backdrop_luminance (& mut self, _slot : u32) -> Option<f32> { None } }",
+      "signature": "# [doc = \" A renderer for headless windows that can produce real rendered output.\"] # [cfg (any (test, feature = \"test-support\"))] pub trait PlatformHeadlessRenderer { # [doc = \" Render a scene and return the result as an RGBA image.\"] fn render_scene_to_image (& mut self, scene : & Scene, size : Size<DevicePixels>,) -> Result<RgbaImage>; # [doc = \" Render a scene to an offscreen target without reading the result back.\"] # [doc = \"\"] # [doc = \" This is the headless analogue of presenting a frame: it performs the\"] # [doc = \" same CPU-side scene encoding and GPU submission as drawing to a real\"] # [doc = \" window, but doesn't block on GPU completion or copy pixels back.\"] fn render_scene (& mut self, scene : & Scene, size : Size<DevicePixels>) -> Result<()>; # [doc = \" Opt-in, blocking measurement of one offscreen submission. Ordinary rendering\"] # [doc = \" stays nonblocking. Completion is not presentation, and pixel capture is not\"] # [doc = \" GPU execution. Unsupported implementations return an error, not zero time.\"] fn measure_scene (& mut self, _scene : & Scene, _size : Size<DevicePixels>,) -> Result<crate::RendererFrameTiming> { anyhow::bail ! (\"renderer timing is unsupported by this backend\") } # [doc = \" Adapter/backend identity for same-host evidence, not a portability promise.\"] fn timing_identity (& self) -> String { \"unsupported\" . into () } # [doc = \" Returns the sprite atlas used by this renderer.\"] fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; # [doc = \" The luminance this renderer read back for a probe slot, with the same\"] # [doc = \" meaning as [`PlatformWindow::backdrop_luminance`].\"] fn backdrop_luminance (& mut self, _slot : u32) -> Option<f32> { None } # [doc = \" Same measurement and availability as [`PlatformWindow::backdrop_statistics`].\"] fn backdrop_statistics (& mut self, _id : u32) -> Option<crate::BackdropStatistics> { None } }",
       "cfg": [
         "cfg (any (test, feature = \"test-support\"))"
       ]
@@ -28611,7 +28684,7 @@
       "source": "crates/gpui/src/platform.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { # [doc = \" Checks a native command on the owner UI thread immediately before dispatch.\"] # [doc = \" Mobile backends must opt in to commands they implement; OS-owned window\"] # [doc = \" geometry is not a successful resize. Use `Window::try_*` to receive errors\"] # [doc = \" instead of relying on legacy void commands, which may do nothing on mobile.\"] fn check_window_operation (& self, _operation : WindowOperation,) -> Result<(), PlatformOperationError> { if cfg ! (any (target_os = \"android\", target_os = \"ios\")) { Err (PlatformOperationError::Unsupported (\"window command\")) } else { Ok (()) } } fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents one opaque menu revision. Replacements must invalidate the old\"] # [doc = \" revision and wait for its native tracking loop to exit before starting\"] # [doc = \" the next, including replacements from another window on this UI thread.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuError::NotSupported`] so the component can render in-window.\"] # [doc = \" Failed replacement cancellation is a refusal, not unsupported capability.\"] fn show_context_menu (& self, _session : NativeMenuSessionId, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> { Err (NativeMenuNotSupportedError . into ()) } # [doc = \" Invalidates only the matching current revision. `true` means a cancel\"] # [doc = \" request, not completed closure; the result receiver confirms loop exit.\"] # [doc = \" A stale identity must never call a thread-wide native cancellation API.\"] # [doc = \" Even a refused cancellation must suppress that revision's late command.\"] fn cancel_context_menu (& self, _session : NativeMenuSessionId) -> Result<bool, NativeMenuError> { Ok (false) } # [doc = \" Observes a menu only while inside the actual native tracking call.\"] # [doc = \" Queued menus and test-platform simulations must return `None`. This is\"] # [doc = \" instrumentation for native loop smoke tests, not presentation state.\"] # [cfg (any (test, feature = \"test-support\"))] fn native_context_menu_tracking (& self) -> Option<NativeMenuSessionId> { None } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change. Update\"] # [doc = \" the value returned by `insets` before invoking this callback.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that text input state changed. Called while\"] # [doc = \" the core window is borrowed; defer native queries through the input\"] # [doc = \" handler until after returning, rather than reentering the core window.\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } }",
+      "signature": "# [expect (missing_docs)] pub trait PlatformWindow : HasWindowHandle + HasDisplayHandle { # [doc = \" Checks a native command on the owner UI thread immediately before dispatch.\"] # [doc = \" Mobile backends must opt in to commands they implement; OS-owned window\"] # [doc = \" geometry is not a successful resize. Use `Window::try_*` to receive errors\"] # [doc = \" instead of relying on legacy void commands, which may do nothing on mobile.\"] fn check_window_operation (& self, _operation : WindowOperation,) -> Result<(), PlatformOperationError> { if cfg ! (any (target_os = \"android\", target_os = \"ios\")) { Err (PlatformOperationError::Unsupported (\"window command\")) } else { Ok (()) } } fn bounds (& self) -> Bounds<Pixels>; fn is_maximized (& self) -> bool; fn window_bounds (& self) -> WindowBounds; fn content_size (& self) -> Size<Pixels>; fn resize (& mut self, size : Size<Pixels>); fn scale_factor (& self) -> f32; fn appearance (& self) -> WindowAppearance; fn display (& self) -> Option<Rc<dyn PlatformDisplay>>; fn mouse_position (& self) -> Point<Pixels>; fn modifiers (& self) -> Modifiers; fn capslock (& self) -> Capslock; fn set_input_handler (& mut self, input_handler : PlatformInputHandler); fn take_input_handler (& mut self) -> Option<PlatformInputHandler>; fn prompt (& self, level : PromptLevel, msg : & str, detail : Option<& str>, answers : & [PromptButton],) -> Option<oneshot::Receiver<usize>>; fn activate (& self); # [doc = \" Requests that the operating system draw attention to this window.\"] fn request_attention (& self) { } fn is_active (& self) -> bool; fn is_hovered (& self) -> bool; fn background_appearance (& self) -> WindowBackgroundAppearance; fn set_title (& mut self, title : & str); fn set_background_appearance (& self, background_appearance : WindowBackgroundAppearance); fn minimize (& self); fn zoom (& self); # [doc = \" Asks the platform to close this window through its normal close path.\"] # [doc = \"\"] # [doc = \" The request must run the callback registered by [`Self::on_should_close`]\"] # [doc = \" and leave the window open when that callback refuses.\"] fn request_close (& self); fn toggle_fullscreen (& self); fn is_fullscreen (& self) -> bool; fn on_request_frame (& self, callback : Box<dyn FnMut (RequestFrameOptions)>); fn on_input (& self, callback : Box<dyn FnMut (PlatformInput) -> DispatchEventResult>); fn on_active_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_hover_status_change (& self, callback : Box<dyn FnMut (bool)>); fn on_resize (& self, callback : Box<dyn FnMut (Size<Pixels>, f32)>); fn on_moved (& self, callback : Box<dyn FnMut ()>); fn on_should_close (& self, callback : Box<dyn FnMut () -> bool>); # [doc = \" Registers the hit test for client-drawn window chrome.\"] # [doc = \"\"] # [doc = \" The platform supplies the position from the native hit-test request\"] # [doc = \" itself. Using the last delivered pointer event is one movement behind\"] # [doc = \" on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a\"] # [doc = \" maximize button report client area on entry instead of `HTMAXBUTTON`.\"] fn on_hit_test_window_control (& self, callback : Box<dyn FnMut (Point<Pixels>) -> Option<WindowControlArea>>,); fn on_close (& self, callback : Box<dyn FnOnce ()>); fn on_appearance_changed (& self, callback : Box<dyn FnMut ()>); fn on_button_layout_changed (& self, _callback : Box<dyn FnMut ()>) { } fn draw (& self, scene : & Scene); # [doc = \" Draws a scene with primitives at and after `overlay_start` on a platform\"] # [doc = \" overlay surface when one has been enabled.\"] # [doc = \"\"] # [doc = \" Platforms without layered scene support fall back to drawing the complete\"] # [doc = \" scene on their primary surface.\"] fn draw_layered (& self, scene : & Scene, _overlay_start : usize) { self . draw (scene); } # [doc = \" Enables a transparent GPUI surface above native child views.\"] # [doc = \"\"] # [doc = \" This is currently an experimental capability for embedding native\"] # [doc = \" surfaces between GPUI's base and deferred-overlay paint planes.\"] fn enable_scene_overlay (& self) -> anyhow::Result<()> { anyhow::bail ! (\"layered GPUI scenes are not supported on this platform\") } # [doc = \" Creates a native surface slot between GPUI's base and overlay planes.\"] fn create_native_surface (& self) -> Result<Rc<dyn PlatformNativeSurface>> { anyhow::bail ! (\"native surface portals are not supported on this platform\") } # [doc = \" Attaches, repositions and detaches natively hosted views to match the\"] # [doc = \" frame GPUI just drew.\"] # [doc = \"\"] # [doc = \" Called from the window's draw, which runs on the platform's UI thread, so\"] # [doc = \" implementations may touch native view hierarchies directly. Platforms\"] # [doc = \" without native view hosting ignore the update.\"] fn update_platform_views (& self, _update : & PlatformViewUpdate) { } fn completed_frame (& self) { } fn sprite_atlas (& self) -> Arc<dyn PlatformAtlas>; fn is_subpixel_rendering_supported (& self) -> bool; fn get_title (& self) -> String { String::new () } fn tabbed_windows (& self) -> Option<Vec<SystemWindowTab>> { None } fn tab_bar_visible (& self) -> bool { false } fn set_edited (& mut self, _edited : bool) { } fn set_document_path (& self, _path : Option<& std::path::Path>) { } # [cfg (target_os = \"macos\")] fn set_traffic_light_position (& self, _position : Point<Pixels>) { } fn show_character_palette (& self) { } fn titlebar_double_click (& self, _is_resizable : bool, _is_minimizable : bool) { } fn on_move_tab_to_new_window (& self, _callback : Box<dyn FnMut ()>) { } fn on_merge_all_windows (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_previous_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_select_next_tab (& self, _callback : Box<dyn FnMut ()>) { } fn on_toggle_tab_bar (& self, _callback : Box<dyn FnMut ()>) { } fn merge_all_windows (& self) { } fn move_tab_to_new_window (& self) { } fn toggle_window_tab_overview (& self) { } fn set_tabbing_identifier (& self, _identifier : Option<String>) { } # [cfg (target_os = \"windows\")] fn get_raw_handle (& self) -> windows::Win32::Foundation::HWND; fn inner_window_bounds (& self) -> WindowBounds { self . window_bounds () } fn request_decorations (& self, _decorations : WindowDecorations) { } fn show_window_menu (& self, _position : Point<Pixels>) { } # [doc = \" Presents one opaque menu revision. Replacements must invalidate the old\"] # [doc = \" revision and wait for its native tracking loop to exit before starting\"] # [doc = \" the next, including replacements from another window on this UI thread.\"] # [doc = \"\"] # [doc = \" Implementations must run a blocking native tracking loop only after the\"] # [doc = \" current GPUI call stack has yielded. Coordinates are window-relative\"] # [doc = \" logical pixels. Unsupported platforms return\"] # [doc = \" [`NativeMenuError::NotSupported`] so the component can render in-window.\"] # [doc = \" Failed replacement cancellation is a refusal, not unsupported capability.\"] fn show_context_menu (& self, _session : NativeMenuSessionId, _menu : Menu, _position : Point<Pixels>,) -> std::result::Result<oneshot::Receiver<PlatformNativeMenuOutcome>, NativeMenuError> { Err (NativeMenuNotSupportedError . into ()) } # [doc = \" Invalidates only the matching current revision. `true` means a cancel\"] # [doc = \" request, not completed closure; the result receiver confirms loop exit.\"] # [doc = \" A stale identity must never call a thread-wide native cancellation API.\"] # [doc = \" Even a refused cancellation must suppress that revision's late command.\"] fn cancel_context_menu (& self, _session : NativeMenuSessionId) -> Result<bool, NativeMenuError> { Ok (false) } # [doc = \" Observes a menu only while inside the actual native tracking call.\"] # [doc = \" Queued menus and test-platform simulations must return `None`. This is\"] # [doc = \" instrumentation for native loop smoke tests, not presentation state.\"] # [cfg (any (test, feature = \"test-support\"))] fn native_context_menu_tracking (& self) -> Option<NativeMenuSessionId> { None } fn start_window_move (& self) { } fn can_start_external_drag (& self) -> bool { false } fn start_external_drag (& self, _payload : & ExternalDragPayload) -> bool { false } fn start_window_resize (& self, _edge : ResizeEdge) { } fn set_exclusive_zone (& self, _zone : Pixels) { } # [cfg (all (target_os = \"linux\", feature = \"wayland\"))] fn set_exclusive_edge (& self, _edge : layer_shell::Anchor) { } fn set_input_region (& self, _region : Option<& [Bounds<Pixels>]>) { } fn window_decorations (& self) -> Decorations { Decorations::Server } fn set_app_id (& mut self, _app_id : & str) { } fn map_window (& mut self) -> anyhow::Result<()> { Ok (()) } fn window_controls (& self) -> WindowControls { WindowControls::default () } fn set_client_inset (& self, _inset : Pixels) { } fn gpu_specs (& self) -> Option<GpuSpecs>; fn update_ime_position (& self, _bounds : Bounds<Pixels>); # [doc = \" The regions of this window currently obscured or reserved by the\"] # [doc = \" system. Zero on platforms without such regions.\"] fn insets (& self) -> WindowInsets { WindowInsets::default () } # [doc = \" Registers a callback invoked whenever [`Self::insets`] change. Update\"] # [doc = \" the value returned by `insets` before invoking this callback.\"] # [doc = \"\"] # [doc = \" Contract: fires continuously during animated transitions (Android\"] # [doc = \" `WindowInsetsAnimation` progress; on iOS the platform interpolates\"] # [doc = \" the keyboard animation curve on frame ticks) and is exact at rest.\"] fn on_insets_changed (& self, _callback : Box<dyn FnMut (WindowInsets)>) { } # [doc = \" Sets the handler for the system back action (Android back\"] # [doc = \" button/gesture; no source on iOS or desktop).\"] fn set_back_handler (& self, _callback : Box<dyn FnMut ()>) { } # [doc = \" Declares whether the application would currently handle the system\"] # [doc = \" back action (e.g. navigation depth> 0).\"] fn set_back_enabled (& self, _enabled : bool) { } # [doc = \" Requests that the soft keyboard be shown.\"] fn show_soft_keyboard (& self) { } # [doc = \" Requests that the soft keyboard be hidden.\"] fn hide_soft_keyboard (& self) { } # [doc = \" Inform the operating system that text input state changed. Called while\"] # [doc = \" the core window is borrowed; defer native queries through the input\"] # [doc = \" handler until after returning, rather than reentering the core window.\"] fn text_input_state_changed (& self, _change : TextInputStateChange) { } fn play_system_bell (& self) { } # [doc = \" Initialize the accessibility adapter with callbacks.\"] fn a11y_init (& self, _callbacks : A11yCallbacks) { } # [doc = \" Provide a TreeUpdate to the accessibility adapter.\"] fn a11y_tree_update (& self, _tree_update : accesskit::TreeUpdate) { } # [doc = \" Inform the adapter of updated window bounds.\"] fn a11y_update_window_bounds (& self) { } # [cfg (any (test, feature = \"test-support\"))] fn as_test (& mut self) -> Option<& mut TestWindow> { None } # [doc = \" Renders the given scene to a texture and returns the pixel data as an RGBA image.\"] # [doc = \" This does not present the frame to screen - useful for visual testing where we want\"] # [doc = \" to capture what would be rendered without displaying it or requiring the window to be visible.\"] # [cfg (any (test, feature = \"test-support\"))] fn render_to_image (& self, _scene : & Scene) -> Result<RgbaImage> { anyhow::bail ! (\"render_to_image not implemented for this platform\") } # [doc = \" The luminance the renderer read back for this probe slot, or `None`\"] # [doc = \" while no probed surface has completed a frame in it — including on a\"] # [doc = \" renderer that takes no probes at all, which is how the absence of the\"] # [doc = \" capability is reported rather than hidden.\"] fn backdrop_luminance (& self, _slot : u32) -> Option<f32> { None } # [doc = \" Five-sample optical-source statistics for an active probe lease.\"] # [doc = \" Unsupported renderers and probes without completed readings return `None`.\"] fn backdrop_statistics (& self, _id : u32) -> Option<crate::BackdropStatistics> { None } }",
       "cfg": []
     },
     {
@@ -33361,7 +33434,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "A within-window glass surface: the renderer snapshots everything painted below this order, optionally derives a blurred source, and paints it back through the surface's shape and material. See [`crate::Window::paint_backdrop_glass`].",
       "documentation": "A within-window glass surface: the renderer snapshots everything painted\nbelow this order, optionally derives a blurred source, and paints it back\nthrough the surface's shape and material. See\n[`crate::Window::paint_backdrop_glass`].",
-      "signature": "# [doc = \" A within-window glass surface: the renderer snapshots everything painted\"] # [doc = \" below this order, optionally derives a blurred source, and paints it back\"] # [doc = \" through the surface's shape and material. See\"] # [doc = \" [`crate::Window::paint_backdrop_glass`].\"] # [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct BackdropGlass { pub order : DrawOrder, # [doc = \" The region the surface occupies. With more than one lobe this is the\"] # [doc = \" union's bounding box, which is what the renderer rasterizes and what\"] # [doc = \" clips the blur; the shape inside it comes from `lobes`.\"] pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, # [doc = \" The rounding used when `lobe_count` is 0.\"] pub corner_radii : Corners<ScaledPixels>, pub material : GlassMaterial<ScaledPixels>, # [doc = \" The length is written out rather than named so that the C header\"] # [doc = \" generated for the Metal shaders carries a literal bound, which needs no\"] # [doc = \" integer typedef and no include. [`MAX_GLASS_LOBES`] is asserted equal\"] # [doc = \" to it below, so the two cannot drift.\"] pub lobes : [GlassLobe<ScaledPixels>; 8], # [doc = \" How many entries of `lobes` are real. Zero means the surface is the\"] # [doc = \" single rounded rect named by `bounds` and `corner_radii`.\"] pub lobe_count : u32, }",
+      "signature": "# [doc = \" A within-window glass surface: the renderer snapshots everything painted\"] # [doc = \" below this order, optionally derives a blurred source, and paints it back\"] # [doc = \" through the surface's shape and material. See\"] # [doc = \" [`crate::Window::paint_backdrop_glass`].\"] # [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct BackdropGlass { pub order : DrawOrder, # [doc = \" The region the surface occupies. With more than one lobe this is the\"] # [doc = \" union's bounding box, which is what the renderer rasterizes and what\"] # [doc = \" clips the blur; the shape inside it comes from `lobes`.\"] pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, # [doc = \" The rounding used when `lobe_count` is 0.\"] pub corner_radii : Corners<ScaledPixels>, pub material : GlassMaterial<ScaledPixels>, # [doc = \" The length is written out rather than named so that the C header\"] # [doc = \" generated for the Metal shaders carries a literal bound, which needs no\"] # [doc = \" integer typedef and no include. [`MAX_GLASS_LOBES`] is asserted equal\"] # [doc = \" to it below, so the two cannot drift.\"] pub lobes : [GlassLobe<ScaledPixels>; 8], # [doc = \" How many entries of `lobes` are real. Zero means the surface is the\"] # [doc = \" single rounded rect named by `bounds` and `corner_radii`.\"] pub lobe_count : u32, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -33593,7 +33666,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "The complete optical response of a glass surface.",
       "documentation": "The complete optical response of a glass surface.\n\nBlur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\nsnapshots the sharp backdrop and leaves it unchanged; callers independently\nadd refraction, dispersion, transmission, an optical lift, or edge light.\n[`GlassMaterial::frosted`] adds only scattering. Refraction samples that\nscattered source throughout the surface, including the rim. The retained\nsharp snapshot restores the original backdrop only under an explicit edge mask.",
-      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. Refraction samples that\"] # [doc = \" scattered source throughout the surface, including the rim. The retained\"] # [doc = \" sharp snapshot restores the original backdrop only under an explicit edge mask.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] # [doc = \" Renderers bound this requested depth by the shape's rounded-corner\"] # [doc = \" reach; see [`BackdropGlass::optical_bevel`].\"] pub bevel : P, # [doc = \" Signed multiplier of the surface thickness. Zero flattens the surface;\"] # [doc = \" positive values describe a convex face, negative values a concave face.\"] # [doc = \" This scales both the height and its derivative, including lighting.\"] pub refraction : f32, # [doc = \" Maximum profile height before applying `refraction`. Zero follows the\"] # [doc = \" geometrically bounded bevel. Explicit heights do not widen the bevel.\"] pub thickness : P, # [doc = \" Dielectric index relative to air, sanitized to 1..=2.5. One removes\"] # [doc = \" refraction and Fresnel reflection. Clear constructors use 1.5.\"] pub refractive_index : f32, # [doc = \" Effective distance below the profile base to the sampled optical plane.\"] # [doc = \" The refracted ray propagates through this distance in the same medium:\"] # [doc = \" this is not an air gap behind a second dielectric interface. Screen-space\"] # [doc = \" glass has no scene depth, hidden geometry or multi-bounce ray tracing.\"] pub backdrop_depth : P, # [doc = \" Fractional variation of `refractive_index - 1` for red and blue.\"] # [doc = \" Zero uses the same Snell ray for all channels, not a post-sample fringe.\"] pub dispersion : f32, # [doc = \" Strength of the Fresnel-weighted directional environment reflection,\"] # [doc = \" 0 for none. Reflection and transmission share the profile's normal.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" Saturation of the sampled backdrop, including the refracted rim, before\"] # [doc = \" transmission gain. One preserves colour, zero uses Rec. 709 luminance.\"] # [doc = \" Values above one intensify colour; negative results are clamped to zero.\"] pub saturation : f32, # [doc = \" Achromatic source-over material wash after saturation and transmission\"] # [doc = \" gain, before optical lift and edge light. RGB must be all zero (dark) or\"] # [doc = \" all one (light); alpha is strength. Sanitization selects black or white\"] # [doc = \" from red at 0.5. This covers the refracted rim, unlike an element fill.\"] pub wash : Rgba, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Opaque [`crate::LuminanceProbeLease::id`], or [`NO_LUMINANCE_PROBE`].\"] # [doc = \" The u32 carries a generation and physical slot; retain its lease and\"] # [doc = \" never substitute the decoded slot when querying the cache.\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, # [doc = \" Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,\"] # [doc = \" 3 left, 4 right. Stored as a float so the GPU struct stays one packed\"] # [doc = \" run of 32-bit words.\"] pub edge_mask_edge : f32, # [doc = \" How far that fade reaches from the named edge, in the surface's unit.\"] # [doc = \" Zero disables the mask even when [`Self::edge_mask_edge`] is set.\"] pub edge_mask_band : P, }",
+      "signature": "# [doc = \" The complete optical response of a glass surface.\"] # [doc = \"\"] # [doc = \" Blur is scattering, not a prerequisite for glass. [`GlassMaterial::clear`]\"] # [doc = \" snapshots the sharp backdrop and leaves it unchanged; callers independently\"] # [doc = \" add refraction, dispersion, transmission, an optical lift, or edge light.\"] # [doc = \" [`GlassMaterial::frosted`] adds only scattering. Refraction samples that\"] # [doc = \" scattered source throughout the surface, including the rim. The retained\"] # [doc = \" sharp snapshot restores the original backdrop only under an explicit edge mask.\"] # [derive (Debug, Copy, Clone, PartialEq)] # [repr (C)] pub struct GlassMaterial<P = ScaledPixels> { # [doc = \" Gaussian sigma applied to the backdrop snapshot. Zero keeps the source\"] # [doc = \" sharp while still allowing every other optical field to act on it.\"] pub blur_radius : P, # [doc = \" How far in from the edge the bevel that bends the backdrop reaches.\"] # [doc = \" Zero leaves the backdrop flat however large the other fields are,\"] # [doc = \" because there is no slope for them to act on.\"] # [doc = \" Renderers bound this requested depth by the shape's rounded-corner\"] # [doc = \" reach; see [`BackdropGlass::optical_bevel`].\"] pub bevel : P, # [doc = \" Signed multiplier of the surface thickness. Zero flattens the surface;\"] # [doc = \" positive values describe a convex face, negative values a concave face.\"] # [doc = \" This scales both the height and its derivative, including lighting.\"] pub refraction : f32, # [doc = \" Maximum profile height before applying `refraction`. Zero follows the\"] # [doc = \" geometrically bounded bevel. Explicit heights do not widen the bevel.\"] pub thickness : P, # [doc = \" Dielectric index relative to air, sanitized to 1..=2.5. One removes\"] # [doc = \" refraction and Fresnel reflection. Clear constructors use 1.5.\"] pub refractive_index : f32, # [doc = \" Effective distance below the profile base to the sampled optical plane.\"] # [doc = \" The refracted ray propagates through this distance in the same medium:\"] # [doc = \" this is not an air gap behind a second dielectric interface. Screen-space\"] # [doc = \" glass has no scene depth, hidden geometry or multi-bounce ray tracing.\"] pub backdrop_depth : P, # [doc = \" Fractional variation of `refractive_index - 1` for red and blue.\"] # [doc = \" Zero uses the same Snell ray for all channels, not a post-sample fringe.\"] pub dispersion : f32, # [doc = \" Strength of the Fresnel-weighted directional environment reflection,\"] # [doc = \" 0 for none. Reflection and transmission share the profile's normal.\"] pub specular : f32, # [doc = \" Multiplicative transmission applied after sampling. One preserves the\"] # [doc = \" backdrop; values above one model the measured light gain of clear glass.\"] pub transmission_gain : f32, # [doc = \" Saturation of the sampled backdrop, including the refracted rim, before\"] # [doc = \" transmission gain. One preserves colour, zero uses Rec. 709 luminance.\"] # [doc = \" Values above one intensify colour; negative results are clamped to zero.\"] pub saturation : f32, # [doc = \" Straight-alpha source-over material colour after saturation and\"] # [doc = \" transmission gain, before optical lift and edge light. RGB and alpha\"] # [doc = \" are independently clamped to 0..=1; non-finite channels become zero.\"] # [doc = \" Neutral washes and caller tints cover the refracted rim and fused\"] # [doc = \" bridges, unlike a foreground element fill.\"] pub wash : Rgba, # [doc = \" A colour added after transmission, as `rgb * alpha`. This is not\"] # [doc = \" source-over tint: it lifts the light already passing through the glass.\"] pub optical_lift : Rgba, # [doc = \" Width of the consistently lit edge in pixels. Zero paints no hairline.\"] pub hairline : P, # [doc = \" Where the light is, in radians clockwise from straight up.\"] pub light_angle : f32, # [doc = \" How tight the specular lobe is. Larger is a smaller, harder highlight.\"] pub specular_sharpness : f32, # [doc = \" How far apart two lobes may be and still join. Zero makes the union a\"] # [doc = \" plain minimum, so lobes meet at a crease.\"] pub smoothing : P, # [doc = \" Opaque [`crate::LuminanceProbeLease::id`], or [`NO_LUMINANCE_PROBE`].\"] # [doc = \" The u32 carries a generation and physical slot; retain its lease and\"] # [doc = \" never substitute the decoded slot when querying the cache.\"] # [doc = \"\"] # [doc = \" A probed surface has the mean luminance of its optical source reported\"] # [doc = \" back through [`crate::Window::backdrop_luminance`], one frame later.\"] # [doc = \" That source is sharp for clear glass and blurred for frosted glass. See\"] # [doc = \" that method for what the delay means for a caller.\"] pub probe : u32, # [doc = \" Which edge a linear mask fades from. Zero is none; 1 top, 2 bottom,\"] # [doc = \" 3 left, 4 right. Stored as a float so the GPU struct stays one packed\"] # [doc = \" run of 32-bit words.\"] pub edge_mask_edge : f32, # [doc = \" How far that fade reaches from the named edge, in the surface's unit.\"] # [doc = \" Zero disables the mask even when [`Self::edge_mask_edge`] is set.\"] pub edge_mask_band : P, }",
       "cfg": []
     },
     {
@@ -33811,7 +33884,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct MonochromeSprite { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub tile : AtlasTile, pub transformation : TransformationMatrix, }",
+      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct MonochromeSprite { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub tile : AtlasTile, pub transformation : TransformationMatrix, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -33853,7 +33926,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Clone, Debug)] # [allow (missing_docs)] pub struct PaintSurface { pub order : DrawOrder, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, # [cfg (target_os = \"macos\")] pub image_buffer : core_video::pixel_buffer::CVPixelBuffer, }",
+      "signature": "# [derive (Clone, Debug)] # [allow (missing_docs)] pub struct PaintSurface { pub order : DrawOrder, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub clip_id : crate::ClipId, # [cfg (target_os = \"macos\")] pub image_buffer : core_video::pixel_buffer::CVPixelBuffer, }",
       "cfg": []
     },
     {
@@ -33867,7 +33940,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "A line made up of a series of vertices and control points.",
       "documentation": "A line made up of a series of vertices and control points.",
-      "signature": "# [doc = \" A line made up of a series of vertices and control points.\"] # [derive (Clone, Debug)] # [expect (missing_docs)] pub struct Path<P : Clone + Debug + Default + PartialEq> { pub id : PathId, pub order : DrawOrder, pub bounds : Bounds<P>, pub content_mask : ContentMask<P>, pub vertices : Vec<PathVertex<P>>, pub color : Background, start : Point<P>, current : Point<P>, contour_count : usize, }",
+      "signature": "# [doc = \" A line made up of a series of vertices and control points.\"] # [derive (Clone, Debug)] # [expect (missing_docs)] pub struct Path<P : Clone + Debug + Default + PartialEq> { pub id : PathId, pub order : DrawOrder, pub bounds : Bounds<P>, pub content_mask : ContentMask<P>, pub vertices : Vec<PathVertex<P>>, pub color : Background, pub clip_id : crate::ClipId, start : Point<P>, current : Point<P>, contour_count : usize, }",
       "cfg": []
     },
     {
@@ -34043,7 +34116,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct PolychromeSprite { pub order : DrawOrder, pub blend_mode : SpriteBlendMode, pub color_mode : SpriteColorMode, pub sample_inset : PaddedBool32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub tile : AtlasTile, pub transformation : TransformationMatrix, pub tint : Hsla, pub opacity : f32, pub pad : u32, }",
+      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct PolychromeSprite { pub order : DrawOrder, pub blend_mode : SpriteBlendMode, pub color_mode : SpriteColorMode, pub sample_inset : PaddedBool32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub tile : AtlasTile, pub transformation : TransformationMatrix, pub tint : Hsla, pub opacity : f32, pub pad : u32, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -34072,6 +34145,21 @@
       "summary": "",
       "documentation": "",
       "signature": "pub fn bounds (& self) -> & Bounds<ScaledPixels>",
+      "cfg": [],
+      "target": "Primitive"
+    },
+    {
+      "id": "gpui::scene::Primitive::clip_id",
+      "name": "clip_id",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "Rounded subtree clip in the owning scene.",
+      "documentation": "Rounded subtree clip in the owning scene.",
+      "signature": "pub fn clip_id (& self) -> crate::ClipId",
       "cfg": [],
       "target": "Primitive"
     },
@@ -34130,7 +34218,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Default, Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Quad { pub order : DrawOrder, pub border_style : BorderStyle, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub background : Background, pub border_color : Hsla, pub corner_radii : Corners<ScaledPixels>, pub border_widths : Edges<ScaledPixels>, }",
+      "signature": "# [derive (Default, Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Quad { pub order : DrawOrder, pub border_style : BorderStyle, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub background : Background, pub border_color : Hsla, pub corner_radii : Corners<ScaledPixels>, pub border_widths : Edges<ScaledPixels>, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -34144,7 +34232,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Default)] # [expect (missing_docs)] pub struct Scene { pub (crate) paint_operations : Vec<PaintOperation>, primitive_bounds : BoundsTree<ScaledPixels>, layer_stack : Vec<DrawOrder>, pub shadows : Vec<Shadow>, pub quads : Vec<Quad>, pub paths : Vec<Path<ScaledPixels>>, pub underlines : Vec<Underline>, pub monochrome_sprites : Vec<MonochromeSprite>, pub subpixel_sprites : Vec<SubpixelSprite>, pub polychrome_sprites : Vec<PolychromeSprite>, pub surfaces : Vec<PaintSurface>, # [doc = \" Glass surfaces — deliberately outside the primitive batch stream so\"] # [doc = \" renderers can snapshot the framebuffer at each surface's order.\"] pub backdrop_glass : Vec<BackdropGlass>, }",
+      "signature": "# [derive (Default)] # [expect (missing_docs)] pub struct Scene { pub (crate) paint_operations : Vec<PaintOperation>, # [doc = \" Rounded subtree geometry, separate from rectangular culling and optical\"] # [doc = \" capture bounds. Indices belong to this scene and expire on `clear`.\"] pub clip_nodes : crate::ClipNodes, active_clip : crate::ClipId, primitive_bounds : BoundsTree<ScaledPixels>, layer_stack : Vec<DrawOrder>, pub shadows : Vec<Shadow>, pub quads : Vec<Quad>, pub paths : Vec<Path<ScaledPixels>>, pub underlines : Vec<Underline>, pub monochrome_sprites : Vec<MonochromeSprite>, pub subpixel_sprites : Vec<SubpixelSprite>, pub polychrome_sprites : Vec<PolychromeSprite>, pub surfaces : Vec<PaintSurface>, # [doc = \" Glass surfaces — deliberately outside the primitive batch stream so\"] # [doc = \" renderers can snapshot the framebuffer at each surface's order.\"] pub backdrop_glass : Vec<BackdropGlass>, }",
       "cfg": []
     },
     {
@@ -34298,6 +34386,21 @@
       "target": "Scene"
     },
     {
+      "id": "gpui::scene::Scene::with_clip_chain",
+      "name": "with_clip_chain",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "scene",
+      "path": "gpui::scene",
+      "source": "crates/gpui/src/scene.rs",
+      "summary": "Paint a scope using a value-typed clip chain in window coordinates. Rectangular culling and backdrop sampling remain independent of this chain.",
+      "documentation": "Paint a scope using a value-typed clip chain in window coordinates.\nRectangular culling and backdrop sampling remain independent of this chain.",
+      "signature": "pub fn with_clip_chain<R> (& mut self, chain : & crate::ClipChain, scale : f32, paint : impl FnOnce (& mut Self) -> R,) -> R",
+      "cfg": [],
+      "target": "Scene"
+    },
+    {
       "id": "gpui::scene::Shadow",
       "name": "Shadow",
       "kind": "struct",
@@ -34308,7 +34411,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Shadow { pub order : DrawOrder, pub blur_radius : ScaledPixels, pub bounds : Bounds<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub element_bounds : Bounds<ScaledPixels>, pub element_corner_radii : Corners<ScaledPixels>, # [doc = \" 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).\"] pub inset : u32, # [doc = \" 1 = cut the element's own rounded shape out of the shadow, so it reads\"] # [doc = \" as a ring rather than painting under the element. Only consulted for a\"] # [doc = \" drop shadow; an inset shadow is already clipped to the element.\"] pub outer_only : u32, }",
+      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Shadow { pub order : DrawOrder, pub blur_radius : ScaledPixels, pub bounds : Bounds<ScaledPixels>, pub corner_radii : Corners<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub element_bounds : Bounds<ScaledPixels>, pub element_corner_radii : Corners<ScaledPixels>, # [doc = \" 0 = drop shadow (rendered outside the element), 1 = inset shadow (rendered inside).\"] pub inset : u32, # [doc = \" 1 = cut the element's own rounded shape out of the shadow, so it reads\"] # [doc = \" as a ring rather than painting under the element. Only consulted for a\"] # [doc = \" drop shadow; an inset shadow is already clipped to the element.\"] pub outer_only : u32, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -34528,7 +34631,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct SubpixelSprite { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub tile : AtlasTile, pub transformation : TransformationMatrix, }",
+      "signature": "# [derive (Copy, Clone, Debug)] # [repr (C)] # [expect (missing_docs)] pub struct SubpixelSprite { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub tile : AtlasTile, pub transformation : TransformationMatrix, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -34661,7 +34764,7 @@
       "source": "crates/gpui/src/scene.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Underline { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub thickness : ScaledPixels, pub wavy : PaddedBool32, }",
+      "signature": "# [derive (Debug, Copy, Clone)] # [repr (C)] # [expect (missing_docs)] pub struct Underline { pub order : DrawOrder, pub pad : u32, pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub color : Hsla, pub thickness : ScaledPixels, pub wavy : PaddedBool32, pub clip_id : crate::ClipId, }",
       "cfg": []
     },
     {
@@ -35955,6 +36058,286 @@
       "signature": "pub fn new (unsubscribe : impl 'static + FnOnce ()) -> Self",
       "cfg": [],
       "target": "Subscription"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain",
+      "name": "ClipChain",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Value-typed inherited clips. Cloning is cheap and equality compares geometry, not allocation or scene-local indices, so this can be retained across frames.",
+      "documentation": "Value-typed inherited clips. Cloning is cheap and equality compares geometry,\nnot allocation or scene-local indices, so this can be retained across frames.\n\nFlat storage also makes traversal and destruction independent of nesting\ndepth; neither operation consumes a recursive call stack.",
+      "signature": "# [doc = \" Value-typed inherited clips. Cloning is cheap and equality compares geometry,\"] # [doc = \" not allocation or scene-local indices, so this can be retained across frames.\"] # [doc = \"\"] # [doc = \" Flat storage also makes traversal and destruction independent of nesting\"] # [doc = \" depth; neither operation consumes a recursive call stack.\"] # [derive (Clone, Debug, Default, PartialEq, Eq)] pub struct ClipChain (Arc<Vec<RoundedClip>>);",
+      "cfg": []
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain::accessible_bounds",
+      "name": "accessible_bounds",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Conservative rectangular bounds for accessibility APIs such as AccessKit that cannot represent curved regions. Corner pixels may belong to this rectangle while being rejected by visual clipping and pointer hit tests. This is not an approximation used for pointer input or fragment coverage.",
+      "documentation": "Conservative rectangular bounds for accessibility APIs such as AccessKit\nthat cannot represent curved regions. Corner pixels may belong to this\nrectangle while being rejected by visual clipping and pointer hit tests.\nThis is not an approximation used for pointer input or fragment coverage.",
+      "signature": "pub fn accessible_bounds (& self, bounds : Bounds<Pixels>) -> Bounds<Pixels>",
+      "cfg": [],
+      "target": "ClipChain"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain::clips",
+      "name": "clips",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Ordered outermost to innermost.",
+      "documentation": "Ordered outermost to innermost.",
+      "signature": "pub fn clips (& self) -> & [RoundedClip]",
+      "cfg": [],
+      "target": "ClipChain"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain::contains",
+      "name": "contains",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "True only if every ancestor admits this point. No depth limit applies.",
+      "documentation": "True only if every ancestor admits this point. No depth limit applies.",
+      "signature": "pub fn contains (& self, position : Point<Pixels>) -> bool",
+      "cfg": [],
+      "target": "ClipChain"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain::pop",
+      "name": "pop",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Removes the innermost clip, returning it if present.",
+      "documentation": "Removes the innermost clip, returning it if present.",
+      "signature": "pub fn pop (& mut self) -> Option<RoundedClip>",
+      "cfg": [],
+      "target": "ClipChain"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipChain::push",
+      "name": "push",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Adds a clip to this value without changing clones retained elsewhere.",
+      "documentation": "Adds a clip to this value without changing clones retained elsewhere.",
+      "signature": "pub fn push (& mut self, clip : RoundedClip)",
+      "cfg": [],
+      "target": "ClipChain"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipId",
+      "name": "ClipId",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Scene-local linked clip index. Zero means no clip; nodes are one-based.",
+      "documentation": "Scene-local linked clip index. Zero means no clip; nodes are one-based.",
+      "signature": "# [doc = \" Scene-local linked clip index. Zero means no clip; nodes are one-based.\"] # [derive (Clone, Copy, Debug, Default, PartialEq, Eq, Hash)] # [repr (C)] pub struct ClipId { index : u32, padding : u32, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::subtree_clip::ClipId::as_u32",
+      "name": "as_u32",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Integer used in GPU records. Nonzero indices are meaningful only in the scene that issued them.",
+      "documentation": "Integer used in GPU records. Nonzero indices are meaningful only in the\nscene that issued them.",
+      "signature": "pub fn as_u32 (self) -> u32",
+      "cfg": [],
+      "target": "ClipId"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNode",
+      "name": "ClipNode",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "GPU-facing rounded clip record (ten 32-bit words, with no implicit padding). Parent is always zero or less than this node's one-based index. Renderers can walk until zero without a depth cap or cycle detection.",
+      "documentation": "GPU-facing rounded clip record (ten 32-bit words, with no implicit padding).\nParent is always zero or less than this node's one-based index. Renderers can\nwalk until zero without a depth cap or cycle detection.",
+      "signature": "# [doc = \" GPU-facing rounded clip record (ten 32-bit words, with no implicit padding).\"] # [doc = \" Parent is always zero or less than this node's one-based index. Renderers can\"] # [doc = \" walk until zero without a depth cap or cycle detection.\"] # [derive (Clone, Copy, Debug, PartialEq)] # [repr (C)] pub struct ClipNode { # [doc = \" Device-space bounds; never a replacement for a primitive's content mask.\"] pub bounds : Bounds<ScaledPixels>, # [doc = \" Fitted device-space corner radii.\"] pub corner_radii : Corners<ScaledPixels>, # [doc = \" Parent's one-based index, or zero.\"] pub parent : ClipId, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNodes",
+      "name": "ClipNodes",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Scene-owned clip storage. Only validated append operations can create nodes, ensuring that GPU traversal always terminates.",
+      "documentation": "Scene-owned clip storage. Only validated append operations can create nodes,\nensuring that GPU traversal always terminates.",
+      "signature": "# [doc = \" Scene-owned clip storage. Only validated append operations can create nodes,\"] # [doc = \" ensuring that GPU traversal always terminates.\"] # [derive (Default)] pub struct ClipNodes (Vec<ClipNode>);",
+      "cfg": []
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNodes::clear",
+      "name": "clear",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Clears frame-local indices along with the owning scene.",
+      "documentation": "Clears frame-local indices along with the owning scene.",
+      "signature": "pub fn clear (& mut self)",
+      "cfg": [],
+      "target": "ClipNodes"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNodes::insert",
+      "name": "insert",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Encodes a CPU chain in device coordinates, returning its innermost node. Fails clearly on invalid scale or exhausting the 32-bit index space.",
+      "documentation": "Encodes a CPU chain in device coordinates, returning its innermost node.\nFails clearly on invalid scale or exhausting the 32-bit index space.",
+      "signature": "pub fn insert (& mut self, chain : & ClipChain, scale : f32) -> ClipId",
+      "cfg": [],
+      "target": "ClipNodes"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNodes::nodes",
+      "name": "nodes",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "GPU upload records, in parent-first order.",
+      "documentation": "GPU upload records, in parent-first order.",
+      "signature": "pub fn nodes (& self) -> & [ClipNode]",
+      "cfg": [],
+      "target": "ClipNodes"
+    },
+    {
+      "id": "gpui::subtree_clip::ClipNodes::replay",
+      "name": "replay",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Copies one old chain parent-first into this scene. It never treats an old index as a new index, even when destination nodes already occupy that slot. Callers replaying many primitives should memoize the returned old/new pair.",
+      "documentation": "Copies one old chain parent-first into this scene. It never treats an old\nindex as a new index, even when destination nodes already occupy that slot.\nCallers replaying many primitives should memoize the returned old/new pair.",
+      "signature": "pub fn replay (& mut self, old : ClipId, source : & Self) -> ClipId",
+      "cfg": [],
+      "target": "ClipNodes"
+    },
+    {
+      "id": "gpui::subtree_clip::RoundedClip",
+      "name": "RoundedClip",
+      "kind": "struct",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "A rounded rectangle in window coordinates.",
+      "documentation": "A rounded rectangle in window coordinates.\n\nRadii are fitted exactly as for framework quads: each radius is nonnegative\nand at most half the shortest side. This makes quadrant selection in the\nrounded rectangle distance function unambiguous.",
+      "signature": "# [doc = \" A rounded rectangle in window coordinates.\"] # [doc = \"\"] # [doc = \" Radii are fitted exactly as for framework quads: each radius is nonnegative\"] # [doc = \" and at most half the shortest side. This makes quadrant selection in the\"] # [doc = \" rounded rectangle distance function unambiguous.\"] # [derive (Clone, Copy, Debug, PartialEq, Eq)] pub struct RoundedClip { bounds : Bounds<Pixels>, corner_radii : Corners<Pixels>, }",
+      "cfg": []
+    },
+    {
+      "id": "gpui::subtree_clip::RoundedClip::bounds",
+      "name": "bounds",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "The rectangle enclosing the rounded clip.",
+      "documentation": "The rectangle enclosing the rounded clip.",
+      "signature": "pub fn bounds (& self) -> Bounds<Pixels>",
+      "cfg": [],
+      "target": "RoundedClip"
+    },
+    {
+      "id": "gpui::subtree_clip::RoundedClip::contains",
+      "name": "contains",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Tests the same rounded rectangle distance used by renderer shaders.",
+      "documentation": "Tests the same rounded rectangle distance used by renderer shaders.",
+      "signature": "pub fn contains (& self, position : Point<Pixels>) -> bool",
+      "cfg": [],
+      "target": "RoundedClip"
+    },
+    {
+      "id": "gpui::subtree_clip::RoundedClip::corner_radii",
+      "name": "corner_radii",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Fitted corner radii in top-left, top-right, bottom-right, bottom-left order.",
+      "documentation": "Fitted corner radii in top-left, top-right, bottom-right, bottom-left order.",
+      "signature": "pub fn corner_radii (& self) -> Corners<Pixels>",
+      "cfg": [],
+      "target": "RoundedClip"
+    },
+    {
+      "id": "gpui::subtree_clip::RoundedClip::new",
+      "name": "new",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "subtree_clip",
+      "path": "gpui::subtree_clip",
+      "source": "crates/gpui/src/subtree_clip.rs",
+      "summary": "Constructs finite geometry. Empty bounds represent an empty clip.",
+      "documentation": "Constructs finite geometry. Empty bounds represent an empty clip.\n\nPanics for nonfinite coordinates or radii rather than admitting an\nundefined CPU/GPU disagreement.",
+      "signature": "pub fn new (bounds : Bounds<Pixels>, corner_radii : Corners<Pixels>) -> Self",
+      "cfg": [],
+      "target": "RoundedClip"
     },
     {
       "id": "gpui::svg_renderer::RenderSvgParams",
@@ -39058,7 +39441,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "A rectangular region that potentially blocks hitboxes inserted prior. See [Window::insert_hitbox] for more details.",
       "documentation": "A rectangular region that potentially blocks hitboxes inserted prior.\nSee [Window::insert_hitbox] for more details.",
-      "signature": "# [doc = \" A rectangular region that potentially blocks hitboxes inserted prior.\"] # [doc = \" See [Window::insert_hitbox] for more details.\"] # [derive (Clone, Debug, Deref)] pub struct Hitbox { # [doc = \" A unique identifier for the hitbox.\"] pub id : HitboxId, # [doc = \" The bounds of the hitbox.\"] # [deref] pub bounds : Bounds<Pixels>, # [doc = \" The content mask when the hitbox was inserted.\"] pub content_mask : ContentMask<Pixels>, # [doc = \" Flags that specify hitbox behavior.\"] pub behavior : HitboxBehavior, }",
+      "signature": "# [doc = \" A rectangular region that potentially blocks hitboxes inserted prior.\"] # [doc = \" See [Window::insert_hitbox] for more details.\"] # [derive (Clone, Debug, Deref)] pub struct Hitbox { # [doc = \" A unique identifier for the hitbox.\"] pub id : HitboxId, # [doc = \" The bounds of the hitbox.\"] # [deref] pub bounds : Bounds<Pixels>, # [doc = \" The content mask when the hitbox was inserted.\"] pub content_mask : ContentMask<Pixels>, # [doc = \" Rounded ancestor clips captured during prepaint.\"] pub clip_chain : crate::ClipChain, # [doc = \" Flags that specify hitbox behavior.\"] pub behavior : HitboxBehavior, }",
       "cfg": []
     },
     {
@@ -39367,7 +39750,7 @@
       "source": "crates/gpui/src/window.rs",
       "summary": "Holds the state for a specific window.",
       "documentation": "Holds the state for a specific window.",
-      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, native_context_menu : Option<(crate::NativeMenuSessionId, bool)>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, touch_pan_capture : Option<ElementId>, touch_pinch_capture : Option<ElementId>, touch_pinch_target : Option<ElementId>, touch_pinch_anchor : Option<Point<Pixels>>, last_pinch_event : Option<crate::PinchEvent>, text_input_state : Option<(FocusId, crate::TextInputOptions)>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
+      "signature": "# [doc = \" Holds the state for a specific window.\"] pub struct Window { pub (crate) handle : AnyWindowHandle, pub (crate) invalidator : WindowInvalidator, pub (crate) removed : bool, pub (crate) platform_window : Box<dyn PlatformWindow>, native_context_menu : Option<(crate::NativeMenuSessionId, bool)>, # [doc = \" Whether the platform accepted a transparent scene plane above native\"] # [doc = \" child views. This is window state rather than frame state: once native\"] # [doc = \" hosting creates the plane, every later deferred overlay uses it.\"] scene_overlay_enabled : Cell<bool>, # [doc = \" True only while painting primitives that will land on that transparent\"] # [doc = \" plane. Subpixel glyphs require a known opaque destination, so text in\"] # [doc = \" this phase must use grayscale antialiasing.\"] painting_transparent_overlay : bool, display_id : Option<DisplayId>, is_resizable : bool, is_minimizable : bool, sprite_atlas : Arc<dyn PlatformAtlas>, text_system : Arc<WindowTextSystem>, text_rendering_mode : Rc<Cell<TextRenderingMode>>, rem_size : Pixels, # [doc = \" The stack of override values for the window's rem size.\"] # [doc = \"\"] # [doc = \" This is used by `with_rem_size` to allow rendering an element tree with\"] # [doc = \" a given rem size.\"] rem_size_override_stack : SmallVec<[Pixels; 8]>, pub (crate) viewport_size : Size<Pixels>, layout_engine : Option<TaffyLayoutEngine>, pub (crate) root : Option<AnyView>, pub (crate) element_id_stack : SmallVec<[ElementId; 32]>, pub (crate) text_style_stack : Vec<TextStyleRefinement>, pub (crate) rendered_entity_stack : Vec<EntityId>, pub (crate) element_offset_stack : Vec<Point<Pixels>>, pub (crate) element_opacity : f32, pub (crate) edge_fade : Option<EdgeFade>, pub (crate) content_mask_stack : Vec<ContentMask<Pixels>>, pub (crate) clip_chain : crate::ClipChain, pub (crate) selection_scope_stack : Vec<crate::SelectionScopeId>, # [doc = \" One selection that may span separately mounted text elements. It\"] # [doc = \" belongs to the window rather than to a global, so a closed window\"] # [doc = \" leaves nothing behind.\"] pub (crate) document_selection : crate::DocumentSelectionState, pub (crate) requested_autoscroll : Option<Bounds<Pixels>>, pub (crate) image_cache_stack : Vec<AnyImageCache>, pub (crate) rendered_frame : Frame, pub (crate) next_frame : Frame, platform_view_registry : PlatformViewRegistry, next_hitbox_id : HitboxId, pub (crate) next_tooltip_id : TooltipId, pub (crate) tooltip_bounds : Option<TooltipBounds>, next_frame_callbacks : Rc<RefCell<Vec<FrameCallback>>>, pub (crate) dirty_views : FxHashSet<EntityId>, focus_listeners : SubscriberSet<(), AnyWindowFocusListener>, pub (crate) focus_lost_listeners : SubscriberSet<(), AnyObserver>, default_prevented : bool, effect_owner : Rc<Cell<Option<crate::EffectOwner>>>, remaining_scroll_delta : Option<crate::ScrollDelta>, mouse_position : Point<Pixels>, mouse_hit_test : HitTest, modifiers : Modifiers, capslock : Capslock, scale_factor : f32, pub (crate) bounds_observers : SubscriberSet<(), AnyObserver>, appearance : WindowAppearance, pub (crate) appearance_observers : SubscriberSet<(), AnyObserver>, pub (crate) button_layout_observers : SubscriberSet<(), AnyObserver>, active : Rc<Cell<bool>>, hovered : Rc<Cell<bool>>, pub (crate) needs_present : Rc<Cell<bool>>, # [doc = \" Tracks recent input event timestamps to determine if input is arriving at a high rate.\"] # [doc = \" Used to selectively enable VRR optimization only when input rate exceeds 60fps.\"] pub (crate) input_rate_tracker : Rc<RefCell<InputRateTracker>>, frame_inputs : FrameInputAccumulator, pending_frame_timing : Option<PendingFrameTiming>, # [cfg (feature = \"input-latency-histogram\")] input_latency_tracker : InputLatencyTracker, last_input_modality : InputModality, touch_gestures : TouchGestureRecognizer, touch_prediction_enabled : bool, long_press_timer : Option<Task<()>>, long_press_capture : Option<EntityId>, touch_pan_capture : Option<ElementId>, touch_pinch_capture : Option<ElementId>, touch_pinch_target : Option<ElementId>, touch_pinch_anchor : Option<Point<Pixels>>, last_pinch_event : Option<crate::PinchEvent>, text_input_state : Option<(FocusId, crate::TextInputOptions)>, pub (crate) refreshing : bool, pub (crate) activation_observers : SubscriberSet<(), AnyObserver>, pub (crate) focus : Option<FocusId>, focus_enabled : bool, # [doc = \" Whether a pointer press put focus where it currently is, rather than a\"] # [doc = \" tab stop, an action, or the application moving it. Read by\"] # [doc = \" focus-visible styling; see [`Window::focus_is_visible`].\"] focus_placed_by_pointer : bool, # [doc = \" Incremented every time focus moves. Used to invalidate a\"] # [doc = \" pending keyboard activation state when focus changes.\"] pub (crate) focus_generation : u64, pending_input : Option<PendingInput>, pending_modifier : ModifierState, pub (crate) pending_input_observers : SubscriberSet<(), AnyObserver>, prompt : Option<RenderablePromptHandle>, pub (crate) client_inset : Option<Pixels>, # [doc = \" The hitbox that has captured the pointer, if any.\"] # [doc = \" While captured, mouse events route to this hitbox regardless of hit testing.\"] captured_hitbox : Option<HitboxId>, # [doc = \" The stable identity behind `captured_hitbox`, when the capturing\"] # [doc = \" element has an id. This remaps capture to its replacement hitbox after\"] # [doc = \" a redraw.\"] captured_pointer_element : Option<GlobalElementId>, captured_pointer_button : Option<MouseButton>, # [cfg (any (feature = \"inspector\", debug_assertions))] inspector : Option<Entity<Inspector>>, pub (crate) a11y : A11y, current_frame_stats : profiler::FrameStats, completed_frame_stats : profiler::FrameStats, }",
       "cfg": []
     },
     {
@@ -39427,6 +39810,21 @@
       "summary": "The mean luminance of the optical source a probed glass surface covered, in `0..=1`, or `None` while this lease holds no completed reading or was absent from the last submitted frame (including budget fallback). The source is sharp for clear glass and blurred for frost.",
       "documentation": "The mean luminance of the optical source a probed glass surface\ncovered, in `0..=1`, or `None` while this lease holds no completed\nreading or was absent from the last submitted frame (including budget\nfallback). The source is sharp for clear glass and blurred for frost.\n\nPass the opaque ID from a live [`crate::LuminanceProbeLease`], also set\nin [`crate::GlassMaterial::probe`], never its physical slot index. The\nrenderer copies the reading back without stalling the frame that took\nit, so the value describes the backdrop one frame ago: a caller that\nflips its own contrast on it must expect the flip to land a frame\nafter the backdrop moved, and `None` on any renderer that takes no\nprobes — the honest reading for a backdrop nobody measured.",
       "signature": "pub fn backdrop_luminance (& self, id : u32) -> Option<f32>",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::backdrop_statistics",
+      "name": "backdrop_statistics",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Statistics of the five sampled optical-source texels, not exhaustive backdrop extrema or linear-light measurements. See [`crate::BackdropStatistics`]. Pass a live [`crate::LuminanceProbeLease`] ID also set on the glass material. Availability and freshness match [`Self::backdrop_luminance`], including `None` for absent probes, budget fallback, and unsupported renderers. Collection preserves backend behavior: WGPU can wait for an outstanding map and DirectX can wait when mapping staging data; Metal reads its completion-populated cache. No additional GPU work is submitted here.",
+      "documentation": "Statistics of the five sampled optical-source texels, not exhaustive\nbackdrop extrema or linear-light measurements. See [`crate::BackdropStatistics`].\nPass a live [`crate::LuminanceProbeLease`] ID also set on the glass material.\nAvailability and freshness match [`Self::backdrop_luminance`], including\n`None` for absent probes, budget fallback, and unsupported renderers.\nCollection preserves backend behavior: WGPU can wait for an outstanding\nmap and DirectX can wait when mapping staging data; Metal reads its\ncompletion-populated cache. No additional GPU work is submitted here.",
+      "signature": "pub fn backdrop_statistics (& self, id : u32) -> Option<crate::BackdropStatistics>",
       "cfg": [],
       "target": "Window"
     },
@@ -42819,6 +43217,21 @@
       "summary": "Executes the provided function with the specified rem size.",
       "documentation": "Executes the provided function with the specified rem size.\n\nThis method must only be called as part of element drawing.",
       "signature": "pub fn with_rem_size<F, R> (& mut self, rem_size : Option<impl Into<Pixels>>, f : F) -> R where F : FnOnce (& mut Self) -> R,",
+      "cfg": [],
+      "target": "Window"
+    },
+    {
+      "id": "gpui::window::Window::with_rounded_content_mask",
+      "name": "with_rounded_content_mask",
+      "kind": "method",
+      "package": "gpui-box",
+      "crate": "gpui",
+      "module": "window",
+      "path": "gpui::window",
+      "source": "crates/gpui/src/window.rs",
+      "summary": "Clips all descendants to a rounded rectangle in window coordinates. Enter the same scope in prepaint and paint. Pointer input evaluates the full inherited chain; accessibility exposes its conservative rectangle. This affects primitive writes, never the source sampled by backdrop optics.",
+      "documentation": "Clips all descendants to a rounded rectangle in window coordinates.\nEnter the same scope in prepaint and paint. Pointer input evaluates the\nfull inherited chain; accessibility exposes its conservative rectangle.\nThis affects primitive writes, never the source sampled by backdrop optics.",
+      "signature": "pub fn with_rounded_content_mask<R> (& mut self, clip : crate::RoundedClip, f : impl FnOnce (& mut Self) -> R,) -> R",
       "cfg": [],
       "target": "Window"
     },
@@ -103680,7 +104093,7 @@
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "A glass surface: optionally scattered and bent backdrop, optional fill, and caller-owned content.",
       "documentation": "A glass surface: optionally scattered and bent backdrop, optional fill,\nand caller-owned content.",
-      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, elevation : Elevation, radius : Radius, radius_px : Option<f32>, blur : Option<f32>, preset : GlassPreset, thickness : Option<f32>, refractive_index : Option<f32>, backdrop_depth : Option<f32>, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, focused : bool, tint : Option<Hsla>, edge_mask : Option<(GlassEdge, f32)>, child : Option<AnyElement>, frame : Option<gpui::Stateful<gpui::Div>>, }",
+      "signature": "# [doc = \" A glass surface: optionally scattered and bent backdrop, optional fill,\"] # [doc = \" and caller-owned content.\"] # [derive (IntoElement)] pub struct Glass { ident : Ident, surface : Surface, elevation : Elevation, radius : Radius, radius_px : Option<f32>, blur : Option<f32>, preset : GlassPreset, thickness : Option<f32>, refractive_index : Option<f32>, backdrop_depth : Option<f32>, refraction : Option<f32>, dispersion : Option<f32>, specular : Option<f32>, light_angle : Option<f32>, track_pointer : bool, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, focused : bool, protect_text : bool, tint : Option<Hsla>, edge_mask : Option<(GlassEdge, f32)>, child : Option<AnyElement>, frame : Option<gpui::Stateful<gpui::Div>>, }",
       "cfg": []
     },
     {
@@ -103894,6 +104307,21 @@
       "target": "Glass"
     },
     {
+      "id": "gpui_kit::overlay::glass::Glass::protect_text_contrast",
+      "name": "protect_text_contrast",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Preserve the default worst-neutral-backdrop 4.5:1 body-text protection for untinted Regular glass. Disable only when the caller owns foreground legibility: the material then retains its token wash rather than darkening or whitening the entire surface for the theme's body text. Other presets and reduced transparency retain their own policies.",
+      "documentation": "Preserve the default worst-neutral-backdrop 4.5:1 body-text protection\nfor untinted Regular glass. Disable only when the caller owns foreground\nlegibility: the material then retains its token wash rather than\ndarkening or whitening the entire surface for the theme's body text.\nOther presets and reduced transparency retain their own policies.",
+      "signature": "pub fn protect_text_contrast (mut self, protect : bool) -> Self",
+      "cfg": [],
+      "target": "Glass"
+    },
+    {
       "id": "gpui_kit::overlay::glass::Glass::radius",
       "name": "radius",
       "kind": "method",
@@ -104007,8 +104435,8 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Overlay this colour instead of the surface role. The tint is what `NSGlassEffectView.tintColor` and a prominent toolbar item are.",
-      "documentation": "Overlay this colour instead of the surface role. The tint is what\n`NSGlassEffectView.tintColor` and a prominent toolbar item are.",
+      "summary": "Colour the optical material, before its rim and highlights. Alpha controls tint strength; zero preserves the preset, one replaces its transmitted colour. Frosted and opaque fallbacks use this as their fill. The caller owns foreground contrast when supplying a tint.",
+      "documentation": "Colour the optical material, before its rim and highlights. Alpha\ncontrols tint strength; zero preserves the preset, one replaces its\ntransmitted colour. Frosted and opaque fallbacks use this as their fill.\nThe caller owns foreground contrast when supplying a tint.",
       "signature": "pub fn tint (mut self, tint : impl Into<Hsla>) -> Self",
       "cfg": [],
       "target": "Glass"
@@ -104053,7 +104481,7 @@
       "source": "crates/gpui-kit/src/overlay/glass.rs",
       "summary": "Several glass panes fused into one body.",
       "documentation": "Several glass panes fused into one body.\n\nEach pane is a rounded rect lobe of a single glass surface; where two\npanes come within `effect.glassMergeDistance` of each other, the shape's\nsmooth minimum joins them into one outline, the way two drops of water\nmeet. The optics — bevel, refraction, dispersion, the highlight — follow\nthe fused outline rather than each pane's own.\n\nAt most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque\noverlay panes instead, preserving every pane's content without holes.",
-      "signature": "# [doc = \" Several glass panes fused into one body.\"] # [doc = \"\"] # [doc = \" Each pane is a rounded rect lobe of a single glass surface; where two\"] # [doc = \" panes come within `effect.glassMergeDistance` of each other, the shape's\"] # [doc = \" smooth minimum joins them into one outline, the way two drops of water\"] # [doc = \" meet. The optics — bevel, refraction, dispersion, the highlight — follow\"] # [doc = \" the fused outline rather than each pane's own.\"] # [doc = \"\"] # [doc = \" At most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque\"] # [doc = \" overlay panes instead, preserving every pane's content without holes.\"] # [derive (IntoElement)] pub struct GlassGroup { ident : Ident, surface : Surface, radius : Radius, blur : Option<f32>, preset : GlassPreset, thickness : Option<f32>, refractive_index : Option<f32>, backdrop_depth : Option<f32>, merge : Option<f32>, gap : Option<f32>, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, tint : Option<Hsla>, panes : Vec<(Ident, AnyElement)>, }",
+      "signature": "# [doc = \" Several glass panes fused into one body.\"] # [doc = \"\"] # [doc = \" Each pane is a rounded rect lobe of a single glass surface; where two\"] # [doc = \" panes come within `effect.glassMergeDistance` of each other, the shape's\"] # [doc = \" smooth minimum joins them into one outline, the way two drops of water\"] # [doc = \" meet. The optics — bevel, refraction, dispersion, the highlight — follow\"] # [doc = \" the fused outline rather than each pane's own.\"] # [doc = \"\"] # [doc = \" At most [`MAX_GLASS_LOBES`] panes fuse. A larger group paints opaque\"] # [doc = \" overlay panes instead, preserving every pane's content without holes.\"] # [derive (IntoElement)] pub struct GlassGroup { ident : Ident, surface : Surface, radius : Radius, blur : Option<f32>, preset : GlassPreset, thickness : Option<f32>, refractive_index : Option<f32>, backdrop_depth : Option<f32>, merge : Option<f32>, gap : Option<f32>, pressable : bool, adaptive : bool, adaptive_appearance : bool, dimmed : bool, protect_text : bool, tint : Option<Hsla>, panes : Vec<(Ident, AnyElement)>, }",
       "cfg": []
     },
     {
@@ -104222,6 +104650,21 @@
       "target": "GlassGroup"
     },
     {
+      "id": "gpui_kit::overlay::glass::GlassGroup::protect_text_contrast",
+      "name": "protect_text_contrast",
+      "kind": "method",
+      "package": "gpui-box-kit",
+      "crate": "gpui_kit",
+      "module": "overlay::glass",
+      "path": "gpui_kit::overlay::glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "Apply [`Glass::protect_text_contrast`]'s body-text policy to the joined material. Enabled by default; disabling makes legibility caller-owned.",
+      "documentation": "Apply [`Glass::protect_text_contrast`]'s body-text policy to the joined\nmaterial. Enabled by default; disabling makes legibility caller-owned.",
+      "signature": "pub fn protect_text_contrast (mut self, protect : bool) -> Self",
+      "cfg": [],
+      "target": "GlassGroup"
+    },
+    {
       "id": "gpui_kit::overlay::glass::GlassGroup::radius",
       "name": "radius",
       "kind": "method",
@@ -104290,8 +104733,8 @@
       "module": "overlay::glass",
       "path": "gpui_kit::overlay::glass",
       "source": "crates/gpui-kit/src/overlay/glass.rs",
-      "summary": "Overlay this colour on every pane instead of the surface role.",
-      "documentation": "Overlay this colour on every pane instead of the surface role.",
+      "summary": "Colour the joined optical material once, including its bridge, using [`Glass::tint`]'s alpha and foreground-contrast contract.",
+      "documentation": "Colour the joined optical material once, including its bridge, using\n[`Glass::tint`]'s alpha and foreground-contrast contract.",
       "signature": "pub fn tint (mut self, tint : impl Into<Hsla>) -> Self",
       "cfg": [],
       "target": "GlassGroup"
@@ -120810,6 +121253,21 @@
       "target": "MetalRenderer"
     },
     {
+      "id": "gpui_macos::metal_renderer::MetalRenderer::backdrop_statistics",
+      "name": "backdrop_statistics",
+      "kind": "method",
+      "package": "gpui-box-macos",
+      "crate": "gpui_macos",
+      "module": "metal_renderer",
+      "path": "gpui_macos::metal_renderer",
+      "source": "crates/gpui_macos/src/metal_renderer.rs",
+      "summary": "",
+      "documentation": "",
+      "signature": "pub fn backdrop_statistics (& mut self, id : u32) -> Option<gpui::BackdropStatistics>",
+      "cfg": [],
+      "target": "MetalRenderer"
+    },
+    {
       "id": "gpui_macos::metal_renderer::MetalRenderer::destroy",
       "name": "destroy",
       "kind": "method",
@@ -121023,7 +121481,7 @@
       "source": "crates/gpui_macos/src/metal_renderer.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [repr (C)] pub struct PathRasterizationVertex { pub xy_position : Point<ScaledPixels>, pub st_position : Point<f32>, pub color : Background, pub bounds : Bounds<ScaledPixels>, }",
+      "signature": "# [repr (C)] pub struct PathRasterizationVertex { pub xy_position : Point<ScaledPixels>, pub st_position : Point<f32>, pub color : Background, pub bounds : Bounds<ScaledPixels>, pub clip_id : gpui::ClipId, }",
       "cfg": []
     },
     {
@@ -121051,7 +121509,7 @@
       "source": "crates/gpui_macos/src/metal_renderer.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Clone, Debug, Eq, PartialEq)] # [repr (C)] pub struct SurfaceBounds { pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, }",
+      "signature": "# [derive (Clone, Debug, Eq, PartialEq)] # [repr (C)] pub struct SurfaceBounds { pub bounds : Bounds<ScaledPixels>, pub content_mask : ContentMask<ScaledPixels>, pub clip_id : gpui::ClipId, }",
       "cfg": []
     },
     {
@@ -123727,6 +124185,21 @@
       "summary": "The luminance the most recently completed frame read for this slot.",
       "documentation": "The luminance the most recently completed frame read for this slot.",
       "signature": "pub fn backdrop_luminance (& mut self, id : u32) -> Option<f32>",
+      "cfg": [],
+      "target": "WgpuRenderer"
+    },
+    {
+      "id": "gpui_wgpu::wgpu_renderer::WgpuRenderer::backdrop_statistics",
+      "name": "backdrop_statistics",
+      "kind": "method",
+      "package": "gpui-box-wgpu",
+      "crate": "gpui_wgpu",
+      "module": "wgpu_renderer",
+      "path": "gpui_wgpu::wgpu_renderer",
+      "source": "crates/gpui_wgpu/src/wgpu_renderer.rs",
+      "summary": "Statistics from the same completed optical-source readback as luminance.",
+      "documentation": "Statistics from the same completed optical-source readback as luminance.",
+      "signature": "pub fn backdrop_statistics (& mut self, id : u32) -> Option<gpui::BackdropStatistics>",
       "cfg": [],
       "target": "WgpuRenderer"
     },
@@ -131455,6 +131928,7 @@
         "adaptive(adaptive: bool) -> Self",
         "adaptive_appearance(adaptive: bool) -> Self",
         "dimmed(dimmed: bool) -> Self",
+        "protect_text_contrast(protect: bool) -> Self",
         "tint(tint: impl Into<Hsla>) -> Self",
         "edge_mask(edge: GlassEdge, band: f32) -> Self",
         "child(child: impl IntoElement) -> Self"
@@ -131465,7 +131939,8 @@
       "reports": [],
       "scenes": [
         "glass",
-        "glass-optics"
+        "glass-optics",
+        "glass-materials"
       ]
     },
     {
@@ -131491,6 +131966,7 @@
         "adaptive(adaptive: bool) -> Self",
         "adaptive_appearance(adaptive: bool) -> Self",
         "dimmed(dimmed: bool) -> Self",
+        "protect_text_contrast(protect: bool) -> Self",
         "tint(tint: impl Into<Hsla>) -> Self",
         "pane(ident: impl Into<Ident>, child: impl IntoElement) -> Self"
       ],
@@ -131499,7 +131975,8 @@
       "slots": [],
       "reports": [],
       "scenes": [
-        "glass-optics"
+        "glass-optics",
+        "glass-materials"
       ]
     },
     {
@@ -155586,6 +156063,20 @@
       "example": "fn glass_optics(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let specimens = [\n        (\"identity\", \"Index 1 / unchanged\", 1., 24., 24., 0., 0.),\n        (\"water\", \"Index 1.33 / shallow bend\", 1.33, 24., 24., 0., 0.),\n        (\"glass\", \"Index 1.5 / deeper bend\", 1.5, 24., 24., 0., 0.),\n        (\n            \"thick\",\n            \"48px thickness / same index\",\n            1.5,\n            48.,\n            24.,\n            0.,\n            0.,\n        ),\n        (\"contact\", \"Source plane at base\", 1.5, 24., 0., 0., 0.),\n        (\n            \"dispersion\",\n            \"Spectral indices / no highlight\",\n            1.5,\n            24.,\n            24.,\n            0.25,\n            0.,\n        ),\n        (\n            \"reflection\",\n            \"Fresnel / same surface normal\",\n            1.5,\n            24.,\n            24.,\n            0.,\n            1.,\n        ),\n        (\n            \"scatter\",\n            \"Same optics / 8px scattering\",\n            1.5,\n            24.,\n            24.,\n            0.,\n            0.,\n        ),\n    ];\n    stack(&theme)\n        .w(px(900.))\n        .child(caption(\n            &theme,\n            \"Snell refraction — fixture grid; foreground content is not distorted\",\n        ))\n        .children(specimens.chunks(4).map(|specimens| {\n            row(&theme).children(specimens.iter().map(\n                |&(name, title, index, thickness, depth, dispersion, specular)| {\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Sm)\n                        .w(px(210.))\n                        .child(caption(&theme, title))\n                        .child(\n                            div()\n                                .relative()\n                                .w(px(210.))\n                                .h(px(180.))\n                                .overflow_hidden()\n                                .bg(theme.colors.canvas)\n                                .children((0..18).map(|line| {\n                                    div()\n                                        .absolute()\n                                        .top(px(line as f32 * 10.))\n                                        .left_0()\n                                        .w_full()\n                                        .h(px(1.))\n                                        .bg(theme.colors.text_faint)\n                                }))\n                                .children((0..21).map(|line| {\n                                    div()\n                                        .absolute()\n                                        .left(px(line as f32 * 10.))\n                                        .top_0()\n                                        .h_full()\n                                        .w(px(1.))\n                                        .bg(theme.colors.text_faint)\n                                }))\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(22.))\n                                        .left(px(25.))\n                                        .w(px(160.))\n                                        .child(\n                                            Glass::new(format!(\"scene.glass-optics.{name}\"))\n                                                .preset(GlassPreset::Lens)\n                                                .radius_px(48.)\n                                                .refraction(1.)\n                                                .thickness(thickness)\n                                                .refractive_index(index)\n                                                .backdrop_depth(depth)\n                                                .dispersion(dispersion)\n                                                .specular(specular)\n                                                .blur(if name == \"scatter\" { 8. } else { 0. })\n                                                .track_pointer(name == \"reflection\")\n                                                .pressable(true)\n                                                .child(\n                                                    div()\n                                                        .w_full()\n                                                        .h(px(136.))\n                                                        .flex()\n                                                        .items_center()\n                                                        .justify_center()\n                                                        .child(\n                                                            div()\n                                                                .px_token(&theme, Space::Sm)\n                                                                .bg(theme.colors.panel)\n                                                                .child(\"Aa 123\"),\n                                                        ),\n                                                ),\n                                        ),\n                                ),\n                        )\n                },\n            ))\n        }))\n        .child(caption(\n            &theme,\n            \"Fused Regular / zero blur — one height field; press changes thickness and its normal\",\n        ))\n        .child(\n            div()\n                .relative()\n                .w(px(864.))\n                .h(px(120.))\n                .overflow_hidden()\n                .children((0..87).map(|line| {\n                    div()\n                        .absolute()\n                        .left(px(line as f32 * 10.))\n                        .top_0()\n                        .h_full()\n                        .w(px(1.))\n                        .bg(theme.colors.text_faint)\n                }))\n                .children((0..12).map(|line| {\n                    div()\n                        .absolute()\n                        .top(px(line as f32 * 10.))\n                        .left_0()\n                        .w_full()\n                        .h(px(1.))\n                        .bg(theme.colors.text_faint)\n                }))\n                .child(\n                    div().absolute().left(px(24.)).top(px(24.)).child(\n                        GlassGroup::new(\"scene.glass-optics.fused\")\n                            .preset(GlassPreset::Liquid)\n                            .blur(0.)\n                            .thickness(48.)\n                            .refractive_index(1.5)\n                            .backdrop_depth(24.)\n                            .radius(Radius::Pill)\n                            .gap(8.)\n                            .merge(32.)\n                            .pressable(true)\n                            .pane(\n                                \"scene.glass-optics.fused.left\",\n                                div()\n                                    .w(px(380.))\n                                    .h(px(72.))\n                                    .flex()\n                                    .items_center()\n                                    .justify_center()\n                                    .child(\"Left\"),\n                            )\n                            .pane(\n                                \"scene.glass-optics.fused.right\",\n                                div()\n                                    .w(px(380.))\n                                    .h(px(72.))\n                                    .flex()\n                                    .items_center()\n                                    .justify_center()\n                                    .child(\"Right\"),\n                            ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "glass-materials",
+      "capture": "cargo run -p xtask -- headless capture glass-materials",
+      "kind": "exhibit",
+      "subjects": [
+        "Glass",
+        "GlassGroup"
+      ],
+      "uses": [
+        "Glass",
+        "GlassGroup"
+      ],
+      "example": "fn glass_materials(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let specimens = [\n        (\"protected\", \"Default body protection\", true, None),\n        (\"material\", \"Caller-owned legibility\", false, None),\n        (\n            \"tint-partial\",\n            \"25% tint / visible backdrop\",\n            true,\n            Some(0.25),\n        ),\n        (\n            \"tint-solid\",\n            \"100% tint / rim above colour\",\n            true,\n            Some(1.0),\n        ),\n    ];\n    let backdrop = || {\n        div()\n            .relative()\n            .w(px(200.0))\n            .h(px(112.0))\n            .bg(gpui::rgb(0xffffff))\n            .children((0..8).map(|stripe| {\n                div()\n                    .absolute()\n                    .left(px(stripe as f32 * 25.0))\n                    .top_0()\n                    .w(px(12.0))\n                    .h_full()\n                    .bg(gpui::rgb(0x8090a0))\n            }))\n    };\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(\n            &theme,\n            \"Material policy / deterministic stripe fixture, not native reference\",\n        ))\n        .child(\n            row(&theme).children(specimens.into_iter().map(|(id, title, protect, tint)| {\n                let mut glass = Glass::new(format!(\"scene.glass-materials.{id}\"))\n                    .radius_px(24.0)\n                    .blur(2.0)\n                    .protect_text_contrast(protect);\n                if let Some(alpha) = tint {\n                    glass = glass.tint(theme.colors.accent.opacity(alpha));\n                }\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Sm)\n                    .child(caption(&theme, title))\n                    .child(\n                        backdrop().child(\n                            div()\n                                .absolute()\n                                .left(px(20.0))\n                                .top(px(24.0))\n                                .child(glass.child(div().w(px(160.0)).h(px(64.0)))),\n                        ),\n                    )\n            })),\n        )\n        .child(caption(\n            &theme,\n            \"Tint across joined panes / reduced-transparency fallback\",\n        ))\n        .child(\n            row(&theme).children([false, true].into_iter().map(|reduced| {\n                let id = if reduced { \"reduced\" } else { \"joined\" };\n                let tint = theme.colors.accent.opacity(0.25);\n                let group = GlassGroup::new(format!(\"scene.glass-materials.{id}\"))\n                    .radius(Radius::Pill)\n                    .gap(8.0)\n                    .merge(32.0)\n                    .blur(2.0)\n                    .tint(tint)\n                    .pane(\n                        format!(\"scene.glass-materials.{id}.left\"),\n                        div().w(px(68.0)).h(px(56.0)),\n                    )\n                    .pane(\n                        format!(\"scene.glass-materials.{id}.right\"),\n                        div().w(px(68.0)).h(px(56.0)),\n                    );\n                backdrop().child(div().absolute().left(px(28.0)).top(px(28.0)).child(\n                    ThemeOverlay::new(move |t| t.clone().with_reduce_transparency(reduced), group),\n                ))\n            })),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "media-caption",
       "capture": "cargo run -p xtask -- headless capture media-caption",
       "kind": "composition",
@@ -157052,6 +157543,15 @@
       ],
       "validation": "Linux WGPU pixel tests and offscreen catalog are local authority. Native Metal tests, HLSL compilation and macOS/Windows baselines require the Platforms lane; WARP uses WGPU and is not native Direct3D pixel evidence."
     },
+    "framework_glass_wash": {
+      "contract": "GlassMaterial wash preserves straight-alpha RGB; finite channels clamp independently to 0..=1 and non-finite channels become zero. Existing Metal/WGSL/HLSL colour paths are reused without ABI changes. Kit tints compose once before rim lighting, including joined bridges; default untinted body-text protection remains explicit and independently selectable.",
+      "tests": [
+        "material_wash_clamps_each_channel_without_destroying_tint",
+        "optical_tint_composes_with_wash_without_covering_the_rim",
+        "material_policy_and_tint_reach_surface_and_fused_bridge_pixels"
+      ],
+      "validation": "Linux framework unit tests and the glass_reference example's WGPU pixel tests exercise colour and policy. The same example's four tests passed on native Metal in source snapshot ccf09bc1b45fa3fdaff4c6411beba30a0603c3bd844a39f882da3f371cd0c79c (macOS27 build26A5416b, M4 Pro, SDK26.2). SwiftUI captures remain reference acquisition, not GPUI equivalence evidence. Native Direct3D runtime validation remains pending."
+    },
     "framework_intrinsic_layout": {
       "contract": "Window::request_intrinsic_layout distinguishes natural content dimensions from authored aspect ratio. Assigned axes and size constraints win; only missing axes derive from the natural ratio. Block intrinsic widths, flex/grid stretch, absolute insets and unresolved percentages share one local layout result authority. Ordinary measured text retains the stock leaf algorithm; no Taffy vendor or patch and no renderer ABI change.",
       "tests": [
@@ -157075,6 +157575,12 @@
     },
     "framework_luminance_probe": {
       "contract": "LuminanceProbeLease encodes a 4-bit physical slot and 28-bit generation in the existing u32 material field. Exhausted slots retire without wraparound. Metal, Direct3D and WGPU share LuminanceProbeCache: absent probes read None; completed samples must match full ID and current activation, and cannot overwrite newer samples. No GPU ABI change or new Metal wait.",
+      "statistics": "BackdropStatistics decodes the same five optical-source texels after scattering and before compositing: encoded RGB mean and Rec.709 encoded luminance mean/min/max/population variance. Alpha is ignored, without unpremultiplication. These are sample statistics, not exhaustive extrema or linear light. Platform forwarding retains identical freshness; WGPU poll and Direct3D staging Map may wait, while Metal reads completion-populated cache.",
+      "statistics_tests": [
+        "encoded_statistics_respect_channels_padding_and_alpha",
+        "statistics_follow_owner_activation_and_completion_freshness",
+        "coloured_backdrop_statistics_use_the_existing_optical_readback"
+      ],
       "tests": [
         "a_reacquired_slot_cannot_read_or_publish_the_previous_owners_value",
         "an_unsubmitted_fallback_probe_has_no_reading",
@@ -157133,6 +157639,11 @@
       ],
       "frame_submission": "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames.",
       "meaning": "Submission completion means the PlatformWindow draw call returned, not that a compositor or display presented the frame."
+    },
+    "framework_rounded_subtree_clip": {
+      "contract": "Explicit with_rounded_content_mask scopes must surround descendants in both prepaint and paint using window-coordinate logical pixels. Geometry-equal inherited chains govern pointer hitboxes and retained/deferred execution. Scene-local parent-first replay masks primitive writes, leaving rectangular ContentMask culling and optical source capture/probes unchanged. AccessKit uses conservative outer rectangle intersections, not curved bounds. Style overflow behavior is unchanged.",
+      "portable_test": "framework_rounded_subtree_clip_pixels",
+      "validation": "Combined Linux CPU613/WGPU57/headless13 tests and 364 catalog images pass. The integer-texture test is not browser GL runtime evidence. Native Metal executed the portable clip pixel test in source snapshot ccf09bc1b45fa3fdaff4c6411beba30a0603c3bd844a39f882da3f371cd0c79c (macOS27 build26A5416b, M4 Pro, SDK26.2). CVPixelBuffer pixels, native D3D/FXC and native full-catalog validation remain pending; this evidence does not cover subsequent visual-scale work."
     },
     "framework_typed_scopes_and_scroll_axes": {
       "contract": "EffectScoped<T> retains the child's EffectOwner through typed map operations until element rendering. From<T> inherits ambient ownership. Vertical Div/UniformList no longer project pure horizontal wheel input into row scrolling; diagonal residuals preserve independent axes.",

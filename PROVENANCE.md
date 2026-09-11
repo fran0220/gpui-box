@@ -762,6 +762,15 @@ Framework luminance probe leases and the generation/submission-aware CPU cache
 are original GPUI Box ownership infrastructure. Metal, Direct3D and WGPU retain
 the existing fixed-size GPU readbacks and decode physical slots only for offsets;
 full lease IDs reject stale owners and activations without a new shader interface.
+`BackdropStatistics` and shared CPU decoding of the same five encoded texels
+are original GPUI Box work, with no new GPU copies, ABI or imported source.
+
+Rounded subtree geometry, pointer clipping, conservative accessibility bounds,
+retained/deferred chain propagation and scene replay are original GPUI Box
+framework work. Metal, Direct3D and WGPU clip transports mask primitive writes
+without changing optical source captures. The shared rounded-rectangle field
+is extracted from the existing local geometry. No new third-party dependency
+or source is introduced; the frozen historical import receipt is unchanged.
 
 ### Kit Regular/Clear material policy
 
@@ -1002,3 +1011,21 @@ Affinity-aware native positions, atomic primary endpoint selection, and active
 composition rollback are likewise original GPUI Box model/geometry work.
 Incident-paragraph caret lookup reuses the existing indexed document and
 retained shaping authority; it introduces no new source or dependency.
+
+### Native glass reference acquisition and colour calibration
+
+`tools/liquid-glass-reference` is independently authored reference acquisition,
+validation and comparison code using public SwiftUI glass APIs and
+ScreenCaptureKit. It does not copy Apple's renderer or sample implementation.
+Native captures retain OS/SDK identity, exact source and fixture hashes, and
+capture timing; synthetic tests and GPUI candidate images are identified
+separately. Native surface resizing is not evidence of cross-view morphing;
+queued AppKit events are not hardware input.
+
+The colour-preserving `GlassMaterial::wash` sanitizer, Kit tint composition
+and explicit body-text protection policy are original GPUI Box work. Existing
+Metal, HLSL and WGSL colour-wash paths are reused without a material ABI change.
+These changes do not alter the frozen historical import receipt or introduce
+an external source/package authority. Reference observations do not establish
+Apple-equivalent optics, volume transport or native-platform verification of
+the GPUI implementation.

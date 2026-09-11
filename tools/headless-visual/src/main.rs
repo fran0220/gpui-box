@@ -480,6 +480,148 @@ mod imp {
         use super::*;
         use image::{Rgba, RgbaImage};
 
+        /// Runs through the platform's actual headless renderer (Metal on macOS),
+        /// not a window or a baseline. Paths must use the same once-only clip as
+        /// quads, and nested optics must retain their original source pixels.
+        #[test]
+        fn framework_rounded_subtree_clip_pixels() -> Result<()> {
+            use gpui::{
+                BackdropGlass, Background, Bounds, ClipChain, ClipId, ContentMask, Corners,
+                DevicePixels, GlassMaterial, Hsla, Path, Quad, RoundedClip, ScaledPixels, Scene,
+                point,
+            };
+            let mut renderer = gpui_platform::current_headless_renderer()
+                .expect("platform headless renderer required");
+            let bounds = Bounds::new(
+                point(ScaledPixels(0.), ScaledPixels(0.)),
+                size(ScaledPixels(128.), ScaledPixels(128.)),
+            );
+            let quad = Quad {
+                order: 0,
+                border_style: Default::default(),
+                bounds,
+                content_mask: ContentMask { bounds },
+                background: Background::from(Hsla::black()),
+                border_color: Hsla::transparent_black(),
+                corner_radii: Corners::default(),
+                border_widths: Default::default(),
+                clip_id: ClipId::NONE,
+            };
+            let mut chain = ClipChain::default();
+            chain.push(RoundedClip::new(
+                Bounds::new(point(px(16.), px(16.)), size(px(96.), px(96.))),
+                Corners {
+                    top_left: px(40.),
+                    top_right: px(0.),
+                    bottom_right: px(24.),
+                    bottom_left: px(0.),
+                },
+            ));
+            for _ in 0..80 {
+                chain.push(RoundedClip::new(
+                    Bounds::new(point(px(17.), px(17.)), size(px(94.), px(94.))),
+                    Corners::default(),
+                ));
+            }
+            let extent = size(DevicePixels(128), DevicePixels(128));
+            let mut reference = None;
+            for path in [false, true] {
+                let mut scene = Scene::default();
+                scene.insert_primitive(quad);
+                scene.with_clip_chain(&chain, 1., |scene| {
+                    if path {
+                        let mut path = Path::new(point(px(0.), px(0.)));
+                        path.line_to(point(px(128.), px(0.)));
+                        path.line_to(point(px(128.), px(128.)));
+                        path.line_to(point(px(0.), px(128.)));
+                        let mut path = path.scale(1.);
+                        path.content_mask = quad.content_mask;
+                        path.color = Background::from(Hsla::white());
+                        scene.insert_primitive(path);
+                    } else {
+                        scene.insert_primitive(Quad {
+                            background: Background::from(Hsla::white()),
+                            ..quad
+                        });
+                    }
+                });
+                scene.finish();
+                let frame = renderer.render_scene_to_image(&scene, extent)?;
+                for (x, y) in [(18, 18), (109, 109), (8, 60)] {
+                    assert_eq!(frame.get_pixel(x, y).0, [0, 0, 0, 255]);
+                }
+                for (x, y) in [(64, 64), (108, 20), (20, 108)] {
+                    assert_eq!(frame.get_pixel(x, y).0, [255; 4]);
+                }
+                if let Some(reference) = reference.as_ref() {
+                    assert!(
+                        within_one_step(reference, &frame),
+                        "path clip applies once, in window coordinates"
+                    );
+                } else {
+                    reference = Some(frame);
+                }
+            }
+            let mut images = Vec::new();
+            let mut probes = Vec::new();
+            for clipped in [false, true] {
+                let mut scene = Scene::default();
+                scene.insert_primitive(Quad {
+                    background: Background::from(gpui::hsla(0., 0., 0.3, 1.)),
+                    ..quad
+                });
+                let glass = BackdropGlass {
+                    order: 0,
+                    bounds,
+                    content_mask: quad.content_mask,
+                    corner_radii: Corners::default(),
+                    material: GlassMaterial {
+                        blur_radius: ScaledPixels(12.),
+                        wash: gpui::Rgba {
+                            r: 0.,
+                            g: 0.,
+                            b: 0.,
+                            a: 0.4,
+                        },
+                        probe: 0,
+                        ..GlassMaterial::clear()
+                    },
+                    lobes: Default::default(),
+                    lobe_count: 0,
+                    clip_id: ClipId::NONE,
+                };
+                scene.insert_backdrop_glass(glass);
+                let paint = |scene: &mut Scene| {
+                    scene.insert_backdrop_glass(BackdropGlass {
+                        material: GlassMaterial {
+                            probe: 1,
+                            ..glass.material
+                        },
+                        ..glass
+                    })
+                };
+                if clipped {
+                    scene.with_clip_chain(&chain, 1., paint);
+                } else {
+                    paint(&mut scene);
+                }
+                scene.finish();
+                images.push(renderer.render_scene_to_image(&scene, extent)?);
+                probes.push(
+                    renderer
+                        .backdrop_luminance(1)
+                        .expect("nested probe completes"),
+                );
+            }
+            assert_eq!(probes[0], probes[1], "clip never filters probe source");
+            assert_eq!(images[0].get_pixel(64, 64), images[1].get_pixel(64, 64));
+            assert!(
+                images[1].get_pixel(18, 18)[0] > images[0].get_pixel(18, 18)[0] + 10,
+                "rejected rounded corner retains earlier glass rather than applying later glass"
+            );
+            Ok(())
+        }
+
         #[test]
         fn glass_focus_is_an_inner_report_even_after_budget_refusal() -> Result<()> {
             use gpui::rgb;

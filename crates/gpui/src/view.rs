@@ -296,6 +296,7 @@ struct ViewElementCacheKey {
     bounds: Bounds<Pixels>,
     effect_owner: Option<crate::EffectOwner>,
     content_mask: ContentMask<Pixels>,
+    clip_chain: crate::ClipChain,
     text_style: TextStyle,
     transparent_overlay: bool,
 }
@@ -393,6 +394,7 @@ impl<V: View> Element for ViewElement<V> {
                             && element_state.cache_key.bounds == bounds
                             && element_state.cache_key.effect_owner == cx.current_effect_owner()
                             && element_state.cache_key.content_mask == content_mask
+                            && element_state.cache_key.clip_chain == window.clip_chain
                             && element_state.cache_key.text_style == text_style
                             && element_state.cache_key.transparent_overlay
                                 == window.is_painting_transparent_overlay()
@@ -437,6 +439,7 @@ impl<V: View> Element for ViewElement<V> {
                                     bounds,
                                     effect_owner: cx.current_effect_owner(),
                                     content_mask,
+                                    clip_chain: window.clip_chain.clone(),
                                     text_style,
                                     transparent_overlay: window.is_painting_transparent_overlay(),
                                 },

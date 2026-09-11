@@ -46,6 +46,8 @@ mod macos_build {
             "Hsla".into(),
             "Rgba".into(),
             "ContentMask".into(),
+            "ClipId".into(),
+            "ClipNode".into(),
             "Uniforms".into(),
             "AtlasTile".into(),
             "PathRasterizationInputIndex".into(),
@@ -85,6 +87,7 @@ mod macos_build {
         // Source files from gpui that define types used in shaders
         let gpui_src_paths = [
             gpui_dir.join("src/scene.rs"),
+            gpui_dir.join("src/subtree_clip.rs"),
             gpui_dir.join("src/geometry.rs"),
             gpui_dir.join("src/color.rs"),
             gpui_dir.join("src/window.rs"),

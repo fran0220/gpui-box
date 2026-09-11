@@ -1017,20 +1017,10 @@ impl DirectXRenderer {
                 for &id in &self.probe_pending {
                     let slot = luminance_probe_slot(id).expect("only valid probes are encoded");
                     let row = &data[slot * pitch..];
-                    let mut total = 0.0;
-                    for index in 0..LUMINANCE_PROBE_SAMPLES {
-                        // The render target, and so every texel here, is BGRA.
-                        let texel = &row[index * 4..index * 4 + 4];
-                        total += probe_sample_luminance(
-                            texel[2] as f32 / 255.0,
-                            texel[1] as f32 / 255.0,
-                            texel[0] as f32 / 255.0,
-                        );
-                    }
-                    values.publish(
+                    values.publish_statistics(
                         self.probe_pending_frame,
                         id,
-                        total / LUMINANCE_PROBE_SAMPLES as f32,
+                        gpui::BackdropStatistics::from_encoded_texels(row, 4, true),
                     );
                 }
                 devices.device_context.Unmap(staging, 0);
@@ -1047,6 +1037,11 @@ impl DirectXRenderer {
     pub(crate) fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
         self.collect_probes();
         self.probe_values.get(slot)
+    }
+
+    pub(crate) fn backdrop_statistics(&mut self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.collect_probes();
+        self.probe_values.statistics(id)
     }
 
     pub(crate) fn resize(&mut self, new_size: Size<DevicePixels>) -> Result<()> {
@@ -1099,6 +1094,28 @@ impl DirectXRenderer {
 
     fn upload_scene_buffers(&mut self, scene: &Scene, transparent_overlay: bool) -> Result<()> {
         let devices = self.devices.as_ref().context("devices missing")?;
+
+        let nodes = scene.clip_nodes.nodes();
+        anyhow::ensure!(
+            std::mem::size_of_val(nodes) <= MAX_INSTANCE_BUFFER_SIZE,
+            "rounded clip buffer exceeds {MAX_INSTANCE_BUFFER_SIZE} bytes"
+        );
+        let clips = create_buffer(
+            &devices.device,
+            std::mem::size_of::<gpui::ClipNode>(),
+            nodes.len().max(1),
+        )?;
+        if !nodes.is_empty() {
+            update_buffer(&devices.device_context, &clips, nodes)?;
+        }
+        let view = create_buffer_view(&devices.device, &clips)?;
+        // t2 is independent of t0 (atlas/source) and t1 (instances/sharp).
+        // D3D retains the view for the encoded commands, including interleaved glass.
+        unsafe {
+            devices
+                .device_context
+                .PSSetShaderResources(2, Some(&[view]));
+        }
 
         if !scene.shadows.is_empty() {
             self.pipelines.shadow_pipeline.update_buffer(
@@ -1224,6 +1241,7 @@ impl DirectXRenderer {
                 st_position: v.st_position,
                 color: path.color,
                 bounds: path.clipped_bounds(),
+                clip_id: path.clip_id,
             }));
         }
 
@@ -1867,7 +1885,7 @@ struct BackdropGlassParams {
     transmission_gain: f32,
     hairline: f32,
     saturation: f32,
-    _optical_pad: f32,
+    clip_id: u32,
     wash: [f32; 4],
     optical_lift: [f32; 4],
     edge_mask: [f32; 4],
@@ -1930,7 +1948,7 @@ impl BackdropGlassParams {
             transmission_gain: glass.material.transmission_gain,
             hairline: glass.material.hairline.0,
             saturation: glass.material.saturation,
-            _optical_pad: 0.0,
+            clip_id: glass.clip_id.as_u32(),
             wash: [
                 glass.material.wash.r,
                 glass.material.wash.g,
@@ -2203,6 +2221,7 @@ struct PathRasterizationSprite {
     st_position: Point<f32>,
     color: Background,
     bounds: Bounds<ScaledPixels>,
+    clip_id: gpui::ClipId,
 }
 
 #[derive(Clone, Copy)]

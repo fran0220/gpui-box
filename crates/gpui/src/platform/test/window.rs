@@ -566,6 +566,14 @@ impl PlatformWindow for TestWindow {
             .and_then(|renderer| renderer.backdrop_luminance(slot))
     }
 
+    fn backdrop_statistics(&self, id: u32) -> Option<crate::BackdropStatistics> {
+        self.0
+            .lock()
+            .renderer
+            .as_mut()
+            .and_then(|renderer| renderer.backdrop_statistics(id))
+    }
+
     fn as_test(&mut self) -> Option<&mut TestWindow> {
         Some(self)
     }

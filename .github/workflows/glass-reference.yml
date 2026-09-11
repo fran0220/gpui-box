@@ -1,0 +1,23 @@
+name: Native Liquid Glass reference
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Portable evidence contract tests
+        run: python3 -B -m unittest discover -s tools/liquid-glass-reference -p 'test_*.py'
+      - name: Capture native compositor references (permission failures are failures)
+        run: python3 -B tools/liquid-glass-reference/run.py --output "$RUNNER_TEMP/liquid-glass-reference"
+      - name: Upload reference or failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: liquid-glass-reference-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/liquid-glass-reference
+          if-no-files-found: warn
+          retention-days: 14

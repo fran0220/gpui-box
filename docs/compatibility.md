@@ -531,15 +531,33 @@ radius derives a blurred source for both the interior and refracted rim; the
 sharp paint-order snapshot is retained only for explicit edge-mask restoration.
 `GlassMaterial::clear()` replaces the historical
 zero-argument `frosted()` constructor; `GlassMaterial::frosted(radius)` names an
-actual frost. The material also carries saturation, an achromatic wash,
+actual frost. The material also carries saturation, a straight-alpha colour wash,
 transmission gain, additive optical lift, and hairline width. All renderers
 apply Rec. 709 saturation to the sampled interior and refracted rim, clamp
-negative channels, multiply transmission gain, source-over the black/white
+negative channels, multiply transmission gain, source-over the material colour
 wash, then add optical lift and edge light. Clear/frosted constructors default
 to saturation 1 and transparent wash. Metal generates its packed material
 layout from Rust; Direct3D and WGPU map it to aligned uniform registers.
 The browser shares WGPU, not a separate glass implementation. Native Windows
 and Linux validation of this extension is still required in their lanes.
+
+Wash sanitization preserves RGB rather than collapsing it to a black/white
+pole; each channel is clamped independently and non-finite channels become
+zero. This reuses the existing three renderer colour paths without an ABI
+change. Kit composes `Glass::tint` and `GlassGroup::tint` into that wash before
+the optical rim, including fused bridges. Frosted keeps its existing fill.
+Untinted Regular protects body-text contrast by default;
+`protect_text_contrast(false)` preserves the configured material and makes
+foreground legibility caller-owned. It is an explicit policy, not evidence
+that an unprotected native-like control meets a body-text contrast target.
+
+The independently authored `tools/liquid-glass-reference` harness records
+public SwiftUI compositor output and validates source, image and timing
+identities separately from GPUI candidate renders. Static trial selection
+reports training, held-out size, cross-appearance and Clear-invariance scores;
+neither a score nor native capture certifies GPUI equivalence to Apple's
+private renderer. Native surface resizing and synthetic AppKit event receipt
+are distinct from cross-view morphs and physical input.
 
 Glass uses a shared elliptical height field: `thickness` (zero follows the
 bounded bevel) times the signed `refraction` multiplier determines height and
@@ -594,6 +612,27 @@ fragments no longer evaluate an exponential for every tap. Metal publishes
 luminance probes from command-buffer completion handlers, so a query returns
 the most recently completed frame without waiting for the GPU and may remain
 one additional frame behind when completion is late.
+
+`Window::backdrop_statistics` exposes encoded RGB mean and encoded Rec.709
+luminance mean, minimum, maximum and population variance from the same five
+optical-source samples. These are not exhaustive backdrop extrema or linear
+light measurements. Alpha is ignored, not used to unpremultiply or weight RGB.
+Statistics share the lease and completion freshness of the scalar reading;
+existing WGPU polling and Direct3D staging mapping can wait for completion.
+
+`Window::with_rounded_content_mask` explicitly scopes descendants in both
+prepaint and paint using logical window coordinates. Rounded chains constrain
+pointer input and primitive writes, including retained and deferred rendering,
+without narrowing the rectangular optical source capture. AccessKit receives
+only the conservative enclosing rectangle intersection. This does not change
+Style overflow behavior or add rounded clipping to external native child views.
+Linux tests exercise storage and integer-texture clip transport on a software
+GPU; the latter is not a browser GL runtime test. The portable rounded-clip
+pixel test, four glass-reference tests and seven Metal renderer tests also
+passed on an exact source snapshot on macOS 27 build 26A5416b, M4 Pro, SDK26.2;
+`compatibility.toml` records its SHA-256 identity. This does not exercise
+CVPixelBuffer pixels or native Direct3D, certify a native full catalog, or
+validate subsequent visual-scale changes.
 
 Independently, the scene admits at most 16 backdrop-glass surfaces per frame.
 Valid surfaces past that paint their caller-supplied ordinary-fill fallback

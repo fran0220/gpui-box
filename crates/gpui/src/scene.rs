@@ -41,6 +41,10 @@ impl From<bool> for PaddedBool32 {
 #[expect(missing_docs)]
 pub struct Scene {
     pub(crate) paint_operations: Vec<PaintOperation>,
+    /// Rounded subtree geometry, separate from rectangular culling and optical
+    /// capture bounds. Indices belong to this scene and expire on `clear`.
+    pub clip_nodes: crate::ClipNodes,
+    active_clip: crate::ClipId,
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<DrawOrder>,
     pub shadows: Vec<Shadow>,
@@ -60,6 +64,8 @@ pub struct Scene {
 impl Scene {
     pub fn clear(&mut self) {
         self.paint_operations.clear();
+        self.clip_nodes.clear();
+        self.active_clip = crate::ClipId::NONE;
         self.primitive_bounds.clear();
         self.layer_stack.clear();
         self.paths.clear();
@@ -110,11 +116,36 @@ impl Scene {
         self.insert_backdrop_glass_with_fallback(glass, None);
     }
 
+    /// Paint a scope using a value-typed clip chain in window coordinates.
+    /// Rectangular culling and backdrop sampling remain independent of this chain.
+    pub fn with_clip_chain<R>(
+        &mut self,
+        chain: &crate::ClipChain,
+        scale: f32,
+        paint: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let clip = self.clip_nodes.insert(chain, scale);
+        let previous = std::mem::replace(&mut self.active_clip, clip);
+        let result = paint(self);
+        self.active_clip = previous;
+        result
+    }
+
+    pub(crate) fn replace_clip(&mut self, clip: crate::ClipId) -> crate::ClipId {
+        std::mem::replace(&mut self.active_clip, clip)
+    }
+
+    pub(crate) fn push_clip(&mut self, clip: crate::RoundedClip, scale: f32) -> crate::ClipId {
+        let next = self.clip_nodes.push(clip, scale, self.active_clip);
+        self.replace_clip(next)
+    }
+
     pub(crate) fn insert_backdrop_glass_with_fallback(
         &mut self,
         mut glass: BackdropGlass,
         fallback: Option<Hsla>,
     ) {
+        glass.clip_id = self.active_clip;
         glass.material = glass.material.sanitized();
         if !glass.material.needs_backdrop() {
             return;
@@ -146,6 +177,7 @@ impl Scene {
                     border_color: Hsla::transparent_black(),
                     corner_radii: lobe.corner_radii,
                     border_widths: Edges::default(),
+                    clip_id: glass.clip_id,
                 }));
         }
         // Keep every valid intent replayable even when this frame rejected it.
@@ -159,6 +191,7 @@ impl Scene {
 
     pub fn insert_primitive(&mut self, primitive: impl Into<Primitive>) {
         let mut primitive = primitive.into();
+        *primitive.clip_id_mut() = self.active_clip;
         let clipped_bounds = primitive
             .cull_bounds()
             .intersect(&primitive.content_mask().bounds);
@@ -212,7 +245,17 @@ impl Scene {
     }
 
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
+        let previous_clip = self.active_clip;
+        let mut remapped = collections::FxHashMap::default();
         for operation in &prev_scene.paint_operations[range] {
+            let old_clip = match operation {
+                PaintOperation::Primitive(primitive) => primitive.clip_id(),
+                PaintOperation::BackdropGlass { glass, .. } => glass.clip_id,
+                _ => crate::ClipId::NONE,
+            };
+            self.active_clip =
+                self.clip_nodes
+                    .replay_with_cache(old_clip, &prev_scene.clip_nodes, &mut remapped);
             match operation {
                 PaintOperation::Primitive(primitive) => self.insert_primitive(primitive.clone()),
                 PaintOperation::BackdropGlass { glass, fallback } => {
@@ -222,6 +265,7 @@ impl Scene {
                 PaintOperation::EndLayer => self.pop_layer(),
             }
         }
+        self.active_clip = previous_clip;
     }
 
     pub fn finish(&mut self) {
@@ -401,6 +445,7 @@ mod tests {
         material.refraction = 0.34;
         let mut scene = Scene::default();
         scene.insert_backdrop_glass(BackdropGlass {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask: ContentMask { bounds },
@@ -430,6 +475,7 @@ mod tests {
         material.refraction = 0.34;
         material.probe = index as u32;
         BackdropGlass {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask: ContentMask { bounds },
@@ -444,10 +490,25 @@ mod tests {
     fn backdrop_glass_admission_bounds_work_and_keeps_rejected_intents_replayable() {
         let mut scene = Scene::default();
         let fallback = Hsla::black();
-
-        for index in 0..1_000 {
-            scene.insert_backdrop_glass_with_fallback(bounded_glass(index), Some(fallback));
-        }
+        let mut chain = crate::ClipChain::default();
+        chain.push(crate::RoundedClip::new(
+            Bounds::new(
+                point(crate::px(7.), crate::px(11.)),
+                crate::size(crate::px(2000.), crate::px(80.)),
+            ),
+            Corners {
+                top_left: crate::px(23.),
+                ..Corners::default()
+            },
+        ));
+        scene.with_clip_chain(&chain, 1.5, |scene| {
+            for index in 0..1_000 {
+                scene.insert_backdrop_glass_with_fallback(bounded_glass(index), Some(fallback));
+            }
+        });
+        let source_clip = scene.backdrop_glass[0].clip_id;
+        assert_ne!(source_clip, crate::ClipId::NONE);
+        assert!(scene.quads.iter().all(|quad| quad.clip_id == source_clip));
 
         assert_eq!(
             scene.backdrop_glass.len(),
@@ -482,11 +543,21 @@ mod tests {
         assert_eq!(replayed.quads.len(), scene.quads.len());
 
         let mut promoted = Scene::default();
+        promoted.with_clip_chain(&chain, 2., |_| {});
         promoted.replay(
             MAX_BACKDROP_GLASS_SURFACES_PER_FRAME..MAX_BACKDROP_GLASS_SURFACES_PER_FRAME + 1,
             &scene,
         );
         assert_eq!(promoted.backdrop_glass.len(), 1);
+        let promoted_clip = promoted.backdrop_glass[0].clip_id;
+        assert_ne!(
+            promoted_clip, source_clip,
+            "source indices cannot alias destination nodes"
+        );
+        assert_eq!(
+            promoted.clip_nodes.nodes()[promoted_clip.as_u32() as usize - 1],
+            scene.clip_nodes.nodes()[source_clip.as_u32() as usize - 1]
+        );
         assert!(
             promoted.quads.is_empty(),
             "a previously rejected cached intent must not retain its fallback when admitted"
@@ -590,6 +661,7 @@ mod tests {
 
         for radius in [-1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             scene.insert_backdrop_glass(BackdropGlass {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 bounds,
                 content_mask: ContentMask { bounds },
@@ -615,6 +687,7 @@ mod tests {
         };
         let mut scene = Scene::default();
         scene.insert_backdrop_glass(BackdropGlass {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask: ContentMask { bounds },
@@ -648,6 +721,7 @@ mod tests {
             bottom_left: ScaledPixels(6.),
         };
         let glass = BackdropGlass {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask: ContentMask { bounds },
@@ -708,7 +782,15 @@ mod tests {
         assert_eq!(material.specular, 0.);
         assert_eq!(material.transmission_gain, 1.);
         assert_eq!(material.saturation, 1.);
-        assert_eq!(material.wash, Rgba::default());
+        assert_eq!(
+            material.wash,
+            Rgba {
+                r: 0.,
+                g: 1.,
+                b: 0.,
+                a: 0.,
+            }
+        );
         assert_eq!(
             material.optical_lift,
             Rgba {
@@ -776,10 +858,52 @@ mod tests {
         assert_eq!(
             material.wash,
             Rgba {
-                r: 1.,
-                g: 1.,
-                b: 1.,
+                r: 0.9,
+                g: 0.1,
+                b: 0.2,
                 a: 1.
+            }
+        );
+    }
+
+    #[test]
+    fn material_wash_clamps_each_channel_without_destroying_tint() {
+        let material = GlassMaterial::<ScaledPixels> {
+            wash: Rgba {
+                r: -0.5,
+                g: 1.2,
+                b: 0.37,
+                a: f32::NAN,
+            },
+            ..GlassMaterial::clear()
+        }
+        .sanitized();
+        assert_eq!(
+            material.wash,
+            Rgba {
+                r: 0.,
+                g: 1.,
+                b: 0.37,
+                a: 0.
+            }
+        );
+        let material = GlassMaterial::<ScaledPixels> {
+            wash: Rgba {
+                r: f32::INFINITY,
+                g: f32::NEG_INFINITY,
+                b: f32::NAN,
+                a: 0.6,
+            },
+            ..GlassMaterial::clear()
+        }
+        .sanitized();
+        assert_eq!(
+            material.wash,
+            Rgba {
+                r: 0.,
+                g: 0.,
+                b: 0.,
+                a: 0.6
             }
         );
     }
@@ -856,6 +980,7 @@ mod tests {
             },
         };
         BackdropGlass {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask: ContentMask { bounds },
@@ -1174,6 +1299,7 @@ mod tests {
                 + size_of::<Hsla>()
                 + size_of::<f32>()
                 + size_of::<u32>()
+                + size_of::<crate::ClipId>()
         );
         assert_eq!(
             size_of::<BackdropGlass>(),
@@ -1184,12 +1310,14 @@ mod tests {
                 + size_of::<GlassMaterial>()
                 + MAX_GLASS_LOBES * size_of::<GlassLobe>()
                 + size_of::<u32>()
+                + size_of::<crate::ClipId>()
         );
     }
 
     #[test]
     fn backdrop_glass_splits_same_kind_primitive_batches() {
         let shadow = |order| Shadow {
+            clip_id: crate::ClipId::NONE,
             order,
             blur_radius: ScaledPixels::default(),
             bounds: Bounds::default(),
@@ -1204,6 +1332,7 @@ mod tests {
         let mut scene = Scene {
             shadows: vec![shadow(1), shadow(2), shadow(4)],
             backdrop_glass: vec![BackdropGlass {
+                clip_id: crate::ClipId::NONE,
                 order: 3,
                 bounds: Bounds::default(),
                 content_mask: ContentMask::default(),
@@ -1232,6 +1361,7 @@ mod tests {
             size: size(ScaledPixels(20.0), ScaledPixels(20.0)),
         };
         PolychromeSprite {
+            clip_id: crate::ClipId::NONE,
             order: 1,
             blend_mode,
             color_mode: SpriteColorMode::Color,
@@ -1350,6 +1480,33 @@ pub enum Primitive {
 
 #[expect(missing_docs)]
 impl Primitive {
+    /// Rounded subtree clip in the owning scene.
+    pub fn clip_id(&self) -> crate::ClipId {
+        match self {
+            Self::Shadow(p) => p.clip_id,
+            Self::Quad(p) => p.clip_id,
+            Self::Path(p) => p.clip_id,
+            Self::Underline(p) => p.clip_id,
+            Self::MonochromeSprite(p) => p.clip_id,
+            Self::SubpixelSprite(p) => p.clip_id,
+            Self::PolychromeSprite(p) => p.clip_id,
+            Self::Surface(p) => p.clip_id,
+        }
+    }
+
+    fn clip_id_mut(&mut self) -> &mut crate::ClipId {
+        match self {
+            Self::Shadow(p) => &mut p.clip_id,
+            Self::Quad(p) => &mut p.clip_id,
+            Self::Path(p) => &mut p.clip_id,
+            Self::Underline(p) => &mut p.clip_id,
+            Self::MonochromeSprite(p) => &mut p.clip_id,
+            Self::SubpixelSprite(p) => &mut p.clip_id,
+            Self::PolychromeSprite(p) => &mut p.clip_id,
+            Self::Surface(p) => &mut p.clip_id,
+        }
+    }
+
     pub fn bounds(&self) -> &Bounds<ScaledPixels> {
         match self {
             Primitive::Shadow(shadow) => &shadow.bounds,
@@ -1716,6 +1873,7 @@ pub struct Quad {
     pub border_color: Hsla,
     pub corner_radii: Corners<ScaledPixels>,
     pub border_widths: Edges<ScaledPixels>,
+    pub clip_id: crate::ClipId,
 }
 
 impl From<Quad> for Primitive {
@@ -1735,6 +1893,7 @@ pub struct Underline {
     pub color: Hsla,
     pub thickness: ScaledPixels,
     pub wavy: PaddedBool32,
+    pub clip_id: crate::ClipId,
 }
 
 impl From<Underline> for Primitive {
@@ -1893,10 +2052,11 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// transmission gain. One preserves colour, zero uses Rec. 709 luminance.
     /// Values above one intensify colour; negative results are clamped to zero.
     pub saturation: f32,
-    /// Achromatic source-over material wash after saturation and transmission
-    /// gain, before optical lift and edge light. RGB must be all zero (dark) or
-    /// all one (light); alpha is strength. Sanitization selects black or white
-    /// from red at 0.5. This covers the refracted rim, unlike an element fill.
+    /// Straight-alpha source-over material colour after saturation and
+    /// transmission gain, before optical lift and edge light. RGB and alpha
+    /// are independently clamped to 0..=1; non-finite channels become zero.
+    /// Neutral washes and caller tints cover the refracted rim and fused
+    /// bridges, unlike a foreground element fill.
     pub wash: Rgba,
     /// A colour added after transmission, as `rgb * alpha`. This is not
     /// source-over tint: it lifts the light already passing through the glass.
@@ -2031,15 +2191,10 @@ impl<P: GlassLength> GlassMaterial<P> {
         self.specular = finite(self.specular, 0.).max(0.);
         self.transmission_gain = finite(self.transmission_gain, 1.).max(0.);
         self.saturation = finite(self.saturation, 1.).max(0.);
-        let wash_channel = if finite(self.wash.r, 0.) >= 0.5 {
-            1.
-        } else {
-            0.
-        };
         self.wash = Rgba {
-            r: wash_channel,
-            g: wash_channel,
-            b: wash_channel,
+            r: finite(self.wash.r, 0.).clamp(0., 1.),
+            g: finite(self.wash.g, 0.).clamp(0., 1.),
+            b: finite(self.wash.b, 0.).clamp(0., 1.),
             a: finite(self.wash.a, 0.).clamp(0., 1.),
         };
         self.optical_lift = Rgba {
@@ -2127,6 +2282,7 @@ pub struct BackdropGlass {
     /// How many entries of `lobes` are real. Zero means the surface is the
     /// single rounded rect named by `bounds` and `corner_radii`.
     pub lobe_count: u32,
+    pub clip_id: crate::ClipId,
 }
 
 /// Integral device-pixel regions a backdrop renderer must preserve.
@@ -2414,46 +2570,12 @@ pub fn glass_lobe_sdf(point: Point<f32>, lobe: &GlassLobe) -> f32 {
 }
 
 fn glass_lobe_field(at: Point<f32>, lobe: &GlassLobe) -> GlassField {
-    let half_width = lobe.bounds.size.width.0 / 2.;
-    let half_height = lobe.bounds.size.height.0 / 2.;
-    let center_x = lobe.bounds.origin.x.0 + half_width;
-    let center_y = lobe.bounds.origin.y.0 + half_height;
-    let to_center_x = at.x - center_x;
-    let to_center_y = at.y - center_y;
-
-    let radius = if to_center_x < 0. {
-        if to_center_y < 0. {
-            lobe.corner_radii.top_left.0
-        } else {
-            lobe.corner_radii.bottom_left.0
-        }
-    } else if to_center_y < 0. {
-        lobe.corner_radii.top_right.0
-    } else {
-        lobe.corner_radii.bottom_right.0
-    };
-
-    let corner_x = to_center_x.abs() - half_width + radius;
-    let corner_y = to_center_y.abs() - half_height + radius;
-    let outside = (corner_x.max(0.).powi(2) + corner_y.max(0.).powi(2)).sqrt();
-    let mut gradient = if corner_x > corner_y {
-        point(1., 0.)
-    } else {
-        point(0., 1.)
-    };
-    if radius != 0. && outside > 0. {
-        gradient = point(corner_x.max(0.) / outside, corner_y.max(0.) / outside);
-    }
-    gradient.x *= if to_center_x >= 0. { 1. } else { -1. };
-    gradient.y *= if to_center_y >= 0. { 1. } else { -1. };
-    GlassField {
-        distance: if radius == 0. {
-            corner_x.max(corner_y)
-        } else {
-            outside + corner_x.max(corner_y).min(0.) - radius
-        },
-        gradient,
-    }
+    let (distance, gradient) = crate::subtree_clip::rounded_rect_field(
+        at,
+        lobe.bounds.map(|value| value.0),
+        lobe.corner_radii.map(|value| value.0),
+    );
+    GlassField { distance, gradient }
 }
 
 /// The polynomial smooth minimum, which is what makes two lobes join into one
@@ -2522,6 +2644,7 @@ pub struct Shadow {
     /// as a ring rather than painting under the element. Only consulted for a
     /// drop shadow; an inset shadow is already clipped to the element.
     pub outer_only: u32,
+    pub clip_id: crate::ClipId,
 }
 
 impl From<Shadow> for Primitive {
@@ -2833,6 +2956,7 @@ pub struct MonochromeSprite {
     pub color: Hsla,
     pub tile: AtlasTile,
     pub transformation: TransformationMatrix,
+    pub clip_id: crate::ClipId,
 }
 
 impl From<MonochromeSprite> for Primitive {
@@ -2852,6 +2976,7 @@ pub struct SubpixelSprite {
     pub color: Hsla,
     pub tile: AtlasTile,
     pub transformation: TransformationMatrix,
+    pub clip_id: crate::ClipId,
 }
 
 impl From<SubpixelSprite> for Primitive {
@@ -2876,6 +3001,7 @@ pub struct PolychromeSprite {
     pub tint: Hsla,
     pub opacity: f32,
     pub pad: u32,
+    pub clip_id: crate::ClipId,
 }
 
 impl PolychromeSprite {
@@ -2896,6 +3022,7 @@ pub struct PaintSurface {
     pub order: DrawOrder,
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
+    pub clip_id: crate::ClipId,
     #[cfg(target_os = "macos")]
     pub image_buffer: core_video::pixel_buffer::CVPixelBuffer,
 }
@@ -2920,6 +3047,7 @@ pub struct Path<P: Clone + Debug + Default + PartialEq> {
     pub content_mask: ContentMask<P>,
     pub vertices: Vec<PathVertex<P>>,
     pub color: Background,
+    pub clip_id: crate::ClipId,
     start: Point<P>,
     current: Point<P>,
     contour_count: usize,
@@ -2929,6 +3057,7 @@ impl Path<Pixels> {
     /// Create a new path with the given starting point.
     pub fn new(start: Point<Pixels>) -> Self {
         Self {
+            clip_id: crate::ClipId::NONE,
             id: PathId(0),
             order: DrawOrder::default(),
             vertices: Vec::new(),
@@ -2947,6 +3076,7 @@ impl Path<Pixels> {
     /// Scale this path by the given factor.
     pub fn scale(&self, factor: f32) -> Path<ScaledPixels> {
         Path {
+            clip_id: self.clip_id,
             id: self.id,
             order: self.order,
             bounds: self.bounds.scale(factor),

@@ -2621,6 +2621,10 @@ impl PlatformWindow for MacWindow {
         self.0.lock().renderer.backdrop_luminance(slot)
     }
 
+    fn backdrop_statistics(&self, id: u32) -> Option<gpui::BackdropStatistics> {
+        self.0.lock().renderer.backdrop_statistics(id)
+    }
+
     fn a11y_init(&self, callbacks: gpui::A11yCallbacks) {
         let mut lock = self.0.lock();
 

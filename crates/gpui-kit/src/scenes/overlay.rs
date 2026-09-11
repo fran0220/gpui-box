@@ -1345,6 +1345,102 @@ pub(super) fn glass_optics(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// Colour belongs to the optical material, including a group's bridge.
+/// Captions remain outside the specimens so tint strength is visible.
+pub(super) fn glass_materials(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let specimens = [
+        ("protected", "Default body protection", true, None),
+        ("material", "Caller-owned legibility", false, None),
+        (
+            "tint-partial",
+            "25% tint / visible backdrop",
+            true,
+            Some(0.25),
+        ),
+        (
+            "tint-solid",
+            "100% tint / rim above colour",
+            true,
+            Some(1.0),
+        ),
+    ];
+    let backdrop = || {
+        div()
+            .relative()
+            .w(px(200.0))
+            .h(px(112.0))
+            .bg(gpui::rgb(0xffffff))
+            .children((0..8).map(|stripe| {
+                div()
+                    .absolute()
+                    .left(px(stripe as f32 * 25.0))
+                    .top_0()
+                    .w(px(12.0))
+                    .h_full()
+                    .bg(gpui::rgb(0x8090a0))
+            }))
+    };
+    stack(&theme)
+        .w(px(900.0))
+        .child(caption(
+            &theme,
+            "Material policy / deterministic stripe fixture, not native reference",
+        ))
+        .child(
+            row(&theme).children(specimens.into_iter().map(|(id, title, protect, tint)| {
+                let mut glass = Glass::new(format!("scene.glass-materials.{id}"))
+                    .radius_px(24.0)
+                    .blur(2.0)
+                    .protect_text_contrast(protect);
+                if let Some(alpha) = tint {
+                    glass = glass.tint(theme.colors.accent.opacity(alpha));
+                }
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Sm)
+                    .child(caption(&theme, title))
+                    .child(
+                        backdrop().child(
+                            div()
+                                .absolute()
+                                .left(px(20.0))
+                                .top(px(24.0))
+                                .child(glass.child(div().w(px(160.0)).h(px(64.0)))),
+                        ),
+                    )
+            })),
+        )
+        .child(caption(
+            &theme,
+            "Tint across joined panes / reduced-transparency fallback",
+        ))
+        .child(
+            row(&theme).children([false, true].into_iter().map(|reduced| {
+                let id = if reduced { "reduced" } else { "joined" };
+                let tint = theme.colors.accent.opacity(0.25);
+                let group = GlassGroup::new(format!("scene.glass-materials.{id}"))
+                    .radius(Radius::Pill)
+                    .gap(8.0)
+                    .merge(32.0)
+                    .blur(2.0)
+                    .tint(tint)
+                    .pane(
+                        format!("scene.glass-materials.{id}.left"),
+                        div().w(px(68.0)).h(px(56.0)),
+                    )
+                    .pane(
+                        format!("scene.glass-materials.{id}.right"),
+                        div().w(px(68.0)).h(px(56.0)),
+                    );
+                backdrop().child(div().absolute().left(px(28.0)).top(px(28.0)).child(
+                    ThemeOverlay::new(move |t| t.clone().with_reduce_transparency(reduced), group),
+                ))
+            })),
+        )
+        .into_any_element()
+}
+
 /// The drawer the scene shows, kept across frames and settled so the capture
 /// photographs the panel where it comes to rest rather than mid-slide.
 pub(super) struct SceneDrawer {

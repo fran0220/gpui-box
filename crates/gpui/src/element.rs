@@ -412,7 +412,11 @@ impl<E: Element> Drawable<E> {
                 }
 
                 let bounds = window.layout_bounds(layout_id);
-                let content_clip = window.content_mask().bounds;
+                // AccessKit cannot express curved regions. Expose the enclosing
+                // intersection, without narrowing rendering's optical source mask.
+                let content_clip = window
+                    .clip_chain
+                    .accessible_bounds(window.content_mask().bounds);
                 let visible_bounds = bounds.intersect(&content_clip);
                 let a11y_bounds = if bounds.is_empty() {
                     bounds

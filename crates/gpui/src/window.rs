@@ -797,6 +797,8 @@ pub struct Hitbox {
     pub bounds: Bounds<Pixels>,
     /// The content mask when the hitbox was inserted.
     pub content_mask: ContentMask<Pixels>,
+    /// Rounded ancestor clips captured during prepaint.
+    pub clip_chain: crate::ClipChain,
     /// Flags that specify hitbox behavior.
     pub behavior: HitboxBehavior,
 }
@@ -930,6 +932,7 @@ pub(crate) struct DeferredDraw {
     element_id_stack: SmallVec<[ElementId; 32]>,
     text_style_stack: Vec<TextStyleRefinement>,
     content_mask: Option<ContentMask<Pixels>>,
+    clip_chain: crate::ClipChain,
     rem_size: Pixels,
     element: Option<AnyElement>,
     absolute_offset: Point<Pixels>,
@@ -1096,7 +1099,7 @@ impl Frame {
         let mut hit_test = HitTest::default();
         for hitbox in self.hitboxes.iter().rev() {
             let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
-            if bounds.contains(&position) {
+            if bounds.contains(&position) && hitbox.clip_chain.contains(position) {
                 hit_test.ids.push(hitbox.id);
                 if !set_hover_hitbox_count
                     && hitbox.behavior == HitboxBehavior::BlockMouseExceptScroll
@@ -1180,6 +1183,7 @@ pub struct Window {
     pub(crate) element_opacity: f32,
     pub(crate) edge_fade: Option<EdgeFade>,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
+    pub(crate) clip_chain: crate::ClipChain,
     pub(crate) selection_scope_stack: Vec<crate::SelectionScopeId>,
     /// One selection that may span separately mounted text elements. It
     /// belongs to the window rather than to a global, so a closed window
@@ -2101,6 +2105,7 @@ impl Window {
             rendered_entity_stack: Vec::new(),
             element_offset_stack: Vec::new(),
             content_mask_stack: Vec::new(),
+            clip_chain: crate::ClipChain::default(),
             element_opacity: 1.0,
             edge_fade: None,
             requested_autoscroll: None,
@@ -2856,6 +2861,18 @@ impl Window {
     /// probes — the honest reading for a backdrop nobody measured.
     pub fn backdrop_luminance(&self, id: u32) -> Option<f32> {
         self.platform_window.backdrop_luminance(id)
+    }
+
+    /// Statistics of the five sampled optical-source texels, not exhaustive
+    /// backdrop extrema or linear-light measurements. See [`crate::BackdropStatistics`].
+    /// Pass a live [`crate::LuminanceProbeLease`] ID also set on the glass material.
+    /// Availability and freshness match [`Self::backdrop_luminance`], including
+    /// `None` for absent probes, budget fallback, and unsupported renderers.
+    /// Collection preserves backend behavior: WGPU can wait for an outstanding
+    /// map and DirectX can wait when mapping staging data; Metal reads its
+    /// completion-populated cache. No additional GPU work is submitted here.
+    pub fn backdrop_statistics(&self, id: u32) -> Option<crate::BackdropStatistics> {
+        self.platform_window.backdrop_statistics(id)
     }
 
     /// Set the content size of the window.
@@ -3979,6 +3996,7 @@ impl Window {
                     rem_size,
                     absolute_offset,
                     content_mask,
+                    clip_chain,
                     prepaint_range,
                 ) = {
                     let deferred_draw = &mut self.next_frame.deferred_draws[deferred_draw_ix];
@@ -3994,6 +4012,7 @@ impl Window {
                         deferred_draw.rem_size,
                         deferred_draw.absolute_offset,
                         deferred_draw.content_mask,
+                        deferred_draw.clip_chain.clone(),
                         deferred_draw.prepaint_range.clone(),
                     )
                 };
@@ -4003,6 +4022,7 @@ impl Window {
                     .map(|context| self.a11y.nodes.begin_deferred(context));
 
                 let prepaint_start = self.prepaint_index();
+                let previous_chain = std::mem::replace(&mut self.clip_chain, clip_chain);
                 if let Some(mut element) = element {
                     self.with_rendered_view(current_view, |window| {
                         window.with_content_mask(content_mask, |window| {
@@ -4017,6 +4037,7 @@ impl Window {
                 } else {
                     self.reuse_prepaint(prepaint_range);
                 }
+                self.clip_chain = previous_chain;
                 if let Some(state) = a11y_state {
                     self.a11y.nodes.end_deferred(state);
                 }
@@ -4055,6 +4076,14 @@ impl Window {
 
             let paint_start = self.paint_index();
             let content_mask = deferred_draw.content_mask;
+            let previous_chain =
+                std::mem::replace(&mut self.clip_chain, deferred_draw.clip_chain.clone());
+            let clip = self
+                .next_frame
+                .scene
+                .clip_nodes
+                .insert(&self.clip_chain, self.scale_factor());
+            let previous_clip = self.next_frame.scene.replace_clip(clip);
             if let Some(element) = deferred_draw.element.as_mut() {
                 self.with_rendered_view(deferred_draw.current_view, |window| {
                     window.with_content_mask(content_mask, |window| {
@@ -4066,6 +4095,8 @@ impl Window {
             } else {
                 self.reuse_paint(deferred_draw.paint_range.clone());
             }
+            self.next_frame.scene.replace_clip(previous_clip);
+            self.clip_chain = previous_chain;
             let paint_end = self.paint_index();
             deferred_draw.paint_range = paint_start..paint_end;
         }
@@ -4134,6 +4165,7 @@ impl Window {
                     element_id_stack: deferred_draw.element_id_stack.clone(),
                     text_style_stack: deferred_draw.text_style_stack.clone(),
                     content_mask: deferred_draw.content_mask,
+                    clip_chain: deferred_draw.clip_chain.clone(),
                     rem_size: deferred_draw.rem_size,
                     priority: deferred_draw.priority,
                     element: None,
@@ -4404,6 +4436,32 @@ impl Window {
         } else {
             f(self)
         }
+    }
+
+    /// Clips all descendants to a rounded rectangle in window coordinates.
+    /// Enter the same scope in prepaint and paint. Pointer input evaluates the
+    /// full inherited chain; accessibility exposes its conservative rectangle.
+    /// This affects primitive writes, never the source sampled by backdrop optics.
+    pub fn with_rounded_content_mask<R>(
+        &mut self,
+        clip: crate::RoundedClip,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint_or_prepaint();
+        self.clip_chain.push(clip);
+        let painting = self.invalidator.inner.borrow().draw_phase == DrawPhase::Paint;
+        let previous = if painting {
+            let scale = self.scale_factor();
+            Some(self.next_frame.scene.push_clip(clip, scale))
+        } else {
+            None
+        };
+        let result = f(self);
+        if let Some(previous) = previous {
+            self.next_frame.scene.replace_clip(previous);
+        }
+        self.clip_chain.pop();
+        result
     }
 
     /// Updates the global element offset relative to the current offset. This is used to implement
@@ -5028,6 +5086,7 @@ impl Window {
             element_id_stack: self.element_id_stack.clone(),
             text_style_stack: self.text_style_stack.clone(),
             content_mask,
+            clip_chain: self.clip_chain.clone(),
             rem_size: self.rem_size(),
             priority,
             element: Some(element),
@@ -5087,6 +5146,7 @@ impl Window {
             let painted_bounds = shadow_bounds.dilate(shadow.blur_radius * 3.0);
             let opacity = self.element_opacity_for_visible_bounds(&painted_bounds);
             self.next_frame.scene.insert_primitive(Shadow {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 blur_radius: shadow.blur_radius.scale(scale_factor),
                 bounds: self.cover_bounds(shadow_bounds),
@@ -5132,6 +5192,7 @@ impl Window {
                 bottom_left: (corner_radii.bottom_left - shadow.spread_radius).max(zero),
             };
             self.next_frame.scene.insert_primitive(Shadow {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 blur_radius: shadow.blur_radius.scale(scale_factor),
                 bounds: self.cover_bounds(hole),
@@ -5287,6 +5348,7 @@ impl Window {
         // Invisible splitter primitive: forces a batch boundary at this order
         // so the renderer can break its render pass exactly here.
         self.next_frame.scene.insert_primitive(Shadow {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             blur_radius: ScaledPixels(0.),
             bounds: bounds.scale(scale_factor),
@@ -5314,6 +5376,7 @@ impl Window {
             .filter(|color| !color.is_transparent());
         self.next_frame.scene.insert_backdrop_glass_with_fallback(
             BackdropGlass {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 bounds: bounds.scale(scale_factor),
                 content_mask,
@@ -5345,6 +5408,7 @@ impl Window {
         let snapped_bounds = self.snap_bounds(quad.bounds);
         let snapped_border_widths = self.snap_border_widths(quad.border_widths);
         let quad = Quad {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds: snapped_bounds,
             content_mask: self.snapped_content_mask(),
@@ -5452,6 +5516,7 @@ impl Window {
         let element_opacity = self.element_opacity_at(origin);
 
         self.next_frame.scene.insert_primitive(Underline {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             pad: 0,
             bounds,
@@ -5482,6 +5547,7 @@ impl Window {
         let opacity = self.element_opacity_at(origin);
 
         self.next_frame.scene.insert_primitive(Underline {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             pad: 0,
             bounds,
@@ -5558,6 +5624,7 @@ impl Window {
 
             if subpixel_rendering {
                 self.next_frame.scene.insert_primitive(SubpixelSprite {
+                    clip_id: crate::ClipId::NONE,
                     order: 0,
                     pad: 0,
                     bounds,
@@ -5568,6 +5635,7 @@ impl Window {
                 });
             } else {
                 self.next_frame.scene.insert_primitive(MonochromeSprite {
+                    clip_id: crate::ClipId::NONE,
                     order: 0,
                     pad: 0,
                     bounds,
@@ -5662,6 +5730,7 @@ impl Window {
             });
 
             self.next_frame.scene.insert_primitive(PolychromeSprite {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 blend_mode: Default::default(),
                 color_mode: Default::default(),
@@ -5732,6 +5801,7 @@ impl Window {
             .map_size(|size| size.ceil());
 
         self.next_frame.scene.insert_primitive(MonochromeSprite {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             pad: 0,
             bounds: final_bounds,
@@ -5913,6 +5983,7 @@ impl Window {
                 ..tile
             };
             self.next_frame.scene.insert_primitive(PolychromeSprite {
+                clip_id: crate::ClipId::NONE,
                 order: 0,
                 blend_mode: instance.blend_mode,
                 color_mode: instance.color_mode,
@@ -6027,6 +6098,7 @@ impl Window {
         let bounds = self.snap_bounds(bounds);
         let content_mask = self.snapped_content_mask();
         self.next_frame.scene.insert_primitive(PaintSurface {
+            clip_id: crate::ClipId::NONE,
             order: 0,
             bounds,
             content_mask,
@@ -6232,6 +6304,7 @@ impl Window {
             id,
             bounds,
             content_mask,
+            clip_chain: self.clip_chain.clone(),
             behavior,
         };
         self.next_frame.hitboxes.push(hitbox.clone());

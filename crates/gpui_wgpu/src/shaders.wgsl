@@ -693,6 +693,7 @@ struct Quad {
     border_color: Hsla,
     corner_radii: Corners,
     border_widths: Edges,
+    clip_id: vec2<u32>,
 }
 
 struct QuadVarying {
@@ -729,8 +730,7 @@ fn vs_quad(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) insta
     return out;
 }
 
-@fragment
-fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
+fn quad_color(input: QuadVarying) -> vec4<f32> {
     // Alpha clip first, since we don't have `clip_distance`.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return vec4<f32>(0.0);
@@ -1132,6 +1132,7 @@ struct Shadow {
     // 1 = cut the element's own shape out of a drop shadow, so it rings the
     // element instead of painting under it.
     outer_only: u32,
+    clip_id: vec2<u32>,
 }
 
 struct ShadowVarying {
@@ -1166,8 +1167,7 @@ fn vs_shadow(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) ins
     return out;
 }
 
-@fragment
-fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
+fn shadow_color(input: ShadowVarying) -> vec4<f32> {
     // Alpha clip first, since we don't have `clip_distance`.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return vec4<f32>(0.0);
@@ -1230,6 +1230,7 @@ struct PathRasterizationVertex {
     st_position: vec2<f32>,
     color: Background,
     bounds: Bounds,
+    clip_id: vec2<u32>,
 }
 
 
@@ -1254,8 +1255,7 @@ fn vs_path_rasterization(@builtin(vertex_index) vertex_id: u32) -> PathRasteriza
     return out;
 }
 
-@fragment
-fn fs_path_rasterization(input: PathRasterizationVarying) -> @location(0) vec4<f32> {
+fn path_rasterization_color(input: PathRasterizationVarying) -> vec4<f32> {
     let dx = dpdx(input.st_position);
     let dy = dpdy(input.st_position);
     if (any(input.clip_distances < vec4<f32>(0.0))) {
@@ -1332,6 +1332,7 @@ struct Underline {
     color: Hsla,
     thickness: f32,
     wavy: u32,
+    clip_id: vec2<u32>,
 }
 
 
@@ -1356,8 +1357,7 @@ fn vs_underline(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) 
     return out;
 }
 
-@fragment
-fn fs_underline(input: UnderlineVarying) -> @location(0) vec4<f32> {
+fn underline_color(input: UnderlineVarying) -> vec4<f32> {
     const WAVE_FREQUENCY: f32 = 2.0;
     const WAVE_HEIGHT_RATIO: f32 = 0.8;
 
@@ -1398,6 +1398,7 @@ struct MonochromeSprite {
     color: Hsla,
     tile: AtlasTile,
     transformation: TransformationMatrix,
+    clip_id: vec2<u32>,
 }
 
 
@@ -1406,6 +1407,7 @@ struct MonoSpriteVarying {
     @location(0) tile_position: vec2<f32>,
     @location(1) @interpolate(flat) color: vec4<f32>,
     @location(3) clip_distances: vec4<f32>,
+    @location(4) @interpolate(flat) clip_id: u32,
 }
 
 @vertex
@@ -1419,11 +1421,11 @@ fn vs_mono_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index
     out.tile_position = to_tile_position(unit_vertex, sprite.tile);
     out.color = hsla_to_rgba(sprite.color);
     out.clip_distances = distance_from_clip_rect_transformed(unit_vertex, sprite.bounds, sprite.content_mask, sprite.transformation);
+    out.clip_id = sprite.clip_id.x;
     return out;
 }
 
-@fragment
-fn fs_mono_sprite(input: MonoSpriteVarying) -> @location(0) vec4<f32> {
+fn mono_sprite_color(input: MonoSpriteVarying) -> vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.tile_position).r;
     let alpha_corrected = apply_contrast_and_gamma_correction(sample, input.color.rgb, gamma_params.grayscale_enhanced_contrast, gamma_params.gamma_ratios);
 
@@ -1450,6 +1452,7 @@ struct PolychromeSprite {
     tint: Hsla,
     opacity: f32,
     pad: u32,
+    clip_id: vec2<u32>,
 }
 
 
@@ -1484,8 +1487,7 @@ fn vs_poly_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index
     return out;
 }
 
-@fragment
-fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
+fn poly_sprite_color(input: PolySpriteVarying) -> vec4<f32> {
     let sample = textureSample(t_sprite, s_sprite, input.tile_position);
     let sprite = load_poly_sprite(input.sprite_id);
     let distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
@@ -1525,6 +1527,7 @@ fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
 struct SurfaceParams {
     bounds: Bounds,
     content_mask: Bounds,
+    clip_id: vec2<u32>,
 }
 
 @group(1) @binding(1) var<uniform> surface_locals: SurfaceParams;
@@ -1556,8 +1559,7 @@ fn vs_surface(@builtin(vertex_index) vertex_id: u32) -> SurfaceVarying {
     return out;
 }
 
-@fragment
-fn fs_surface(input: SurfaceVarying) -> @location(0) vec4<f32> {
+fn surface_color(input: SurfaceVarying) -> vec4<f32> {
     // Alpha clip after using the derivatives.
     if (any(input.clip_distances < vec4<f32>(0.0))) {
         return vec4<f32>(0.0);
@@ -1569,4 +1571,48 @@ fn fs_surface(input: SurfaceVarying) -> @location(0) vec4<f32> {
         1.0);
 
     return ycbcr_to_RGB * y_cb_cr;
+}
+
+fn clip_color(color: vec4<f32>, position: vec2<f32>, id: u32, premultiplied: bool) -> vec4<f32> {
+    if (id == 0u) { return color; }
+    let coverage = rounded_clip_coverage(position, id);
+    return vec4<f32>(color.rgb * select(1.0, coverage, premultiplied), color.a * coverage);
+}
+
+@fragment
+fn fs_quad(input: QuadVarying) -> @location(0) vec4<f32> {
+    return clip_color(quad_color(input), input.position.xy, load_quad(input.quad_id).clip_id.x, globals.premultiplied_alpha != 0u);
+}
+
+@fragment
+fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
+    return clip_color(shadow_color(input), input.position.xy, load_shadow(input.shadow_id).clip_id.x, globals.premultiplied_alpha != 0u);
+}
+
+@fragment
+fn fs_underline(input: UnderlineVarying) -> @location(0) vec4<f32> {
+    return clip_color(underline_color(input), input.position.xy, load_underline(input.underline_id).clip_id.x, globals.premultiplied_alpha != 0u);
+}
+
+@fragment
+fn fs_mono_sprite(input: MonoSpriteVarying) -> @location(0) vec4<f32> {
+    return clip_color(mono_sprite_color(input), input.position.xy, input.clip_id, globals.premultiplied_alpha != 0u);
+}
+
+@fragment
+fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
+    let color = poly_sprite_color(input);
+    let sprite = load_poly_sprite(input.sprite_id);
+    return clip_color(color, input.position.xy, sprite.clip_id.x, globals.premultiplied_alpha != 0u || sprite.blend_mode == 2u);
+}
+
+@fragment
+fn fs_path_rasterization(input: PathRasterizationVarying) -> @location(0) vec4<f32> {
+    // Rasterize once; never reapply the clip when compositing the path texture.
+    return clip_color(path_rasterization_color(input), input.position.xy, load_path_vertex(input.vertex_id).clip_id.x, true);
+}
+
+@fragment
+fn fs_surface(input: SurfaceVarying) -> @location(0) vec4<f32> {
+    return clip_color(surface_color(input), input.position.xy, surface_locals.clip_id.x, globals.premultiplied_alpha != 0u);
 }

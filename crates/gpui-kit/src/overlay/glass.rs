@@ -268,6 +268,7 @@ pub struct Glass {
     adaptive_appearance: bool,
     dimmed: bool,
     focused: bool,
+    protect_text: bool,
     tint: Option<Hsla>,
     edge_mask: Option<(GlassEdge, f32)>,
     child: Option<AnyElement>,
@@ -297,6 +298,7 @@ impl std::fmt::Debug for Glass {
             .field("adaptive_appearance", &self.adaptive_appearance)
             .field("dimmed", &self.dimmed)
             .field("focused", &self.focused)
+            .field("protect_text", &self.protect_text)
             .field("tint", &self.tint)
             .field("edge_mask", &self.edge_mask)
             .field("has_child", &self.child.is_some())
@@ -327,6 +329,7 @@ impl Glass {
             adaptive_appearance: false,
             dimmed: false,
             focused: false,
+            protect_text: true,
             tint: None,
             edge_mask: None,
             child: None,
@@ -485,8 +488,20 @@ impl Glass {
         self
     }
 
-    /// Overlay this colour instead of the surface role. The tint is what
-    /// `NSGlassEffectView.tintColor` and a prominent toolbar item are.
+    /// Preserve the default worst-neutral-backdrop 4.5:1 body-text protection
+    /// for untinted Regular glass. Disable only when the caller owns foreground
+    /// legibility: the material then retains its token wash rather than
+    /// darkening or whitening the entire surface for the theme's body text.
+    /// Other presets and reduced transparency retain their own policies.
+    pub fn protect_text_contrast(mut self, protect: bool) -> Self {
+        self.protect_text = protect;
+        self
+    }
+
+    /// Colour the optical material, before its rim and highlights. Alpha
+    /// controls tint strength; zero preserves the preset, one replaces its
+    /// transmitted colour. Frosted and opaque fallbacks use this as their fill.
+    /// The caller owns foreground contrast when supplying a tint.
     pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
         self.tint = Some(tint.into());
         self
@@ -650,9 +665,10 @@ impl RenderOnce for Glass {
             overlay_theme = Some(theme.clone());
         }
 
-        if self.preset.resolved(&theme) == GlassPreset::Liquid {
+        if self.protect_text && self.preset.resolved(&theme) == GlassPreset::Liquid {
             protect_text_contrast(&mut material, &theme);
         }
+        tint_material(&mut material, self.preset.resolved(&theme), self.tint);
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
         let fallback = Some(tone.opacity(1.0));
@@ -778,6 +794,7 @@ pub struct GlassGroup {
     adaptive: bool,
     adaptive_appearance: bool,
     dimmed: bool,
+    protect_text: bool,
     tint: Option<Hsla>,
     panes: Vec<(Ident, AnyElement)>,
 }
@@ -800,6 +817,7 @@ impl std::fmt::Debug for GlassGroup {
             .field("adaptive", &self.adaptive)
             .field("adaptive_appearance", &self.adaptive_appearance)
             .field("dimmed", &self.dimmed)
+            .field("protect_text", &self.protect_text)
             .field("tint", &self.tint)
             .field("panes", &self.panes.len())
             .finish()
@@ -823,6 +841,7 @@ impl GlassGroup {
             adaptive: false,
             adaptive_appearance: false,
             dimmed: false,
+            protect_text: true,
             tint: None,
             panes: Vec::new(),
         }
@@ -918,7 +937,15 @@ impl GlassGroup {
         self
     }
 
-    /// Overlay this colour on every pane instead of the surface role.
+    /// Apply [`Glass::protect_text_contrast`]'s body-text policy to the joined
+    /// material. Enabled by default; disabling makes legibility caller-owned.
+    pub fn protect_text_contrast(mut self, protect: bool) -> Self {
+        self.protect_text = protect;
+        self
+    }
+
+    /// Colour the joined optical material once, including its bridge, using
+    /// [`Glass::tint`]'s alpha and foreground-contrast contract.
     pub fn tint(mut self, tint: impl Into<Hsla>) -> Self {
         self.tint = Some(tint.into());
         self
@@ -1033,9 +1060,10 @@ impl RenderOnce for GlassGroup {
             overlay_theme = Some(theme.clone());
         }
 
-        if self.preset.resolved(&theme) == GlassPreset::Liquid {
+        if self.protect_text && self.preset.resolved(&theme) == GlassPreset::Liquid {
             protect_text_contrast(&mut material, &theme);
         }
+        tint_material(&mut material, self.preset.resolved(&theme), self.tint);
         let tone = self.tint.unwrap_or_else(|| theme.surface(self.surface));
         let fill = tone.opacity(alpha);
         let fallback = Some(tone.opacity(1.0));
@@ -1201,7 +1229,28 @@ fn can_flip(bounds: Bounds<Pixels>, max_extent: f32) -> bool {
     width > 0.0 && height > 0.0 && width * height <= max_extent * max_extent
 }
 
-/// Keep body text readable even before the probe arrives, or where its mean
+/// Compose the caller's tint with the existing wash in straight-alpha form.
+/// A foreground quad would cover the highlight and miss a group's bridge.
+/// Frosted already owns its source-over fill, so it must not be tinted twice.
+fn tint_material(material: &mut GlassMaterial<Pixels>, preset: GlassPreset, tint: Option<Hsla>) {
+    if preset == GlassPreset::Frosted {
+        return;
+    }
+    let Some(tint) = tint.filter(|tint| tint.a > 0.0) else {
+        return;
+    };
+    let tint: Rgba = tint.into();
+    let residual = material.wash.a * (1.0 - tint.a);
+    let alpha = tint.a + residual;
+    material.wash = Rgba {
+        r: (tint.r * tint.a + material.wash.r * residual) / alpha,
+        g: (tint.g * tint.a + material.wash.g * residual) / alpha,
+        b: (tint.b * tint.a + material.wash.b * residual) / alpha,
+        a: alpha,
+    };
+}
+
+/// Keep untinted body text readable even before the probe arrives, or where its mean
 /// conceals a locally opposed patch. Adjust the shader's achromatic wash, not
 /// a second source-over face. The worst neutral backdrop includes the shader's
 /// transmission gain and optical lift; 4.5 is the WCAG normal-text ratio.
@@ -1638,6 +1687,43 @@ mod tests {
         assert_eq!(material.hairline, px(theme.effects.glass_hairline));
         assert_eq!(material.light_angle, theme.effects.glass_light_angle);
         assert!(!material.is_flat());
+    }
+
+    #[test]
+    fn optical_tint_composes_with_wash_without_covering_the_rim() {
+        let base = GlassMaterial {
+            wash: Rgba {
+                r: 0.2,
+                g: 0.4,
+                b: 0.8,
+                a: 0.5,
+            },
+            specular: 0.37,
+            ..GlassMaterial::clear()
+        };
+        for preset in [GlassPreset::Liquid, GlassPreset::Clear, GlassPreset::Lens] {
+            let mut material = base;
+            tint_material(&mut material, preset, Some(gpui::hsla(0.0, 1.0, 0.5, 0.25)));
+            // red at 1/4 over the prior wash at 1/2: alpha 5/8;
+            // premultiplied colour = (0.325, 0.15, 0.3).
+            for (actual, expected) in [
+                (material.wash.r, 0.52),
+                (material.wash.g, 0.24),
+                (material.wash.b, 0.48),
+                (material.wash.a, 0.625),
+            ] {
+                assert!((actual - expected).abs() < 1e-6);
+            }
+            assert_eq!(material.specular, base.specular);
+            let mut unchanged = base;
+            tint_material(&mut unchanged, preset, Some(gpui::hsla(0.3, 0.8, 0.7, 0.0)));
+            assert_eq!(unchanged, base);
+            tint_material(&mut material, preset, Some(gpui::hsla(0.0, 1.0, 0.5, 1.0)));
+            assert_eq!(material.wash, gpui::red().into());
+        }
+        let mut frosted = base;
+        tint_material(&mut frosted, GlassPreset::Frosted, Some(gpui::red()));
+        assert_eq!(frosted, base);
     }
 
     #[test]

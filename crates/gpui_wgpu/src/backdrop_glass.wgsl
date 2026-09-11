@@ -27,7 +27,7 @@ struct Params {
     edge_mask_edge: f32,
     edge_mask_band: f32,
     saturation: f32,
-    _mask_pad: f32,
+    clip_id: u32,
     wash: vec4<f32>,
     thickness: f32,
     refractive_index: f32,
@@ -169,8 +169,7 @@ fn optical_displacement(normal: vec3<f32>, index: f32, distance: f32) -> vec2<f3
     return ray.xy / max(-ray.z, 1e-4) * distance;
 }
 
-@fragment
-fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
+fn composite_color(input: Varying) -> vec4<f32> {
     let point = input.position.xy;
     let mask_end = params.mask.xy + params.mask.zw;
     let field = glass_field(point);
@@ -259,4 +258,14 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
 @fragment
 fn fs_copy(input: Varying) -> @location(0) vec4<f32> {
     return textureLoad(source, vec2<i32>(input.position.xy), 0);
+}
+
+@fragment
+fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
+    let optical = composite_color(input);
+    if (params.clip_id == 0u) { return optical; }
+    // The compositor replaces its destination. Mix against the original sharp
+    // snapshot, never a clipped/blurred source or a newly captured subtree.
+    let original = textureLoad(sharp_source, vec2<i32>(input.position.xy), 0);
+    return mix(original, optical, rounded_clip_coverage(input.position.xy, params.clip_id));
 }

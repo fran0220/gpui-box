@@ -8,10 +8,11 @@ struct SubpixelSprite {
     color: Hsla,
     tile: AtlasTile,
     transformation: TransformationMatrix,
+    clip_id: vec2<u32>,
 }
 
 fn load_subpixel_sprite(instance_id: u32) -> SubpixelSprite {
-    var cursor = instance_cursor(instance_id * 28u);
+    var cursor = instance_cursor(instance_id * 30u);
     return SubpixelSprite(
         read_word(&cursor),
         read_word(&cursor),
@@ -20,6 +21,7 @@ fn load_subpixel_sprite(instance_id: u32) -> SubpixelSprite {
         read_hsla(&cursor),
         read_atlas_tile(&cursor),
         read_transformation(&cursor),
+        vec2<u32>(read_word(&cursor), read_word(&cursor)),
     );
 }
 
@@ -28,6 +30,7 @@ struct SubpixelSpriteOutput {
     @location(0) tile_position: vec2<f32>,
     @location(1) @interpolate(flat) color: vec4<f32>,
     @location(3) clip_distances: vec4<f32>,
+    @location(4) @interpolate(flat) clip_id: u32,
 }
 
 struct SubpixelSpriteFragmentOutput {
@@ -45,6 +48,7 @@ fn vs_subpixel_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_i
     out.tile_position = to_tile_position(unit_vertex, sprite.tile);
     out.color = hsla_to_rgba(sprite.color);
     out.clip_distances = distance_from_clip_rect_transformed(unit_vertex, sprite.bounds, sprite.content_mask, sprite.transformation);
+    out.clip_id = sprite.clip_id.x;
     return out;
 }
 
@@ -64,5 +68,8 @@ fn fs_subpixel_sprite(input: SubpixelSpriteOutput) -> SubpixelSpriteFragmentOutp
     var out = SubpixelSpriteFragmentOutput();
     out.foreground = vec4<f32>(input.color.rgb, 1.0);
     out.alpha = vec4<f32>(input.color.a * alpha_corrected, 1.0);
+    if (input.clip_id != 0u) {
+        out.alpha *= rounded_clip_coverage(input.position.xy, input.clip_id);
+    }
     return out;
 }
