@@ -1155,6 +1155,196 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// Optical parameters over a deterministic ruled fixture, without a wash or
+/// decorative highlight hiding the displacement. Labels sit outside the lens.
+pub(super) fn glass_optics(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let specimens = [
+        ("identity", "Index 1 / unchanged", 1., 24., 24., 0., 0.),
+        ("water", "Index 1.33 / shallow bend", 1.33, 24., 24., 0., 0.),
+        ("glass", "Index 1.5 / deeper bend", 1.5, 24., 24., 0., 0.),
+        (
+            "thick",
+            "48px thickness / same index",
+            1.5,
+            48.,
+            24.,
+            0.,
+            0.,
+        ),
+        ("contact", "Source plane at base", 1.5, 24., 0., 0., 0.),
+        (
+            "dispersion",
+            "Spectral indices / no highlight",
+            1.5,
+            24.,
+            24.,
+            0.25,
+            0.,
+        ),
+        (
+            "reflection",
+            "Fresnel / same surface normal",
+            1.5,
+            24.,
+            24.,
+            0.,
+            1.,
+        ),
+        (
+            "scatter",
+            "Same optics / 8px scattering",
+            1.5,
+            24.,
+            24.,
+            0.,
+            0.,
+        ),
+    ];
+    stack(&theme)
+        .w(px(900.))
+        .child(caption(
+            &theme,
+            "Snell refraction — fixture grid; foreground content is not distorted",
+        ))
+        .children(specimens.chunks(4).map(|specimens| {
+            row(&theme).children(specimens.iter().map(
+                |&(name, title, index, thickness, depth, dispersion, specular)| {
+                    div()
+                        .column()
+                        .gap_token(&theme, Space::Sm)
+                        .w(px(210.))
+                        .child(caption(&theme, title))
+                        .child(
+                            div()
+                                .relative()
+                                .w(px(210.))
+                                .h(px(180.))
+                                .overflow_hidden()
+                                .bg(theme.colors.canvas)
+                                .children((0..18).map(|line| {
+                                    div()
+                                        .absolute()
+                                        .top(px(line as f32 * 10.))
+                                        .left_0()
+                                        .w_full()
+                                        .h(px(1.))
+                                        .bg(theme.colors.text_faint)
+                                }))
+                                .children((0..21).map(|line| {
+                                    div()
+                                        .absolute()
+                                        .left(px(line as f32 * 10.))
+                                        .top_0()
+                                        .h_full()
+                                        .w(px(1.))
+                                        .bg(theme.colors.text_faint)
+                                }))
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(px(22.))
+                                        .left(px(25.))
+                                        .w(px(160.))
+                                        .child(
+                                            Glass::new(format!("scene.glass-optics.{name}"))
+                                                .preset(GlassPreset::Lens)
+                                                .radius_px(48.)
+                                                .refraction(1.)
+                                                .thickness(thickness)
+                                                .refractive_index(index)
+                                                .backdrop_depth(depth)
+                                                .dispersion(dispersion)
+                                                .specular(specular)
+                                                .blur(if name == "scatter" { 8. } else { 0. })
+                                                .track_pointer(name == "reflection")
+                                                .pressable(true)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h(px(136.))
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .child(
+                                                            div()
+                                                                .px_token(&theme, Space::Sm)
+                                                                .bg(theme.colors.panel)
+                                                                .child("Aa 123"),
+                                                        ),
+                                                ),
+                                        ),
+                                ),
+                        )
+                },
+            ))
+        }))
+        .child(caption(
+            &theme,
+            "Fused Regular / zero blur — one height field; press changes thickness and its normal",
+        ))
+        .child(
+            div()
+                .relative()
+                .w(px(864.))
+                .h(px(120.))
+                .overflow_hidden()
+                .children((0..87).map(|line| {
+                    div()
+                        .absolute()
+                        .left(px(line as f32 * 10.))
+                        .top_0()
+                        .h_full()
+                        .w(px(1.))
+                        .bg(theme.colors.text_faint)
+                }))
+                .children((0..12).map(|line| {
+                    div()
+                        .absolute()
+                        .top(px(line as f32 * 10.))
+                        .left_0()
+                        .w_full()
+                        .h(px(1.))
+                        .bg(theme.colors.text_faint)
+                }))
+                .child(
+                    div().absolute().left(px(24.)).top(px(24.)).child(
+                        GlassGroup::new("scene.glass-optics.fused")
+                            .preset(GlassPreset::Liquid)
+                            .blur(0.)
+                            .thickness(48.)
+                            .refractive_index(1.5)
+                            .backdrop_depth(24.)
+                            .radius(Radius::Pill)
+                            .gap(8.)
+                            .merge(32.)
+                            .pressable(true)
+                            .pane(
+                                "scene.glass-optics.fused.left",
+                                div()
+                                    .w(px(380.))
+                                    .h(px(72.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .child("Left"),
+                            )
+                            .pane(
+                                "scene.glass-optics.fused.right",
+                                div()
+                                    .w(px(380.))
+                                    .h(px(72.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .child("Right"),
+                            ),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
 /// The drawer the scene shows, kept across frames and settled so the capture
 /// photographs the panel where it comes to rest rather than mid-slide.
 pub(super) struct SceneDrawer {

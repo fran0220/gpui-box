@@ -680,6 +680,134 @@ mod imp {
         }
 
         #[test]
+        fn glass_press_changes_optics_without_moving_semantic_bounds() -> Result<()> {
+            use gpui::{
+                MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point,
+                rgb,
+            };
+            use gpui_kit::prelude::{Glass, GlassPreset};
+            use gpui_kit_theme::Elevation;
+
+            struct PressHost;
+            impl Render for PressHost {
+                fn render(
+                    &mut self,
+                    window: &mut Window,
+                    cx: &mut Context<Self>,
+                ) -> impl IntoElement {
+                    SemanticCoordinator::global(cx).begin_frame(window);
+                    div()
+                        .size_full()
+                        .bg(rgb(0x202020))
+                        .children((0..32).map(|x| {
+                            div()
+                                .absolute()
+                                .left(px(x as f32 * 8.))
+                                .top_0()
+                                .h_full()
+                                .w(px(2.))
+                                .bg(rgb(0xe0e0e0))
+                        }))
+                        .child(
+                            div().absolute().left(px(40.)).top(px(32.)).child(
+                                Glass::new("test.glass.press")
+                                    .preset(GlassPreset::Lens)
+                                    .elevation(Elevation::Flat)
+                                    .radius_px(32.)
+                                    .refraction(1.)
+                                    .thickness(18.)
+                                    .backdrop_depth(24.)
+                                    .pressable(true)
+                                    .child(div().w(px(168.)).h(px(112.))),
+                            ),
+                        )
+                }
+            }
+            let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                "Geist",
+            ));
+            let mut cx = HeadlessAppContext::with_platform(
+                text_system,
+                Arc::new(gpui_kit::assets::Assets),
+                gpui_platform::current_headless_renderer,
+            );
+            cx.update(|cx| {
+                gpui_kit::install(cx);
+                cx.set_reduce_motion(true);
+                activate_theme("studio-dark", cx);
+            });
+            let coordinator = cx.update(|cx| SemanticCoordinator::global(cx));
+            let _diagnostics = coordinator.arm();
+            let window: AnyWindowHandle = cx
+                .open_window(size(px(256.), px(176.)), |_, cx| cx.new(|_| PressHost))?
+                .into();
+            let initial = settled_image(&mut cx, window)?;
+            let bounds = || {
+                coordinator
+                    .snapshot(window.window_id())
+                    .unwrap()
+                    .find("test.glass.press")
+                    .unwrap()
+                    .bounds
+            };
+            let original_bounds = bounds();
+            assert!(original_bounds.width > 0. && original_bounds.height > 0.);
+            let position = point(
+                px(original_bounds.x + original_bounds.width / 2.),
+                px(original_bounds.y + original_bounds.height / 2.),
+            );
+            cx.update_window(window, |_, window, cx| {
+                window.dispatch_event(
+                    PlatformInput::MouseMove(MouseMoveEvent {
+                        position,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+                window.dispatch_event(
+                    PlatformInput::MouseDown(MouseDownEvent {
+                        position,
+                        button: MouseButton::Left,
+                        click_count: 1,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+            })?;
+            let pressed = settled_image(&mut cx, window)?;
+            assert_eq!(bounds(), original_bounds);
+            let changed = initial
+                .pixels()
+                .zip(pressed.pixels())
+                .filter(|(a, b)| a.0[0].abs_diff(b.0[0]) > 8)
+                .count();
+            assert!(
+                changed > 100,
+                "press must displace real backdrop pixels, changed={changed}"
+            );
+            cx.update_window(window, |_, window, cx| {
+                window.dispatch_event(
+                    PlatformInput::MouseUp(MouseUpEvent {
+                        position,
+                        button: MouseButton::Left,
+                        click_count: 1,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+            })?;
+            let released = settled_image(&mut cx, window)?;
+            assert_eq!(bounds(), original_bounds);
+            assert!(
+                within_one_step(&initial, &released),
+                "release restores the original optics"
+            );
+            initial.save(repo_root().join("target/headless-glass-released.png"))?;
+            pressed.save(repo_root().join("target/headless-glass-pressed.png"))?;
+            Ok(())
+        }
+
+        #[test]
         fn clear_pill_dims_media_inside_a_clipped_card() -> Result<()> {
             use gpui::{DevicePixels, ObjectFit, RenderImage, img};
             use gpui_kit::foundation::Sizable;

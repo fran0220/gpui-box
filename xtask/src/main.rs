@@ -2470,6 +2470,15 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("effect.glassShadowMin", tokens.effect.glass_shadow_min),
         ("effect.glassShadowMax", tokens.effect.glass_shadow_max),
         ("effect.glassRefraction", tokens.effect.glass_refraction),
+        ("effect.glassThickness", tokens.effect.glass_thickness),
+        (
+            "effect.glassRefractiveIndex",
+            tokens.effect.glass_refractive_index,
+        ),
+        (
+            "effect.glassBackdropDepth",
+            tokens.effect.glass_backdrop_depth,
+        ),
         ("effect.glassDispersion", tokens.effect.glass_dispersion),
         ("effect.glassSpecular", tokens.effect.glass_specular),
         (

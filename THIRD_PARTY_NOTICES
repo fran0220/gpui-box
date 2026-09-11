@@ -55,6 +55,11 @@ antialiasing width that sizes the polychrome sprite corner mask are GPUI Box
 work over those existing shader contracts and import no additional source.
 The rounded-glass optical profile reach bound is original GPUI Box geometry
 work shared by Metal, Direct3D and WGPU; it imports no additional source.
+The subsequent unified dielectric height field, Snell sampling bounds, spectral
+indices and Fresnel response are original GPUI Box work. Khronos OpenGL 4 and
+PBR third edition (2018), section 8.2 were consulted for mathematical definitions,
+not copied code. See PROVENANCE.md, Unified screen-space dielectric glass.
+The frozen historical import receipt and its exact revisions remain unchanged.
 Generation-aware luminance probe leasing and shared CPU completion caching are
 original GPUI Box lifecycle corrections; no additional source is imported.
 Unicode line-breaking integration is original GPUI Box work using the existing

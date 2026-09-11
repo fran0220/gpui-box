@@ -147,6 +147,9 @@ impl GlassPreset {
                     a: effects.glass_wash,
                 },
                 refraction: effects.glass_refraction,
+                thickness: px(effects.glass_thickness),
+                refractive_index: effects.glass_refractive_index,
+                backdrop_depth: px(effects.glass_backdrop_depth),
                 dispersion: effects.glass_dispersion,
                 specular: effects.glass_specular,
                 transmission_gain: effects.glass_transmission_gain,
@@ -163,10 +166,16 @@ impl GlassPreset {
             },
             GlassPreset::Lens => GlassMaterial {
                 refraction: effects.glass_refraction,
+                thickness: px(effects.glass_thickness),
+                refractive_index: effects.glass_refractive_index,
+                backdrop_depth: px(effects.glass_backdrop_depth),
                 ..GlassMaterial::clear()
             },
             GlassPreset::Clear => GlassMaterial {
                 refraction: effects.glass_refraction,
+                thickness: px(effects.glass_thickness),
+                refractive_index: effects.glass_refractive_index,
+                backdrop_depth: px(effects.glass_backdrop_depth),
                 dispersion: effects.glass_dispersion,
                 specular: effects.glass_specular,
                 transmission_gain: effects.glass_transmission_gain,
@@ -246,6 +255,9 @@ pub struct Glass {
     radius_px: Option<f32>,
     blur: Option<f32>,
     preset: GlassPreset,
+    thickness: Option<f32>,
+    refractive_index: Option<f32>,
+    backdrop_depth: Option<f32>,
     refraction: Option<f32>,
     dispersion: Option<f32>,
     specular: Option<f32>,
@@ -272,6 +284,9 @@ impl std::fmt::Debug for Glass {
             .field("radius_px", &self.radius_px)
             .field("blur", &self.blur)
             .field("preset", &self.preset)
+            .field("thickness", &self.thickness)
+            .field("refractive_index", &self.refractive_index)
+            .field("backdrop_depth", &self.backdrop_depth)
             .field("refraction", &self.refraction)
             .field("dispersion", &self.dispersion)
             .field("specular", &self.specular)
@@ -299,6 +314,9 @@ impl Glass {
             radius_px: None,
             blur: None,
             preset: GlassPreset::default(),
+            thickness: None,
+            refractive_index: None,
+            backdrop_depth: None,
             refraction: None,
             dispersion: None,
             specular: None,
@@ -372,7 +390,31 @@ impl Glass {
         self
     }
 
-    /// How thick the glass reads, overriding `effect.glassRefraction`.
+    /// Profile height in pixels before the [`Self::refraction`] multiplier,
+    /// overriding `effect.glassThickness`. Zero follows the bounded bevel.
+    /// Use `refraction(1.0)` to make this the effective maximum thickness.
+    pub fn thickness(mut self, thickness: f32) -> Self {
+        self.thickness = Some(thickness.max(0.0));
+        self
+    }
+
+    /// Refractive index, overriding `effect.glassRefractiveIndex`, clamped to
+    /// 1..=2.5. One does not bend light.
+    pub fn refractive_index(mut self, refractive_index: f32) -> Self {
+        self.refractive_index = Some(refractive_index.clamp(1.0, 2.5));
+        self
+    }
+
+    /// Effective distance in pixels through the refracted medium to the 2D
+    /// source plane, overriding `effect.glassBackdropDepth`. Clamped
+    /// nonnegative; this is not a physical air gap behind the glass.
+    pub fn backdrop_depth(mut self, backdrop_depth: f32) -> Self {
+        self.backdrop_depth = Some(backdrop_depth.max(0.0));
+        self
+    }
+
+    /// Signed thickness multiplier controlling optical height and normal,
+    /// overriding `effect.glassRefraction`.
     pub fn refraction(mut self, refraction: f32) -> Self {
         self.refraction = Some(refraction);
         self
@@ -468,13 +510,6 @@ impl Glass {
         self
     }
 
-    /// The material this surface asks the renderer for, for tests that need to
-    /// assert what a wrapper resolved to without rendering a window.
-    #[cfg(test)]
-    pub(crate) fn material_for_test(&self, theme: &Theme) -> GlassMaterial<Pixels> {
-        self.material(theme)
-    }
-
     /// The material this surface asks the renderer for: the preset's
     /// combination with the caller's overrides laid over it.
     fn material(&self, theme: &Theme) -> GlassMaterial<Pixels> {
@@ -484,6 +519,15 @@ impl Glass {
         let mut material = self.preset.material(theme);
         if let Some(blur) = self.blur {
             material.blur_radius = px(blur);
+        }
+        if let Some(thickness) = self.thickness {
+            material.thickness = px(thickness);
+        }
+        if let Some(refractive_index) = self.refractive_index {
+            material.refractive_index = refractive_index;
+        }
+        if let Some(backdrop_depth) = self.backdrop_depth {
+            material.backdrop_depth = px(backdrop_depth);
         }
         if let Some(refraction) = self.refraction {
             material.refraction = refraction;
@@ -725,6 +769,9 @@ pub struct GlassGroup {
     radius: Radius,
     blur: Option<f32>,
     preset: GlassPreset,
+    thickness: Option<f32>,
+    refractive_index: Option<f32>,
+    backdrop_depth: Option<f32>,
     merge: Option<f32>,
     gap: Option<f32>,
     pressable: bool,
@@ -744,6 +791,9 @@ impl std::fmt::Debug for GlassGroup {
             .field("radius", &self.radius)
             .field("blur", &self.blur)
             .field("preset", &self.preset)
+            .field("thickness", &self.thickness)
+            .field("refractive_index", &self.refractive_index)
+            .field("backdrop_depth", &self.backdrop_depth)
             .field("merge", &self.merge)
             .field("gap", &self.gap)
             .field("pressable", &self.pressable)
@@ -764,6 +814,9 @@ impl GlassGroup {
             radius: Radius::Card,
             blur: None,
             preset: GlassPreset::default(),
+            thickness: None,
+            refractive_index: None,
+            backdrop_depth: None,
             merge: None,
             gap: None,
             pressable: false,
@@ -796,6 +849,28 @@ impl GlassGroup {
     /// Which combination of optics the fused surface asks for.
     pub fn preset(mut self, preset: GlassPreset) -> Self {
         self.preset = preset;
+        self
+    }
+
+    /// Profile height in pixels before the theme's `effect.glassRefraction`
+    /// multiplier, overriding `effect.glassThickness`. Zero follows the bevel.
+    pub fn thickness(mut self, thickness: f32) -> Self {
+        self.thickness = Some(thickness.max(0.0));
+        self
+    }
+
+    /// Refractive index, overriding `effect.glassRefractiveIndex`, clamped to
+    /// 1..=2.5. One does not bend light.
+    pub fn refractive_index(mut self, refractive_index: f32) -> Self {
+        self.refractive_index = Some(refractive_index.clamp(1.0, 2.5));
+        self
+    }
+
+    /// Effective distance in pixels through the refracted medium to the 2D
+    /// source plane, overriding `effect.glassBackdropDepth`. Clamped
+    /// nonnegative; this is not a physical air gap behind the glass.
+    pub fn backdrop_depth(mut self, backdrop_depth: f32) -> Self {
+        self.backdrop_depth = Some(backdrop_depth.max(0.0));
         self
     }
 
@@ -855,6 +930,27 @@ impl GlassGroup {
         self.panes.push((ident.into(), child.into_any_element()));
         self
     }
+
+    /// Resolve the same caller overrides initially and after an appearance flip.
+    fn material(&self, theme: &Theme) -> GlassMaterial<Pixels> {
+        let mut material = self.preset.material(theme);
+        if !theme.reduce_transparency {
+            if let Some(blur) = self.blur {
+                material.blur_radius = px(blur);
+            }
+            if let Some(thickness) = self.thickness {
+                material.thickness = px(thickness);
+            }
+            if let Some(refractive_index) = self.refractive_index {
+                material.refractive_index = refractive_index;
+            }
+            if let Some(backdrop_depth) = self.backdrop_depth {
+                material.backdrop_depth = px(backdrop_depth);
+            }
+        }
+        material.smoothing = px(self.merge.unwrap_or(theme.effects.glass_merge_distance));
+        material
+    }
 }
 
 impl RenderOnce for GlassGroup {
@@ -867,13 +963,7 @@ impl RenderOnce for GlassGroup {
         } else {
             self.preset.tint_alpha(&theme).clamp(0.0, 1.0)
         };
-        let mut material = self.preset.material(&theme);
-        if !theme.reduce_transparency
-            && let Some(blur) = self.blur
-        {
-            material.blur_radius = px(blur);
-        }
-        material.smoothing = px(self.merge.unwrap_or(theme.effects.glass_merge_distance));
+        let mut material = self.material(&theme);
         let bevel = self.preset.bevel(&theme);
 
         let id = self.ident.semantic_id();
@@ -933,16 +1023,13 @@ impl RenderOnce for GlassGroup {
                 .and_then(|registry| registry.counterpart_for(&theme))
         {
             theme = counterpart;
-            let counterpart_material = self.preset.material(&theme);
+            let counterpart_material = self.material(&theme);
             material = GlassMaterial {
                 probe: material.probe,
                 smoothing: material.smoothing,
                 ..counterpart_material
             };
             material.refraction *= press_depth;
-            if let Some(blur) = self.blur {
-                material.blur_radius = px(blur);
-            }
             overlay_theme = Some(theme.clone());
         }
 
@@ -1354,8 +1441,76 @@ impl IntoElement for BackdropLayer {
 }
 
 #[cfg(test)]
+impl Glass {
+    /// Resolve wrapper material without a window. Keep test-only declarations
+    /// after production APIs so the generated catalog includes GlassGroup.
+    pub(crate) fn material_for_test(&self, theme: &Theme) -> GlassMaterial<Pixels> {
+        self.material(theme)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn optical_overrides_survive_theme_resolution_and_respect_accessibility() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let theme = theme.modify(|theme| {
+                theme.effects.glass_thickness = 5.0;
+                theme.effects.glass_refractive_index = 1.7;
+                theme.effects.glass_backdrop_depth = 19.0;
+            });
+            for preset in [GlassPreset::Liquid, GlassPreset::Clear, GlassPreset::Lens] {
+                let base = preset.material(&theme);
+                assert_eq!(base.thickness, px(5.0));
+                assert_eq!(base.refractive_index, 1.7);
+                assert_eq!(base.backdrop_depth, px(19.0));
+                let glass = Glass::new("optic").preset(preset).thickness(11.0);
+                let group = GlassGroup::new("optics")
+                    .preset(preset)
+                    .refractive_index(2.1)
+                    .backdrop_depth(37.0);
+                let single = glass.material(&theme);
+                assert_eq!(single.thickness, px(11.0));
+                assert_eq!(single.refractive_index, 1.7);
+                assert_eq!(single.backdrop_depth, px(19.0));
+                let fused = group.material(&theme);
+                assert_eq!(fused.thickness, px(5.0));
+                assert_eq!(fused.refractive_index, 2.1);
+                assert_eq!(fused.backdrop_depth, px(37.0));
+                let reduced = theme.clone().with_reduce_transparency(true);
+                let frosted = GlassPreset::Frosted.material(&reduced);
+                assert_eq!(glass.material(&reduced), frosted);
+                let mut expected = frosted;
+                expected.smoothing = px(reduced.effects.glass_merge_distance);
+                assert_eq!(group.material(&reduced), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn optical_builders_clamp_distances_and_index_independently() {
+        let theme = Theme::studio_dark();
+        let single = Glass::new("optic")
+            .thickness(-3.0)
+            .refractive_index(9.0)
+            .backdrop_depth(-7.0)
+            .refraction(-0.4)
+            .material(&theme);
+        assert_eq!(single.thickness, px(0.0));
+        assert_eq!(single.refractive_index, 2.5);
+        assert_eq!(single.backdrop_depth, px(0.0));
+        assert_eq!(single.refraction, -0.4);
+        let group = GlassGroup::new("optics")
+            .thickness(13.0)
+            .refractive_index(0.5)
+            .backdrop_depth(29.0)
+            .material(&theme);
+        assert_eq!(group.thickness, px(13.0));
+        assert_eq!(group.refractive_index, 1.0);
+        assert_eq!(group.backdrop_depth, px(29.0));
+    }
 
     #[test]
     fn clear_optics_show_a_backdrop_without_blur() {

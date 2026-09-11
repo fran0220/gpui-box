@@ -2511,8 +2511,7 @@ mod tests {
         let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
         let mut renderer = MetalRenderer::new_headless(pool);
         let extent = size(DevicePixels(256), DevicePixels(256));
-        for (radius, specular, interleaved) in
-            [(12., 0., true), (12., 0.06, true), (16., 0.06, false)]
+        for (radius, specular, interleaved) in [(12., 0., true), (12., 1., true), (16., 1., false)]
         {
             let mut scene = probed_scene(gpui::hsla(0., 0., 0.1, 1.), 0);
             let glass = &mut scene.backdrop_glass[0];
@@ -2552,6 +2551,62 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn glass_snell_and_fresnel_follow_the_material_on_metal() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let template = probed_scene(Hsla::black(), gpui::NO_LUMINANCE_PROBE);
+        let mut scene = Scene::default();
+        for x in 0..256 {
+            let mut stripe = template.quads[0];
+            stripe.bounds.origin.x = ScaledPixels(x as f32);
+            stripe.bounds.size.width = ScaledPixels(1.);
+            stripe.background = Background::from(gpui::hsla(0., 0., x as f32 / 255., 1.));
+            scene.insert_primitive(stripe);
+        }
+        let mut glass = template.backdrop_glass[0];
+        glass.material = GlassMaterial {
+            bevel: ScaledPixels(13.),
+            thickness: ScaledPixels(13. * 3_f32.sqrt()),
+            backdrop_depth: ScaledPixels(24.),
+            refraction: 1.,
+            ..GlassMaterial::clear()
+        };
+        scene.insert_backdrop_glass(glass);
+        scene.finish();
+        for index in [1., 1.33, 1.5, 2.5] {
+            scene.backdrop_glass[0].material.refractive_index = index;
+            let image = renderer
+                .render_scene_to_image(&scene, extent)
+                .expect("Snell ramp renders");
+            // At inset 6.5 the ellipse has a 45-degree normal and height 19.5.
+            // Independently use angular Snell, rather than shader vector math.
+            let angle =
+                (std::f32::consts::FRAC_1_SQRT_2 / index).asin() - std::f32::consts::FRAC_PI_4;
+            let expected = (70. - angle.tan() * 43.5).round();
+            assert!((image.get_pixel(70, 128)[0] as f32 - expected).abs() <= 1.);
+            assert_eq!(image.get_pixel(128, 128).0, [128, 128, 128, 255]);
+        }
+        let mut white = probed_scene(Hsla::white(), gpui::NO_LUMINANCE_PROBE);
+        white.backdrop_glass[0].material = GlassMaterial {
+            specular: 1.,
+            specular_sharpness: 12.,
+            ..GlassMaterial::clear()
+        };
+        let reflected = renderer
+            .render_scene_to_image(&white, extent)
+            .expect("Fresnel surface renders");
+        // Index 1.5 reflects 4% at normal incidence; the directional environment
+        // is almost black here. The former additive highlight leaves 255.
+        assert!((reflected.get_pixel(128, 128)[0] as i16 - 245).abs() <= 1);
+        white.backdrop_glass[0].material.refractive_index = 1.;
+        let identity = renderer
+            .render_scene_to_image(&white, extent)
+            .expect("index-one glass renders");
+        assert_eq!(identity.get_pixel(128, 128).0, [255, 255, 255, 255]);
     }
 
     #[test]

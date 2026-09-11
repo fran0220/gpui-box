@@ -485,11 +485,40 @@ layout from Rust; Direct3D and WGPU map it to aligned uniform registers.
 The browser shares WGPU, not a separate glass implementation. Native Windows
 and Linux validation of this extension is still required in their lanes.
 
-Glass normals use analytic rounded-rect derivatives and polynomial smooth-min
-weights, normalized after the union. Medial-axis ties choose an incident face:
-averaging across a crease invents a bisector specular highlight. A bevel wider
-than the corner radius still describes a creased surface, not a rounded dome;
-the renderer does not silently change the requested silhouette or bevel width.
+Glass uses a shared elliptical height field: `thickness` (zero follows the
+bounded bevel) times the signed `refraction` multiplier determines height and
+its derivative. Positive refraction makes a convex cap; negative makes a
+depression of the same maximum depth. `BackdropGlass::optical_bevel` bounds the
+profile width by positive corner radii and half-extents without changing the
+silhouette. Analytic rounded-rect and polynomial smooth-min derivatives retain
+their magnitude through the union; only the final 3D normal is normalized.
+Medial-axis ties choose an incident face rather than inventing a bisector.
+
+Metal, HLSL and WGSL use Snell refraction with `refractive_index` in 1..=2.5.
+RGB indices are `1 + (index - 1) * (1 - dispersion, 1, 1 + dispersion)`.
+Index 1 is exactly undisplaced and has no Fresnel reflection. Rays intersect
+an effective optical background plane at local height plus `backdrop_depth`;
+there is no 45%-of-bevel displacement cap. The CPU sampling bound follows
+`(maximum height + backdrop depth) * sqrt(maximum channel index² - 1)`, plus
+one bilinear texel and Gaussian support. Content masks restrict output, not
+the source information needed by a visible refracted pixel.
+
+The same normal reflects the incident view ray into an analytic directional
+environment. Schlick Fresnel blends reflection with transmission; `specular`
+is its strength, no longer an independent additive highlight. Wash, gain,
+lift and hairline remain explicit artistic controls, so the entire material
+is not an energy-conserving physical volume. This is single-interface,
+screen-space optics: `backdrop_depth` is distance in the refracted medium,
+**not** a second-interface air gap. There is no scene-depth recovery, hidden
+geometry, real external environment reflection, multiple internal reflection,
+or caustic transport. Blur remains a spatially uniform scattering model.
+It is not Apple's private Liquid Glass renderer.
+
+The `glass-optics` exhibit isolates index, thickness, plane distance, dispersion,
+Fresnel and scattering over a ruled fixture and includes a fused height field.
+Existing `Glass`/`GlassGroup` press response changes this height and normal
+together; pointer tracking changes the analytic light direction. Foreground
+layout, hit testing and accessibility geometry do not deform.
 Metal pixel regressions check the inner diagonal against adjacent face pixels,
 retain the real arc highlight, and bound text-stroke variance at a blurred rim
 against the flat interior. Blur-zero Clear remains sharp. These tests do not

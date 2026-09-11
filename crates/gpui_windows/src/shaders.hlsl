@@ -1493,6 +1493,10 @@ cbuffer BackdropGlassParams: register(b2) {
     float4 backdrop_optical_lift;
     // x = edge (0 none, 1 top, 2 bottom, 3 left, 4 right), y = band in pixels.
     float4 backdrop_edge_mask;
+    float backdrop_thickness;
+    float backdrop_refractive_index;
+    float backdrop_depth;
+    float backdrop_optics_pad;
     // Eight lobes, each a bounds and a radii. Written as an array of vectors
     // rather than of structs so that the sixteen-byte constant buffer packing
     // is the one the Rust side lays out.
@@ -1627,6 +1631,13 @@ float4 apply_backdrop_edge_mask(float4 color, float2 pt) {
 // surface's shape and material.
 // Mirrors `fs_composite` in backdrop_glass.wgsl and
 // `backdrop_glass_fragment` in shaders.metal.
+// Single-interface refraction to an effective optical plane, not volume tracing.
+float2 backdrop_optical_displacement(float3 normal, float index, float distance) {
+    if (index == 1.0) return float2(0.0, 0.0);
+    float3 ray = refract(float3(0.0, 0.0, -1.0), normal, 1.0 / index);
+    return ray.xy / max(-ray.z, 1e-4) * distance;
+}
+
 float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     float2 pt = input.position.xy;
     float2 mask_end = backdrop_mask.xy + backdrop_mask.zw;
@@ -1639,42 +1650,38 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
 
     // A plain frost is an exact copy of its blurred source. Liquid reaches the
     // path below even with blur zero: scattering is not the optics switch.
-    if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) &&
-        backdrop_specular <= 0.0 && backdrop_transmission_gain == 1.0 &&
+    if ((backdrop_bevel <= 0.0 || backdrop_thickness == 0.0 || backdrop_refractive_index == 1.0) &&
+        (backdrop_specular <= 0.0 || backdrop_refractive_index == 1.0) && backdrop_transmission_gain == 1.0 &&
         backdrop_saturation == 1.0 && backdrop_wash.a <= 0.0 &&
         backdrop_optical_lift.a <= 0.0 && backdrop_hairline <= 0.0) {
         return apply_backdrop_edge_mask(t_sprite.Load(int3(int2(pt), 0)), pt);
     }
 
-    // Analytic incident-face and smooth-union derivatives; normalize only
-    // after the fold. Differencing across a crease invents a specular normal.
+    // Keep the smooth-union derivative magnitude for the height derivative.
+    // Only the decorative hairline needs a unit contour direction.
     float2 gradient = field.xy;
     float gradient_length = length(gradient);
     if (gradient_length > 0.0) {
         gradient = gradient / gradient_length;
     }
 
-    // `depth` is zero at the rim and one once the dome has flattened. The
-    // spherical slope diverges at the rim, then the measured reach cap bounds
-    // displacement to 45% of the profile depth.
-    float depth = backdrop_bevel > 0.0 ? saturate(-distance / backdrop_bevel) : 1.0;
-    float rise = 1.0 - depth;
-    float slope = rise / sqrt(max(1.0 - rise * rise, 1e-4));
-    float2 displacement = -gradient * slope * backdrop_bevel * backdrop_refraction;
-    float reach_limit = backdrop_bevel * 0.45;
-    float reach = length(displacement);
-    if (reach > reach_limit && reach > 0.0) {
-        displacement *= reach_limit / reach;
+    float u = backdrop_bevel > 0.0 ? saturate(1.0 + distance / backdrop_bevel) : 0.0;
+    float profile = sqrt(max(1.0 - u * u, 0.0));
+    float height = backdrop_thickness * (backdrop_refraction < 0.0 ? 1.0 - profile : profile);
+    float3 normal = float3(0.0, 0.0, 1.0);
+    if (backdrop_bevel > 0.0 && backdrop_thickness > 0.0) {
+        normal = normalize(float3(field.xy * (backdrop_thickness / backdrop_bevel) *
+            u / sqrt(max(1.0 - u * u, 1e-4)) * sign(backdrop_refraction), 1.0));
     }
+    float travel = height + backdrop_depth;
+    float index = backdrop_refractive_index;
 
     // Refract the scattered source even at the rim: mixing the sharp snapshot
     // back in would resurrect readable backdrop text. With blur zero this
     // source is already sharp, preserving Clear optics.
-    float2 red_uv = (pt + displacement * (1.0 - backdrop_dispersion)) /
-        global_viewport_size;
-    float2 green_uv = (pt + displacement) / global_viewport_size;
-    float2 blue_uv = (pt + displacement * (1.0 + backdrop_dispersion)) /
-        global_viewport_size;
+    float2 red_uv = (pt + backdrop_optical_displacement(normal, 1.0 + (index - 1.0) * (1.0 - backdrop_dispersion), travel)) / global_viewport_size;
+    float2 green_uv = (pt + backdrop_optical_displacement(normal, index, travel)) / global_viewport_size;
+    float2 blue_uv = (pt + backdrop_optical_displacement(normal, 1.0 + (index - 1.0) * (1.0 + backdrop_dispersion), travel)) / global_viewport_size;
     float4 frosted_red = t_sprite.Sample(s_sprite, red_uv);
     float4 frosted_green = t_sprite.Sample(s_sprite, green_uv);
     float4 frosted_blue = t_sprite.Sample(s_sprite, blue_uv);
@@ -1688,17 +1695,15 @@ float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
     color.a = backdrop_wash.a + color.a * (1.0 - backdrop_wash.a);
     color.rgb += backdrop_optical_lift.rgb * backdrop_optical_lift.a;
 
-    if (backdrop_specular > 0.0) {
-        // The light sits on the unit sphere at `light_angle`, measured
-        // clockwise from straight up, tilted towards the viewer so a flat
-        // surface is lit rather than black.
-        float3 normal = normalize(float3(gradient * rise, max(depth, 0.001)));
+    if (backdrop_specular > 0.0 && index > 1.0) {
+        // Analytic directional environment, not a real environment reflection.
         float3 light = normalize(float3(sin(backdrop_light_angle),
                                         -cos(backdrop_light_angle), 0.6));
-        float lobe_value = saturate(dot(normal, light));
-        float highlight = pow(lobe_value, backdrop_specular_sharpness) *
-                          backdrop_specular * rise;
-        color.rgb += highlight;
+        float3 reflected = reflect(float3(0.0, 0.0, -1.0), normal);
+        float lobe_value = pow(max(dot(reflected, light), 0.0), backdrop_specular_sharpness);
+        float f0 = pow((index - 1.0) / (index + 1.0), 2.0);
+        float fresnel = f0 + (1.0 - f0) * pow(1.0 - normal.z, 5.0);
+        color.rgb = lerp(color.rgb, lobe_value.xxx, saturate(backdrop_specular * fresnel));
     }
 
     if (backdrop_hairline > 0.0) {

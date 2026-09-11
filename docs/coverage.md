@@ -8,6 +8,15 @@ fact, a locale fact, a transport, or a platform chrome the OS already
 owns. `docs/components.md` describes the components themselves; this file
 exists so a gap is a recorded decision rather than an oversight.
 
+Glass optics use a shared height field, Snell refraction, spectral indices and
+Fresnel reflection in all three shader backends. `glass-optics` isolates these
+parameters over a ruled fixture, including fused panes. The implementation is
+single-interface screen-space optics, not full volume transport: no second
+interface, internal bounces, caustics, hidden-background recovery or real
+environment reflection is claimed. Scattering remains a uniform Gaussian;
+background-busyness probes and fused-outline shadows remain deferred. See
+`docs/compatibility.md` for the material contract and platform evidence boundary.
+
 A component counts as covered only when it has all four of: a public builder or
 view, a scene in `gpui_kit::scenes`, behaviour tests driven through simulated
 input, and an entry in `docs/components.md`.

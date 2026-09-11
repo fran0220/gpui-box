@@ -29,6 +29,10 @@ struct Params {
     saturation: f32,
     _mask_pad: f32,
     wash: vec4<f32>,
+    thickness: f32,
+    refractive_index: f32,
+    backdrop_depth: f32,
+    _optics_pad: f32,
     lobes: array<Lobe, MAX_GLASS_LOBES>,
 }
 
@@ -157,6 +161,14 @@ fn glass_field(point: vec2<f32>) -> vec3<f32> {
     return field;
 }
 
+// One refracting interface and an effective optical background plane, not
+// volume tracing. Index one is exactly undeformed, including at grazing angles.
+fn optical_displacement(normal: vec3<f32>, index: f32, distance: f32) -> vec2<f32> {
+    if (index == 1.0) { return vec2<f32>(0.0); }
+    let ray = refract(vec3<f32>(0.0, 0.0, -1.0), normal, 1.0 / index);
+    return ray.xy / max(-ray.z, 1e-4) * distance;
+}
+
 @fragment
 fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
     let point = input.position.xy;
@@ -170,43 +182,42 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
 
     // A plain frost is an exact copy of its blurred source. Liquid reaches the
     // path below even with blur zero: scattering is not the optics switch.
-    if ((params.bevel <= 0.0 || params.refraction == 0.0) && params.specular <= 0.0 &&
+    if ((params.bevel <= 0.0 || params.thickness == 0.0 || params.refractive_index == 1.0) &&
+        (params.specular <= 0.0 || params.refractive_index == 1.0) &&
         params.transmission_gain == 1.0 && params.optical_lift.a <= 0.0 &&
         params.saturation == 1.0 && params.wash.a <= 0.0 &&
         params.hairline <= 0.0) {
         return apply_edge_mask(textureLoad(source, vec2<i32>(point), 0), point);
     }
 
-    // Analytic incident-face and smooth-union derivatives; normalize only
-    // after the fold. Differencing across a crease invents a specular normal.
+    // Keep the smooth-union derivative magnitude for the height derivative.
+    // Only the decorative hairline needs a unit contour direction.
     var gradient = field.xy;
     let gradient_length = length(gradient);
     if (gradient_length > 0.0) {
         gradient = gradient / gradient_length;
     }
 
-    // `depth` is zero at the rim and one once the dome has flattened. The
-    // corresponding spherical slope diverges at the rim, then the measured
-    // reach cap below bounds its displacement to 45% of the profile depth.
-    var depth = 1.0;
+    var u = 0.0;
     if (params.bevel > 0.0) {
-        depth = clamp(-distance / params.bevel, 0.0, 1.0);
+        u = clamp(1.0 + distance / params.bevel, 0.0, 1.0);
     }
-    let rise = 1.0 - depth;
-    let slope = rise / sqrt(max(1.0 - rise * rise, 1e-4));
-    var displacement = -gradient * slope * params.bevel * params.refraction;
-    let reach_limit = params.bevel * 0.45;
-    let reach = length(displacement);
-    if (reach > reach_limit && reach > 0.0) {
-        displacement *= reach_limit / reach;
+    let profile = sqrt(max(1.0 - u * u, 0.0));
+    let height = params.thickness * select(profile, 1.0 - profile, params.refraction < 0.0);
+    var normal = vec3<f32>(0.0, 0.0, 1.0);
+    if (params.bevel > 0.0 && params.thickness > 0.0) {
+        normal = normalize(vec3<f32>(field.xy * (params.thickness / params.bevel) *
+            u / sqrt(max(1.0 - u * u, 1e-4)) * sign(params.refraction), 1.0));
     }
+    let travel = height + params.backdrop_depth;
+    let index = params.refractive_index;
 
     // Refract the scattered source even at the rim: mixing the sharp snapshot
     // back in would resurrect readable backdrop text. With blur zero this
     // source is already sharp, preserving Clear optics.
-    let red_uv = (point + displacement * (1.0 - params.dispersion)) / params.viewport;
-    let green_uv = (point + displacement) / params.viewport;
-    let blue_uv = (point + displacement * (1.0 + params.dispersion)) / params.viewport;
+    let red_uv = (point + optical_displacement(normal, 1.0 + (index - 1.0) * (1.0 - params.dispersion), travel)) / params.viewport;
+    let green_uv = (point + optical_displacement(normal, index, travel)) / params.viewport;
+    let blue_uv = (point + optical_displacement(normal, 1.0 + (index - 1.0) * (1.0 + params.dispersion), travel)) / params.viewport;
     let frosted_red = textureSample(source, source_sampler, red_uv);
     let frosted_green = textureSample(source, source_sampler, green_uv);
     let frosted_blue = textureSample(source, source_sampler, blue_uv);
@@ -221,17 +232,16 @@ fn fs_composite(input: Varying) -> @location(0) vec4<f32> {
         params.wash.a + color.a * (1.0 - params.wash.a),
     );
 
-    if (params.specular > 0.0) {
-        // The light sits on the unit sphere at `light_angle`, measured
-        // clockwise from straight up, tilted towards the viewer so a flat
-        // surface is lit rather than black.
-        let normal = normalize(vec3<f32>(gradient * rise, max(depth, 0.001)));
+    if (params.specular > 0.0 && index > 1.0) {
+        // Analytic directional environment, not a real environment reflection.
         let light = normalize(vec3<f32>(
             sin(params.light_angle), -cos(params.light_angle), 0.6));
-        let lobe_value = clamp(dot(normal, light), 0.0, 1.0);
-        let highlight = pow(lobe_value, params.specular_sharpness) *
-            params.specular * rise;
-        color = vec4<f32>(color.rgb + highlight, color.a);
+        let reflected = reflect(vec3<f32>(0.0, 0.0, -1.0), normal);
+        let lobe_value = pow(max(dot(reflected, light), 0.0), params.specular_sharpness);
+        let f0 = pow((index - 1.0) / (index + 1.0), 2.0);
+        let fresnel = f0 + (1.0 - f0) * pow(1.0 - normal.z, 5.0);
+        color = vec4<f32>(mix(color.rgb, vec3<f32>(lobe_value),
+            clamp(params.specular * fresnel, 0.0, 1.0)), color.a);
     }
 
     if (params.hairline > 0.0) {

@@ -352,7 +352,11 @@ impl TokenDocument {
             ),
             ("effect.glassShadowMin", self.effect.glass_shadow_min),
             ("effect.glassShadowMax", self.effect.glass_shadow_max),
-            ("effect.glassRefraction", self.effect.glass_refraction),
+            ("effect.glassThickness", self.effect.glass_thickness),
+            (
+                "effect.glassBackdropDepth",
+                self.effect.glass_backdrop_depth,
+            ),
             ("effect.glassHairline", self.effect.glass_hairline),
             (
                 "effect.glassMergeDistance",
@@ -362,6 +366,10 @@ impl TokenDocument {
             if value < 0.0 {
                 return invalid(path, "must not be negative");
             }
+        }
+
+        if !(1.0..=2.5).contains(&self.effect.glass_refractive_index) {
+            return invalid("effect.glassRefractiveIndex", "must be between 1 and 2.5");
         }
 
         if self.effect.glass_bevel_min > self.effect.glass_bevel_max {
@@ -2661,13 +2669,18 @@ pub struct EffectTokens {
     /// Shadow alpha multipliers on bright and dark backdrops respectively.
     pub glass_shadow_min: f32,
     pub glass_shadow_max: f32,
-    /// How far the bevel displaces what is behind it, as a fraction of the
-    /// bevel. Read as the thickness of the glass body.
+    /// Signed thickness multiplier controlling both optical height and normal.
     pub glass_refraction: f32,
-    /// How far apart the red and blue samples land at the bevel, as a fraction
-    /// of the refraction offset. Zero is a colourless bend.
+    /// Optical thickness in pixels; zero derives it from the optical bevel.
+    pub glass_thickness: f32,
+    /// Refractive index in the range 1..=2.5; one does not bend light.
+    pub glass_refractive_index: f32,
+    /// Nonnegative effective distance in pixels through the refracted medium
+    /// to the 2D source plane. This is not a physical air gap.
+    pub glass_backdrop_depth: f32,
+    /// Fractional RGB variation of refractive index minus one.
     pub glass_dispersion: f32,
-    /// Peak brightness of the rim highlight.
+    /// Strength of Fresnel-weighted directional environment reflection.
     pub glass_specular: f32,
     /// Multiplicative light transmission through Liquid glass.
     pub glass_transmission_gain: f32,

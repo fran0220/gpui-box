@@ -739,7 +739,15 @@ pub struct Effects {
     pub glass_flip_max_extent: f32,
     pub glass_shadow_min: f32,
     pub glass_shadow_max: f32,
+    /// Signed thickness multiplier controlling optical height and normal.
     pub glass_refraction: f32,
+    /// Optical thickness in pixels; zero derives it from the optical bevel.
+    pub glass_thickness: f32,
+    /// Refractive index in 1..=2.5; one does not bend light.
+    pub glass_refractive_index: f32,
+    /// Nonnegative effective distance through the refracted medium to the 2D
+    /// source plane, in pixels, not a physical air gap.
+    pub glass_backdrop_depth: f32,
     pub glass_dispersion: f32,
     pub glass_specular: f32,
     pub glass_transmission_gain: f32,
@@ -1338,6 +1346,9 @@ impl Theme {
                 glass_shadow_min: tokens.effect.glass_shadow_min,
                 glass_shadow_max: tokens.effect.glass_shadow_max,
                 glass_refraction: tokens.effect.glass_refraction,
+                glass_thickness: tokens.effect.glass_thickness,
+                glass_refractive_index: tokens.effect.glass_refractive_index,
+                glass_backdrop_depth: tokens.effect.glass_backdrop_depth,
                 glass_dispersion: tokens.effect.glass_dispersion,
                 glass_specular: tokens.effect.glass_specular,
                 glass_transmission_gain: tokens.effect.glass_transmission_gain,
@@ -2186,6 +2197,18 @@ fn color(value: Color) -> Hsla {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn glass_optics_map_distinct_token_values() {
+        let mut tokens = gpui_kit_tokens::all()[0].clone();
+        tokens.effect.glass_thickness = 7.0;
+        tokens.effect.glass_refractive_index = 1.8;
+        tokens.effect.glass_backdrop_depth = 23.0;
+        let theme = Theme::from_tokens(&tokens, Density::Comfortable);
+        assert_eq!(theme.effects.glass_thickness, 7.0);
+        assert_eq!(theme.effects.glass_refractive_index, 1.8);
+        assert_eq!(theme.effects.glass_backdrop_depth, 23.0);
+    }
 
     /// The library groups content with colour rather than with a line drawn
     /// round it, so a step between two surfaces has to be visible on its own.

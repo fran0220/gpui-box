@@ -353,9 +353,25 @@ mod tests {
         }
     }
 
-    /// CPU reference for the profile all three native shaders mirror. Keeping
-    /// it next to the framework tests makes the cap and centre/rim invariants
-    /// executable without making a shader implementation another public API.
+    /// Independent angle-space Snell reference. Shaders use vector refract;
+    /// this uses asin and tan to check their geometric sampling bound.
+    fn snell_offset(distance: f32, bevel: f32, thickness: f32, index: f32, plane: f32) -> f32 {
+        if bevel <= 0. || thickness == 0. || index == 1. {
+            return 0.;
+        }
+        let u = (1. + distance / bevel).clamp(0., 1.);
+        let theta = (thickness / bevel * u / (1. - u * u).max(1e-4).sqrt()).atan();
+        let transmitted = (theta.sin() / index).asin() - theta;
+        let profile = (1. - u * u).max(0.).sqrt();
+        let height = thickness.abs()
+            * if thickness < 0. {
+                1. - profile
+            } else {
+                profile
+            };
+        transmitted.tan() * (height + plane)
+    }
+
     fn optical_profile(
         distance: f32,
         outward: Point<f32>,
@@ -367,27 +383,8 @@ mod tests {
         } else {
             1.0
         };
-        let rise = 1.0 - depth;
-        let slope = rise / (1.0 - rise * rise).max(1e-4).sqrt();
-        let mut offset = point(
-            -outward.x * slope * bevel * refraction,
-            -outward.y * slope * bevel * refraction,
-        );
-        let reach = (offset.x * offset.x + offset.y * offset.y).sqrt();
-        let limit = bevel * 0.45;
-        if reach > limit && reach > 0.0 {
-            offset.x *= limit / reach;
-            offset.y *= limit / reach;
-        }
-        (depth, offset)
-    }
-
-    fn channel_offsets(offset: Point<f32>, dispersion: f32) -> [Point<f32>; 3] {
-        [
-            point(offset.x * (1.0 - dispersion), offset.y * (1.0 - dispersion)),
-            offset,
-            point(offset.x * (1.0 + dispersion), offset.y * (1.0 + dispersion)),
-        ]
+        let offset = snell_offset(distance, bevel, bevel * refraction, 1.5, 0.);
+        (depth, point(outward.x * offset, outward.y * offset))
     }
 
     #[test]
@@ -523,21 +520,61 @@ mod tests {
 
         let (rim_depth, rim_offset) = optical_profile(0.0, outward, 18.0, 0.34);
         assert_eq!(rim_depth, 0.0);
-        assert!((rim_offset.x.abs() - 18.0 * 0.45).abs() < 1e-5);
-        assert_eq!(rim_offset.y, 0.0);
+        assert_eq!(rim_offset, point(0.0, 0.0), "zero height at the rim");
+        assert!(snell_offset(0., 18., 6.12, 1.5, 8.).abs() > 0.);
     }
 
     #[test]
     fn dispersion_is_independent_and_subtle() {
-        let (_, offset) = optical_profile(-9.0, point(1.0, 0.0), 18.0, 0.34);
-        let together = channel_offsets(offset, 0.0);
-        assert_eq!(together[0], together[1]);
-        assert_eq!(together[1], together[2]);
+        let red = snell_offset(-9., 18., 6.12, 1.4975, 0.);
+        let green = snell_offset(-9., 18., 6.12, 1.5, 0.);
+        let blue = snell_offset(-9., 18., 6.12, 1.5025, 0.);
+        assert!(red.abs() < green.abs());
+        assert!(green.abs() < blue.abs());
+        assert!((blue - red).abs() < green.abs() * 0.011);
+    }
 
-        let measured = channel_offsets(offset, 0.005);
-        assert!(measured[0].x.abs() < measured[1].x.abs());
-        assert!(measured[1].x.abs() < measured[2].x.abs());
-        assert!((measured[2].x - measured[0].x).abs() < offset.x.abs() * 0.011);
+    #[test]
+    fn snell_sampling_bound_covers_thick_distant_and_dispersed_surfaces() {
+        let mut glass = bounded_glass(0);
+        // Keep this bound test away from viewport clamping; GPU tests also
+        // exercise clipped surfaces and sampling beyond their content masks.
+        glass.bounds.origin = point(ScaledPixels(2000.), ScaledPixels(2000.));
+        glass.content_mask.bounds = glass.bounds;
+        glass.material.bevel = ScaledPixels(9.);
+        glass.material.probe = NO_LUMINANCE_PROBE;
+        for index in [1., 1.33, 1.5, 2.5] {
+            for thickness in [0., 3., 32.] {
+                for plane in [0., 24., 80.] {
+                    for strength in [-2., 0., 0.34, 1.7] {
+                        glass.material.refractive_index = index;
+                        glass.material.thickness = ScaledPixels(thickness);
+                        glass.material.backdrop_depth = ScaledPixels(plane);
+                        glass.material.refraction = strength;
+                        glass.material.dispersion = 1.;
+                        let region = glass
+                            .render_region(0, size(DevicePixels(4000), DevicePixels(4000)))
+                            .expect("visible glass has a render region");
+                        let reach = (region.visible.origin.x.0 - region.sampling.origin.x.0) as f32;
+                        for step in 0..=100 {
+                            for channel_index in [1., index, 1. + (index - 1.) * 2.] {
+                                let offset = snell_offset(
+                                    -9. * step as f32 / 100.,
+                                    9.,
+                                    glass.optical_thickness().0 * strength.signum(),
+                                    channel_index,
+                                    plane,
+                                );
+                                assert!(
+                                    offset.abs() <= reach,
+                                    "offset={offset}, reach={reach}, index={channel_index}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -632,6 +669,9 @@ mod tests {
             blur_radius: ScaledPixels(f32::NEG_INFINITY),
             bevel: ScaledPixels(f32::NAN),
             refraction: f32::INFINITY,
+            thickness: ScaledPixels(f32::NAN),
+            refractive_index: f32::INFINITY,
+            backdrop_depth: ScaledPixels(-3.),
             dispersion: 4.,
             specular: -1.,
             transmission_gain: f32::NAN,
@@ -661,6 +701,9 @@ mod tests {
         assert_eq!(material.blur_radius, ScaledPixels(0.));
         assert_eq!(material.bevel, ScaledPixels(0.));
         assert_eq!(material.refraction, 0.);
+        assert_eq!(material.thickness, ScaledPixels(0.));
+        assert_eq!(material.refractive_index, 1.5);
+        assert_eq!(material.backdrop_depth, ScaledPixels(0.));
         assert_eq!(material.dispersion, 1., "dispersion is a fraction");
         assert_eq!(material.specular, 0.);
         assert_eq!(material.transmission_gain, 1.);
@@ -747,6 +790,9 @@ mod tests {
             blur_radius: Pixels(24.),
             bevel: Pixels(14.),
             refraction: 0.55,
+            thickness: Pixels(7.),
+            refractive_index: 1.33,
+            backdrop_depth: Pixels(11.),
             dispersion: 0.16,
             specular: 0.4,
             transmission_gain: 1.042,
@@ -776,6 +822,9 @@ mod tests {
 
         assert_eq!(device.blur_radius, ScaledPixels(48.));
         assert_eq!(device.bevel, ScaledPixels(28.));
+        assert_eq!(device.thickness, ScaledPixels(14.));
+        assert_eq!(device.backdrop_depth, ScaledPixels(22.));
+        assert_eq!(device.refractive_index, logical.refractive_index);
         assert_eq!(device.smoothing, ScaledPixels(56.));
         assert_eq!(device.hairline, ScaledPixels(2.));
         assert_eq!(device.edge_mask_band, ScaledPixels(64.));
@@ -863,13 +912,13 @@ mod tests {
                 point(DevicePixels(71), DevicePixels(71)),
             )
         );
-        // Four radius-18 supports plus six pixels for the capped, dispersed
+        // Four radius-18 supports plus five pixels for the Snell, dispersed
         // refraction reach the texture edge on the top and left.
         assert_eq!(
             region.sampling,
             Bounds::from_corners(
                 point(DevicePixels(0), DevicePixels(0)),
-                point(DevicePixels(149), DevicePixels(149)),
+                point(DevicePixels(148), DevicePixels(148)),
             )
         );
     }
@@ -1026,21 +1075,14 @@ mod tests {
                     0.34,
                 );
                 let rise = 1. - depth;
-                let normal = [
-                    field.gradient.x * rise,
-                    field.gradient.y * rise,
-                    depth.max(0.001),
-                ];
-                let length = normal.iter().map(|v| v * v).sum::<f32>().sqrt();
-                let dot = (normal[0] * std::f32::consts::FRAC_1_SQRT_2
-                    - normal[1] * std::f32::consts::FRAC_1_SQRT_2
-                    + normal[2] * 0.6)
-                    / (length * 1.36_f32.sqrt());
-                let highlight = dot.clamp(0., 1.).powi(12) * 0.06 * rise;
+                let slope = 0.34 * rise / (1. - rise * rise).max(1e-4).sqrt();
                 assert!(
-                    highlight * 255. <= 2.,
-                    "radius={radius}, inset={inset}: {highlight}"
+                    slope < 0.1,
+                    "the profile must be nearly flat before the arc centre: radius={radius}, inset={inset}, slope={slope}"
                 );
+                if inset >= radius {
+                    assert_eq!(slope, 0.);
+                }
             }
             // Explicit unions and unequal radii use the same safe depth.
             glass.lobes[0] = lobes[0];
@@ -1063,10 +1105,9 @@ mod tests {
                 - glass_field(point(at.x - epsilon, at.y), &lobes, 20.).distance;
             let dy = glass_field(point(at.x, at.y + epsilon), &lobes, 20.).distance
                 - glass_field(point(at.x, at.y - epsilon), &lobes, 20.).distance;
-            let length = (dx * dx + dy * dy).sqrt();
             let gradient = glass_field(at, &lobes, 20.).gradient;
-            assert!((gradient.x - dx / length).abs() < 0.002);
-            assert!((gradient.y - dy / length).abs() < 0.002);
+            assert!((gradient.x - dx / (2. * epsilon)).abs() < 0.002);
+            assert!((gradient.y - dy / (2. * epsilon)).abs() < 0.002);
         }
     }
 
@@ -1118,7 +1159,7 @@ mod tests {
                 + size_of::<u32>()
         );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
-        assert_eq!(size_of::<GlassMaterial>(), 22 * size_of::<f32>());
+        assert_eq!(size_of::<GlassMaterial>(), 25 * size_of::<f32>());
         assert_eq!(
             size_of::<PolychromeSprite>(),
             size_of::<DrawOrder>()
@@ -1824,14 +1865,26 @@ pub struct GlassMaterial<P = ScaledPixels> {
     /// Renderers bound this requested depth by the shape's rounded-corner
     /// reach; see [`BackdropGlass::optical_bevel`].
     pub bevel: P,
-    /// How far the bevel displaces the sample, as a fraction of `bevel`. This
-    /// is a thickness in disguise: 0 is a flat pane and larger values read as
-    /// a deeper body of glass.
+    /// Signed multiplier of the surface thickness. Zero flattens the surface;
+    /// positive values describe a convex face, negative values a concave face.
+    /// This scales both the height and its derivative, including lighting.
     pub refraction: f32,
-    /// How far apart the red and blue samples land, as a fraction of the
-    /// refraction offset. Zero samples all three channels together.
+    /// Maximum profile height before applying `refraction`. Zero follows the
+    /// geometrically bounded bevel. Explicit heights do not widen the bevel.
+    pub thickness: P,
+    /// Dielectric index relative to air, sanitized to 1..=2.5. One removes
+    /// refraction and Fresnel reflection. Clear constructors use 1.5.
+    pub refractive_index: f32,
+    /// Effective distance below the profile base to the sampled optical plane.
+    /// The refracted ray propagates through this distance in the same medium:
+    /// this is not an air gap behind a second dielectric interface. Screen-space
+    /// glass has no scene depth, hidden geometry or multi-bounce ray tracing.
+    pub backdrop_depth: P,
+    /// Fractional variation of `refractive_index - 1` for red and blue.
+    /// Zero uses the same Snell ray for all channels, not a post-sample fringe.
     pub dispersion: f32,
-    /// Peak brightness of the rim highlight, 0 for none.
+    /// Strength of the Fresnel-weighted directional environment reflection,
+    /// 0 for none. Reflection and transmission share the profile's normal.
     pub specular: f32,
     /// Multiplicative transmission applied after sampling. One preserves the
     /// backdrop; values above one model the measured light gain of clear glass.
@@ -1910,6 +1963,9 @@ impl<P: GlassLength> GlassMaterial<P> {
             blur_radius: P::from_raw(0.),
             bevel: P::from_raw(0.),
             refraction: 0.,
+            thickness: P::from_raw(0.),
+            refractive_index: 1.5,
+            backdrop_depth: P::from_raw(0.),
             dispersion: 0.,
             specular: 0.,
             transmission_gain: 1.,
@@ -1948,7 +2004,7 @@ impl<P: GlassLength> GlassMaterial<P> {
 
     /// Whether the backdrop sample is displaced at all.
     pub fn bends_light(&self) -> bool {
-        self.bevel.raw() > 0. && self.refraction != 0.
+        self.bevel.raw() > 0. && self.refraction != 0. && self.refractive_index > 1.
     }
 
     /// Whether a renderer must snapshot the framebuffer for this material.
@@ -1968,6 +2024,9 @@ impl<P: GlassLength> GlassMaterial<P> {
         self.blur_radius = P::from_raw(finite(self.blur_radius.raw(), 0.).max(0.));
         self.bevel = P::from_raw(finite(self.bevel.raw(), 0.).max(0.));
         self.refraction = finite(self.refraction, 0.);
+        self.thickness = P::from_raw(finite(self.thickness.raw(), 0.).max(0.));
+        self.refractive_index = finite(self.refractive_index, 1.5).clamp(1., 2.5);
+        self.backdrop_depth = P::from_raw(finite(self.backdrop_depth.raw(), 0.).max(0.));
         self.dispersion = finite(self.dispersion, 0.).clamp(0., 1.);
         self.specular = finite(self.specular, 0.).max(0.);
         self.transmission_gain = finite(self.transmission_gain, 1.).max(0.);
@@ -2017,6 +2076,9 @@ impl GlassMaterial<Pixels> {
             blur_radius: self.blur_radius.scale(factor),
             bevel: self.bevel.scale(factor),
             refraction: self.refraction,
+            thickness: self.thickness.scale(factor),
+            refractive_index: self.refractive_index,
+            backdrop_depth: self.backdrop_depth.scale(factor),
             dispersion: self.dispersion,
             specular: self.specular,
             transmission_gain: self.transmission_gain,
@@ -2117,6 +2179,18 @@ impl BackdropGlass {
         ScaledPixels(bevel.max(0.))
     }
 
+    /// Maximum height of the elliptical edge profile, shared by upload and
+    /// sampling bounds. Its analytic derivative defines the Snell and lighting
+    /// normal. The profile joins a flat interior before a corner collapses.
+    pub fn optical_thickness(&self) -> ScaledPixels {
+        let thickness = if self.material.thickness.0 > 0. {
+            self.material.thickness.0
+        } else {
+            self.optical_bevel().0
+        };
+        ScaledPixels(thickness * self.material.refraction.abs())
+    }
+
     /// The lobes that make up the shape, which is the explicit list when
     /// there is one and the surface's own rounded rect when there is not.
     ///
@@ -2201,10 +2275,12 @@ impl BackdropGlass {
     ///
     /// `gaussian_passes` is the number of same-variance passes the backend
     /// will apply. A platform Gaussian is one pass; a clear surface is zero.
-    /// The Gaussian support is three standard deviations per pass. Refraction
-    /// is capped by the shader at 45% of bevel depth, with dispersion allowed
-    /// to move the furthest color channel one pixel farther for linear
-    /// sampling. Both regions are rounded outwards and clamped to `viewport`.
+    /// The Gaussian support is three standard deviations per pass. For a
+    /// normally incident ray entering index n, Snell's law bounds the ray's
+    /// lateral slope by sqrt(n² - 1), including at a grazing surface normal.
+    /// Use the largest channel index and maximum optical-plane distance, plus
+    /// one pixel for bilinear filtering. No shader displacement cap is needed.
+    /// Both regions are rounded outwards and clamped to `viewport`.
     /// When the material requests a valid luminance probe, `sampling` also
     /// retains each probe texel and its blur dependencies even when the
     /// content mask clips that point out of `visible`.
@@ -2225,7 +2301,10 @@ impl BackdropGlass {
         };
         let blur_reach = (sigma * 3.).ceil() * gaussian_passes as f32;
         let optical_reach = if self.material.bends_light() {
-            (self.material.bevel.0 * 0.45 * (1. + self.material.dispersion)).ceil() + 1.
+            let index =
+                1. + (self.material.refractive_index - 1.) * (1. + self.material.dispersion);
+            let distance = self.optical_thickness().0 + self.material.backdrop_depth.0;
+            (distance * (index * index - 1.).sqrt()).ceil() + 1.
         } else {
             0.
         };
@@ -2300,7 +2379,8 @@ pub const MAX_GLASS_GAUSSIAN_PASSES: u32 = 16;
 pub struct GlassField {
     /// Signed distance to the surface's edge, negative inside.
     pub distance: f32,
-    /// The direction the distance increases in, normalized. At a lobe's medial
+    /// The analytic distance derivative, not normalized. Preserve its magnitude
+    /// when deriving the height-field normal across a union. At a lobe's medial
     /// axis choose an actual incident face, not their fictitious bisector.
     /// Zero for an empty field or cancelling smooth-union derivatives.
     pub gradient: Point<f32>,
@@ -2396,7 +2476,8 @@ pub fn glass_smooth_min(a: f32, b: f32, smoothing: f32) -> f32 {
 /// a specular ridge. Choose one incident face at ties instead. A bevel wider
 /// than its corner radius still has a real crease; this does not smooth it or
 /// change the silhouette. For a smooth union, blend derivatives by h/2 (the
-/// derivative of the polynomial correction), normalizing only after the fold.
+/// derivative of the polynomial correction). Do not normalize away the union's
+/// slope attenuation; the final three-dimensional surface normal is normalized.
 pub fn glass_field(at: Point<f32>, lobes: &[GlassLobe], smoothing: f32) -> GlassField {
     let Some((first, rest)) = lobes.split_first() else {
         return GlassField {
@@ -2419,10 +2500,6 @@ pub fn glass_field(at: Point<f32>, lobes: &[GlassLobe], smoothing: f32) -> Glass
         };
         field.gradient = field.gradient * (1. - weight) + next.gradient * weight;
         field.distance = glass_smooth_min(field.distance, next.distance, smoothing);
-    }
-    let length = (field.gradient.x.powi(2) + field.gradient.y.powi(2)).sqrt();
-    if length > 0. {
-        field.gradient = field.gradient / length;
     }
     field
 }

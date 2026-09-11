@@ -942,3 +942,21 @@ Exact incremental paragraph wrapping and viewport-restricted editable geometry
 are original GPUI Box work on the existing local text-system authority. They
 reuse public Ropey snapshot differences and GPUI WrappedLine layout/painting;
 no imported renderer, shader, platform adapter or historical receipt changed.
+
+### Unified screen-space dielectric glass
+
+The elliptical height field, thickness/index/optical-plane material parameters,
+Snell-derived sampling bounds, spectral index variation and shared-normal
+Fresnel environment response are original GPUI Box work in `scene.rs` and the
+Metal, WGSL and HLSL renderers. They supersede the historical empirical
+displacement cap and additive specular model described in P12, without changing
+that import receipt. Kit presets, tokens and `glass-optics` are original work.
+
+Mathematical references (consulted 2026-09-11, not copied source): Khronos
+OpenGL 4 `refract` reference at
+<https://registry.khronos.org/OpenGL-Refpages/gl4/html/refract.xhtml> and
+Physically Based Rendering, third edition (2018), §8.2 at
+<https://pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission>.
+The implementation uses native shader intrinsics and a Schlick approximation;
+it is a single-interface optical-plane model, not PBR volume tracing or Apple's
+private material. No package, external source, or frozen revision changed.

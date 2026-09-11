@@ -1871,14 +1871,18 @@ struct BackdropGlassParams {
     wash: [f32; 4],
     optical_lift: [f32; 4],
     edge_mask: [f32; 4],
+    thickness: f32,
+    refractive_index: f32,
+    backdrop_depth: f32,
+    _optics_pad: f32,
     lobes: [[f32; 4]; MAX_GLASS_LOBES * 2],
 }
 
-// Ten sixteen-byte registers of header, then two per lobe. HLSL packs a
+// Eleven sixteen-byte registers of header, then two per lobe. HLSL packs a
 // constant buffer into sixteen-byte registers that a member may not straddle,
 // which is what the groupings above are chosen to respect.
 const _: () = assert!(
-    std::mem::size_of::<BackdropGlassParams>() == 160 + MAX_GLASS_LOBES * 32,
+    std::mem::size_of::<BackdropGlassParams>() == 176 + MAX_GLASS_LOBES * 32,
     "the backdrop parameter buffer must match the cbuffer in shaders.hlsl"
 );
 
@@ -1945,6 +1949,10 @@ impl BackdropGlassParams {
                 0.0,
                 0.0,
             ],
+            thickness: glass.optical_thickness().0,
+            refractive_index: glass.material.refractive_index,
+            backdrop_depth: glass.material.backdrop_depth.0,
+            _optics_pad: 0.0,
             lobes,
         }
     }

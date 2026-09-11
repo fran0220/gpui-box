@@ -503,6 +503,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -1316,6 +1319,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -2129,6 +2135,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -2942,6 +2951,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -3755,6 +3767,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -4568,6 +4583,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -5381,6 +5399,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -6194,6 +6215,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -7007,6 +7031,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |
@@ -7820,6 +7847,9 @@ Row stagger maximum items: `8`.
 | `effect.glassShadowMin` | 0.8 |
 | `effect.glassShadowMax` | 1.5 |
 | `effect.glassRefraction` | 0.34 |
+| `effect.glassThickness` | 0 |
+| `effect.glassRefractiveIndex` | 1.5 |
+| `effect.glassBackdropDepth` | 0 |
 | `effect.glassDispersion` | 0.005 |
 | `effect.glassSpecular` | 0.06 |
 | `effect.glassTransmissionGain` | 1.042 |

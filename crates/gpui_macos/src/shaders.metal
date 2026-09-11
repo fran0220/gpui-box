@@ -1584,6 +1584,13 @@ vertex BackdropGlassVertexOutput backdrop_glass_vertex(
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
+// Single-interface refraction to an effective optical plane, not volume tracing.
+float2 glass_optical_displacement(float3 normal, float index, float distance) {
+  if (index == 1.) return float2(0.);
+  float3 ray = refract(float3(0., 0., -1.), normal, 1. / index);
+  return ray.xy / max(-ray.z, 1e-4) * distance;
+}
+
 fragment float4 backdrop_glass_fragment(
     BackdropGlassFragmentInput input [[stage_in]],
     constant BackdropGlass *surfaces [[buffer(BackdropGlassInputIndex_Surfaces)]],
@@ -1625,6 +1632,8 @@ fragment float4 backdrop_glass_fragment(
   float bevel = glass.material.bevel;
   float refraction = glass.material.refraction;
   float specular = glass.material.specular;
+  float thickness = (glass.material.thickness > 0. ? glass.material.thickness : bevel) * abs(refraction);
+  float index = glass.material.refractive_index;
   float4 optical_lift = float4(glass.material.optical_lift.r,
                                glass.material.optical_lift.g,
                                glass.material.optical_lift.b,
@@ -1635,7 +1644,8 @@ fragment float4 backdrop_glass_fragment(
              glass.bounds.size.height),
       glass.material.edge_mask_edge, glass.material.edge_mask_band);
 
-  if ((bevel <= 0. || refraction == 0.) && specular <= 0. &&
+  if ((bevel <= 0. || thickness == 0. || index == 1.) &&
+      (specular <= 0. || index == 1.) &&
       glass.material.transmission_gain == 1. && optical_lift.a <= 0. &&
       glass.material.saturation == 1. && glass.material.wash.a <= 0. &&
       glass.material.hairline <= 0.) {
@@ -1647,32 +1657,29 @@ fragment float4 backdrop_glass_fragment(
     return mix(original, frosted, edge_mask);
   }
 
-  // Analytic incident-face and smooth-union derivatives; normalize only
-  // after the fold. Differencing across a crease invents a specular normal.
+  // Keep the smooth-union derivative magnitude for the height derivative.
+  // Only the decorative hairline needs a unit contour direction.
   float2 gradient = field.xy;
   float gradient_length = length(gradient);
   gradient = gradient_length > 0. ? gradient / gradient_length : float2(0.);
 
-  // `depth` is zero at the rim and one once the dome has flattened. The
-  // spherical slope diverges at the rim, then the measured reach cap bounds
-  // displacement to 45% of the profile depth.
-  float depth = bevel > 0. ? saturate(-distance / bevel) : 1.;
-  float rise = 1. - depth;
-  float slope = rise / sqrt(max(1. - rise * rise, 1e-4));
-  float2 displacement = -gradient * slope * bevel * refraction;
-  float reach_limit = bevel * 0.45;
-  float reach = length(displacement);
-  if (reach > reach_limit && reach > 0.) {
-    displacement *= reach_limit / reach;
+  float u = bevel > 0. ? saturate(1. + distance / bevel) : 0.;
+  float profile = sqrt(max(1. - u * u, 0.));
+  float height = thickness * (refraction < 0. ? 1. - profile : profile);
+  float3 normal = float3(0., 0., 1.);
+  if (bevel > 0. && thickness > 0.) {
+    normal = normalize(float3(field.xy * (thickness / bevel) *
+        u / sqrt(max(1. - u * u, 1e-4)) * sign(refraction), 1.));
   }
+  float travel = height + glass.material.backdrop_depth;
 
   // Refract the scattered source even at the rim: mixing the sharp snapshot
   // back in would resurrect readable backdrop text. With blur zero this
   // source is already sharp, preserving Clear optics.
   float dispersion = glass.material.dispersion;
-  float2 red_uv = (point + displacement * (1. - dispersion)) / viewport;
-  float2 green_uv = (point + displacement) / viewport;
-  float2 blue_uv = (point + displacement * (1. + dispersion)) / viewport;
+  float2 red_uv = (point + glass_optical_displacement(normal, 1. + (index - 1.) * (1. - dispersion), travel)) / viewport;
+  float2 green_uv = (point + glass_optical_displacement(normal, index, travel)) / viewport;
+  float2 blue_uv = (point + glass_optical_displacement(normal, 1. + (index - 1.) * (1. + dispersion), travel)) / viewport;
   float4 frosted_red = source_texture.sample(source_sampler, red_uv);
   float4 frosted_green = source_texture.sample(source_sampler, green_uv);
   float4 frosted_blue = source_texture.sample(source_sampler, blue_uv);
@@ -1688,17 +1695,15 @@ fragment float4 backdrop_glass_fragment(
   color.a = wash.a + color.a * (1. - wash.a);
   color.rgb += optical_lift.rgb * optical_lift.a;
 
-  if (specular > 0.) {
-    // The light sits on the unit sphere at `light_angle`, measured clockwise
-    // from straight up, tilted towards the viewer so a flat surface is lit
-    // rather than black.
-    float3 normal = normalize(float3(gradient * rise, max(depth, 0.001)));
+  if (specular > 0. && index > 1.) {
+    // Analytic directional environment, not a real environment reflection.
     float angle = glass.material.light_angle;
     float3 light = normalize(float3(sin(angle), -cos(angle), 0.6));
-    float lobe_value = saturate(dot(normal, light));
-    float highlight = pow(lobe_value, glass.material.specular_sharpness) *
-                      specular * rise;
-    color.rgb += highlight;
+    float3 reflected = reflect(float3(0., 0., -1.), normal);
+    float lobe_value = pow(max(dot(reflected, light), 0.), glass.material.specular_sharpness);
+    float f0 = pow((index - 1.) / (index + 1.), 2.);
+    float fresnel = f0 + (1. - f0) * pow(1. - normal.z, 5.);
+    color.rgb = mix(color.rgb, float3(lobe_value), saturate(specular * fresnel));
   }
 
   if (glass.material.hairline > 0.) {

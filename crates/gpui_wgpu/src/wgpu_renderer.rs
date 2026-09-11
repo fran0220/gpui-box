@@ -282,6 +282,10 @@ struct BackdropParams {
     saturation: f32,
     _mask_pad: f32,
     wash: [f32; 4],
+    thickness: f32,
+    refractive_index: f32,
+    backdrop_depth: f32,
+    _optics_pad: f32,
     lobes: [BackdropLobe; MAX_GLASS_LOBES],
 }
 
@@ -2707,6 +2711,10 @@ impl WgpuRenderer {
                 material.wash.b,
                 material.wash.a,
             ],
+            thickness: glass.optical_thickness().0,
+            refractive_index: material.refractive_index,
+            backdrop_depth: material.backdrop_depth.0,
+            _optics_pad: 0.0,
             lobes,
         };
 
@@ -3999,16 +4007,47 @@ mod tests {
         // declares has no gap the Rust side does not also have.
         assert_eq!(size_of::<BackdropLobe>(), 32);
         assert_eq!(size_of::<BackdropLobe>() % 16, 0);
-        // Everything ahead of the lobe array occupies 160 bytes, which is a
+        // Everything ahead of the lobe array occupies 176 bytes, which is a
         // multiple of 16. The scalar register and optical-lift vector keep the
         // array at the same offset in Rust and WGSL; otherwise the shader
         // would round up where the Rust side did not.
-        const HEADER: usize = 160;
+        const HEADER: usize = 176;
         assert_eq!(HEADER % 16, 0, "the lobe array must start 16-byte aligned");
         assert_eq!(
             size_of::<BackdropParams>(),
             HEADER + size_of::<BackdropLobe>() * MAX_GLASS_LOBES
         );
+        let module =
+            naga::front::wgsl::parse_str(BACKDROP_GLASS_SHADERS).expect("glass shader parses");
+        let params = module
+            .types
+            .iter()
+            .find_map(|(_, ty)| (ty.name.as_deref() == Some("Params")).then_some(&ty.inner));
+        let Some(naga::TypeInner::Struct { members, span }) = params else {
+            panic!("missing shader parameter struct");
+        };
+        assert_eq!(*span as usize, size_of::<BackdropParams>());
+        for (name, offset) in [
+            ("thickness", std::mem::offset_of!(BackdropParams, thickness)),
+            (
+                "refractive_index",
+                std::mem::offset_of!(BackdropParams, refractive_index),
+            ),
+            (
+                "backdrop_depth",
+                std::mem::offset_of!(BackdropParams, backdrop_depth),
+            ),
+            ("lobes", std::mem::offset_of!(BackdropParams, lobes)),
+        ] {
+            assert_eq!(
+                members
+                    .iter()
+                    .find(|member| member.name.as_deref() == Some(name))
+                    .expect("optical uniform member exists")
+                    .offset as usize,
+                offset
+            );
+        }
     }
 
     #[test]
@@ -4335,7 +4374,9 @@ mod tests {
             glass.material.bevel = ScaledPixels(36.);
             glass.material.refraction = 0.34;
             glass.material.hairline = ScaledPixels(1.);
-            glass.material.specular = 0.06;
+            // Unit environment weight: Fresnel now owns reflection strength,
+            // rather than an additive 6% highlight independent of the index.
+            glass.material.specular = 1.;
             glass.material.specular_sharpness = 12.;
             glass.material.light_angle = std::f32::consts::FRAC_PI_4;
             let image = headless
@@ -4355,6 +4396,132 @@ mod tests {
                 "the actual rounded arc must retain its highlight"
             );
         }
+    }
+
+    #[test]
+    fn glass_snell_pixels_follow_height_index_dispersion_and_optical_plane() {
+        use gpui::{Background, PlatformHeadlessRenderer, point, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut headless =
+            WgpuHeadlessRenderer::new().expect("glass pixel tests require an adapter");
+        let template = probed_scene(gpui::Hsla::black(), gpui::NO_LUMINANCE_PROBE);
+        let mut scene = Scene::default();
+        // Linear, achromatic 1px ramp makes each sampled coordinate observable
+        // in all channels, independently of the shader's optical calculation.
+        for x in 0..256 {
+            let mut stripe = template.quads[0];
+            stripe.bounds.origin.x = ScaledPixels(x as f32);
+            stripe.bounds.size.width = ScaledPixels(1.);
+            stripe.background = Background::from(gpui::hsla(0., 0., x as f32 / 255., 1.));
+            scene.insert_primitive(stripe);
+        }
+        let mut glass = template.backdrop_glass[0];
+        glass.material = GlassMaterial {
+            bevel: ScaledPixels(32.),
+            refraction: 1.,
+            ..GlassMaterial::clear()
+        };
+        glass.content_mask.bounds = Bounds::new(
+            point(ScaledPixels(68.), ScaledPixels(64.)),
+            size(ScaledPixels(120.), ScaledPixels(128.)),
+        );
+        scene.insert_backdrop_glass(glass);
+        scene.finish();
+        for (thickness, plane, index, dispersion, strength) in [
+            (12., 0., 1.5, 0., 1.),
+            (32., 40., 1.5, 0.4, 1.),
+            (32., 40., 2.5, 0.4, 1.),
+            (32., 40., 1.33, 0.4, -1.),
+            (32., 40., 1., 0.4, 1.),
+            (32., 40., 1.5, 0.4, 0.),
+        ] {
+            let material = &mut scene.backdrop_glass[0].material;
+            material.thickness = ScaledPixels(thickness);
+            material.backdrop_depth = ScaledPixels(plane);
+            material.refractive_index = index;
+            material.dispersion = dispersion;
+            material.refraction = strength;
+            let image = headless
+                .render_scene_to_image(&scene, size(DevicePixels(256), DevicePixels(256)))
+                .expect("Snell ramp renders");
+            for x in [70_u32, 83, 128, 177, 183] {
+                let at = x as f32 + 0.5;
+                let inset = (at - 64.).min(192. - at);
+                let u = (1. - inset / 32.).clamp(0., 1.);
+                let profile = (1. - u * u).sqrt();
+                let height =
+                    thickness * strength.abs() * if strength < 0. { 1. - profile } else { profile };
+                // Independent angular Snell construction, not vector refract.
+                let theta = (thickness * strength / 32. * u / profile.max(0.01)).atan();
+                for (channel, n) in [
+                    1. + (index - 1.) * (1. - dispersion),
+                    index,
+                    1. + (index - 1.) * (1. + dispersion),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let angle = (theta.sin() / n).asin() - theta;
+                    let direction = if at < 128. { -1. } else { 1. };
+                    let expected = (x as f32 + direction * angle.tan() * (height + plane))
+                        .clamp(0., 255.)
+                        .round();
+                    let actual = image.get_pixel(x, 128)[channel] as f32;
+                    assert!(
+                        (actual - expected).abs() <= 1.,
+                        "x={x}, channel={channel}, thickness={thickness}, plane={plane}, n={n}, strength={strength}: got {actual}, expected {expected}"
+                    );
+                }
+            }
+            assert_eq!(
+                image.get_pixel(66, 128).0,
+                [66, 66, 66, 255],
+                "content mask remains undisplaced"
+            );
+        }
+    }
+
+    #[test]
+    fn glass_index_one_has_no_fresnel_even_with_a_curved_surface() {
+        use gpui::{PlatformHeadlessRenderer, size};
+        let _gpu = crate::serialised_gpu_test();
+        let mut headless = match WgpuHeadlessRenderer::new() {
+            Ok(headless) => headless,
+            Err(error) => {
+                eprintln!("skipping: {error}");
+                return;
+            }
+        };
+        let mut scene = probed_scene(gpui::hsla(0., 0., 0.4, 1.), 0);
+        scene.backdrop_glass[0].material.refractive_index = 1.;
+        let extent = size(DevicePixels(256), DevicePixels(256));
+        let plain = headless
+            .render_scene_to_image(&scene, extent)
+            .expect("flat glass renders");
+        let material = &mut scene.backdrop_glass[0].material;
+        material.bevel = ScaledPixels(32.);
+        material.thickness = ScaledPixels(48.);
+        material.backdrop_depth = ScaledPixels(64.);
+        material.refraction = 1.;
+        material.specular = 1.;
+        material.dispersion = 0.5;
+        let curved = headless
+            .render_scene_to_image(&scene, extent)
+            .expect("index-one glass renders");
+        assert_eq!(plain, curved, "index one must have zero Fresnel reflection");
+
+        let mut white = probed_scene(gpui::Hsla::white(), gpui::NO_LUMINANCE_PROBE);
+        white.backdrop_glass[0].material = GlassMaterial {
+            specular: 1.,
+            specular_sharpness: 12.,
+            ..GlassMaterial::clear()
+        };
+        let reflected = headless
+            .render_scene_to_image(&white, extent)
+            .expect("Fresnel surface renders");
+        // At normal incidence index 1.5 reflects 4% into an almost black
+        // directional environment. An additive highlight would leave 255.
+        assert!((reflected.get_pixel(128, 128)[0] as i16 - 245).abs() <= 1);
     }
 
     #[test]
