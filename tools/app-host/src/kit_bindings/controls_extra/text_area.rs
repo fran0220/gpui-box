@@ -427,7 +427,11 @@ mod tests {
                 json!("none")
             );
         });
-        harness.keystrokes("ctrl-z");
+        harness.keystrokes(if cfg!(target_os = "macos") {
+            "cmd-z"
+        } else {
+            "ctrl-z"
+        });
         harness.update(|window,cx|{
             assert_eq!(state.invoke_text_area(&descriptor.borrow(),"value",&json!({}),true,window,cx).expect("undo survived"),json!("AλZ"));
             let result=state.invoke_text_area(&descriptor.borrow(),"replace_ranges",&json!({"edits":[{"range":{"start":1,"end":3},"text":"BC"},{"range":{"start":3,"end":4},"text":"!"}]}),false,window,cx).expect("atomic edits");assert_eq!(result,json!(true));

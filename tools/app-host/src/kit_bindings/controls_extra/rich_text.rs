@@ -572,7 +572,11 @@ mod tests {
             .props
             .insert("toolbar".into(), json!(false));
         harness.update(|_, cx| cx.refresh_windows());
-        harness.keystrokes("ctrl-z ctrl-z enter");
+        harness.keystrokes(if cfg!(target_os = "macos") {
+            "cmd-z cmd-z enter"
+        } else {
+            "ctrl-z ctrl-z enter"
+        });
         harness.update(|_, cx| {
             assert_eq!(
                 state.rich_editors.borrow()[&(0, "rich".into())]

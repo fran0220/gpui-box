@@ -249,3 +249,24 @@ The complete log is `target/mobile-final-gate-full-accepted.log`.
 Publication and native execution remain outstanding at this checkpoint.
 Android SDK license acceptance and a native device/executor are not implied by
 the source implementation or the browser/offscreen evidence above.
+
+## Verification after integrating the published glass work
+
+The mobile candidate was rebased over published glass source, native baselines,
+and catalog corrections at `cc012a00f74a1fff05a8f19d8429ab324ccdb143`.
+`CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` passed again:
+362 Linux images match (544.31 seconds), all reference action checks and 12
+captures pass, and all 13 mobile browser tests pass (4.4 minutes). Workspace
+default/all-feature tests, strict Clippy, performance, wasm32, rustdoc and
+generated catalogs pass. The log is `target/mobile-rebased-gate-full.log`.
+The reference image is byte-identical to the inspected reference-final artifact.
+
+Two app-host history tests now send Cmd-Z on macOS and Ctrl-Z elsewhere, matching
+the component keymaps without changing their expected history assertions. This
+gate verifies Linux only; the corrected macOS tests still require native execution.
+
+Publication remains paused for the glass owner's final test-only platform cfg
+commit and deployment/macOS verification. Earlier Metal/WARP and Windows native
+successes belong to the glass revision, not to this integrated mobile candidate.
+Windows runtime AppContainer error 5 remains unresolved. No Android licenses,
+native mobile IME/accessibility, or native checkpoint roundtrip evidence is claimed.
