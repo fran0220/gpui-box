@@ -4398,6 +4398,9 @@ mod tests {
         }
     }
 
+    // Deterministic WGPU headless requires a software adapter on these hosts;
+    // macOS exercises the optical model in its native Metal pixel tests.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn glass_snell_pixels_follow_height_index_dispersion_and_optical_plane() {
         use gpui::{Background, PlatformHeadlessRenderer, point, size};
