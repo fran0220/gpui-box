@@ -438,12 +438,13 @@
     "control": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["xs", "sm", "md", "lg"],
+      "required": ["xs", "sm", "md", "lg", "touch"],
       "properties": {
         "xs": { "$ref": "#/$defs/controlStep" },
         "sm": { "$ref": "#/$defs/controlStep" },
         "md": { "$ref": "#/$defs/controlStep" },
-        "lg": { "$ref": "#/$defs/controlStep" }
+        "lg": { "$ref": "#/$defs/controlStep" },
+        "touch": { "$ref": "#/$defs/controlStep" }
       }
     },
     "border": {

@@ -2281,6 +2281,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("sm", ControlSize::Sm),
         ("md", ControlSize::Md),
         ("lg", ControlSize::Lg),
+        ("touch", ControlSize::Touch),
     ] {
         let step = tokens.control(size);
         writeln!(

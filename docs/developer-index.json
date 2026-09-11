@@ -112258,7 +112258,7 @@
       "source": "crates/gpui-kit-theme/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Control { pub xs : ControlMetrics, pub sm : ControlMetrics, pub md : ControlMetrics, pub lg : ControlMetrics, }",
+      "signature": "# [derive (Debug, Clone, Copy, PartialEq)] pub struct Control { pub xs : ControlMetrics, pub sm : ControlMetrics, pub md : ControlMetrics, pub lg : ControlMetrics, pub touch : ControlMetrics, }",
       "cfg": []
     },
     {
@@ -113661,9 +113661,9 @@
       "module": "",
       "path": "gpui_kit_tokens",
       "source": "crates/gpui-kit-tokens/src/lib.rs",
-      "summary": "The four control heights every interactive component resolves against.",
-      "documentation": "The four control heights every interactive component resolves against.",
-      "signature": "# [doc = \" The four control heights every interactive component resolves against.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)] pub enum ControlSize { Xs, Sm, # [default] Md, Lg, }",
+      "summary": "Explicit control sizing; input modality is never inferred from the OS.",
+      "documentation": "Explicit control sizing; input modality is never inferred from the OS.",
+      "signature": "# [doc = \" Explicit control sizing; input modality is never inferred from the OS.\"] # [derive (Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)] pub enum ControlSize { Xs, Sm, # [default] Md, Lg, # [doc = \" Touch-oriented geometry, unaffected by compact density. Components must\"] # [doc = \" allocate the target in layout, hit testing and accessibility together;\"] # [doc = \" selecting this size alone does not certify an entire mobile interface.\"] Touch, }",
       "cfg": []
     },
     {
@@ -113691,7 +113691,7 @@
       "source": "crates/gpui-kit-tokens/src/lib.rs",
       "summary": "",
       "documentation": "",
-      "signature": "# [derive (Debug, Clone, Deserialize, Serialize)] # [serde (deny_unknown_fields)] pub struct ControlTokens { pub xs : ControlStep, pub sm : ControlStep, pub md : ControlStep, pub lg : ControlStep, }",
+      "signature": "# [derive (Debug, Clone, Deserialize, Serialize)] # [serde (deny_unknown_fields)] pub struct ControlTokens { pub xs : ControlStep, pub sm : ControlStep, pub md : ControlStep, pub lg : ControlStep, pub touch : ControlStep, }",
       "cfg": []
     },
     {
@@ -142470,6 +142470,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -143255,6 +143262,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -144040,6 +144054,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -144825,6 +144846,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -145610,6 +145638,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -146395,6 +146430,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -147180,6 +147222,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -147965,6 +148014,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -148750,6 +148806,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {
@@ -149535,6 +149598,13 @@
             "gap": 8,
             "fontSize": 14,
             "iconSize": 17
+          },
+          "touch": {
+            "height": 48,
+            "paddingX": 16,
+            "gap": 8,
+            "fontSize": 16,
+            "iconSize": 20
           }
         },
         "border": {

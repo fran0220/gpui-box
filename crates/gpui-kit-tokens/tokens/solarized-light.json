@@ -464,6 +464,13 @@
       "gap": 8,
       "fontSize": 14,
       "iconSize": 17
+    },
+    "touch": {
+      "height": 48,
+      "paddingX": 16,
+      "gap": 8,
+      "fontSize": 16,
+      "iconSize": 20
     }
   },
   "border": {

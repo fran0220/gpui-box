@@ -741,3 +741,18 @@ indentation and syntax providers accept `None`; disabling language services
 removes outstanding popups and releases claimed completion/navigation keys.
 Native full-document values remain complete; these setters make no additional
 large-document performance claim.
+
+### Explicit touch sizing is not mobile platform certification
+
+`ControlSize::Touch` selects the new required `control.touch` token step. Custom
+theme JSON must add that step; exhaustive Rust matches on `ControlSize` must
+handle the new variant. Bundled themes use a 48 logical-pixel target height,
+16px text and 20px icons. Compact density leaves touch metrics unchanged, while
+explicit `Theme::scaled` scales them like other subtree geometry.
+
+Desktop size defaults are unchanged. Components opting into Touch must retain
+usable nested actions and allocate actual target width, hit bounds and accessible
+bounds consistently. The token does not expand an arbitrary element's hit area
+or establish mobile keyboard, screen-reader or device support. Native platform
+and mobile component validation remains separately required by the delivery
+ledger in `tasks/mobile-platform-delivery.md`.

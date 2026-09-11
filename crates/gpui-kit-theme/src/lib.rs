@@ -583,6 +583,7 @@ pub struct Control {
     pub sm: ControlMetrics,
     pub md: ControlMetrics,
     pub lg: ControlMetrics,
+    pub touch: ControlMetrics,
 }
 
 impl Control {
@@ -592,6 +593,7 @@ impl Control {
             ControlSize::Sm => self.sm,
             ControlSize::Md => self.md,
             ControlSize::Lg => self.lg,
+            ControlSize::Touch => self.touch,
         }
     }
 }
@@ -899,8 +901,14 @@ impl Theme {
                 *value *= factor;
             }
 
-            let Control { xs, sm, md, lg } = &mut data.control;
-            for metrics in [xs, sm, md, lg] {
+            let Control {
+                xs,
+                sm,
+                md,
+                lg,
+                touch,
+            } = &mut data.control;
+            for metrics in [xs, sm, md, lg, touch] {
                 let ControlMetrics {
                     height,
                     padding_x,
@@ -1220,6 +1228,13 @@ impl Theme {
             control: {
                 let metrics = |size| {
                     let step = tokens.control(size);
+                    // Touch is an explicit input target, not a density step.
+                    // Preserve its geometry even inside compact desktop chrome.
+                    let scale = if size == ControlSize::Touch {
+                        tokens.density(Density::Comfortable)
+                    } else {
+                        scale
+                    };
                     ControlMetrics {
                         height: scale_control(step.height, scale),
                         padding_x: scale_control(step.padding_x, scale),
@@ -1233,6 +1248,7 @@ impl Theme {
                     sm: metrics(ControlSize::Sm),
                     md: metrics(ControlSize::Md),
                     lg: metrics(ControlSize::Lg),
+                    touch: metrics(ControlSize::Touch),
                 }
             },
             borders: Borders {
@@ -2248,6 +2264,25 @@ mod tests {
         assert!(compact.typography.body.size < comfortable.typography.body.size);
         assert_eq!(compact.colors.accent, comfortable.colors.accent);
         assert_eq!(compact.radii.card, comfortable.radii.card);
+    }
+
+    #[test]
+    fn touch_geometry_ignores_density_but_obeys_explicit_subtree_scaling() {
+        for tokens in gpui_kit_tokens::all() {
+            let comfortable = Theme::from_tokens(tokens, Density::Comfortable);
+            let compact = Theme::from_tokens(tokens, Density::Compact);
+            assert_eq!(compact.control.get(ControlSize::Touch).height, 48.0);
+            assert_eq!(compact.control.get(ControlSize::Touch).font_size, 16.0);
+            assert_eq!(
+                compact.control.get(ControlSize::Touch),
+                comfortable.control.get(ControlSize::Touch)
+            );
+            assert_eq!(compact.control.get(ControlSize::Md).height, 24.0);
+            assert_eq!(
+                compact.scaled(0.5).control.get(ControlSize::Touch).height,
+                24.0
+            );
+        }
     }
 
     #[test]

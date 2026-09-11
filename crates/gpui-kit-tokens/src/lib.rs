@@ -308,6 +308,7 @@ impl TokenDocument {
             self.control.sm.height,
             self.control.md.height,
             self.control.lg.height,
+            self.control.touch.height,
         ];
         if heights.windows(2).any(|window| window[0] >= window[1]) {
             return invalid("control", "heights must be strictly increasing");
@@ -1064,6 +1065,7 @@ impl TokenDocument {
             ControlSize::Sm => &self.control.sm,
             ControlSize::Md => &self.control.md,
             ControlSize::Lg => &self.control.lg,
+            ControlSize::Touch => &self.control.touch,
         }
     }
 
@@ -1526,7 +1528,7 @@ pub enum Radius {
     Pill,
 }
 
-/// The four control heights every interactive component resolves against.
+/// Explicit control sizing; input modality is never inferred from the OS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
 pub enum ControlSize {
     Xs,
@@ -1534,10 +1536,14 @@ pub enum ControlSize {
     #[default]
     Md,
     Lg,
+    /// Touch-oriented geometry, unaffected by compact density. Components must
+    /// allocate the target in layout, hit testing and accessibility together;
+    /// selecting this size alone does not certify an entire mobile interface.
+    Touch,
 }
 
 impl ControlSize {
-    pub const ALL: [Self; 4] = [Self::Xs, Self::Sm, Self::Md, Self::Lg];
+    pub const ALL: [Self; 5] = [Self::Xs, Self::Sm, Self::Md, Self::Lg, Self::Touch];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2410,15 +2416,17 @@ pub struct ControlTokens {
     pub sm: ControlStep,
     pub md: ControlStep,
     pub lg: ControlStep,
+    pub touch: ControlStep,
 }
 
 impl ControlTokens {
-    fn entries(&self) -> [(&'static str, &ControlStep); 4] {
+    fn entries(&self) -> [(&'static str, &ControlStep); 5] {
         [
             ("control.xs", &self.xs),
             ("control.sm", &self.sm),
             ("control.md", &self.md),
             ("control.lg", &self.lg),
+            ("control.touch", &self.touch),
         ]
     }
 }
@@ -3214,6 +3222,23 @@ decelerates on the way out, which reads as reluctance"
     }
 
     #[test]
+    fn touch_metrics_are_explicit_and_validated_for_every_theme() {
+        for tokens in all() {
+            let touch = tokens.control(ControlSize::Touch);
+            assert_eq!(touch.height, 48.0);
+            assert_eq!(touch.icon_size, 20.0);
+            assert_eq!(touch.font_size, 16.0);
+        }
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["control"]["touch"]["height"] = serde_json::json!(34);
+        assert!(TokenDocument::parse(&value.to_string()).is_err());
+        value["control"]["touch"]["height"] = serde_json::json!(48);
+        value["control"]["touch"]["iconSize"] = serde_json::json!(0);
+        assert!(TokenDocument::parse(&value.to_string()).is_err());
+    }
+
+    #[test]
     fn compact_menu_measure_cannot_be_wider_than_the_normal_menu() {
         let mut value: serde_json::Value =
             serde_json::from_str(studio_dark_json()).expect("bundled JSON");
@@ -3304,15 +3329,16 @@ decelerates on the way out, which reads as reluctance"
     fn field_focus_is_required_and_typed() {
         let mut value: serde_json::Value =
             serde_json::from_str(studio_dark_json()).expect("bundled JSON");
-        let schema: serde_json::Value = serde_json::from_str(TOKEN_SCHEMA_JSON).unwrap();
-        let validator = jsonschema::validator_for(&schema).unwrap();
+        let schema: serde_json::Value =
+            serde_json::from_str(TOKEN_SCHEMA_JSON).expect("bundled token schema");
+        let validator = jsonschema::validator_for(&schema).expect("valid token schema");
         for (name, expected) in [("ring", FieldFocus::Ring), ("fill", FieldFocus::Fill)] {
             value["effect"]["fieldFocus"] = serde_json::json!(name);
             assert!(validator.is_valid(&value));
             let tokens = TokenDocument::parse(&value.to_string()).expect("focus treatment");
             assert_eq!(tokens.effect.field_focus, expected);
             assert_eq!(
-                serde_json::to_value(&tokens).unwrap()["effect"]["fieldFocus"],
+                serde_json::to_value(&tokens).expect("serialized tokens")["effect"]["fieldFocus"],
                 name
             );
         }
@@ -3321,7 +3347,7 @@ decelerates on the way out, which reads as reluctance"
         assert!(!validator.is_valid(&value));
         value["effect"]
             .as_object_mut()
-            .unwrap()
+            .expect("effect token object")
             .remove("fieldFocus");
         assert!(TokenDocument::parse(&value.to_string()).is_err());
         assert!(!validator.is_valid(&value));

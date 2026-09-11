@@ -14,6 +14,17 @@ rejects incomplete or unknown fields, invalid values, and every required color
 pair below its contrast floor, so applications receive the same validation
 when registering their own documents at runtime.
 
+`control.touch` is explicit touch-oriented geometry, not an OS detection rule.
+Its bundled 48 logical-pixel height follows Android's
+[48dp target guidance](https://developer.android.com/guide/topics/ui/accessibility/apps)
+and exceeds Apple's [44pt button guidance](https://developer.apple.com/design/human-interface-guidelines/buttons)
+when platform logical units are mapped correctly. Compact density does not
+shrink these metrics. Explicit subtree scaling still scales them; a scaled-down
+canvas preview is not a certified touch surface. Components must allocate target
+width as well as height in layout, hit testing and accessibility, while icons
+remain smaller than their interactive target. These metrics do not prove that
+every consumer or native platform implements those contracts.
+
 Rules:
 
 - surfaces establish hierarchy before borders;

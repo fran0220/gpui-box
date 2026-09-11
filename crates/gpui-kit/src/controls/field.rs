@@ -44,6 +44,7 @@ impl FieldState {
 /// and borders visible around it.
 pub fn nested_control_size(size: ControlSize) -> ControlSize {
     match size {
+        ControlSize::Touch => ControlSize::Touch,
         ControlSize::Lg => ControlSize::Md,
         ControlSize::Md => ControlSize::Sm,
         ControlSize::Sm | ControlSize::Xs => ControlSize::Xs,
