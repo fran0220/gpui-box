@@ -265,8 +265,16 @@ Two app-host history tests now send Cmd-Z on macOS and Ctrl-Z elsewhere, matchin
 the component keymaps without changing their expected history assertions. This
 gate verifies Linux only; the corrected macOS tests still require native execution.
 
-Publication remains paused for the glass owner's final test-only platform cfg
-commit and deployment/macOS verification. Earlier Metal/WARP and Windows native
+The candidate was then rebased onto final glass commit
+`a557e6bf3ccf414a868666e335cc4b9f92d0852a`. The resulting tree differs from the
+passing full-gate tree only by three lines restricting the strict software-WGPU
+glass test to Linux/Windows, with macOS covered by native Metal tests. After
+this rebase, all 55 all-feature WGPU library tests, all-target/all-feature strict
+WGPU Clippy, fmt, API/developer catalog checks and dependency checks pass.
+The full gate was not rerun after this test-only platform restriction.
+
+Publication remains paused for the glass owner's deployment/macOS verification
+completion notice. Earlier Metal/WARP and Windows native
 successes belong to the glass revision, not to this integrated mobile candidate.
 Windows runtime AppContainer error 5 remains unresolved. No Android licenses,
 native mobile IME/accessibility, or native checkpoint roundtrip evidence is claimed.
