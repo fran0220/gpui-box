@@ -943,6 +943,7 @@ pub(crate) struct Frame {
     pub(crate) element_states: FxHashMap<(GlobalElementId, TypeId), ElementStateBox>,
     accessed_element_states: Vec<(GlobalElementId, TypeId)>,
     pub(crate) mouse_listeners: Vec<Option<AnyMouseListener>>,
+    touch_listeners: Vec<(bool, ElementId)>,
     pub(crate) dispatch_tree: DispatchTree,
     pub(crate) scene: Scene,
     /// First paint operation that belongs on the GPUI overlay surface.
@@ -1000,6 +1001,7 @@ pub(crate) struct PrepaintStateIndex {
 pub(crate) struct PaintIndex {
     scene_index: usize,
     mouse_listeners_index: usize,
+    touch_listeners_index: usize,
     input_handlers_index: usize,
     cursor_styles_index: usize,
     accessed_element_states_index: usize,
@@ -1016,6 +1018,7 @@ impl Frame {
             element_states: FxHashMap::default(),
             accessed_element_states: Vec::new(),
             mouse_listeners: Vec::new(),
+            touch_listeners: Vec::new(),
             dispatch_tree,
             scene: Scene::default(),
             overlay_scene_start: 0,
@@ -1045,6 +1048,7 @@ impl Frame {
         self.element_states.clear();
         self.accessed_element_states.clear();
         self.mouse_listeners.clear();
+        self.touch_listeners.clear();
         self.dispatch_tree.clear();
         self.scene.clear();
         self.overlay_scene_start = 0;
@@ -1220,6 +1224,12 @@ pub struct Window {
     touch_prediction_enabled: bool,
     long_press_timer: Option<Task<()>>,
     long_press_capture: Option<EntityId>,
+    touch_pan_capture: Option<ElementId>,
+    touch_pinch_capture: Option<ElementId>,
+    touch_pinch_target: Option<ElementId>,
+    touch_pinch_anchor: Option<Point<Pixels>>,
+    last_pinch_event: Option<crate::PinchEvent>,
+    text_input_state: Option<(FocusId, crate::TextInputOptions)>,
     pub(crate) refreshing: bool,
     pub(crate) activation_observers: SubscriberSet<(), AnyObserver>,
     pub(crate) focus: Option<FocusId>,
@@ -1942,6 +1952,15 @@ impl Window {
                 handle
                     .update(&mut cx, |_, window, cx| {
                         window.active.set(active);
+                        if !active {
+                            window.cancel_touch_input(cx);
+                            if window.text_input_state.take().is_some() {
+                                window.text_input_state_changed(
+                                    crate::TextInputStateChange::FocusLost,
+                                );
+                                window.platform_window.hide_soft_keyboard();
+                            }
+                        }
                         window.modifiers = window.platform_window.modifiers();
                         window.capslock = window.platform_window.capslock();
                         window
@@ -1954,6 +1973,14 @@ impl Window {
 
                         SystemWindowTabController::update_last_active(cx, window.handle.id);
                     })
+                    .log_err();
+            }
+        }));
+        platform_window.on_insets_changed(Box::new({
+            let mut cx = cx.to_async();
+            move |_| {
+                handle
+                    .update(&mut cx, |_, window, _| window.refresh())
                     .log_err();
             }
         }));
@@ -2119,6 +2146,12 @@ impl Window {
             touch_prediction_enabled: true,
             long_press_timer: None,
             long_press_capture: None,
+            touch_pan_capture: None,
+            touch_pinch_capture: None,
+            touch_pinch_target: None,
+            touch_pinch_anchor: None,
+            last_pinch_event: None,
+            text_input_state: None,
             refreshing: false,
             activation_observers: SubscriberSet::new(),
             focus: None,
@@ -2499,6 +2532,30 @@ impl Window {
         self.platform_window.set_input_region(region);
     }
 
+    /// System-reserved edge regions in logical pixels of the current content
+    /// viewport. Changes invalidate the window, including animation frames.
+    /// See [`crate::WindowInsets`] for resize versus overlay semantics.
+    pub fn insets(&self) -> crate::WindowInsets {
+        self.platform_window.insets()
+    }
+
+    /// Register the host's system-back action. The backend has no source on
+    /// platforms without system back; this does not install an edge gesture.
+    pub fn set_back_handler(&self, callback: impl FnMut() + 'static) {
+        self.platform_window.set_back_handler(Box::new(callback));
+    }
+
+    /// Declare whether the host can currently consume system back.
+    pub fn set_back_enabled(&self, enabled: bool) {
+        self.platform_window.set_back_enabled(enabled);
+    }
+
+    /// Notify native text services after caller-owned content or selection
+    /// changes. Focus and keyboard-options changes are tracked during paint.
+    pub fn text_input_state_changed(&self, change: crate::TextInputStateChange) {
+        self.platform_window.text_input_state_changed(change);
+    }
+
     /// Return the `WindowBounds` to indicate that how a window should be opened
     /// after it has been closed
     pub fn window_bounds(&self) -> WindowBounds {
@@ -2802,8 +2859,18 @@ impl Window {
     }
 
     /// Set the content size of the window.
+    /// May do nothing on mobile; use [`Self::try_resize`] to receive a refusal.
     pub fn resize(&mut self, size: Size<Pixels>) {
         self.platform_window.resize(size);
+    }
+
+    /// Checks and requests a content size on the owner UI thread. Success means
+    /// accepted, not that an asynchronous native resize has completed.
+    pub fn try_resize(&mut self, size: Size<Pixels>) -> Result<(), crate::PlatformOperationError> {
+        self.platform_window
+            .check_window_operation(crate::WindowOperation::Resize)?;
+        self.resize(size);
+        Ok(())
     }
 
     /// Returns whether or not the window is currently fullscreen
@@ -2856,8 +2923,17 @@ impl Window {
     }
 
     /// Toggle zoom on the window.
+    /// May do nothing on mobile; use [`Self::try_zoom_window`].
     pub fn zoom_window(&self) {
         self.platform_window.zoom();
+    }
+
+    /// Checks and requests native zoom on the owner UI thread.
+    pub fn try_zoom_window(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform_window
+            .check_window_operation(crate::WindowOperation::Zoom)?;
+        self.zoom_window();
+        Ok(())
     }
 
     /// Requests that the platform close this window through its normal close
@@ -3398,15 +3474,36 @@ impl Window {
         // paint_range indices remain valid for reuse_paint on the next frame.
         // Search backwards to find the last Some entry, since reuse_paint may
         // have copied None slots from the previous frame. (Fixes #50456)
-        if let Some(input_handler) = self
+        let mut input_options = None;
+        if let Some(mut input_handler) = self
             .next_frame
             .input_handlers
             .iter_mut()
             .rev()
             .find_map(|h| h.take())
         {
+            input_options = input_handler.input_options_in_window(self, cx);
             self.platform_window.set_input_handler(input_handler);
         }
+        let new_input_state = self.focus.zip(input_options).filter(|_| self.active.get());
+        let old_focus = self.text_input_state.map(|(focus, _)| focus);
+        let new_focus = new_input_state.map(|(focus, _)| focus);
+        if old_focus != new_focus {
+            if old_focus.is_some() {
+                self.text_input_state_changed(crate::TextInputStateChange::FocusLost);
+            }
+            if new_focus.is_some() {
+                self.text_input_state_changed(crate::TextInputStateChange::FocusGained);
+                if old_focus.is_none() {
+                    self.platform_window.show_soft_keyboard();
+                }
+            } else {
+                self.platform_window.hide_soft_keyboard();
+            }
+        } else if self.text_input_state != new_input_state {
+            self.text_input_state_changed(crate::TextInputStateChange::OptionsChanged);
+        }
+        self.text_input_state = new_input_state;
 
         self.layout_engine
             .as_mut()
@@ -4051,6 +4148,7 @@ impl Window {
         PaintIndex {
             scene_index: self.next_frame.scene.len(),
             mouse_listeners_index: self.next_frame.mouse_listeners.len(),
+            touch_listeners_index: self.next_frame.touch_listeners.len(),
             input_handlers_index: self.next_frame.input_handlers.len(),
             cursor_styles_index: self.next_frame.cursor_styles.len(),
             accessed_element_states_index: self.next_frame.accessed_element_states.len(),
@@ -4061,6 +4159,12 @@ impl Window {
     }
 
     pub(crate) fn reuse_paint(&mut self, range: Range<PaintIndex>) {
+        self.next_frame.touch_listeners.extend(
+            self.rendered_frame.touch_listeners
+                [range.start.touch_listeners_index..range.end.touch_listeners_index]
+                .iter()
+                .cloned(),
+        );
         self.next_frame.cursor_styles.extend(
             self.rendered_frame.cursor_styles
                 [range.start.cursor_styles_index..range.end.cursor_styles_index]
@@ -6254,6 +6358,80 @@ impl Window {
         )));
     }
 
+    /// Register an exclusive direction-aware touch manipulation listener during
+    /// paint. `id` must be stable and unique in this window across frames.
+    /// On `Started`, reject points outside your prepaint bounds, then call
+    /// `prevent_default` to acquire. Offers bubble inner-first; acquisition
+    /// automatically stops propagation. Only the acquiring ID receives later
+    /// phases, even outside its original bounds. Keep that listener registered
+    /// until the terminal event, or cancel touch input before removing it.
+    /// See [`crate::TouchPanEvent`] for direction and scroll arbitration.
+    pub fn on_touch_pan(
+        &mut self,
+        id: impl Into<ElementId>,
+        mut listener: impl FnMut(&crate::TouchPanEvent, &mut Window, &mut App) + 'static,
+    ) {
+        let id = id.into();
+        self.next_frame.touch_listeners.push((false, id.clone()));
+        self.on_mouse_event(move |event: &crate::TouchPanEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble {
+                return;
+            }
+            if event.phase == crate::TouchPhase::Started {
+                if window.touch_pan_capture.is_some() {
+                    return;
+                }
+                listener(event, window, cx);
+                if window.default_prevented {
+                    window.touch_pan_capture = Some(id.clone());
+                    cx.stop_propagation();
+                }
+            } else if window.touch_pan_capture.as_ref() == Some(&id) {
+                listener(event, window, cx);
+                cx.stop_propagation();
+            }
+        });
+    }
+
+    /// Register a captured portable or native pinch listener during paint. On `Started`,
+    /// hit-test `position` against prepaint bounds and prevent default to own
+    /// the stream. Only that stable window-unique ID receives subsequent events,
+    /// regardless of the moving centroid. Use the same ID with `on_touch_pan`
+    /// to allow that pan to cancel and promote into this pinch on a second
+    /// contact. No other claimed direct manipulation is eligible for takeover.
+    /// Keep the owner registered until its terminal phase or cancel before removal.
+    pub fn on_touch_pinch(
+        &mut self,
+        id: impl Into<ElementId>,
+        mut listener: impl FnMut(&crate::PinchEvent, &mut Window, &mut App) + 'static,
+    ) {
+        let id = id.into();
+        self.next_frame.touch_listeners.push((true, id.clone()));
+        self.on_mouse_event(move |event: &crate::PinchEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble {
+                return;
+            }
+            if event.phase == crate::TouchPhase::Started {
+                if window.touch_pinch_capture.is_some()
+                    || window
+                        .touch_pinch_target
+                        .as_ref()
+                        .is_some_and(|target| target != &id)
+                {
+                    return;
+                }
+                listener(event, window, cx);
+                if window.default_prevented {
+                    window.touch_pinch_capture = Some(id.clone());
+                    cx.stop_propagation();
+                }
+            } else if window.touch_pinch_capture.as_ref() == Some(&id) {
+                listener(event, window, cx);
+                cx.stop_propagation();
+            }
+        });
+    }
+
     /// Register a key event listener on this node for the next frame. The type of event
     /// is determined by the first parameter of the given listener. When the next frame is rendered
     /// the listener will be cleared.
@@ -6585,6 +6763,10 @@ impl Window {
                 self.mouse_position = touch_drag.start_position;
                 PlatformInput::TouchDrag(touch_drag)
             }
+            PlatformInput::TouchPan(touch_pan) => {
+                self.mouse_position = touch_pan.start_position;
+                PlatformInput::TouchPan(touch_pan)
+            }
             PlatformInput::KeyDown(_)
             | PlatformInput::KeyUp(_)
             | PlatformInput::MouseCancelled(_) => event,
@@ -6651,13 +6833,55 @@ impl Window {
         self.touch_prediction_enabled = enabled;
     }
 
+    /// Cancel every portable touch gesture, native pinch, pending long press and fling.
+    /// Called automatically when the platform reports inactive. Backends must
+    /// report inactive before suspending input or destroying the surface, even
+    /// if no fingers remain. Hosts may call this before removing a gesture
+    /// owner. Cancellation never synthesizes a release, click, or commit.
+    pub fn cancel_touch_input(&mut self, cx: &mut App) {
+        self.long_press_timer.take();
+        for gesture in self.touch_gestures.cancel() {
+            self.dispatch_recognized_touch_gesture(gesture, cx);
+        }
+        // Native trackpad streams do not belong to the portable recognizer.
+        // Its terminal dispatch already clears this state for portable pinch.
+        if let Some(mut pinch) = self.last_pinch_event.take() {
+            pinch.phase = crate::TouchPhase::Cancelled;
+            pinch.delta = 0.;
+            cx.propagate_event = true;
+            self.default_prevented = false;
+            self.dispatch_mouse_event(&pinch, cx);
+        }
+        self.long_press_capture = None;
+        self.touch_pan_capture = None;
+        self.touch_pinch_capture = None;
+        self.touch_pinch_target = None;
+        self.touch_pinch_anchor = None;
+    }
+
     /// Runs the portable gesture recognizer over a raw touch event and
     /// dispatches its semantic scroll, tap, drag, or long-press events through
     /// the ordinary mouse-event path.
     fn dispatch_touch_event(&mut self, event: &TouchEvent, cx: &mut App) {
         let mut event = event.clone();
-        if !self.touch_prediction_enabled {
+        // Arbitration/handoff must conserve actual contact travel, not a
+        // speculative position whose correction would belong to another owner.
+        if !self.touch_prediction_enabled || !self.rendered_frame.touch_listeners.is_empty() {
             event.predicted_position = None;
+        }
+        if event.phase == crate::TouchPhase::Started
+            && let Some(owner) = self.touch_pan_capture.clone()
+            && self
+                .rendered_frame
+                .touch_listeners
+                .contains(&(true, owner.clone()))
+            && let Some(cancelled) = self.touch_gestures.prepare_pinch_takeover(event.id)
+        {
+            self.dispatch_recognized_touch_gesture(cancelled, cx);
+            self.touch_pinch_target = Some(owner);
+        }
+        if let Some(offer) = self.touch_gestures.offer_touch_pan(&event) {
+            self.dispatch_recognized_touch_gesture(RecognizedTouchGesture::TouchPan(offer), cx);
         }
         let recognized_gestures = self.touch_gestures.handle_event(&event);
         if event.phase == crate::TouchPhase::Started
@@ -6693,10 +6917,48 @@ impl Window {
 
     fn dispatch_recognized_touch_gesture(&mut self, gesture: RecognizedTouchGesture, cx: &mut App) {
         match gesture {
+            RecognizedTouchGesture::Pinch(pinch) => {
+                cx.propagate_event = true;
+                self.default_prevented = false;
+                self.dispatch_mouse_event(&pinch, cx);
+            }
+            RecognizedTouchGesture::TouchPan(pan) => {
+                self.mouse_position = pan.touch_start_position;
+                cx.propagate_event = true;
+                self.default_prevented = false;
+                self.dispatch_mouse_event(&pan, cx);
+                if pan.phase == crate::TouchPhase::Started {
+                    if let Some(cancelled) = self
+                        .touch_gestures
+                        .resolve_touch_pan(&pan, self.touch_pan_capture.is_some())
+                    {
+                        self.dispatch_recognized_touch_gesture(
+                            RecognizedTouchGesture::Scroll(cancelled),
+                            cx,
+                        );
+                    }
+                } else if matches!(
+                    pan.phase,
+                    crate::TouchPhase::Ended | crate::TouchPhase::Cancelled
+                ) {
+                    self.touch_pan_capture = None;
+                }
+            }
             RecognizedTouchGesture::Scroll(scroll_wheel) => {
                 self.mouse_position = scroll_wheel.position;
                 cx.propagate_event = true;
-                self.dispatch_mouse_event(&scroll_wheel, cx);
+                let residual = self.dispatch_mouse_event_with_residual(&scroll_wheel, cx);
+                if matches!(
+                    scroll_wheel.touch_phase,
+                    crate::TouchPhase::Started | crate::TouchPhase::Moved
+                ) && let Some(crate::ScrollDelta::Pixels(residual)) = residual
+                    && let Some(offer) = self.touch_gestures.offer_scroll_handoff(residual)
+                {
+                    self.dispatch_recognized_touch_gesture(
+                        RecognizedTouchGesture::TouchPan(offer),
+                        cx,
+                    );
+                }
             }
             RecognizedTouchGesture::Tap { down, up } => {
                 self.mouse_position = up.position;
@@ -6804,6 +7066,35 @@ impl Window {
     }
 
     fn dispatch_mouse_event(&mut self, event: &dyn Any, cx: &mut App) {
+        // Both native trackpad and recognized touch pinch enter here. Keep
+        // hit routing and terminal ownership cleanup independent of producer.
+        let pinch = event.downcast_ref::<crate::PinchEvent>();
+        if let Some(pinch) = pinch {
+            if pinch.phase == crate::TouchPhase::Started {
+                self.touch_pinch_anchor = Some(pinch.position);
+            }
+            self.mouse_position = self.touch_pinch_anchor.unwrap_or(pinch.position);
+            self.last_pinch_event = Some(pinch.clone());
+        }
+        self.dispatch_mouse_event_with_residual(event, cx);
+        if pinch.is_some_and(|pinch| {
+            matches!(
+                pinch.phase,
+                crate::TouchPhase::Ended | crate::TouchPhase::Cancelled
+            )
+        }) {
+            self.touch_pinch_capture = None;
+            self.touch_pinch_target = None;
+            self.touch_pinch_anchor = None;
+            self.last_pinch_event = None;
+        }
+    }
+
+    fn dispatch_mouse_event_with_residual(
+        &mut self,
+        event: &dyn Any,
+        cx: &mut App,
+    ) -> Option<crate::ScrollDelta> {
         let cancelled = event.is::<crate::MouseCancelEvent>();
         let hit_test = self.rendered_frame.hit_test(self.mouse_position());
         if hit_test != self.mouse_hit_test {
@@ -6815,7 +7106,7 @@ impl Window {
         if !cancelled && self.is_inspector_picking(cx) {
             self.handle_inspector_mouse_event(event, cx);
             // When inspector is picking, all other mouse handling is skipped.
-            return;
+            return None;
         }
 
         let mut mouse_listeners = mem::take(&mut self.rendered_frame.mouse_listeners);
@@ -6861,6 +7152,7 @@ impl Window {
         }
 
         self.rendered_frame.mouse_listeners = mouse_listeners;
+        let residual = self.remaining_scroll_delta;
         self.remaining_scroll_delta = previous_delta;
 
         if cx.has_active_drag() {
@@ -6892,6 +7184,7 @@ impl Window {
         {
             self.release_pointer();
         }
+        residual
     }
 
     fn dispatch_key_event(&mut self, event: &dyn Any, cx: &mut App) {
@@ -7364,13 +7657,31 @@ impl Window {
     }
 
     /// Minimize the current window at the platform level.
+    /// May do nothing on mobile; use [`Self::try_minimize_window`].
     pub fn minimize_window(&self) {
         self.platform_window.minimize();
     }
 
+    /// Checks and requests native minimization on the owner UI thread.
+    pub fn try_minimize_window(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform_window
+            .check_window_operation(crate::WindowOperation::Minimize)?;
+        self.minimize_window();
+        Ok(())
+    }
+
     /// Toggle full screen status on the current window at the platform level.
+    /// May do nothing on mobile; use [`Self::try_toggle_fullscreen`].
     pub fn toggle_fullscreen(&self) {
         self.platform_window.toggle_fullscreen();
+    }
+
+    /// Checks and requests a fullscreen transition on the owner UI thread.
+    pub fn try_toggle_fullscreen(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform_window
+            .check_window_operation(crate::WindowOperation::ToggleFullscreen)?;
+        self.toggle_fullscreen();
+        Ok(())
     }
 
     /// Updates the IME panel position suggestions for languages like japanese, chinese.
@@ -9546,6 +9857,411 @@ mod tests {
             sample.input_events, 1,
             "the semantic drag/tap events synthesized inside raw-touch dispatch are not top-level inputs"
         );
+    }
+
+    #[gpui::test]
+    fn inactive_platform_cancels_touch_once_and_insets_invalidate(cx: &mut TestAppContext) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let window = cx.add_window({
+            let events = events.clone();
+            move |_, _| TouchDragListener { events }
+        });
+        dispatch_touch(window, cx, TouchId(19), TouchPhase::Started, 11.);
+        dispatch_touch(window, cx, TouchId(19), TouchPhase::Moved, 33.);
+        let platform = cx.test_window(window.into());
+        platform.simulate_active_status_change(false);
+        platform.simulate_active_status_change(false);
+        assert_eq!(
+            *events.borrow(),
+            [
+                (TouchPhase::Started, px(11.)),
+                (TouchPhase::Moved, px(33.)),
+                (TouchPhase::Cancelled, px(33.))
+            ]
+        );
+        let before_insets = cx
+            .update_window(window.into(), |_, window, cx| {
+                window.draw(cx).clear(cx);
+                assert!(!window.invalidator.is_dirty());
+                window.invalidator.update_count()
+            })
+            .expect("clean frame");
+        let insets = crate::WindowInsets {
+            safe_area: crate::Edges {
+                top: px(13.),
+                right: px(7.),
+                bottom: px(29.),
+                left: px(3.),
+            },
+            ime: crate::Edges {
+                top: px(0.),
+                right: px(11.),
+                bottom: px(217.),
+                left: px(0.),
+            },
+        };
+        cx.simulate_window_insets(window.into(), insets.clone());
+        cx.update_window(window.into(), |_, window, _| {
+            assert_eq!(window.insets(), insets);
+            assert_eq!(
+                window.insets().effective(),
+                crate::Edges {
+                    top: px(13.),
+                    right: px(11.),
+                    bottom: px(217.),
+                    left: px(3.)
+                }
+            );
+            assert!(window.invalidator.update_count() > before_insets);
+        })
+        .expect("inset callback redraws");
+    }
+
+    struct ResidualTouchProbe {
+        remaining: Rc<Cell<Pixels>>,
+        scroll_phases: Rc<RefCell<Vec<TouchPhase>>>,
+        pans: Rc<RefCell<Vec<crate::TouchPanEvent>>>,
+    }
+
+    impl Render for ResidualTouchProbe {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let remaining = self.remaining.clone();
+            let scroll_phases = self.scroll_phases.clone();
+            let pans = self.pans.clone();
+            canvas(
+                |_, _, _| {},
+                move |_, _, window, _| {
+                    window.on_touch_pan("sheet", move |event, window, _| {
+                        if event.phase == TouchPhase::Started && !event.is_scroll_handoff {
+                            return;
+                        }
+                        pans.borrow_mut().push(event.clone());
+                        if event.phase == TouchPhase::Started {
+                            window.prevent_default();
+                        }
+                    });
+                    window.on_mouse_event(
+                        move |event: &crate::ScrollWheelEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Bubble {
+                                return;
+                            }
+                            scroll_phases.borrow_mut().push(event.touch_phase);
+                            let delta = event.delta.pixel_delta(px(16.)).x;
+                            let consumed = delta.max(px(0.)).min(remaining.get());
+                            remaining.set(remaining.get() - consumed);
+                            window.consume_scroll_delta(point(consumed, px(0.)), px(16.), cx);
+                        },
+                    );
+                },
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn touch_scroll_handoff_conserves_residual_and_reversal(cx: &mut TestAppContext) {
+        let remaining = Rc::new(Cell::new(px(37.)));
+        let scroll_phases = Rc::new(RefCell::new(Vec::new()));
+        let pans = Rc::new(RefCell::new(Vec::new()));
+        let window = cx.add_window({
+            let (remaining, scroll_phases, pans) =
+                (remaining.clone(), scroll_phases.clone(), pans.clone());
+            move |_, _| ResidualTouchProbe {
+                remaining,
+                scroll_phases,
+                pans,
+            }
+        });
+        dispatch_touch(window, cx, TouchId(5), TouchPhase::Started, 7.);
+        dispatch_touch(window, cx, TouchId(5), TouchPhase::Moved, 37.);
+        assert_eq!(remaining.get(), px(7.));
+        assert!(pans.borrow().is_empty());
+        dispatch_touch(window, cx, TouchId(5), TouchPhase::Moved, 67.);
+        assert_eq!(remaining.get(), px(0.));
+        let start = pans.borrow()[0].clone();
+        assert_eq!(
+            start.position - start.start_position,
+            point(px(23.), px(0.))
+        );
+        assert_eq!(start.touch_start_position, point(px(7.), px(0.)));
+        assert_eq!(start.start_position, point(px(44.), px(0.)));
+        dispatch_touch(window, cx, TouchId(5), TouchPhase::Moved, 52.);
+        dispatch_touch(window, cx, TouchId(5), TouchPhase::Ended, 52.);
+        assert_eq!(
+            *scroll_phases.borrow(),
+            [
+                TouchPhase::Started,
+                TouchPhase::Moved,
+                TouchPhase::Cancelled
+            ]
+        );
+        let pans = pans.borrow();
+        assert_eq!(
+            pans.iter().map(|p| p.phase).collect::<Vec<_>>(),
+            [TouchPhase::Started, TouchPhase::Moved, TouchPhase::Ended]
+        );
+        assert_eq!(
+            px(37.) + pans[2].position.x - pans[2].start_position.x,
+            px(45.)
+        ); // 52 - 7 total actual travel.
+    }
+
+    struct PinchOwners {
+        events: Rc<RefCell<Vec<(&'static str, TouchPhase, Pixels)>>>,
+        pan_first: bool,
+    }
+
+    impl Render for PinchOwners {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let events = self.events.clone();
+            let pan_first = self.pan_first;
+            canvas(
+                |_, _, _| {},
+                move |_, _, window, _| {
+                    for id in ["a", "b"] {
+                        let events = events.clone();
+                        window.on_touch_pinch(id, move |event, window, _| {
+                            if event.phase == TouchPhase::Started
+                                && ((event.position.x < px(100.)) != (id == "a"))
+                            {
+                                return;
+                            }
+                            events
+                                .borrow_mut()
+                                .push((id, event.phase, event.position.x));
+                            if event.phase == TouchPhase::Started {
+                                window.prevent_default();
+                            }
+                        });
+                    }
+                    if pan_first {
+                        window.on_touch_pan("a", move |event, window, _| {
+                            events
+                                .borrow_mut()
+                                .push(("pan", event.phase, event.position.x));
+                            if event.phase == TouchPhase::Started {
+                                window.prevent_default();
+                            }
+                        });
+                    }
+                },
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn native_pinch_terminal_releases_owner_for_next_stream(cx: &mut TestAppContext) {
+        use crate::PlatformInput;
+
+        for terminal in [Some(TouchPhase::Ended), Some(TouchPhase::Cancelled), None] {
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let window = cx.add_window({
+                let events = events.clone();
+                move |_, _| PinchOwners {
+                    events,
+                    pan_first: false,
+                }
+            });
+            for (phase, x) in [(TouchPhase::Started, 17.), (TouchPhase::Moved, 211.)] {
+                cx.update_window(window.into(), |_, window, cx| {
+                    window.dispatch_event(
+                        PlatformInput::Pinch(crate::PinchEvent {
+                            phase,
+                            position: point(px(x), px(13.)),
+                            delta: 0.25,
+                            ..Default::default()
+                        }),
+                        cx,
+                    );
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                })
+                .expect("native pinch dispatch");
+            }
+            cx.update_window(window.into(), |_, window, cx| {
+                if let Some(phase) = terminal {
+                    window.dispatch_event(
+                        PlatformInput::Pinch(crate::PinchEvent {
+                            phase,
+                            position: point(px(211.), px(13.)),
+                            ..Default::default()
+                        }),
+                        cx,
+                    );
+                } else {
+                    window.cancel_touch_input(cx);
+                    window.cancel_touch_input(cx);
+                }
+                assert!(window.touch_pinch_capture.is_none());
+                assert!(window.touch_pinch_anchor.is_none());
+                assert!(window.last_pinch_event.is_none());
+                for (phase, x) in [
+                    (TouchPhase::Started, 233.),
+                    (TouchPhase::Moved, 41.),
+                    (TouchPhase::Ended, 37.),
+                ] {
+                    window.dispatch_event(
+                        PlatformInput::Pinch(crate::PinchEvent {
+                            phase,
+                            position: point(px(x), px(13.)),
+                            ..Default::default()
+                        }),
+                        cx,
+                    );
+                }
+            })
+            .expect("next owner acquires");
+            assert_eq!(
+                *events.borrow(),
+                [
+                    ("a", TouchPhase::Started, px(17.)),
+                    ("a", TouchPhase::Moved, px(211.)),
+                    ("a", terminal.unwrap_or(TouchPhase::Cancelled), px(211.)),
+                    ("b", TouchPhase::Started, px(233.)),
+                    ("b", TouchPhase::Moved, px(41.)),
+                    ("b", TouchPhase::Ended, px(37.)),
+                ]
+            );
+        }
+    }
+
+    #[gpui::test]
+    fn touch_pinch_owner_does_not_follow_centroid_and_same_owner_pan_can_promote(
+        cx: &mut TestAppContext,
+    ) {
+        for pan_first in [false, true] {
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let window = cx.add_window({
+                let events = events.clone();
+                move |_, _| PinchOwners { events, pan_first }
+            });
+            dispatch_touch(window, cx, TouchId(41), TouchPhase::Started, 10.);
+            if pan_first {
+                dispatch_touch(window, cx, TouchId(41), TouchPhase::Moved, 40.);
+            }
+            dispatch_touch(window, cx, TouchId(2), TouchPhase::Started, 60.);
+            cx.update_window(window.into(), |_, window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+            .expect("redraw succeeds");
+            dispatch_touch(window, cx, TouchId(2), TouchPhase::Moved, 300.);
+            dispatch_touch(window, cx, TouchId(41), TouchPhase::Ended, 40.);
+            let events = events.borrow();
+            assert!(!events.iter().any(|(id, _, _)| *id == "b"));
+            let phases = events
+                .iter()
+                .filter(|(id, _, _)| *id == "a")
+                .map(|(_, phase, _)| *phase)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                phases,
+                [TouchPhase::Started, TouchPhase::Moved, TouchPhase::Ended]
+            );
+            assert_eq!(events.last().expect("pinch ended").2, px(170.));
+            if pan_first {
+                assert_eq!(
+                    events
+                        .iter()
+                        .filter(|(id, _, _)| *id == "pan")
+                        .map(|(_, phase, _)| *phase)
+                        .collect::<Vec<_>>(),
+                    [
+                        TouchPhase::Started,
+                        TouchPhase::Moved,
+                        TouchPhase::Cancelled
+                    ]
+                );
+            }
+        }
+    }
+
+    struct TouchPanListeners {
+        events: Rc<RefCell<Vec<(&'static str, crate::TouchPanEvent)>>>,
+        claim_inner: bool,
+    }
+
+    impl Render for TouchPanListeners {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let events = self.events.clone();
+            let claim_inner = self.claim_inner;
+            canvas(
+                |_, _, _| {},
+                move |_, _, window, _| {
+                    for (id, claim) in [("outer", true), ("inner", claim_inner)] {
+                        let events = events.clone();
+                        window.on_touch_pan(id, move |event, window, _| {
+                            events.borrow_mut().push((id, event.clone()));
+                            if event.phase == TouchPhase::Started && claim {
+                                window.prevent_default();
+                            }
+                        });
+                    }
+                },
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn touch_pan_ownership_survives_frames_and_cancellation_has_one_terminal(
+        cx: &mut TestAppContext,
+    ) {
+        for claim_inner in [true, false] {
+            let events = Rc::new(RefCell::new(Vec::new()));
+            let window = cx.add_window({
+                let events = events.clone();
+                move |_, _| TouchPanListeners {
+                    events,
+                    claim_inner,
+                }
+            });
+            dispatch_touch(window, cx, TouchId(31), TouchPhase::Started, 7.);
+            assert!(events.borrow().is_empty());
+            dispatch_touch(window, cx, TouchId(31), TouchPhase::Moved, 37.);
+            cx.update_window(window.into(), |_, window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+            .expect("captured owner survives redraw");
+            dispatch_touch(window, cx, TouchId(8), TouchPhase::Started, 300.);
+            dispatch_touch(window, cx, TouchId(31), TouchPhase::Moved, -13.);
+            window
+                .update(cx, |_, window, cx| {
+                    window.cancel_touch_input(cx);
+                    window.cancel_touch_input(cx);
+                })
+                .expect("window remains available for cancellation");
+            dispatch_touch(window, cx, TouchId(31), TouchPhase::Ended, -19.);
+            let events = events.borrow();
+            let owner = if claim_inner { "inner" } else { "outer" };
+            let phases = events
+                .iter()
+                .filter(|(id, _)| *id == owner)
+                .map(|(_, event)| event.phase)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                phases,
+                [
+                    TouchPhase::Started,
+                    TouchPhase::Moved,
+                    TouchPhase::Moved,
+                    TouchPhase::Cancelled
+                ]
+            );
+            let last = &events.last().expect("owner receives cancellation").1;
+            assert_eq!(last.start_position, point(px(7.), px(0.)));
+            assert_eq!(last.position, point(px(-13.), px(0.)));
+            assert_eq!(last.axis, crate::Axis::Horizontal);
+            let other = events
+                .iter()
+                .filter(|(id, _)| *id != owner)
+                .collect::<Vec<_>>();
+            assert_eq!(other.len(), usize::from(!claim_inner));
+            assert!(
+                other
+                    .iter()
+                    .all(|(_, event)| event.phase == TouchPhase::Started)
+            );
+        }
     }
 
     struct TouchDragListener {

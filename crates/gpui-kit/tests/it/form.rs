@@ -477,6 +477,28 @@ fn a_number_drawn_as_wrong_can_say_what_is_wrong_with_it(cx: &mut TestAppContext
 // -- SegmentedControl -----------------------------------------------------
 
 #[gpui::test]
+fn touch_segments_keep_full_hit_targets_without_enlarging_desktop(cx: &mut TestAppContext) {
+    for control_size in [ControlSize::Touch, ControlSize::Sm] {
+        let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+            SegmentedControl::new("targets")
+                .control_size(control_size)
+                .segments([Segment::new("a", "A"), Segment::new("b", "B")])
+                .on_select(|_, _, _| {})
+                .into_any_element()
+        });
+        let bounds = harness.node("targets.a").expect("measured segment").bounds;
+        if control_size == ControlSize::Touch {
+            assert!(bounds.width >= 48.0 && bounds.height >= 48.0, "{bounds:?}");
+        } else {
+            assert!(
+                bounds.height < 48.0,
+                "desktop size remains compact: {bounds:?}"
+            );
+        }
+    }
+}
+
+#[gpui::test]
 fn segments_with_asymmetric_labels_have_equal_widths(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         SegmentedControl::new("equal")

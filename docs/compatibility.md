@@ -58,7 +58,8 @@ button-specific API and framework drag/drop remains left-button-owned.
 Web reconciles the complete `buttons` snapshot on intermediate pointer moves,
 and cancels only the active pointer on pointercancel, lostpointercapture, or
 window blur. Normal final up followed by capture loss is idempotent. Primary
-touch/pen pointer compatibility is retained; this is not a multi-touch API.
+pen pointer compatibility is retained. Touch contacts use the distinct portable
+multi-contact path described below rather than duplicate mouse events.
 Windows retains OS capture until no mouse buttons remain, and delivers capture
 loss separately after normal up dispatch. Shared regressions run with
 `cargo test -p gpui-box --lib pointer_`; real browser cancellation and native
@@ -88,6 +89,32 @@ on-demand lane means a `Platforms` run of that commit; the commands do not
 erase the explicit limitations in the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
+
+Native mobile source is **experimental and not an additional validated row**.
+`gpui-box-android` provides an API33+ arm64 Vulkan Activity/JNI host, and
+`gpui-box-ios` provides a UIKit/WGPU host with caller-supplied fonts. Portable
+host checks exercise Rust types and local contracts, not Java/APK compilation,
+Xcode linking, native frame presentation, keyboard behavior or accessibility.
+See the [Android backend contract](../crates/gpui_android/README.md) and
+[iOS native procedure](../examples/ios-native/README.md) for explicit limits,
+SDK/device requirements and executable acceptance procedures.
+
+Mobile browser tests run with
+`npm --prefix examples/browser-gallery run mobile` after `xtask web build`.
+`gate full`, `web smoke` and `web gate` build the gallery and run this suite.
+They exercise Chromium touch delivery, keyless input/composition, lifecycle,
+CSS/backing-size consistency and residual inset fixtures. They do not establish
+Android Chrome or iOS Safari keyboard activation, autofill, native selection,
+screen-reader or device lifecycle behavior. The exact boundary is documented in
+[the browser mobile contract](../crates/gpui_web/MOBILE.md).
+
+Checked `App::try_*` and `Window::try_*` operations preserve unsupported,
+unavailable and refused outcomes before native dispatch. An accepted request
+does not prove an OS transition completed. Mobile backends default to denial
+unless they implement the operation. WGPU explicit detach/destroy drains native
+resources before handle invalidation; device loss reports unconfirmed completion
+while still releasing resources. Native teardown and recreation must be tested
+on each platform before claiming lifecycle acceptance.
 
 Accessibility action listeners are frame-local and registered only while the
 window's AccessKit adapter is active for that frame. Adapter activation forces
@@ -152,17 +179,46 @@ lands immediately. Finite eased values may exceed 0–1, so an underdamped
 spring's overshoot is preserved. Kit retains the token, semantic-role, visual
 settle, transition, presence, and FLIP policy above this scalar primitive.
 
-Raw touch also has one portable framework path. GPUI recognizes one contact at
-a time as a synthesized tap/multi-tap, an axis-locked phased scroll with
-least-squares release velocity and catchable fling momentum, or a phased
-touch-drag/long-press stream explicitly claimed by an element. Predicted touch
-positions can lead visual pan output but never classification, hit testing, or
-velocity, and later samples reconcile the prediction. `PlatformGestures`
-selects exponential iOS-style or Android friction-spline deceleration while
-the existing `GestureTuning::momentum_decay_per_ms` field remains source
-compatible. This contract begins when a platform emits `TouchEvent`; GPUI Box
-does not yet supply native iOS/Android producers, a portable pinch recognizer,
-or a multi-touch arena. Platform-provided trackpad pinch remains unchanged.
+Raw touch has one portable framework path. Every contact carries a stable
+`TouchId`; native pointer indices are not identities. Single contact tap,
+axis-locked scrolling/fling and claimed drag/long press remain compatible.
+The first two unclaimed contacts promote to pinch, cancelling an existing
+scroll. Pinch uses raw centroid and incremental span ratios, never predictions.
+Coincident contacts retain the last nonzero scale baseline. Additional contacts
+drain without becoming taps after the owner ends.
+
+During paint, `Window::on_touch_pan` registers a stable window-unique owner ID.
+An initial `Started` offer carries direction after slop. Later unconsumed live
+scroll can offer `Started` with `is_scroll_handoff`; rejected offers have no
+terminal event. Inspect `touch_start_position` for hit testing and use
+`position - start_position` for travel: handoff rebases the latter to residual
+movement only. `prevent_default` acquires and stops bubbling. Only the owner
+receives later phases. A captured manipulation retains reversal and never
+silently transfers back to scrolling. Frames with arbitration listeners use
+raw scrolling positions so consumed plus residual equals actual travel.
+
+`Window::on_touch_pinch` similarly captures an owner, even when the centroid
+crosses into another view. Registering pinch and pan with the same ID permits
+that owner's pan to cancel and promote to pinch; other claimed manipulations
+retain ownership. Keep captured listeners registered until their terminal
+phase, or call `cancel_touch_input` before removal. Inactive platform status
+automatically cancels contacts, pending timers and already-released momentum.
+This is exclusive arbitration for these primitives, not a rotation recognizer
+or an arbitrary simultaneous-gesture graph. Shared tests are not native
+device integration evidence. Platform-provided trackpad pinch remains separate.
+
+`Window::insets` reports safe-area and IME edge avoidance in logical pixels
+relative to the **current** content viewport. A resized viewport must not also
+subtract the keyboard's full height; only residual overlap is reported.
+`effective()` takes a per-edge maximum. Floating/split keyboard geometry is not
+invented as full-width padding. Backend inset changes invalidate the window.
+Text input hints and fallible actions flow through `EntityInputHandler`,
+`InputHandler` and `PlatformInputHandler`; native text positions/ranges use
+UTF-16 offsets and unsupported geometry is unavailable, not approximated.
+Keyboard focus/options notifications follow the installed accepting handler.
+Backends defer input-handler queries until these notifications return to avoid
+reentering a borrowed core window. Autofill hints do not promise SMS access,
+validation, or successful autofill.
 
 Application-provided native context menus use the framework's existing
 `Menu`/`MenuItem` action tree rather than a platform-specific component model.

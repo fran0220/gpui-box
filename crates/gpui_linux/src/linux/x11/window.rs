@@ -870,7 +870,7 @@ impl Drop for X11Window {
             parent.state.borrow_mut().children.remove(&self.0.x_window);
         }
 
-        state.renderer.destroy();
+        state.renderer.destroy().log_err();
 
         let destroy_x_window = maybe!({
             check_reply(

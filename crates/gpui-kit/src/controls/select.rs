@@ -104,6 +104,8 @@ pub struct Select {
     trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
     reveal_active: bool,
     menu_geometry: Option<popover::MenuGeometry>,
+    presentation: popover::PickerPresentation,
+    sheet: Option<popover::PickerSheet>,
 }
 
 impl std::fmt::Debug for Select {
@@ -138,7 +140,25 @@ impl Select {
             trigger_bounds: Rc::default(),
             reveal_active: false,
             menu_geometry: None,
+            presentation: popover::PickerPresentation::Anchored,
+            sheet: None,
         }
+    }
+
+    /// Presents the same caller-owned choices in an anchored menu or bottom modal.
+    pub fn presentation(mut self, presentation: popover::PickerPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+
+    /// Adapts presentation without resetting the current selection.
+    pub fn set_presentation(
+        &mut self,
+        presentation: popover::PickerPresentation,
+        cx: &mut Context<Self>,
+    ) {
+        self.presentation = presentation;
+        cx.notify();
     }
 
     pub fn options(mut self, options: impl IntoIterator<Item = SelectOption>) -> Self {
@@ -350,6 +370,12 @@ impl Select {
         cx.notify();
     }
 
+    /// Closes either presentation without changing the caller-owned selection.
+    /// A retained bottom modal releases focus ownership on its next render.
+    pub fn close(&mut self, cx: &mut Context<Self>) {
+        self.close_menu(cx);
+    }
+
     fn close_menu(&mut self, cx: &mut Context<Self>) {
         if !self.open {
             return;
@@ -508,6 +534,19 @@ impl Select {
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .children(rows);
+        if self.presentation == popover::PickerPresentation::Bottom {
+            return div()
+                .h_full()
+                .w_full()
+                .track_focus(&self.focus_handle)
+                .on_key_down(cx.listener(Self::on_key_down))
+                .child(viewport.h_full().max_h_full())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("menu").semantic_id(), Role::Menu),
+                )
+                .into_any_element();
+        }
         let list = popover::card_flush(self.ident.child("menu"), &theme)
             .py(px(inset))
             .w(px(geometry.width))
@@ -573,6 +612,9 @@ impl Select {
 
         let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
+            .when(self.size == ControlSize::Touch, |row| {
+                row.min_h(px(theme.control.touch.height))
+            })
             .group(hover_group.clone())
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
@@ -650,6 +692,39 @@ impl Focusable for Select {
 impl Render for Select {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let bottom = self.presentation == popover::PickerPresentation::Bottom;
+        if bottom && self.sheet.is_none() {
+            let picker = cx.weak_entity();
+            self.sheet = Some(popover::PickerSheet::new(
+                self.ident.child("sheet"),
+                self.name.clone(),
+                vec![self.focus_handle.clone()],
+                move |window, cx| {
+                    picker
+                        .update(cx, |picker, cx| {
+                            let theme = cx.theme().clone();
+                            picker.menu(
+                                popover::MenuGeometry {
+                                    placement: Placement::Below,
+                                    hang: Hang::Start,
+                                    width: (f32::from(window.viewport_size().width)
+                                        - theme.space(Space::Lg) * 2.0)
+                                        .max(0.0),
+                                    max_height: theme.measures.menu_max_height,
+                                },
+                                cx,
+                            )
+                        })
+                        .unwrap_or_else(|_| div().into_any_element())
+                },
+                |picker, cx| picker.close_menu(cx),
+                window,
+                cx,
+            ));
+        }
+        if let Some(sheet) = &self.sheet {
+            sheet.sync(bottom && self.open, window, cx);
+        }
         let direction = cx.layout_direction();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
@@ -672,7 +747,7 @@ impl Render for Select {
             spec = spec.value(option.label.clone());
         }
 
-        let geometry = self.open.then(|| {
+        let geometry = (self.open && !bottom).then(|| {
             popover::menu_geometry(
                 window,
                 self.trigger_bounds.get(),
@@ -739,6 +814,13 @@ impl Render for Select {
                         div()
                             .id(clear.element_id())
                             .flex_none()
+                            .when(self.size == ControlSize::Touch, |clear| {
+                                clear
+                                    .size(px(metrics.height))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                            })
                             .cursor_pointer()
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -781,7 +863,10 @@ impl Render for Select {
             .child(trigger)
             .into_any_element();
 
-        popover::anchored_slot(placement, hang, trigger, menu)
+        div()
+            .w_full()
+            .child(popover::anchored_slot(placement, hang, trigger, menu))
+            .children(self.sheet.as_ref().map(|sheet| sheet.drawer.clone()))
     }
 }
 

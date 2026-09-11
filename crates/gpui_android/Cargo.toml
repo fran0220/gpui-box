@@ -1,0 +1,30 @@
+[package]
+name = "gpui-box-android"
+version = "0.1.2"
+edition.workspace = true
+rust-version.workspace = true
+license = "Apache-2.0"
+repository.workspace = true
+description = "Android Activity and native surface backend for GPUI Box"
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "gpui_android"
+
+[features]
+# Type-check the JNI bridge on a host without pretending it can run there.
+host-check = []
+
+[dependencies]
+gpui = { package = "gpui-box", path = "../gpui", version = "0.1.2", default-features = false }
+gpui_wgpu.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+raw-window-handle.workspace = true
+uuid.workspace = true
+accesskit.workspace = true
+serde_json.workspace = true
+jni = "0.21.1"

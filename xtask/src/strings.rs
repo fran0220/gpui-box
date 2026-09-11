@@ -57,7 +57,14 @@ use anyhow::{Result, bail};
 /// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
-const EXEMPT: &[&str] = &["strings.rs", "strings/packs.rs", "datetime/fixture.rs"];
+/// - `interaction/mobile_tests.rs` is an external `#[cfg(test)]` module;
+///   its labels and assertions belong to test fixtures, not component copy.
+const EXEMPT: &[&str] = &[
+    "strings.rs",
+    "strings/packs.rs",
+    "datetime/fixture.rs",
+    "interaction/mobile_tests.rs",
+];
 
 /// Directories whose literals are not component copy either.
 const EXEMPT_TREES: &[&str] = &["scenes/"];

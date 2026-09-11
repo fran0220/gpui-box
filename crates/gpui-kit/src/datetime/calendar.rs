@@ -18,8 +18,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, Elevation, Radius, SemanticColor, SemanticWash, Space, Surface,
-    TextTone, Theme, TypeScale, Variant,
+    ActiveTheme, ColorChoice, ControlSize, Elevation, Radius, SemanticColor, SemanticWash, Space,
+    Surface, TextTone, Theme, TypeScale, Variant,
 };
 
 use crate::strings::{ActiveStrings, StringKey};
@@ -99,6 +99,7 @@ pub struct Calendar {
     range: Option<DayRange>,
     overlay: Option<Overlay>,
     disabled: bool,
+    size: ControlSize,
     /// Which way the last navigation travelled, and how many have happened.
     /// The count keys the arrival animation; zero means the first frame, which
     /// arrives without motion so a capture of a settled calendar is settled.
@@ -126,6 +127,17 @@ impl std::fmt::Debug for Calendar {
 }
 
 impl Calendar {
+    /// Changes day targets without resetting the visible month or selection.
+    /// Touch uses shared target metrics for cells and month navigation.
+    /// Its minimum width is seven targets plus horizontal card padding; hosts
+    /// must provide that width or an explicit horizontal scrolling container.
+    pub fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        if self.size != size {
+            self.size = size;
+            cx.notify();
+        }
+    }
+
     pub fn new(
         ident: impl Into<Ident>,
         adapter: SharedDateAdapter,
@@ -145,6 +157,7 @@ impl Calendar {
             range: None,
             overlay: None,
             disabled: false,
+            size: ControlSize::Lg,
             travel: 0,
             navigations: 0,
             day_idents: RefCell::new(HashMap::new()),
@@ -457,7 +470,11 @@ impl Calendar {
                     cx.strings().text(StringKey::CalendarPreviousMonth),
                 )
                 .ghost()
-                .small()
+                .control_size(if self.size == ControlSize::Touch {
+                    self.size
+                } else {
+                    ControlSize::Sm
+                })
                 .semantic_parent(self.ident.semantic_id())
                 .disabled(!can_move)
                 .on_click(move |_window, cx| {
@@ -478,7 +495,11 @@ impl Calendar {
                     cx.strings().text(StringKey::CalendarNextMonth),
                 )
                 .ghost()
-                .small()
+                .control_size(if self.size == ControlSize::Touch {
+                    self.size
+                } else {
+                    ControlSize::Sm
+                })
                 .semantic_parent(self.ident.semantic_id())
                 .disabled(!can_move)
                 .on_click(move |_window, cx| {
@@ -495,7 +516,7 @@ impl Calendar {
             .row_reading(direction)
             .children(self.adapter.weekday_labels().into_iter().map(|label| {
                 foundation_text(theme, TypeScale::Caption, label)
-                    .w(px(theme.control.lg.height))
+                    .w(px(theme.control.get(self.size).height))
                     .flex_none()
                     .text_align(gpui::TextAlign::Center)
                     .text_tone(theme, TextTone::Faint)
@@ -515,7 +536,7 @@ impl Calendar {
         let theme = cx.theme().clone();
         let Some(day) = cell.day() else {
             return div()
-                .size(px(theme.control.lg.height))
+                .size(px(theme.control.get(self.size).height))
                 .flex_none()
                 .into_any_element();
         };
@@ -589,7 +610,7 @@ impl Calendar {
 
         let cell = div()
             .id(ident.element_id())
-            .size(px(theme.control.lg.height))
+            .size(px(theme.control.get(self.size).height))
             .flex_none()
             .relative()
             .flex()
@@ -838,6 +859,11 @@ impl Render for Calendar {
             .flex_none()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Sm)
+            .when(self.size == ControlSize::Touch, |calendar| {
+                calendar.min_w(px(
+                    theme.control.touch.height * 7.0 + theme.space(Space::Sm) * 2.0
+                ))
+            })
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .track_focus(&self.focus_handle)

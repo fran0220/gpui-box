@@ -696,14 +696,22 @@ playback state, projected targets, and finite overshoot. Kit owns the theme and
 component policy above it. This is an invisible framework primitive and does
 not add a scene merely to increase catalog coverage.
 
-Single-touch recognition is no longer a local component approximation either.
+Touch recognition is no longer a local component approximation either.
 When a platform supplies raw `TouchEvent`s, GPUI resolves tap/multi-tap, phased
 axis-locked pan and frame-rate-independent momentum, prediction correction,
-touch-drag, long press, cancellation, and fling interruption through the same
-window dispatch used by mouse and scroll consumers. The remaining boundary is
-explicit: native iOS/Android touch production, a real multi-contact arena, and
-portable pinch recognition are not implemented. Existing platform-generated
-trackpad pinch events are a separate input path.
+touch-drag, long press, multi-contact pinch, exclusive ID-based pan/pinch
+ownership, cancellation and fling interruption through window dispatch.
+Tests cover contact reordering/degeneracy, either pinch contact cancelling,
+captured ownership across redraw and a centroid crossing another view, and
+scroll consumption plus residual handoff/reversal without double movement.
+Platform inactivity cancels pending recognition and post-release momentum.
+These tests do not execute native devices, native keyboards or system gestures.
+Rotation and arbitrary simultaneous recognizer graphs are not provided;
+captured owners must cancel before unregistering, and manipulation reversal
+does not transfer ownership back to scrolling. Native geometry forwarding
+returns unavailable for unsupported queries; its shared tests prove transport
+and refusal, not platform text geometry. Platform-generated trackpad pinch
+remains a separate input path.
 
 | Framework boundary | Why it matters |
 |---|---|
@@ -1262,3 +1270,37 @@ emulated browser support. macOS/Windows native focus, IME, accessibility and
 overlay behavior still need platform-run evidence. Origin-aware asynchronous
 permission approvals are not represented by Wry's kind-only callback; current
 host policy refuses surfaced permission, popup and download requests.
+
+## Native editable geometry preserves affinity, not missing font data
+
+`EditableTextLayout` exposes selection fragments, cluster-edge carets, visual
+navigation and Unicode paragraph base-direction queries over the retained
+`WrappedLine` glyph cells and soft-wrap indices. `NativeTextPosition` retains
+both incident edges at bidi and wrap boundaries; `NativeTextSelection` stores
+the primary anchor/head affinities atomically in `EditBuffer` and its history.
+Legacy logical selection setters reset both affinities to downstream. Secondary
+cursors remain logical-only; native primary selection clears them. Active IME
+cancellation restores the original selection and text, including in secret
+fields, without enabling completed secret undo/redo history.
+
+The asymmetric geometry tests supply explicit shaped glyph positions and
+exercise mixed bidi travel in both directions, wrap affinity, actual row heights,
+graphemes, UTF-16 surrogate rejection, reversed selections and history. They
+prove platform-independent geometry/model behavior, not UIKit or Android
+execution. Native adapters and the macOS/Windows lanes need their own evidence.
+No renderer or component painting changes are implied by these additive APIs.
+
+`ShapedGlyph` has no font-provided ligature caret table or per-grapheme advances
+inside a multi-grapheme shaping cluster. An interior caret query, or horizontal
+movement requiring that caret, returns `None`; selection covers the complete
+painted cluster. Supplying GDEF/platform caret data at the shaping boundary is
+the prerequisite to lifting that limitation; interpolating a width is not a
+substitute. The current layout paints uniform-height horizontal rows. Paragraph
+direction overrides are not in the editable model, so mutation stays explicitly
+unsupported. Native caret bounds resolve only the incident hard paragraph,
+using indexed UTF-16 conversion for source-backed layouts; painting a visible
+caret preserves the viewport shaping budget. Point, selection-fragment,
+farthest-position and movement queries still enumerate the document and may
+shape offscreen lazy lines; those are not viewport-bounded operations.
+
+Reference contract: [Apple UITextInput](https://developer.apple.com/documentation/uikit/uitextinput).

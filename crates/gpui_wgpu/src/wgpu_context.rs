@@ -383,6 +383,9 @@ impl WgpuContext {
     #[cfg(not(target_family = "wasm"))]
     pub fn instance(display: Box<dyn wgpu::wgt::WgpuHasDisplayHandle>) -> wgpu::Instance {
         wgpu::Instance::new(wgpu::InstanceDescriptor {
+            #[cfg(target_os = "ios")]
+            backends: wgpu::Backends::METAL,
+            #[cfg(not(target_os = "ios"))]
             backends: wgpu::Backends::VULKAN | wgpu::Backends::GL,
             flags: wgpu::InstanceFlags::default(),
             backend_options: wgpu::BackendOptions::default(),
@@ -393,7 +396,12 @@ impl WgpuContext {
 
     pub fn check_compatible_with_surface(&self, surface: &wgpu::Surface<'_>) -> anyhow::Result<()> {
         let caps = surface.get_capabilities(&self.adapter);
-        if caps.formats.is_empty() {
+        if !self.adapter.is_surface_supported(surface)
+            || caps.formats.is_empty()
+            || caps.present_modes.is_empty()
+            || caps.alpha_modes.is_empty()
+            || !caps.usages.contains(wgpu::TextureUsages::RENDER_ATTACHMENT)
+        {
             let info = self.adapter.get_info();
             anyhow::bail!(
                 "Adapter {:?} (backend={:?}, device={:#06x}) is not compatible with the \

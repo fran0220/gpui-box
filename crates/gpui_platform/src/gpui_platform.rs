@@ -3,6 +3,11 @@
 
 pub use gpui::Platform;
 
+/// Creates an experimental UIKit application with explicit caller-owned fonts.
+/// Native iOS execution is required; no headless or empty-font fallback exists.
+#[cfg(all(feature = "native-platform", target_os = "ios"))]
+pub use gpui_ios::application as application_with_ios_fonts;
+
 #[cfg(feature = "native-platform")]
 use std::rc::Rc;
 
@@ -63,8 +68,28 @@ pub fn web_init() {
 }
 
 /// Returns the default [`Platform`] for the current OS.
+///
+/// iOS requires explicit fonts through `application_with_ios_fonts`; this
+/// generic constructor and headless initialization are not available there.
 #[cfg(feature = "native-platform")]
 pub fn current_platform(headless: bool) -> Rc<dyn Platform> {
+    #[cfg(target_os = "ios")]
+    {
+        let _ = headless;
+        panic!(
+            "iOS requires application_with_ios_fonts; generic/headless initialization is unsupported"
+        )
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        assert!(
+            !headless,
+            "Android headless creation cannot create an Activity"
+        );
+        gpui_android::AndroidPlatform::current().expect("initialize the Android Activity first")
+    }
+
     #[cfg(target_os = "macos")]
     {
         Rc::new(gpui_macos::MacPlatform::new(headless))

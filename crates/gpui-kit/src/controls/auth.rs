@@ -55,6 +55,7 @@ impl std::fmt::Debug for PasswordInputEvent {
 }
 
 impl EventEmitter<PasswordInputEvent> for PasswordInput {}
+impl EventEmitter<gpui::TextInputAction> for PasswordInput {}
 
 /// One sensitive password editor with a visual reveal action.
 ///
@@ -69,6 +70,7 @@ pub struct PasswordInput {
     name: Option<SharedString>,
     initial: Option<SharedString>,
     size: ControlSize,
+    input_options: gpui::TextInputOptions,
     disabled: bool,
     invalid: bool,
     required: bool,
@@ -113,6 +115,9 @@ impl PasswordInput {
             };
             cx.emit(event);
         });
+        let actions = cx.subscribe(&field, |_, _, action: &gpui::TextInputAction, cx| {
+            cx.emit(*action)
+        });
         Self {
             ident,
             field,
@@ -121,6 +126,7 @@ impl PasswordInput {
             name: None,
             initial: None,
             size: ControlSize::Md,
+            input_options: gpui::TextInputOptions::default(),
             disabled: false,
             invalid: false,
             required: false,
@@ -128,13 +134,27 @@ impl PasswordInput {
             revealed: false,
             seeded: false,
             configured: false,
-            _subscriptions: vec![subscription],
+            _subscriptions: vec![subscription, actions],
         }
     }
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = Some(placeholder.into());
         self
+    }
+
+    /// Caller-selected keyboard and autofill hints; reveal never removes the
+    /// editor's secure flag. Next/previous emit [`gpui::TextInputAction`].
+    pub fn input_options(mut self, options: gpui::TextInputOptions) -> Self {
+        self.input_options = options;
+        self
+    }
+
+    /// Updates native hints while retaining the sensitive editing session.
+    pub fn set_input_options(&mut self, options: gpui::TextInputOptions, cx: &mut Context<Self>) {
+        self.input_options = options;
+        self.field
+            .update(cx, |field, cx| field.set_input_options(options, cx));
     }
 
     /// Names the one native password input when its visible label is outside
@@ -284,6 +304,7 @@ impl PasswordInput {
         let placeholder = self.placeholder.take();
         let name = self.name.take();
         let initial = self.initial.take().filter(|_| !self.seeded);
+        let input_options = self.input_options;
         self.seeded = true;
         let (disabled, invalid, required, read_only, size) = (
             self.disabled,
@@ -293,6 +314,7 @@ impl PasswordInput {
             self.size,
         );
         self.field.update(cx, move |field, cx| {
+            field.set_input_options(input_options, cx);
             if let Some(placeholder) = placeholder {
                 field.set_placeholder(placeholder, cx);
             }
@@ -355,7 +377,12 @@ impl Render for PasswordInput {
         let control = cx.entity().downgrade();
         let mut reveal = Button::new(self.ident.child("reveal"))
             .ghost()
-            .icon_only(Icon::Key, name)
+            .when(self.size == ControlSize::Touch, |button| {
+                button.label(name.clone())
+            })
+            .when(self.size != ControlSize::Touch, |button| {
+                button.icon_only(Icon::Key, name)
+            })
             .checked_state(self.revealed)
             .control_size(self.size)
             .semantic_parent(self.ident.semantic_id())
@@ -403,6 +430,7 @@ impl std::fmt::Debug for OneTimeCodeInputEvent {
 }
 
 impl EventEmitter<OneTimeCodeInputEvent> for OneTimeCodeInput {}
+impl EventEmitter<gpui::TextInputAction> for OneTimeCodeInput {}
 
 /// One sensitive editor presented as a bounded run of visual slots.
 ///
@@ -416,6 +444,7 @@ pub struct OneTimeCodeInput {
     initial: Option<SharedString>,
     slots: usize,
     size: ControlSize,
+    input_options: gpui::TextInputOptions,
     disabled: bool,
     invalid: bool,
     required: bool,
@@ -454,6 +483,9 @@ impl OneTimeCodeInput {
             TextInputEvent::Submit => cx.emit(OneTimeCodeInputEvent::Submit),
             _ => {}
         });
+        let actions = cx.subscribe(&field, |_, _, action: &gpui::TextInputAction, cx| {
+            cx.emit(*action)
+        });
         Self {
             ident,
             field,
@@ -461,14 +493,31 @@ impl OneTimeCodeInput {
             initial: None,
             slots: DEFAULT_CODE_SLOTS,
             size: ControlSize::Md,
+            input_options: gpui::TextInputOptions::default(),
             disabled: false,
             invalid: false,
             required: false,
             read_only: false,
             seeded: false,
             configured: false,
-            _subscriptions: vec![subscription],
+            _subscriptions: vec![subscription, actions],
         }
+    }
+
+    /// Requests keyboard/autofill hints. `OneTimeCode` is only an operating
+    /// system hint: clipboard paste is not SMS autofill, and this control
+    /// neither reads SMS nor guarantees suggestions. Alphanumeric codes remain
+    /// valid; callers choose whether a numeric keyboard suits their code.
+    pub fn input_options(mut self, options: gpui::TextInputOptions) -> Self {
+        self.input_options = options;
+        self
+    }
+
+    /// Updates hints without resetting code slots or the sensitive editor.
+    pub fn set_input_options(&mut self, options: gpui::TextInputOptions, cx: &mut Context<Self>) {
+        self.input_options = options;
+        self.field
+            .update(cx, |field, cx| field.set_input_options(options, cx));
     }
 
     /// Names the one native sensitive input when its visible label is outside
@@ -600,6 +649,7 @@ impl OneTimeCodeInput {
             .take()
             .filter(|_| !self.seeded)
             .map(|value| value.graphemes(true).take(self.slots).collect::<String>());
+        let input_options = self.input_options;
         self.seeded = true;
         let (slots, disabled, invalid, required, read_only, size) = (
             self.slots,
@@ -611,6 +661,7 @@ impl OneTimeCodeInput {
         );
         self.field.update(cx, move |field, cx| {
             field.set_sensitive_slots(slots, cx);
+            field.set_input_options(input_options, cx);
             if let Some(name) = name {
                 field.set_name(name, cx);
             }
@@ -666,11 +717,14 @@ impl Render for OneTimeCodeInput {
         let selected_end = value[..selection.end].graphemes(true).count();
         let cursor = value[..cursor].graphemes(true).count();
         let direction = cx.layout_direction();
+        self.field
+            .update(cx, |field, _| field.reset_slot_bounds(self.slots));
         // A code is read as a run of separate places, so each place is drawn
         // as one: its own well, its own boundary, its own gap. Hairlines
         // inside a single bar say only that the bar has been divided, and
         // leave a typed slot looking exactly like an empty one.
         let slots = (0..self.slots).map(|index| {
+            let field = self.field.clone();
             let selected = selected_start <= index && index < selected_end;
             let active = focused && selection.is_empty() && cursor == index;
             let filled = index < length;
@@ -685,6 +739,7 @@ impl Render for OneTimeCodeInput {
                     .invalid(self.invalid)
                     .disabled(self.disabled),
             )
+            .relative()
             .w_auto()
             .flex_1()
             .px_0()
@@ -693,6 +748,16 @@ impl Render for OneTimeCodeInput {
             // the shared focus halo from `field_shell`, so the next character
             // has one soft location marker rather than an outlined box.
             .when(selected, |slot| slot.bg(theme.colors.selected))
+            .child(
+                gpui::canvas(
+                    move |bounds, _, cx| {
+                        field.update(cx, |field, _| field.set_slot_bounds(index, bounds));
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .inset_0(),
+            )
             .child(
                 foundation_text(&theme, TypeScale::Label, if filled { "•" } else { "" })
                     .text_size(px(metrics.font_size))
@@ -714,5 +779,103 @@ impl Render for OneTimeCodeInput {
             // nothing in slot mode, but owns input, hit testing, IME bounds,
             // and the one semantic/native node for the control.
             .child(div().absolute().inset_0().child(self.field.clone()))
+    }
+}
+
+#[cfg(test)]
+mod native_geometry_tests {
+    use super::*;
+    use gpui::{EntityInputHandler, NativeTextPosition, TextAffinity, TextNavigationDirection};
+
+    #[gpui::test]
+    fn native_otp_fragments_follow_measured_wells_not_uniform_editor_slices(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let slot = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let build = slot.clone();
+        let mut harness =
+            gpui_kit_testkit::harness::Harness::new(cx, crate::install, move |window, cx| {
+                let code = build
+                    .borrow_mut()
+                    .get_or_insert_with(|| {
+                        cx.new(|cx| {
+                            OneTimeCodeInput::new("native.code", window, cx)
+                                .slots(4)
+                                .text("a🦀e\u{301}z")
+                                .control_size(ControlSize::Touch)
+                        })
+                    })
+                    .clone();
+                div().w(px(300.0)).child(code).into_any_element()
+            });
+        harness.frame();
+        let code = slot.borrow().clone().expect("mounted OTP");
+        harness.update(|window, cx| {
+            let field = code.read(cx).field.clone();
+            field.update(cx, |field, cx| {
+                let rects = field.selection_rects_for_range(0..6, window, cx);
+                assert_eq!(rects.len(), 4);
+                for pair in rects.windows(2) {
+                    assert!(
+                        pair[0].bounds.right() < pair[1].bounds.left(),
+                        "selection fragments exclude the real gaps"
+                    );
+                }
+                assert!(rects[0].bounds.size.width >= px(48.0));
+                assert!(
+                    rects[0].bounds.size.width < px(75.0),
+                    "not one quarter of the300px editor"
+                );
+                let before = NativeTextPosition {
+                    utf16_offset: 3,
+                    affinity: TextAffinity::Upstream,
+                };
+                let after = NativeTextPosition {
+                    affinity: TextAffinity::Downstream,
+                    ..before
+                };
+                assert_eq!(
+                    field
+                        .native_position_bounds(before, window, cx)
+                        .expect("trailing slot caret")
+                        .left(),
+                    rects[1].bounds.right()
+                );
+                assert_eq!(
+                    field
+                        .native_position_bounds(after, window, cx)
+                        .expect("leading slot caret")
+                        .left(),
+                    rects[2].bounds.left()
+                );
+                assert_eq!(
+                    field
+                        .native_position_in_direction(
+                            after,
+                            TextNavigationDirection::Right,
+                            1,
+                            window,
+                            cx
+                        )
+                        .expect("next slot")
+                        .utf16_offset,
+                    5
+                );
+                let selected = field
+                    .native_position_for_point(
+                        rects[3].bounds.bottom_right(),
+                        Some(1..3),
+                        window,
+                        cx,
+                    )
+                    .expect("constrained slot position");
+                assert_eq!(selected.utf16_offset, 3);
+                assert!(
+                    field
+                        .native_position_for_point(rects[0].bounds.origin, Some(2..3), window, cx)
+                        .is_none()
+                );
+            });
+        });
     }
 }

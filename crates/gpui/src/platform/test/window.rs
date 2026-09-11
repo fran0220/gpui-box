@@ -20,6 +20,8 @@ use std::{
 
 pub(crate) struct TestWindowState {
     pub(crate) bounds: Bounds<Pixels>,
+    pub(crate) operation_error: Option<crate::PlatformOperationError>,
+    pub(crate) checked_operations: Vec<crate::WindowOperation>,
     pub(crate) handle: AnyWindowHandle,
     display: Rc<dyn PlatformDisplay>,
     pub(crate) title: Option<String>,
@@ -42,6 +44,10 @@ pub(crate) struct TestWindowState {
     appearance_change_callback: Option<Box<dyn FnMut()>>,
     a11y_callbacks: Option<A11yCallbacks>,
     input_handler: Option<PlatformInputHandler>,
+    pub(crate) text_input_changes: Vec<crate::TextInputStateChange>,
+    pub(crate) keyboard_requests: Vec<bool>,
+    insets: crate::WindowInsets,
+    insets_callback: Option<Box<dyn FnMut(crate::WindowInsets)>>,
     is_fullscreen: bool,
     appearance: WindowAppearance,
     external_drag_files: Vec<(PathBuf, bool)>,
@@ -92,6 +98,8 @@ impl TestWindow {
         };
         Self(Rc::new(Mutex::new(TestWindowState {
             bounds: params.bounds,
+            operation_error: None,
+            checked_operations: Vec::new(),
             display,
             platform,
             handle,
@@ -112,6 +120,10 @@ impl TestWindow {
             appearance_change_callback: None,
             a11y_callbacks: None,
             input_handler: None,
+            text_input_changes: Vec::new(),
+            keyboard_requests: Vec::new(),
+            insets: crate::WindowInsets::default(),
+            insets_callback: None,
             is_fullscreen: false,
             appearance: WindowAppearance::Light,
             external_drag_files: Vec::new(),
@@ -188,6 +200,17 @@ impl TestWindow {
         drop(lock);
         callback(active);
         self.0.lock().active_status_change_callback = Some(callback);
+    }
+
+    pub(crate) fn simulate_insets_change(&self, insets: crate::WindowInsets) {
+        let mut state = self.0.lock();
+        state.insets = insets.clone();
+        let callback = state.insets_callback.take();
+        drop(state);
+        if let Some(mut callback) = callback {
+            callback(insets);
+            self.0.lock().insets_callback = Some(callback);
+        }
     }
 
     pub fn simulate_appearance_change(&self, appearance: WindowAppearance) {
@@ -267,6 +290,15 @@ impl TestWindow {
 }
 
 impl PlatformWindow for TestWindow {
+    fn check_window_operation(
+        &self,
+        operation: crate::WindowOperation,
+    ) -> Result<(), crate::PlatformOperationError> {
+        let mut state = self.0.lock();
+        state.checked_operations.push(operation);
+        state.operation_error.clone().map_or(Ok(()), Err)
+    }
+
     fn bounds(&self) -> Bounds<Pixels> {
         self.0.lock().bounds
     }
@@ -435,6 +467,26 @@ impl PlatformWindow for TestWindow {
 
     fn on_active_status_change(&self, callback: Box<dyn FnMut(bool)>) {
         self.0.lock().active_status_change_callback = Some(callback)
+    }
+
+    fn insets(&self) -> crate::WindowInsets {
+        self.0.lock().insets.clone()
+    }
+
+    fn on_insets_changed(&self, callback: Box<dyn FnMut(crate::WindowInsets)>) {
+        self.0.lock().insets_callback = Some(callback);
+    }
+
+    fn text_input_state_changed(&self, change: crate::TextInputStateChange) {
+        self.0.lock().text_input_changes.push(change);
+    }
+
+    fn show_soft_keyboard(&self) {
+        self.0.lock().keyboard_requests.push(true);
+    }
+
+    fn hide_soft_keyboard(&self) {
+        self.0.lock().keyboard_requests.push(false);
     }
 
     fn on_hover_status_change(&self, callback: Box<dyn FnMut(bool)>) {

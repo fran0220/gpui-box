@@ -217,6 +217,7 @@ impl std::fmt::Debug for TextInputEvent {
 }
 
 impl EventEmitter<TextInputEvent> for TextInput {}
+impl EventEmitter<gpui::TextInputAction> for TextInput {}
 
 /// Clipboard policy refusals are separate from editing events: a refused cut
 /// is not a text change, and composing controls need not reinterpret it.
@@ -258,12 +259,16 @@ pub struct TextInput {
     /// Used by segmented sensitive inputs, where one slot means one Unicode
     /// grapheme rather than one UTF-8 byte.
     max_graphemes: Option<usize>,
+    input_options: gpui::TextInputOptions,
     /// A custom visual may segment the one editor into this many slots. The
     /// editor still owns hit testing and IME geometry for the full surface.
     visual_slots: Option<usize>,
+    /// Actual slot wells measured during prepaint, in logical slot order.
+    visual_slot_bounds: Vec<Bounds<Pixels>>,
     scroll_offset: Pixels,
     is_selecting: bool,
     last_layout: Option<EditableTextLayout>,
+    last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
@@ -302,10 +307,13 @@ impl TextInput {
             bare: false,
             max_length: None,
             max_graphemes: None,
+            input_options: gpui::TextInputOptions::default(),
             visual_slots: None,
+            visual_slot_bounds: Vec::new(),
             scroll_offset: px(0.0),
             is_selecting: false,
             last_layout: None,
+            last_layout_text: SharedString::default(),
             last_bounds: None,
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
@@ -317,6 +325,21 @@ impl TextInput {
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
         self
+    }
+
+    /// Requests a platform keyboard and autofill purpose. Hints are best-effort,
+    /// not evidence of credential or SMS access. This editor always overrides
+    /// `multiline` and `secure` with its actual editing and sensitivity policy.
+    /// Next/previous emit [`gpui::TextInputAction`] for the caller to route.
+    pub fn input_options(mut self, options: gpui::TextInputOptions) -> Self {
+        self.input_options = options;
+        self
+    }
+
+    /// Changes keyboard hints without replacing text, selection, or composition.
+    pub fn set_input_options(&mut self, options: gpui::TextInputOptions, cx: &mut Context<Self>) {
+        self.input_options = options;
+        cx.notify();
     }
 
     /// Names the field for a reader without drawing anything. Use it when a
@@ -608,8 +631,19 @@ impl TextInput {
     }
 
     pub(crate) fn set_last_layout(&mut self, layout: EditableTextLayout, bounds: Bounds<Pixels>) {
+        self.last_layout_text = self.display_text();
         self.last_layout = Some(layout);
         self.last_bounds = Some(bounds);
+    }
+
+    pub(crate) fn reset_slot_bounds(&mut self, slots: usize) {
+        self.visual_slot_bounds = vec![Bounds::default(); slots];
+    }
+
+    pub(crate) fn set_slot_bounds(&mut self, slot: usize, bounds: Bounds<Pixels>) {
+        if let Some(target) = self.visual_slot_bounds.get_mut(slot) {
+            *target = bounds;
+        }
     }
 
     /// What the element shapes, which is dots for a secret.
@@ -724,24 +758,26 @@ impl TextInput {
         let Some(bounds) = self.last_bounds.as_ref() else {
             return 0;
         };
-        if let Some(slots) = self.visual_slots {
-            let x = (position.x - bounds.left()).clamp(px(0.0), bounds.size.width);
-            let width = bounds.size.width.max(px(1.0));
-            let slot_width = width / slots as f32;
-            let physical_slot = ((x / slot_width).floor() as usize).min(slots.saturating_sub(1));
-            let logical_slot = if rtl {
-                slots - physical_slot - 1
-            } else {
-                physical_slot
-            };
-            let after_midpoint = if rtl {
-                x - slot_width * (physical_slot as f32) < slot_width / 2.0
-            } else {
-                x - slot_width * physical_slot as f32 >= slot_width / 2.0
-            };
-            let boundary = (logical_slot + usize::from(after_midpoint))
-                .min(self.edit.text().graphemes(true).count());
-            return self.content_offset_for_grapheme(boundary);
+        if self.visual_slots.is_some() {
+            let count = self.edit.text().graphemes(true).count();
+            let mut closest = (f32::INFINITY, 0);
+            for (index, bounds) in self.visual_slot_bounds.iter().enumerate() {
+                if bounds.size.width <= px(0.0) {
+                    continue;
+                }
+                for trailing in [false, true] {
+                    let x = if trailing != rtl {
+                        bounds.right()
+                    } else {
+                        bounds.left()
+                    };
+                    let distance = f32::from(position.x - x).abs();
+                    if distance < closest.0 || (distance == closest.0 && !rtl) {
+                        closest = (distance, (index + usize::from(trailing)).min(count));
+                    }
+                }
+            }
+            return self.content_offset_for_grapheme(closest.1);
         }
         if position.y < bounds.top() {
             return 0;
@@ -997,8 +1033,8 @@ impl TextInput {
         self.apply_edit(None, &text, text_edit::Cause::Paste, cx);
     }
 
-    fn submit(&mut self, _: &Submit, _: &mut Window, cx: &mut Context<Self>) {
-        cx.emit(TextInputEvent::Submit);
+    fn submit(&mut self, _: &Submit, window: &mut Window, cx: &mut Context<Self>) {
+        self.perform_text_input_action(self.input_options.action, window, cx);
     }
 
     fn cancel(&mut self, _: &Cancel, _: &mut Window, cx: &mut Context<Self>) {
@@ -1051,6 +1087,57 @@ impl TextInput {
 
     fn offset_to_utf16(&self, offset: usize) -> usize {
         text_edit::offset_to_utf16(self.edit.text(), offset)
+    }
+
+    fn native_layout(&self) -> Option<&EditableTextLayout> {
+        (self.last_layout_text == self.display_text())
+            .then_some(self.last_layout.as_ref())
+            .flatten()
+    }
+
+    fn native_display_position(
+        &self,
+        position: gpui::NativeTextPosition,
+    ) -> Option<gpui::NativeTextPosition> {
+        let text = self.edit.text();
+        let byte = gpui::offset_from_utf16(text, position.utf16_offset);
+        if self.offset_to_utf16(byte) != position.utf16_offset
+            || (byte != text.len() && !text.grapheme_indices(true).any(|(index, _)| index == byte))
+        {
+            return None;
+        }
+        let utf16_offset = if self.visual_slots.is_some() {
+            self.grapheme_offset(byte)
+        } else {
+            text_edit::offset_to_utf16(&self.display_text(), self.display_offset(byte))
+        };
+        Some(gpui::NativeTextPosition {
+            utf16_offset,
+            ..position
+        })
+    }
+
+    fn native_content_position(
+        &self,
+        position: gpui::NativeTextPosition,
+    ) -> Option<gpui::NativeTextPosition> {
+        let text = self.display_text();
+        let byte = if self.visual_slots.is_some() {
+            if position.utf16_offset > self.edit.text().graphemes(true).count() {
+                return None;
+            }
+            self.content_offset_for_grapheme(position.utf16_offset)
+        } else {
+            let display_byte = gpui::offset_from_utf16(&text, position.utf16_offset);
+            if text_edit::offset_to_utf16(&text, display_byte) != position.utf16_offset {
+                return None;
+            }
+            self.content_offset_for_display(display_byte)
+        };
+        Some(gpui::NativeTextPosition {
+            utf16_offset: self.offset_to_utf16(byte),
+            ..position
+        })
     }
 
     fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
@@ -1138,6 +1225,399 @@ impl Focusable for TextInput {
 }
 
 impl EntityInputHandler for TextInput {
+    fn native_position_for_point(
+        &mut self,
+        point: Point<Pixels>,
+        within_range: Option<Range<usize>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        let range = within_range.unwrap_or(0..self.offset_to_utf16(self.edit.text().len()));
+        let start = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.start,
+            ..Default::default()
+        })?;
+        let end = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.end,
+            ..Default::default()
+        })?;
+        if range.start > range.end {
+            return None;
+        }
+        if self.visual_slots.is_some() {
+            let mut nearest = None;
+            let mut distance = f32::INFINITY;
+            for index in start.utf16_offset..=end.utf16_offset {
+                for affinity in [gpui::TextAffinity::Downstream, gpui::TextAffinity::Upstream] {
+                    let position = self.native_content_position(gpui::NativeTextPosition {
+                        utf16_offset: index,
+                        affinity,
+                    })?;
+                    let Some(bounds) = self.native_position_bounds(position, window, cx) else {
+                        continue;
+                    };
+                    let dx = f32::from(point.x - bounds.left());
+                    let dy = f32::from(point.y - point.y.clamp(bounds.top(), bounds.bottom()));
+                    let candidate = dx * dx + dy * dy;
+                    if candidate < distance
+                        || (candidate == distance && !cx.layout_direction().is_rtl())
+                    {
+                        distance = candidate;
+                        nearest = Some(position);
+                    }
+                }
+            }
+            return nearest;
+        }
+        let bounds = self.last_bounds?;
+        let origin = gpui::point(bounds.left() - self.scroll_offset, bounds.top());
+        let found = self.native_layout()?.native_position_for_point(
+            &self.display_text(),
+            point - origin,
+            Some(start.utf16_offset..end.utf16_offset),
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )?;
+        self.native_content_position(found)
+    }
+
+    fn native_selection(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextSelection> {
+        (!self.disabled).then(|| self.edit.native_selection())
+    }
+
+    fn set_native_selection(
+        &mut self,
+        selection: gpui::NativeTextSelection,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.disabled || !self.edit.set_native_selection(selection) {
+            return false;
+        }
+        cx.notify();
+        true
+    }
+
+    fn native_position_in_direction(
+        &mut self,
+        position: gpui::NativeTextPosition,
+        direction: gpui::TextNavigationDirection,
+        offset: usize,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        let painted = self.native_display_position(position)?;
+        if self.visual_slots.is_some() {
+            use gpui::TextNavigationDirection::*;
+            let forward = match direction {
+                Left => cx.layout_direction().is_rtl(),
+                Right => !cx.layout_direction().is_rtl(),
+                Up | Down => return None,
+            };
+            let index = painted.utf16_offset;
+            let next = if forward {
+                index.checked_add(offset)?
+            } else {
+                index.checked_sub(offset)?
+            };
+            return self.native_content_position(gpui::NativeTextPosition {
+                utf16_offset: next,
+                ..position
+            });
+        }
+        let layout = self.native_layout()?;
+        let next = layout.native_position_in_direction(
+            &self.display_text(),
+            painted,
+            direction,
+            offset,
+            gpui::TextAlign::Left,
+            self.last_bounds?.size.width,
+        )?;
+        self.native_content_position(next)
+    }
+
+    fn native_position_bounds(
+        &mut self,
+        position: gpui::NativeTextPosition,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        let painted = self.native_display_position(position)?;
+        let width = px(cx.theme().measures.caret_width);
+        if self.visual_slots.is_some() {
+            let index = painted.utf16_offset;
+            let preceding = index > 0
+                && (position.affinity == gpui::TextAffinity::Upstream
+                    || index == self.visual_slot_bounds.len());
+            let slot = if preceding && index > 0 {
+                index - 1
+            } else {
+                index
+            };
+            let bounds = *self.visual_slot_bounds.get(slot)?;
+            if bounds.size.width <= px(0.0) {
+                return None;
+            }
+            let x = if preceding != cx.layout_direction().is_rtl() {
+                bounds.right()
+            } else {
+                bounds.left()
+            };
+            return Some(Bounds::new(
+                point(x, bounds.top()),
+                gpui::size(width, bounds.size.height),
+            ));
+        }
+        let bounds = self.last_bounds?;
+        self.native_layout()?.native_position_bounds(
+            &self.display_text(),
+            painted,
+            point(bounds.left() - self.scroll_offset, bounds.top()),
+            width,
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )
+    }
+
+    fn farthest_native_position(
+        &mut self,
+        range: Range<usize>,
+        direction: gpui::TextNavigationDirection,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        let start = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.start,
+            ..Default::default()
+        })?;
+        let end = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.end,
+            ..Default::default()
+        })?;
+        if start.utf16_offset > end.utf16_offset {
+            return None;
+        }
+        if self.visual_slots.is_some() {
+            use gpui::TextNavigationDirection::*;
+            let endmost = match direction {
+                Left => cx.layout_direction().is_rtl(),
+                Right => !cx.layout_direction().is_rtl(),
+                Up | Down => return None,
+            };
+            return self.native_content_position(if endmost { end } else { start });
+        }
+        let next = self.native_layout()?.farthest_native_position(
+            &self.display_text(),
+            start.utf16_offset..end.utf16_offset,
+            direction,
+            gpui::TextAlign::Left,
+            self.last_bounds?.size.width,
+        )?;
+        self.native_content_position(next)
+    }
+
+    fn selection_rects_for_range(
+        &mut self,
+        range: Range<usize>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::TextSelectionRect> {
+        let Some(start) = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.start,
+            ..Default::default()
+        }) else {
+            return vec![];
+        };
+        let Some(end) = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: range.end,
+            ..Default::default()
+        }) else {
+            return vec![];
+        };
+        if range.start >= range.end {
+            return vec![];
+        }
+        if self.visual_slots.is_some() {
+            let direction = if cx.layout_direction().is_rtl() {
+                gpui::TextWritingDirection::RightToLeft
+            } else {
+                gpui::TextWritingDirection::LeftToRight
+            };
+            return (start.utf16_offset..end.utf16_offset)
+                .filter_map(|index| {
+                    let bounds = *self.visual_slot_bounds.get(index)?;
+                    (bounds.size.width > px(0.0)).then_some(gpui::TextSelectionRect {
+                        bounds,
+                        writing_direction: direction,
+                        contains_start: index == start.utf16_offset,
+                        contains_end: index + 1 == end.utf16_offset,
+                        is_vertical: false,
+                    })
+                })
+                .collect();
+        }
+        let (Some(layout), Some(bounds)) = (self.native_layout(), self.last_bounds) else {
+            return vec![];
+        };
+        let text = self.display_text();
+        let range = text_edit::range_from_utf16(&text, &(start.utf16_offset..end.utf16_offset));
+        layout.native_selection_rects(
+            &text,
+            range,
+            point(bounds.left() - self.scroll_offset, bounds.top()),
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )
+    }
+
+    fn text_position_in_direction(
+        &mut self,
+        position: usize,
+        direction: gpui::TextNavigationDirection,
+        offset: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        self.native_position_in_direction(
+            gpui::NativeTextPosition {
+                utf16_offset: position,
+                ..Default::default()
+            },
+            direction,
+            offset,
+            window,
+            cx,
+        )
+        .map(|p| p.utf16_offset)
+    }
+
+    fn native_caret_bounds(
+        &mut self,
+        position: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        self.native_position_bounds(
+            gpui::NativeTextPosition {
+                utf16_offset: position,
+                ..Default::default()
+            },
+            window,
+            cx,
+        )
+    }
+
+    fn farthest_text_position(
+        &mut self,
+        range: Range<usize>,
+        direction: gpui::TextNavigationDirection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        self.farthest_native_position(range, direction, window, cx)
+            .map(|p| p.utf16_offset)
+    }
+
+    fn base_writing_direction(
+        &mut self,
+        position: usize,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::TextWritingDirection> {
+        let painted = self.native_display_position(gpui::NativeTextPosition {
+            utf16_offset: position,
+            ..Default::default()
+        })?;
+        if self.visual_slots.is_some() {
+            return Some(if cx.layout_direction().is_rtl() {
+                gpui::TextWritingDirection::RightToLeft
+            } else {
+                gpui::TextWritingDirection::LeftToRight
+            });
+        }
+        let text = self.display_text();
+        self.native_layout()?.native_base_writing_direction(
+            &text,
+            gpui::offset_from_utf16(&text, painted.utf16_offset),
+        )
+    }
+
+    fn grapheme_range_at(
+        &mut self,
+        position: usize,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        let byte = gpui::offset_from_utf16(self.edit.text(), position);
+        if self.offset_to_utf16(byte) != position {
+            return None;
+        }
+        self.edit
+            .text()
+            .grapheme_indices(true)
+            .find(|(start, grapheme)| *start <= byte && byte < start + grapheme.len())
+            .map(|(start, grapheme)| self.range_to_utf16(&(start..start + grapheme.len())))
+    }
+
+    fn text_input_options(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> gpui::TextInputOptions {
+        gpui::TextInputOptions {
+            multiline: false,
+            secure: self.secret,
+            ..self.input_options
+        }
+    }
+
+    fn perform_text_input_action(
+        &mut self,
+        action: gpui::TextInputAction,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.disabled || self.read_only || action == gpui::TextInputAction::Newline {
+            return false;
+        }
+        if matches!(
+            action,
+            gpui::TextInputAction::Next | gpui::TextInputAction::Previous
+        ) {
+            cx.emit(action);
+        } else {
+            cx.emit(TextInputEvent::Submit);
+        }
+        true
+    }
+
+    fn accepts_text_input(&self, _: &mut Window, _: &mut Context<Self>) -> bool {
+        !self.disabled && !self.read_only
+    }
+
+    fn text_length_utf16(&mut self, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
+        Some(self.offset_to_utf16(self.edit.text().len()))
+    }
+
+    fn set_selected_text_range(
+        &mut self,
+        range_utf16: Range<usize>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.disabled {
+            return;
+        }
+        self.edit
+            .set_selection(self.range_from_utf16(&range_utf16), false);
+        cx.notify();
+    }
+
     fn text_for_range(
         &mut self,
         range_utf16: Range<usize>,
@@ -1219,25 +1699,19 @@ impl EntityInputHandler for TextInput {
         &mut self,
         range_utf16: Range<usize>,
         bounds: Bounds<Pixels>,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
         let range = self.range_from_utf16(&range_utf16);
-        if let Some(slots) = self.visual_slots {
-            let boundary_x = |offset| {
-                let boundary = self.grapheme_offset(offset) as f32 / slots as f32;
-                if cx.layout_direction().is_rtl() {
-                    bounds.right() - bounds.size.width * boundary
-                } else {
-                    bounds.left() + bounds.size.width * boundary
-                }
-            };
-            let start = boundary_x(range.start);
-            let end = boundary_x(range.end);
-            return Some(Bounds::from_corners(
-                gpui::point(start.min(end), bounds.top()),
-                gpui::point(start.max(end), bounds.bottom()),
-            ));
+        if self.visual_slots.is_some() {
+            if range_utf16.is_empty() {
+                return self.native_caret_bounds(range_utf16.start, window, cx);
+            }
+            return self
+                .selection_rects_for_range(range_utf16, window, cx)
+                .into_iter()
+                .map(|fragment| fragment.bounds)
+                .reduce(|a, b| a.union(&b));
         }
         let layout = self.last_layout.as_ref()?;
         let display_range = self.display_offset(range.start)..self.display_offset(range.end);
@@ -1459,6 +1933,356 @@ mod retained_options_tests {
     use gpui::{AppContext as _, TestAppContext};
     use gpui_kit_testkit::harness::Harness;
     use std::{cell::RefCell, rc::Rc};
+
+    #[gpui::test]
+    fn native_mask_geometry_preserves_model_offsets_and_affinity(cx: &mut TestAppContext) {
+        use gpui::{
+            NativeTextPosition as Position, NativeTextSelection, TextAffinity::*,
+            TextNavigationDirection::*,
+        };
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        TextInput::new("native.mask", window, cx)
+                            .text("a🦀e\u{301}z")
+                            .secret(true)
+                    })
+                })
+                .clone()
+                .into_any_element()
+        });
+        harness.frame();
+        let input = slot.borrow().clone().expect("mounted input");
+        harness.update(|window, cx| {
+            input.update(cx, |input, cx| {
+                let position = Position {
+                    utf16_offset: 3,
+                    affinity: Upstream,
+                };
+                let painted = input
+                    .native_display_position(position)
+                    .expect("mapped mask position");
+                assert_eq!(
+                    painted,
+                    Position {
+                        utf16_offset: 2,
+                        affinity: Upstream
+                    }
+                );
+                assert_eq!(input.native_content_position(painted), Some(position));
+                assert!(
+                    input
+                        .native_display_position(Position {
+                            utf16_offset: 2,
+                            ..position
+                        })
+                        .is_none()
+                );
+                assert!(
+                    input
+                        .native_display_position(Position {
+                            utf16_offset: 4,
+                            ..position
+                        })
+                        .is_none()
+                );
+                let next = input
+                    .native_position_in_direction(
+                        Position {
+                            affinity: Downstream,
+                            ..position
+                        },
+                        Right,
+                        1,
+                        window,
+                        cx,
+                    )
+                    .expect("next mask position");
+                assert_eq!(
+                    next.utf16_offset, 5,
+                    "one painted bullet means one model grapheme, not one UTF16 unit"
+                );
+                let fragments = input.selection_rects_for_range(1..5, window, cx);
+                assert!(!fragments.is_empty());
+                assert!(fragments.first().expect("first fragment").contains_start);
+                assert!(fragments.last().expect("last fragment").contains_end);
+                assert!(input.native_position_bounds(position, window, cx).is_some());
+                let selection = NativeTextSelection {
+                    anchor: position,
+                    head: Position {
+                        utf16_offset: 1,
+                        affinity: Downstream,
+                    },
+                };
+                assert!(input.set_native_selection(selection, window, cx));
+                assert_eq!(input.native_selection(window, cx), Some(selection));
+                assert!(!input.set_native_selection(
+                    NativeTextSelection {
+                        head: Position {
+                            utf16_offset: 2,
+                            ..position
+                        },
+                        ..selection
+                    },
+                    window,
+                    cx
+                ));
+                assert_eq!(input.native_selection(window, cx), Some(selection));
+                assert_eq!(input.grapheme_range_at(4, window, cx), Some(3..5));
+                assert_eq!(
+                    input
+                        .native_position_for_point(
+                            fragments
+                                .last()
+                                .expect("last fragment")
+                                .bounds
+                                .bottom_right(),
+                            Some(1..3),
+                            window,
+                            cx
+                        )
+                        .expect("constrained mask position")
+                        .utf16_offset,
+                    3
+                );
+                input.set_value("new content", cx);
+                assert!(
+                    input.native_position_bounds(position, window, cx).is_none(),
+                    "stale painted text cannot report new geometry"
+                );
+                input.set_placeholder("Not editable text", cx);
+                input.set_value("", cx);
+            })
+        });
+        harness.frame();
+        harness.update(|window, cx| {
+            input.update(cx, |input, cx| {
+                let bounds = input
+                    .native_position_bounds(Position::default(), window, cx)
+                    .expect("empty document caret");
+                assert_eq!(
+                    input
+                        .native_position_for_point(bounds.origin, None, window, cx)
+                        .expect("empty document point")
+                        .utf16_offset,
+                    0
+                );
+            })
+        });
+    }
+
+    #[gpui::test]
+    fn native_multiline_geometry_retains_rows_and_atomic_selection(cx: &mut TestAppContext) {
+        use gpui::{
+            NativeTextPosition as Position, NativeTextSelection, TextAffinity::*,
+            TextNavigationDirection::*,
+        };
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        crate::controls::textarea::TextArea::new("native.rows", window, cx)
+                            .text("a🦀\nbc")
+                    })
+                })
+                .clone()
+                .into_any_element()
+        });
+        harness.frame();
+        let area = slot.borrow().clone().expect("mounted textarea");
+        harness.update(|window, cx| {
+            area.update(cx, |area, cx| {
+                let first = Position {
+                    utf16_offset: 0,
+                    affinity: Downstream,
+                };
+                let next = area
+                    .native_position_in_direction(first, Down, 1, window, cx)
+                    .expect("next visual row");
+                assert_eq!(next.utf16_offset, 4);
+                let a = area
+                    .native_position_bounds(first, window, cx)
+                    .expect("first row caret");
+                let b = area
+                    .native_position_bounds(next, window, cx)
+                    .expect("second row caret");
+                assert!(b.top() > a.top());
+                let fragments = area.selection_rects_for_range(0..6, window, cx);
+                assert!(fragments.len() >= 2);
+                assert!(
+                    fragments
+                        .first()
+                        .expect("first row fragment")
+                        .contains_start
+                );
+                assert!(fragments.last().expect("last row fragment").contains_end);
+                let selection = NativeTextSelection {
+                    anchor: Position {
+                        utf16_offset: 4,
+                        affinity: Upstream,
+                    },
+                    head: first,
+                };
+                assert!(area.set_native_selection(selection, window, cx));
+                assert_eq!(area.native_selection(window, cx), Some(selection));
+                assert!(!area.set_native_selection(
+                    NativeTextSelection {
+                        head: Position {
+                            utf16_offset: 2,
+                            affinity: Downstream
+                        },
+                        ..selection
+                    },
+                    window,
+                    cx
+                ));
+                assert_eq!(area.native_selection(window, cx), Some(selection));
+                assert!(area.selection_rects_for_range(2..6, window, cx).is_empty());
+                assert_eq!(
+                    area.native_position_for_point(b.origin, Some(0..3), window, cx)
+                        .expect("point constrained before nearest row")
+                        .utf16_offset,
+                    0
+                );
+                area.set_placeholder("Not editable text", cx);
+                area.set_value("", cx);
+            })
+        });
+        harness.frame();
+        harness.update(|window, cx| {
+            area.update(cx, |area, cx| {
+                let bounds = area
+                    .native_position_bounds(Position::default(), window, cx)
+                    .expect("empty textarea caret");
+                assert_eq!(
+                    area.native_position_for_point(bounds.origin, None, window, cx)
+                        .expect("empty textarea position")
+                        .utf16_offset,
+                    0
+                );
+            })
+        });
+    }
+
+    #[gpui::test]
+    fn native_actions_and_hints_preserve_editor_policy(cx: &mut TestAppContext) {
+        let mut harness = Harness::new(cx, crate::install, |_, _| div().into_any_element());
+        let next = Rc::new(RefCell::new(Vec::new()));
+        let actions = next.clone();
+        let (input, _subscription) = harness.update(|window, cx| {
+            let input = cx.new(|cx| {
+                TextInput::new("native.actions", window, cx)
+                    .text("a🦀z")
+                    .secret(true)
+                    .input_options(gpui::TextInputOptions {
+                        purpose: gpui::KeyboardPurpose::Email,
+                        action: gpui::TextInputAction::Next,
+                        autofill: Some(gpui::AutofillPurpose::Username),
+                        multiline: true,
+                        secure: false,
+                    })
+            });
+            let subscription = cx.subscribe(&input, move |_, action: &gpui::TextInputAction, _| {
+                actions.borrow_mut().push(*action)
+            });
+            input.update(cx, |input, cx| {
+                let options = input.text_input_options(window, cx);
+                assert_eq!(options.purpose, gpui::KeyboardPurpose::Email);
+                assert_eq!(options.autofill, Some(gpui::AutofillPurpose::Username));
+                assert!(options.secure);
+                assert!(!options.multiline);
+                input.set_selected_text_range(1..3, window, cx);
+                input.submit(&Submit, window, cx);
+                assert_eq!(input.selected_range(), 1..5);
+                assert_eq!(input.value().as_ref(), "a🦀z");
+                assert!(!input.perform_text_input_action(
+                    gpui::TextInputAction::Newline,
+                    window,
+                    cx
+                ));
+            });
+            (input, subscription)
+        });
+        assert_eq!(*next.borrow(), vec![gpui::TextInputAction::Next]);
+        harness.update(|window, cx| {
+            input.update(cx, |input, cx| {
+                input.set_disabled(true, cx);
+                assert!(!input.perform_text_input_action(gpui::TextInputAction::Next, window, cx));
+            })
+        });
+        assert_eq!(next.borrow().len(), 1);
+        harness.update(|window, cx| {
+            let area = cx.new(|cx| {
+                crate::controls::textarea::TextArea::new("native.multiline", window, cx).text("a")
+            });
+            area.update(cx, |area, cx| {
+                assert_eq!(
+                    area.text_input_options(window, cx).action,
+                    gpui::TextInputAction::Newline
+                );
+                assert!(area.perform_text_input_action(gpui::TextInputAction::Default, window, cx));
+                assert_eq!(area.value().as_ref(), "a\n");
+                area.set_enter(crate::controls::textarea::Enter::Submits, cx);
+                assert_eq!(
+                    area.text_input_options(window, cx).action,
+                    gpui::TextInputAction::Send
+                );
+                assert!(area.perform_text_input_action(gpui::TextInputAction::Send, window, cx));
+                assert_eq!(area.value().as_ref(), "a\n");
+            });
+        });
+    }
+
+    #[gpui::test]
+    fn native_selection_uses_utf16_and_read_only_keeps_selection(cx: &mut TestAppContext) {
+        let mut harness = Harness::new(cx, crate::install, |_, _| div().into_any_element());
+        harness.update(|window, cx| {
+            let input = cx.new(|cx| TextInput::new("native.input", window, cx).text("a🦀中z"));
+            input.update(cx, |input, cx| {
+                assert_eq!(input.text_length_utf16(window, cx), Some(5));
+                input.set_selected_text_range(1..3, window, cx);
+                assert_eq!(input.selected_range(), 1..5);
+                input.replace_text_in_range(None, "é", window, cx);
+                assert_eq!(input.value().as_ref(), "aé中z");
+                input.set_read_only(true, cx);
+                assert!(!input.accepts_text_input(window, cx));
+                input.set_selected_text_range(2..3, window, cx);
+                assert_eq!(input.selected_range(), 3..6);
+                input.replace_text_in_range(None, "x", window, cx);
+                assert_eq!(input.value().as_ref(), "aé中z");
+                input.set_disabled(true, cx);
+                input.set_selected_text_range(0..1, window, cx);
+                assert_eq!(input.selected_range(), 3..6);
+            });
+
+            let area = cx.new(|cx| {
+                crate::controls::textarea::TextArea::new("native.area", window, cx).text("a🦀\n中z")
+            });
+            area.update(cx, |area, cx| {
+                assert_eq!(area.text_length_utf16(window, cx), Some(6));
+                area.set_selected_text_range(1..4, window, cx);
+                assert_eq!(area.selected_range(), 1..6);
+                area.replace_text_in_range(None, "é\n", window, cx);
+                assert_eq!(area.value().as_ref(), "aé\n中z");
+                area.set_read_only(true, cx);
+                assert!(!area.accepts_text_input(window, cx));
+                area.set_selected_text_range(3..4, window, cx);
+                assert_eq!(area.selected_range(), 4..7);
+                area.replace_text_in_range(None, "x", window, cx);
+                assert_eq!(area.value().as_ref(), "aé\n中z");
+                area.set_disabled(true, cx);
+                area.set_selected_text_range(0..1, window, cx);
+                assert_eq!(area.selected_range(), 4..7);
+            });
+        });
+    }
 
     #[gpui::test]
     fn options_retain_caret_and_secret_changes_revoke_exports(cx: &mut TestAppContext) {

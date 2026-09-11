@@ -895,8 +895,14 @@ fn pasted_workflow_picture(cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn image_viewer(window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    let state = crate::motion::keyed::slot::<(FitMode, Option<SharedString>)>(
+        &"scene.image.controlled".into(),
+        window.window_handle().window_id(),
+        cx,
+    );
+    let (fit, showing) = state.borrow().clone();
     stack(&theme)
         .w(px(860.0))
         .child(
@@ -917,11 +923,19 @@ pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     .natural(1200, 1200),
                             ],
                         )
-                        .showing("graph")
-                        .fit(FitMode::Contain)
+                        .showing(showing.unwrap_or_else(|| "graph".into()))
+                        .fit(fit)
+                        .control_size(gpui_kit_theme::ControlSize::Touch)
                         .height(200.0)
                         .image(|_, _, cx| Some(run_graph_picture(cx)))
-                        .on_event(|_, _, _| {}),
+                        .on_event(move |event, window, _| {
+                            match event {
+                                ImageViewerEvent::FitChanged(fit) => state.borrow_mut().0 = *fit,
+                                ImageViewerEvent::Stepped { id } => state.borrow_mut().1 = Some(id.clone()),
+                                _ => return,
+                            }
+                            window.refresh();
+                        }),
                     ),
                 )
                 .child(
@@ -945,7 +959,7 @@ pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .label("A size the host never stated"),
         )
         .child(
-            div().w(px(396.0)).child(
+            div().row().items_start().gap(px(theme.spacing.lg)).child(div().w(px(396.0)).child(
                 ImageViewer::new(
                     "scene.image.unmeasured",
                     [ImageFrame::new("sketch", "A pasted sketch").source("clipboard")],
@@ -953,8 +967,16 @@ pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .height(200.0)
                 .image(|_, _, cx| Some(pasted_workflow_picture(cx)))
                 .on_event(|_, _, _| {}),
-            ),
+            )).child(div().w(px(396.0)).child(
+                ImageViewer::new("scene.image.zoom-refused", [ImageFrame::new("graph", "Zoom retained by host").natural(1600, 900)])
+                    .fit(FitMode::Zoom(0.5))
+                    .control_size(gpui_kit_theme::ControlSize::Touch)
+                    .height(200.0)
+                    .image(|_, _, cx| Some(pasted_workflow_picture(cx)))
+                    .on_event(|_, _, _| {}),
+            )),
         )
+        .child(caption(&theme, "Fixture: the run graph accepts zoom and stepping; Zoom retained by host refuses fit changes; the scan refuses image access."))
         .into_any_element()
 }
 

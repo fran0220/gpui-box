@@ -2822,6 +2822,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-box-android"
+version = "0.1.2"
+dependencies = [
+ "accesskit",
+ "anyhow",
+ "futures",
+ "gpui-box",
+ "gpui-box-wgpu",
+ "jni",
+ "raw-window-handle",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "gpui-box-android-example"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "gpui-box",
+ "gpui-box-android",
+ "gpui-box-kit",
+ "gpui-box-mobile-reference",
+ "jni",
+ "serde_json",
+]
+
+[[package]]
 name = "gpui-box-app-host"
 version = "0.1.2"
 dependencies = [
@@ -2894,6 +2922,26 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "url",
+]
+
+[[package]]
+name = "gpui-box-ios"
+version = "0.1.2"
+dependencies = [
+ "accesskit",
+ "accesskit_consumer 0.38.0",
+ "anyhow",
+ "cc",
+ "futures",
+ "gpui-box",
+ "gpui-box-kit",
+ "gpui-box-mobile-reference",
+ "gpui-box-wgpu",
+ "log",
+ "raw-window-handle",
+ "serde_json",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]
@@ -3119,6 +3167,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-box-mobile-reference"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "gpui-box",
+ "gpui-box-kit",
+ "gpui-box-kit-semantics",
+ "gpui-box-kit-theme",
+ "gpui-box-platform",
+ "gpui-box-wgpu",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "gpui-box-performance"
 version = "0.1.2"
 dependencies = [
@@ -3136,6 +3199,8 @@ version = "0.1.2"
 dependencies = [
  "console_error_panic_hook",
  "gpui-box",
+ "gpui-box-android",
+ "gpui-box-ios",
  "gpui-box-linux",
  "gpui-box-macos",
  "gpui-box-web",

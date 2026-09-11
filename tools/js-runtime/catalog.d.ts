@@ -2,6 +2,7 @@
 export interface KitBindingCatalog {
   readonly "AbilityBar": { readonly source: "crates/gpui-kit/src/game/presentation.rs"; readonly status: "partial" };
   readonly "Accordion": { readonly source: "crates/gpui-kit/src/navigation/accordion.rs"; readonly status: "partial" };
+  readonly "ActionSheet": { readonly source: "crates/gpui-kit/src/overlay/sheet.rs"; readonly status: "unbound" };
   readonly "AgentActivityLine": { readonly source: "crates/gpui-kit/src/agent/presentation.rs"; readonly status: "partial" };
   readonly "AgentAvatar": { readonly source: "crates/gpui-kit/src/agent/presentation.rs"; readonly status: "partial" };
   readonly "AgentCard": { readonly source: "crates/gpui-kit/src/agent/presentation.rs"; readonly status: "partial" };
@@ -13,6 +14,7 @@ export interface KitBindingCatalog {
   readonly "AgentRunIssues": { readonly source: "crates/gpui-kit/src/agent/presentation.rs"; readonly status: "partial" };
   readonly "AnchorList": { readonly source: "crates/gpui-kit/src/navigation/anchor_list.rs"; readonly status: "partial" };
   readonly "AnimatedNumber": { readonly source: "crates/gpui-kit/src/display/animated_number.rs"; readonly status: "partial" };
+  readonly "AppBar": { readonly source: "crates/gpui-kit/src/layout/app_bar.rs"; readonly status: "unbound" };
   readonly "ApprovalPrompt": { readonly source: "crates/gpui-kit/src/agent/approval.rs"; readonly status: "partial" };
   readonly "AreaChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "ArtifactPreview": { readonly source: "crates/gpui-kit/src/agent/artifact.rs"; readonly status: "partial" };
@@ -26,6 +28,8 @@ export interface KitBindingCatalog {
   readonly "Banner": { readonly source: "crates/gpui-kit/src/display/status.rs"; readonly status: "partial" };
   readonly "BarChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "BarLoader": { readonly source: "crates/gpui-kit/src/display/loading.rs"; readonly status: "partial" };
+  readonly "BottomNavigation": { readonly source: "crates/gpui-kit/src/navigation/bottom_navigation.rs"; readonly status: "unbound" };
+  readonly "BottomSheet": { readonly source: "crates/gpui-kit/src/overlay/sheet.rs"; readonly status: "unbound" };
   readonly "Breadcrumb": { readonly source: "crates/gpui-kit/src/navigation/breadcrumb.rs"; readonly status: "partial" };
   readonly "BrowserPanel": { readonly source: "crates/gpui-kit/src/content/browser.rs"; readonly status: "partial" };
   readonly "Bubble": { readonly source: "crates/gpui-kit/src/display/bubble.rs"; readonly status: "partial" };
@@ -121,6 +125,7 @@ export interface KitBindingCatalog {
   readonly "OutcomePanel": { readonly source: "crates/gpui-kit/src/display/outcome.rs"; readonly status: "partial" };
   readonly "Outline": { readonly source: "crates/gpui-kit/src/content/outline.rs"; readonly status: "partial" };
   readonly "Overlay": { readonly source: "crates/gpui-kit/src/overlay/layer.rs"; readonly status: "partial" };
+  readonly "PageLayout": { readonly source: "crates/gpui-kit/src/layout/page.rs"; readonly status: "unbound" };
   readonly "Pagination": { readonly source: "crates/gpui-kit/src/navigation/pagination.rs"; readonly status: "partial" };
   readonly "PartyRoster": { readonly source: "crates/gpui-kit/src/game/presentation.rs"; readonly status: "partial" };
   readonly "PasswordInput": { readonly source: "crates/gpui-kit/src/controls/auth.rs"; readonly status: "partial" };
@@ -134,6 +139,7 @@ export interface KitBindingCatalog {
   readonly "ProgressBar": { readonly source: "crates/gpui-kit/src/display/progress.rs"; readonly status: "partial" };
   readonly "ProgressCircle": { readonly source: "crates/gpui-kit/src/display/progress_circle.rs"; readonly status: "partial" };
   readonly "PromptBuilder": { readonly source: "crates/gpui-kit/src/agent/prompt.rs"; readonly status: "partial" };
+  readonly "PullToRefresh": { readonly source: "crates/gpui-kit/src/interaction/refresh.rs"; readonly status: "unbound" };
   readonly "PulseLoader": { readonly source: "crates/gpui-kit/src/display/loading.rs"; readonly status: "partial" };
   readonly "RadarChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "Radio": { readonly source: "crates/gpui-kit/src/controls/toggle.rs"; readonly status: "partial" };
@@ -174,6 +180,7 @@ export interface KitBindingCatalog {
   readonly "StatusDot": { readonly source: "crates/gpui-kit/src/display/status.rs"; readonly status: "partial" };
   readonly "StatusLine": { readonly source: "crates/gpui-kit/src/display/status.rs"; readonly status: "partial" };
   readonly "SubagentTree": { readonly source: "crates/gpui-kit/src/agent/presentation.rs"; readonly status: "partial" };
+  readonly "SwipeActions": { readonly source: "crates/gpui-kit/src/interaction/swipe.rs"; readonly status: "unbound" };
   readonly "Switch": { readonly source: "crates/gpui-kit/src/controls/toggle.rs"; readonly status: "partial" };
   readonly "Table": { readonly source: "crates/gpui-kit/src/data/table.rs"; readonly status: "partial" };
   readonly "Tabs": { readonly source: "crates/gpui-kit/src/navigation/tabs.rs"; readonly status: "partial" };

@@ -46,6 +46,28 @@ gate_lane = "authority"
 ci_commands = ["cargo run -p xtask -- web check"]
 limitations = ["application context menus use the in-window fallback", "native media playback is unavailable", "threaded COOP/COEP not claimed", "screen-reader announcements not covered"]
 
+[mobile_development]
+status = "experimental-source-native-acceptance-pending"
+android = "API33+ arm64 Vulkan, one opaque Activity; JNI lifecycle, touch, InputConnection and basic AccessKit bridge. Host-check does not compile Java, link an APK or execute Android."
+ios = "UIKit host and WGPU Metal adapter with caller-supplied fonts, affinity-aware text queries and basic AccessKit projection. Linux platform-check is not Xcode linking or UIKit execution."
+browser = "Pointer contact identity, lifecycle cancellation, residual VisualViewport/safe-area edges, keyless input and IME traits. Chromium touch and inset fixtures are not Android Chrome or iOS Safari device acceptance."
+native_editors = "TextInput and TextArea implement native affinity/selection hooks, including masked and OTP wrappers. RichTextEditor retains its legacy handler; its native affinity/geometry adapter is missing, and Android's native selection bridge refuses it."
+host_checks = ["cargo test -p gpui-box-ios -p gpui-box-android --all-features", "cargo check -p gpui-box-ios --features platform-check", "cargo check -p gpui-box-android-example --features host-check", "npm --prefix examples/browser-gallery run mobile"]
+native_requirements = ["licensed Android SDK/NDK and authorized device or external emulator", "macOS with Xcode and installed iOS simulator runtime", "actual keyboard/IME, accessibility and surface lifecycle acceptance", "signing and device provisioning for physical iOS devices"]
+limitations = ["no complete mobile accessibility claim", "native hardware keyboard/pointer coverage incomplete", "OS autofill, process restoration and predictive back remain capability-scoped", "portable tests and construction markers do not establish presented frames"]
+
+[mobile_reference]
+package = "gpui-box-mobile-reference"
+contract = "Default library mounts caller-owned fixture state without a desktop platform dependency. Versioned checkpoints exclude focus, keyboard, open overlays and active refresh. Native example hosts choose back policy and private persistence."
+capture = "cargo run -p gpui-box-mobile-reference --features capture --example capture -- target/mobile-reference"
+ios = "python3 -B examples/ios-native/run-simulator.py --reference"
+android = "bash examples/android/launch.sh reference"
+limitations = ["offscreen 390px and resized-window captures do not establish native keyboard or touch timing", "native persistence and recreation require executed device/simulator evidence", "Android requires a separately installed development APK and ANDROID_SERIAL"]
+
+[framework_native_operations]
+contract = "App::try_* and Window::try_* check support and dispatch synchronously on the owning thread. Unsupported, unavailable and refused requests are distinct; acceptance does not mean the OS transition completed. Mobile defaults deny unless a backend implements the operation. Legacy desktop behavior is preserved."
+surface_lifecycle = "WGPU explicit detach/destroy drain submitted native resources before platform handle invalidation. Device loss can make completion unconfirmable; destroy still releases resources and reports failure. Repeated cleanup after release succeeds. Native lifecycle execution remains required."
+
 [framework_context_menu]
 contract = "Window::show_context_menu returns an opaque revision session with captured EffectOwner. Cancellation invalidates command authority immediately, but completion waits for native tracking exit. Replacements serialize across windows; stale cancellation cannot end a newer menu. Only NotSupported permits fallback; cancellation refusal and unavailable presentation are distinct from dismissal. macOS uses NSMenu.cancelTracking and Windows uses identity-guarded EndMenu. Linux/browser retain explicit unsupported capability."
 tests = ["native_context_menu_revision_and_refusal", "native_context_menu_cross_window_replacement", "native_context_menu_invalidation_waits_for_real_completion", "native_context_menu_transport_loss_is_not_dismissal", "native_context_menu_dispatches_in_the_captured_focus_context"]
@@ -87,9 +109,16 @@ measured_reveal = "A stable-id Reveal measures its subtree at an unconstrained p
 spring = "SpringConfig analytically advances position and velocity for fixed or steadily moving targets; with_spring retains per-element state across retargeting, supports pause, stop, complete, and cancel, and resolves finite overshoot without clamping. Reduced motion snaps a running spring to its target."
 
 [framework_gestures]
-portable_touch = "One raw touch stream resolves to synthesized tap presses, an axis-locked phased scroll with optional prediction and catchable fling momentum, or an element-claimed phased touch drag or long press. Additional concurrent contacts are ignored."
+portable_touch = "Stable contact IDs resolve to tap, axis-locked scrolling/fling, claimed drag/long press, captured directional pan or two-contact pinch. Unclaimed pan cancels before pinch; a captured pan promotes only to its same-ID registered pinch. Extra contacts drain without phantom taps."
 scroll_physics = "PlatformGestures selects exponential or Android friction-spline deceleration without replacing the source-compatible GestureTuning::momentum_decay_per_ms field."
-limitations = ["no portable pinch recognizer", "no multi-touch arena", "no native iOS or Android touch producer"]
+handoff = "After live scroll consumes movement, a TouchPanEvent may acquire only its residual; touch_start_position retains the hit anchor and start_position rebases to current minus residual. Captured ownership lasts through reversal and one terminal phase. Prediction is disabled in frames with arbitration listeners."
+interruption = "Inactive platform status invokes Window::cancel_touch_input before suspension, cancelling pending recognition, owned gestures and released momentum. Per-contact cancellation never cancels an unrelated owner."
+limitations = ["no rotation or arbitrary simultaneous gesture graph", "captured manipulation does not hand back to scrolling on reversal", "owners must cancel before unregistering their captured listener", "shared tests do not establish native device integration"]
+
+[framework_mobile_input]
+insets = "Window::insets and invalidation callbacks expose residual edge occlusion in logical current-viewport pixels; effective is per-edge maximum, not addition. Floating keyboards are not approximated as full-width edge padding."
+text = "InputHandler, EntityInputHandler and PlatformInputHandler forward keyboard/autofill hints, fallible editor actions and UTF-16 native geometry queries. Focus/options notifications follow the installed accepting handler; backend callbacks must defer reentrant queries."
+limitations = ["keyboard/autofill hints are best-effort, not validation or SMS retrieval", "unknown text geometry returns unavailable rather than invented coordinates", "unsupported paragraph-direction mutations return false"]
 
 [framework_profiling]
 frame_submission = "FrameTiming retains each draw; FrameSubmissionTiming pairs the newly drawn frame with the synchronous platform submission call, first invalidating input, and coalesced top-level input count. FrameTimingMonitor remains passive and bounded but summarizes submitted frames."
@@ -160,3 +189,8 @@ limitations = ["host must register freshly minted true mount tokens and preserve
 contract = "After native HWND placement, an opt-in UI-thread callback allocates toolkit content using the full physical viewport, not the clip region. WebView2 controller bounds use this callback; GPUI retains HWND positioning and clipping authority."
 commands = ["cargo test -p gpui-box allocation_callback --features test-support", "cargo run --locked -p gpui-box-webview --example smoke"]
 limitations = ["Windows native execution required; cross-compilation and Linux smoke do not certify WebView2 allocation", "does not add arbitrary transforms or rounded clipping"]
+
+[framework_native_editable_geometry]
+contract = "Native selection fragments follow retained shaped glyph cells and exact soft-wrap rows, preserving logical endpoint flags and Unicode resolved direction. NativeTextPosition preserves both incident bidi/soft-wrap carets; NativeTextSelection atomically retains primary anchor/head affinities in EditBuffer and history. Legacy logical selection setters explicitly reset downstream. Undo, redo and active IME cancellation restore both primary affinities."
+commands = ["cargo test -p gpui-box --lib editable_text --no-default-features", "cargo run -p xtask -- dependencies check", "cargo run -p xtask -- gate full"]
+limitations = ["Linux geometry tests do not certify UIKit or Android native execution", "legacy usize geometry is an explicitly lossy projection of the affinity-aware methods", "the current editable layout paints uniform-height horizontal rows", "font-provided intra-ligature caret positions are absent from ShapedGlyph; interior caret queries and movement requiring them return None, and selections cover the actual full cluster", "paragraph-direction mutation is unsupported because the editable model has no direction overrides", "point, range and movement queries enumerate the document; caret bounds instead resolve only the incident hard paragraph, with indexed UTF16 conversion for source layouts", "secondary cursors retain the existing logical-only policy; an atomic native selection replaces the primary and clears secondaries", "secret fields retain only active composition rollback state, never completed undo/redo history"]

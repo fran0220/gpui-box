@@ -295,6 +295,7 @@ multiline rich-text replacement needs {expected} new block ids, got {actual}
 must be between 0 and 1
 must be finite
 no record without a parent
+nonempty validated detents
 not applicable
 not fetched
 null
@@ -336,6 +337,7 @@ unknown-limit
 unrenderable, required
 unrendered html
 validated fold ranges
+validated selected detent
 visible series are drawn by the caller
 voice {field} {reason}
 withheld

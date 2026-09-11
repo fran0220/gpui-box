@@ -112,9 +112,12 @@ pub struct TouchId(pub u64);
 
 /// A raw touch event from the platform.
 ///
-/// The core recognizer classifies one touch stream at a time. Tap and pan
-/// routing remain anchored to the starting position; additional concurrent
-/// touches are ignored until the active stream resolves.
+/// Forward all contacts using stable IDs, never their index in a native event.
+/// Coordinates are logical window pixels. Deliver historical samples before
+/// current samples, and never also synthesize mouse/native gestures for these
+/// contacts. Predictions affect pan output only. Cancellation is per-contact;
+/// a system-wide interruption must call [`Window::cancel_touch_input`] as well
+/// to stop post-release momentum and pending recognition.
 #[derive(Clone, Debug, Default)]
 pub struct TouchEvent {
     /// Which touch this event belongs to.
@@ -625,8 +628,7 @@ impl Default for ScrollDelta {
     }
 }
 
-/// A pinch gesture event from the platform, generated when the user performs
-/// a pinch-to-zoom gesture (typically on a trackpad).
+/// A pinch gesture from a platform trackpad or GPUI's portable touch recognizer.
 ///
 #[derive(Clone, Debug, Default)]
 pub struct PinchEvent {
@@ -636,6 +638,8 @@ pub struct PinchEvent {
     /// The zoom delta for this event.
     /// Positive values indicate zooming in, negative values indicate zooming out.
     /// For example, 0.1 represents a 10% zoom increase.
+    /// Portable touch pinch reports the ratio to the previous contact span
+    /// minus one; consumers multiply their scale by `1.0 + delta`.
     pub delta: f32,
 
     /// The modifiers that were held down during the pinch gesture.
@@ -1099,6 +1103,8 @@ pub enum PlatformInput {
     LongPress(LongPressEvent),
     /// A direct touch drag claimed by an element.
     TouchDrag(TouchDragEvent),
+    /// A direction-aware touch manipulation acquired after slop.
+    TouchPan(crate::TouchPanEvent),
     /// Files were dragged and dropped onto the window.
     FileDrop(FileDropEvent),
     /// Non-path native data was dragged and dropped onto the window.
@@ -1123,6 +1129,7 @@ impl PlatformInput {
             PlatformInput::Pinch(event) => Some(event),
             PlatformInput::LongPress(event) => Some(event),
             PlatformInput::TouchDrag(event) => Some(event),
+            PlatformInput::TouchPan(event) => Some(event),
             PlatformInput::FileDrop(event) => Some(event),
             PlatformInput::ExternalDrop(event) => Some(event),
             PlatformInput::Touch(_) => None,
@@ -1144,6 +1151,7 @@ impl PlatformInput {
             PlatformInput::Pinch(_) => None,
             PlatformInput::LongPress(_) => None,
             PlatformInput::TouchDrag(_) => None,
+            PlatformInput::TouchPan(_) => None,
             PlatformInput::FileDrop(_) => None,
             PlatformInput::ExternalDrop(_) => None,
             PlatformInput::Touch(_) => None,
@@ -1167,6 +1175,7 @@ impl PlatformInput {
             PlatformInput::Pinch(_) => "pinch",
             PlatformInput::LongPress(_) => "long_press",
             PlatformInput::TouchDrag(_) => "touch_drag",
+            PlatformInput::TouchPan(_) => "touch_pan",
             PlatformInput::FileDrop(_) => "file_drop",
             PlatformInput::ExternalDrop(_) => "external_drop",
             PlatformInput::Touch(_) => "touch",

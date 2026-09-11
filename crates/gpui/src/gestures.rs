@@ -1,13 +1,14 @@
-//! Portable single-touch gesture recognition.
+//! Portable touch gesture recognition and exclusive arbitration.
 //!
-//! GPUI resolves one raw [`TouchEvent`](crate::TouchEvent) stream at a time.
+//! GPUI tracks stable contact identities for the entire touch sequence.
 //! Taps become synthesized mouse presses so existing click and text-selection
 //! behavior works unchanged. Pans become phased
 //! [`ScrollWheelEvent`](crate::ScrollWheelEvent)s and may continue with fling
 //! momentum. Elements can claim a pending touch as [`TouchDragEvent`] or
-//! [`LongPressEvent`]. Additional concurrent touches are ignored; pinch input
-//! remains a platform-provided [`PinchEvent`](crate::PinchEvent), not a
-//! portable recognizer.
+//! [`LongPressEvent`]. Two contacts promote an unclaimed gesture to pinch,
+//! cancelling an existing pan first. Claimed drags and long presses retain
+//! ownership. After pinch or its owner ends, remaining contacts drain without
+//! becoming taps; a new single-touch gesture requires all fingers to lift.
 
 use std::collections::VecDeque;
 use std::mem;
@@ -18,8 +19,8 @@ use smallvec::SmallVec;
 
 use crate::{
     Axis, GestureEvent, InputEvent, IsZero, Modifiers, MouseButton, MouseDownEvent, MouseEvent,
-    MouseUpEvent, Pixels, PlatformInput, Point, ScrollDelta, ScrollWheelEvent, TouchEvent, TouchId,
-    TouchPhase, point, px, seal::Sealed,
+    MouseUpEvent, PinchEvent, Pixels, PlatformInput, Point, ScrollDelta, ScrollWheelEvent,
+    TouchEvent, TouchId, TouchPhase, point, px, seal::Sealed,
 };
 
 const SCROLL_EVENT_SEPARATION: Duration = Duration::from_millis(28);
@@ -352,7 +353,8 @@ mod friction_spline {
 ///
 /// Used by [`PlatformGestures::native_recognizers`] to declare which gestures
 /// the platform handles instead of forwarding their raw contacts to GPUI's
-/// portable single-touch recognizer.
+/// portable recognizer. A backend must not send both raw contacts and native
+/// semantic events for the same gesture; this declaration does not filter input.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GestureKinds {
     /// Tap and multi-tap. GPUI's portable path synthesizes mouse presses so
@@ -387,6 +389,10 @@ impl GestureKinds {
 
 /// A direct touch drag claimed by an element before touch input becomes a tap,
 /// long press, or scrolling gesture.
+///
+/// A pending contact offers `Started` once at touch-down. Only a claimed offer
+/// receives subsequent phases. For direction-aware acquisition after slop,
+/// use the separate [`TouchPanEvent`] stream.
 #[derive(Clone, Debug)]
 pub struct TouchDragEvent {
     /// The phase of the touch drag.
@@ -405,6 +411,50 @@ impl InputEvent for TouchDragEvent {
 }
 impl GestureEvent for TouchDragEvent {}
 impl MouseEvent for TouchDragEvent {}
+
+/// A direction-aware direct manipulation offered when a pending touch exceeds
+/// slop, or when live scrolling leaves an unconsumed delta at an edge. Listen
+/// during paint with [`crate::Window::on_touch_pan`]. Hit testing uses
+/// `touch_start_position`, including after a scroll handoff.
+///
+/// On `Started`, inspect `axis` and signed `position - start_position` and
+/// call [`crate::Window::prevent_default`] to acquire.
+/// Bubble dispatch lets the innermost eligible listener acquire before its
+/// ancestors; a pull-to-refresh owner should acquire only downward at scroll
+/// top. Refusal leaves the full travel for default axis-locked scrolling.
+/// At handoff the scroll has already consumed its portion; `start_position`
+/// is rebased so this offer contains only the residual. Acquisition cancels
+/// the scroll stream, then owns the contact until its terminal phase, including
+/// reversals. Claimed direct manipulations never transfer to another owner.
+///
+/// Only acquisition produces `Moved` and exactly one `Ended` or `Cancelled`.
+/// Cancellation must roll back, not commit. The axis is fixed at acquisition,
+/// but positions remain raw and two-dimensional. There is no implicit fling.
+#[derive(Clone, Debug)]
+pub struct TouchPanEvent {
+    /// Lifecycle phase; `Started` is an acquisition offer.
+    pub phase: TouchPhase,
+    /// Dominant axis at slop crossing; vertical wins an exact tie.
+    pub axis: Axis,
+    /// Original contact hit-test anchor in logical window pixels.
+    pub touch_start_position: Point<Pixels>,
+    /// Whether acquisition followed a partially or wholly unconsumed scroll.
+    pub is_scroll_handoff: bool,
+    /// Manipulation origin. On handoff this is current position minus residual
+    /// scroll travel, not the original contact point.
+    pub start_position: Point<Pixels>,
+    /// Current raw position in logical window pixels.
+    pub position: Point<Pixels>,
+}
+
+impl Sealed for TouchPanEvent {}
+impl InputEvent for TouchPanEvent {
+    fn to_platform_input(self) -> PlatformInput {
+        PlatformInput::TouchPan(self)
+    }
+}
+impl GestureEvent for TouchPanEvent {}
+impl MouseEvent for TouchPanEvent {}
 
 /// A phased long-press gesture recognized from a touch.
 #[derive(Clone, Debug)]
@@ -492,7 +542,7 @@ const VELOCITY_ASSUME_STOPPED_GAP: Duration = Duration::from_millis(40);
 const VELOCITY_MAX_SAMPLES: usize = 20;
 
 /// The portable recognizer behind raw touch input: it watches the
-/// [`TouchEvent`] stream for one touch at a time and resolves it into either
+/// [`TouchEvent`] stream and resolves it into either
 /// a tap, pan, claimed direct drag, or claimed long press. Pans continue into
 /// post-release momentum when the touch lifts at speed; the window drives that
 /// phase through [`Self::tick_momentum`].
@@ -501,14 +551,22 @@ const VELOCITY_MAX_SAMPLES: usize = 20;
 /// [`ClickEvent::Touch`](crate::ClickEvent), which keeps every existing
 /// mouse-driven behavior (click listeners, caret placement, double-tap
 /// selection) working before elements grow a direct tap-delivery path.
-/// Pinch recognition is not implemented yet, and additional touches are ignored
-/// while one is being recognized.
+/// Pinch uses the first two contacts, without replacing a lifted member with
+/// a third finger. Predictions never affect its centroid or scale.
 pub(crate) struct TouchGestureRecognizer {
     tuning: GestureTuning,
     scroll_physics: ScrollPhysics,
     state: TouchGestureState,
     momentum: Option<Momentum>,
     last_tap: Option<CompletedTap>,
+    contacts: Vec<TouchEvent>,
+    pinch: Option<ActivePinch>,
+}
+
+struct ActivePinch {
+    ids: [TouchId; 2],
+    position: Point<Pixels>,
+    span: f32,
 }
 
 /// A semantic event recognized from raw touches, ready to dispatch through
@@ -525,6 +583,8 @@ pub(crate) enum RecognizedTouchGesture {
     },
     TouchDrag(TouchDragEvent),
     LongPress(LongPressEvent),
+    Pinch(PinchEvent),
+    TouchPan(TouchPanEvent),
 }
 
 enum TouchGestureState {
@@ -545,6 +605,7 @@ enum TouchGestureState {
     },
     LongPressing(ActiveTouch),
     TouchDragging(ActiveTouch),
+    TouchPanning(ActiveTouch, TouchPanEvent),
 }
 
 struct ActiveTouch {
@@ -606,6 +667,8 @@ impl TouchGestureRecognizer {
             state: TouchGestureState::Idle,
             momentum: None,
             last_tap: None,
+            contacts: Vec::new(),
+            pinch: None,
         }
     }
 
@@ -621,7 +684,171 @@ impl TouchGestureRecognizer {
         event: &TouchEvent,
         now: Instant,
     ) -> SmallVec<[RecognizedTouchGesture; 2]> {
+        let index = self.contacts.iter().position(|touch| touch.id == event.id);
+        if event.phase == TouchPhase::Started {
+            if index.is_some() {
+                return SmallVec::new();
+            }
+            self.contacts.push(event.clone());
+        } else if let Some(index) = index {
+            self.contacts[index] = event.clone();
+        } else {
+            return SmallVec::new();
+        }
+
         let mut recognized = SmallVec::new();
+        if self.pinch.is_none()
+            && event.phase == TouchPhase::Started
+            && self.contacts.len() == 2
+            && matches!(
+                self.state,
+                TouchGestureState::Pending { .. } | TouchGestureState::Panning { .. }
+            )
+        {
+            recognized.extend(self.cancel_active());
+            let first = &self.contacts[0];
+            let second = &self.contacts[1];
+            let position = (first.position + second.position) / 2.;
+            self.pinch = Some(ActivePinch {
+                ids: [first.id, second.id],
+                position,
+                span: (first.position - second.position).magnitude() as f32,
+            });
+            recognized.push(RecognizedTouchGesture::Pinch(PinchEvent {
+                position,
+                delta: 0.,
+                modifiers: Modifiers::default(),
+                phase: TouchPhase::Started,
+            }));
+        } else if let Some(pinch) = &mut self.pinch {
+            if pinch.ids.contains(&event.id) {
+                let first = self
+                    .contacts
+                    .iter()
+                    .find(|touch| touch.id == pinch.ids[0])
+                    .expect("pinch retains its first contact until the terminal event");
+                let second = self
+                    .contacts
+                    .iter()
+                    .find(|touch| touch.id == pinch.ids[1])
+                    .expect("pinch retains its second contact until the terminal event");
+                let position = (first.position + second.position) / 2.;
+                let span = (first.position - second.position).magnitude() as f32;
+                // Coincident contacts establish a baseline when they separate;
+                // they cannot define a scale ratio at zero distance.
+                let delta = if pinch.span > f32::EPSILON
+                    && span > f32::EPSILON
+                    && event.phase != TouchPhase::Cancelled
+                {
+                    span / pinch.span - 1.
+                } else {
+                    0.
+                };
+                pinch.position = position;
+                if span > f32::EPSILON {
+                    pinch.span = span;
+                }
+                recognized.push(RecognizedTouchGesture::Pinch(PinchEvent {
+                    position,
+                    delta,
+                    modifiers: Modifiers::default(),
+                    phase: event.phase,
+                }));
+                if matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+                    self.pinch = None;
+                }
+            }
+        } else if event.phase != TouchPhase::Started || self.contacts.len() == 1 {
+            recognized.extend(self.handle_single_event_at(event, now));
+        }
+        if matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+            self.contacts.retain(|touch| touch.id != event.id);
+        }
+        recognized
+    }
+
+    /// Cancel every owned gesture and forget every contact. Call before input
+    /// suspension, focus loss, surface destruction, or a platform-wide cancel.
+    /// Repeated calls are harmless; no tap or fling is produced.
+    pub(crate) fn cancel(&mut self) -> SmallVec<[RecognizedTouchGesture; 2]> {
+        let mut recognized = self.cancel_active();
+        if let Some(pinch) = self.pinch.take() {
+            recognized.push(RecognizedTouchGesture::Pinch(PinchEvent {
+                position: pinch.position,
+                delta: 0.,
+                modifiers: Modifiers::default(),
+                phase: TouchPhase::Cancelled,
+            }));
+        }
+        self.contacts.clear();
+        recognized
+    }
+
+    fn cancel_active(&mut self) -> SmallVec<[RecognizedTouchGesture; 2]> {
+        let mut recognized = SmallVec::new();
+        let state = mem::replace(&mut self.state, TouchGestureState::Idle);
+        match state {
+            TouchGestureState::Panning { touch, .. } => {
+                recognized.push(RecognizedTouchGesture::Scroll(scroll_event(
+                    touch.start_position,
+                    Point::default(),
+                    TouchPhase::Cancelled,
+                )))
+            }
+            TouchGestureState::TouchDragging(touch) => {
+                recognized.push(RecognizedTouchGesture::TouchDrag(TouchDragEvent {
+                    phase: TouchPhase::Cancelled,
+                    start_position: touch.start_position,
+                    position: touch.last_position,
+                }))
+            }
+            TouchGestureState::LongPressing(touch) => {
+                recognized.push(RecognizedTouchGesture::LongPress(LongPressEvent {
+                    phase: TouchPhase::Cancelled,
+                    start_position: touch.start_position,
+                    position: touch.last_position,
+                }))
+            }
+            TouchGestureState::TouchPanning(touch, pan) => {
+                recognized.push(RecognizedTouchGesture::TouchPan(TouchPanEvent {
+                    phase: TouchPhase::Cancelled,
+                    position: touch.last_position,
+                    ..pan
+                }))
+            }
+            _ => {}
+        }
+        if let Some(momentum) = self.momentum.take() {
+            recognized.push(RecognizedTouchGesture::Scroll(scroll_event(
+                momentum.position,
+                Point::default(),
+                TouchPhase::Cancelled,
+            )));
+        }
+        self.last_tap = None;
+        recognized
+    }
+
+    fn handle_single_event_at(
+        &mut self,
+        event: &TouchEvent,
+        now: Instant,
+    ) -> SmallVec<[RecognizedTouchGesture; 2]> {
+        let mut recognized = SmallVec::new();
+        if let TouchGestureState::TouchPanning(touch, pan) = &mut self.state
+            && touch.id == event.id
+        {
+            touch.last_position = event.position;
+            recognized.push(RecognizedTouchGesture::TouchPan(TouchPanEvent {
+                phase: event.phase,
+                position: event.position,
+                ..pan.clone()
+            }));
+            if matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+                self.state = TouchGestureState::Idle;
+            }
+            return recognized;
+        }
         match event.phase {
             TouchPhase::Started => {
                 let caught_fling = if let Some(momentum) = self.momentum.take() {
@@ -901,6 +1128,111 @@ impl TouchGestureRecognizer {
             },
         }
         recognized
+    }
+
+    /// A captured owner explicitly registered for pinch may relinquish its pan
+    /// before the second contact is processed. The old owner gets cancellation.
+    pub(crate) fn prepare_pinch_takeover(
+        &mut self,
+        new_contact: TouchId,
+    ) -> Option<RecognizedTouchGesture> {
+        if self.contacts.len() != 1 || self.contacts[0].id == new_contact {
+            return None;
+        }
+        let state = mem::replace(&mut self.state, TouchGestureState::Idle);
+        match state {
+            TouchGestureState::TouchPanning(touch, pan) => {
+                let cancelled = RecognizedTouchGesture::TouchPan(TouchPanEvent {
+                    phase: TouchPhase::Cancelled,
+                    position: touch.last_position,
+                    ..pan
+                });
+                self.state = TouchGestureState::Pending {
+                    touch,
+                    deadline: Instant::now(),
+                    long_press_offered: true,
+                    touch_drag_offered: true,
+                };
+                Some(cancelled)
+            }
+            other => {
+                self.state = other;
+                None
+            }
+        }
+    }
+
+    /// Called before processing a move. Rejection immediately falls through
+    /// to regular recognition, so the same pending touch cannot offer twice.
+    pub(crate) fn offer_touch_pan(&self, event: &TouchEvent) -> Option<TouchPanEvent> {
+        let TouchGestureState::Pending { touch, .. } = &self.state else {
+            return None;
+        };
+        let displacement = event.position - touch.start_position;
+        if event.phase != TouchPhase::Moved
+            || touch.id != event.id
+            || displacement.magnitude() <= f64::from(self.tuning.touch_slop)
+        {
+            return None;
+        }
+        Some(TouchPanEvent {
+            phase: TouchPhase::Started,
+            axis: dominant_axis(displacement),
+            touch_start_position: touch.start_position,
+            is_scroll_handoff: false,
+            start_position: touch.start_position,
+            position: event.position,
+        })
+    }
+
+    /// Offer only unconsumed authoritative travel from an active contact.
+    /// Momentum and terminal scroll events cannot acquire a manipulation.
+    pub(crate) fn offer_scroll_handoff(
+        &self,
+        mut residual: Point<Pixels>,
+    ) -> Option<TouchPanEvent> {
+        let TouchGestureState::Panning { touch, axis } = &self.state else {
+            return None;
+        };
+        lock_delta_to_axis(&mut residual, *axis);
+        if residual.is_zero() {
+            return None;
+        }
+        Some(TouchPanEvent {
+            phase: TouchPhase::Started,
+            axis: *axis,
+            touch_start_position: touch.start_position,
+            is_scroll_handoff: true,
+            start_position: touch.last_position - residual,
+            position: touch.last_position,
+        })
+    }
+
+    pub(crate) fn resolve_touch_pan(
+        &mut self,
+        event: &TouchPanEvent,
+        claimed: bool,
+    ) -> Option<ScrollWheelEvent> {
+        let mut cancelled = None;
+        if claimed {
+            let state = mem::replace(&mut self.state, TouchGestureState::Idle);
+            self.state = match state {
+                TouchGestureState::Pending { mut touch, .. } => {
+                    touch.last_position = event.position;
+                    TouchGestureState::TouchPanning(touch, event.clone())
+                }
+                TouchGestureState::Panning { touch, .. } if event.is_scroll_handoff => {
+                    cancelled = Some(scroll_event(
+                        touch.start_position,
+                        Point::default(),
+                        TouchPhase::Cancelled,
+                    ));
+                    TouchGestureState::TouchPanning(touch, event.clone())
+                }
+                other => other,
+            };
+        }
+        cancelled
     }
 
     pub(crate) fn pending_long_press(&self) -> Option<(TouchId, Duration)> {
@@ -1576,6 +1908,53 @@ mod tests {
     }
 
     #[test]
+    fn interruption_cancels_released_momentum_and_pending_timer_without_revival() {
+        let now = Instant::now();
+        let mut recognizer = TouchGestureRecognizer::new(GestureTuning::default());
+        recognizer.handle_event_at(
+            &touch_event(TouchId(9), TouchPhase::Started, 17., 300.),
+            now,
+        );
+        for step in 1..=3 {
+            recognizer.handle_event_at(
+                &touch_event(TouchId(9), TouchPhase::Moved, 17., 300. - step as f32 * 33.),
+                now + Duration::from_millis(step * 16),
+            );
+        }
+        recognizer.handle_event_at(
+            &touch_event(TouchId(9), TouchPhase::Ended, 17., 201.),
+            now + Duration::from_millis(60),
+        );
+        assert!(recognizer.has_momentum());
+        assert!(recognizer.contacts.is_empty());
+        let events = recognizer.cancel();
+        assert!(matches!(
+            events.as_slice(),
+            [RecognizedTouchGesture::Scroll(ScrollWheelEvent {
+                touch_phase: TouchPhase::Cancelled,
+                ..
+            })]
+        ));
+        assert!(!recognizer.has_momentum());
+        assert!(
+            recognizer
+                .tick_momentum_at(now + Duration::from_secs(1))
+                .is_none()
+        );
+        assert!(recognizer.cancel().is_empty());
+        recognizer.handle_event_at(&touch_event(TouchId(2), TouchPhase::Started, 5., 11.), now);
+        assert!(recognizer.pending_long_press().is_some());
+        assert!(recognizer.cancel().is_empty());
+        assert!(recognizer.pending_long_press().is_none());
+        assert!(recognizer.offer_long_press(TouchId(2)).is_none());
+        assert!(
+            recognizer
+                .handle_event_at(&touch_event(TouchId(2), TouchPhase::Ended, 5., 11.), now)
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn fast_release_starts_momentum_that_decays_to_a_stop() {
         let mut recognizer = TouchGestureRecognizer::new(GestureTuning::default());
         let now = Instant::now();
@@ -1818,39 +2197,138 @@ mod tests {
     }
 
     #[test]
-    fn concurrent_touches_are_ignored_while_one_is_active() {
+    fn pinch_tracks_ids_and_drains_remaining_contacts_without_taps() {
         let mut recognizer = TouchGestureRecognizer::new(GestureTuning::default());
         let now = Instant::now();
-
         recognizer.handle_event_at(
-            &touch_event(TouchId(1), TouchPhase::Started, 100., 100.),
+            &touch_event(TouchId(91), TouchPhase::Started, 10., 20.),
             now,
         );
-        let recognized = recognizer.handle_event_at(
-            &touch_event(TouchId(2), TouchPhase::Started, 200., 200.),
-            now + Duration::from_millis(8),
-        );
-        assert!(recognized.is_empty());
-        let recognized = recognizer.handle_event_at(
-            &touch_event(TouchId(2), TouchPhase::Moved, 200., 300.),
-            now + Duration::from_millis(16),
-        );
-        assert!(recognized.is_empty());
-        let recognized = recognizer.handle_event_at(
-            &touch_event(TouchId(2), TouchPhase::Ended, 200., 300.),
-            now + Duration::from_millis(24),
-        );
-        assert!(recognized.is_empty());
-
-        // The first touch still resolves normally.
-        let recognized = recognizer.handle_event_at(
-            &touch_event(TouchId(1), TouchPhase::Moved, 100., 150.),
-            now + Duration::from_millis(32),
-        );
-        let [RecognizedTouchGesture::Scroll(scroll)] = recognized.as_slice() else {
-            panic!("expected scroll, got {recognized:?}");
+        let started = recognizer
+            .handle_event_at(&touch_event(TouchId(3), TouchPhase::Started, 40., 60.), now);
+        let [RecognizedTouchGesture::Pinch(started)] = started.as_slice() else {
+            panic!("{started:?}")
         };
-        assert_eq!(scroll.touch_phase, TouchPhase::Started);
+        assert_eq!(started.phase, TouchPhase::Started);
+        assert_eq!(started.position, point(px(25.), px(40.)));
+        assert!(
+            recognizer
+                .handle_event_at(
+                    &touch_event(TouchId(8), TouchPhase::Started, 400., 500.),
+                    now
+                )
+                .is_empty()
+        );
+        let mut event = touch_event(TouchId(3), TouchPhase::Moved, 70., 100.);
+        event.predicted_position = Some(point(px(900.), px(600.)));
+        let moved = recognizer.handle_event_at(&event, now);
+        let [RecognizedTouchGesture::Pinch(moved)] = moved.as_slice() else {
+            panic!("{moved:?}")
+        };
+        assert_eq!(moved.delta, 1.); // 3-4-5 triangle doubled: 50 -> 100.
+        assert_eq!(moved.position, point(px(40.), px(60.)));
+        let ended =
+            recognizer.handle_event_at(&touch_event(TouchId(91), TouchPhase::Ended, 10., 20.), now);
+        assert!(matches!(
+            ended.as_slice(),
+            [RecognizedTouchGesture::Pinch(PinchEvent {
+                phase: TouchPhase::Ended,
+                ..
+            })]
+        ));
+        for id in [TouchId(3), TouchId(8)] {
+            assert!(
+                recognizer
+                    .handle_event_at(&touch_event(id, TouchPhase::Moved, 900., 100.), now)
+                    .is_empty()
+            );
+            assert!(
+                recognizer
+                    .handle_event_at(&touch_event(id, TouchPhase::Ended, 900., 100.), now)
+                    .is_empty()
+            );
+        }
+        assert!(recognizer.contacts.is_empty());
+        recognizer.handle_event_at(&touch_event(TouchId(3), TouchPhase::Started, 7., 8.), now);
+        assert!(matches!(
+            recognizer
+                .handle_event_at(&touch_event(TouchId(3), TouchPhase::Ended, 7., 8.), now)
+                .as_slice(),
+            [RecognizedTouchGesture::Tap { .. }]
+        ));
+    }
+
+    #[test]
+    fn pinch_degeneracy_and_either_contact_cancellation_are_finite_and_terminal() {
+        for cancelled_id in [TouchId(17), TouchId(2)] {
+            let mut recognizer = TouchGestureRecognizer::new(GestureTuning::default());
+            let now = Instant::now();
+            for id in [TouchId(17), TouchId(2)] {
+                recognizer.handle_event_at(&touch_event(id, TouchPhase::Started, 3., 9.), now);
+            }
+            for (x, expected) in [(13., 0.), (3., 0.), (23., 1.)] {
+                let events = recognizer
+                    .handle_event_at(&touch_event(TouchId(2), TouchPhase::Moved, x, 9.), now);
+                let [RecognizedTouchGesture::Pinch(pinch)] = events.as_slice() else {
+                    panic!("{events:?}")
+                };
+                assert_eq!(pinch.delta, expected);
+            }
+            let events = recognizer.handle_event_at(
+                &touch_event(cancelled_id, TouchPhase::Cancelled, 3., 9.),
+                now,
+            );
+            let [RecognizedTouchGesture::Pinch(pinch)] = events.as_slice() else {
+                panic!("{events:?}")
+            };
+            assert_eq!(pinch.phase, TouchPhase::Cancelled);
+            assert_eq!(pinch.delta, 0.);
+            assert!(recognizer.cancel().is_empty());
+            assert!(recognizer.cancel().is_empty());
+        }
+    }
+
+    #[test]
+    fn second_contact_cancels_scroll_before_pinch_but_does_not_steal_claimed_drag() {
+        for claimed in [false, true] {
+            let mut recognizer = TouchGestureRecognizer::new(GestureTuning::default());
+            let now = Instant::now();
+            recognizer.handle_event_at(&touch_event(TouchId(7), TouchPhase::Started, 1., 9.), now);
+            if claimed {
+                recognizer.offer_touch_drag(TouchId(7));
+                recognizer.resolve_touch_drag(true);
+            }
+            recognizer.handle_event_at(&touch_event(TouchId(7), TouchPhase::Moved, 5., 49.), now);
+            let events = recognizer
+                .handle_event_at(&touch_event(TouchId(2), TouchPhase::Started, 31., 89.), now);
+            if claimed {
+                assert!(events.is_empty());
+                let events = recognizer.cancel();
+                assert!(matches!(
+                    events.as_slice(),
+                    [RecognizedTouchGesture::TouchDrag(TouchDragEvent {
+                        phase: TouchPhase::Cancelled,
+                        ..
+                    })]
+                ));
+            } else {
+                assert!(matches!(
+                    events.as_slice(),
+                    [
+                        RecognizedTouchGesture::Scroll(ScrollWheelEvent {
+                            touch_phase: TouchPhase::Cancelled,
+                            ..
+                        }),
+                        RecognizedTouchGesture::Pinch(PinchEvent {
+                            phase: TouchPhase::Started,
+                            ..
+                        })
+                    ]
+                ));
+                assert!(recognizer.pending_long_press().is_none());
+                assert!(!recognizer.has_momentum());
+            }
+        }
     }
 
     #[test]

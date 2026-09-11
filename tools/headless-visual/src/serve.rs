@@ -5,6 +5,10 @@
 //! stdout line as a reply. Each session is one offscreen window showing one
 //! scene; the semantic tree, input injection, and screenshots all come from
 //! that window after it has been drawn.
+//! `open` accepts optional `width` and `height` in logical pixels (1–4096).
+//! Omitted dimensions retain the canonical 920×1000 defaults; this does not
+//! change the capture/check baseline viewport. The reply reports the actual
+//! logical viewport and scale factor, not a claim about a native mobile device.
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
@@ -128,6 +132,7 @@ impl Server {
     }
 
     fn open(&mut self, params: &Value) -> Result<Value> {
+        let viewport = requested_viewport(params)?;
         let scene = required_str(params, "scene")?;
         let theme = match params.get("theme").and_then(Value::as_str).unwrap_or("") {
             "" => "studio-dark",
@@ -141,12 +146,19 @@ impl Server {
             bail!("unknown scene `{scene}`");
         }
         self.activate(scene, theme)?;
-        let handle = self.cx.open_window(size(px(920.0), px(1000.0)), {
+        let handle = self.cx.open_window(viewport, {
             let scene = scene.to_owned();
             move |_, cx: &mut App| cx.new(|_| Host { scene: Some(scene) })
         })?;
         let window = handle.into();
         self.settle(window)?;
+        let viewport = self.cx.update_window(window, |_, window, _| {
+            json!({
+                "width": f32::from(window.viewport_size().width),
+                "height": f32::from(window.viewport_size().height),
+                "scale_factor": window.scale_factor(),
+            })
+        })?;
         let id = format!("s{}", self.next_id);
         self.next_id += 1;
         self.sessions.insert(
@@ -161,6 +173,7 @@ impl Server {
             "session": id,
             "scene": scene,
             "theme": theme,
+            "viewport": viewport,
             "generation": self.generation(window)?,
         }))
     }
@@ -432,6 +445,26 @@ impl Server {
     }
 }
 
+fn requested_viewport(params: &Value) -> Result<gpui::Size<gpui::Pixels>> {
+    let dimension = |key: &str, default: f32| -> Result<gpui::Pixels> {
+        let Some(value) = params.get(key) else {
+            return Ok(px(default));
+        };
+        let value = value
+            .as_f64()
+            .with_context(|| format!("{key} must be a number in logical pixels"))?;
+        anyhow::ensure!(
+            value.is_finite() && (1.0..=4096.0).contains(&value),
+            "{key} must be between 1 and 4096 logical pixels"
+        );
+        Ok(px(value as f32))
+    };
+    Ok(size(
+        dimension("width", 920.0)?,
+        dimension("height", 1000.0)?,
+    ))
+}
+
 fn required_str<'a>(params: &'a Value, key: &str) -> Result<&'a str> {
     params
         .get(key)
@@ -498,6 +531,8 @@ mod tests {
             &json!({ "scene": "button", "theme": "studio-dark" }),
         )?;
         let session = opened["session"].as_str().expect("session id").to_owned();
+        assert_eq!(opened["viewport"]["width"], 920.0);
+        assert_eq!(opened["viewport"]["height"], 1000.0);
         assert!(opened["generation"].as_u64().unwrap_or(0) > 0);
 
         let snapshot = server.dispatch("snapshot", &json!({ "session": session }))?;
@@ -525,6 +560,57 @@ mod tests {
             .dispatch("snapshot", &json!({ "session": session }))
             .expect_err("closed session");
         assert!(closed.to_string().contains(&session), "{closed}");
+        Ok(())
+    }
+
+    #[test]
+    fn requested_dimensions_reject_invalid_values_before_opening() {
+        assert_eq!(
+            requested_viewport(&json!({"width": 361})).unwrap(),
+            size(px(361.0), px(1000.0))
+        );
+        assert_eq!(
+            requested_viewport(&json!({"height": 701})).unwrap(),
+            size(px(920.0), px(701.0))
+        );
+        for value in [
+            json!(0),
+            json!(-1),
+            json!(4097),
+            json!(0.5),
+            json!("390"),
+            Value::Null,
+        ] {
+            for key in ["width", "height"] {
+                let mut params = json!({});
+                params[key] = value.clone();
+                assert!(requested_viewport(&params).is_err(), "{params}");
+            }
+        }
+    }
+
+    #[test]
+    fn narrow_asymmetric_viewport_is_the_rendered_window() -> Result<()> {
+        let mut server = Server::new()?;
+        for (width, height) in [(390, 844), (361, 701)] {
+            let opened = server.dispatch(
+                "open",
+                &json!({"scene": "button", "width": width, "height": height}),
+            )?;
+            assert_eq!(opened["viewport"]["width"], width as f64);
+            assert_eq!(opened["viewport"]["height"], height as f64);
+            let session = server.lookup(&json!({"session": opened["session"]}))?;
+            let frame = server.settled_image(session.window)?;
+            let scale = opened["viewport"]["scale_factor"].as_f64().unwrap();
+            assert_eq!(
+                frame.dimensions(),
+                (
+                    (width as f64 * scale) as u32,
+                    (height as f64 * scale) as u32
+                )
+            );
+            server.dispatch("close", &json!({"session": opened["session"]}))?;
+        }
         Ok(())
     }
 }

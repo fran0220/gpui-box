@@ -82,6 +82,13 @@ Stdio additionally publishes `session_open`, `session_snapshot`,
 reuses it, so actions operate on real GPUI layout, hit testing, input delivery,
 semantics, simulated time, and offscreen rendering.
 
+`session_open` accepts optional `width` and `height` in logical pixels, each
+between 1 and 4096. They default independently to 920 and 1000. Its response
+includes `viewport: {width, height, scale_factor}` measured from the actual
+window. Use narrow sessions to inspect mobile layouts; canonical baseline
+captures retain their fixed size. Simulated insets do not prove native keyboard
+or safe-area delivery.
+
 These tools require a complete checkout, Rust toolchain, native dependencies,
 and the platform headless renderer. They read and render but do not edit files,
 compile caller projects, or replace `cargo run -p xtask -- gate`. They are not

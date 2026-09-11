@@ -17,7 +17,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::controls::button::IconButton;
 use crate::foundation::{Ident, Sizable, StyledExt};
@@ -53,6 +53,7 @@ impl EventEmitter<DrawerEvent> for Drawer {}
 pub struct Drawer {
     ident: Ident,
     focus_handle: FocusHandle,
+    close_focus: FocusHandle,
     edge: Edge,
     size: f32,
     title: SharedString,
@@ -61,6 +62,9 @@ pub struct Drawer {
     footer: Option<Body>,
     dismissable: bool,
     resizable: bool,
+    avoid_insets: bool,
+    close_size: ControlSize,
+    body_padding_x: Space,
     /// A size the pointer is holding, which is transient visual state until
     /// the host applies [`DrawerEvent::ResizeRequested`].
     preview: Option<f32>,
@@ -94,6 +98,7 @@ impl Drawer {
         Self {
             ident: ident.into(),
             focus_handle: cx.focus_handle(),
+            close_focus: cx.focus_handle(),
             edge: Edge::Right,
             size: DEFAULT_SIZE,
             title: SharedString::default(),
@@ -102,6 +107,9 @@ impl Drawer {
             footer: None,
             dismissable: true,
             resizable: false,
+            avoid_insets: false,
+            close_size: ControlSize::Sm,
+            body_padding_x: Space::Lg,
             preview: None,
             drag: None,
             open: false,
@@ -116,6 +124,32 @@ impl Drawer {
     /// Which side the panel hangs from and slides in from.
     pub fn edge(mut self, edge: Edge) -> Self {
         self.edge = edge;
+        self
+    }
+
+    /// Fits the entire surface, including its header and dismissal control,
+    /// inside the window's residual safe-area/IME insets. Enable when mounted
+    /// outside a page that already consumes those insets. Defaults to false.
+    pub fn avoid_insets(mut self, avoid: bool) -> Self {
+        self.avoid_insets = avoid;
+        self
+    }
+
+    pub fn set_avoid_insets(&mut self, avoid: bool, cx: &mut Context<Self>) {
+        self.avoid_insets = avoid;
+        cx.notify();
+    }
+
+    /// The visible dismissal target; use Touch for a finger-sized surface.
+    pub fn close_control_size(mut self, size: ControlSize) -> Self {
+        self.close_size = size;
+        self
+    }
+
+    /// Horizontal body inset. A touch calendar can use Xs to retain its grid
+    /// target widths in a narrow viewport; the header keeps its normal inset.
+    pub fn body_padding_x(mut self, padding: Space) -> Self {
+        self.body_padding_x = padding;
         self
     }
 
@@ -355,7 +389,10 @@ impl Drawer {
         Some(
             IconButton::new(self.ident.child("close"), Icon::Close, label)
                 .ghost()
-                .small()
+                .control_size(self.close_size)
+                .when(self.close_size == ControlSize::Touch, |button| {
+                    button.track_focus(&self.close_focus)
+                })
                 .semantic_parent(self.ident.semantic_id())
                 .on_click(move |window, cx| {
                     drawer
@@ -519,6 +556,9 @@ impl Render for Drawer {
         for stop in self.stops.clone() {
             self.trap.register(stop);
         }
+        if self.close_size == ControlSize::Touch && self.dismissable {
+            self.trap.register(self.close_focus.clone());
+        }
         if self.trap.stops().is_empty() {
             self.trap.register(self.focus_handle.clone());
         }
@@ -556,6 +596,27 @@ impl Render for Drawer {
             .when(!horizontal, |element| element.h(px(shown)).w_full())
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));
+        if self.avoid_insets {
+            let insets = window.insets().effective();
+            let viewport = window.viewport_size();
+            let width = (viewport.width - insets.left - insets.right).max(px(0.0));
+            let height = (viewport.height - insets.top - insets.bottom).max(px(0.0));
+            card = card
+                .mt(insets.top)
+                .mb(insets.bottom)
+                .ml(insets.left)
+                .mr(insets.right)
+                .w(if horizontal {
+                    px(shown).min(width)
+                } else {
+                    width
+                })
+                .h(if horizontal {
+                    height
+                } else {
+                    px(shown).min(height)
+                });
+        }
         card = match self.edge {
             Edge::Left => card.left(px(-travel)),
             Edge::Right => card.left(px(travel)),
@@ -592,6 +653,7 @@ impl Render for Drawer {
         // rather than as a hole opened up above pinned actions.
         let body = body.map(|body| {
             panel::band(&theme)
+                .px_token(&theme, self.body_padding_x)
                 .flex_1()
                 .min_h(px(0.0))
                 .overflow_hidden()

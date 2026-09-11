@@ -6,7 +6,9 @@
 //! visual rows, UTF-8 offsets, points, selections, and carets using the same
 //! [`WrappedLine`] values that are painted.
 
+mod native;
 mod wrapped;
+pub use native::{TextNavigationDirection, TextSelectionRect, TextWritingDirection};
 pub use wrapped::EditableWrappedCache;
 
 use std::{

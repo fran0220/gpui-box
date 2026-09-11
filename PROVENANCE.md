@@ -4,6 +4,35 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+Portable multi-contact arbitration, captured pan/pinch ownership, residual
+scroll-to-manipulation handoff, interrupted-input cleanup, and the mobile
+keyboard/inset/native text query contracts are original GPUI Box framework
+work. They extend the historical single-touch import without changing its
+receipt or introducing a new source dependency. Behavioral reference:
+Android [multi-touch identity and cancellation](https://developer.android.com/develop/ui/views/touch-and-input/gestures/multi),
+UIKit [gesture lifecycle](https://developer.apple.com/documentation/uikit/uigesturerecognizer),
+[UITextInputTraits](https://developer.apple.com/documentation/uikit/uitextinputtraits),
+and Android [EditorInfo](https://developer.android.com/reference/android/view/inputmethod/EditorInfo).
+These references informed contracts; no platform documentation code was copied.
+Shared tests establish only framework behavior, not native device integration.
+
+The Android JNI/Activity and UIKit hosts, mobile browser delivery, checked
+native operation wrappers, WGPU surface lifecycle corrections, and mobile Kit
+components are original GPUI Box work. They use public platform APIs rather
+than imported backend implementations. Browser specification references are
+recorded in `crates/gpui_web/MOBILE.md`; native contracts and remaining acceptance
+work are recorded in `crates/gpui_android/README.md` and
+`examples/ios-native/README.md`. Existing bundled fonts retain their existing
+notices. SDKs, signing identities and development devices are external build
+prerequisites, not vendored source. Neither native mobile backend is claimed
+validated by the portable tests. Historical import receipts remain unchanged.
+
+The shared mobile reference fixture and its Android/iOS launch and checkpoint
+hosts are original GPUI Box example code. The fixture owns routing and data;
+platform examples own private storage. They reuse bundled Kit assets with the
+notices below and add no imported source. Offscreen fixture captures do not
+certify native keyboard, accessibility, persistence or rendering.
+
 The source-line projection index, projected editable geometry, and disjoint
 painted accessibility regions are original GPUI Box framework work. Editor
 fold identities and transient toggle policy are original Kit work; no new
@@ -664,9 +693,10 @@ transcription of AOSP `OverScroller.SplineOverScroller`
 Copyright 2006 The Android Open Source Project). The complete imported bytes are
 fixed by the package checksum and source revision above.
 
-This is a portable single-touch input path, not a claim of a complete gesture
-arena: additional contacts are ignored while one touch is active, pinch remains
-a platform event, and no native iOS/Android touch producer is added. No
+At import time this was a portable single-touch input path: additional contacts
+were ignored while one touch was active, pinch remained a platform event, and
+the import added no native iOS/Android touch producer. Subsequent original
+GPUI Box multi-contact work is described above. No
 `gpui-pre`, Longbridge, Zed Git source, or Cargo patch was added.
 
 Zed's split draw/submission profiler model also informed the local
@@ -960,3 +990,15 @@ Physically Based Rendering, third edition (2018), §8.2 at
 The implementation uses native shader intrinsics and a Schlick approximation;
 it is a single-interface optical-plane model, not PBR volume tracing or Apple's
 private material. No package, external source, or frozen revision changed.
+
+### Native editable text geometry
+
+Native editable selection fragments and visual cluster-edge navigation are
+original GPUI Box work over retained WrappedLine glyph cells and wrap indices.
+UIKit's public UITextInput/UITextSelectionRect documentation informed the
+contract; no Apple source was copied. Existing Unicode dependencies resolve
+graphemes and paragraph direction. Frozen import receipts are unchanged.
+Affinity-aware native positions, atomic primary endpoint selection, and active
+composition rollback are likewise original GPUI Box model/geometry work.
+Incident-paragraph caret lookup reuses the existing indexed document and
+retained shaping authority; it introduces no new source or dependency.

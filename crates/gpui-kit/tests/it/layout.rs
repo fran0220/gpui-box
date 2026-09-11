@@ -1,6 +1,70 @@
 //! Split, scroll area, and toolbar report what the typist asked the layout to
 //! be. None of them decides that it happened.
 
+#[gpui::test]
+fn page_layout_consumes_residual_insets_once_and_unmounts_hidden_footer(cx: &mut TestAppContext) {
+    use gpui_kit::layout::PageLayout;
+    let hidden = Rc::new(std::cell::Cell::new(false));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let hidden = hidden.clone();
+        move |_, _| {
+            let mut insets = gpui::WindowInsets::default();
+            insets.safe_area.top = px(13.0);
+            insets.safe_area.left = px(7.0);
+            insets.safe_area.right = px(11.0);
+            insets.safe_area.bottom = px(23.0);
+            insets.ime.bottom = px(101.0);
+            div()
+                .w(px(300.0))
+                .h(px(500.0))
+                .child(
+                    PageLayout::new("page", div().child("Body"))
+                        .insets(insets)
+                        .hide_footer(hidden.get())
+                        .header(div().h(px(41.0)).child("Header"))
+                        .footer(
+                            div()
+                                .h(px(37.0))
+                                .child(Button::new("footer.action").label("Action")),
+                        ),
+                )
+                .into_any_element()
+        }
+    });
+    let body = harness.bounds("page.body").expect("body is mounted");
+    assert_eq!(body.origin, gpui::point(px(7.0), px(54.0)));
+    assert_eq!(body.size, gpui::size(px(282.0), px(308.0)));
+    assert!(harness.node("footer.action").is_some());
+    hidden.set(true);
+    harness.update(|_, cx| cx.refresh_windows());
+    assert!(harness.node("footer.action").is_none());
+    assert_eq!(
+        harness
+            .bounds("page.body")
+            .expect("body is mounted")
+            .size
+            .height,
+        px(345.0)
+    );
+    harness.remount(|_, _| {
+        div()
+            .w(px(300.0))
+            .h(px(399.0))
+            .child(PageLayout::new(
+                "resized",
+                div().child("Already resized above keyboard"),
+            ))
+            .into_any_element()
+    });
+    assert_eq!(
+        harness
+            .bounds("resized.body")
+            .expect("resized body is mounted")
+            .size,
+        gpui::size(px(300.0), px(399.0))
+    );
+}
+
 use std::cell::RefCell;
 use std::rc::Rc;
 

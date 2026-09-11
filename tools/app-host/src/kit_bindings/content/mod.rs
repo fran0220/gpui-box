@@ -869,6 +869,10 @@ pub(super) fn render(
                         TransportEvent::SeekPreview(value) => {
                             json!({"kind":"seekPreview","value":value})
                         }
+                        TransportEvent::SeekCancelled => json!({"kind":"seekCancelled"}),
+                        TransportEvent::PresentationRequested(state) => {
+                            json!({"kind":"presentationRequested","state":state.name()})
+                        }
                         TransportEvent::SeekRequested(value) => {
                             json!({"kind":"seekRequested","value":value})
                         }

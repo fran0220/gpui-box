@@ -28,11 +28,13 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
-use crate::content::transport::{TransportBar, TransportDuration};
+use crate::content::transport::{
+    MediaPresentation, TransportBar, TransportDuration, TransportEvent,
+};
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, Ident, StyledExt, text};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::layout::{AspectFit, AspectRatio};
 use crate::media::audio_player::{command_for, unready};
 use crate::media::transport::{
@@ -46,6 +48,7 @@ const DEFAULT_RATIO: f32 = 16.0 / 9.0;
 
 type EventHandler = Rc<dyn Fn(&MediaEvent, &mut Window, &mut App)>;
 type FrameSupplier = Rc<dyn Fn(&mut Window, &mut App) -> Option<AnyElement>>;
+type PresentationHandler = Rc<dyn Fn(MediaPresentation, &mut Window, &mut App)>;
 
 /// What is in the frame, as the surface publishes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +84,10 @@ pub struct VideoPlayer {
     remaining: Option<SharedString>,
     step: Option<f32>,
     speeds: Vec<f32>,
+    control_size: ControlSize,
+    presentation: Option<(MediaPresentation, SharedString)>,
+    presentation_refusal: Option<SharedString>,
+    on_presentation: Option<PresentationHandler>,
     disabled: bool,
     on_event: Option<EventHandler>,
 }
@@ -116,6 +123,10 @@ impl VideoPlayer {
             remaining: None,
             step: None,
             speeds: Vec::new(),
+            control_size: ControlSize::Sm,
+            presentation: None,
+            presentation_refusal: None,
+            on_presentation: None,
             disabled: false,
             on_event: None,
         }
@@ -194,11 +205,45 @@ impl VideoPlayer {
         self
     }
 
+    /// The verified native video presentation and localized next-action label.
+    /// Omit when the host cannot present this media. This never enters window fullscreen.
+    pub fn presentation(
+        mut self,
+        state: MediaPresentation,
+        label: impl Into<SharedString>,
+    ) -> Self {
+        self.presentation = Some((state, label.into()));
+        self
+    }
+
+    /// The host refused presentation; retain the actual state and show its reason.
+    pub fn presentation_refused(mut self, reason: impl Into<SharedString>) -> Self {
+        self.presentation_refusal = Some(reason.into());
+        self
+    }
+
+    /// Requests native presentation independently of decoder commands. The host must
+    /// update `presentation` after native completion/dismissal, or report a refusal.
+    pub fn on_presentation_request(
+        mut self,
+        handler: impl Fn(MediaPresentation, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_presentation = Some(Rc::new(handler));
+        self
+    }
+
     pub fn on_event(
         mut self,
         handler: impl Fn(&MediaEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_event = Some(Rc::new(handler));
+        self
+    }
+}
+
+impl Sizable for VideoPlayer {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.control_size = size;
         self
     }
 }
@@ -419,6 +464,7 @@ fn bar(
     actionable: bool,
 ) -> TransportBar {
     let mut bar = TransportBar::new(ident.child("transport"))
+        .control_size(player.control_size)
         .state(snapshot.state)
         .position(snapshot.position)
         .volume(snapshot.volume)
@@ -443,9 +489,26 @@ fn bar(
     if capabilities.rates && !player.speeds.is_empty() {
         bar = bar.speeds(player.speeds.iter().copied(), snapshot.speed);
     }
+    if let Some((state, label)) = player
+        .presentation
+        .clone()
+        .filter(|_| player.on_presentation.is_some())
+    {
+        bar = bar.presentation(state, label);
+    }
+    if let Some(reason) = player.presentation_refusal.clone() {
+        bar = bar.presentation_refused(reason);
+    }
     if actionable {
         let handler = player.on_event.clone();
+        let presentation = player.on_presentation.clone();
         bar = bar.on_event(move |event, window, cx| {
+            if let TransportEvent::PresentationRequested(state) = event {
+                if let Some(handler) = &presentation {
+                    handler(*state, window, cx);
+                }
+                return;
+            }
             let Some(command) = command_for(event) else {
                 return;
             };

@@ -31,6 +31,7 @@ mod palette;
 pub mod panel;
 pub mod popover;
 pub mod positioner;
+pub mod sheet;
 pub(crate) mod stack;
 pub mod tail;
 pub mod toast;
@@ -50,8 +51,12 @@ pub use notification_center::{
     Notification, NotificationCenter, NotificationCenterEvent, UnreadCount,
 };
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
-pub use popover::{Popover, PopoverEvent};
+pub use popover::{PickerPresentation, Popover, PopoverEvent};
 pub use positioner::{Positioner, Room, Side};
+pub use sheet::{
+    ActionSheet, ActionSheetEvent, BottomSheet, BottomSheetEvent, SheetAction, SheetActionState,
+    SheetDetent,
+};
 pub use stack::ModalScope;
 pub use tail::{TailSide, tail};
 pub use toast::{Toast, ToastCorner, ToastLayer};

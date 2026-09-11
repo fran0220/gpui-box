@@ -433,6 +433,7 @@ pub enum TextAreaEvent {
 }
 
 impl EventEmitter<TextAreaEvent> for TextArea {}
+impl EventEmitter<gpui::TextInputAction> for TextArea {}
 
 /// Wrapped, multi-line editable text.
 ///
@@ -456,6 +457,7 @@ pub struct TextArea {
     rows: usize,
     max_rows: Option<usize>,
     enter: Enter,
+    input_options: gpui::TextInputOptions,
     frame: Frame,
     wrap: TextAreaWrap,
     line_projection: Option<gpui::EditableLineProjection>,
@@ -543,6 +545,7 @@ impl TextArea {
             rows: DEFAULT_ROWS,
             max_rows: None,
             enter: Enter::Opens,
+            input_options: gpui::TextInputOptions::default(),
             frame: Frame::Own,
             wrap: TextAreaWrap::Soft,
             line_projection: None,
@@ -582,6 +585,21 @@ impl TextArea {
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
         self
+    }
+
+    /// Platform keyboard/autofill hints, not a guarantee of platform support.
+    /// Multiline and non-sensitive semantics follow the actual editor. A
+    /// default action follows [`Enter`]; explicit next/previous actions emit
+    /// [`gpui::TextInputAction`] for caller-owned focus routing.
+    pub fn input_options(mut self, options: gpui::TextInputOptions) -> Self {
+        self.input_options = options;
+        self
+    }
+
+    /// Updates hints without discarding text, composition, selection or history.
+    pub fn set_input_options(&mut self, options: gpui::TextInputOptions, cx: &mut Context<Self>) {
+        self.input_options = options;
+        cx.notify();
     }
 
     /// Starts reporting focus and blur. Idempotent: an area that is already
@@ -2199,6 +2217,281 @@ impl Focusable for TextArea {
 }
 
 impl EntityInputHandler for TextArea {
+    fn native_position_for_point(
+        &mut self,
+        point: Point<Pixels>,
+        within_range: Option<Range<usize>>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        let bounds = self.last_bounds?;
+        self.last_layout.as_ref()?.native_position_for_point(
+            self.edit.text(),
+            point - self.text_origin(bounds),
+            within_range,
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )
+    }
+
+    fn native_selection(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextSelection> {
+        (!self.disabled).then(|| self.edit.native_selection())
+    }
+
+    fn set_native_selection(
+        &mut self,
+        selection: gpui::NativeTextSelection,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.disabled || !self.edit.set_native_selection(selection) {
+            return false;
+        }
+        self.goal_x = None;
+        self.multi_goal_x.clear();
+        self.reveal_caret = true;
+        cx.emit(TextAreaEvent::SelectionChanged(self.edit.selection()));
+        cx.notify();
+        true
+    }
+
+    fn native_position_in_direction(
+        &mut self,
+        position: gpui::NativeTextPosition,
+        direction: gpui::TextNavigationDirection,
+        offset: usize,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        self.last_layout.as_ref()?.native_position_in_direction(
+            self.edit.text(),
+            position,
+            direction,
+            offset,
+            gpui::TextAlign::Left,
+            self.last_bounds?.size.width,
+        )
+    }
+
+    fn native_position_bounds(
+        &mut self,
+        position: gpui::NativeTextPosition,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        let bounds = self.last_bounds?;
+        self.last_layout.as_ref()?.native_position_bounds(
+            self.edit.text(),
+            position,
+            self.text_origin(bounds),
+            self.caret_width,
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )
+    }
+
+    fn farthest_native_position(
+        &mut self,
+        range: Range<usize>,
+        direction: gpui::TextNavigationDirection,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::NativeTextPosition> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        self.last_layout.as_ref()?.farthest_native_position(
+            self.edit.text(),
+            range,
+            direction,
+            gpui::TextAlign::Left,
+            self.last_bounds?.size.width,
+        )
+    }
+
+    fn selection_rects_for_range(
+        &mut self,
+        range: Range<usize>,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Vec<gpui::TextSelectionRect> {
+        if self.last_layout_text != *self.edit.text() {
+            return vec![];
+        }
+        let (Some(layout), Some(bounds)) = (&self.last_layout, self.last_bounds) else {
+            return vec![];
+        };
+        let bytes = self.range_from_utf16(&range);
+        if self.range_to_utf16(&bytes) != range {
+            return vec![];
+        }
+        layout.native_selection_rects(
+            self.edit.text(),
+            bytes,
+            self.text_origin(bounds),
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        )
+    }
+
+    fn text_position_in_direction(
+        &mut self,
+        position: usize,
+        direction: gpui::TextNavigationDirection,
+        offset: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        self.native_position_in_direction(
+            gpui::NativeTextPosition {
+                utf16_offset: position,
+                ..Default::default()
+            },
+            direction,
+            offset,
+            window,
+            cx,
+        )
+        .map(|p| p.utf16_offset)
+    }
+
+    fn native_caret_bounds(
+        &mut self,
+        position: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        self.native_position_bounds(
+            gpui::NativeTextPosition {
+                utf16_offset: position,
+                ..Default::default()
+            },
+            window,
+            cx,
+        )
+    }
+
+    fn farthest_text_position(
+        &mut self,
+        range: Range<usize>,
+        direction: gpui::TextNavigationDirection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        self.farthest_native_position(range, direction, window, cx)
+            .map(|p| p.utf16_offset)
+    }
+
+    fn base_writing_direction(
+        &mut self,
+        position: usize,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<gpui::TextWritingDirection> {
+        if self.last_layout_text != *self.edit.text() {
+            return None;
+        }
+        let byte = gpui::offset_from_utf16(self.edit.text(), position);
+        if self.offset_to_utf16(byte) != position {
+            return None;
+        }
+        self.last_layout
+            .as_ref()?
+            .native_base_writing_direction(self.edit.text(), byte)
+    }
+
+    fn grapheme_range_at(
+        &mut self,
+        position: usize,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        let byte = gpui::offset_from_utf16(self.edit.text(), position);
+        if self.offset_to_utf16(byte) != position {
+            return None;
+        }
+        self.edit
+            .text()
+            .grapheme_indices(true)
+            .find(|(start, grapheme)| *start <= byte && byte < start + grapheme.len())
+            .map(|(start, grapheme)| self.range_to_utf16(&(start..start + grapheme.len())))
+    }
+
+    fn text_input_options(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> gpui::TextInputOptions {
+        gpui::TextInputOptions {
+            multiline: true,
+            secure: false,
+            action: if self.input_options.action == gpui::TextInputAction::Default {
+                match self.enter {
+                    Enter::Opens => gpui::TextInputAction::Newline,
+                    Enter::Submits => gpui::TextInputAction::Send,
+                }
+            } else {
+                self.input_options.action
+            },
+            ..self.input_options
+        }
+    }
+
+    fn perform_text_input_action(
+        &mut self,
+        action: gpui::TextInputAction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.disabled || self.read_only {
+            return false;
+        }
+        let action = if action == gpui::TextInputAction::Default {
+            self.text_input_options(window, cx).action
+        } else {
+            action
+        };
+        match action {
+            gpui::TextInputAction::Newline => self.newline(&Newline, window, cx),
+            gpui::TextInputAction::Next | gpui::TextInputAction::Previous => cx.emit(action),
+            _ => self.submit(&Submit, window, cx),
+        }
+        true
+    }
+
+    fn accepts_text_input(&self, _: &mut Window, _: &mut Context<Self>) -> bool {
+        !self.disabled && !self.read_only
+    }
+
+    fn text_length_utf16(&mut self, _: &mut Window, _: &mut Context<Self>) -> Option<usize> {
+        Some(self.offset_to_utf16(self.document().len()))
+    }
+
+    fn set_selected_text_range(
+        &mut self,
+        range_utf16: Range<usize>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.disabled {
+            return;
+        }
+        self.set_selections([(self.range_from_utf16(&range_utf16), false)], cx);
+    }
+
     fn text_for_range(
         &mut self,
         range_utf16: Range<usize>,

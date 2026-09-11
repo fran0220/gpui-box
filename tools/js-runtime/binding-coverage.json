@@ -74,6 +74,31 @@
       }
     },
     {
+      "name": "ActionSheet",
+      "source": "crates/gpui-kit/src/overlay/sheet.rs",
+      "path": "gpui_kit::overlay::ActionSheet",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        ],
+        "options": [],
+        "commands": [
+          "set_actions(actions: Vec<SheetAction>, cx: &mut Context<Self>)",
+          "set_state(state: SheetActionState, cx: &mut Context<Self>)",
+          "open(window: &mut Window, cx: &mut Context<Self>)",
+          "close(window: &mut Window, cx: &mut Context<Self>)"
+        ],
+        "queries": [
+          "sheet() -> Entity<BottomSheet>"
+        ],
+        "slots": []
+      }
+    },
+    {
       "name": "AgentActivityLine",
       "source": "crates/gpui-kit/src/agent/presentation.rs",
       "path": "gpui_kit::agent::AgentActivityLine",
@@ -587,6 +612,27 @@
           "format(format: impl Fn(f64) -> String + 'static) -> Self",
           "spec(spec: MotionSpec) -> Self",
           "type_scale(scale: TypeScale) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
+      "name": "AppBar",
+      "source": "crates/gpui-kit/src/layout/app_bar.rs",
+      "path": "gpui_kit::layout::AppBar",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, title: impl Into<SharedString>) -> Self"
+        ],
+        "options": [
+          "leading(content: impl IntoElement) -> Self",
+          "trailing(content: impl IntoElement) -> Self"
         ],
         "commands": [],
         "queries": [],
@@ -1469,6 +1515,60 @@
       }
     },
     {
+      "name": "BottomNavigation",
+      "source": "crates/gpui-kit/src/navigation/bottom_navigation.rs",
+      "path": "gpui_kit::navigation::BottomNavigation",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>) -> Self"
+        ],
+        "options": [
+          "items(items: impl IntoIterator<Item = NavigationItem>) -> Self",
+          "selected(id: impl Into<SharedString>) -> Self",
+          "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
+      "name": "BottomSheet",
+      "source": "crates/gpui-kit/src/overlay/sheet.rs",
+      "path": "gpui_kit::overlay::BottomSheet",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        ],
+        "options": [],
+        "commands": [
+          "set_detents(detents: Vec<SheetDetent>, selected: impl Into<SharedString>, cx: &mut Context<Self>) -> bool",
+          "set_detent(id: impl Into<SharedString>, cx: &mut Context<Self>) -> bool",
+          "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
+          "set_content(content: Option<Body>, cx: &mut Context<Self>)",
+          "set_scroll_handle(scroll: Option<ScrollHandle>, cx: &mut Context<Self>)",
+          "set_focus_stops(stops: impl IntoIterator<Item = FocusHandle>, cx: &mut Context<Self>)",
+          "set_dismissable(dismissable: bool, cx: &mut Context<Self>)",
+          "open(window: &mut Window, cx: &mut Context<Self>)",
+          "close(window: &mut Window, cx: &mut Context<Self>)",
+          "settle(cx: &mut Context<Self>)"
+        ],
+        "queries": [
+          "selected_detent() -> &SharedString",
+          "is_open(cx: &App) -> bool"
+        ],
+        "slots": []
+      }
+    },
+    {
       "name": "Breadcrumb",
       "source": "crates/gpui-kit/src/navigation/breadcrumb.rs",
       "path": "gpui_kit::navigation::Breadcrumb",
@@ -2129,6 +2229,7 @@
           "range(range: DayRange) -> Self"
         ],
         "commands": [
+          "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_multi(multi: bool, cx: &mut Context<Self>)",
           "reset_navigation(cx: &mut Context<Self>)",
           "set_selection(days: Vec<Day>, cx: &mut Context<Self>)",
@@ -3720,6 +3821,7 @@
         ],
         "options": [
           "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
+          "presentation(presentation: popover::PickerPresentation) -> Self",
           "selected(id: impl Into<SharedString>) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
           "placeholder(placeholder: impl Into<SharedString>) -> Self",
@@ -3727,6 +3829,7 @@
           "allow_custom(allow_custom: bool) -> Self"
         ],
         "commands": [
+          "set_presentation(presentation: popover::PickerPresentation, cx: &mut Context<Self>)",
           "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
           "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
@@ -8933,11 +9036,15 @@
           "new(ident: impl Into<Ident>, adapter: SharedDateAdapter, window: &mut Window, cx: &mut Context<Self>) -> Self"
         ],
         "options": [
+          "name(name: impl Into<SharedString>) -> Self",
           "value(day: Day) -> Self",
+          "presentation(presentation: popover::PickerPresentation) -> Self",
           "required(required: bool) -> Self",
           "invalid(invalid: bool) -> Self"
         ],
         "commands": [
+          "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+          "set_presentation(presentation: popover::PickerPresentation, cx: &mut Context<Self>)",
           "set_required(required: bool, cx: &mut Context<Self>)",
           "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
@@ -9853,6 +9960,9 @@
         ],
         "options": [
           "edge(edge: Edge) -> Self",
+          "avoid_insets(avoid: bool) -> Self",
+          "close_control_size(size: ControlSize) -> Self",
+          "body_padding_x(padding: Space) -> Self",
           "size(size: f32) -> Self",
           "title(title: impl Into<SharedString>) -> Self",
           "description(description: impl Into<SharedString>) -> Self",
@@ -9863,6 +9973,7 @@
           "focus_stops(stops: impl IntoIterator<Item = FocusHandle>) -> Self"
         ],
         "commands": [
+          "set_avoid_insets(avoid: bool, cx: &mut Context<Self>)",
           "set_size(size: f32, cx: &mut Context<Self>)",
           "set_focus_stops(stops: impl IntoIterator<Item = FocusHandle>, cx: &mut Context<Self>)",
           "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -23321,6 +23432,7 @@
         ],
         "options": [
           "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
+          "presentation(presentation: popover::PickerPresentation) -> Self",
           "selected(selected: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
           "placeholder(placeholder: impl Into<SharedString>) -> Self",
@@ -23328,6 +23440,7 @@
           "clearable(clearable: bool) -> Self"
         ],
         "commands": [
+          "set_presentation(presentation: popover::PickerPresentation, cx: &mut Context<Self>)",
           "set_selected(selected: impl IntoIterator<Item = impl Into<SharedString>>, cx: &mut Context<Self>)",
           "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
@@ -23369,7 +23482,9 @@
         "construct": [
           "new(ident: impl Into<Ident>, history: &NavHistory, label: impl Into<SharedString>, focus: FocusHandle, content: impl IntoElement) -> Self"
         ],
-        "options": [],
+        "options": [
+          "back_transition(transition: &BackTransition) -> Self"
+        ],
         "commands": [],
         "queries": [],
         "slots": []
@@ -24612,6 +24727,7 @@
           "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
         ],
         "options": [
+          "input_options(options: gpui::TextInputOptions) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
           "text(text: impl Into<SharedString>) -> Self",
           "slots(slots: usize) -> Self",
@@ -24620,6 +24736,7 @@
           "read_only(read_only: bool) -> Self"
         ],
         "commands": [
+          "set_input_options(options: gpui::TextInputOptions, cx: &mut Context<Self>)",
           "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
           "set_slots(slots: usize, cx: &mut Context<Self>)",
           "set_required(required: bool, cx: &mut Context<Self>)",
@@ -24754,6 +24871,29 @@
           "progress(progress: f32) -> Self",
           "child(content: impl IntoElement) -> Self",
           "on_dismiss(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
+      "name": "PageLayout",
+      "source": "crates/gpui-kit/src/layout/page.rs",
+      "path": "gpui_kit::layout::PageLayout",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, body: impl IntoElement) -> Self"
+        ],
+        "options": [
+          "insets(insets: WindowInsets) -> Self",
+          "header(content: impl IntoElement) -> Self",
+          "footer(content: impl IntoElement) -> Self",
+          "hide_footer(hidden: bool) -> Self"
         ],
         "commands": [],
         "queries": [],
@@ -25115,6 +25255,7 @@
         ],
         "options": [
           "placeholder(placeholder: impl Into<SharedString>) -> Self",
+          "input_options(options: gpui::TextInputOptions) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
           "text(text: impl Into<SharedString>) -> Self",
           "invalid(invalid: bool) -> Self",
@@ -25122,6 +25263,7 @@
           "read_only(read_only: bool) -> Self"
         ],
         "commands": [
+          "set_input_options(options: gpui::TextInputOptions, cx: &mut Context<Self>)",
           "set_name(name: Option<SharedString>, cx: &mut Context<Self>)",
           "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
           "set_required(required: bool, cx: &mut Context<Self>)",
@@ -25702,6 +25844,29 @@
       }
     },
     {
+      "name": "PullToRefresh",
+      "source": "crates/gpui-kit/src/interaction/refresh.rs",
+      "path": "gpui_kit::interaction::PullToRefresh",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, scroll: ScrollHandle, label: impl Into<SharedString>, armed_label: impl Into<SharedString>) -> Self"
+        ],
+        "options": [],
+        "commands": [
+          "set_content(body: Option<Body>, cx: &mut Context<Self>)",
+          "set_state(state: RefreshState, cx: &mut Context<Self>)",
+          "set_enabled(enabled: bool, cx: &mut Context<Self>)",
+          "set_threshold(threshold: f32, cx: &mut Context<Self>) -> bool"
+        ],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
       "name": "PulseLoader",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "path": "gpui_kit::display::PulseLoader",
@@ -26153,6 +26318,7 @@
           "invalid(invalid: bool) -> Self"
         ],
         "commands": [
+          "set_control_size(size: gpui_kit_theme::ControlSize, cx: &mut Context<Self>)",
           "set_overlay(overlay: impl Fn(Day) -> Option<DayMark> + 'static, cx: &mut Context<Self>)",
           "set_range(range: Option<DayRange>, cx: &mut Context<Self>)",
           "set_disabled(disabled: bool, cx: &mut Context<Self>)",
@@ -30126,6 +30292,7 @@
           "bind(select: &Entity<Self>, signal: &Signal<Option<SharedString>>, cx: &mut App) -> Vec<Subscription>"
         ],
         "options": [
+          "presentation(presentation: popover::PickerPresentation) -> Self",
           "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
           "selected(id: impl Into<SharedString>) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
@@ -30134,6 +30301,7 @@
           "clearable(clearable: bool) -> Self"
         ],
         "commands": [
+          "set_presentation(presentation: popover::PickerPresentation, cx: &mut Context<Self>)",
           "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_invalid(invalid: bool, cx: &mut Context<Self>)",
           "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
@@ -30141,7 +30309,8 @@
           "set_control_size(size: ControlSize, cx: &mut Context<Self>)",
           "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
           "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
-          "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+          "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+          "close(cx: &mut Context<Self>)"
         ],
         "queries": [
           "selected_id() -> Option<&SharedString>",
@@ -35162,6 +35331,32 @@
       }
     },
     {
+      "name": "SwipeActions",
+      "source": "crates/gpui-kit/src/interaction/swipe.rs",
+      "path": "gpui_kit::interaction::SwipeActions",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, reveal_label: impl Into<SharedString>) -> Self"
+        ],
+        "options": [],
+        "commands": [
+          "set_content(body: Option<Body>, cx: &mut Context<Self>)",
+          "set_actions(side: SwipeSide, actions: Vec<SheetAction>, cx: &mut Context<Self>)",
+          "set_state(state: SheetActionState, cx: &mut Context<Self>)",
+          "set_enabled(enabled: bool, cx: &mut Context<Self>)",
+          "reveal(side: Option<SwipeSide>, cx: &mut Context<Self>) -> bool"
+        ],
+        "queries": [
+          "revealed() -> Option<SwipeSide>"
+        ],
+        "slots": []
+      }
+    },
+    {
       "name": "Switch",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
       "path": "gpui_kit::controls::Switch",
@@ -36851,6 +37046,7 @@
         ],
         "options": [
           "placeholder(placeholder: impl Into<SharedString>) -> Self",
+          "input_options(options: gpui::TextInputOptions) -> Self",
           "frame(frame: Frame) -> Self",
           "wrap(wrap: TextAreaWrap) -> Self",
           "text(text: impl Into<SharedString>) -> Self",
@@ -36864,6 +37060,7 @@
           "max_length(max_length: usize) -> Self"
         ],
         "commands": [
+          "set_input_options(options: gpui::TextInputOptions, cx: &mut Context<Self>)",
           "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_frame(frame: Frame, cx: &mut Context<Self>)",
           "set_wrap(wrap: TextAreaWrap, cx: &mut Context<Self>)",
@@ -37298,6 +37495,7 @@
         ],
         "options": [
           "placeholder(placeholder: impl Into<SharedString>) -> Self",
+          "input_options(options: gpui::TextInputOptions) -> Self",
           "name(name: impl Into<SharedString>) -> Self",
           "text(text: impl Into<SharedString>) -> Self",
           "invalid(invalid: bool) -> Self",
@@ -37308,6 +37506,7 @@
           "max_length(max_length: usize) -> Self"
         ],
         "commands": [
+          "set_input_options(options: gpui::TextInputOptions, cx: &mut Context<Self>)",
           "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
           "set_secret(secret: bool, cx: &mut Context<Self>)",
           "set_max_length(max_length: Option<usize>, cx: &mut Context<Self>)",
@@ -38558,6 +38757,8 @@
           "volume_control(available: bool) -> Self",
           "has_previous(has_previous: bool) -> Self",
           "has_next(has_next: bool) -> Self",
+          "presentation(state: MediaPresentation, label: impl Into<SharedString>) -> Self",
+          "presentation_refused(reason: impl Into<SharedString>) -> Self",
           "on_event(handler: impl Fn(&TransportEvent, &mut Window, &mut App) + 'static) -> Self"
         ],
         "commands": [],
@@ -38849,6 +39050,9 @@
           "remaining(remaining: impl Into<SharedString>) -> Self",
           "step_seconds(seconds: f32) -> Self",
           "speeds(speeds: impl IntoIterator<Item = f32>) -> Self",
+          "presentation(state: MediaPresentation, label: impl Into<SharedString>) -> Self",
+          "presentation_refused(reason: impl Into<SharedString>) -> Self",
+          "on_presentation_request(handler: impl Fn(MediaPresentation, &mut Window, &mut App) + 'static) -> Self",
           "on_event(handler: impl Fn(&MediaEvent, &mut Window, &mut App) + 'static) -> Self"
         ],
         "commands": [],

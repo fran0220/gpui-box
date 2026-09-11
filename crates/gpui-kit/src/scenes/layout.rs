@@ -2,6 +2,58 @@
 
 use super::support::*;
 
+pub(super) fn mobile_page(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::layout::{AppBar, PageLayout};
+    let theme = cx.theme().clone();
+    let page = |name: &'static str, keyboard: bool, safe: bool| {
+        let id = format!("scene.mobile-page.{name}");
+        let mut insets = gpui::WindowInsets::default();
+        if safe {
+            insets.safe_area.top = px(24.0);
+            insets.safe_area.bottom = px(20.0);
+            insets.safe_area.left = px(7.0);
+            insets.safe_area.right = px(11.0);
+        }
+        if keyboard {
+            insets.ime.bottom = px(140.0);
+        }
+        div()
+            .w(px(290.0))
+            .h(px(430.0))
+            .border_1()
+            .border_color(theme.colors.control_hairline)
+            .surface(&theme, Surface::Panel)
+            .child(
+                PageLayout::new(
+                    id.clone(),
+                    ScrollArea::new(format!("{id}.scroll")).child(filler(
+                        &theme,
+                        "Fixture page content",
+                        12,
+                    )),
+                )
+                .insets(insets)
+                .hide_footer(keyboard)
+                .header(
+                    AppBar::new(format!("{id}.bar"), name).leading(
+                        Button::new(format!("{id}.back"))
+                            .label("Back")
+                            .ghost()
+                            .control_size(ControlSize::Touch)
+                            .disabled(!safe)
+                            .on_click(|_, _| {}),
+                    ),
+                )
+                .footer(div().p(px(theme.space(Space::Sm))).child("Caller footer")),
+            )
+    };
+    stack(&theme)
+        .child(caption(&theme, "Fixture residual insets: desktop zero · safe area · overlapping IME with footer unmounted"))
+        .child(row(&theme).items_start().child(page("Desktop", false, false))
+            .child(page("Safe area", false, true)).child(page("Keyboard", true, true)))
+        .into_any_element()
+}
+
 pub(super) fn scroll_edge_effect(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)

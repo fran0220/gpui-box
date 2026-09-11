@@ -73,6 +73,8 @@ pub struct Combobox {
     trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
     reveal_active: bool,
     menu_geometry: Option<popover::MenuGeometry>,
+    presentation: popover::PickerPresentation,
+    sheet: Option<popover::PickerSheet>,
     slots: Slots,
     /// Held so the query subscription lives as long as the combobox does.
     _subscriptions: Vec<Subscription>,
@@ -120,6 +122,8 @@ impl Combobox {
             trigger_bounds: Rc::default(),
             reveal_active: false,
             menu_geometry: None,
+            presentation: popover::PickerPresentation::Anchored,
+            sheet: None,
             slots: Slots::default(),
             _subscriptions: vec![subscription],
         }
@@ -128,6 +132,22 @@ impl Combobox {
     pub fn options(mut self, options: impl IntoIterator<Item = SelectOption>) -> Self {
         self.options = options.into_iter().collect();
         self
+    }
+
+    /// Chooses an anchored menu or retained bottom modal for the same options.
+    pub fn presentation(mut self, presentation: popover::PickerPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+
+    /// Changes presentation without resetting the query or caller selection.
+    pub fn set_presentation(
+        &mut self,
+        presentation: popover::PickerPresentation,
+        cx: &mut Context<Self>,
+    ) {
+        self.presentation = presentation;
+        cx.notify();
     }
 
     pub fn selected(mut self, id: impl Into<SharedString>) -> Self {
@@ -573,6 +593,21 @@ impl Combobox {
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .children(rows);
+        if self.presentation == popover::PickerPresentation::Bottom {
+            return div()
+                .h_full()
+                .w_full()
+                .column()
+                .capture_key_down(cx.listener(Self::on_key_down))
+                .child(div().flex_none().child(self.query.clone()))
+                .child(viewport.flex_1().min_h_0().max_h_full())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(menu_ident.semantic_id(), Role::Menu)
+                        .parent(self.ident.semantic_id()),
+                )
+                .into_any_element();
+        }
         let list = popover::card_flush(menu_ident.clone(), &theme)
             .py(px(inset))
             .w(px(geometry.width))
@@ -623,6 +658,9 @@ impl Combobox {
         let clicked_value = value.clone();
         popover::menu_row(&theme, false, true)
             .id(ident.element_id())
+            .when(self.size == ControlSize::Touch, |row| {
+                row.min_h(px(theme.control.touch.height))
+            })
             .when(!self.disabled, |element| {
                 element.cursor_pointer().pressable(cx).on_mouse_down(
                     MouseButton::Left,
@@ -669,6 +707,9 @@ impl Combobox {
 
         let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
+            .when(self.size == ControlSize::Touch, |row| {
+                row.min_h(px(theme.control.touch.height))
+            })
             .group(hover_group.clone())
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
@@ -760,6 +801,42 @@ impl Slotted for Combobox {
 impl Render for Combobox {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        self.query
+            .update(cx, |query, cx| query.set_control_size(self.size, cx));
+        let bottom = self.presentation == popover::PickerPresentation::Bottom;
+        if bottom && self.sheet.is_none() {
+            let picker = cx.weak_entity();
+            self.sheet = Some(popover::PickerSheet::new(
+                self.ident.child("sheet"),
+                self.name.clone(),
+                vec![self.query.read(cx).focus_handle(cx)],
+                move |window, cx| {
+                    picker
+                        .update(cx, |picker, cx| {
+                            let theme = cx.theme().clone();
+                            picker.menu(
+                                popover::MenuGeometry {
+                                    placement: Placement::Below,
+                                    hang: Hang::Start,
+                                    width: (f32::from(window.viewport_size().width)
+                                        - theme.space(Space::Lg) * 2.0)
+                                        .max(0.0),
+                                    max_height: theme.measures.menu_max_height,
+                                },
+                                window,
+                                cx,
+                            )
+                        })
+                        .unwrap_or_else(|_| div().into_any_element())
+                },
+                |picker, cx| picker.close(cx),
+                window,
+                cx,
+            ));
+        }
+        if let Some(sheet) = &self.sheet {
+            sheet.sync(bottom && self.open, window, cx);
+        }
         if !self.seeded {
             self.seeded = true;
             if let Some(label) = self.selected_label() {
@@ -783,7 +860,7 @@ impl Render for Combobox {
         }
 
         let focused = self.query.read(cx).focus_handle(cx).is_focused(window);
-        let geometry = self.open.then(|| {
+        let geometry = (self.open && !bottom).then(|| {
             popover::menu_geometry(
                 window,
                 self.trigger_bounds.get(),
@@ -830,7 +907,21 @@ impl Render for Combobox {
                 }),
             )
         })
-        .child(div().flex_1().child(self.query.clone()))
+        .child(
+            div().flex_1().child(
+                if self
+                    .sheet
+                    .as_ref()
+                    .is_some_and(|sheet| sheet.drawer.read(cx).is_rendered())
+                {
+                    div()
+                        .child(self.query.read(cx).value().clone())
+                        .into_any_element()
+                } else {
+                    self.query.clone().into_any_element()
+                },
+            ),
+        )
         .child(
             icon(Icon::AltArrowDown)
                 .size(px(theme.control.get(self.size).icon_size * 0.9))
@@ -858,6 +949,7 @@ impl Render for Combobox {
             .capture_action(cx.listener(Self::on_line_end))
             .capture_key_down(cx.listener(Self::on_key_down))
             .child(popover::anchored_slot(placement, hang, trigger, menu))
+            .children(self.sheet.as_ref().map(|sheet| sheet.drawer.clone()))
             .semantic_in(cx, spec)
     }
 }

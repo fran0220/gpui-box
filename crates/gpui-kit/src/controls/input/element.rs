@@ -30,6 +30,7 @@ impl TextElement {
 
 pub struct PrepaintState {
     layout: Option<EditableTextLayout>,
+    document_layout: Option<EditableTextLayout>,
     cursor: Option<PaintQuad>,
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
@@ -149,6 +150,16 @@ impl Element for TextElement {
             .map(|lines| lines.into_iter().collect::<Vec<_>>())
             .unwrap_or_default();
         let layout = EditableTextLayout::new(display_text.as_ref(), lines, line_height);
+        // Placeholder glyphs are not editable text. Retain the real empty
+        // line for native caret/point queries instead of a mismatched layout.
+        let document_layout = input.is_empty().then(|| {
+            let lines = window
+                .text_system()
+                .shape_text("".into(), font_size, &[style.to_run(0)], None, None)
+                .map(|lines| lines.into_iter().collect())
+                .unwrap_or_default();
+            EditableTextLayout::new("", lines, line_height)
+        });
 
         // Long text scrolls under a fixed frame, so the caret stays visible
         // instead of being painted outside the control.
@@ -200,7 +211,21 @@ impl Element for TextElement {
             (
                 Vec::new(),
                 Some(fill(
-                    layout.caret_bounds(cursor, origin, px(theme.measures.caret_width)),
+                    input
+                        .native_display_position(input.edit.native_selection().head)
+                        .and_then(|position| {
+                            layout.native_position_bounds(
+                                &display_text,
+                                position,
+                                origin,
+                                px(theme.measures.caret_width),
+                                gpui::TextAlign::Left,
+                                bounds.size.width,
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            layout.caret_bounds(cursor, origin, px(theme.measures.caret_width))
+                        }),
                     theme.colors.accent,
                 )),
             )
@@ -217,6 +242,7 @@ impl Element for TextElement {
 
         PrepaintState {
             layout: Some(layout),
+            document_layout,
             cursor,
             selection,
             scroll_offset,
@@ -266,7 +292,8 @@ impl Element for TextElement {
                     }
                 }
                 self.input.update(cx, |input, _| {
-                    input.set_last_layout(layout, bounds);
+                    input
+                        .set_last_layout(prepaint.document_layout.take().unwrap_or(layout), bounds);
                     input.set_scroll_offset(scroll_offset);
                 });
             }

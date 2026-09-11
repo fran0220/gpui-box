@@ -3,6 +3,8 @@ resolver = "3"
 members = [
   "crates/collections",
   "crates/gpui",
+  "crates/gpui_android",
+  "crates/gpui_ios",
   "crates/gpui_linux",
   "crates/gpui_macos",
   "crates/gpui_macros",
@@ -27,8 +29,10 @@ members = [
   "crates/gpui-kit-theme",
   "crates/gpui-kit-tokens",
   "crates/gpui-kit",
+  "examples/android",
   "examples/browser-gallery",
   "examples/gallery",
+  "examples/mobile-reference",
   "tools/app-host",
   "tools/mcp",
   "tools/performance-check",
@@ -51,6 +55,8 @@ rust-version = "1.97"
 [workspace.dependencies]
 collections = { package = "gpui-box-collections", path = "crates/collections", version = "0.1.2" }
 gpui = { package = "gpui-box", path = "crates/gpui", version = "0.1.2" }
+gpui_android = { package = "gpui-box-android", path = "crates/gpui_android", version = "0.1.2" }
+gpui_ios = { package = "gpui-box-ios", path = "crates/gpui_ios", version = "0.1.2" }
 gpui_linux = { package = "gpui-box-linux", path = "crates/gpui_linux", version = "0.1.2" }
 gpui_macos = { package = "gpui-box-macos", path = "crates/gpui_macos", version = "0.1.2" }
 gpui_macros = { package = "gpui-box-macros", path = "crates/gpui_macros", version = "0.1.2" }

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "smoke": "playwright test --config playwright.config.mjs",
+    "mobile": "playwright test --config mobile.config.mjs",
     "visual:check": "playwright test --config visual.config.mjs",
     "visual:capture": "playwright test --config visual.config.mjs --update-snapshots"
   },

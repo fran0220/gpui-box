@@ -1495,3 +1495,116 @@ pub(super) fn menubar(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(bar)
         .into_any_element()
 }
+
+struct SceneBottomSheet(Entity<crate::overlay::sheet::BottomSheet>);
+impl Global for SceneBottomSheet {}
+
+pub(super) fn bottom_sheet(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::overlay::sheet::{BottomSheet, BottomSheetEvent, SheetDetent};
+    if !cx.has_global::<SceneBottomSheet>() {
+        let sheet = cx.new(|cx| BottomSheet::new("scene.bottom-sheet", window, cx));
+        sheet.update(cx, |sheet, cx| {
+            sheet.set_title("Choose destination · fixture", cx);
+            sheet.set_detents(
+                vec![
+                    SheetDetent::new("Compact", 290.0),
+                    SheetDetent::new("Half", 430.0),
+                    SheetDetent::new("Full", 640.0),
+                ],
+                "Half",
+                cx,
+            );
+            let scroll = gpui::ScrollHandle::new();
+            sheet.set_scroll_handle(Some(scroll.clone()), cx);
+            sheet.set_content(
+                Some(Rc::new(move |_, cx| {
+                    let _theme = cx.theme().clone();
+                    div()
+                        .id("scene.bottom-sheet.list")
+                        .column()
+                        .size_full()
+                        .overflow_y_scroll()
+                        .track_scroll(&scroll)
+                        .children(
+                            [
+                                ("home", "Home"),
+                                ("work", "Work"),
+                                ("library", "Library"),
+                                ("airport", "Airport"),
+                                ("station", "Station"),
+                                ("garden", "Garden"),
+                                ("museum", "Museum"),
+                            ]
+                            .into_iter()
+                            .map(|(id, label)| {
+                                Button::new(format!("scene.bottom-sheet.destination.{id}"))
+                                    .label(label)
+                                    .secondary()
+                                    .control_size(gpui_kit_theme::ControlSize::Touch)
+                                    .on_click(|_, _| {})
+                            }),
+                        )
+                        .into_any_element()
+                })),
+                cx,
+            );
+            sheet.open(window, cx);
+            sheet.settle(cx);
+        });
+        cx.subscribe(&sheet, |sheet, event, cx| {
+            if let BottomSheetEvent::DetentRequested(id) = event {
+                sheet.update(cx, |sheet, cx| {
+                    sheet.set_detent(id.clone(), cx);
+                });
+            }
+        })
+        .detach();
+        cx.set_global(SceneBottomSheet(sheet));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w_full()
+        .h(px(640.0))
+        .child(page_behind(&theme, "Caller-owned destinations"))
+        .child(cx.global::<SceneBottomSheet>().0.clone())
+        .into_any_element()
+}
+
+struct SceneActionSheet(Entity<crate::overlay::sheet::ActionSheet>);
+impl Global for SceneActionSheet {}
+
+pub(super) fn action_sheet(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::overlay::sheet::{ActionSheet, SheetAction, SheetActionState};
+    if !cx.has_global::<SceneActionSheet>() {
+        let sheet = cx.new(|cx| ActionSheet::new("scene.action-sheet", window, cx));
+        sheet.update(cx, |sheet, cx| {
+            let mut remove = SheetAction::new("remove", "Remove from collection");
+            remove.destructive = true;
+            let mut share = SheetAction::new("share", "Share unavailable");
+            share.disabled = true;
+            sheet.set_actions(
+                vec![SheetAction::new("save", "Save a copy"), share, remove],
+                cx,
+            );
+            sheet.set_state(
+                SheetActionState::Error(
+                    "Fixture refusal: the last attempt failed; nothing was removed.".into(),
+                ),
+                cx,
+            );
+            sheet.sheet().update(cx, |sheet, cx| {
+                sheet.set_title("Collection actions · fixture", cx);
+            });
+            sheet.open(window, cx);
+            sheet.sheet().update(cx, |sheet, cx| sheet.settle(cx));
+        });
+        cx.set_global(SceneActionSheet(sheet));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w_full()
+        .h(px(600.0))
+        .child(page_behind(&theme, "Last verified collection"))
+        .child(cx.global::<SceneActionSheet>().0.clone())
+        .into_any_element()
+}

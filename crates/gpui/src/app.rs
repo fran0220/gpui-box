@@ -1007,8 +1007,18 @@ impl App {
     }
 
     /// Gracefully quit the application via the platform's standard routine.
+    /// May do nothing on mobile; use [`Self::try_quit`] to receive a refusal.
     pub fn quit(&self) {
         self.platform.quit();
+    }
+
+    /// Checks and requests quit on the owner UI thread. Success means accepted,
+    /// not that the OS has finished terminating the application.
+    pub fn try_quit(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::Quit)?;
+        self.quit();
+        Ok(())
     }
 
     /// Returns the current policy for hiding the cursor in response to
@@ -1285,18 +1295,45 @@ impl App {
     }
 
     /// Hide the application at the platform level.
+    /// May do nothing on mobile; use [`Self::try_hide`] to receive a refusal.
     pub fn hide(&self) {
         self.platform.hide();
     }
 
+    /// Checks and requests application hiding on the owner UI thread.
+    pub fn try_hide(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::Hide)?;
+        self.hide();
+        Ok(())
+    }
+
     /// Hide other applications at the platform level.
+    /// May do nothing on mobile; use [`Self::try_hide_other_apps`].
     pub fn hide_other_apps(&self) {
         self.platform.hide_other_apps();
     }
 
+    /// Checks and requests hiding other applications on the owner UI thread.
+    pub fn try_hide_other_apps(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::HideOtherApps)?;
+        self.hide_other_apps();
+        Ok(())
+    }
+
     /// Unhide other applications at the platform level.
+    /// May do nothing on mobile; use [`Self::try_unhide_other_apps`].
     pub fn unhide_other_apps(&self) {
         self.platform.unhide_other_apps();
+    }
+
+    /// Checks and requests unhiding other applications on the owner UI thread.
+    pub fn try_unhide_other_apps(&self) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::UnhideOtherApps)?;
+        self.unhide_other_apps();
+        Ok(())
     }
 
     /// Returns the list of currently active displays.
@@ -1553,13 +1590,32 @@ impl App {
     }
 
     /// Reveals the specified path at the platform level, such as in Finder on macOS.
+    /// May do nothing on mobile; use [`Self::try_reveal_path`].
     pub fn reveal_path(&self, path: &Path) {
         self.platform.reveal_path(path)
     }
 
+    /// Checks and requests path reveal on the owner UI thread.
+    pub fn try_reveal_path(&self, path: &Path) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::RevealPath)?;
+        self.reveal_path(path);
+        Ok(())
+    }
+
     /// Opens the specified path with the system's default application.
+    /// May do nothing on mobile; use [`Self::try_open_with_system`].
     pub fn open_with_system(&self, path: &Path) {
         self.platform.open_with_system(path)
+    }
+
+    /// Checks and requests opening a path on the owner UI thread. Success means
+    /// the request was issued, not that the external application opened it.
+    pub fn try_open_with_system(&self, path: &Path) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::OpenWithSystem)?;
+        self.open_with_system(path);
+        Ok(())
     }
 
     /// Returns whether the user has configured scrollbars to auto-hide at the platform level.
@@ -1568,11 +1624,21 @@ impl App {
     }
 
     /// Restarts the application.
+    /// May do nothing on mobile; use [`Self::try_restart`] to avoid notifying
+    /// restart observers when the platform cannot restart.
     pub fn restart(&mut self) {
         self.restart_observers
             .clone()
             .retain(&(), |observer| observer(self));
         self.platform.restart(self.restart_path.take())
+    }
+
+    /// Checks restart before notifying observers or consuming the restart path.
+    pub fn try_restart(&mut self) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::Restart)?;
+        self.restart();
+        Ok(())
     }
 
     /// Sets the path to use when restarting the application.
@@ -2385,8 +2451,20 @@ impl App {
     }
 
     /// Sets the right click menu for the app icon in the dock
+    /// May do nothing on mobile; use [`Self::try_set_dock_menu`].
     pub fn set_dock_menu(&self, menus: Vec<MenuItem>) {
         self.platform.set_dock_menu(menus, &self.keymap.borrow())
+    }
+
+    /// Checks and installs a dock menu on the owner UI thread.
+    pub fn try_set_dock_menu(
+        &self,
+        menus: Vec<MenuItem>,
+    ) -> Result<(), crate::PlatformOperationError> {
+        self.platform
+            .check_app_operation(crate::AppOperation::SetDockMenu)?;
+        self.set_dock_menu(menus);
+        Ok(())
     }
 
     /// Performs the action associated with the given dock menu item, only used on Windows for now.

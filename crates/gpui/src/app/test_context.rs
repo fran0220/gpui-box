@@ -405,6 +405,12 @@ impl TestAppContext {
         self.test_window(window_handle).simulate_resize(size);
     }
 
+    /// Simulates residual viewport occlusion through the platform inset callback.
+    /// This changes test geometry, not an actual system keyboard or safe area.
+    pub fn simulate_window_insets(&self, window: AnyWindowHandle, insets: crate::WindowInsets) {
+        self.test_window(window).simulate_insets_change(insets);
+    }
+
     /// Controls whether the test window accepts platform-native context menus.
     /// Test windows default to unsupported so component fallback rendering is
     /// exercised unless a test opts into the native contract.
@@ -941,6 +947,11 @@ impl VisualTestContext {
         self.simulate_window_resize(self.window, size)
     }
 
+    /// Simulates viewport insets and their redraw notification, not a native keyboard.
+    pub fn simulate_insets(&self, insets: crate::WindowInsets) {
+        self.simulate_window_insets(self.window, insets)
+    }
+
     /// debug_bounds returns the bounds of the element with the given selector.
     pub fn debug_bounds(&mut self, selector: &'static str) -> Option<Bounds<Pixels>> {
         self.update(|window, _| window.rendered_frame.debug_bounds.get(selector).copied())
@@ -1206,6 +1217,113 @@ mod tests {
     use std::cell::RefCell;
     use std::path::PathBuf;
     use std::rc::Rc;
+
+    #[gpui::test]
+    async fn checked_app_commands_preserve_refusals_and_restart_state(cx: &mut TestAppContext) {
+        use crate::PlatformOperationError as Error;
+        let restarts = Rc::new(std::cell::Cell::new(0));
+        let _subscription = cx.update(|app| {
+            app.set_restart_path(PathBuf::from("/pending/restart"));
+            app.on_app_restart({
+                let restarts = restarts.clone();
+                move |_| restarts.set(restarts.get() + 1)
+            })
+        });
+        let (sender, mut receiver) = futures::channel::oneshot::channel();
+        *cx.test_platform.expect_restart.borrow_mut() = Some(sender);
+        for error in [
+            Error::Unsupported("test"),
+            Error::Unavailable("test"),
+            Error::Refused("test"),
+        ] {
+            *cx.test_platform.app_operation_error.borrow_mut() = Some(error.clone());
+            cx.update(|app| {
+                assert_eq!(app.try_quit(), Err(error.clone()));
+                assert_eq!(app.try_hide(), Err(error.clone()));
+                assert_eq!(app.try_hide_other_apps(), Err(error.clone()));
+                assert_eq!(app.try_unhide_other_apps(), Err(error.clone()));
+                assert_eq!(
+                    app.try_reveal_path(std::path::Path::new("/a")),
+                    Err(error.clone())
+                );
+                assert_eq!(
+                    app.try_open_with_system(std::path::Path::new("/a")),
+                    Err(error.clone())
+                );
+                assert_eq!(app.try_set_dock_menu(Vec::new()), Err(error.clone()));
+                assert_eq!(app.try_restart(), Err(error.clone()));
+            });
+            assert_eq!(
+                cx.test_platform.checked_operations.take(),
+                [
+                    crate::AppOperation::Quit,
+                    crate::AppOperation::Hide,
+                    crate::AppOperation::HideOtherApps,
+                    crate::AppOperation::UnhideOtherApps,
+                    crate::AppOperation::RevealPath,
+                    crate::AppOperation::OpenWithSystem,
+                    crate::AppOperation::SetDockMenu,
+                    crate::AppOperation::Restart
+                ]
+            );
+            assert_eq!(restarts.get(), 0);
+            assert_eq!(
+                receiver.try_recv().expect("restart channel remains open"),
+                None
+            );
+        }
+        *cx.test_platform.app_operation_error.borrow_mut() = None;
+        cx.update(|app| app.try_restart().expect("supported restart accepted"));
+        assert_eq!(restarts.get(), 1);
+        assert_eq!(
+            receiver.await.expect("restart dispatched"),
+            Some(PathBuf::from("/pending/restart"))
+        );
+    }
+
+    #[gpui::test]
+    fn checked_window_commands_do_not_mutate_on_refusal(cx: &mut TestAppContext) {
+        use crate::PlatformOperationError as Error;
+        let cx = cx.add_empty_window();
+        let native = cx.test_window(cx.window);
+        let original = native.0.lock().bounds.size;
+        let requested = crate::size(crate::px(321.), crate::px(123.));
+        for error in [
+            Error::Unsupported("test"),
+            Error::Unavailable("test"),
+            Error::Refused("test"),
+        ] {
+            native.0.lock().operation_error = Some(error.clone());
+            cx.update(|window, _| {
+                assert_eq!(window.try_resize(requested), Err(error.clone()));
+                assert_eq!(window.try_zoom_window(), Err(error.clone()));
+                assert_eq!(window.try_minimize_window(), Err(error.clone()));
+                assert_eq!(window.try_toggle_fullscreen(), Err(error.clone()));
+                assert!(!window.is_fullscreen());
+            });
+            assert_eq!(
+                std::mem::take(&mut native.0.lock().checked_operations),
+                [
+                    crate::WindowOperation::Resize,
+                    crate::WindowOperation::Zoom,
+                    crate::WindowOperation::Minimize,
+                    crate::WindowOperation::ToggleFullscreen
+                ]
+            );
+            assert_eq!(native.0.lock().bounds.size, original);
+        }
+        native.0.lock().operation_error = None;
+        cx.update(|window, _| {
+            window
+                .try_resize(requested)
+                .expect("supported resize accepted");
+            window
+                .try_toggle_fullscreen()
+                .expect("supported fullscreen accepted");
+            assert!(window.is_fullscreen());
+        });
+        assert_eq!(native.0.lock().bounds.size, requested);
+    }
 
     #[gpui::test]
     async fn test_system_notifications_require_identity_and_replace_matching_tags(

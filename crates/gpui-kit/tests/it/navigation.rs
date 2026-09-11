@@ -1,6 +1,67 @@
 //! Tabs, accordion, and breadcrumb report where the typist wants to go. None
 //! of them decides that they got there.
 
+#[gpui::test]
+fn bottom_navigation_reports_intent_without_accepting_it_and_disables_handlers(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::navigation::{BottomNavigation, NavigationItem};
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let calls = calls.clone();
+        move |_, _| {
+            let calls = calls.clone();
+            BottomNavigation::new("bottom")
+                .items([
+                    NavigationItem::new("library", "Library"),
+                    NavigationItem::new("search", "Search"),
+                    NavigationItem::new("settings", "Settings").disabled(true),
+                ])
+                .selected("search")
+                .on_select(move |id, _, _| calls.borrow_mut().push(id))
+                .into_any_element()
+        }
+    });
+    harness.click("bottom.library");
+    assert_eq!(&*calls.borrow(), &[SharedString::from("library")]);
+    assert_eq!(
+        harness
+            .node("bottom.search")
+            .expect("search is mounted")
+            .checked,
+        Some(true)
+    );
+    assert!(
+        harness
+            .bounds("bottom.search")
+            .expect("search is mounted")
+            .size
+            .height
+            >= gpui::px(48.0)
+    );
+    harness.click("bottom.settings");
+    assert_eq!(calls.borrow().len(), 1);
+    assert!(
+        harness
+            .node("bottom.settings")
+            .expect("settings is mounted")
+            .disabled
+    );
+    harness.remount(|_, _| {
+        BottomNavigation::new("unavailable")
+            .items([NavigationItem::new("library", "Library")])
+            .into_any_element()
+    });
+    assert!(
+        harness
+            .node("unavailable.library")
+            .expect("library is mounted")
+            .disabled
+    );
+    harness.click("unavailable.library");
+    assert_eq!(calls.borrow().len(), 1);
+}
+
 use std::cell::RefCell;
 use std::rc::Rc;
 

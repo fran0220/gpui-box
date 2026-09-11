@@ -37,6 +37,8 @@ pub(crate) struct TestPlatform {
     pub(crate) system_notifications: RefCell<TestSystemNotifications>,
     pub text_system: Arc<dyn PlatformTextSystem>,
     pub expect_restart: RefCell<Option<oneshot::Sender<Option<PathBuf>>>>,
+    pub(crate) app_operation_error: RefCell<Option<crate::PlatformOperationError>>,
+    pub(crate) checked_operations: RefCell<Vec<crate::AppOperation>>,
     headless_renderer_factory: Option<Box<dyn Fn() -> Option<Box<dyn PlatformHeadlessRenderer>>>>,
     weak: Weak<Self>,
 }
@@ -139,6 +141,8 @@ impl TestPlatform {
             active_window: Default::default(),
             native_context_menu: Default::default(),
             expect_restart: Default::default(),
+            app_operation_error: Default::default(),
+            checked_operations: Default::default(),
             current_clipboard_item: Mutex::new(None),
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             current_primary_item: Mutex::new(None),
@@ -308,6 +312,17 @@ impl TestPlatform {
 }
 
 impl Platform for TestPlatform {
+    fn check_app_operation(
+        &self,
+        operation: crate::AppOperation,
+    ) -> Result<(), crate::PlatformOperationError> {
+        self.checked_operations.borrow_mut().push(operation);
+        self.app_operation_error
+            .borrow()
+            .clone()
+            .map_or(Ok(()), Err)
+    }
+
     fn background_executor(&self) -> BackgroundExecutor {
         self.background_executor.clone()
     }

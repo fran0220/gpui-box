@@ -1870,6 +1870,18 @@ mod tests {
             10
         );
         assert_eq!(parse_tool_list(LOCAL_TOOLS).expect("local tools").len(), 7);
+        let local = parse_tool_list(LOCAL_TOOLS).expect("local tools");
+        let open = local
+            .iter()
+            .find(|tool| tool["name"] == "session_open")
+            .expect("checkout session open");
+        for (dimension, default) in [("width", 920), ("height", 1000)] {
+            assert_eq!(
+                open["inputSchema"]["properties"][dimension],
+                json!({"type": "number", "minimum": 1, "maximum": 4096, "default": default})
+            );
+        }
+        assert_eq!(open["inputSchema"]["required"], json!(["scene"]));
         for tool in parse_tool_list(REMOTE_TOOLS)
             .expect("remote tools")
             .into_iter()

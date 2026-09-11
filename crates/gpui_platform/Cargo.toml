@@ -27,7 +27,7 @@ required-features = ["native-platform", "test-support"]
 # `default-features = false`, as `tools/headless-visual` does.
 default = ["native-platform", "font-kit"]
 font-kit = ["gpui_macos?/font-kit"]
-native-platform = ["dep:gpui_linux", "dep:gpui_macos", "dep:gpui_web", "dep:gpui_windows"]
+native-platform = ["dep:gpui_android", "dep:gpui_ios", "dep:gpui_linux", "dep:gpui_macos", "dep:gpui_web", "dep:gpui_windows"]
 web-multithreaded = ["gpui_web/multithreaded"]
 test-support = [
     "gpui/test-support",
@@ -45,6 +45,12 @@ x11 = ["gpui_linux/x11"]
 gpui.workspace = true
 gpui_wgpu = { workspace = true, optional = true }
 log.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+gpui_android = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+gpui_ios = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 gpui_macos = { workspace = true, optional = true }

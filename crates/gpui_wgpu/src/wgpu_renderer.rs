@@ -579,30 +579,8 @@ impl WgpuRenderer {
                 )
             })?;
 
-        let pick_alpha_mode =
-            |preferences: &[wgpu::CompositeAlphaMode]| -> anyhow::Result<wgpu::CompositeAlphaMode> {
-                preferences
-                    .iter()
-                    .find(|p| surface_caps.alpha_modes.contains(p))
-                    .copied()
-                    .or_else(|| surface_caps.alpha_modes.first().copied())
-                    .ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "Surface reports no supported alpha modes for adapter {:?}",
-                            context.adapter.get_info().name
-                        )
-                    })
-            };
-
-        let transparent_alpha_mode = pick_alpha_mode(&[
-            wgpu::CompositeAlphaMode::PreMultiplied,
-            wgpu::CompositeAlphaMode::Inherit,
-        ])?;
-
-        let opaque_alpha_mode = pick_alpha_mode(&[
-            wgpu::CompositeAlphaMode::Opaque,
-            wgpu::CompositeAlphaMode::Inherit,
-        ])?;
+        let transparent_alpha_mode = supported_alpha_mode(true, &surface_caps.alpha_modes)?;
+        let opaque_alpha_mode = supported_alpha_mode(false, &surface_caps.alpha_modes)?;
 
         let alpha_mode = if config.transparent {
             transparent_alpha_mode
@@ -632,10 +610,10 @@ impl WgpuRenderer {
             color_space: config.color_space,
             width: clamped_width.max(1),
             height: clamped_height.max(1),
-            present_mode: config
-                .preferred_present_mode
-                .filter(|mode| surface_caps.present_modes.contains(mode))
-                .unwrap_or(wgpu::PresentMode::Fifo),
+            present_mode: supported_present_mode(
+                config.preferred_present_mode,
+                &surface_caps.present_modes,
+            ),
             desired_maximum_frame_latency: 2,
             alpha_mode,
             view_formats: vec![],
@@ -2133,6 +2111,8 @@ impl WgpuRenderer {
 
         if let Err(error) = self.draw_to_view(scene, &frame_view, wgpu::Color::TRANSPARENT, None) {
             log::error!("{error}");
+            // Discard the acquired drawable rather than presenting an incomplete frame.
+            return false;
         }
         self.resources().queue.present(frame);
         true
@@ -3486,64 +3466,96 @@ impl WgpuRenderer {
         Ok(())
     }
 
-    /// Mark the surface as unconfigured so rendering is skipped until a new
+    /// Drop the surface so rendering is skipped until a new
     /// surface is provided via [`replace_surface`](Self::replace_surface).
     ///
     /// This does **not** drop the renderer — the device, queue, atlas, and
     /// pipelines stay alive.  Use this when the native window is destroyed
     /// (e.g. Android `TerminateWindow`) but you intend to re-create the
-    /// surface later without losing cached atlas textures.
-    pub fn unconfigure_surface(&mut self) {
+    /// surface later without losing cached atlas textures. Call synchronously before
+    /// releasing native handles or acknowledging native surface destruction.
+    ///
+    /// `draw` holds its drawable only on the stack and requires exclusive access,
+    /// so no acquired frame can survive this call. Native submitted work is drained
+    /// before the surface is released. A drain failure is returned, but the surface
+    /// is still dropped and rendering remains disabled. The platform must serialize
+    /// lifecycle callbacks with drawing and stop other submitters sharing the device
+    /// before backgrounding (in particular on iOS).
+    pub fn unconfigure_surface(&mut self) -> anyhow::Result<()> {
         self.surface_configured = false;
-        // Drop intermediate textures since they reference the old surface size.
+        #[allow(unused_mut)]
+        let mut result = if self.resources.is_some() && self.device_lost() {
+            Err(anyhow::anyhow!(
+                "GPU device is lost; surface work completion cannot be confirmed"
+            ))
+        } else {
+            Ok(())
+        };
         if let Some(res) = self.resources.as_mut() {
+            #[cfg(not(target_family = "wasm"))]
+            {
+                if let Err(error) = res.device.poll(wgpu::PollType::Wait {
+                    submission_index: None,
+                    timeout: None,
+                }) {
+                    result = Err(anyhow::anyhow!("Failed to drain surface work: {error}"));
+                }
+            }
             res.invalidate_intermediate_textures();
+            res.surface.take();
         }
+        result
     }
 
     /// Replace the wgpu surface with a new one (e.g. after Android destroys
     /// and recreates the native window).  Keeps the device, queue, atlas, and
     /// all pipelines intact so cached `AtlasTextureId`s remain valid.
     ///
-    /// The `instance` **must** be the same [`wgpu::Instance`] that was used to
-    /// create the adapter and device (i.e. from the [`WgpuContext`]).  Using a
-    /// different instance will cause a "Device does not exist" panic because
-    /// the wgpu device is bound to its originating instance.
+    /// Uses the original context's instance. The caller must keep the native
+    /// handle valid until detachment or destruction, and call on the native UI
+    /// thread when required (UIKit). Failure leaves the renderer detached.
     #[cfg(not(target_family = "wasm"))]
     pub fn replace_surface<W: HasWindowHandle>(
         &mut self,
         window: &W,
         config: WgpuSurfaceConfig,
-        instance: &wgpu::Instance,
     ) -> anyhow::Result<()> {
+        self.unconfigure_surface()?;
+        anyhow::ensure!(
+            !self.device_lost(),
+            "GPU device is lost; recover before attaching a surface"
+        );
         let window_handle = window
             .window_handle()
             .map_err(|e| anyhow::anyhow!("Failed to get window handle: {e}"))?;
 
-        let surface = create_surface(instance, window_handle.as_raw())?;
-
-        let supports_current_format = {
+        let (surface, capabilities) = {
             let gpu_context = self
                 .context
                 .as_ref()
-                .expect("replace_surface requires gpu_context");
+                .ok_or_else(|| anyhow::anyhow!("replace_surface requires gpu_context"))?;
             let context = gpu_context.borrow();
-            let context = context
-                .as_ref()
-                .expect("replace_surface requires an initialized context");
+            let context = context.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("replace_surface requires an initialized context")
+            })?;
+            let surface = create_surface(&context.instance, window_handle.as_raw())?;
+            context.check_compatible_with_surface(&surface)?;
             let capabilities = surface.get_capabilities(&context.adapter);
-            surface_formats_for_color_space(&capabilities, config.color_space)
-                .contains(&self.surface_config.format)
+            (surface, capabilities)
         };
         anyhow::ensure!(
-            supports_current_format,
+            surface_formats_for_color_space(&capabilities, config.color_space)
+                .contains(&self.surface_config.format),
             "Replacement surface does not support format {:?} in color space {:?}",
             self.surface_config.format,
             config.color_space,
         );
 
-        let width = (config.size.width.0 as u32).max(1);
-        let height = (config.size.height.0 as u32).max(1);
+        let width = (config.size.width.0 as u32).clamp(1, self.max_texture_size);
+        let height = (config.size.height.0 as u32).clamp(1, self.max_texture_size);
+
+        self.transparent_alpha_mode = supported_alpha_mode(true, &capabilities.alpha_modes)?;
+        self.opaque_alpha_mode = supported_alpha_mode(false, &capabilities.alpha_modes)?;
 
         let alpha_mode = if config.transparent {
             self.transparent_alpha_mode
@@ -3555,16 +3567,19 @@ impl WgpuRenderer {
         self.surface_config.height = height;
         self.surface_config.alpha_mode = alpha_mode;
         self.surface_config.color_space = config.color_space;
-        if let Some(mode) = config.preferred_present_mode {
-            self.surface_config.present_mode = mode;
-        }
+        self.surface_config.present_mode =
+            supported_present_mode(config.preferred_present_mode, &capabilities.present_modes);
 
         {
             let res = self
                 .resources
                 .as_mut()
-                .expect("GPU resources not available");
+                .ok_or_else(|| anyhow::anyhow!("GPU resources not available"))?;
+            let errors = res.device.push_error_scope(wgpu::ErrorFilter::Validation);
             surface.configure(&res.device, &self.surface_config);
+            if let Some(error) = gpui::block_on(errors.pop()) {
+                anyhow::bail!("Replacement surface configuration failed: {error}");
+            }
             res.surface = Some(surface);
 
             // Invalidate intermediate textures — they'll be recreated lazily.
@@ -3572,14 +3587,62 @@ impl WgpuRenderer {
         }
 
         self.surface_configured = true;
+        self.needs_redraw = true;
 
         Ok(())
     }
 
-    pub fn destroy(&mut self) {
-        // Release surface-bound GPU resources eagerly so the underlying native
-        // window can be destroyed before the renderer itself is dropped.
+    /// Drains and releases presentation resources before native-window destruction.
+    /// Shares the synchronization contract of [`Self::unconfigure_surface`]; callers
+    /// need not detach first. Resources are released even when draining fails, but
+    /// the returned error means GPU completion could not be confirmed. Repeated
+    /// destruction succeeds once resources have been released.
+    pub fn destroy(&mut self) -> anyhow::Result<()> {
+        let result = self.unconfigure_surface();
         self.resources.take();
+        result
+    }
+
+    /// Waits for GPU work already submitted on this renderer's device, with
+    /// `timeout` as the native GPU wait limit (callback execution adds time).
+    /// Checks device loss before and after polling and pending GPU errors
+    /// after callbacks have run. Errors are not consumed: validation must not hide
+    /// them from the normal draw/recovery path.
+    ///
+    /// This also succeeds for an idle device. It does not prove that a frame was
+    /// drawn or displayed. For native frame validation, first require `draw` to
+    /// return true, then call this before another draw can consume pending errors,
+    /// and obtain separate native pixel evidence. Serialize other device users;
+    /// work submitted concurrently or after this call is outside this guarantee.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn wait_for_gpu_completion(&self, timeout: std::time::Duration) -> anyhow::Result<()> {
+        let resources = self
+            .resources
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Renderer has been destroyed"))?;
+        anyhow::ensure!(
+            !self.device_lost(),
+            "GPU device lost before completion wait"
+        );
+        resources
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: Some(timeout),
+            })
+            .map_err(|error| anyhow::anyhow!("GPU completion wait failed: {error}"))?;
+        anyhow::ensure!(
+            !self.device_lost(),
+            "GPU device lost during completion wait"
+        );
+        let error = self
+            .last_error
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(error) = error.as_ref() {
+            anyhow::bail!("GPU error during completion wait: {error}");
+        }
+        Ok(())
     }
 
     /// Returns true if the GPU device was lost and recovery is needed.
@@ -3673,6 +3736,36 @@ impl WgpuRenderer {
         log::info!("GPU recovery complete");
         Ok(())
     }
+}
+
+fn supported_present_mode(
+    preferred: Option<wgpu::PresentMode>,
+    supported: &[wgpu::PresentMode],
+) -> wgpu::PresentMode {
+    preferred
+        .filter(|mode| {
+            matches!(
+                mode,
+                wgpu::PresentMode::AutoVsync | wgpu::PresentMode::AutoNoVsync
+            ) || supported.contains(mode)
+        })
+        .unwrap_or(wgpu::PresentMode::Fifo)
+}
+
+fn supported_alpha_mode(
+    transparent: bool,
+    supported: &[wgpu::CompositeAlphaMode],
+) -> anyhow::Result<wgpu::CompositeAlphaMode> {
+    let preferred = if transparent {
+        wgpu::CompositeAlphaMode::PreMultiplied
+    } else {
+        wgpu::CompositeAlphaMode::Opaque
+    };
+    [preferred, wgpu::CompositeAlphaMode::Inherit]
+        .into_iter()
+        .find(|mode| supported.contains(mode))
+        .or_else(|| supported.first().copied())
+        .ok_or_else(|| anyhow::anyhow!("Surface reports no supported alpha modes"))
 }
 
 fn instance_range(range: Range<usize>) -> Range<u32> {
@@ -3949,6 +4042,149 @@ mod tests {
         MAX_GLASS_SIGMA_PER_PASS, MonochromeSprite, PolychromeSprite, Quad, Shadow, SubpixelSprite,
         Underline,
     };
+
+    #[test]
+    fn surface_preferences_use_replacement_capabilities() -> anyhow::Result<()> {
+        use wgpu::{CompositeAlphaMode as Alpha, PresentMode as Present};
+        assert_eq!(
+            supported_present_mode(Some(Present::Mailbox), &[Present::Fifo]),
+            Present::Fifo
+        );
+        assert_eq!(
+            supported_present_mode(Some(Present::Mailbox), &[Present::Fifo, Present::Mailbox]),
+            Present::Mailbox
+        );
+        assert_eq!(
+            supported_present_mode(None, &[Present::Mailbox, Present::Fifo]),
+            Present::Fifo
+        );
+        assert_eq!(
+            supported_present_mode(Some(Present::AutoVsync), &[Present::Fifo]),
+            Present::AutoVsync
+        );
+        assert_eq!(
+            supported_present_mode(Some(Present::AutoNoVsync), &[Present::Fifo]),
+            Present::AutoNoVsync
+        );
+        assert_eq!(
+            supported_alpha_mode(true, &[Alpha::Opaque, Alpha::PreMultiplied])?,
+            Alpha::PreMultiplied
+        );
+        assert_eq!(
+            supported_alpha_mode(false, &[Alpha::PreMultiplied, Alpha::Opaque])?,
+            Alpha::Opaque
+        );
+        assert_eq!(
+            supported_alpha_mode(true, &[Alpha::Opaque, Alpha::Inherit])?,
+            Alpha::Inherit
+        );
+        assert_eq!(
+            supported_alpha_mode(false, &[Alpha::PostMultiplied])?,
+            Alpha::PostMultiplied
+        );
+        assert!(supported_alpha_mode(true, &[]).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn detached_renderer_skips_draw_and_preserves_gpu_resources() -> anyhow::Result<()> {
+        let context = WgpuContext::new_headless()?;
+        let atlas = Arc::new(WgpuAtlas::new(
+            context.device.clone(),
+            context.queue.clone(),
+            context.color_texture_format(),
+        ));
+        let mut renderer = WgpuRenderer::new_headless(&context, atlas.clone())?;
+        let device = renderer.resources().device.clone();
+        renderer.unconfigure_surface()?;
+        renderer.unconfigure_surface()?;
+        renderer.update_drawable_size(gpui::size(DevicePixels(73), DevicePixels(41)));
+        assert!(!renderer.draw(&Scene::default()));
+        assert!(!renderer.surface_configured);
+        assert!(renderer.resources().surface.is_none());
+        assert!(Arc::ptr_eq(&device, &renderer.resources().device));
+        assert!(Arc::ptr_eq(&atlas, &renderer.atlas));
+        renderer.destroy()?;
+        assert!(!renderer.draw(&Scene::default()));
+        renderer.unconfigure_surface()?;
+        renderer.destroy()?;
+        Ok(())
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[test]
+    fn completion_wait_checks_callback_errors_without_consuming_them() -> anyhow::Result<()> {
+        let _gpu = crate::serialised_gpu_test();
+        let context = WgpuContext::new_headless()?;
+        let atlas = Arc::new(WgpuAtlas::from_context(&context));
+        let mut renderer = WgpuRenderer::new_headless(&context, atlas)?;
+        let timeout = std::time::Duration::from_secs(10);
+        renderer.render_scene_offscreen(
+            &Scene::default(),
+            gpui::size(DevicePixels(73), DevicePixels(41)),
+        )?;
+        renderer.wait_for_gpu_completion(timeout)?;
+
+        context.queue.submit([]);
+        let errors = renderer.last_error.clone();
+        context.queue.on_submitted_work_done(move || {
+            *errors.lock().expect("error lock") = Some("callback validation failure".into());
+        });
+        assert!(
+            renderer
+                .wait_for_gpu_completion(timeout)
+                .expect_err("callback error must fail validation")
+                .to_string()
+                .contains("callback validation failure")
+        );
+        assert!(
+            renderer.wait_for_gpu_completion(timeout).is_err(),
+            "validation must not consume the error"
+        );
+        renderer.last_error.lock().expect("error lock").take();
+
+        context.queue.submit([]);
+        let lost = renderer.device_lost.clone();
+        context.queue.on_submitted_work_done(move || {
+            lost.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        assert!(renderer.wait_for_gpu_completion(timeout).is_err());
+        assert!(renderer.device_lost());
+        assert!(renderer.wait_for_gpu_completion(timeout).is_err());
+        assert!(renderer.destroy().is_err());
+        assert!(renderer.wait_for_gpu_completion(timeout).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn destroy_releases_resources_even_when_device_loss_prevents_confirmation() -> anyhow::Result<()>
+    {
+        let context = WgpuContext::new_headless()?;
+        let atlas = Arc::new(WgpuAtlas::new(
+            context.device.clone(),
+            context.queue.clone(),
+            context.color_texture_format(),
+        ));
+        for detach_first in [false, true] {
+            let mut renderer = WgpuRenderer::new_headless(&context, atlas.clone())?;
+            // Reproduce the state published by the asynchronous device-lost callback.
+            renderer
+                .device_lost
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            if detach_first {
+                assert!(renderer.unconfigure_surface().is_err());
+                assert!(renderer.resources.is_some());
+                assert!(!renderer.draw(&Scene::default()));
+            }
+            assert!(renderer.destroy().is_err());
+            assert!(renderer.resources.is_none());
+            assert!(!renderer.surface_configured);
+            assert!(!renderer.draw(&Scene::default()));
+            renderer.destroy()?;
+            renderer.unconfigure_surface()?;
+        }
+        Ok(())
+    }
 
     fn backdrop_glass_with_radius(radius: f32) -> BackdropGlass {
         BackdropGlass {

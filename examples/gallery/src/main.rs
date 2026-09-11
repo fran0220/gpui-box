@@ -2889,7 +2889,9 @@ fn media_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                         TransportEvent::PauseRequested => media.state = TransportState::Paused,
                         // A preview is not a seek, so the head stays where it
                         // is until the reader lets go.
-                        TransportEvent::SeekPreview(_) => {}
+                        TransportEvent::SeekPreview(_) | TransportEvent::SeekCancelled => {}
+                        // This fixture offers no native presentation capability.
+                        TransportEvent::PresentationRequested(_) => {}
                         TransportEvent::SeekRequested(seconds) => media.position = seconds,
                         TransportEvent::VolumeRequested(volume) => media.volume = volume,
                         TransportEvent::MuteToggled => media.muted = !media.muted,

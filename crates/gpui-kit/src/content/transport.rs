@@ -151,6 +151,30 @@ impl TrackStep {
     }
 }
 
+/// The host's actual video presentation, independent of playback and window fullscreen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MediaPresentation {
+    #[default]
+    Inline,
+    Fullscreen,
+}
+
+impl MediaPresentation {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Inline => "inline",
+            Self::Fullscreen => "fullscreen",
+        }
+    }
+
+    fn toggled(self) -> Self {
+        match self {
+            Self::Inline => Self::Fullscreen,
+            Self::Fullscreen => Self::Inline,
+        }
+    }
+}
+
 /// What a transport reports. It applies none of it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TransportEvent {
@@ -161,12 +185,17 @@ pub enum TransportEvent {
     /// Reported on every move so a host can show a preview frame, and never
     /// as a seek, so a host does not seek once per pixel.
     SeekPreview(f32),
+    /// Abandon any host preview without seeking or changing the verified position.
+    SeekCancelled,
     /// Where the reader let go, or where a key asked to go, in seconds.
     SeekRequested(f32),
     VolumeRequested(f32),
     MuteToggled,
     SpeedRequested(f32),
     Stepped(TrackStep),
+    /// Intent only. The host must present/dismiss the native video controller,
+    /// then supply its actual state or refusal; this never changes the window.
+    PresentationRequested(MediaPresentation),
 }
 
 type EventHandler = Rc<dyn Fn(&TransportEvent, &mut Window, &mut App)>;
@@ -202,6 +231,9 @@ pub struct TransportBar {
     volume_control: bool,
     has_previous: bool,
     has_next: bool,
+    control_size: ControlSize,
+    presentation: Option<(MediaPresentation, SharedString)>,
+    presentation_refusal: Option<SharedString>,
     disabled: bool,
     on_event: Option<EventHandler>,
 }
@@ -241,6 +273,9 @@ impl TransportBar {
             volume_control: true,
             has_previous: false,
             has_next: false,
+            control_size: ControlSize::Sm,
+            presentation: None,
+            presentation_refusal: None,
             disabled: false,
             on_event: None,
         }
@@ -353,6 +388,25 @@ impl TransportBar {
         self
     }
 
+    /// Offers a host-supported presentation toggle. `label` names the next action
+    /// in the host's locale; `state` is the verified presentation, not the request.
+    /// Omit this method when native presentation is unsupported.
+    pub fn presentation(
+        mut self,
+        state: MediaPresentation,
+        label: impl Into<SharedString>,
+    ) -> Self {
+        self.presentation = Some((state, label.into()));
+        self
+    }
+
+    /// Keeps the actual presentation visible and disables its request with the
+    /// host's reason. Other playback controls remain independent.
+    pub fn presentation_refused(mut self, reason: impl Into<SharedString>) -> Self {
+        self.presentation_refusal = Some(reason.into());
+        self
+    }
+
     pub fn on_event(
         mut self,
         handler: impl Fn(&TransportEvent, &mut Window, &mut App) + 'static,
@@ -371,6 +425,13 @@ impl TransportBar {
 impl Disableable for TransportBar {
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+impl Sizable for TransportBar {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.control_size = size;
         self
     }
 }
@@ -529,7 +590,11 @@ impl RenderOnce for TransportBar {
             .id(ident.child("scrubber").element_id())
             .relative()
             .w_full()
-            .h(px(KNOB))
+            .h(px(if self.control_size == ControlSize::Touch {
+                theme.control.get(self.control_size).height
+            } else {
+                KNOB
+            }))
             .flex()
             .items_center()
             .when(scrubbable, |element| element.cursor_pointer())
@@ -556,15 +621,125 @@ impl RenderOnce for TransportBar {
             let press = Rc::clone(&report);
             let press_bounds = Rc::clone(&measured);
             let press_held = Rc::clone(&scrubbing);
-            track = track.on_mouse_down(MouseButton::Left, move |event, window, cx| {
-                let bounds = press_bounds.get();
-                press_held.borrow_mut().held = true;
-                press(
-                    TransportEvent::SeekPreview(seek_from(event.position, bounds, total)),
+            track = track.on_mouse_down_with_pointer_capture(
+                MouseButton::Left,
+                move |event, window, cx| {
+                    let bounds = press_bounds.get();
+                    press_held.borrow_mut().held = true;
+                    press(
+                        TransportEvent::SeekPreview(seek_from(event.position, bounds, total)),
+                        window,
+                        cx,
+                    );
+                },
+            );
+            let drag = Rc::clone(&report);
+            let drag_bounds = Rc::clone(&measured);
+            let drag_held = Rc::clone(&scrubbing);
+            track = track.on_mouse_move(move |event, window, cx| {
+                if !drag_held.borrow().held {
+                    return;
+                }
+                if event.pressed_button != Some(MouseButton::Left) {
+                    drag_held.borrow_mut().held = false;
+                    return;
+                }
+                drag(
+                    TransportEvent::SeekPreview(seek_from(
+                        event.position,
+                        drag_bounds.get(),
+                        total,
+                    )),
                     window,
                     cx,
                 );
             });
+            let release = Rc::clone(&report);
+            let release_bounds = Rc::clone(&measured);
+            let release_held = Rc::clone(&scrubbing);
+            track = track.on_mouse_up(MouseButton::Left, move |event, window, cx| {
+                if std::mem::take(&mut release_held.borrow_mut().held) {
+                    release(
+                        TransportEvent::SeekRequested(seek_from(
+                            event.position,
+                            release_bounds.get(),
+                            total,
+                        )),
+                        window,
+                        cx,
+                    );
+                }
+            });
+            let cancelled = Rc::clone(&scrubbing);
+            let cancel_report = Rc::clone(&report);
+            track = track.child(crate::interaction::on_pointer_cancel(move |window, cx| {
+                if std::mem::take(&mut cancelled.borrow_mut().held) {
+                    cancel_report(TransportEvent::SeekCancelled, window, cx);
+                }
+            }));
+            let touch_id = ident.child("scrubber-touch").element_id();
+            let touch_report = Rc::clone(&report);
+            let touch_held = Rc::clone(&scrubbing);
+            track = track.child(
+                gpui::canvas(
+                    |_, _, _| (),
+                    move |bounds, _, window, _| {
+                        let visible = bounds.intersect(&window.content_mask().bounds);
+                        let report = Rc::clone(&touch_report);
+                        let held = Rc::clone(&touch_held);
+                        window.on_touch_pan(touch_id.clone(), move |event, window, cx| {
+                            match event.phase {
+                                gpui::TouchPhase::Started => {
+                                    if event.axis != gpui::Axis::Horizontal
+                                        || !visible.contains(&event.touch_start_position)
+                                    {
+                                        return;
+                                    }
+                                    window.prevent_default();
+                                    held.borrow_mut().held = true;
+                                    report(
+                                        TransportEvent::SeekPreview(seek_from(
+                                            event.position,
+                                            bounds,
+                                            total,
+                                        )),
+                                        window,
+                                        cx,
+                                    );
+                                }
+                                gpui::TouchPhase::Moved => report(
+                                    TransportEvent::SeekPreview(seek_from(
+                                        event.position,
+                                        bounds,
+                                        total,
+                                    )),
+                                    window,
+                                    cx,
+                                ),
+                                gpui::TouchPhase::Ended => {
+                                    held.borrow_mut().held = false;
+                                    report(
+                                        TransportEvent::SeekRequested(seek_from(
+                                            event.position,
+                                            bounds,
+                                            total,
+                                        )),
+                                        window,
+                                        cx,
+                                    );
+                                }
+                                gpui::TouchPhase::Cancelled => {
+                                    held.borrow_mut().held = false;
+                                    report(TransportEvent::SeekCancelled, window, cx);
+                                }
+                            }
+                            window.refresh();
+                        });
+                    },
+                )
+                .absolute()
+                .size_full(),
+            );
         }
 
         let readout = |text: SharedString, tone: gpui::Hsla| {
@@ -637,7 +812,7 @@ impl RenderOnce for TransportBar {
                 // step buttons that are glyphs alone.
                 .icon(if playing { Icon::Pause } else { Icon::Play })
                 .secondary()
-                .control_size(ControlSize::Sm)
+                .control_size(self.control_size)
                 .semantic_parent(ident.semantic_id())
                 .disabled(!actionable);
             if actionable {
@@ -658,7 +833,7 @@ impl RenderOnce for TransportBar {
             |name: &'static str, glyph: Icon, key: StringKey, step: TrackStep, enabled: bool| {
                 let mut control = IconButton::new(ident.child(name), glyph, strings.text(key))
                     .ghost()
-                    .control_size(ControlSize::Sm)
+                    .control_size(self.control_size)
                     .semantic_parent(ident.semantic_id())
                     .disabled(!enabled || !actionable);
                 if enabled && actionable {
@@ -707,7 +882,7 @@ impl RenderOnce for TransportBar {
                 // takes the same chip the transport's other worded control
                 // takes, and stays quieter than it by carrying no glyph.
                 .secondary()
-                .control_size(ControlSize::Sm)
+                .control_size(self.control_size)
                 .semantic_parent(ident.semantic_id())
                 .disabled(!actionable);
             if actionable {
@@ -723,7 +898,7 @@ impl RenderOnce for TransportBar {
                 .label(strings.text(StringKey::TransportVolume))
                 .range(0.0, 1.0)
                 .value(self.volume)
-                .control_size(ControlSize::Sm)
+                .control_size(self.control_size)
                 .display(cx.numbers().percent(self.volume))
                 .disabled(!actionable);
             if actionable {
@@ -738,7 +913,11 @@ impl RenderOnce for TransportBar {
             let offered = self.speeds.clone();
             let report = Rc::clone(&report);
             let mut control = SegmentedControl::new(ident.child("speed"))
-                .control_size(ControlSize::Xs)
+                .control_size(if self.control_size == ControlSize::Sm {
+                    ControlSize::Xs
+                } else {
+                    self.control_size
+                })
                 .segments(offered.iter().map(|speed| {
                     Segment::new(
                         speed_id(*speed),
@@ -762,15 +941,43 @@ impl RenderOnce for TransportBar {
             control
         });
 
+        let presentation = self.presentation.clone().map(|(state, label)| {
+            let enabled = actionable && self.presentation_refusal.is_none();
+            let mut button = Button::new(ident.child("presentation-toggle"))
+                .label(label)
+                .secondary()
+                .control_size(self.control_size)
+                .semantic_parent(ident.semantic_id())
+                .disabled(!enabled);
+            if enabled {
+                let report = Rc::clone(&report);
+                button = button.on_click(move |window, cx| {
+                    report(
+                        TransportEvent::PresentationRequested(state.toggled()),
+                        window,
+                        cx,
+                    )
+                });
+            }
+            div().child(button).semantic_in(
+                cx,
+                NodeSpec::new(ident.child("presentation").semantic_id(), Role::Status)
+                    .parent(ident.semantic_id())
+                    .value(state.name()),
+            )
+        });
+
         // One skeleton for every transport: the controls that move the media
         // at the reading edge, what is playing in the middle, and the controls
         // that shape it at the trailing edge. A transport that offers fewer of
-        // them leaves a slot out rather than rearranging the rest, and nothing
-        // wraps, so a narrow bar keeps one row instead of inventing a second
-        // layout.
+        // them leaves a slot out. Touch controls wrap in their measured layout
+        // rather than shrinking their hit targets to fit desktop chrome.
         let controls = div()
             .row()
             .w_full()
+            .when(self.control_size == ControlSize::Touch, |element| {
+                element.flex_wrap()
+            })
             .gap_token(&theme, Space::Sm)
             .child(
                 div()
@@ -784,7 +991,11 @@ impl RenderOnce for TransportBar {
                     // in the same column as the readout under it and the
                     // titles above it rather than a control's padding inside
                     // them.
-                    .ml(px(-glyph_inset(&theme)))
+                    .ml(px(if self.control_size == ControlSize::Touch {
+                        0.0
+                    } else {
+                        -glyph_inset(&theme)
+                    }))
                     .child(step_control(
                         "previous",
                         Icon::AltArrowLeft,
@@ -822,9 +1033,13 @@ impl RenderOnce for TransportBar {
                     .row()
                     .flex_none()
                     .gap_token(&theme, Space::Sm)
+                    .when(self.control_size == ControlSize::Touch, |element| {
+                        element.w_full().flex_wrap()
+                    })
                     .children(mute)
                     .children(volume)
-                    .children(speeds),
+                    .children(speeds)
+                    .children(presentation),
             );
 
         let mut root = div()
@@ -839,58 +1054,24 @@ impl RenderOnce for TransportBar {
                 element.tab_index(0).focus_ring(&theme)
             })
             .child(controls)
-            .child(scrubber_row);
+            .child(scrubber_row)
+            .children(self.presentation_refusal.clone().map(|reason| {
+                div()
+                    .text_color(theme.colors.warning)
+                    .child(reason.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(
+                            ident.child("presentation-refusal").semantic_id(),
+                            Role::Status,
+                        )
+                        .parent(ident.semantic_id())
+                        .text(reason)
+                        .value("refused"),
+                    )
+            }));
 
         if actionable {
-            // A scrub is followed across the whole bar rather than the few
-            // pixels of the track, so letting go outside it still commits
-            // once instead of leaving the scrub running.
-            if let (true, Some(total)) = (self.seekable, total) {
-                let drag = Rc::clone(&report);
-                let drag_bounds = Rc::clone(&measured);
-                let drag_held = Rc::clone(&scrubbing);
-                root = root.on_mouse_move(move |event, window, cx| {
-                    if !drag_held.borrow().held {
-                        return;
-                    }
-                    if event.pressed_button != Some(MouseButton::Left) {
-                        drag_held.borrow_mut().held = false;
-                        return;
-                    }
-                    drag(
-                        TransportEvent::SeekPreview(seek_from(
-                            event.position,
-                            drag_bounds.get(),
-                            total,
-                        )),
-                        window,
-                        cx,
-                    );
-                });
-
-                let release = Rc::clone(&report);
-                let release_bounds = Rc::clone(&measured);
-                let release_held = Rc::clone(&scrubbing);
-                let cancelled = Rc::clone(&scrubbing);
-                root = root.child(crate::interaction::on_pointer_cancel(move |_, _| {
-                    cancelled.borrow_mut().held = false;
-                }));
-                root = root.on_mouse_up(MouseButton::Left, move |event, window, cx| {
-                    if !std::mem::take(&mut release_held.borrow_mut().held) {
-                        return;
-                    }
-                    release(
-                        TransportEvent::SeekRequested(seek_from(
-                            event.position,
-                            release_bounds.get(),
-                            total,
-                        )),
-                        window,
-                        cx,
-                    );
-                });
-            }
-
             let keys = Rc::clone(&report);
             let (position, step, state, seekable) =
                 (self.position, self.step, self.state, self.seekable);
@@ -950,6 +1131,160 @@ fn clamp_to(seconds: f32, total: Option<f32>) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn touch_scrub_captures_outside_release_but_cancellation_never_seeks(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::point;
+        use gpui_kit_testkit::harness::Harness;
+        use std::cell::RefCell;
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let sink = events.clone();
+        let mut harness = Harness::new(cx, crate::install, move |_, _| {
+            let sink = sink.clone();
+            div()
+                .w(px(400.0))
+                .child(
+                    TransportBar::new("seek")
+                        .duration(100.0)
+                        .position(23.0)
+                        .control_size(ControlSize::Touch)
+                        .on_event(move |event, _, _| sink.borrow_mut().push(event.clone())),
+                )
+                .into_any_element()
+        });
+        let bounds = harness.bounds("seek.scrubber").expect("scrubber bounds");
+        let start = point(bounds.left() + bounds.size.width * 0.2, bounds.center().y);
+        let moved = point(bounds.left() + bounds.size.width * 0.7, start.y);
+        let outside = point(bounds.right() + px(90.0), start.y);
+        for terminal in [gpui::TouchPhase::Cancelled, gpui::TouchPhase::Ended] {
+            events.borrow_mut().clear();
+            harness.update(|window, cx| {
+                for (phase, position) in [
+                    (gpui::TouchPhase::Started, start),
+                    (gpui::TouchPhase::Moved, moved),
+                ] {
+                    window.dispatch_event(
+                        gpui::PlatformInput::Touch(gpui::TouchEvent {
+                            id: gpui::TouchId(7),
+                            phase,
+                            position,
+                            ..Default::default()
+                        }),
+                        cx,
+                    );
+                }
+            });
+            harness.frame(); // owner survives redraw
+            harness.update(|window, cx| {
+                window.dispatch_event(
+                    gpui::PlatformInput::Touch(gpui::TouchEvent {
+                        id: gpui::TouchId(7),
+                        phase: terminal,
+                        position: outside,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+            });
+            let events = events.borrow();
+            assert!(events.iter().any(|event| matches!(event, TransportEvent::SeekPreview(value) if (*value - 70.0).abs() < 0.01)));
+            if terminal == gpui::TouchPhase::Cancelled {
+                assert!(events.contains(&TransportEvent::SeekCancelled));
+                assert!(
+                    !events
+                        .iter()
+                        .any(|event| matches!(event, TransportEvent::SeekRequested(_)))
+                );
+            } else {
+                assert_eq!(
+                    events
+                        .iter()
+                        .filter(|event| matches!(event, TransportEvent::SeekRequested(_)))
+                        .count(),
+                    1
+                );
+                assert!(events.contains(&TransportEvent::SeekRequested(100.0)));
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn presentation_is_a_request_and_refusal_keeps_state_and_disables_action(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui_kit_testkit::harness::Harness;
+        use std::cell::RefCell;
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let sink = events.clone();
+        let mut harness = Harness::new(cx, crate::install, move |_, _| {
+            let sink = sink.clone();
+            TransportBar::new("bar")
+                .duration(100.0)
+                .position(23.0)
+                .control_size(ControlSize::Touch)
+                .presentation(MediaPresentation::Inline, "Present video")
+                .on_event(move |event, _, _| sink.borrow_mut().push(event.clone()))
+                .into_any_element()
+        });
+        harness.click("bar.presentation-toggle");
+        assert_eq!(
+            *events.borrow(),
+            [TransportEvent::PresentationRequested(
+                MediaPresentation::Fullscreen
+            )]
+        );
+        assert_eq!(
+            harness
+                .node("bar.presentation")
+                .expect("presentation state")
+                .value
+                .as_deref(),
+            Some("inline")
+        );
+        assert_eq!(
+            harness
+                .bounds("bar.scrubber")
+                .expect("scrubber bounds")
+                .size
+                .height,
+            px(48.0)
+        );
+        let sink = events.clone();
+        harness.remount(move |_, _| {
+            let sink = sink.clone();
+            TransportBar::new("bar")
+                .presentation(MediaPresentation::Inline, "Present video")
+                .presentation_refused("Native host refused")
+                .on_event(move |event, _, _| sink.borrow_mut().push(event.clone()))
+                .into_any_element()
+        });
+        harness.click("bar.presentation-toggle");
+        assert_eq!(events.borrow().len(), 1);
+        assert!(
+            harness
+                .node("bar.presentation-toggle")
+                .expect("presentation toggle")
+                .disabled
+        );
+        assert_eq!(
+            harness
+                .node("bar.presentation-refusal")
+                .expect("presentation refusal")
+                .text
+                .as_deref(),
+            Some("Native host refused")
+        );
+        assert_eq!(
+            harness
+                .node("bar.presentation")
+                .expect("presentation state")
+                .value
+                .as_deref(),
+            Some("inline")
+        );
+    }
 
     #[test]
     fn a_live_stream_has_a_position_and_no_fraction() {

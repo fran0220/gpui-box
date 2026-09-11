@@ -30,12 +30,14 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 
 use crate::content::transport::{TransportBar, TransportDuration, TransportEvent};
 use crate::display::badge::Badge;
 use crate::display::signature;
-use crate::foundation::{Disableable, Ident, StyledExt, text};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::media::notice;
 use crate::media::transport::{
     MediaAvailability, MediaCapabilities, MediaCommand, MediaEvent, MediaTransport,
@@ -60,6 +62,7 @@ pub struct AudioPlayer {
     peaks: Vec<f32>,
     step: Option<f32>,
     speeds: Vec<f32>,
+    control_size: ControlSize,
     disabled: bool,
     on_event: Option<EventHandler>,
 }
@@ -91,6 +94,7 @@ impl AudioPlayer {
             peaks: Vec::new(),
             step: None,
             speeds: Vec::new(),
+            control_size: ControlSize::Sm,
             disabled: false,
             on_event: None,
         }
@@ -156,6 +160,13 @@ impl AudioPlayer {
         handler: impl Fn(&MediaEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_event = Some(Rc::new(handler));
+        self
+    }
+}
+
+impl Sizable for AudioPlayer {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.control_size = size;
         self
     }
 }
@@ -355,6 +366,7 @@ fn bar(
     actionable: bool,
 ) -> TransportBar {
     let mut bar = TransportBar::new(ident.child("transport"))
+        .control_size(player.control_size)
         .state(snapshot.state)
         .position(snapshot.position)
         .volume(snapshot.volume)
@@ -410,7 +422,9 @@ pub(crate) fn command_for(event: &TransportEvent) -> Option<MediaCommand> {
         TransportEvent::MuteToggled => MediaCommand::ToggleMute,
         TransportEvent::SpeedRequested(speed) => MediaCommand::SetSpeed(*speed),
         TransportEvent::Stepped(step) => MediaCommand::Step(*step),
-        TransportEvent::SeekPreview(_) => return None,
+        TransportEvent::SeekPreview(_)
+        | TransportEvent::SeekCancelled
+        | TransportEvent::PresentationRequested(_) => return None,
     })
 }
 

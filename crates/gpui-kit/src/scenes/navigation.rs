@@ -2,6 +2,148 @@
 
 use super::support::*;
 
+pub(super) fn bottom_navigation(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::navigation::{BottomNavigation, NavigationItem};
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(390.0))
+        .child(caption(
+            &theme,
+            "Fixture destinations; selected, enabled and disabled actions",
+        ))
+        .child(
+            BottomNavigation::new("scene.bottom-navigation.ready")
+                .items([
+                    NavigationItem::new("library", "Library"),
+                    NavigationItem::new("search", "Search"),
+                    NavigationItem::new("settings", "Settings").disabled(true),
+                ])
+                .selected("search")
+                .on_select(|_, _, _| {}),
+        )
+        .child(caption(
+            &theme,
+            "No host handler: destinations are unavailable",
+        ))
+        .child(
+            BottomNavigation::new("scene.bottom-navigation.unavailable")
+                .items([
+                    NavigationItem::new("library", "Library"),
+                    NavigationItem::new("search", "Search"),
+                ])
+                .selected("library"),
+        )
+        .into_any_element()
+}
+
+pub(super) fn adaptive_navigation(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::layout::{AppBar, PageLayout, Responsive};
+    use crate::navigation::{BottomNavigation, NavigationItem};
+    let theme = cx.theme().clone();
+    let make = |id: &'static str, width: f32| {
+        div().w(px(width)).h(px(320.0)).child(
+            Responsive::new(id, move |size, _, _| {
+                let wide = size.at_least(600.0);
+                let body = div()
+                    .flex()
+                    .size_full()
+                    .when(wide, |body| {
+                        body.child(
+                            Sidebar::new(format!("{id}.rail"))
+                                .section(SidebarSection::new("destinations").items([
+                                    SidebarItem::new("library", "Library"),
+                                    SidebarItem::new("search", "Search"),
+                                ]))
+                                .active("search")
+                                .on_select(|_, _, _| {}),
+                        )
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .p(px(16.0))
+                            .child("Fixture content · caller owns route selection"),
+                    );
+                PageLayout::new(format!("{id}.page"), body)
+                    .insets(gpui::WindowInsets::default())
+                    .header(AppBar::new(
+                        format!("{id}.bar"),
+                        if wide {
+                            "Wide container"
+                        } else {
+                            "Compact container"
+                        },
+                    ))
+                    .hide_footer(wide)
+                    .footer(
+                        BottomNavigation::new(format!("{id}.bottom"))
+                            .items([
+                                NavigationItem::new("library", "Library"),
+                                NavigationItem::new("search", "Search"),
+                            ])
+                            .selected("search")
+                            .on_select(|_, _, _| {}),
+                    )
+                    .into_any_element()
+            })
+            .fill(),
+        )
+    };
+    stack(&theme)
+        .child(caption(&theme, "Same caller data; measured container width selects rail or bottom destinations. No platform guessing."))
+        .child(make("scene.adaptive-navigation.wide", 640.0))
+        .child(make("scene.adaptive-navigation.compact", 350.0))
+        .into_any_element()
+}
+
+pub(super) fn nav_back_preview(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::navigation::{BackTransition, NavHistory, NavStack};
+    let theme = cx.theme().clone();
+    let state = window.use_keyed_state("scene.nav-back-preview.state", cx, |_, cx| {
+        let mut history = NavHistory::new("overview");
+        history.push("details");
+        (history, None::<BackTransition>, cx.focus_handle())
+    });
+    let (history, preview, focus) = state.read(cx).clone();
+    let progress = state.clone();
+    let cancel = state.clone();
+    let commit = state.clone();
+    let reset = state.clone();
+    let mut page = NavStack::new(
+        "scene.nav-back-preview",
+        &history,
+        history.current().clone(),
+        focus,
+        Card::new()
+            .padding(Space::Xl)
+            .child(history.current().clone()),
+    );
+    if let Some(preview) = &preview {
+        page = page.back_transition(preview);
+    }
+    stack(&theme).w(px(550.0))
+        .child(caption(&theme, "Fixture host-fed progress; cancel retains the page, accept mutates caller history. Reduced motion holds full opacity."))
+        .child(Slider::new("scene.nav-back-preview.progress").label("Back progress")
+            .range(0.0, 1.0).value(preview.as_ref().map_or(0.0, BackTransition::progress))
+            .disabled(!history.can_pop()).on_change(move |value, _, cx| progress.update(cx, |state, cx| {
+                if state.1.is_none() { state.1 = BackTransition::begin(&state.0); }
+                if let Some(preview) = &mut state.1 { preview.update(value); }
+                cx.notify();
+            })))
+        .child(row(&theme)
+            .child(Button::new("scene.nav-back-preview.cancel").label("Cancel").disabled(preview.is_none())
+                .on_click(move |_, cx| cancel.update(cx, |state, cx| {
+                    if let Some(preview) = state.1.take() { preview.cancel(); } cx.notify();
+                })))
+            .child(Button::new("scene.nav-back-preview.accept").label("Accept back").disabled(preview.is_none())
+                .on_click(move |_, cx| commit.update(cx, |state, cx| {
+                    if let Some(preview) = state.1.take() { preview.commit(&mut state.0); } cx.notify();
+                })))
+            .child(Button::new("scene.nav-back-preview.reset").label("Forward").disabled(!history.can_forward())
+                .on_click(move |_, cx| reset.update(cx, |state, cx| { state.0.forward(); cx.notify(); }))))
+        .child(page).into_any_element()
+}
+
 pub(super) fn nav_stack(window: &mut Window, cx: &mut App) -> AnyElement {
     use crate::navigation::nav_stack::{NavHistory, NavStack};
     let theme = cx.theme().clone();

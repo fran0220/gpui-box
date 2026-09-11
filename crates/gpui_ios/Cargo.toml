@@ -1,0 +1,40 @@
+[package]
+name = "gpui-box-ios"
+version = "0.1.2"
+edition.workspace = true
+rust-version.workspace = true
+homepage = "https://github.com/fran0220/gpui-box"
+repository.workspace = true
+license = "Apache-2.0"
+description = "UIKit host integration for GPUI Box (native acceptance pending)"
+publish = false
+
+[lib]
+name = "gpui_ios"
+
+[lints]
+workspace = true
+
+[features]
+# Type-check the actual adapter on Linux; never supplies a native host there.
+platform-check = []
+
+[dependencies]
+gpui.workspace = true
+gpui_wgpu.workspace = true
+anyhow.workspace = true
+raw-window-handle.workspace = true
+futures.workspace = true
+uuid.workspace = true
+log.workspace = true
+accesskit.workspace = true
+accesskit_consumer = "0.38"
+
+[dev-dependencies]
+gpui-box-mobile-reference = { path = "../../examples/mobile-reference", default-features = false }
+gpui-kit.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+
+[build-dependencies]
+cc = "1"

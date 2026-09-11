@@ -311,6 +311,20 @@ impl Render for BrowserGallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let publish = SemanticCoordinator::global(cx).begin_frame(window);
         let theme = Theme::get(cx).clone();
+        let insets = window.insets().effective();
+        // Exercise the platform contract in the real host, not a DOM overlay.
+        let metrics = serde_json::json!({
+            "top": f32::from(insets.top), "right": f32::from(insets.right),
+            "bottom": f32::from(insets.bottom), "left": f32::from(insets.left),
+            "width": f32::from(window.viewport_size().width),
+            "height": f32::from(window.viewport_size().height),
+        });
+        js_sys::Reflect::set(
+            &js_sys::global(),
+            &"gpuiBoxViewport".into(),
+            &metrics.to_string().into(),
+        )
+        .ok();
         let content = if self.mode == BrowserMode::Playground {
             self.playground(window, cx)
         } else {
@@ -326,6 +340,10 @@ impl Render for BrowserGallery {
             })
             .id("browser.gallery.root")
             .size_full()
+            .pt(insets.top)
+            .pr(insets.right)
+            .pb(insets.bottom)
+            .pl(insets.left)
             .overflow_hidden()
             .bg(theme.colors.canvas)
             .semantic_in(

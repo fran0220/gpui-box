@@ -1199,6 +1199,24 @@ fn gate(full: bool) -> Result<()> {
             Some(("RUSTDOCFLAGS", "-D warnings")),
         )?;
         headless("check", &[])?;
+        step(
+            "cargo",
+            &[
+                "run",
+                "-p",
+                "gpui-box-mobile-reference",
+                "--features",
+                "capture",
+                "--example",
+                "capture",
+                "--",
+                "target/mobile-reference",
+            ],
+            None,
+        )?;
+        web_build()?;
+        web_prepare()?;
+        web_mobile_prepared()?;
     }
     println!("gate passed");
     Ok(())
@@ -1461,6 +1479,7 @@ fn web_smoke() -> Result<()> {
     web_build()?;
     web_prepare()?;
     web_smoke_prepared()?;
+    web_mobile_prepared()?;
     web_site_smoke_prepared()
 }
 
@@ -1523,6 +1542,14 @@ fn web_smoke_prepared() -> Result<()> {
             None,
         )
     }
+}
+
+fn web_mobile_prepared() -> Result<()> {
+    step(
+        "npm",
+        &["--prefix", "examples/browser-gallery", "run", "mobile"],
+        None,
+    )
 }
 
 fn web_site_smoke_prepared() -> Result<()> {
@@ -1603,6 +1630,7 @@ fn web_gate(scenes: &[String]) -> Result<()> {
     web_build()?;
     web_prepare()?;
     web_smoke_prepared()?;
+    web_mobile_prepared()?;
     web_site_smoke_prepared()?;
     web_visual_prepared("check", scenes)?;
     println!("web gate passed");

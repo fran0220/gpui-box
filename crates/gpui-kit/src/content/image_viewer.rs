@@ -259,10 +259,147 @@ impl Default for Pin {
 #[derive(Debug, Default)]
 struct Viewport {
     pin: Pin,
-    /// Set while the pointer is holding the image, so a pan that leaves the
-    /// frame ends rather than continuing on the next unrelated move.
+    image: Option<SharedString>,
+    accepted: FitMode,
+    requested: Option<(f32, Pin)>,
+    /// Captured until release or cancellation, including outside the frame.
     panning: bool,
     at: Option<Point<Pixels>>,
+    gesture_origin: Option<(FitMode, Pin)>,
+}
+
+impl Viewport {
+    fn reconcile(&mut self, image: SharedString, fit: FitMode) {
+        if self.image.as_ref() != Some(&image) {
+            *self = Self {
+                image: Some(image),
+                accepted: fit,
+                ..Self::default()
+            };
+            return;
+        }
+        if fit != self.accepted
+            && let Some((_, pin)) = self.requested
+        {
+            self.pin = pin;
+        }
+        self.accepted = fit;
+        self.requested = None;
+    }
+
+    fn geometry(&self, frame: Size<f32>, natural: Size<f32>, zoom: (f32, f32)) -> Geometry {
+        layout(self.accepted, frame, natural, self.pin, zoom)
+    }
+
+    /// Accumulate input before redraw, without committing an unaccepted scale or pin.
+    fn zoom_by(
+        &mut self,
+        frame: Size<f32>,
+        natural: Size<f32>,
+        zoom: (f32, f32),
+        ratio: f32,
+        at: Point<f32>,
+    ) -> Option<f32> {
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return None;
+        }
+        let current = match self.requested {
+            Some((scale, pin)) => layout(FitMode::Zoom(scale), frame, natural, pin, zoom),
+            None => self.geometry(frame, natural, zoom),
+        };
+        let next = (current.scale * ratio).clamp(zoom.0, zoom.1);
+        if (next - current.scale).abs() < f32::EPSILON {
+            return None;
+        }
+        self.requested = Some((next, pin_at(frame, current, at)));
+        Some(next)
+    }
+
+    fn pan(&mut self, frame: Size<f32>, natural: Size<f32>, zoom: (f32, f32), delta: Point<f32>) {
+        self.pin = pan_by(frame, self.geometry(frame, natural, zoom), delta);
+        if let Some((scale, pin)) = self.requested {
+            let geometry = layout(FitMode::Zoom(scale), frame, natural, pin, zoom);
+            self.requested = Some((scale, pan_by(frame, geometry, delta)));
+        }
+    }
+
+    fn begin(&mut self, at: Point<Pixels>) {
+        self.gesture_origin = Some((self.accepted, self.pin));
+        self.at = Some(at);
+    }
+
+    fn pinch(
+        &mut self,
+        event: &gpui::PinchEvent,
+        bounds: Bounds<Pixels>,
+        natural: Size<f32>,
+        zoom: (f32, f32),
+    ) -> Option<FitMode> {
+        match event.phase {
+            gpui::TouchPhase::Started => self.begin(event.position),
+            gpui::TouchPhase::Moved => {
+                let frame = frame_extent(bounds);
+                if let Some(previous) = self.at {
+                    self.pan(
+                        frame,
+                        natural,
+                        zoom,
+                        point(
+                            f32::from(event.position.x - previous.x),
+                            f32::from(event.position.y - previous.y),
+                        ),
+                    );
+                }
+                self.at = Some(event.position);
+                return self
+                    .zoom_by(
+                        frame,
+                        natural,
+                        zoom,
+                        1.0 + event.delta,
+                        point(
+                            f32::from(event.position.x - bounds.left()),
+                            f32::from(event.position.y - bounds.top()),
+                        ),
+                    )
+                    .map(FitMode::Zoom);
+            }
+            gpui::TouchPhase::Ended => {
+                self.at = None;
+                self.gesture_origin = None;
+            }
+            gpui::TouchPhase::Cancelled => {
+                let origin = self.gesture_origin;
+                let accepted_pin = self.pin;
+                self.cancel();
+                if let Some((fit, pin)) = origin {
+                    // Rollback is a request too: do not shift the newer accepted
+                    // image while waiting for the caller to accept or refuse it.
+                    if fit != self.accepted {
+                        self.pin = accepted_pin;
+                        self.requested = Some((
+                            scale_for(fit, frame_extent(bounds), natural, zoom.0, zoom.1),
+                            pin,
+                        ));
+                    }
+                    return Some(fit);
+                }
+                return None;
+            }
+        }
+        None
+    }
+
+    fn cancel(&mut self) {
+        if let Some((fit, pin)) = self.gesture_origin.take()
+            && fit == self.accepted
+        {
+            self.pin = pin;
+        }
+        self.panning = false;
+        self.at = None;
+        self.requested = None;
+    }
 }
 
 /// The images already reported as unsupplied for one viewer.
@@ -387,6 +524,7 @@ pub struct ImageViewer {
     min_zoom: f32,
     max_zoom: f32,
     height: Option<f32>,
+    control_size: ControlSize,
     disabled: bool,
     image: Option<ImageSupplier>,
     on_event: Option<EventHandler>,
@@ -417,6 +555,7 @@ impl ImageViewer {
             min_zoom: 0.1,
             max_zoom: 8.0,
             height: None,
+            control_size: ControlSize::Sm,
             disabled: false,
             image: None,
             on_event: None,
@@ -485,6 +624,13 @@ impl Disableable for ImageViewer {
     }
 }
 
+impl Sizable for ImageViewer {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.control_size = size;
+        self
+    }
+}
+
 impl RenderOnce for ImageViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -502,6 +648,10 @@ impl RenderOnce for ImageViewer {
         let measured = measure::cell(&ident.child("frame").semantic_id(), window, cx);
         let state =
             keyed::slot::<Viewport>(&ident.semantic_id(), window.window_handle().window_id(), cx);
+        state.borrow_mut().reconcile(frame.id.clone(), self.fit);
+        if self.disabled {
+            state.borrow_mut().cancel();
+        }
         let bounds = measured.get();
         let extent = size(f32::from(bounds.size.width), f32::from(bounds.size.height));
         let pin = state.borrow().pin;
@@ -592,6 +742,7 @@ impl RenderOnce for ImageViewer {
             move |event: ImageViewerEvent, window: &mut Window, cx: &mut App| {
                 if let Some(handler) = &handler {
                     handler(&event, window, cx);
+                    window.refresh();
                 }
             }
         };
@@ -607,7 +758,7 @@ impl RenderOnce for ImageViewer {
             .frame(&theme, Surface::Raised, Elevation::Raised)
             .child(body);
 
-        if let (true, Some(geometry)) = (zoomable, geometry) {
+        if let (true, Some(geometry), Some(natural)) = (zoomable, geometry, measurable) {
             let pannable = geometry.pannable(extent);
             let report_wheel = Rc::clone(&report);
             let wheel_bounds = Rc::clone(&measured);
@@ -623,15 +774,20 @@ impl RenderOnce for ImageViewer {
                 if notches == 0.0 {
                     return;
                 }
-                let next = (geometry.scale * ZOOM_STEP.powf(notches)).clamp(min, max);
-                if (next - geometry.scale).abs() < f32::EPSILON {
-                    return;
-                }
                 let at = point(
                     f32::from(event.position.x - bounds.left()),
                     f32::from(event.position.y - bounds.top()),
                 );
-                wheel_state.borrow_mut().pin = pin_at(extent, geometry, at);
+                let Some(next) = wheel_state.borrow_mut().zoom_by(
+                    extent,
+                    natural,
+                    (min, max),
+                    ZOOM_STEP.powf(notches),
+                    at,
+                ) else {
+                    return;
+                };
+                cx.stop_propagation();
                 report_wheel(
                     ImageViewerEvent::FitChanged(FitMode::Zoom(next)),
                     window,
@@ -639,16 +795,88 @@ impl RenderOnce for ImageViewer {
                 );
             });
 
+            let gesture_id = ident.child("frame-gesture").element_id();
+            let gesture_state = Rc::clone(&state);
+            let gesture_report = Rc::clone(&report);
+            viewport = viewport.child(
+                gpui::canvas(
+                    |_, _, _| (),
+                    move |bounds, _, window, _| {
+                        let visible = bounds.intersect(&window.content_mask().bounds);
+                        let pinch_state = Rc::clone(&gesture_state);
+                        let pinch_report = Rc::clone(&gesture_report);
+                        window.on_touch_pinch(gesture_id.clone(), move |event, window, cx| {
+                            if event.phase == gpui::TouchPhase::Started {
+                                if !visible.contains(&event.position) {
+                                    return;
+                                }
+                                window.prevent_default();
+                            }
+                            let fit =
+                                pinch_state
+                                    .borrow_mut()
+                                    .pinch(event, bounds, natural, (min, max));
+                            if let Some(fit) = fit {
+                                pinch_report(ImageViewerEvent::FitChanged(fit), window, cx);
+                            }
+                            window.refresh();
+                        });
+                        let pan_state = Rc::clone(&gesture_state);
+                        window.on_touch_pan(gesture_id.clone(), move |event, window, _| {
+                            let mut state = pan_state.borrow_mut();
+                            let frame = frame_extent(bounds);
+                            match event.phase {
+                                gpui::TouchPhase::Started => {
+                                    if !visible.contains(&event.touch_start_position)
+                                        || !state
+                                            .geometry(frame, natural, (min, max))
+                                            .pannable(frame)
+                                    {
+                                        return;
+                                    }
+                                    window.prevent_default();
+                                    state.begin(event.start_position);
+                                }
+                                gpui::TouchPhase::Cancelled => {
+                                    state.cancel();
+                                    window.refresh();
+                                    return;
+                                }
+                                _ => {}
+                            }
+                            if let Some(previous) = state.at {
+                                state.pan(
+                                    frame,
+                                    natural,
+                                    (min, max),
+                                    point(
+                                        f32::from(event.position.x - previous.x),
+                                        f32::from(event.position.y - previous.y),
+                                    ),
+                                );
+                            }
+                            state.at = Some(event.position);
+                            if event.phase == gpui::TouchPhase::Ended {
+                                state.at = None;
+                                state.gesture_origin = None;
+                            }
+                            window.refresh();
+                        });
+                    },
+                )
+                .absolute()
+                .size_full(),
+            );
+
             if pannable {
                 let down_state = Rc::clone(&state);
-                viewport = viewport.cursor_pointer().on_mouse_down(
-                    MouseButton::Left,
-                    move |event, _, _| {
+                viewport = viewport
+                    .cursor_pointer()
+                    .on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, _, _| {
                         let mut state = down_state.borrow_mut();
                         state.panning = true;
-                        state.at = Some(event.position);
-                    },
-                );
+                        state.begin(event.position);
+                    });
 
                 let move_state = Rc::clone(&state);
                 let move_bounds = Rc::clone(&measured);
@@ -671,7 +899,7 @@ impl RenderOnce for ImageViewer {
                         f32::from(event.position.y - previous.y),
                     );
                     state.at = Some(event.position);
-                    state.pin = pan_by(frame_extent(move_bounds.get()), geometry, delta);
+                    state.pan(frame_extent(move_bounds.get()), natural, (min, max), delta);
                     // Panning is this component's own transient state, so the
                     // frame that shows it has to be asked for.
                     window.refresh();
@@ -680,14 +908,14 @@ impl RenderOnce for ImageViewer {
                 let cancelled = Rc::clone(&state);
                 viewport = viewport.child(crate::interaction::on_pointer_cancel(move |_, _| {
                     let mut state = cancelled.borrow_mut();
-                    state.panning = false;
-                    state.at = None;
+                    state.cancel();
                 }));
                 let up_state = Rc::clone(&state);
                 viewport = viewport.on_mouse_up(MouseButton::Left, move |_, _, _| {
                     let mut state = up_state.borrow_mut();
                     state.panning = false;
                     state.at = None;
+                    state.gesture_origin = None;
                 });
             }
         }
@@ -699,7 +927,7 @@ impl RenderOnce for ImageViewer {
                 let id = target.map(|frame| frame.id.clone());
                 let mut control = IconButton::new(ident.child(name), glyph, label)
                     .ghost()
-                    .control_size(ControlSize::Sm)
+                    .control_size(self.control_size)
                     .semantic_parent(ident.semantic_id())
                     .disabled(id.is_none() || !actionable);
                 // Stepping past the end would wrap without saying so, so the
@@ -731,7 +959,7 @@ impl RenderOnce for ImageViewer {
         let fits = {
             let report = Rc::clone(&report);
             let mut control = SegmentedControl::new(ident.child("fit"))
-                .control_size(ControlSize::Sm)
+                .control_size(self.control_size)
                 .segments([
                     Segment::new("contain", strings.text(StringKey::ImageViewerContain)),
                     Segment::new("cover", strings.text(StringKey::ImageViewerCover)),
@@ -810,6 +1038,7 @@ impl RenderOnce for ImageViewer {
                 div()
                     .row()
                     .w_full()
+                    .flex_wrap()
                     .gap_token(&theme, Space::Sm)
                     .justify_between()
                     .child(
@@ -855,18 +1084,33 @@ impl RenderOnce for ImageViewer {
             )
             .child(caption);
 
-        if let (true, Some(geometry)) = (zoomable, geometry) {
+        if let (true, Some(geometry), Some(natural)) = (zoomable, geometry, measurable) {
             let report = Rc::clone(&report);
             let (min, max) = (self.min_zoom, self.max_zoom);
             let state = Rc::clone(&state);
             root.interactivity().on_key_down(move |event, window, cx| {
                 let fit = match event.keystroke.key.as_str() {
-                    "+" | "=" => FitMode::Zoom((geometry.scale * ZOOM_STEP).clamp(min, max)),
-                    "-" => FitMode::Zoom((geometry.scale / ZOOM_STEP).clamp(min, max)),
+                    "+" | "=" | "-" => {
+                        let ratio = if event.keystroke.key == "-" {
+                            1.0 / ZOOM_STEP
+                        } else {
+                            ZOOM_STEP
+                        };
+                        let Some(next) = state.borrow_mut().zoom_by(
+                            extent,
+                            natural,
+                            (min, max),
+                            ratio,
+                            point(extent.width / 2.0, extent.height / 2.0),
+                        ) else {
+                            return;
+                        };
+                        FitMode::Zoom(next)
+                    }
                     // Resetting is the fit the viewer starts in, and it puts
                     // the picture back in the middle as well as back to size.
                     "0" => {
-                        state.borrow_mut().pin = Pin::default();
+                        state.borrow_mut().requested = Some((geometry.scale, Pin::default()));
                         FitMode::Contain
                     }
                     _ => return,
@@ -994,6 +1238,104 @@ fn empty_viewer(ident: &Ident, theme: &Theme, height: f32, cx: &mut App) -> AnyE
 mod tests {
     use super::*;
 
+    #[gpui::test]
+    fn portable_pinch_batches_requests_and_disabled_viewer_has_no_handlers(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui_kit_testkit::harness::Harness;
+        use std::cell::RefCell;
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let sink = events.clone();
+        let mut harness = Harness::new(cx, crate::install, move |_, _| {
+            let sink = sink.clone();
+            div()
+                .w(px(400.0))
+                .child(
+                    ImageViewer::new("viewer", [ImageFrame::new("a", "A").natural(800, 400)])
+                        .fit(FitMode::Actual)
+                        .control_size(ControlSize::Touch)
+                        .height(300.0)
+                        .image(|_, _, _| Some(div().size_full().into_any_element()))
+                        .on_event(move |event, _, _| sink.borrow_mut().push(event.clone())),
+                )
+                .into_any_element()
+        });
+        harness.frame();
+        let bounds = harness.bounds("viewer.frame").expect("viewer frame");
+        let at = bounds.origin + point(px(320.0), px(60.0));
+        harness.update(|window, cx| {
+            for (id, phase, x) in [
+                (31, gpui::TouchPhase::Started, -50.0),
+                (32, gpui::TouchPhase::Started, 50.0),
+                (32, gpui::TouchPhase::Moved, 100.0),
+                (32, gpui::TouchPhase::Moved, 130.0),
+            ] {
+                window.dispatch_event(
+                    gpui::PlatformInput::Touch(gpui::TouchEvent {
+                        id: gpui::TouchId(id),
+                        position: at + point(px(x), px(0.0)),
+                        phase,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+            }
+        });
+        assert_eq!(events.borrow().len(), 2);
+        assert_eq!(
+            events.borrow()[0],
+            ImageViewerEvent::FitChanged(FitMode::Zoom(1.5))
+        );
+        let ImageViewerEvent::FitChanged(FitMode::Zoom(last)) = events.borrow()[1] else {
+            panic!("zoom request")
+        };
+        assert!((last - 1.8).abs() < 0.0001);
+        assert!(
+            harness
+                .node("viewer.measurement")
+                .expect("measurement")
+                .text
+                .expect("measurement text")
+                .contains("100%"),
+            "refused requests do not change displayed scale"
+        );
+        assert_eq!(
+            harness
+                .bounds("viewer.next")
+                .expect("next button")
+                .size
+                .height,
+            px(48.0)
+        );
+        harness.update(|window, cx| window.cancel_touch_input(cx));
+        let sink = events.clone();
+        harness.remount(move |_, _| {
+            let sink = sink.clone();
+            ImageViewer::new("viewer", [ImageFrame::new("a", "A").natural(800, 400)])
+                .fit(FitMode::Actual)
+                .disabled(true)
+                .image(|_, _, _| Some(div().size_full().into_any_element()))
+                .on_event(move |event, _, _| sink.borrow_mut().push(event.clone()))
+                .into_any_element()
+        });
+        let count = events.borrow().len();
+        harness.click("viewer.next");
+        harness.update(|window, cx| {
+            for phase in [gpui::TouchPhase::Started, gpui::TouchPhase::Moved] {
+                window.dispatch_event(
+                    gpui::PlatformInput::Pinch(gpui::PinchEvent {
+                        position: at,
+                        phase,
+                        delta: 0.5,
+                        ..Default::default()
+                    }),
+                    cx,
+                );
+            }
+        });
+        assert_eq!(events.borrow().len(), count);
+    }
+
     const FRAME: Size<f32> = Size {
         width: 400.0,
         height: 300.0,
@@ -1005,6 +1347,120 @@ mod tests {
 
     fn zoom() -> (f32, f32) {
         (0.1, 8.0)
+    }
+
+    #[test]
+    fn moving_pinch_anchor_and_refused_cancellation_preserve_host_authority() {
+        let mut state = Viewport::default();
+        state.reconcile("a".into(), FitMode::Actual);
+        let bounds = Bounds::new(point(px(40.0), px(25.0)), size(px(400.0), px(300.0)));
+        let event = |phase, delta, x, y| gpui::PinchEvent {
+            phase,
+            delta,
+            position: bounds.origin + point(px(x), px(y)),
+            ..Default::default()
+        };
+        state.pinch(
+            &event(gpui::TouchPhase::Started, 0.0, 320.0, 60.0),
+            bounds,
+            NATURAL,
+            zoom(),
+        );
+        state.pinch(
+            &event(gpui::TouchPhase::Moved, 0.5, 300.0, 90.0),
+            bounds,
+            NATURAL,
+            zoom(),
+        );
+        state.pinch(
+            &event(gpui::TouchPhase::Moved, 0.2, 330.0, 70.0),
+            bounds,
+            NATURAL,
+            zoom(),
+        );
+        state.reconcile("a".into(), FitMode::Zoom(1.8));
+        let accepted = state.geometry(FRAME, NATURAL, zoom());
+        assert!((accepted.offset.x + 606.0).abs() < 0.01);
+        assert!((accepted.offset.y + 128.0).abs() < 0.01);
+        assert_eq!(
+            state.pinch(
+                &event(gpui::TouchPhase::Cancelled, 0.0, 330.0, 70.0),
+                bounds,
+                NATURAL,
+                zoom()
+            ),
+            Some(FitMode::Actual)
+        );
+        assert_eq!(state.geometry(FRAME, NATURAL, zoom()), accepted);
+        state.reconcile("a".into(), FitMode::Zoom(1.8)); // host refuses rollback
+        assert_eq!(state.geometry(FRAME, NATURAL, zoom()), accepted);
+        assert!(state.requested.is_none());
+    }
+
+    #[test]
+    fn batched_zoom_accumulates_and_refusal_preserves_accepted_geometry() {
+        let mut state = Viewport::default();
+        state.reconcile("a".into(), FitMode::Actual);
+        let before = state.geometry(FRAME, NATURAL, zoom());
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 1.5, point(320.0, 60.0)),
+            Some(1.5)
+        );
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 1.2, point(280.0, 90.0)),
+            Some(1.8000001)
+        );
+        assert_eq!(state.geometry(FRAME, NATURAL, zoom()), before);
+        state.reconcile("a".into(), FitMode::Actual);
+        assert_eq!(state.geometry(FRAME, NATURAL, zoom()), before);
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 2.0, point(320.0, 60.0)),
+            Some(2.0)
+        );
+        state.reconcile("a".into(), FitMode::Zoom(2.0));
+        let after = state.geometry(FRAME, NATURAL, zoom());
+        assert!((after.offset.x - -720.0).abs() < 0.01);
+        assert!((after.offset.y - -160.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn batched_pan_uses_latest_pin_and_image_change_resets_it() {
+        let mut state = Viewport::default();
+        state.reconcile("a".into(), FitMode::Actual);
+        state.pan(FRAME, NATURAL, zoom(), point(35.0, -12.0));
+        state.pan(FRAME, NATURAL, zoom(), point(-10.0, 7.0));
+        let moved = state.geometry(FRAME, NATURAL, zoom());
+        assert!((moved.offset.x + 175.0).abs() < 0.01);
+        assert!((moved.offset.y + 55.0).abs() < 0.01);
+        state.reconcile("a".into(), FitMode::Actual); // refused step
+        assert_eq!(state.geometry(FRAME, NATURAL, zoom()), moved);
+        state.reconcile("b".into(), FitMode::Actual);
+        assert_eq!(state.pin, Pin::default());
+    }
+
+    #[test]
+    fn cancelled_zoom_and_limits_do_not_leave_pending_motion() {
+        let mut state = Viewport::default();
+        state.reconcile("a".into(), FitMode::Actual);
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 100.0, point(320.0, 60.0)),
+            Some(8.0)
+        );
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 2.0, point(320.0, 60.0)),
+            None
+        );
+        state.cancel();
+        assert!(state.requested.is_none());
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), 0.01, point(320.0, 60.0)),
+            Some(0.1)
+        );
+        state.cancel();
+        assert_eq!(
+            state.zoom_by(FRAME, NATURAL, zoom(), f32::NAN, point(1.0, 2.0)),
+            None
+        );
     }
 
     #[test]

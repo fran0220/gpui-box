@@ -115,6 +115,50 @@ struct PageFocus {
     pending: Option<FocusHandle>,
 }
 
+/// A cancellable back preview bound to the exact history it began with.
+/// Platform gesture recognition and completion thresholds belong to the host.
+/// Cancellation drops this transient value; history and focus remain unchanged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BackTransition {
+    origin: NavHistory,
+    progress: f32,
+}
+
+impl BackTransition {
+    /// Root cannot begin a back preview.
+    pub fn begin(history: &NavHistory) -> Option<Self> {
+        history.can_pop().then(|| Self {
+            origin: history.clone(),
+            progress: 0.0,
+        })
+    }
+
+    /// Update visual progress only. Non-finite input is ignored.
+    pub fn update(&mut self, progress: f32) {
+        if progress.is_finite() {
+            self.progress = progress.clamp(0.0, 1.0);
+        }
+    }
+
+    pub fn progress(&self) -> f32 {
+        self.progress
+    }
+
+    /// Refuse stale previews, including history changed away and back again.
+    pub fn is_current(&self, history: &NavHistory) -> bool {
+        &self.origin == history
+    }
+
+    /// Call only after the host accepts back. No implicit completion threshold
+    /// is imposed, allowing platform predictive-back decisions to stay native.
+    pub fn commit(self, history: &mut NavHistory) -> bool {
+        self.is_current(history) && history.pop()
+    }
+
+    /// Roll back without touching caller history or focus.
+    pub fn cancel(self) {}
+}
+
 /// Active navigation content. Inactive pages are not mounted, so their input
 /// handlers and accessibility nodes cannot remain active during a transition.
 /// Uses a token-backed fade on each accepted history change; reduced motion
@@ -127,6 +171,7 @@ pub struct NavStack {
     label: SharedString,
     focus: FocusHandle,
     content: AnyElement,
+    back: Option<BackTransition>,
 }
 
 impl std::fmt::Debug for NavStack {
@@ -154,7 +199,17 @@ impl NavStack {
             label: label.into(),
             focus,
             content: content.into_any_element(),
+            back: None,
         }
+    }
+
+    /// Show host-controlled back progress as a fade of the active page.
+    /// The destination is not mounted until accepted; cancellation restores
+    /// the existing page, including its focus and interaction state. Stale
+    /// previews are ignored. This is not a screenshot/slide transition.
+    pub fn back_transition(mut self, transition: &BackTransition) -> Self {
+        self.back = Some(transition.clone());
+        self
     }
 }
 
@@ -200,10 +255,22 @@ impl RenderOnce for NavStack {
             }
         });
         let page_id = self.ident.child(self.history.current().as_ref());
+        let progress = self
+            .back
+            .as_ref()
+            .filter(|back| back.is_current(&self.history))
+            .map_or(0.0, BackTransition::progress);
         div()
             .id(self.ident.element_id())
             .w_full()
             .overflow_hidden()
+            // Keep preview opacity outside the entrance animation, which
+            // writes its own opacity on the inner page each frame.
+            .opacity(if cx.reduce_motion() {
+                1.0
+            } else {
+                1.0 - progress
+            })
             .child(
                 div()
                     .id(page_id.element_id())

@@ -21,6 +21,7 @@
 //! set is not the user's edit either, so it clears what came before rather
 //! than becoming a step the user can walk back through.
 
+use crate::TextAffinity;
 use std::ops::Range;
 
 /// How far the caret and its selection reached, and which end was moving.
@@ -28,6 +29,7 @@ use std::ops::Range;
 pub(super) struct EditSelection {
     pub(super) range: Range<usize>,
     pub(super) reversed: bool,
+    pub(super) affinities: [TextAffinity; 2],
     pub(super) secondary: Vec<(Range<usize>, bool)>,
 }
 
@@ -38,6 +40,7 @@ impl EditSelection {
         Self {
             range: offset..offset,
             reversed: false,
+            affinities: [TextAffinity::Downstream; 2],
             secondary: Vec::new(),
         }
     }
@@ -195,7 +198,7 @@ impl EditHistory {
         before: &str,
         selection: EditSelection,
     ) {
-        if self.disabled || self.composing.is_some() {
+        if self.composing.is_some() {
             return;
         }
         self.composing = Some(CompositionStart {
@@ -211,7 +214,7 @@ impl EditHistory {
         let Some(start) = self.composing.take() else {
             return;
         };
-        if start.before == after {
+        if self.disabled || start.before == after {
             return;
         }
         self.done.push(HistoryEntry {
@@ -230,6 +233,17 @@ impl EditHistory {
 
     pub(super) fn is_composing(&self) -> bool {
         self.composing.is_some()
+    }
+
+    /// Active composition rollback is transient, including in secret fields;
+    /// it never enters undo history. Ending the composition drops this value.
+    pub(super) fn cancel_composition(&mut self, current_len: usize) -> Option<EditStep> {
+        let start = self.composing.take()?;
+        Some(EditStep {
+            range: start.start..start.start + current_len,
+            text: start.before,
+            selection: start.selection,
+        })
     }
 
     /// Records one replacement.
@@ -263,6 +277,7 @@ impl EditHistory {
         if self.pending.is_none()
             && let Some(entry) = self.done.last_mut().filter(|entry| entry.mergeable)
             && let Some(last) = entry.edits.last_mut()
+            && last.selection_after == selection_before
             && merges(last, start, before, after, cause)
         {
             last.after.push_str(after);

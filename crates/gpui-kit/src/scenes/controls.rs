@@ -2,6 +2,425 @@
 
 use super::support::*;
 
+struct TouchInputs {
+    fields: Vec<(&'static str, &'static str, gpui::AnyView)>,
+    _next: gpui::Subscription,
+}
+impl Global for TouchInputs {}
+
+struct TouchPickers {
+    select: Entity<Select>,
+    search: Entity<Combobox>,
+    multi: Entity<MultiSelect>,
+}
+impl Global for TouchPickers {}
+
+pub(super) fn touch_pickers(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::overlay::popover::PickerPresentation;
+    if !cx.has_global::<TouchPickers>() {
+        let options: Vec<_> = (1..=12)
+            .map(|id| {
+                SelectOption::new(format!("item-{id}"), format!("Fixture choice {id}"))
+                    .disabled(id == 3)
+            })
+            .collect();
+        let select = cx.new(|cx| {
+            Select::new("scene.touch.select", window, cx)
+                .name("Choose one")
+                .options(options.clone())
+                .selected("item-2")
+                .clearable(true)
+                .control_size(ControlSize::Touch)
+                .presentation(PickerPresentation::Bottom)
+        });
+        let search = cx.new(|cx| {
+            Combobox::new("scene.touch.search", window, cx)
+                .name("Search choices")
+                .options(options.clone())
+                .control_size(ControlSize::Touch)
+                .presentation(PickerPresentation::Bottom)
+        });
+        let multi = cx.new(|cx| {
+            MultiSelect::new("scene.touch.multi", window, cx)
+                .name("Choose several")
+                .options(options)
+                .selected(["item-2", "item-5"])
+                .control_size(ControlSize::Touch)
+                .presentation(PickerPresentation::Bottom)
+        });
+        cx.set_global(TouchPickers {
+            select,
+            search,
+            multi,
+        });
+    }
+    let theme = cx.theme().clone();
+    let pickers = cx.global::<TouchPickers>();
+    stack(&theme)
+        .w(px(390.0))
+        .max_w_full()
+        .child(caption(
+            &theme,
+            "Bottom picker fixtures · choices remain caller-owned",
+        ))
+        .child(pickers.select.clone())
+        .child(pickers.search.clone())
+        .child(pickers.multi.clone())
+        .into_any_element()
+}
+
+struct TouchPickerOpened;
+impl Global for TouchPickerOpened {}
+
+pub(super) fn touch_pickers_open(window: &mut Window, cx: &mut App) -> AnyElement {
+    let body = touch_pickers(window, cx);
+    if !cx.has_global::<TouchPickerOpened>() {
+        cx.global::<TouchPickers>()
+            .search
+            .clone()
+            .update(cx, |picker, cx| picker.open(cx));
+        cx.set_global(TouchPickerOpened);
+    }
+    body
+}
+
+#[cfg(test)]
+mod touch_tests {
+    use super::*;
+    use gpui_kit_testkit::harness::Harness;
+
+    #[gpui::test]
+    fn bottom_picker_last_option_survives_residual_ime_fixture(cx: &mut gpui::TestAppContext) {
+        let mut harness = Harness::new(cx, crate::install, touch_pickers_open);
+        harness
+            .context()
+            .simulate_resize(gpui::size(px(390.0), px(844.0)));
+        harness.context().simulate_insets(gpui::WindowInsets {
+            safe_area: gpui::Edges {
+                top: px(17.0),
+                right: px(11.0),
+                bottom: px(34.0),
+                left: px(7.0),
+            },
+            ime: gpui::Edges {
+                bottom: px(540.0),
+                ..Default::default()
+            },
+        });
+        harness.frame();
+        harness.advance(Duration::from_secs(1));
+        let events = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let reported = events.clone();
+        let _subscription = harness.update(|_, cx| {
+            let search = cx.global::<TouchPickers>().search.clone();
+            cx.subscribe(
+                &search,
+                move |_, event: &crate::controls::combobox::ComboboxEvent, _| {
+                    if let crate::controls::combobox::ComboboxEvent::Selected(id) = event {
+                        reported.borrow_mut().push(id.clone());
+                    }
+                },
+            )
+        });
+        harness.scroll("scene.touch.search.item-1", 1200.0);
+        let last = harness
+            .node("scene.touch.search.item-12")
+            .expect("last option")
+            .bounds;
+        assert!(last.x >= 7.0 && last.x + last.width <= 379.0);
+        assert!(
+            last.y >= 17.0 && last.y + last.height <= 304.0,
+            "last option must fit above residual IME: {last:?}"
+        );
+        assert!(last.height >= 48.0);
+        harness.click("scene.touch.search.item-12");
+        assert_eq!(
+            events.borrow().as_slice(),
+            &[gpui::SharedString::from("item-12")]
+        );
+        assert_eq!(
+            harness
+                .node("scene.touch.search")
+                .expect("search picker")
+                .expanded,
+            Some(false)
+        );
+    }
+
+    #[gpui::test]
+    fn touch_form_next_and_disabled_semantics(cx: &mut gpui::TestAppContext) {
+        let mut harness = Harness::new(cx, crate::install, touch_inputs);
+        harness.click("scene.touch.email");
+        harness.keystrokes("a enter");
+        assert!(
+            harness
+                .node("scene.touch.password")
+                .expect("password")
+                .focused
+        );
+        assert!(
+            harness
+                .node("scene.touch.disabled")
+                .expect("disabled field")
+                .disabled
+        );
+        assert!(
+            harness
+                .node("scene.touch.invalid")
+                .expect("invalid field")
+                .invalid
+        );
+        let bounds = harness.node("scene.touch.email").expect("email").bounds;
+        assert!(bounds.height >= 48.0);
+        let reveal = harness
+            .node("scene.touch.password.reveal")
+            .expect("reveal action")
+            .bounds;
+        assert!(reveal.height >= 48.0 && reveal.width >= 48.0);
+    }
+
+    #[gpui::test]
+    fn bottom_picker_keeps_caller_selection_and_closes_on_escape(cx: &mut gpui::TestAppContext) {
+        let mut harness = Harness::new(cx, crate::install, touch_pickers);
+        harness.click("scene.touch.select");
+        assert_eq!(
+            harness
+                .node("scene.touch.select.sheet")
+                .expect("select sheet")
+                .expanded,
+            Some(true)
+        );
+        harness.advance(Duration::from_secs(1));
+        let option = harness
+            .node("scene.touch.select.item-3")
+            .expect("disabled option");
+        assert!(option.disabled);
+        assert!(option.bounds.height >= 48.0);
+        harness.click("scene.touch.select.item-1");
+        assert_eq!(
+            harness
+                .node("scene.touch.select")
+                .expect("select trigger")
+                .value
+                .as_deref(),
+            Some("Fixture choice 2")
+        );
+        assert_eq!(
+            harness
+                .node("scene.touch.select.sheet")
+                .expect("outgoing sheet")
+                .expanded,
+            Some(false),
+            "selection starts the outgoing modal exit"
+        );
+        harness.advance(Duration::from_secs(1));
+        assert!(
+            harness.node("scene.touch.select.sheet").is_none(),
+            "outgoing drawer must finish exit"
+        );
+        harness.click("scene.touch.search.query");
+        harness.keystrokes("f");
+        assert!(
+            harness
+                .node("scene.touch.search.query")
+                .expect("search query")
+                .focused,
+            "next field must receive the click"
+        );
+        assert_eq!(
+            harness
+                .node("scene.touch.search.sheet")
+                .expect("search sheet")
+                .expanded,
+            Some(true)
+        );
+        harness.keystrokes("escape");
+        assert_eq!(
+            harness
+                .node("scene.touch.search")
+                .expect("closed search")
+                .expanded,
+            Some(false)
+        );
+    }
+
+    #[gpui::test]
+    fn bottom_picker_exit_blocks_clicks_without_stealing_replacement_focus(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let mut harness = Harness::new(cx, crate::install, touch_pickers);
+        harness.click("scene.touch.select");
+        assert_eq!(
+            harness
+                .node("scene.touch.select.sheet")
+                .expect("select sheet")
+                .expanded,
+            Some(true)
+        );
+        harness.advance(Duration::from_secs(1));
+        harness.click("scene.touch.select.item-1");
+        assert_eq!(
+            harness
+                .node("scene.touch.select.sheet")
+                .expect("outgoing sheet")
+                .expanded,
+            Some(false)
+        );
+        // The outgoing surface still occludes its background during exit.
+        harness.click("scene.touch.search.query");
+        assert_eq!(
+            harness
+                .node("scene.touch.search")
+                .expect("search trigger")
+                .expanded,
+            Some(false)
+        );
+        // A host may intentionally replace it before the animation completes.
+        harness.update(|_, cx| {
+            cx.global::<TouchPickers>()
+                .search
+                .clone()
+                .update(cx, |picker, cx| picker.open(cx))
+        });
+        assert!(
+            harness
+                .node("scene.touch.search.query")
+                .expect("new query")
+                .focused
+        );
+        harness.advance(Duration::from_secs(1));
+        assert!(
+            harness
+                .node("scene.touch.search.query")
+                .expect("retained query")
+                .focused
+        );
+        assert_eq!(
+            harness
+                .node("scene.touch.search.sheet")
+                .expect("new sheet")
+                .expanded,
+            Some(true)
+        );
+        harness.keystrokes("escape");
+        harness.advance(Duration::from_secs(1));
+        assert_eq!(
+            harness
+                .node("scene.touch.search")
+                .expect("closed search")
+                .expanded,
+            Some(false)
+        );
+    }
+}
+
+/// Narrow fixture with real editing, caller-routed next, disabled and error states.
+pub(super) fn touch_inputs(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<TouchInputs>() {
+        let email = cx.new(|cx| {
+            TextInput::new("scene.touch.email", window, cx)
+                .name("Email")
+                .placeholder("you@example.com")
+                .control_size(ControlSize::Touch)
+                .input_options(gpui::TextInputOptions {
+                    purpose: gpui::KeyboardPurpose::Email,
+                    action: gpui::TextInputAction::Next,
+                    autofill: Some(gpui::AutofillPurpose::Email),
+                    ..Default::default()
+                })
+        });
+        let password = cx.new(|cx| {
+            PasswordInput::new("scene.touch.password", window, cx)
+                .name("Password")
+                .placeholder("Password")
+                .control_size(ControlSize::Touch)
+                .input_options(gpui::TextInputOptions {
+                    action: gpui::TextInputAction::Done,
+                    autofill: Some(gpui::AutofillPurpose::CurrentPassword),
+                    ..Default::default()
+                })
+        });
+        let password_focus = password.clone();
+        let host_window = window.window_handle();
+        let next = cx.subscribe(&email, move |_, action: &gpui::TextInputAction, cx| {
+            if *action == gpui::TextInputAction::Next {
+                let focus = password_focus.read(cx).focus_handle(cx);
+                cx.update_window(host_window, |_, window, cx| focus.focus(window, cx))
+                    .ok();
+            }
+        });
+        let code = cx.new(|cx| {
+            OneTimeCodeInput::new("scene.touch.code", window, cx)
+                .name("Code")
+                .slots(6)
+                .control_size(ControlSize::Touch)
+                .input_options(gpui::TextInputOptions {
+                    purpose: gpui::KeyboardPurpose::Number,
+                    autofill: Some(gpui::AutofillPurpose::OneTimeCode),
+                    ..Default::default()
+                })
+        });
+        let notes = cx.new(|cx| {
+            TextArea::new("scene.touch.notes", window, cx)
+                .placeholder("Notes · wraps at this width")
+                .rows(2)
+                .control_size(ControlSize::Touch)
+        });
+        let disabled = cx.new(|cx| {
+            TextInput::new("scene.touch.disabled", window, cx)
+                .name("Disabled fixture")
+                .text("Managed by the host")
+                .disabled(true)
+                .control_size(ControlSize::Touch)
+        });
+        let invalid = cx.new(|cx| {
+            TextInput::new("scene.touch.invalid", window, cx)
+                .name("Invalid email fixture")
+                .text("not an address")
+                .invalid(true)
+                .control_size(ControlSize::Touch)
+        });
+        cx.set_global(TouchInputs {
+            fields: vec![
+                ("scene.touch.email", "Email", email.into()),
+                ("scene.touch.password", "Password", password.into()),
+                (
+                    "scene.touch.code",
+                    "Verification code · 6 characters",
+                    code.into(),
+                ),
+                ("scene.touch.notes", "Notes", notes.into()),
+                ("scene.touch.disabled", "Managed field", disabled.into()),
+                ("scene.touch.invalid", "Invalid email", invalid.into()),
+            ],
+            _next: next,
+        });
+    }
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(390.0))
+        .max_w_full()
+        .child(caption(
+            &theme,
+            "Touch editing fixtures · keyboard hints are platform-dependent",
+        ))
+        .children(
+            cx.global::<TouchInputs>()
+                .fields
+                .iter()
+                .map(|(id, label, view)| {
+                    FormField::new(format!("{id}.field"), *label)
+                        .control(*id)
+                        .child(view.clone())
+                }),
+        )
+        .child(caption(
+            &theme,
+            "Code paste is not SMS autofill. Error and disabled values remain visible.",
+        ))
+        .into_any_element()
+}
+
 pub(super) fn translation_packs(_window: &mut Window, cx: &mut App) -> AnyElement {
     use crate::strings::TranslationPack;
     use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -1307,9 +1726,6 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                 )
             }),
         };
-        // A caret only paints where the keyboard is, so one area takes it:
-        // otherwise a capture cannot show a caret at all.
-        window.focus(&inputs.review.read(cx).focus_handle(cx), cx);
         cx.set_global(inputs);
     }
 }
@@ -1383,6 +1799,12 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         inputs.asked.clone(),
         inputs.told.clone(),
     );
+    // Focus belongs to this scene's mounted lifetime, not the first scene that
+    // happens to initialize the shared input fixtures. Do not steal it back
+    // from another field on later renders.
+    window.use_keyed_state("scene.textarea.initial-focus", cx, |window, cx| {
+        window.focus(&review.read(cx).focus_handle(cx), cx);
+    });
     let theme = cx.theme().clone();
 
     div()

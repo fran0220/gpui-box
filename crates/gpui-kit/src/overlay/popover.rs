@@ -28,6 +28,65 @@ use crate::motion;
 use crate::motion::{MotionRole, Phase, Presenting};
 use crate::strings::{ActiveSearch, EnglishSearch, SearchMatcher};
 
+/// How an existing picker presents its choices. The caller chooses from its
+/// measured layout; this policy never guesses an operating system or viewport.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PickerPresentation {
+    #[default]
+    Anchored,
+    /// A retained bottom modal, with the shared drawer's focus restoration,
+    /// dismissal and modal stack. This is not a native system picker.
+    Bottom,
+}
+
+/// Retained modal lifetime shared by picker families, separate from selection.
+pub(crate) struct PickerSheet {
+    pub drawer: gpui::Entity<super::Drawer>,
+    _subscription: gpui::Subscription,
+}
+
+impl PickerSheet {
+    pub fn new<V: 'static>(
+        ident: Ident,
+        title: SharedString,
+        stops: Vec<FocusHandle>,
+        body: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+        dismissed: impl Fn(&mut V, &mut Context<V>) + 'static,
+        window: &mut Window,
+        cx: &mut Context<V>,
+    ) -> Self {
+        let drawer = cx.new(|cx| {
+            super::Drawer::new(ident, window, cx)
+                .edge(super::Edge::Bottom)
+                .avoid_insets(true)
+                .close_control_size(gpui_kit_theme::ControlSize::Touch)
+                .body_padding_x(Space::Xs)
+                .title(title)
+                .focus_stops(stops)
+                .content(body)
+        });
+        let subscription = cx.subscribe(&drawer, move |owner, _, event, cx| {
+            if *event == super::DrawerEvent::Dismissed {
+                dismissed(owner, cx);
+            }
+        });
+        Self {
+            drawer,
+            _subscription: subscription,
+        }
+    }
+
+    pub fn sync(&self, open: bool, window: &mut Window, cx: &mut App) {
+        self.drawer.update(cx, |drawer, cx| {
+            if open && !drawer.is_open() {
+                drawer.open(window, cx);
+            } else if !open && drawer.is_open() {
+                drawer.close(window, cx);
+            }
+        });
+    }
+}
+
 /// What a keystroke means to a menu-like surface, once the platform's
 /// modifier conventions have been applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

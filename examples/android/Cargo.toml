@@ -1,0 +1,25 @@
+[package]
+name = "gpui-box-android-example"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "gpui_android_demo"
+crate-type = ["cdylib"]
+
+[features]
+host-check = ["gpui_android/host-check"]
+
+[dependencies]
+gpui.workspace = true
+gpui_android = { package = "gpui-box-android", path = "../../crates/gpui_android" }
+gpui-kit = { package = "gpui-box-kit", path = "../../crates/gpui-kit", default-features = false }
+gpui-box-mobile-reference = { path = "../mobile-reference", default-features = false }
+anyhow.workspace = true
+serde_json.workspace = true
+jni = "0.21.1"

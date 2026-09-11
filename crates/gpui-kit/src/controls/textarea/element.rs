@@ -27,6 +27,7 @@ impl TextAreaElement {
 
 pub struct PrepaintState {
     layout: Option<EditableTextLayout>,
+    document_layout: Option<EditableTextLayout>,
     source_text: gpui::SharedString,
     rows: std::sync::Arc<[std::ops::Range<usize>]>,
     indexed_rows: usize,
@@ -159,6 +160,15 @@ impl Element for TextAreaElement {
                 .unwrap_or_default();
             EditableTextLayout::new(source_text.as_ref(), lines, line_height)
         };
+        // Empty document geometry must not use the placeholder's glyphs.
+        let document_layout = empty.then(|| {
+            let lines = window
+                .text_system()
+                .shape_text("".into(), font_size, &[style.to_run(0)], None, None)
+                .map(|lines| lines.into_iter().collect())
+                .unwrap_or_default();
+            EditableTextLayout::new("", lines, line_height)
+        });
         // A placeholder never grows the frame: only what was typed does.
         let visible_rows = if empty {
             min_rows
@@ -237,8 +247,27 @@ impl Element for TextAreaElement {
                         .any(|visible| visible.start <= range.start && range.start <= visible.end)
             })
             .map(|(range, _)| {
+                let position = if *range == area.edit.selection() {
+                    area.edit.native_selection().head
+                } else {
+                    gpui::NativeTextPosition {
+                        utf16_offset: gpui::offset_to_utf16(&source_text, range.start),
+                        ..Default::default()
+                    }
+                };
                 fill(
-                    layout.caret_bounds(range.start, origin, px(theme.measures.caret_width)),
+                    layout
+                        .native_position_bounds(
+                            &source_text,
+                            position,
+                            origin,
+                            px(theme.measures.caret_width),
+                            gpui::TextAlign::Left,
+                            bounds.size.width,
+                        )
+                        .unwrap_or_else(|| {
+                            layout.caret_bounds(range.start, origin, px(theme.measures.caret_width))
+                        }),
                     theme.colors.accent,
                 )
             })
@@ -259,6 +288,7 @@ impl Element for TextAreaElement {
 
         PrepaintState {
             layout: Some(layout),
+            document_layout,
             source_text,
             rows,
             indexed_rows,
@@ -327,7 +357,7 @@ impl Element for TextAreaElement {
                     area.set_scroll_offset(scroll_offset);
                     area.set_horizontal_scroll_offset(horizontal_scroll_offset);
                     let layout_changed = area.set_last_layout(
-                        layout,
+                        prepaint.document_layout.take().unwrap_or(layout),
                         prepaint.source_text.clone(),
                         bounds,
                         caret_width,

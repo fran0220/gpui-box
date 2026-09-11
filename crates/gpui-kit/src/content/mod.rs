@@ -71,5 +71,6 @@ pub use terminal::{
     GridSnapshot, SelectionKind, Terminal, TerminalEvent, TerminalState,
 };
 pub use transport::{
-    BufferedRange, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
+    BufferedRange, MediaPresentation, TrackStep, TransportBar, TransportDuration, TransportEvent,
+    TransportState,
 };

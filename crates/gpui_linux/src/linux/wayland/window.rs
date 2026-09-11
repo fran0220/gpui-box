@@ -704,7 +704,9 @@ impl Drop for WaylandWindow {
 
         let client = state.client.clone();
 
-        state.renderer.destroy();
+        if let Err(error) = state.renderer.destroy() {
+            log::error!("Failed to drain Wayland renderer during destruction: {error}");
+        }
 
         // Destroy blur first, this has no dependencies.
         if let Some(blur) = &state.blur {

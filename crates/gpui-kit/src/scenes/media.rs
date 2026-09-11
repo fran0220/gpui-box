@@ -23,9 +23,10 @@ pub(super) fn scene_peaks(count: usize) -> Vec<f32> {
 pub(super) fn audio_player(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
-        .w(px(640.0))
+        .w(px(392.0))
         .child(
             AudioPlayer::new("scene.audio.ready")
+                .control_size(gpui_kit_theme::ControlSize::Touch)
                 .title("Release walkthrough")
                 .subtitle("Recorded 12 March")
                 .transport(
@@ -216,9 +217,16 @@ fn walkthrough_poster(cx: &App) -> AnyElement {
 pub(super) fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
-        .w(px(440.0))
+        .w(px(392.0))
         .child(
             VideoPlayer::new("scene.video.frame")
+                .control_size(gpui_kit_theme::ControlSize::Touch)
+                .presentation(
+                    crate::content::transport::MediaPresentation::Inline,
+                    "Present video",
+                )
+                .presentation_refused("Fixture host: native video presentation is unavailable.")
+                .on_presentation_request(|_, _, _| {})
                 .title("Screen capture")
                 .transport(
                     FixtureTransport::ready(96.0)

@@ -31,8 +31,15 @@ pub mod scap_screen_capture;
     feature = "screen-capture"
 ))]
 pub(crate) type PlatformScreenCaptureFrame = scap::frame::Frame;
-#[cfg(not(feature = "screen-capture"))]
+// Unsupported targets never produce native frames. Their Platform implementation
+// must report capture unsupported and return an error from screen_capture_sources.
+#[cfg(all(
+    not(feature = "screen-capture"),
+    not(any(target_os = "android", target_os = "ios"))
+))]
 pub(crate) type PlatformScreenCaptureFrame = ();
+#[cfg(any(target_os = "android", target_os = "ios"))]
+pub(crate) type PlatformScreenCaptureFrame = std::convert::Infallible;
 #[cfg(all(target_os = "macos", feature = "screen-capture"))]
 pub(crate) type PlatformScreenCaptureFrame = core_video::image_buffer::CVImageBuffer;
 
@@ -143,8 +150,70 @@ pub fn guess_compositor() -> &'static str {
     }
 }
 
+/// Application commands whose availability depends on the native host.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AppOperation {
+    /// End the application process through the native host.
+    Quit,
+    /// Relaunch the application process.
+    Restart,
+    /// Hide this application.
+    Hide,
+    /// Hide other applications.
+    HideOtherApps,
+    /// Unhide other applications.
+    UnhideOtherApps,
+    /// Reveal a filesystem path in a native file manager.
+    RevealPath,
+    /// Open a filesystem path with its default application.
+    OpenWithSystem,
+    /// Install an application dock menu.
+    SetDockMenu,
+}
+
+/// Window commands whose availability depends on the native host.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowOperation {
+    /// Request a content size.
+    Resize,
+    /// Toggle maximization/zoom.
+    Zoom,
+    /// Minimize the window.
+    Minimize,
+    /// Toggle native fullscreen.
+    ToggleFullscreen,
+}
+
+/// Why a checked native command was not accepted. A refusal is never success.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum PlatformOperationError {
+    /// The backend does not implement this operation.
+    #[error("unsupported platform operation: {0}")]
+    Unsupported(&'static str),
+    /// The backend implements it, but the required native state is absent.
+    #[error("platform operation temporarily unavailable: {0}")]
+    Unavailable(&'static str),
+    /// The host denied the request, for example because of policy or permission.
+    #[error("platform operation refused: {0}")]
+    Refused(&'static str),
+}
+
 #[expect(missing_docs)]
 pub trait Platform: 'static {
+    /// Checks a native command immediately before issuing it on the owner UI thread.
+    /// Backends must report unsupported, unavailable and refused distinctly. Mobile
+    /// backends must override this conservative default for commands they implement.
+    /// `Ok` means the request may be issued, not that an asynchronous OS transition
+    /// has completed. Legacy void methods cannot report errors; cross-platform
+    /// callers should use the corresponding `App::try_*` methods.
+    fn check_app_operation(&self, _operation: AppOperation) -> Result<(), PlatformOperationError> {
+        if cfg!(any(target_os = "android", target_os = "ios")) {
+            Err(PlatformOperationError::Unsupported("application command"))
+        } else {
+            Ok(())
+        }
+    }
+
     fn background_executor(&self) -> BackgroundExecutor;
     fn foreground_executor(&self) -> ForegroundExecutor;
     fn text_system(&self) -> Arc<dyn PlatformTextSystem>;
@@ -174,7 +243,7 @@ pub trait Platform: 'static {
         let (sources_tx, sources_rx) = oneshot::channel();
         sources_tx
             .send(Err(anyhow::anyhow!(
-                "gpui was compiled without the screen-capture feature"
+                "screen capture is unsupported by this platform implementation"
             )))
             .ok();
         sources_rx
@@ -781,10 +850,13 @@ pub enum AppLifecyclePhase {
 
 /// Regions of a window that are obscured or reserved by the system.
 ///
-/// Mobile applications often share space in their window with system-specific
-/// geometry, from keyboards to camera notches. In GPUI, all this is abstracted
-/// into a single "inset" which should be overlaid on the window's bounds.
-/// It is up to the application develop to determine how to handle these cases.
+/// Distances are nonnegative logical pixels inward from the edges of the
+/// current content viewport, not physical screen pixels or keyboard height.
+/// If the platform already resizes the viewport above an IME, `ime` contains
+/// only remaining overlap (normally zero). Overlay mode reports the occluded
+/// portion. Never apply both a viewport reduction and the same inset again.
+/// Floating/split keyboards cannot be represented faithfully as edge insets;
+/// these values describe edge avoidance, not arbitrary occlusion geometry.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WindowInsets {
     /// Regions covered by system UI or hardware: status bar, display
@@ -799,7 +871,8 @@ pub struct WindowInsets {
 }
 
 impl WindowInsets {
-    /// The combined inset content should avoid.
+    /// The combined inset content should avoid. Overlapping safe-area and
+    /// keyboard regions combine by maximum, never by addition.
     pub fn effective(&self) -> Edges<Pixels> {
         Edges {
             top: self.safe_area.top.max(self.ime.top),
@@ -821,10 +894,27 @@ pub enum TextInputStateChange {
     SelectionChanged,
     /// The document content changed outside of platform-initiated edits.
     ContentChanged,
+    /// Keyboard layout, return action, or autofill hints changed.
+    OptionsChanged,
 }
 
 #[expect(missing_docs)]
 pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
+    /// Checks a native command on the owner UI thread immediately before dispatch.
+    /// Mobile backends must opt in to commands they implement; OS-owned window
+    /// geometry is not a successful resize. Use `Window::try_*` to receive errors
+    /// instead of relying on legacy void commands, which may do nothing on mobile.
+    fn check_window_operation(
+        &self,
+        _operation: WindowOperation,
+    ) -> Result<(), PlatformOperationError> {
+        if cfg!(any(target_os = "android", target_os = "ios")) {
+            Err(PlatformOperationError::Unsupported("window command"))
+        } else {
+            Ok(())
+        }
+    }
+
     fn bounds(&self) -> Bounds<Pixels>;
     fn is_maximized(&self) -> bool;
     fn window_bounds(&self) -> WindowBounds;
@@ -1014,7 +1104,8 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
         WindowInsets::default()
     }
 
-    /// Registers a callback invoked whenever [`Self::insets`] change.
+    /// Registers a callback invoked whenever [`Self::insets`] change. Update
+    /// the value returned by `insets` before invoking this callback.
     ///
     /// Contract: fires continuously during animated transitions (Android
     /// `WindowInsetsAnimation` progress; on iOS the platform interpolates
@@ -1035,7 +1126,9 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     /// Requests that the soft keyboard be hidden.
     fn hide_soft_keyboard(&self) {}
 
-    /// Inform the operating system that the text input state has changed
+    /// Inform the operating system that text input state changed. Called while
+    /// the core window is borrowed; defer native queries through the input
+    /// handler until after returning, rather than reentering the core window.
     fn text_input_state_changed(&self, _change: TextInputStateChange) {}
 
     fn play_system_bell(&self) {}
@@ -1677,6 +1770,236 @@ impl PlatformInputHandler {
         self
     }
 
+    pub(crate) fn input_options_in_window(
+        &mut self,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<TextInputOptions> {
+        cx.with_effect_owner(self.effect_owner, |cx| {
+            self.handler
+                .accepts_text_input(window, cx)
+                .then(|| self.handler.text_input_options(window, cx))
+        })
+    }
+
+    /// See [`InputHandler::native_selection`].
+    pub fn native_selection(&mut self) -> Option<crate::NativeTextSelection> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.native_selection(window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::set_native_selection`].
+    pub fn set_native_selection(&mut self, selection: crate::NativeTextSelection) -> bool {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.set_native_selection(selection, window, cx)
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    /// See [`InputHandler::native_position_in_direction`].
+    pub fn native_position_in_direction(
+        &mut self,
+        position: crate::NativeTextPosition,
+        direction: crate::TextNavigationDirection,
+        offset: usize,
+    ) -> Option<crate::NativeTextPosition> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .native_position_in_direction(position, direction, offset, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::native_position_bounds`].
+    pub fn native_position_bounds(
+        &mut self,
+        position: crate::NativeTextPosition,
+    ) -> Option<Bounds<Pixels>> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.native_position_bounds(position, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::native_position_for_point`].
+    pub fn native_position_for_point(
+        &mut self,
+        point: Point<Pixels>,
+        within_range: Option<Range<usize>>,
+    ) -> Option<crate::NativeTextPosition> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .native_position_for_point(point, within_range, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::farthest_native_position`].
+    pub fn farthest_native_position(
+        &mut self,
+        range: Range<usize>,
+        direction: crate::TextNavigationDirection,
+    ) -> Option<crate::NativeTextPosition> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .farthest_native_position(range, direction, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::selection_rects_for_range`].
+    pub fn selection_rects_for_range(
+        &mut self,
+        range: Range<usize>,
+    ) -> Vec<crate::TextSelectionRect> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.selection_rects_for_range(range, window, cx)
+                })
+            })
+            .unwrap_or_default()
+    }
+
+    /// See [`InputHandler::text_position_in_direction`].
+    pub fn text_position_in_direction(
+        &mut self,
+        position: usize,
+        direction: crate::TextNavigationDirection,
+        offset: usize,
+    ) -> Option<usize> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .text_position_in_direction(position, direction, offset, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::farthest_text_position`].
+    pub fn farthest_text_position(
+        &mut self,
+        range: Range<usize>,
+        direction: crate::TextNavigationDirection,
+    ) -> Option<usize> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .farthest_text_position(range, direction, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::base_writing_direction`].
+    pub fn base_writing_direction(
+        &mut self,
+        position: usize,
+    ) -> Option<crate::TextWritingDirection> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.base_writing_direction(position, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::set_base_writing_direction`].
+    pub fn set_base_writing_direction(
+        &mut self,
+        direction: crate::TextWritingDirection,
+        range: Range<usize>,
+    ) -> bool {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler
+                        .set_base_writing_direction(direction, range, window, cx)
+                })
+            })
+            .unwrap_or(false)
+    }
+
+    /// See [`InputHandler::grapheme_range_at`].
+    pub fn grapheme_range_at(&mut self, position: usize) -> Option<Range<usize>> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.grapheme_range_at(position, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// See [`InputHandler::native_caret_bounds`].
+    pub fn native_caret_bounds(&mut self, position: usize) -> Option<Bounds<Pixels>> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.native_caret_bounds(position, window, cx)
+                })
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// Query the focused editor's keyboard hints. `None` means the window is
+    /// no longer accessible, not that default hints were requested.
+    pub fn text_input_options(&mut self) -> Option<TextInputOptions> {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.text_input_options(window, cx)
+                })
+            })
+            .ok()
+    }
+
+    /// Dispatch an IME action. Returns false if the editor refuses it or the
+    /// window is gone. A refused action must not be reported as submitted.
+    pub fn perform_text_input_action(&mut self, action: TextInputAction) -> bool {
+        self.cx
+            .update(|window, cx| {
+                cx.with_effect_owner(self.effect_owner, |cx| {
+                    self.handler.perform_text_input_action(action, window, cx)
+                })
+            })
+            .unwrap_or(false)
+    }
+
     pub fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
         self.cx
             .update(|window, cx| {
@@ -1930,11 +2253,267 @@ pub struct UTF16Selection {
     pub reversed: bool,
 }
 
+/// Requested keyboard layout. This is a hint, never input validation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum KeyboardPurpose {
+    /// General text entry.
+    #[default]
+    Text,
+    /// Integer numeric entry.
+    Number,
+    /// Decimal numeric entry.
+    Decimal,
+    /// Telephone entry.
+    Phone,
+    /// Email address entry.
+    Email,
+    /// URL entry.
+    Url,
+    /// Search query entry.
+    Search,
+}
+
+/// Requested IME return-key action. The editor, not the platform, decides
+/// whether an action submits data or moves focus. Newline is explicit.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextInputAction {
+    /// Platform default return key.
+    #[default]
+    Default,
+    /// Insert a line break if the editor accepts it.
+    Newline,
+    /// Complete editing.
+    Done,
+    /// Navigate to the entered destination.
+    Go,
+    /// Move to the next input.
+    Next,
+    /// Move to the previous input.
+    Previous,
+    /// Submit a search query.
+    Search,
+    /// Send the composed content.
+    Send,
+}
+
+/// Semantic autofill hint. Availability depends on the platform and user
+/// settings; OneTimeCode neither reads SMS nor guarantees code retrieval.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AutofillPurpose {
+    /// Person's full name.
+    Name,
+    /// Account username.
+    Username,
+    /// Existing account password.
+    CurrentPassword,
+    /// Newly chosen password.
+    NewPassword,
+    /// Email address.
+    Email,
+    /// Telephone number.
+    Phone,
+    /// One-time verification code.
+    OneTimeCode,
+}
+
+/// Caller-owned input traits, analogous to UIKit UITextInputTraits, Android
+/// EditorInfo and HTML inputmode/enterkeyhint/autocomplete. Platforms must
+/// document unsupported hints. These never validate text or perform actions.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TextInputOptions {
+    /// Requested keyboard layout.
+    pub purpose: KeyboardPurpose,
+    /// Requested return-key label/action.
+    pub action: TextInputAction,
+    /// Semantic autofill purpose; None makes no autofill request.
+    pub autofill: Option<AutofillPurpose>,
+    /// Whether line breaks are meaningful to this editor.
+    pub multiline: bool,
+    /// Request secure platform input. The editor must still mask its rendered
+    /// text and exclude sensitive content from diagnostics and accessibility.
+    pub secure: bool,
+}
+
 /// Zed's interface for handling text input from the platform's IME system
 /// This is currently a 1:1 exposure of the NSTextInputClient API:
 ///
 /// <https://developer.apple.com/documentation/appkit/nstextinputclient>
 pub trait InputHandler: 'static {
+    /// Query both primary selection endpoints atomically, preserving visual
+    /// affinity even when offsets coincide. None means unsupported, not empty.
+    fn native_selection(
+        &mut self,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<crate::NativeTextSelection> {
+        None
+    }
+
+    /// Atomically apply primary anchor/head offsets and affinities to the
+    /// caller-owned edit model. Return false on unsupported/invalid requests;
+    /// do not change the range and then separately patch cached affinity.
+    fn set_native_selection(
+        &mut self,
+        _selection: crate::NativeTextSelection,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> bool {
+        false
+    }
+
+    /// Navigate physical caret stops while preserving bidi/wrap affinity.
+    /// Unlike offset-only navigation, two positions at one UTF-16 index may
+    /// remain distinct. None means unavailable; never invent downstream affinity.
+    fn native_position_in_direction(
+        &mut self,
+        _position: crate::NativeTextPosition,
+        _direction: crate::TextNavigationDirection,
+        _offset: usize,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<crate::NativeTextPosition> {
+        None
+    }
+
+    /// Painted caret geometry for the exact UTF-16 index and affinity.
+    fn native_position_bounds(
+        &mut self,
+        _position: crate::NativeTextPosition,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<Bounds<Pixels>> {
+        None
+    }
+
+    /// Nearest painted caret to a logical window point, retaining visual affinity.
+    /// When supplied, the UTF-16 range restricts eligible caret stops before
+    /// comparing geometry; never clamp the resulting logical offset afterward.
+    /// Return unavailable when geometry or an eligible stop is unavailable.
+    fn native_position_for_point(
+        &mut self,
+        _point: Point<Pixels>,
+        _within_range: Option<Range<usize>>,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<crate::NativeTextPosition> {
+        None
+    }
+
+    /// Physical farthest caret in a UTF-16 range, retaining incident affinity.
+    fn farthest_native_position(
+        &mut self,
+        _range: Range<usize>,
+        _direction: crate::TextNavigationDirection,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<crate::NativeTextPosition> {
+        None
+    }
+
+    /// Painted selection fragments for a UTF-16 range, in logical window
+    /// coordinates. Return empty when geometry is unavailable. Never replace
+    /// bidirectional fragments with a guessed union rectangle.
+    fn selection_rects_for_range(
+        &mut self,
+        _range: Range<usize>,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Vec<crate::TextSelectionRect> {
+        Vec::new()
+    }
+
+    /// Move by `offset` visual caret stops in a physical direction. Input and
+    /// output positions are UTF-16 offsets; do not add/subtract UTF-16 units
+    /// as a substitute for visual or grapheme navigation. None means unavailable.
+    /// This compatibility API projects to downstream affinity; native clients
+    /// needing exact bidi/wrap caret identity use `native_position_in_direction`.
+    fn text_position_in_direction(
+        &mut self,
+        _position: usize,
+        _direction: crate::TextNavigationDirection,
+        _offset: usize,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<usize> {
+        None
+    }
+
+    /// The visually farthest caret in a UTF-16 range in the given physical
+    /// direction. None means unavailable; logical endpoints are not a fallback.
+    fn farthest_text_position(
+        &mut self,
+        _range: Range<usize>,
+        _direction: crate::TextNavigationDirection,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<usize> {
+        None
+    }
+
+    /// Resolved paragraph direction at a UTF-16 position, or None if unknown.
+    fn base_writing_direction(
+        &mut self,
+        _position: usize,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<crate::TextWritingDirection> {
+        None
+    }
+
+    /// Request paragraph direction for a UTF-16 range. Return false if the
+    /// editor cannot represent or apply this mutation; never report a no-op
+    /// as success. Plain text need not support explicit paragraph attributes.
+    fn set_base_writing_direction(
+        &mut self,
+        _direction: crate::TextWritingDirection,
+        _range: Range<usize>,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> bool {
+        false
+    }
+
+    /// Extended grapheme containing a UTF-16 position; None if unavailable or
+    /// outside the document. Never split surrogate pairs or combining clusters.
+    fn grapheme_range_at(
+        &mut self,
+        _position: usize,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<Range<usize>> {
+        None
+    }
+
+    /// Visual caret geometry at a UTF-16 position in logical window pixels.
+    /// None is preferable to guessed geometry when shaping is unavailable.
+    /// This compatibility API uses downstream affinity. Prefer
+    /// `native_position_bounds` when the platform retains visual affinity.
+    fn native_caret_bounds(
+        &mut self,
+        _position: usize,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<Bounds<Pixels>> {
+        None
+    }
+
+    /// Requested keyboard/autofill hints; unsupported hints are best-effort.
+    fn text_input_options(&mut self, _window: &mut Window, _cx: &mut App) -> TextInputOptions {
+        TextInputOptions::default()
+    }
+
+    /// Handle an explicit platform IME action. Return true only if handled.
+    /// The default refuses all actions; platforms may deliver their ordinary
+    /// return-key input path when appropriate, but must not invent submission.
+    fn perform_text_input_action(
+        &mut self,
+        _action: TextInputAction,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> bool {
+        false
+    }
+
     /// Get the range of the user's currently selected text, if any
     /// Corresponds to [selectedRange()](https://developer.apple.com/documentation/appkit/nstextinputclient/1438242-selectedrange)
     ///

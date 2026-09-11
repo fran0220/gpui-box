@@ -385,6 +385,19 @@ impl RenderOnce for Overlay {
             _ => anchored.child(surface).into_any_element(),
         };
 
+        // Deferred paint escapes stacking, not the mount's coordinate system.
+        // Window-sized scrims and edge/center surfaces must explicitly anchor
+        // to the window even when the trigger is deep inside a scrolled page.
+        let placed =
+            if self.scrim || matches!(self.placement, Placement::Center | Placement::Edge(_)) {
+                gpui::anchored()
+                    .position(gpui::point(px(0.0), px(0.0)))
+                    .child(placed)
+                    .into_any_element()
+            } else {
+                placed
+            };
+
         // Deferred painting is what lifts the overlay out of its parent's
         // stacking context; the token layer decides the order among overlays.
         pinned(
@@ -564,9 +577,6 @@ fn scrim_frame(
     let mut frame = div()
         .id("overlay.scrim")
         .occlude()
-        .absolute()
-        .top_0()
-        .left_0()
         .w(viewport.width)
         .h(viewport.height)
         .flex();
@@ -596,6 +606,47 @@ pub(crate) fn pinned(layer: AnyElement) -> AnyElement {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn nested_modal_and_edge_anchor_to_window_not_mount(cx: &mut gpui::TestAppContext) {
+        use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+        use gpui_kit_testkit::harness::Harness;
+        for placement in [Placement::Center, Placement::Edge(Edge::Bottom)] {
+            let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+                let viewport = window.viewport_size();
+                div()
+                    .relative()
+                    .ml(px(73.0))
+                    .mt(px(109.0))
+                    .w(px(280.0))
+                    .h(px(200.0))
+                    .child(
+                        Overlay::modal("nested").placement(placement).child(
+                            div()
+                                .w(if placement == Placement::Center {
+                                    px(160.0)
+                                } else {
+                                    viewport.width
+                                })
+                                .h(px(120.0))
+                                .semantic_in(cx, NodeSpec::new("nested.content", Role::Group)),
+                        ),
+                    )
+                    .into_any_element()
+            });
+            let viewport = harness.update(|window, _| window.viewport_size());
+            let bounds = harness
+                .bounds("nested.content")
+                .expect("nested surface measured");
+            if placement == Placement::Center {
+                assert_eq!(bounds.origin.x, (viewport.width - px(160.0)) / 2.0);
+                assert_eq!(bounds.origin.y, (viewport.height - px(120.0)) / 2.0);
+            } else {
+                assert_eq!(bounds.origin.x, px(0.0));
+                assert_eq!(bounds.bottom(), viewport.height);
+            }
+        }
+    }
 
     #[test]
     fn layers_paint_in_token_order() {

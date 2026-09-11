@@ -7,6 +7,12 @@
 //! - [`dnd`] — carrying an item from where it is to where it should go.
 
 pub mod dnd;
+pub(crate) mod pan;
+pub mod refresh;
+pub mod swipe;
+
+#[cfg(test)]
+mod mobile_tests;
 
 /// A paint-only listener for abandoning component-owned pointer state. It
 /// adds no hitbox and emits no completion action. Cancellation is window-wide

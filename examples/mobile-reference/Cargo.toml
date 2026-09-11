@@ -1,0 +1,36 @@
+[package]
+name = "gpui-box-mobile-reference"
+publish = false
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+desktop = ["dep:gpui_platform", "gpui_platform/native-platform", "gpui_platform/font-kit"]
+capture = ["dep:gpui_platform", "gpui_platform/test-support", "dep:gpui_wgpu", "gpui/test-support"]
+
+[dependencies]
+gpui.workspace = true
+gpui-kit = { package = "gpui-box-kit", path = "../../crates/gpui-kit", default-features = false }
+gpui-kit-theme.workspace = true
+gpui-kit-semantics.workspace = true
+gpui_platform = { package = "gpui-box-platform", path = "../../crates/gpui_platform", optional = true, default-features = false }
+gpui_wgpu = { workspace = true, optional = true, features = ["test-support"] }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+
+[[bin]]
+name = "mobile-reference"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[example]]
+name = "capture"
+path = "examples/capture.rs"
+required-features = ["capture"]
+
+[lints]
+workspace = true

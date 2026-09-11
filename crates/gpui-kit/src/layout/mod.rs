@@ -11,11 +11,13 @@
 //! arranges panels in regions over that tree, and [`StatusBar`] states what the
 //! host says is true along the bottom.
 
+pub mod app_bar;
 pub mod aspect_ratio;
 pub mod dock;
 pub mod dock_tree;
 pub mod grid;
 pub(crate) mod measure;
+pub mod page;
 pub mod responsive;
 pub mod scroll;
 pub mod scroll_edge;
@@ -26,6 +28,7 @@ pub mod titlebar;
 pub mod toolbar;
 pub mod tree;
 
+pub use app_bar::AppBar;
 pub use aspect_ratio::{AspectFit, AspectRatio};
 pub use dock::{Dock, DockEvent, DockPanel, DockRegion};
 pub use dock_tree::{
@@ -33,6 +36,7 @@ pub use dock_tree::{
     DockTreeEvent, FloatingDock, FloatingDockRecord,
 };
 pub use grid::{Breakpoint, Container, ContainerWidth, Grid, GridColumns, GridItem};
+pub use page::PageLayout;
 pub use responsive::{ContainerSize, Responsive};
 pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
 pub use scroll_edge::{ScrollEdgeEffect, ScrollEdgeKind};

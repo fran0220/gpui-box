@@ -2,7 +2,6 @@
 use super::*;
 use anyhow::{Result, bail};
 use gpui::{FocusHandle, div};
-use gpui_kit::navigation::*;
 
 pub(super) const COMPONENTS: &[&str] = &[
     "AnchorList",

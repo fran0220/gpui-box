@@ -13,7 +13,7 @@
 
 use std::ops::Range;
 
-use crate::SharedString;
+use crate::{NativeTextPosition, NativeTextSelection, SharedString, TextAffinity};
 use unicode_segmentation::UnicodeSegmentation;
 
 use super::history::{EditHistory, EditSelection};
@@ -49,6 +49,8 @@ pub struct EditBuffer {
     /// A caret is an empty selection, so one range describes both.
     selection: Range<usize>,
     reversed: bool,
+    /// Primary anchor/head affinity, independent of normalized range order.
+    affinities: [TextAffinity; 2],
     secondary: Vec<(Range<usize>, bool)>,
     /// The range an input method is composing, underlined and replaced whole
     /// as composition continues.
@@ -63,6 +65,7 @@ impl Default for EditBuffer {
             text: EditSnapshot::default(),
             selection: 0..0,
             reversed: false,
+            affinities: [TextAffinity::Downstream; 2],
             secondary: Vec::new(),
             marked: None,
             history: EditHistory::default(),
@@ -106,6 +109,45 @@ impl EditBuffer {
         self.reversed
     }
 
+    /// The atomic UTF-16 primary selection, including both visual affinities.
+    /// Secondary selections retain their existing logical-only policy.
+    pub fn native_selection(&self) -> NativeTextSelection {
+        let (anchor, head) = if self.reversed {
+            (self.selection.end, self.selection.start)
+        } else {
+            (self.selection.start, self.selection.end)
+        };
+        NativeTextSelection {
+            anchor: NativeTextPosition {
+                utf16_offset: self.text.offset_to_utf16(anchor),
+                affinity: self.affinities[0],
+            },
+            head: NativeTextPosition {
+                utf16_offset: self.text.offset_to_utf16(head),
+                affinity: self.affinities[1],
+            },
+        }
+    }
+
+    /// Validates both UTF-16 endpoints as complete grapheme boundaries before
+    /// changing anything. Successful native selection clears secondary cursors,
+    /// just like set_selection, but retains both primary endpoint affinities.
+    /// This does not end an active composition or create an undo transaction.
+    pub fn set_native_selection(&mut self, selection: NativeTextSelection) -> bool {
+        let anchor = self.text.offset_from_utf16(selection.anchor.utf16_offset);
+        let head = self.text.offset_from_utf16(selection.head.utf16_offset);
+        if self.text.offset_to_utf16(anchor) != selection.anchor.utf16_offset
+            || self.text.offset_to_utf16(head) != selection.head.utf16_offset
+            || self.text.floor_grapheme(anchor) != anchor
+            || self.text.floor_grapheme(head) != head
+        {
+            return false;
+        }
+        self.set_selection(anchor.min(head)..anchor.max(head), head < anchor);
+        self.affinities = [selection.anchor.affinity, selection.head.affinity];
+        true
+    }
+
     /// Returns the UTF-8 range currently owned by an input composition.
     pub fn marked(&self) -> Option<Range<usize>> {
         self.marked.clone()
@@ -147,6 +189,7 @@ impl EditBuffer {
         EditSelection {
             range: self.selection.clone(),
             reversed: self.reversed,
+            affinities: self.affinities,
             secondary: self.secondary.clone(),
         }
     }
@@ -254,6 +297,7 @@ impl EditBuffer {
         self.end_composition();
         self.selection = merged[0].1.clone();
         self.reversed = merged[0].2;
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary = merged
             .into_iter()
             .skip(1)
@@ -325,6 +369,7 @@ impl EditBuffer {
         }
         self.selection = selections[0].0.clone();
         self.reversed = false;
+        self.affinities = [TextAffinity::Downstream; 2];
         let mut seen = std::collections::HashSet::from([self.selection.start]);
         self.secondary = selections
             .into_iter()
@@ -340,6 +385,7 @@ impl EditBuffer {
         let offset = self.text.floor_grapheme(offset);
         self.selection = offset..offset;
         self.reversed = false;
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary.clear();
     }
 
@@ -347,12 +393,14 @@ impl EditBuffer {
     pub fn set_selection(&mut self, range: Range<usize>, reversed: bool) {
         self.selection = self.clamp(range);
         self.reversed = reversed;
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary.clear();
     }
 
     /// Moves the end that is moving, keeping the other one anchored.
     pub fn extend_selection(&mut self, offset: usize) {
         let offset = self.text.floor_grapheme(offset);
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary.clear();
         if self.reversed {
             self.selection.start = offset;
@@ -393,6 +441,7 @@ impl EditBuffer {
             let caret = range.start + insertion.len();
             self.selection = caret..caret;
             self.reversed = false;
+            self.affinities = [TextAffinity::Downstream; 2];
             self.secondary.clear();
             self.marked = None;
             return EditOutcome { changed: false };
@@ -403,6 +452,7 @@ impl EditBuffer {
         let caret = range.start + insertion.len();
         self.selection = caret..caret;
         self.reversed = false;
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary.clear();
         self.marked = None;
 
@@ -469,6 +519,7 @@ impl EditBuffer {
             }
         };
         self.reversed = false;
+        self.affinities = [TextAffinity::Downstream; 2];
         EditOutcome { changed }
     }
 
@@ -491,6 +542,7 @@ impl EditBuffer {
     }
 
     /// Applies the last transaction backwards. Returns whether anything moved.
+    /// Native composition cancellation uses cancel_composition instead.
     pub fn undo(&mut self) -> bool {
         let Some(step) = self.history.undo() else {
             return false;
@@ -506,6 +558,17 @@ impl EditBuffer {
         self.apply(step)
     }
 
+    /// Rolls back only the active IME composition, restoring its original
+    /// primary affinities and secondary selection set. Unlike undo, this is
+    /// available for secret fields and retains no completed text history.
+    pub fn cancel_composition(&mut self) -> bool {
+        let current_len = self.marked.as_ref().map_or(0, |range| range.len());
+        let Some(step) = self.history.cancel_composition(current_len) else {
+            return false;
+        };
+        self.apply(vec![step])
+    }
+
     fn apply(&mut self, steps: Vec<super::history::EditStep>) -> bool {
         // History stores exact byte replacements, including insertions that
         // joined an adjacent grapheme. Re-clamping would delete its neighbour.
@@ -515,6 +578,7 @@ impl EditBuffer {
             let end = self.text.len();
             self.selection = step.selection.range.start.min(end)..step.selection.range.end.min(end);
             self.reversed = step.selection.reversed;
+            self.affinities = step.selection.affinities;
             self.secondary = step.selection.secondary;
         }
         true
@@ -536,6 +600,7 @@ impl EditBuffer {
         let end = self.text.len();
         self.selection = end..end;
         self.reversed = false;
+        self.affinities = [TextAffinity::Downstream; 2];
         self.secondary.clear();
         self.marked = None;
         self.history.clear();
@@ -593,6 +658,103 @@ pub(crate) fn clamp_grapheme_range(text: &str, range: Range<usize>) -> Range<usi
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn native(anchor: usize, head: usize) -> NativeTextSelection {
+        NativeTextSelection {
+            anchor: NativeTextPosition {
+                utf16_offset: anchor,
+                affinity: TextAffinity::Upstream,
+            },
+            head: NativeTextPosition {
+                utf16_offset: head,
+                affinity: TextAffinity::Downstream,
+            },
+        }
+    }
+
+    #[test]
+    fn native_selection_is_atomic_preserves_affinity_and_validates_utf16_graphemes() {
+        let mut buffer = buffer("a😀אבz");
+        let coincident = native(3, 3);
+        assert!(buffer.set_native_selection(coincident));
+        assert_eq!(buffer.native_selection(), coincident);
+        assert_eq!(buffer.selection(), 5..5);
+        let reversed = native(5, 1);
+        assert!(buffer.set_native_selection(reversed));
+        assert_eq!(buffer.native_selection(), reversed);
+        assert_eq!(buffer.selection(), 1..9);
+        assert!(buffer.is_reversed());
+        assert!(
+            !buffer.set_native_selection(native(3, 2)),
+            "surrogate interior is refused, not rounded"
+        );
+        assert_eq!(
+            buffer.native_selection(),
+            reversed,
+            "invalid head must not mutate valid anchor"
+        );
+        assert!(!buffer.set_native_selection(native(usize::MAX, 0)));
+        buffer.set_selection(1..9, true);
+        assert_eq!(
+            buffer.native_selection().anchor.affinity,
+            TextAffinity::Downstream
+        );
+        let mut combined = super::tests::buffer("a\u{301}z");
+        assert!(
+            !combined.set_native_selection(native(0, 1)),
+            "combining sequence is indivisible"
+        );
+    }
+
+    #[test]
+    fn native_selection_history_restores_reversed_endpoints_and_composition_affinity() {
+        let mut buffer = buffer("a😀אבz");
+        let before = native(5, 1);
+        assert!(buffer.set_native_selection(before));
+        buffer.replace(1..9, "Q", EditCause::Paste);
+        let after = buffer.native_selection();
+        assert!(buffer.undo());
+        assert_eq!(buffer.text().as_ref(), "a😀אבz");
+        assert_eq!(buffer.native_selection(), before);
+        assert!(buffer.redo());
+        assert_eq!(buffer.native_selection(), after);
+        assert!(buffer.undo());
+        buffer.replace_and_mark(1..9, "界", Some(0..3));
+        let composed = native(2, 1);
+        assert!(buffer.set_native_selection(composed));
+        buffer.end_composition();
+        assert!(buffer.undo());
+        assert_eq!(buffer.native_selection(), before);
+        assert!(buffer.redo());
+        assert_eq!(buffer.native_selection(), composed);
+    }
+
+    #[test]
+    fn native_composition_cancel_restores_affinities_without_enabling_secret_history() {
+        for secret in [false, true] {
+            let mut buffer = buffer("a😀אבz");
+            if secret {
+                buffer.forbid_history();
+            }
+            let initial = native(5, 1);
+            assert!(buffer.set_native_selection(initial));
+            buffer.replace_and_mark(1..9, "界", None);
+            buffer.replace_and_mark(1..4, "", None);
+            assert!(buffer.cancel_composition());
+            assert_eq!(buffer.text().as_ref(), "a😀אבz");
+            assert_eq!(buffer.native_selection(), initial);
+            assert!(!buffer.can_undo());
+            assert!(!buffer.can_redo());
+            assert!(!buffer.cancel_composition());
+            buffer.replace_and_mark(1..9, "x", None);
+            buffer.end_composition();
+            assert_eq!(buffer.can_undo(), !secret);
+            assert!(
+                !buffer.cancel_composition(),
+                "committed composition is no longer rollback state"
+            );
+        }
+    }
 
     #[test]
     fn native_composition_keeps_primary_authority_and_undo_restores_secondary() {

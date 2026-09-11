@@ -63,6 +63,8 @@ pub struct MultiSelect {
     scroll: ScrollHandle,
     trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
     reveal_active: bool,
+    presentation: popover::PickerPresentation,
+    sheet: Option<popover::PickerSheet>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -104,6 +106,8 @@ impl MultiSelect {
             scroll: ScrollHandle::new(),
             trigger_bounds: Rc::default(),
             reveal_active: false,
+            presentation: popover::PickerPresentation::Anchored,
+            sheet: None,
             _subscriptions: vec![subscription],
         }
     }
@@ -111,6 +115,22 @@ impl MultiSelect {
     pub fn options(mut self, options: impl IntoIterator<Item = SelectOption>) -> Self {
         self.options = options.into_iter().collect();
         self
+    }
+
+    /// Presents the existing options in an anchored menu or bottom modal.
+    pub fn presentation(mut self, presentation: popover::PickerPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+
+    /// Adapts the surface while preserving query and caller-owned selections.
+    pub fn set_presentation(
+        &mut self,
+        presentation: popover::PickerPresentation,
+        cx: &mut Context<Self>,
+    ) {
+        self.presentation = presentation;
+        cx.notify();
     }
 
     pub fn selected(mut self, selected: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
@@ -363,6 +383,47 @@ impl MultiSelect {
         }
     }
 
+    fn list(&self, max_height: f32, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let visible_indices = self.matches(cx);
+        div()
+            .id(self.ident.child("list").element_id())
+            .max_h(px(max_height))
+            .when(
+                self.presentation == popover::PickerPresentation::Bottom,
+                |list| list.flex_1().min_h_0().max_h_full(),
+            )
+            .overflow_y_scroll()
+            .track_scroll(&self.scroll)
+            .p(px(theme.space(Space::Xs)))
+            .flex()
+            .flex_col()
+            .gap(px(theme.space(Space::Xxs)))
+            .children(
+                visible_indices
+                    .iter()
+                    .copied()
+                    .map(|index| self.option(index, cx)),
+            )
+            .when(visible_indices.is_empty(), |list| {
+                list.child(
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().format(
+                            StringKey::ComboboxNoMatch,
+                            &[self.query.read(cx).value().as_ref()],
+                        ),
+                    )
+                    .kind(EmptyKind::Empty),
+                )
+            })
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.child("list").semantic_id(), Role::List),
+            )
+            .into_any_element()
+    }
+
     fn option(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let option = &self.options[index];
@@ -374,6 +435,9 @@ impl MultiSelect {
         let mut row = div()
             .id(ident.element_id())
             .w_full()
+            .when(self.size == ControlSize::Touch, |row| {
+                row.min_h(px(theme.control.touch.height))
+            })
             .row()
             .items_center()
             .gap(px(theme.space(Space::Sm)))
@@ -452,6 +516,36 @@ impl Focusable for MultiSelect {
 impl Render for MultiSelect {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let bottom = self.presentation == popover::PickerPresentation::Bottom;
+        if bottom && self.sheet.is_none() {
+            let picker = cx.weak_entity();
+            self.sheet = Some(popover::PickerSheet::new(
+                self.ident.child("sheet"),
+                self.name.clone(),
+                vec![self.query.read(cx).focus_handle(cx)],
+                move |_, cx| {
+                    picker
+                        .update(cx, |picker, cx| {
+                            div()
+                                .flex()
+                                .flex_col()
+                                .h_full()
+                                .w_full()
+                                .capture_key_down(cx.listener(Self::on_key_down))
+                                .child(div().flex_none().child(picker.query.clone()))
+                                .child(picker.list(cx.theme().measures.menu_max_height, cx))
+                                .into_any_element()
+                        })
+                        .unwrap_or_else(|_| div().into_any_element())
+                },
+                |picker, cx| picker.close(cx),
+                window,
+                cx,
+            ));
+        }
+        if let Some(sheet) = &self.sheet {
+            sheet.sync(bottom && self.open, window, cx);
+        }
         let metrics = theme.control.get(self.size);
         let focused = self.query.read(cx).focus_handle(cx).is_focused(window);
         let placeholder = self
@@ -462,10 +556,11 @@ impl Render for MultiSelect {
             query.set_placeholder(placeholder.clone(), cx);
             query.set_name(self.name.clone(), cx);
             query.set_disabled(self.disabled, cx);
+            query.set_control_size(self.size, cx);
         });
 
         let visible_indices = self.matches(cx);
-        let geometry = self.open.then(|| {
+        let geometry = (self.open && !bottom).then(|| {
             popover::menu_geometry(
                 window,
                 self.trigger_bounds.get(),
@@ -495,7 +590,8 @@ impl Render for MultiSelect {
                     option.label.clone(),
                 )
                 .disabled(self.disabled)
-                .when(!self.disabled, |tag| {
+                // Touch removal uses the full option row, not a tiny chip icon.
+                .when(!self.disabled && self.size != ControlSize::Touch, |tag| {
                     tag.on_remove(move |_, app| {
                         let id = id.clone();
                         select.update(app, |select, cx| select.remove_id(id, cx));
@@ -524,10 +620,19 @@ impl Render for MultiSelect {
         })
         .children(chips)
         .child(
-            div()
-                .flex_1()
-                .min_w(px(theme.space(Space::Xl)))
-                .child(self.query.clone()),
+            div().flex_1().min_w(px(theme.space(Space::Xl))).child(
+                if self
+                    .sheet
+                    .as_ref()
+                    .is_some_and(|sheet| sheet.drawer.read(cx).is_rendered())
+                {
+                    div()
+                        .child(self.query.read(cx).value().clone())
+                        .into_any_element()
+                } else {
+                    self.query.clone().into_any_element()
+                },
+            ),
         )
         .when(
             self.clearable && !self.selected.is_empty() && !self.disabled,
@@ -535,6 +640,13 @@ impl Render for MultiSelect {
                 element.child(
                     div()
                         .id(self.ident.child("clear").element_id())
+                        .when(self.size == ControlSize::Touch, |clear| {
+                            clear
+                                .size(px(metrics.height))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                        })
                         .cursor_pointer()
                         .on_mouse_down(
                             MouseButton::Left,
@@ -566,37 +678,7 @@ impl Render for MultiSelect {
             .into_any_element();
 
         let menu = geometry.map(|geometry| {
-            let list = div()
-                .id(self.ident.child("list").element_id())
-                .max_h(px(geometry.max_height))
-                .overflow_y_scroll()
-                .track_scroll(&self.scroll)
-                .p(px(theme.space(Space::Xs)))
-                .flex()
-                .flex_col()
-                .gap(px(theme.space(Space::Xxs)))
-                .children(
-                    visible_indices
-                        .iter()
-                        .copied()
-                        .map(|index| self.option(index, cx)),
-                )
-                .when(visible_indices.is_empty(), |list| {
-                    list.child(
-                        EmptyState::new(
-                            self.ident.child("empty"),
-                            cx.strings().format(
-                                StringKey::ComboboxNoMatch,
-                                &[self.query.read(cx).value().as_ref()],
-                            ),
-                        )
-                        .kind(EmptyKind::Empty),
-                    )
-                })
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("list").semantic_id(), Role::List),
-                );
+            let list = self.list(geometry.max_height, cx);
             popover::menu_overlay(
                 &self.ident.child("menu.anchor"),
                 &theme,
@@ -636,6 +718,7 @@ impl Render for MultiSelect {
                 trigger,
                 menu,
             ))
+            .children(self.sheet.as_ref().map(|sheet| sheet.drawer.clone()))
             .semantic_in(cx, spec)
     }
 }

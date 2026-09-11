@@ -32,6 +32,7 @@ mod datetime;
 mod display;
 mod effects;
 mod game;
+mod interaction;
 mod layout;
 mod media;
 mod motion;
@@ -61,14 +62,15 @@ use controls::{
     dropzone, editor, editor_folding, editor_multicursor, editor_options, editor_services,
     filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor, mention_input,
     multi_select, rich_text_editor, search_field, search_input, settings, settings_page, textarea,
-    toggle, transfer_list, translation_packs, upload_list,
+    toggle, touch_inputs, touch_pickers, touch_pickers_open, transfer_list, translation_packs,
+    upload_list,
 };
 use data::{
     data_grid, data_grid_editing, deferred_drop, diagnostics_list, drag_list, drag_tree, flow,
     image_list, kanban, list, masonry, table, tree, tree_grid,
 };
 #[cfg(feature = "fixtures")]
-use datetime::{calendar, date_range, date_time};
+use datetime::{calendar, date_range, date_time, touch_dates};
 use display::{
     animated_number, attachment, avatar, badge, banner, bubble, card, chart, detail, divider,
     empty_state, failure_panel, heatmap, icon, loading, metric_card, outcome_panel,
@@ -77,20 +79,23 @@ use display::{
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
+use interaction::{pull_to_refresh, swipe_actions};
 use layout::{
     aspect_ratio, container, desktop_titlebar, dock_floating, dock_tree, grid, ide_shell,
-    responsive, scroll_area, scroll_edge_effect, scroll_fade, scroll_shadow, split_pane,
-    split_tree, toolbar,
+    mobile_page, responsive, scroll_area, scroll_edge_effect, scroll_fade, scroll_shadow,
+    split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
 use navigation::{
-    accordion, anchor_list, breadcrumb, carousel, collapsible, document_tabs, nav_stack,
-    pagination, sidebar, tabs, undo_history, wizard,
+    accordion, adaptive_navigation, anchor_list, bottom_navigation, breadcrumb, carousel,
+    collapsible, document_tabs, nav_back_preview, nav_stack, pagination, sidebar, tabs,
+    undo_history, wizard,
 };
 use overlay::{
-    command_palette, context_menu, dialog, drawer, frost, glass, glass_optics, hover_card, kbd,
-    media_caption, menu, menubar, notification_center, overlay, popover, toast, tooltip,
+    action_sheet, bottom_sheet, command_palette, context_menu, dialog, drawer, frost, glass,
+    glass_optics, hover_card, kbd, media_caption, menu, menubar, notification_center, overlay,
+    popover, toast, tooltip,
 };
 use structured::{json_view, schema_form};
 
@@ -162,6 +167,26 @@ pub fn catalog() -> Vec<Scene> {
     #[allow(unused_mut)]
     let mut scenes = vec![
         Scene {
+            name: "bottom-sheet",
+            build: bottom_sheet,
+            shows: Shows::Subjects(&["BottomSheet"]),
+        },
+        Scene {
+            name: "action-sheet",
+            build: action_sheet,
+            shows: Shows::Subjects(&["ActionSheet"]),
+        },
+        Scene {
+            name: "pull-to-refresh",
+            build: pull_to_refresh,
+            shows: Shows::Subjects(&["PullToRefresh"]),
+        },
+        Scene {
+            name: "swipe-actions",
+            build: swipe_actions,
+            shows: Shows::Subjects(&["SwipeActions"]),
+        },
+        Scene {
             name: "button",
             build: button,
             shows: Shows::Subjects(&["Button"]),
@@ -232,6 +257,21 @@ pub fn catalog() -> Vec<Scene> {
             name: "input",
             build: input,
             shows: Shows::Subjects(&["Select", "TextInput"]),
+        },
+        Scene {
+            name: "touch-inputs",
+            build: touch_inputs,
+            shows: Shows::Subjects(&["TextInput", "TextArea", "PasswordInput", "OneTimeCodeInput"]),
+        },
+        Scene {
+            name: "touch-pickers",
+            build: touch_pickers,
+            shows: Shows::Subjects(&["Select", "Combobox", "MultiSelect"]),
+        },
+        Scene {
+            name: "touch-pickers-open",
+            build: touch_pickers_open,
+            shows: Shows::Subjects(&["Combobox"]),
         },
         Scene {
             name: "textarea",
@@ -523,6 +563,32 @@ pub fn catalog() -> Vec<Scene> {
             name: "desktop-titlebar",
             build: desktop_titlebar,
             shows: Shows::Subjects(&["DesktopTitlebar"]),
+        },
+        Scene {
+            name: "mobile-page",
+            build: mobile_page,
+            shows: Shows::Subjects(&["AppBar", "PageLayout"]),
+        },
+        Scene {
+            name: "bottom-navigation",
+            build: bottom_navigation,
+            shows: Shows::Subjects(&["BottomNavigation"]),
+        },
+        Scene {
+            name: "nav-back-preview",
+            build: nav_back_preview,
+            shows: Shows::Subjects(&["NavStack"]),
+        },
+        Scene {
+            name: "adaptive-navigation",
+            build: adaptive_navigation,
+            shows: Shows::Composition(&[
+                "Responsive",
+                "Sidebar",
+                "BottomNavigation",
+                "PageLayout",
+                "AppBar",
+            ]),
         },
         Scene {
             name: "sidebar",
@@ -1055,6 +1121,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "date-time",
             build: date_time,
             shows: Shows::Subjects(&["DateInput", "TimeInput"]),
+        },
+        Scene {
+            name: "touch-dates",
+            build: touch_dates,
+            shows: Shows::Subjects(&["DateInput", "TimeInput", "RangePicker"]),
         },
     ]);
     scenes

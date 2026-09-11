@@ -7,6 +7,37 @@ use gpui_kit_testkit::audit_or_error;
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
+fn textarea_scene_focus_is_mount_scoped_after_touch_interaction(cx: &mut TestAppContext) {
+    let scene = |name| {
+        scenes::catalog()
+            .into_iter()
+            .find(|scene| scene.name == name)
+            .expect("required input exhibit")
+            .build
+    };
+    let mut harness = Harness::new(cx, gpui_kit::install, scene("input"));
+    harness.remount(scene("touch-inputs"));
+    harness.click("scene.touch.email");
+    harness.remount(scene("textarea"));
+    assert!(
+        harness
+            .node("scene.textarea.review")
+            .expect("review")
+            .focused
+    );
+    harness.click("scene.textarea.notes");
+    assert!(harness.node("scene.textarea.notes").expect("notes").focused);
+    harness.remount(scene("touch-inputs"));
+    harness.remount(scene("textarea"));
+    assert!(
+        harness
+            .node("scene.textarea.review")
+            .expect("review")
+            .focused
+    );
+}
+
+#[gpui::test]
 fn every_scene_publishes_an_auditable_tree(cx: &mut TestAppContext) {
     let mut catalog = scenes::catalog().into_iter();
     let first = catalog.next().expect("the catalog is not empty");

@@ -6,7 +6,9 @@
       "type": "object",
       "properties": {
         "scene": { "type": "string" },
-        "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "default": "studio-dark" }
+        "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "default": "studio-dark" },
+        "width": { "type": "number", "minimum": 1, "maximum": 4096, "default": 920 },
+        "height": { "type": "number", "minimum": 1, "maximum": 4096, "default": 1000 }
       },
       "required": ["scene"]
     }

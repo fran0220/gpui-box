@@ -367,7 +367,11 @@ impl Render for TimeInput {
         // it; a caption wider than two digits then widens the column it
         // names, because a caption that does not occupy its own width prints
         // over the one next to it.
-        let cell_width = px(metrics.font_size * 2.0);
+        let cell_width = px(if self.size == ControlSize::Touch {
+            metrics.height.max(metrics.font_size * 2.0)
+        } else {
+            metrics.font_size * 2.0
+        });
 
         // A caption and the value it names are one column, so the column is
         // built once and both rows of it are laid out together. The mark
@@ -408,6 +412,9 @@ impl Render for TimeInput {
                     .id(ident.element_id())
                     .flex_none()
                     .min_w(cell_width)
+                    .when(self.size == ControlSize::Touch, |cell| {
+                        cell.min_h(px(metrics.height)).justify_center()
+                    })
                     .column()
                     .items_center()
                     .px_token(&theme, Space::Xs)
@@ -500,9 +507,12 @@ impl Render for TimeInput {
             .column()
             .flex_none()
             .gap_token(&theme, Space::Xs)
-            .track_focus(&self.focus_handle)
-            .when(!self.disabled, |element| element.tab_index(0))
-            .on_key_down(cx.listener(Self::on_key_down))
+            .when(!self.disabled, |element| {
+                element
+                    .track_focus(&self.focus_handle)
+                    .tab_index(0)
+                    .on_key_down(cx.listener(Self::on_key_down))
+            })
             .child(
                 field_shell(
                     &theme,
@@ -518,11 +528,14 @@ impl Render for TimeInput {
             )
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                    .focus(&self.focus_handle)
-                    .disabled(self.disabled)
-                    .invalid(self.invalid)
-                    .value(self.adapter.format_time(self.value)),
+                (if self.disabled {
+                    NodeSpec::new(self.ident.semantic_id(), Role::Group)
+                } else {
+                    NodeSpec::new(self.ident.semantic_id(), Role::Group).focus(&self.focus_handle)
+                })
+                .disabled(self.disabled)
+                .invalid(self.invalid)
+                .value(self.adapter.format_time(self.value)),
             )
     }
 }

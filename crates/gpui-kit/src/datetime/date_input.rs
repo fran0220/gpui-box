@@ -9,8 +9,8 @@
 
 use gpui::{
     App, AppContext as _, Context, ElementId, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, SharedString, Styled,
-    Subscription, Window, div, px,
+    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, SharedString,
+    StatefulInteractiveElement, Styled, Subscription, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -47,6 +47,7 @@ impl EventEmitter<DateInputEvent> for DateInput {}
 /// A text field over a host-owned calendar, with that calendar in a popover.
 pub struct DateInput {
     ident: Ident,
+    name: SharedString,
     focus_handle: FocusHandle,
     adapter: SharedDateAdapter,
     field: Entity<TextInput>,
@@ -63,6 +64,8 @@ pub struct DateInput {
     /// Whether the seeded day has been put on screen. The text belongs to the
     /// typist afterwards, so it is written once.
     seeded: bool,
+    presentation: popover::PickerPresentation,
+    sheet: Option<popover::PickerSheet>,
     /// Held so the field and calendar subscriptions live as long as this does.
     _subscriptions: Vec<Subscription>,
 }
@@ -87,7 +90,11 @@ impl DateInput {
         cx: &mut Context<Self>,
     ) -> Self {
         let ident = ident.into();
-        let field = cx.new(|cx| TextInput::new(ident.child("field"), window, cx).bare(true));
+        let field = cx.new(|cx| {
+            TextInput::new(ident.child("field"), window, cx)
+                .bare(true)
+                .placeholder(cx.strings().text(StringKey::DateInputPlaceholder))
+        });
         let calendar =
             cx.new(|cx| Calendar::new(ident.child("calendar"), adapter.clone(), window, cx));
         let subscriptions = vec![
@@ -105,6 +112,7 @@ impl DateInput {
 
         Self {
             ident,
+            name: cx.strings().text(StringKey::DateInputPlaceholder),
             focus_handle: cx.focus_handle(),
             adapter,
             field,
@@ -117,14 +125,44 @@ impl DateInput {
             required: false,
             invalid: false,
             seeded: false,
+            presentation: popover::PickerPresentation::Anchored,
+            sheet: None,
             _subscriptions: subscriptions,
         }
+    }
+
+    /// Names this date field for assistive technology independently of its value.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    /// Updates the accessible name without replacing text or validation.
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.into();
+        cx.notify();
     }
 
     /// Seeds the day the caller holds.
     pub fn value(mut self, day: Day) -> Self {
         self.value = Some(day);
         self
+    }
+
+    /// Uses the existing calendar in an anchored menu or retained bottom modal.
+    pub fn presentation(mut self, presentation: popover::PickerPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+
+    /// Adapts the calendar surface without replacing typed text or validation.
+    pub fn set_presentation(
+        &mut self,
+        presentation: popover::PickerPresentation,
+        cx: &mut Context<Self>,
+    ) {
+        self.presentation = presentation;
+        cx.notify();
     }
 
     pub fn required(mut self, required: bool) -> Self {
@@ -332,6 +370,44 @@ impl Focusable for DateInput {
 impl Render for DateInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        self.field.update(cx, |field, cx| {
+            field.set_control_size(self.size, cx);
+            field.set_name(self.name.clone(), cx);
+        });
+        self.calendar.update(cx, |calendar, cx| {
+            calendar.set_control_size(
+                if self.size == ControlSize::Touch {
+                    ControlSize::Touch
+                } else {
+                    ControlSize::Lg
+                },
+                cx,
+            )
+        });
+        let bottom = self.presentation == popover::PickerPresentation::Bottom;
+        if bottom && self.sheet.is_none() {
+            let calendar = self.calendar.clone();
+            let scroll_id = self.ident.child("calendar.scroll").element_id();
+            self.sheet = Some(popover::PickerSheet::new(
+                self.ident.child("sheet"),
+                cx.strings().text(StringKey::DateInputOpen),
+                vec![calendar.read(cx).focus_handle(cx)],
+                move |_, _| {
+                    div()
+                        .id(scroll_id.clone())
+                        .size_full()
+                        .overflow_scroll()
+                        .child(calendar.clone())
+                        .into_any_element()
+                },
+                |picker, cx| picker.close(cx),
+                window,
+                cx,
+            ));
+        }
+        if let Some(sheet) = &self.sheet {
+            sheet.sync(bottom && self.open, window, cx);
+        }
         if !self.seeded {
             self.seeded = true;
             if let Some(day) = self.value {
@@ -365,7 +441,7 @@ impl Render for DateInput {
             input.update(cx, |input, cx| input.toggle(cx)).ok();
         });
 
-        let surface = self.open.then(|| {
+        let surface = (self.open && !bottom).then(|| {
             let card = popover::card(self.ident.child("calendar"), &theme)
                 .child(self.calendar.clone())
                 .into_any_element();
@@ -393,8 +469,11 @@ impl Render for DateInput {
             .column()
             .w_full()
             .gap(px(theme.space(Space::Xs)))
-            .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::on_key_down))
+            .when(!self.disabled, |element| {
+                element
+                    .track_focus(&self.focus_handle)
+                    .on_key_down(cx.listener(Self::on_key_down))
+            })
             .child(
                 field_shell(
                     &theme,
@@ -408,17 +487,23 @@ impl Render for DateInput {
                 .child(trigger),
             )
             .child(div().relative().children(surface))
+            .children(self.sheet.as_ref().map(|sheet| sheet.drawer.clone()))
             .children(message)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Input)
-                    .focus(&self.field.read(cx).focus_handle(cx))
-                    .disabled(self.disabled)
-                    .required(self.required)
-                    .invalid(invalid)
-                    .expanded(self.open)
-                    .value(self.field.read(cx).value().clone())
-                    .placeholder(cx.strings().text(StringKey::DateInputPlaceholder)),
+                (if self.disabled {
+                    NodeSpec::new(self.ident.semantic_id(), Role::Input)
+                } else {
+                    NodeSpec::new(self.ident.semantic_id(), Role::Input)
+                        .focus(&self.field.read(cx).focus_handle(cx))
+                })
+                .text(self.name.clone())
+                .disabled(self.disabled)
+                .required(self.required)
+                .invalid(invalid)
+                .expanded(self.open)
+                .value(self.field.read(cx).value().clone())
+                .placeholder(cx.strings().text(StringKey::DateInputPlaceholder)),
             )
     }
 }

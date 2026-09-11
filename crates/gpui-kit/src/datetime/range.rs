@@ -147,6 +147,13 @@ impl std::fmt::Debug for RangePicker {
 }
 
 impl RangePicker {
+    /// Changes calendar target metrics while preserving caller-owned endpoints
+    /// and the adapter's blocked-day validation.
+    pub fn set_control_size(&mut self, size: gpui_kit_theme::ControlSize, cx: &mut Context<Self>) {
+        self.calendar
+            .update(cx, |calendar, cx| calendar.set_control_size(size, cx));
+    }
+
     pub fn new(
         ident: impl Into<Ident>,
         adapter: SharedDateAdapter,

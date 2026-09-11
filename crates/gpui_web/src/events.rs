@@ -139,6 +139,9 @@ impl WebWindowInner {
             self.register_composition_start(),
             self.register_composition_update(),
             self.register_composition_end(),
+            self.register_mobile_input(),
+            self.register_before_input(),
+            self.register_input_blur(),
             self.register_focus(),
             self.register_blur(),
             self.register_pointer_enter(),
@@ -146,6 +149,7 @@ impl WebWindowInner {
         handles.extend(self.register_visibility_change());
         handles.extend(self.register_appearance_change());
         handles.extend(self.register_fullscreen_change());
+        handles.extend(self.register_viewport_changes());
 
         WebEventListeners { _handles: handles }
     }
@@ -251,6 +255,12 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointerdown", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if event.pointer_type() == "touch" {
+                event.prevent_default();
+                this.canvas.set_pointer_capture(event.pointer_id()).ok();
+                this.dispatch_touch(&event, TouchPhase::Started);
+                return;
+            }
             if !event.is_primary() {
                 return;
             }
@@ -273,6 +283,11 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointerup", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if event.pointer_type() == "touch" {
+                event.prevent_default();
+                this.dispatch_touch(&event, TouchPhase::Ended);
+                return;
+            }
             if this.active_pointer.get() != Some(event.pointer_id()) {
                 return;
             }
@@ -327,13 +342,61 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen(name, move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if event.pointer_type() == "touch" {
+                this.dispatch_touch(&event, TouchPhase::Cancelled);
+                return;
+            }
             if this.active_pointer.get() == Some(event.pointer_id()) {
                 this.cancel_pointer();
             }
         })
     }
 
-    fn cancel_pointer(&self) {
+    fn dispatch_touch(&self, event: &web_sys::PointerEvent, phase: TouchPhase) {
+        let position = pointer_position_in_element(event);
+        let id = event.pointer_id();
+        {
+            let mut touches = self.touches.borrow_mut();
+            match phase {
+                TouchPhase::Started => {
+                    touches.insert(id, position);
+                }
+                TouchPhase::Moved => {
+                    let Some(last) = touches.get_mut(&id) else {
+                        return;
+                    };
+                    *last = position;
+                }
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    if touches.remove(&id).is_none() {
+                        return;
+                    }
+                }
+            }
+        }
+        self.dispatch_input(PlatformInput::Touch(gpui::TouchEvent {
+            id: gpui::TouchId(id as u64),
+            phase,
+            position,
+            predicted_position: None,
+            force: Some(event.pressure()),
+        }));
+        if phase == TouchPhase::Ended {
+            self.focus_text_input();
+        }
+    }
+
+    pub(crate) fn cancel_pointer(&self) {
+        let touches = std::mem::take(&mut *self.touches.borrow_mut());
+        for (id, position) in touches {
+            self.canvas.release_pointer_capture(id).ok();
+            self.dispatch_input(PlatformInput::Touch(gpui::TouchEvent {
+                id: gpui::TouchId(id as u64),
+                phase: TouchPhase::Cancelled,
+                position,
+                ..Default::default()
+            }));
+        }
         let Some(id) = self.active_pointer.take() else {
             return;
         };
@@ -350,6 +413,11 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen("pointermove", move |event: JsValue| {
             let event: web_sys::PointerEvent = event.unchecked_into();
+            if event.pointer_type() == "touch" {
+                event.prevent_default();
+                this.dispatch_touch(&event, TouchPhase::Moved);
+                return;
+            }
             if !event.is_primary() {
                 return;
             }
@@ -487,6 +555,11 @@ impl WebWindowInner {
             }
             let targets_hidden_input = this.event_targets_hidden_input(&event);
             let event: web_sys::KeyboardEvent = event.unchecked_into();
+            // Let the IME own its key stream; preventing these keys can abort
+            // mobile composition before compositionupdate/input arrives.
+            if this.is_composing.get() || event.is_composing() || event.key_code() == 229 {
+                return;
+            }
 
             let modifiers = modifiers_from_keyboard_event(&event, this.is_mac);
             let capslock = capslock_from_keyboard_event(&event);
@@ -501,6 +574,15 @@ impl WebWindowInner {
             let key = dom_key_to_gpui_key(&event);
 
             if is_modifier_only_key(&key) {
+                return;
+            }
+
+            if targets_hidden_input
+                && key == "enter"
+                && !modifiers.modified()
+                && this.perform_text_action()
+            {
+                event.prevent_default();
                 return;
             }
 
@@ -641,6 +723,90 @@ impl WebWindowInner {
         })
     }
 
+    fn register_mobile_input(self: &Rc<Self>) -> EventListenerHandle {
+        let this = Rc::clone(self);
+        self.listen_input("input", move |event: JsValue| {
+            let event: web_sys::InputEvent = event.unchecked_into();
+            if this.is_composing.get() || event.is_composing() {
+                return;
+            }
+            // Desktop keydown and paste prevent their DOM edits. Soft keyboards
+            // and dictation can instead deliver input without a usable keydown.
+            let value = this.input_element.value();
+            let kind = event.input_type();
+            if kind == "insertFromComposition" {
+                this.input_element.set_value("");
+                return;
+            }
+            if kind == "deleteContentBackward" || kind == "deleteContentForward" {
+                let key = if kind == "deleteContentBackward" {
+                    "backspace"
+                } else {
+                    "delete"
+                };
+                this.dispatch_input(PlatformInput::KeyDown(KeyDownEvent {
+                    keystroke: Keystroke {
+                        key: key.into(),
+                        modifiers: Modifiers::default(),
+                        key_char: None,
+                    },
+                    is_held: false,
+                    prefer_character_input: false,
+                }));
+            } else if !value.is_empty() {
+                this.with_input_handler(|handler| handler.replace_text_in_range(None, &value));
+            }
+            this.input_element.set_value("");
+        })
+    }
+
+    fn register_before_input(self: &Rc<Self>) -> EventListenerHandle {
+        let this = Rc::clone(self);
+        self.listen_input("beforeinput", move |event: JsValue| {
+            let event: web_sys::InputEvent = event.unchecked_into();
+            if !event.cancelable() || event.is_composing() || this.is_composing.get() {
+                return;
+            }
+            let key = match event.input_type().as_str() {
+                "deleteContentBackward" => "backspace",
+                "deleteContentForward" => "delete",
+                "insertLineBreak" | "insertParagraph" => "enter",
+                _ => return,
+            };
+            event.prevent_default();
+            if key == "enter" && this.perform_text_action() {
+                return;
+            }
+            this.dispatch_input(PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: Keystroke {
+                    key: key.into(),
+                    modifiers: Modifiers::default(),
+                    key_char: None,
+                },
+                is_held: false,
+                prefer_character_input: false,
+            }));
+        })
+    }
+
+    fn register_input_blur(self: &Rc<Self>) -> EventListenerHandle {
+        let this = Rc::clone(self);
+        self.listen_input("blur", move |_| {
+            let was_composing = this.is_composing.replace(false);
+            this.input_element.set_value("");
+            // blur may be synchronous inside a core FocusLost hook.
+            let deferred = this.clone();
+            let callback = Closure::once_into_js(move || {
+                if was_composing {
+                    deferred.with_input_handler(|handler| handler.unmark_text());
+                }
+                deferred.sync_insets();
+            });
+            this.browser_window
+                .queue_microtask(callback.unchecked_ref());
+        })
+    }
+
     fn register_composition_update(self: &Rc<Self>) -> EventListenerHandle {
         let this = Rc::clone(self);
         self.listen_input("compositionupdate", move |event: JsValue| {
@@ -658,7 +824,10 @@ impl WebWindowInner {
         self.listen_input("compositionend", move |event: JsValue| {
             let event: web_sys::CompositionEvent = event.unchecked_into();
             let data = event.data().unwrap_or_default();
-            this.is_composing.set(false);
+            if !this.is_composing.replace(false) {
+                this.input_element.set_value("");
+                return;
+            }
             this.with_input_handler(|handler| {
                 handler.replace_text_in_range(None, &data);
                 handler.unmark_text();
@@ -690,19 +859,20 @@ impl WebWindowInner {
         )
     }
 
-    fn schedule_active_status_sync(self: &Rc<Self>) {
+    pub(crate) fn schedule_active_status_sync(self: &Rc<Self>) {
         let this = Rc::clone(self);
         let callback = Closure::once_into_js(move || {
             let Some(document) = this.browser_window.document() else {
                 return;
             };
-            let is_active = match document.has_focus() {
-                Ok(is_active) => is_active,
-                Err(error) => {
-                    log::error!("Failed to determine browser focus: {error:?}");
-                    return;
-                }
-            };
+            let is_active = !document.hidden()
+                && match document.has_focus() {
+                    Ok(is_active) => is_active,
+                    Err(error) => {
+                        log::error!("Failed to determine browser focus: {error:?}");
+                        return;
+                    }
+                };
             let changed = {
                 let mut state = this.state.borrow_mut();
                 if state.is_active == is_active {

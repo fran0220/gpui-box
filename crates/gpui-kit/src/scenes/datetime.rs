@@ -14,6 +14,68 @@ use crate::foundation::{ActiveTheme, StyledExt};
 
 use super::support::{row, stack};
 
+struct TouchDates(Vec<gpui::AnyView>);
+impl Global for TouchDates {}
+
+pub(super) fn touch_dates(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::foundation::{Disableable, Sizable};
+    use gpui_kit_theme::ControlSize;
+    if !cx.has_global::<TouchDates>() {
+        let adapter = adapter();
+        let field = cx.new(|cx| {
+            DateInput::new("scene.touch.date", adapter.clone(), window, cx)
+                .name("Appointment date")
+                .control_size(ControlSize::Touch)
+                .presentation(crate::overlay::popover::PickerPresentation::Bottom)
+        });
+        let disabled = cx.new(|cx| {
+            DateInput::new("scene.touch.date-disabled", adapter.clone(), window, cx)
+                .name("Managed appointment date")
+                .value(adapter.today().expect("fixture today"))
+                .control_size(ControlSize::Touch)
+                .disabled(true)
+        });
+        let invalid = cx.new(|cx| {
+            DateInput::new("scene.touch.date-invalid", adapter.clone(), window, cx)
+                .name("Invalid appointment date")
+                .value(adapter.today().expect("fixture today"))
+                .control_size(ControlSize::Touch)
+                .invalid(true)
+        });
+        let time = cx.new(|cx| {
+            TimeInput::new("scene.touch.time", adapter.clone(), window, cx)
+                .value(TimeOfDay::new(9, 37))
+                .control_size(ControlSize::Touch)
+        });
+        let range = cx.new(|cx| {
+            let mut picker = RangePicker::new("scene.touch.range", adapter.clone(), window, cx);
+            picker.set_control_size(ControlSize::Touch, cx);
+            picker
+        });
+        cx.set_global(TouchDates(vec![
+            field.into(),
+            disabled.into(),
+            invalid.into(),
+            time.into(),
+            range.into(),
+        ]));
+    }
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(390.0))
+        .max_w_full()
+        // Seven 48px day targets plus card padding require at least352px.
+        // This exhibit deliberately grants the calendar the full narrow width.
+        .px_0()
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Caption,
+            "Touch dates · empty, disabled, invalid · full-width calendar (minimum352px)",
+        ))
+        .children(cx.global::<TouchDates>().0.clone())
+        .into_any_element()
+}
+
 /// The pinned calendar every date scene runs on, so two captures of the
 /// same scene are the same picture.
 fn adapter() -> SharedDateAdapter {
@@ -222,4 +284,57 @@ pub(super) fn date_time(window: &mut Window, cx: &mut App) -> AnyElement {
             .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
+}
+
+#[cfg(test)]
+mod touch_tests {
+    use super::*;
+
+    #[gpui::test]
+    fn touch_calendar_days_fit_full_bleed_narrow_card(cx: &mut gpui::TestAppContext) {
+        let mut harness = gpui_kit_testkit::harness::Harness::new(cx, crate::install, touch_dates);
+        harness
+            .context()
+            .simulate_resize(gpui::size(px(361.0), px(701.0)));
+        let snapshot = harness.snapshot();
+        let card = snapshot
+            .find("scene.touch.range.calendar")
+            .expect("calendar card")
+            .bounds;
+        for (id, name) in [
+            ("scene.touch.date", "Appointment date"),
+            ("scene.touch.date-disabled", "Managed appointment date"),
+            ("scene.touch.date-invalid", "Invalid appointment date"),
+        ] {
+            assert_eq!(
+                snapshot.find(id).expect("date field").text.as_deref(),
+                Some(name)
+            );
+            assert_eq!(
+                snapshot
+                    .find(&format!("{id}.field"))
+                    .expect("date editor")
+                    .text
+                    .as_deref(),
+                Some(name)
+            );
+        }
+        assert!(card.x >= 0.0 && card.x + card.width <= 361.0);
+        let days: Vec<_> = snapshot
+            .nodes
+            .iter()
+            .filter(|node| node.id.starts_with("scene.touch.range.calendar.day-"))
+            .collect();
+        assert!(days.len() >= 28);
+        for day in days {
+            assert!(day.bounds.width >= 48.0 && day.bounds.height >= 48.0);
+            assert!(
+                day.bounds.x >= card.x && day.bounds.x + day.bounds.width <= card.x + card.width,
+                "{} lies outside card: {:?} vs {:?}",
+                day.id,
+                day.bounds,
+                card
+            );
+        }
+    }
 }

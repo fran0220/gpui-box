@@ -255,6 +255,9 @@ impl RenderOnce for SegmentedControl {
                     .min_w_0()
                     .relative()
                     .h(px(metrics.height - 2.0 * theme.borders.hairline))
+                    .when(self.size == ControlSize::Touch, |element| {
+                        element.min_w(px(metrics.height)).h(px(metrics.height))
+                    })
                     .gap(px(metrics.gap))
                     .px(px(metrics.padding_x))
                     .radius(&theme, radius)

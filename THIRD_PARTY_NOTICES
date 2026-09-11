@@ -5,6 +5,22 @@ GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
 source and assets retain the licenses and attribution below. GPUI Box is an
 independent derivative and is not an official Zed Industries project.
 
+Multi-contact arbitration, captured pan/pinch ownership, residual scrolling
+handoff, lifecycle input cancellation and mobile keyboard/inset/native text
+query contracts are original GPUI Box work. Android and UIKit documentation
+informed behavior; no additional third-party source or license was imported.
+The historical single-touch import and its exact receipt remain preserved.
+
+Android JNI/Activity and UIKit hosts, mobile browser input, checked native
+operations, WGPU lifecycle corrections and mobile Kit components are original
+GPUI Box work using public platform APIs. They do not import another project's
+mobile backend. Existing bundled fonts retain their notices below; external
+SDKs and signing material are not distributed by this repository.
+
+The shared mobile reference fixture and its native launch/checkpoint hosts are
+original GPUI Box example code. They reuse existing Kit assets and fonts under
+the notices below and introduce no additional third-party source or licenses.
+
 Source-line projection, projected editable geometry, disjoint accessibility
 regions and Kit fold policy are original GPUI Box work without new third-party
 source or licenses. Historical import receipts remain frozen.
@@ -539,3 +555,12 @@ original GPUI Box work. No new third-party code or license was introduced.
 
 Incremental paragraph wrapping is original GPUI Box work using the existing
 Ropey and local GPUI text-system implementations; existing notices remain intact.
+
+Native editable text fragments and visual navigation are original GPUI Box
+work using the existing unicode-bidi and unicode-segmentation packages.
+Apple's public UIKit API documentation was consulted, not copied as source.
+No new third-party source or frozen import receipt changes are involved.
+Affinity-aware selection and transient IME rollback are original GPUI Box work
+under the existing framework license, with no additional third-party imports.
+Indexed incident-paragraph caret geometry is original GPUI Box work and keeps
+the existing local text-system and dependency license authority unchanged.

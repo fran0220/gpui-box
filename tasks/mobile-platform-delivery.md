@@ -128,3 +128,124 @@ decisive outputs, inspected artifacts and gaps here as results arrive.
   overlap; disabled/error states are visible. OTP labeling and reveal affordance
   were sent back for review. True narrow-window capture is being added to serve;
   a narrow child inside a desktop window is not a phone viewport test.
+
+## Combined candidate (not yet accepted or published)
+
+The candidate was assembled in `/home/user/workspace/mobile-integration` and
+transferred into the main checkout after the Touch foundation deployment
+completed. Both hosted domains verified that foundation's revision, catalog
+counts, tool schemas and component identities. The combined candidate below
+is not yet published.
+
+- Applied shared input stages 1–3, native pinch terminal cleanup, test inset
+  simulation, and native point-query declarations. Both affinity type
+  prerequisites came from stage 3 and were not applied twice.
+- Applied checked native operations, WGPU lifecycle and explicit destroy
+  cleanup; native surface lifecycle remains unverified.
+- Applied navigation, Overlay origin correction, sheets/refresh/swipe,
+  constrained detents, forms/pickers and their scene registrations. Added
+  central prelude exports and checkout MCP viewport schema/documentation.
+- Applied native layout/buffer/history implementation and hard-newline
+  correction, nearest-stop point geometry, Kit native adapters and bounded
+  incident-paragraph caret queries. General range/point queries remain
+  document-wide, and missing intra-ligature caret data remains unavailable.
+- Applied Android owned source and platform dispatch integration, plus Web
+  owned changes. Android is experimental source, not an accepted native target;
+  SDK/NDK licensing and execution remain pending. The iOS adapter, explicit
+  font initializer and completed-frame diagnostic are integrated separately
+  from the direct Metal fixture; neither has native execution evidence yet.
+- Parent checks: combined Kit all-feature check passed before the text/backend
+  additions; 72 editable-text tests passed before the hard-newline correction;
+  MCP tool schema test passes with optional viewport dimensions and unchanged
+  remote/local tool counts. These are checkpoints, not a final combined gate.
+- Parent inspected actual narrow masked inputs: labels, masked password and
+  six-character OTP fit. Picker bottom anchoring and width fit, but last-row
+  clipping required an actual scroll/selection check. Owner reports item 12
+  becomes fully visible and selectable; parent inspected the scrolled frame
+  and confirmed the final row and close control are fully visible.
+- Parent found Sunday Touch cells can overflow the 361px date exhibit card.
+  Corrected minimum 352px/full-bleed layout preserves every 48px day target;
+  parent inspected the corrected 361px frame. Date placeholders now paint and
+  fixtures carry explicit accessible names after the combined audit found one
+  unnamed actionable date field. The original clipped frame is not acceptance.
+- Foundation Platforms run 34609208735 has failing native lanes: macOS app-host
+  tests hardcode Ctrl-Z instead of platform Undo; JS binding coverage omits
+  Overlay::window_snap_margin; Windows unsandboxed handle probe gets access
+  denied. These do not establish a Touch regression, but the run is not green.
+  Regenerating the binding catalog for the new APIs also resolves that existing
+  metadata drift. No native failure was suppressed or converted to success.
+
+- Parent core all-feature checkpoint passed 602 tests. Initial combined Kit run
+  passed 1019 integration tests and failed the date-name audit; it was not green.
+  The first iOS host suite failed Linux linkage of the native example; corrected
+  non-iOS entrypoint then passed Android 5/iOS 3 tests. Later expanded tests are
+  included in the final gate rather than inferred from those earlier results.
+- The initial full visual check found 24 new frames and two textarea focus
+  differences. A mount-scoped scene focus correction passed a real touch/field
+  switching regression and restored both textarea baselines. The scoped media
+  check found six expected frames; date-time and textarea matched. Parent
+  inspected all 30 new/changed frames and recaptured them; all 30 captured images
+  were byte-identical to the inspected candidates.
+- `gate full`, `web smoke` and `web gate` now execute the 13-test mobile browser
+  suite, with its emulation limits intact. A dispatch-only iOS workflow retains
+  separate protocol and GPUI-frame metadata/logs/pixels; it is not yet executed.
+
+Final full gate and native execution remain outstanding. The shared reference
+application and separate Android/iOS launch/checkpoint paths have been exported
+for the next integration stage; they are not yet part of this candidate.
+
+## Reference integration and final gate
+
+The combined tree now includes the shared reference application and its separate
+Android Activity and iOS app. Default reference-library features do not select a
+desktop platform. Native example hosts own private version-1 JSON checkpoints;
+Kit owns neither persistence nor platform back policy. The iOS dispatch-only
+workflow includes separate protocol, GPUI smoke and reference evidence paths.
+
+- The first combined full gate passed workspace checks/tests, strict Clippy,
+  performance, wasm32 and rustdoc, then matched all 360 Linux images. It failed
+  the final browser suite (7 passed, 6 failed), so it was not a passing gate.
+- Five browser failures assumed old scene rows were mounted at the top of the
+  virtualized catalog. Tests now scroll to the same named targets before
+  exercising touch. First-size readiness is explicit, while exact CSS/backing
+  dimension assertions remain unchanged. The integrated browser rerun passed
+  all 13 tests in 4.7 minutes.
+- Reference review found its ImageViewer ignored fit requests and used desktop
+  controls. The fixture now accepts fit requests in transient caller state.
+  Its new measured test then caught 46px Touch segments: the shared segmented
+  control now preserves full 48px targets without enlarging desktop controls.
+  A focused Kit integration regression passes for both sizes.
+- Parent ran the reference capture program: 12 actual 390×844/390×520 logical
+  window captures, with action/refusal/restoration checks, accepted fit changes
+  and measured Touch bounds. Updated image and open-sheet frames were inspected.
+  Both changed Linux ImageViewer exhibit frames were inspected before acceptance.
+  The next full comparison matched 358 frames and identified the same Touch
+  correction in AudioPlayer's rate segments. Both remaining frames were inspected
+  and accepted; another full gate is required, not a claimed prior success.
+- The portable iOS reference runner suite passes 6 tests, and workflow YAML and
+  shell syntax were checked. These do not execute UIKit, Android, native
+  persistence, IME, accessibility, predictive back or gesture timing.
+- Parent iOS reference filesystem/version tests pass 3/3, and the default
+  reference library passes wasm32 checking with warnings denied.
+- Reference back ordering now closes its sheet/picker before routing. The
+  public host entry is `request_back(window, cx)` and the Android host invokes
+  it through the mounted window. The capture runner checks this policy directly
+  without claiming native OS event delivery. Latest Android host-check, reference
+  tests, relevant all-target/all-feature Clippy, reference wasm32/rustdoc and
+  iOS checkpoint tests pass after this change.
+- Native affinity adapters cover TextInput/TextArea and their masked/OTP
+  wrappers. RichTextEditor's separate rich-document handler remains legacy and
+  is refused by the Android selection bridge; compatibility records name this
+  source gap explicitly instead of implying that all editors are native-ready.
+
+The final merged `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` passed:
+360 Linux images match (541.00 seconds), the reference capture runner passes
+all action checks and writes 12 frames, and all 13 mobile browser tests pass
+(4.4 minutes). Workspace default/all-feature tests, strict workspace Clippy,
+performance, wasm32, rustdoc and generated catalogs also pass. The latest
+reference back-policy change additionally passed the focused checks above.
+The complete log is `target/mobile-final-gate-full-accepted.log`.
+
+Publication and native execution remain outstanding at this checkpoint.
+Android SDK license acceptance and a native device/executor are not implied by
+the source implementation or the browser/offscreen evidence above.
