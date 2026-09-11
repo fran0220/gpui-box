@@ -21,6 +21,9 @@ native operation capabilities. These are original GPUI Box corrections following
 an executed UIKit first-frame failure, not imported platform code. Desktop-only
 mobile host-check trait implementations explicitly reject non-native operations;
 they do not fabricate handles or claim desktop backend support.
+The existing platform-independent priority queue is exported consistently across
+hosts. Non-Android builds explicitly reject NDK surface calls rather than linking
+Android symbols. These corrections add no source import or scheduling algorithm.
 
 The Android JNI/Activity and UIKit hosts, mobile browser delivery, checked
 native operation wrappers, WGPU surface lifecycle corrections, and mobile Kit

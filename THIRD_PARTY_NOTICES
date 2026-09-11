@@ -568,3 +568,5 @@ the existing local text-system and dependency license authority unchanged.
 Independent automatic pointer-operation capability checks and cross-host mobile
 adapter trait checks are original GPUI Box work. They add no third-party source
 or licenses and preserve the frozen historical import receipts.
+Consistent exports of the existing generic priority queue and explicit non-Android
+NDK refusal retain the same source and dependency license authority.

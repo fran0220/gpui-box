@@ -250,17 +250,32 @@ impl PlatformDisplay for AndroidDisplay {
 struct NativeSurface(Arc<NativeWindow>);
 #[derive(Debug)]
 struct NativeWindow(usize);
-#[cfg_attr(target_os = "android", link(name = "android"))]
+#[cfg(target_os = "android")]
+#[link(name = "android")]
 unsafe extern "C" {
-    fn ANativeWindow_fromSurface(
+    #[link_name = "ANativeWindow_fromSurface"]
+    fn native_window_from_surface(
         env: *mut jni::sys::JNIEnv,
         surface: jni::sys::jobject,
     ) -> *mut std::ffi::c_void;
-    fn ANativeWindow_release(window: *mut std::ffi::c_void);
+    #[link_name = "ANativeWindow_release"]
+    fn native_window_release(window: *mut std::ffi::c_void);
+}
+// Host-check builds type-check the real bridge but cannot acquire NDK resources.
+#[cfg(not(target_os = "android"))]
+unsafe fn native_window_from_surface(
+    _: *mut jni::sys::JNIEnv,
+    _: jni::sys::jobject,
+) -> *mut std::ffi::c_void {
+    unsupported("NDK surface acquisition outside Android")
+}
+#[cfg(not(target_os = "android"))]
+unsafe fn native_window_release(_: *mut std::ffi::c_void) {
+    unsupported("NDK surface release outside Android")
 }
 impl Drop for NativeWindow {
     fn drop(&mut self) {
-        unsafe { ANativeWindow_release(self.0 as *mut _) };
+        unsafe { native_window_release(self.0 as *mut _) };
     }
 }
 impl HasWindowHandle for NativeSurface {
@@ -617,5 +632,24 @@ fn surface_config(size: Size<DevicePixels>) -> WgpuSurfaceConfig {
         transparent: false,
         color_space: wgpu::SurfaceColorSpace::Auto,
         preferred_present_mode: None,
+    }
+}
+
+#[cfg(all(test, not(target_os = "android")))]
+mod host_tests {
+    #[test]
+    fn ndk_surface_operations_refuse_on_non_android_hosts() {
+        assert!(
+            std::panic::catch_unwind(|| unsafe {
+                super::native_window_from_surface(std::ptr::null_mut(), std::ptr::null_mut())
+            })
+            .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(|| unsafe {
+                super::native_window_release(std::ptr::null_mut())
+            })
+            .is_err()
+        );
     }
 }

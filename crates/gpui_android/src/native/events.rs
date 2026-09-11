@@ -39,7 +39,7 @@ pub extern "system" fn Java_dev_gpui_box_GpuiActivity_nativeSurface(
         );
         let p = platform();
         let native =
-            unsafe { ANativeWindow_fromSurface(env.get_native_interface(), surface.as_raw()) };
+            unsafe { native_window_from_surface(env.get_native_interface(), surface.as_raw()) };
         anyhow::ensure!(!native.is_null(), "ANativeWindow_fromSurface failed");
         let surface = NativeSurface(Arc::new(NativeWindow(native as usize)));
         let drawable = size(DevicePixels(width), DevicePixels(height));

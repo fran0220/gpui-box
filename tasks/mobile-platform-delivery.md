@@ -315,3 +315,30 @@ and confirms 200/208 declared JS adapters. The logs are
 `target/mobile-native-followup-gate-full.log` and
 `target/mobile-runtime-followup-check.log`. Native reruns remain required before
 claiming that the observed iOS abort or desktop compilation failures are resolved.
+
+## Native rerun and host-linking completion
+
+Revision `452289829c5cdd3ebead3a1f20646b1fe5b2456d` was pushed and verified on
+both BWG domains. Platforms `34637689428` passed runtime-macos and the complete
+Metal catalog. All mobile-related WARP frames matched; the five previously held
+glyph-edge frames repeated byte-identically across both native runs and were
+then accepted after the earlier magnified visual inspection. No tolerance changed.
+Runtime-windows now fails only the pre-existing AppContainer error 5.
+
+Desktop workspace compilation progressed past the trait omissions and exposed
+two Android host-check issues: priority queue exports excluded macOS (and actual
+Android), and non-Android tests linked NDK symbols. The generic queue now exports
+on all targets; Android keeps the same native symbols, while non-Android surface
+calls explicitly refuse. Android 8 tests, queue tests, strict targeted Clippy and
+the complete `cargo run -p xtask -- gate` pass, including workspace tests/lint,
+generated artifacts, performance and wasm. Log: `target/mobile-host-linking-gate.log`.
+These non-rendering corrections did not rerun the preceding full visual/browser
+gate; another desktop native run must establish host compilation success.
+
+iOS run `34637692961` passed the actual GPUI/UIKit/WGPU smoke with both required
+markers. Its screenshot was inspected and shows the expected two GPUI labels on
+the blue background, not the protocol fixture. The reference app built but its
+console stayed empty and launch/terminate timed out; a same-revision failed-job
+retry is running without relaxing the deadline or success markers. Native Kit
+reference rendering, keyboard/IME and persistence are not established by the
+successful small GPUI smoke.
