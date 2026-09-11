@@ -16,6 +16,12 @@ and Android [EditorInfo](https://developer.android.com/reference/android/view/in
 These references informed contracts; no platform documentation code was copied.
 Shared tests establish only framework behavior, not native device integration.
 
+Automatic pointer styling and typing/action cursor hiding now check independent
+native operation capabilities. These are original GPUI Box corrections following
+an executed UIKit first-frame failure, not imported platform code. Desktop-only
+mobile host-check trait implementations explicitly reject non-native operations;
+they do not fabricate handles or claim desktop backend support.
+
 The Android JNI/Activity and UIKit hosts, mobile browser delivery, checked
 native operation wrappers, WGPU surface lifecycle corrections, and mobile Kit
 components are original GPUI Box work. They use public platform APIs rather

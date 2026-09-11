@@ -101,6 +101,10 @@ impl HasDisplayHandle for WindowHandle {
     }
 }
 impl PlatformWindow for WindowHandle {
+    #[cfg(target_os = "windows")]
+    fn get_raw_handle(&self) -> windows::Win32::Foundation::HWND {
+        unsupported("Windows HWND; an Android surface is not a Win32 window")
+    }
     fn check_window_operation(
         &self,
         operation: WindowOperation,

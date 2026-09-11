@@ -28,3 +28,6 @@ uuid.workspace = true
 accesskit.workspace = true
 serde_json.workspace = true
 jni = "0.21.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = ["Win32_Foundation"] }

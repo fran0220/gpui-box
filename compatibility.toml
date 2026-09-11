@@ -66,6 +66,7 @@ limitations = ["offscreen 390px and resized-window captures do not establish nat
 
 [framework_native_operations]
 contract = "App::try_* and Window::try_* check support and dispatch synchronously on the owning thread. Unsupported, unavailable and refused requests are distinct; acceptance does not mean the OS transition completed. Mobile defaults deny unless a backend implements the operation. Legacy desktop behavior is preserved."
+automatic_pointer = "Draw and hit-test cursor styling check SetCursorStyle; typing and handled-action hiding independently check HideCursorUntilMouseMoves. Refusal skips only the native call, preserving rendering, hit testing and input delivery. Android admits its implemented styling; UIKit currently refuses both."
 surface_lifecycle = "WGPU explicit detach/destroy drain submitted native resources before platform handle invalidation. Device loss can make completion unconfirmable; destroy still releases resources and reports failure. Repeated cleanup after release succeeds. Native lifecycle execution remains required."
 
 [framework_context_menu]

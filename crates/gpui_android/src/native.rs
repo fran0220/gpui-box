@@ -347,7 +347,10 @@ impl Platform for AndroidPlatform {
         &self,
         operation: AppOperation,
     ) -> std::result::Result<(), PlatformOperationError> {
-        if !matches!(operation, AppOperation::Quit | AppOperation::Hide) {
+        if !matches!(
+            operation,
+            AppOperation::Quit | AppOperation::Hide | AppOperation::SetCursorStyle
+        ) {
             return Err(PlatformOperationError::Unsupported(
                 "Android application command",
             ));
@@ -564,6 +567,15 @@ impl Platform for AndroidPlatform {
         } else {
             unsupported("non-text clipboard items")
         }
+    }
+    // Desktop-only trait requirements when compiling the adapter for host checks.
+    #[cfg(target_os = "macos")]
+    fn read_from_find_pasteboard(&self) -> Option<ClipboardItem> {
+        unsupported("macOS find pasteboard")
+    }
+    #[cfg(target_os = "macos")]
+    fn write_to_find_pasteboard(&self, _: ClipboardItem) {
+        unsupported("macOS find pasteboard")
     }
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn read_from_primary(&self) -> Option<ClipboardItem> {

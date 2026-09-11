@@ -25,7 +25,7 @@ pub struct TestAppContext {
     pub foreground_executor: ForegroundExecutor,
     #[doc(hidden)]
     pub dispatcher: TestDispatcher,
-    test_platform: Rc<TestPlatform>,
+    pub(crate) test_platform: Rc<TestPlatform>,
     text_system: Arc<TextSystem>,
     fn_name: Option<&'static str>,
     on_quit: Rc<RefCell<Vec<Box<dyn FnOnce() + 'static>>>>,

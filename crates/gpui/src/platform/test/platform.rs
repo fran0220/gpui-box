@@ -39,6 +39,11 @@ pub(crate) struct TestPlatform {
     pub expect_restart: RefCell<Option<oneshot::Sender<Option<PathBuf>>>>,
     pub(crate) app_operation_error: RefCell<Option<crate::PlatformOperationError>>,
     pub(crate) checked_operations: RefCell<Vec<crate::AppOperation>>,
+    pub(crate) cursor_style_error: RefCell<Option<crate::PlatformOperationError>>,
+    pub(crate) cursor_hide_error: RefCell<Option<crate::PlatformOperationError>>,
+    pub(crate) checked_pointer_operations: RefCell<Vec<crate::AppOperation>>,
+    pub(crate) cursor_style_calls: RefCell<Vec<CursorStyle>>,
+    pub(crate) cursor_hide_calls: RefCell<usize>,
     headless_renderer_factory: Option<Box<dyn Fn() -> Option<Box<dyn PlatformHeadlessRenderer>>>>,
     weak: Weak<Self>,
 }
@@ -143,6 +148,11 @@ impl TestPlatform {
             expect_restart: Default::default(),
             app_operation_error: Default::default(),
             checked_operations: Default::default(),
+            cursor_style_error: Default::default(),
+            cursor_hide_error: Default::default(),
+            checked_pointer_operations: Default::default(),
+            cursor_style_calls: Default::default(),
+            cursor_hide_calls: Default::default(),
             current_clipboard_item: Mutex::new(None),
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             current_primary_item: Mutex::new(None),
@@ -316,6 +326,15 @@ impl Platform for TestPlatform {
         &self,
         operation: crate::AppOperation,
     ) -> Result<(), crate::PlatformOperationError> {
+        let pointer_error = match operation {
+            crate::AppOperation::SetCursorStyle => Some(&self.cursor_style_error),
+            crate::AppOperation::HideCursorUntilMouseMoves => Some(&self.cursor_hide_error),
+            _ => None,
+        };
+        if let Some(error) = pointer_error {
+            self.checked_pointer_operations.borrow_mut().push(operation);
+            return error.borrow().clone().map_or(Ok(()), Err);
+        }
         self.checked_operations.borrow_mut().push(operation);
         self.app_operation_error
             .borrow()
@@ -539,10 +558,13 @@ impl Platform for TestPlatform {
     }
 
     fn set_cursor_style(&self, style: crate::CursorStyle) {
+        self.cursor_style_calls.borrow_mut().push(style);
         *self.active_cursor.lock() = style;
     }
 
-    fn hide_cursor_until_mouse_moves(&self) {}
+    fn hide_cursor_until_mouse_moves(&self) {
+        *self.cursor_hide_calls.borrow_mut() += 1;
+    }
 
     fn is_cursor_visible(&self) -> bool {
         true

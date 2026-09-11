@@ -2834,6 +2834,7 @@ dependencies = [
  "raw-window-handle",
  "serde_json",
  "uuid",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -2942,6 +2943,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "uuid",
+ "windows 0.61.3",
 ]
 
 [[package]]

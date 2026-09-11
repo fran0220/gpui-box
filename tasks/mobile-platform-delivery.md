@@ -278,3 +278,40 @@ completion notice. Earlier Metal/WARP and Windows native
 successes belong to the glass revision, not to this integrated mobile candidate.
 Windows runtime AppContainer error 5 remains unresolved. No Android licenses,
 native mobile IME/accessibility, or native checkpoint roundtrip evidence is claimed.
+
+## Published candidate and first integrated native results
+
+Candidate `079a09be860f9c61d32a7811b96b60a0c6db419b` was pushed and deployed.
+Both BWG domains verified 208 components, 181 scenes and full MCP schemas.
+Platforms run `34630320442` and iOS run `34630324428` executed that revision.
+Neither run passed:
+
+- macOS/Windows workspace compilation found desktop-only trait requirements
+  missing from the mobile host-check adapters. Explicit unsupported implementations
+  and Windows-only type dependencies are added without inventing native handles.
+- Runtime coverage assumed new mobile Rust components already had JS adapters.
+  The test now explicitly checks AppBar, PageLayout and BottomNavigation remain
+  unbound, while retaining exact coverage for the implemented families.
+- Windows AppContainer error 5 persists independently of that coverage error.
+- iOS UIKit/direct Metal protocol fixture passed, but actual GPUI and reference
+  apps aborted after mount when automatic cursor styling reached an unsupported
+  UIKit operation. Independent framework styling/hiding capability checks now
+  cover frame, hit-test, typing and handled-action paths. Native rerun is required.
+- All 30 Metal and 30 mobile-related WARP changed/new frames were inspected and
+  accepted. Scroll viewport and translated-row clipping are intentional; fixed
+  controls and refusal notices remain readable. Five unrelated WARP frames
+  (canvas-regions dark, node-graph light, log-stream both, diagnostics-list light)
+  differ only on glyph edges, with 1–2 pixels exceeding the one-step threshold.
+  Their old baselines are preserved pending reproducibility evidence; tolerance
+  is unchanged. Neither these captures nor the protocol fixture proves native
+  mobile GPUI rendering or keyboard behavior.
+
+The corrected combined tree passes `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full`:
+606 all-feature core tests, workspace tests/strict Clippy, performance, wasm and
+rustdoc checks, 362 matching Linux images (534.23 seconds), reference captures
+and action assertions, and 13 mobile browser tests (4.4 minutes). Separate
+`npm --prefix tools/app-host run check` passes 202 tests with 15 platform skips
+and confirms 200/208 declared JS adapters. The logs are
+`target/mobile-native-followup-gate-full.log` and
+`target/mobile-runtime-followup-check.log`. Native reruns remain required before
+claiming that the observed iOS abort or desktop compilation failures are resolved.
