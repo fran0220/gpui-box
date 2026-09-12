@@ -1,7 +1,7 @@
 schema = 1
 project = "GPUI Box"
 repository = "https://github.com/fran0220/gpui-box"
-release_status = "unreleased"
+release_status = "released"
 release_version = "0.2.0"
 release_date = "2026-09-12"
 

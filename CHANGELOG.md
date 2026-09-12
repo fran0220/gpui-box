@@ -10,6 +10,10 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [0.2.0] - 2026-09-12
 
+This is a GitHub source release for Git-pinned consumers. No 0.2.0 packages
+are published to crates.io. Pin every GPUI Box dependency and the root
+`block` compatibility patch to the same release revision; see the README.
+
 ### Migration and validation boundaries
 
 This pre-1.0 minor release includes public coordinate-contract changes and new

@@ -1,7 +1,33 @@
 # Releasing GPUI Box
 
-This is the runbook for publishing and verifying a GPUI Box crates.io release.
-Every cohort, including the initial `0.1.0` release, follows this process.
+This is the runbook for GPUI Box source releases and crates.io publication.
+Source releases do not imply that a version exists on crates.io.
+
+## Git-only 0.2.0 release
+
+Version 0.2.0 ships as an immutable annotated Git tag and GitHub Release only.
+Do not dispatch the registry publishing workflow, upload crates, or change
+registry credentials or access controls for this release.
+
+Run the Linux full gate, the macOS/Windows Platforms matrix, the offline
+historical-source audit, and the package check. Record their exact source
+revisions and results. Documentation-only release metadata changes must be
+identified separately from the native implementation that was validated.
+Verify a downstream consumer outside this workspace using Git dependencies:
+all GPUI Box dependencies and the root `block` patch must use the same full
+revision. Require exactly one `lib gpui`, no GPUI Box registry/path sources,
+and a successful locked build. Cargo does not inherit dependency-workspace
+patches; use the complete example in the root README.
+
+Commit the release records, create and push the annotated `v0.2.0` tag, and
+never move it. The GitHub Release must include the full commit SHA, copyable
+`rev`-pinned dependencies, validation evidence, migration notes, and platform
+limitations. State explicitly that no 0.2.0 packages were uploaded to crates.io.
+Consumers commit their lockfile and use `--locked`, not a moving branch.
+
+The remaining sections govern a separately authorized crates.io publication;
+their registry dry-run and post-publication requirements do not describe the
+Git-only release.
 
 ## Cohort and authority
 

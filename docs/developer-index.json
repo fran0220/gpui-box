@@ -4,7 +4,7 @@
     "name": "GPUI Box",
     "repository": "https://github.com/fran0220/gpui-box",
     "releaseVersion": "0.2.0",
-    "releaseStatus": "unreleased",
+    "releaseStatus": "released",
     "rustVersion": "1.97",
     "edition": "2024"
   },
@@ -155096,7 +155096,7 @@
       "slug": "releasing",
       "title": "Releasing GPUI Box",
       "path": "docs/releasing.md",
-      "summary": "This is the runbook for publishing and verifying a GPUI Box crates.io release. Every cohort, including the initial `0.1.0` release, follows this process."
+      "summary": "This is the runbook for GPUI Box source releases and crates.io publication. Source releases do not imply that a version exists on crates.io."
     },
     {
       "slug": "screenshot-testing",
@@ -156137,6 +156137,12 @@
       "title": "What is not printed",
       "guide": "reactive",
       "anchor": "what-is-not-printed"
+    },
+    {
+      "id": "releasing-git-only-0-2-0-release",
+      "title": "Git-only 0.2.0 release",
+      "guide": "releasing",
+      "anchor": "git-only-0-2-0-release"
     },
     {
       "id": "releasing-cohort-and-authority",
@@ -159267,7 +159273,7 @@
     ],
     "project": "GPUI Box",
     "release_date": "2026-09-12",
-    "release_status": "unreleased",
+    "release_status": "released",
     "release_validation": {
       "dependency_graph": "cargo run -p xtask -- dependencies check",
       "publication_plan": "cargo run -p xtask -- package plan",

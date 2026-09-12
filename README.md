@@ -17,7 +17,7 @@ credentials, transports, accounts, or product models.
 
 ## Packages
 
-All publishable packages are versioned as the `0.1.x` cohort. Cargo package
+All publishable packages are versioned as the `0.2.x` cohort. Cargo package
 names and Rust crate names intentionally differ:
 
 | Cargo package(s) | Rust import | Purpose | License |
@@ -37,20 +37,29 @@ for package identity and publishability.
 
 ## Depend on GPUI Box
 
-Use Cargo aliases so source code uses the conventional `gpui` and `gpui_kit`
-imports while resolving the GPUI Box packages:
+Version **0.2.0 is a GitHub source release, not a crates.io publication**.
+Use the immutable `v0.2.0` tag below, or replace every `tag` with the same
+full `rev` from the GitHub release. Commit the application's `Cargo.lock`
+and build with `--locked`; do not track a branch. Cargo aliases retain the
+conventional `gpui` and `gpui_kit` imports:
 
 ```toml
 [dependencies]
-# Last published cohort. Workspace main is ahead of 0.1.1; pin a git
-# revision of this repository when an application needs current Kit.
-gpui = { package = "gpui-box", version = "0.1.1" }
-gpui_platform = { package = "gpui-box-platform", version = "0.1.1" }
-gpui_kit = { package = "gpui-box-kit", version = "0.1.1" }
+gpui = { package = "gpui-box", git = "https://github.com/fran0220/gpui-box", tag = "v0.2.0" }
+gpui_platform = { package = "gpui-box-platform", git = "https://github.com/fran0220/gpui-box", tag = "v0.2.0" }
+gpui_kit = { package = "gpui-box-kit", git = "https://github.com/fran0220/gpui-box", tag = "v0.2.0" }
 
 [dev-dependencies]
-gpui_kit_testkit = { package = "gpui-box-kit-testkit", version = "0.1.1", features = ["test-support"] }
+gpui_kit_testkit = { package = "gpui-box-kit-testkit", git = "https://github.com/fran0220/gpui-box", tag = "v0.2.0", features = ["test-support"] }
+
+[patch.crates-io]
+block = { git = "https://github.com/fran0220/gpui-box", tag = "v0.2.0" }
 ```
+
+Keep the `block` patch in the application's workspace root. Cargo does not
+inherit dependency workspaces' patches; this is the receipted compatibility
+fix for upstream `block` 0.1.6, not a second GPUI implementation. The last
+crates.io cohort remains `0.1.1`; it does not contain the 0.2.0 changes.
 
 Do not add another GPUI implementation to the same application. Every
 framework and kit crate in this cohort resolves through `gpui-box`, producing a
