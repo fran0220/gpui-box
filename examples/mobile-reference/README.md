@@ -16,8 +16,13 @@ cargo run -p gpui-box-mobile-reference --features capture --example capture -- t
 
 The capture program opens actual **390 × 844** and **390 × 520 logical-pixel
 windows**, checks action targets are visible, dispatches real pointer events,
-asserts semantic results and saves 12 renders. The renderer may produce 2× image
-pixels. The shorter window verifies resized layout, **not** the appearance of
+asserts semantic results and saves 12 light renders plus three direct-mount dark
+renders (library, detail and form). Dark notice crops must contain a majority
+of dark background pixels (all RGB channels ≤64) and at least 32 bright text
+pixels (all channels ≥192), independently of theme token values. Crop coordinates
+use measured semantic bounds and the actual image-to-viewport scale. Library
+captures also check that Checkpoint aligns with the inset AppBar Back button.
+The renderer may produce 2× image pixels. The shorter window verifies resized layout, **not** the appearance of
 a native keyboard. It uses reduced motion and does not verify gesture timing.
 The optional desktop/capture dependencies never enter the default library.
 

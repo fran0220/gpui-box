@@ -278,3 +278,110 @@ completion notice. Earlier Metal/WARP and Windows native
 successes belong to the glass revision, not to this integrated mobile candidate.
 Windows runtime AppContainer error 5 remains unresolved. No Android licenses,
 native mobile IME/accessibility, or native checkpoint roundtrip evidence is claimed.
+
+## Published candidate and first integrated native results
+
+Candidate `079a09be860f9c61d32a7811b96b60a0c6db419b` was pushed and deployed.
+Both BWG domains verified 208 components, 181 scenes and full MCP schemas.
+Platforms run `34630320442` and iOS run `34630324428` executed that revision.
+Neither run passed:
+
+- macOS/Windows workspace compilation found desktop-only trait requirements
+  missing from the mobile host-check adapters. Explicit unsupported implementations
+  and Windows-only type dependencies are added without inventing native handles.
+- Runtime coverage assumed new mobile Rust components already had JS adapters.
+  The test now explicitly checks AppBar, PageLayout and BottomNavigation remain
+  unbound, while retaining exact coverage for the implemented families.
+- Windows AppContainer error 5 persists independently of that coverage error.
+- iOS UIKit/direct Metal protocol fixture passed, but actual GPUI and reference
+  apps aborted after mount when automatic cursor styling reached an unsupported
+  UIKit operation. Independent framework styling/hiding capability checks now
+  cover frame, hit-test, typing and handled-action paths. Native rerun is required.
+- All 30 Metal and 30 mobile-related WARP changed/new frames were inspected and
+  accepted. Scroll viewport and translated-row clipping are intentional; fixed
+  controls and refusal notices remain readable. Five unrelated WARP frames
+  (canvas-regions dark, node-graph light, log-stream both, diagnostics-list light)
+  differ only on glyph edges, with 1–2 pixels exceeding the one-step threshold.
+  Their old baselines are preserved pending reproducibility evidence; tolerance
+  is unchanged. Neither these captures nor the protocol fixture proves native
+  mobile GPUI rendering or keyboard behavior.
+
+The corrected combined tree passes `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full`:
+606 all-feature core tests, workspace tests/strict Clippy, performance, wasm and
+rustdoc checks, 362 matching Linux images (534.23 seconds), reference captures
+and action assertions, and 13 mobile browser tests (4.4 minutes). Separate
+`npm --prefix tools/app-host run check` passes 202 tests with 15 platform skips
+and confirms 200/208 declared JS adapters. The logs are
+`target/mobile-native-followup-gate-full.log` and
+`target/mobile-runtime-followup-check.log`. Native reruns remain required before
+claiming that the observed iOS abort or desktop compilation failures are resolved.
+
+## Native rerun and host-linking completion
+
+Revision `452289829c5cdd3ebead3a1f20646b1fe5b2456d` was pushed and verified on
+both BWG domains. Platforms `34637689428` passed runtime-macos and the complete
+Metal catalog. All mobile-related WARP frames matched; the five previously held
+glyph-edge frames repeated byte-identically across both native runs and were
+then accepted after the earlier magnified visual inspection. No tolerance changed.
+Runtime-windows now fails only the pre-existing AppContainer error 5.
+
+Desktop workspace compilation progressed past the trait omissions and exposed
+two Android host-check issues: priority queue exports excluded macOS (and actual
+Android), and non-Android tests linked NDK symbols. The generic queue now exports
+on all targets; Android keeps the same native symbols, while non-Android surface
+calls explicitly refuse. Android 8 tests, queue tests, strict targeted Clippy and
+the complete `cargo run -p xtask -- gate` pass, including workspace tests/lint,
+generated artifacts, performance and wasm. Log: `target/mobile-host-linking-gate.log`.
+These non-rendering corrections did not rerun the preceding full visual/browser
+gate; another desktop native run must establish host compilation success.
+
+iOS run `34637692961` passed the actual GPUI/UIKit/WGPU smoke with both required
+markers. Its screenshot was inspected and shows the expected two GPUI labels on
+the blue background, not the protocol fixture. The reference app built but its
+console stayed empty and launch/terminate timed out; a same-revision failed-job
+retry is running without relaxing the deadline or success markers. Native Kit
+reference rendering, keyboard/IME and persistence are not established by the
+successful small GPUI smoke.
+
+## Native reference inspection and final appearance correction
+
+Revision `26d4b4ae46981d4f9d65d936cd732c2aa99d1f9d` was pushed and verified on
+both BWG domains (208 components, 181 scenes, 8575 symbols, complete MCP schemas).
+Platforms `34640875517` passes Windows native workspace tests, runtime-macos
+and the complete Metal and WARP catalogs (all eight WARP shards and aggregation).
+macOS workspace tests now pass the previously failing editor undo assertions
+and mobile host linking. Two new WGPU lifecycle
+tests fail before assertions because Metal supplies no software fallback adapter.
+They are now limited to Linux/Windows, matching the adjacent strict headless
+tests; assertions and production rendering are unchanged. Runtime-windows still
+fails the unrelated AppContainer error 5. A macOS rerun remains required.
+
+iOS `34637692961`, attempt 2 at the unchanged `45228982` revision, passes all
+three fixtures with clean cleanup and both reference mount/completion markers.
+The inspected reference screenshot proves actual initial Kit rendering but
+exposes black inherited plain text on a dark panel. The reference root now
+sets its theme foreground and sans family, and the checkpoint toolbar uses the
+same inset as Back. No native host or framework styling policy changes.
+
+The capture runner preserves its 12 light/action checks and adds direct-mount
+dark library/detail/form frames. A measured notice crop uses independent RGB
+thresholds (dark <=64, bright >=192), actual image/viewport scale, a majority
+dark background and at least 32 bright pixels. The owner demonstrated failure
+before the fix (46800 dark, 0 bright) and success afterward (44053 dark, 1399
+bright). Parent inspection of both composites confirms readable Chinese and
+plain text, aligned toolbar and no unexpected clipping. The integrated parent
+capture run also passes all 15 frames/actions and all three contrast checks;
+parent inspected its dark library/detail/form and light library images.
+Corrected native iOS appearance still requires a new simulator run and
+screenshot inspection.
+
+The final integrated `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full`
+passes: workspace tests/strict Clippy, 606 all-feature core tests, wasm,
+performance, rustdoc, 362 matching Linux images in 534.50 seconds, all 15
+reference captures/actions and 13 mobile browser tests in 4.6 minutes.
+Log: `target/mobile-final-appearance-gate-full.log`. No Linux baseline or
+comparison tolerance changed.
+
+These initial frames do not establish native keyboard/IME, VoiceOver/TalkBack,
+gesture timing, background/recreation persistence or Android execution. No
+Android SDK licenses were accepted and no device evidence is fabricated.

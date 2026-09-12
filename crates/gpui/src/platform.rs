@@ -169,6 +169,10 @@ pub enum AppOperation {
     OpenWithSystem,
     /// Install an application dock menu.
     SetDockMenu,
+    /// Set the native pointer cursor style.
+    SetCursorStyle,
+    /// Hide the native pointer cursor until mouse movement.
+    HideCursorUntilMouseMoves,
 }
 
 /// Window commands whose availability depends on the native host.
@@ -386,10 +390,17 @@ pub trait Platform: 'static {
     fn app_path(&self) -> Result<PathBuf>;
     fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf>;
 
+    /// Sets the native pointer cursor style. Automatic framework updates check
+    /// `AppOperation::SetCursorStyle` immediately before calling this method.
+    /// Pointer styling and hiding are independent capabilities; a host may support
+    /// one without the other. Refusal skips only the native update, not the frame's
+    /// cursor requests or hit testing. Direct calls retain the backend's behavior.
     fn set_cursor_style(&self, style: CursorStyle);
 
     /// Hides the mouse cursor until the user moves the mouse over one of
-    /// this application's windows.
+    /// this application's windows. Automatic typing/action updates independently
+    /// check `AppOperation::HideCursorUntilMouseMoves` immediately before calling.
+    /// Direct calls retain the backend's behavior, including explicit refusal.
     fn hide_cursor_until_mouse_moves(&self);
 
     /// Returns whether the mouse cursor is currently visible.

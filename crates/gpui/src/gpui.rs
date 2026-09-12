@@ -40,14 +40,7 @@ mod platform;
 pub mod prelude;
 /// Profiling utilities for task, frame, and thread performance tracking.
 pub mod profiler;
-#[cfg(any(
-    test,
-    target_os = "windows",
-    target_os = "linux",
-    target_family = "wasm",
-    feature = "test-support"
-))]
-#[expect(missing_docs)]
+/// Platform-independent priority queues used by native and test dispatchers.
 pub mod queue;
 mod renderer_timing;
 mod scene;
@@ -151,7 +144,6 @@ pub use particles::*;
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;
-#[cfg(any(target_os = "windows", target_os = "linux", target_family = "wasm"))]
 pub use queue::{PriorityQueueReceiver, PriorityQueueSender};
 pub use refineable::*;
 pub use renderer_timing::*;

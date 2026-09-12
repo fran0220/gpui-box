@@ -30,6 +30,9 @@ log.workspace = true
 accesskit.workspace = true
 accesskit_consumer = "0.38"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = ["Win32_Foundation"] }
+
 [dev-dependencies]
 gpui-box-mobile-reference = { path = "../../examples/mobile-reference", default-features = false }
 # Local integration tests must not publish an ios -> kit -> platform -> ios cycle.

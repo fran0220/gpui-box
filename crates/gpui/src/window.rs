@@ -6738,7 +6738,13 @@ impl Window {
                 .rendered_frame
                 .cursor_style(self)
                 .unwrap_or(CursorStyle::Arrow);
-            cx.platform.set_cursor_style(style);
+            if cx
+                .platform
+                .check_app_operation(crate::AppOperation::SetCursorStyle)
+                .is_ok()
+            {
+                cx.platform.set_cursor_style(style);
+            }
         }
     }
 
@@ -7441,6 +7447,10 @@ impl Window {
                     cx.cursor_hide_mode,
                     CursorHideMode::OnTyping | CursorHideMode::OnTypingAndAction
                 )
+                && cx
+                    .platform
+                    .check_app_operation(crate::AppOperation::HideCursorUntilMouseMoves)
+                    .is_ok()
             {
                 cx.platform.hide_cursor_until_mouse_moves();
             }
@@ -7722,6 +7732,10 @@ impl Window {
         if !cx.propagate_event
             && cx.cursor_hide_mode == CursorHideMode::OnTypingAndAction
             && self.last_input_was_keyboard()
+            && cx
+                .platform
+                .check_app_operation(crate::AppOperation::HideCursorUntilMouseMoves)
+                .is_ok()
         {
             cx.platform.hide_cursor_until_mouse_moves();
         }
@@ -9084,6 +9098,151 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    struct PointerView;
+
+    impl Render for PointerView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size(px(40.)).cursor(crate::CursorStyle::Crosshair)
+        }
+    }
+
+    #[gpui::test]
+    fn automatic_pointer_style_checks_draw_and_hit_test(cx: &mut TestAppContext) {
+        use crate::{AppOperation::SetCursorStyle, CursorStyle, PlatformOperationError as Error};
+        let platform = cx.test_platform.clone();
+        let handle = cx.add_window(|_, _| PointerView);
+        // Hiding remains unsupported even when styling is available.
+        *platform.cursor_hide_error.borrow_mut() = Some(Error::Unsupported("hide"));
+        for error in [
+            Some(Error::Unsupported("style")),
+            Some(Error::Unavailable("style")),
+            Some(Error::Refused("style")),
+            None,
+        ] {
+            *platform.cursor_style_error.borrow_mut() = error.clone();
+            cx.update_window(handle.into(), |_, window, app| {
+                window.hovered.set(true);
+                window.active.set(true);
+                window.mouse_position = point(px(80.), px(80.));
+                platform.cursor_style_calls.take();
+                platform.checked_pointer_operations.take();
+                window.draw(app).clear(app);
+                assert_eq!(platform.checked_pointer_operations.take(), [SetCursorStyle]);
+                assert_eq!(
+                    platform.cursor_style_calls.take(),
+                    if error.is_none() {
+                        vec![CursorStyle::Arrow]
+                    } else {
+                        vec![]
+                    }
+                );
+                // Enter the actual rendered hitbox without another draw. Refused
+                // styling must not discard requests or prevent hit-test updates.
+                window.dispatch_event(
+                    MouseMoveEvent {
+                        position: point(px(10.), px(10.)),
+                        pressed_button: None,
+                        modifiers: Default::default(),
+                    }
+                    .to_platform_input(),
+                    app,
+                );
+                assert_eq!(platform.checked_pointer_operations.take(), [SetCursorStyle]);
+                assert_eq!(
+                    window.rendered_frame.cursor_style(window),
+                    Some(CursorStyle::Crosshair)
+                );
+                assert_eq!(
+                    platform.cursor_style_calls.take(),
+                    if error.is_none() {
+                        vec![CursorStyle::Crosshair]
+                    } else {
+                        vec![]
+                    }
+                );
+            })
+            .expect("pointer test window remains open");
+        }
+        assert_eq!(*platform.cursor_hide_calls.borrow(), 0);
+        assert!(platform.checked_operations.borrow().is_empty());
+    }
+
+    crate::actions!(pointer_capability_tests, [HandledPointerAction]);
+
+    #[gpui::test]
+    fn automatic_pointer_hide_checks_typing_and_handled_actions(cx: &mut TestAppContext) {
+        use crate::{
+            AppOperation::HideCursorUntilMouseMoves, CursorHideMode,
+            PlatformOperationError as Error,
+        };
+        let platform = cx.test_platform.clone();
+        let handled = Rc::new(Cell::new(0));
+        cx.update(|app| {
+            let handled = handled.clone();
+            app.on_action(move |_: &HandledPointerAction, app| {
+                handled.set(handled.get() + 1);
+                app.stop_propagation();
+            });
+        });
+        let handle = cx.add_window(|_, _| EmptyView);
+        for (index, error) in [
+            Some(Error::Unsupported("hide")),
+            Some(Error::Unavailable("hide")),
+            Some(Error::Refused("hide")),
+            None,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            *platform.cursor_hide_error.borrow_mut() = error.clone();
+            // Exercise both asymmetric combinations, not a single pointer flag.
+            *platform.cursor_style_error.borrow_mut() = if error.is_none() {
+                Some(Error::Unsupported("style"))
+            } else {
+                None
+            };
+            cx.update_window(handle.into(), |_, window, app| {
+                window.draw(app).clear(app);
+                platform.checked_pointer_operations.take();
+                platform.cursor_hide_calls.take();
+                app.set_cursor_hide_mode(CursorHideMode::OnTyping);
+                window.dispatch_event(
+                    crate::KeyDownEvent {
+                        keystroke: crate::Keystroke::parse("a")
+                            .expect("valid typing keystroke")
+                            .with_simulated_ime(),
+                        is_held: false,
+                        prefer_character_input: false,
+                    }
+                    .to_platform_input(),
+                    app,
+                );
+                assert_eq!(
+                    platform.checked_pointer_operations.take(),
+                    [HideCursorUntilMouseMoves]
+                );
+                assert_eq!(
+                    platform.cursor_hide_calls.take(),
+                    usize::from(error.is_none())
+                );
+                app.set_cursor_hide_mode(CursorHideMode::OnTypingAndAction);
+                let node = window.focus_node_id_in_rendered_frame(None);
+                window.dispatch_action_on_node(node, &HandledPointerAction, app);
+                assert_eq!(handled.get(), index + 1);
+                assert_eq!(
+                    platform.checked_pointer_operations.take(),
+                    [HideCursorUntilMouseMoves]
+                );
+                assert_eq!(
+                    platform.cursor_hide_calls.take(),
+                    usize::from(error.is_none())
+                );
+            })
+            .expect("pointer test window remains open");
+        }
+        assert!(platform.checked_operations.borrow().is_empty());
     }
 
     #[gpui::test]

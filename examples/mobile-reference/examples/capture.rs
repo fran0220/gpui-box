@@ -83,6 +83,50 @@ fn save(
         "expected true 390px logical viewport"
     );
     frame.save(directory.join(format!("{name}.png")))?;
+    if matches!(name, "library" | "dark-library") {
+        let tree = snapshot(cx, window)?;
+        let back = tree.find("reference.back").context("back bounds")?.bounds;
+        let checkpoint = tree
+            .find("reference.checkpoint")
+            .context("checkpoint bounds")?
+            .bounds;
+        anyhow::ensure!(
+            checkpoint.x > 0.0 && (checkpoint.x - back.x).abs() < 0.5,
+            "checkpoint toolbar must align with the inset AppBar: {checkpoint:?}, {back:?}"
+        );
+    }
+    if name.starts_with("dark-") {
+        let tree = snapshot(cx, window)?;
+        let bounds = tree
+            .find("reference.notice")
+            .context("notice bounds")?
+            .bounds;
+        let scale_x = frame.width() as f32 / f32::from(viewport.width);
+        let scale_y = frame.height() as f32 / f32::from(viewport.height);
+        let mut dark = 0;
+        let mut bright = 0;
+        let mut total = 0;
+        // Independent sRGB thresholds: an unadorned notice must contain both
+        // a dark background and bright glyph interiors, not merely semantics.
+        // Channels <=64 versus >=192 imply over 5.6:1 luminance contrast.
+        for y in (bounds.y * scale_y).ceil() as u32
+            ..((bounds.y + bounds.height) * scale_y).floor() as u32
+        {
+            for x in (bounds.x * scale_x).ceil() as u32
+                ..((bounds.x + bounds.width) * scale_x).floor() as u32
+            {
+                let pixel = frame.get_pixel(x, y).0;
+                dark += usize::from(pixel[..3].iter().all(|channel| *channel <= 64));
+                bright += usize::from(pixel[..3].iter().all(|channel| *channel >= 192));
+                total += 1;
+            }
+        }
+        anyhow::ensure!(
+            total > 0 && dark > total / 2 && bright >= 32,
+            "{name}: notice lacks dark background/bright text: {dark} dark, {bright} bright / {total} pixels"
+        );
+        println!("{name}: notice contrast PASS ({dark} dark, {bright} bright pixels)");
+    }
     println!(
         "captured {name}: logical {viewport:?}, image {}x{}",
         frame.width(),
@@ -240,6 +284,15 @@ fn main() -> Result<()> {
     click(&mut cx, shorter.into(), "reference.form.accept")?;
     click(&mut cx, shorter.into(), "reference.sheet.open")?;
     save(&mut cx, shorter.into(), directory, "resized-sheet")?;
+    cx.update(|cx| gpui_kit_theme::activate_theme("studio-dark", cx));
+    // Direct mount, without gallery styling: native hosts use this same root.
+    let dark = cx.open_window(size(px(390.0), px(844.0)), mount)?;
+    save(&mut cx, dark.into(), directory, "dark-library")?;
+    click(&mut cx, dark.into(), "reference.open.notes")?;
+    save(&mut cx, dark.into(), directory, "dark-detail")?;
+    click(&mut cx, dark.into(), "reference.back")?;
+    click(&mut cx, dark.into(), "reference.nav.form")?;
+    save(&mut cx, dark.into(), directory, "dark-form")?;
     println!(
         "PASS: retained rows, explicit refusal, detail/back, dirty-form refusal, checkpoint restore; 390px viewport captures"
     );

@@ -461,6 +461,8 @@ impl Render for ReferenceApp {
         div()
             .size_full()
             .surface(&theme, Surface::Panel)
+            .text_color(theme.colors.text)
+            .font_family(theme.typography.sans.clone())
             .child(
                 PageLayout::new(
                     "reference.page",
@@ -506,6 +508,7 @@ impl Render for ReferenceApp {
                         .child(
                             div()
                                 .flex()
+                                .px(px(theme.space(Space::Sm)))
                                 .gap(px(theme.space(Space::Xs)))
                                 .child(self.action(
                                     "reference.checkpoint",

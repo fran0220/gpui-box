@@ -313,6 +313,15 @@ impl Platform for IosPlatform {
         let text = CString::new(text).expect("clipboard text contains NUL");
         unsafe { gpui_ios_set_clipboard(text.as_ptr()) };
     }
+    // Desktop-only trait requirements when compiling the adapter for host checks.
+    #[cfg(target_os = "macos")]
+    fn read_from_find_pasteboard(&self) -> Option<ClipboardItem> {
+        unsupported("macOS find pasteboard")
+    }
+    #[cfg(target_os = "macos")]
+    fn write_to_find_pasteboard(&self, _: ClipboardItem) {
+        unsupported("macOS find pasteboard")
+    }
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn read_from_primary(&self) -> Option<ClipboardItem> {
         None
@@ -660,6 +669,10 @@ impl Drop for IosWindow {
     }
 }
 impl PlatformWindow for IosWindow {
+    #[cfg(target_os = "windows")]
+    fn get_raw_handle(&self) -> windows::Win32::Foundation::HWND {
+        unsupported("Windows HWND; a UIKit window is not a Win32 window")
+    }
     fn check_window_operation(&self, _: WindowOperation) -> Result<(), PlatformOperationError> {
         Err(PlatformOperationError::Unsupported(
             "UIKit owns window geometry",

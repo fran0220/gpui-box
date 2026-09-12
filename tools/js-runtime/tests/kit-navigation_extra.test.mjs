@@ -7,9 +7,15 @@ import { familySchemas, validateFamilyProps } from '../kit-navigation_extra-sche
 import { validateValue } from '../kit-schema.mjs';
 import { artifacts, families } from '../../app-host/src/kit_bindings/navigation_extra/fixture/generate.mjs';
 
-test('explicit adapters cover exactly the three owned source families', async () => {
+test('explicit adapters cover the owned families except documented unbound components', async () => {
   const index = JSON.parse(await readFile(new URL('../../../docs/api-index.json', import.meta.url)));
-  const excluded = new Set(['Pagination', 'Tabs', 'Accordion', 'ScrollArea', 'SplitPane']);
+  const coverage = JSON.parse(await readFile(new URL('../binding-coverage.json', import.meta.url)));
+  // These mobile Rust components have no JS adapters; do not imply them from a family.
+  const unbound = ['BottomNavigation', 'AppBar', 'PageLayout'];
+  for (const name of unbound) {
+    assert.equal(coverage.components.find(v => v.name === name).binding.status, 'unbound');
+  }
+  const excluded = new Set(['Pagination', 'Tabs', 'Accordion', 'ScrollArea', 'SplitPane', ...unbound]);
   for (const [family, source] of [['navigation_extra', 'navigation'], ['layout_extra', 'layout'], ['datetime', 'datetime']]) {
     const names = index.components.filter(v => v.source.startsWith(`crates/gpui-kit/src/${source}/`) && !excluded.has(v.name)).map(v => v.name).sort();
     assert.deepEqual(Object.keys(families[family].familySchemas).sort(), names);
