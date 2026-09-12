@@ -96,20 +96,47 @@ static void profile_root(const wchar_t *name, wchar_t *path) {
 
 #ifdef GPUI_SANDBOX_PROBE
 /* Native adversarial probe: no Node permission model can mask OS failures. */
+static void check_query(LONG status, const char *operation) {
+    if (status == 0) return;
+    fprintf(stderr, "Windows sandbox probe: %s failed (NTSTATUS 0x%08lx)\n", operation, (DWORD)status);
+    ExitProcess(125);
+}
+
+// FileInternalInformation needs no specific access rights. Unlike the Win32
+// aggregate metadata query (which includes FILE_READ_ATTRIBUTES), this also
+// identifies data-only handles. Query the volume serial separately; never
+// reopen a path, elevate the handle, or skip an access-denied disk handle.
+// https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_internal_information
+static void disk_identity(HANDLE handle, wchar_t *identity) {
+    typedef struct { union { LONG status; PVOID pointer; }; ULONG_PTR information; } io_status;
+    typedef LONG (NTAPI *query_fn)(HANDLE, io_status *, PVOID, ULONG, ULONG);
+    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    query_fn query_file = (query_fn)(void *)GetProcAddress(ntdll, "NtQueryInformationFile");
+    query_fn query_volume = (query_fn)(void *)GetProcAddress(ntdll, "NtQueryVolumeInformationFile");
+    CHECK(query_file && query_volume);
+    io_status status;
+    LARGE_INTEGER index;
+    struct {
+        LARGE_INTEGER creation_time;
+        ULONG serial, label_length;
+        BOOLEAN supports_objects;
+        WCHAR label[PATH_CAP];
+    } volume;
+    check_query(query_file(handle, &status, &index, sizeof(index), 6), "FileInternalInformation");
+    check_query(query_volume(handle, &status, &volume, sizeof(volume), 1), "FileFsVolumeInformation");
+    swprintf(identity, 64, L"%08lx:%08lx:%08lx", volume.serial, (DWORD)index.HighPart, index.LowPart);
+}
+
 static void check_disk_handles(const wchar_t *sentinel) {
     for (uintptr_t value = 4; value < 65536; value += 4) {
         HANDLE handle = (HANDLE)value;
         if (GetFileType(handle) != FILE_TYPE_DISK) continue;
-        BY_HANDLE_FILE_INFORMATION info;
         DWORD flags;
-        CHECK(GetFileInformationByHandle(handle, &info));
         CHECK(GetHandleInformation(handle, &flags));
-        wchar_t identity[64], path[PATH_CAP];
-        swprintf(identity, 64, L"%08lx:%08lx:%08lx", info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow);
-        DWORD length = GetFinalPathNameByHandleW(handle, path, PATH_CAP, 0);
-        CHECK(length && length < PATH_CAP);
-        fprintf(stderr, "Windows sandbox probe: disk handle=%llu flags=%lu id=%ls path=%ls\n",
-            (unsigned long long)value, flags, identity, path);
+        wchar_t identity[64];
+        disk_identity(handle, identity);
+        fprintf(stderr, "Windows sandbox probe: disk handle=%llu flags=%lu id=%ls\n",
+            (unsigned long long)value, flags, identity);
         // Windows opens its own non-inherited cwd/image handles. Detect the
         // host sentinel by file identity even if a duplicate cleared INHERIT.
         CHECK(wcscmp(identity, sentinel) != 0);
@@ -130,6 +157,21 @@ int wmain(int argc, wchar_t **argv) {
     }
     if (!wcscmp(argv[1], L"--leak-check")) {
         check_disk_handles(argv[2]); return 0;
+    }
+    if (!wcscmp(argv[1], L"--handle-control")) {
+        CHECK(argc == 5);
+        // A real data-only handle, without FILE_READ_ATTRIBUTES. The controls
+        // must fail on identity even with INHERIT cleared, and on INHERIT even
+        // for a different file. No host ACL is changed to manufacture denial.
+        HANDLE file = CreateFileW(argv[3], FILE_READ_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, 0, NULL);
+        CHECK(file != INVALID_HANDLE_VALUE);
+        BY_HANDLE_FILE_INFORMATION info;
+        CHECK(!GetFileInformationByHandle(file, &info) && GetLastError() == ERROR_ACCESS_DENIED);
+        CHECK(SetHandleInformation(file, HANDLE_FLAG_INHERIT, _wtoi(argv[4]) ? HANDLE_FLAG_INHERIT : 0));
+        CHECK((uintptr_t)file < 65536);
+        check_disk_handles(argv[2]);
+        CloseHandle(file); return 0;
     }
     if (!wcscmp(argv[1], L"--connect-control")) {
         WSADATA wsa;

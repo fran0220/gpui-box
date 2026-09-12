@@ -82,6 +82,21 @@ test('dev watches imported TS module; bad reload retains verified view and recov
   assert.equal(find(h.frame.tree, 'host.error'), undefined);
 });
 
+test('hung candidate activation is killed without publishing its view; dev reload recovers', async t => {
+  const h = await host(t, true);
+  const original = await readFile(resolve(h.app, 'main.mts'), 'utf8');
+  const instance = find(h.frame.tree, 'app.value').instance;
+  await writeFile(resolve(h.app, 'main.mts'), "gpui.mount(() => gpui.text('unverified', 'Never publish')); while (true) {}");
+  await h.wait(tree => find(tree, 'host.error')?.text.includes('Worker heartbeat deadline exceeded'));
+  assert.equal(find(h.frame.tree, 'app.unverified'), undefined);
+  assert.equal(find(h.frame.tree, 'app.value').instance, instance);
+  assert.equal(find(h.frame.tree, 'app.value').text, 'Count: 7');
+  await writeFile(resolve(h.app, 'main.mts'), original.replace('state<number>(7)', 'state<number>(23)'));
+  await h.wait(tree => find(tree, 'app.value')?.text === 'Count: 23');
+  assert.notEqual(find(h.frame.tree, 'app.value').instance, instance);
+  assert.equal(find(h.frame.tree, 'host.error'), undefined);
+});
+
 test('developer CLI evaluates inside app through a private socket and shutdown removes the endpoint', async t => {
   const h = await host(t, false, true);
   const result = JSON.parse(execFileSync(process.execPath, [resolve(here, 'cli.mjs'), 'debug', h.data, '7 + 3'], { encoding: 'utf8' }));

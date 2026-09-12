@@ -91,6 +91,23 @@ test('Windows factory refuses execution on another OS', { skip: windows }, async
   await assert.rejects(windowsSandbox('.', '.'), /requires Windows/);
 });
 
+test('native handle scan identifies metadata-denied files and rejects inheritance independently', nativeOptions, async t => {
+  const { root, secret } = await fixture(t);
+  const other = join(root, 'not-the-sentinel');
+  await writeFile(other, 'unrelated file');
+  const identity = execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE, ['--file-id', secret], { encoding: 'utf8' }).trim();
+  const probe = { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] };
+  for (const [file, inherit, failure] of [
+    [other, '0', null],
+    [secret, '0', /wcscmp\(identity, sentinel\) != 0 failed/],
+    [other, '1', /!\(flags & HANDLE_FLAG_INHERIT\) failed/],
+  ]) {
+    const run = launch(t, probe, ['--handle-control', identity, file, inherit]);
+    assert.equal((await run.closed)[0], failure ? 125 : 0, run.output().stderr);
+    if (failure) assert.match(run.output().stderr, failure);
+  }
+});
+
 test('native AppContainer blocks host reads, writes, network, spawning and leaked handles', nativeOptions, async t => {
   const { root, minimalRuntime, secret } = await fixture(t);
   assert.ok(process.env.GPUI_WINDOWS_SANDBOX_PROBE, 'build and set GPUI_WINDOWS_SANDBOX_PROBE');

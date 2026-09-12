@@ -12308,6 +12308,7 @@
           "adaptive(adaptive: bool) -> Self",
           "adaptive_appearance(adaptive: bool) -> Self",
           "dimmed(dimmed: bool) -> Self",
+          "protect_text_contrast(protect: bool) -> Self",
           "tint(tint: impl Into<Hsla>) -> Self",
           "edge_mask(edge: GlassEdge, band: f32) -> Self",
           "child(child: impl IntoElement) -> Self"
@@ -12343,6 +12344,7 @@
           "adaptive(adaptive: bool) -> Self",
           "adaptive_appearance(adaptive: bool) -> Self",
           "dimmed(dimmed: bool) -> Self",
+          "protect_text_contrast(protect: bool) -> Self",
           "tint(tint: impl Into<Hsla>) -> Self",
           "pane(ident: impl Into<Ident>, child: impl IntoElement) -> Self"
         ],

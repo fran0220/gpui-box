@@ -480,6 +480,16 @@ mod imp {
         use super::*;
         use image::{Rgba, RgbaImage};
 
+        fn save_test_frame(name: &str, frame: &RgbaImage) -> Result<PathBuf> {
+            let directory = repo_root().join("target");
+            fs::create_dir_all(&directory)?;
+            let path = directory.join(name);
+            frame
+                .save(&path)
+                .with_context(|| format!("save {}", path.display()))?;
+            Ok(path)
+        }
+
         #[test]
         fn unclipped_deferred_pixels_keep_scale_and_restore_ancestor_masks() -> Result<()> {
             use gpui::{Bounds, ContentMask, Corners, RoundedClip, canvas, point};
@@ -665,7 +675,7 @@ mod imp {
                     0,
                 );
             }
-            comparison.save(repo_root().join("target/unclipped-deferred.png"))?;
+            save_test_frame("unclipped-deferred.png", &comparison)?;
             Ok(())
         }
 
@@ -744,7 +754,7 @@ mod imp {
                 settled_image(&mut cx, handle.into())?,
                 "release restores original foreground"
             );
-            scaled.save(repo_root().join("target/headless-visual-scale.png"))?;
+            save_test_frame("headless-visual-scale.png", &scaled)?;
             Ok(())
         }
 
@@ -977,7 +987,7 @@ mod imp {
                 .open_window(size(px(1020.), px(310.)), |_, cx| cx.new(|_| FocusHost))?
                 .into();
             let frame = settled_image(&mut cx, window)?;
-            frame.save(repo_root().join("target/headless-glass-focus.png"))?;
+            save_test_frame("headless-glass-focus.png", &frame)?;
             let scale = frame.width() as f32 / 1020.;
             let sample = |x: f32, y: f32| *frame.get_pixel((x * scale) as u32, (y * scale) as u32);
             for slot in 0..COUNT {
@@ -1071,9 +1081,7 @@ mod imp {
                     })?
                     .into();
                 let frame = settled_image(&mut cx, window)?;
-                frame.save(
-                    repo_root().join(format!("target/headless-rounded-cover-image-{width}.png")),
-                )?;
+                save_test_frame(&format!("headless-rounded-cover-image-{width}.png"), &frame)?;
                 let scale = frame.width() as f32 / (width + 20.);
                 let sample =
                     |x: f32, y: f32| *frame.get_pixel((x * scale) as u32, (y * scale) as u32);
@@ -1212,8 +1220,8 @@ mod imp {
                 within_one_step(&initial, &released),
                 "release restores the original optics"
             );
-            initial.save(repo_root().join("target/headless-glass-released.png"))?;
-            pressed.save(repo_root().join("target/headless-glass-pressed.png"))?;
+            save_test_frame("headless-glass-released.png", &initial)?;
+            save_test_frame("headless-glass-pressed.png", &pressed)?;
             Ok(())
         }
 
@@ -1570,8 +1578,7 @@ mod imp {
                 .open_window(size(px(300.), px(150.)), |_, cx| cx.new(|_| PillHost))?
                 .into();
             let frame = settled_image(&mut cx, window)?;
-            let output = repo_root().join("target/headless-clear-pill.png");
-            frame.save(&output)?;
+            let output = save_test_frame("headless-clear-pill.png", &frame)?;
             let scale = frame.width() as f32 / 300.;
             let sample = |x: f32, y: f32| frame.get_pixel((x * scale) as u32, (y * scale) as u32);
             let raw = sample(150., 40.);

@@ -4510,6 +4510,9 @@ mod tests {
         validate_wgsl(STORAGE_BUFFER_SHADERS, naga::valid::Capabilities::empty());
     }
 
+    // Both WGPU transports require the strict software adapter, which Metal
+    // does not provide. The portable headless suite exercises native Metal.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn visual_scale_moves_foreground_and_replay_once_on_both_transports() {
         use gpui::{
@@ -4613,6 +4616,8 @@ mod tests {
         }
     }
 
+    // Match the software-adapter hosts of the transport test above.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn nested_rounded_clips_mask_every_primitive_without_changing_backdrop_samples() {
         use gpui::{

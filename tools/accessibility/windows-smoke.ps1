@@ -9,6 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+[Console]::Error.WriteLine("UIA probe: loading managed assemblies")
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
@@ -16,7 +17,9 @@ Add-Type -AssemblyName UIAutomationTypes
 # process-local identifier table stops before newer properties. Its documented
 # LookupById(30159) consequently returns null for FullDescription even on a
 # current OS. The native IUIAutomation API accepts the property id directly.
+[Console]::Error.WriteLine("UIA probe: compiling native helper")
 Add-Type -Path (Join-Path $PSScriptRoot "windows-native-uia.cs")
+[Console]::Error.WriteLine("UIA probe: native helper ready")
 
 function Find-All {
     param(

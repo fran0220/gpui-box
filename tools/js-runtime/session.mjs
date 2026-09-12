@@ -79,7 +79,11 @@ export class Session extends EventEmitter {
       detached: isolation.detached ?? false,
     });
     const child = this.child;
-    let lastHeartbeat = Date.now();
+    // The launcher must provision containment and Node must load its trusted
+    // runtime before it can send a heartbeat. Bound that phase separately;
+    // once the worker speaks, timeoutMs remains the event-loop liveness budget.
+    const startupDeadline = Date.now() + 30000;
+    let lastHeartbeat;
     let outputBytes = 0;
     let windowStart = Date.now();
     const meter = bytes => {
@@ -138,7 +142,9 @@ export class Session extends EventEmitter {
       } catch (error) { this.fail(error.message); }
     }, error => this.fail(error.message));
     this.watchdog = setInterval(() => {
-      if (Date.now() - lastHeartbeat > this.options.timeoutMs) this.fail('Worker heartbeat deadline exceeded');
+      if (lastHeartbeat === undefined) {
+        if (Date.now() >= startupDeadline) this.fail('Worker startup deadline exceeded (no heartbeat)');
+      } else if (Date.now() - lastHeartbeat > this.options.timeoutMs) this.fail('Worker heartbeat deadline exceeded');
     }, 100);
     // Attach all handlers before yielding: a missing backend can fail immediately.
     try { await isolation.afterSpawn?.(); }

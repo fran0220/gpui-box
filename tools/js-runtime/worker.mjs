@@ -174,6 +174,9 @@ process.on('uncaughtException', error => { report(error); process.exit(1); });
 process.on('unhandledRejection', error => { report(error); process.exit(1); });
 process.stdin.on('end', () => process.exit(0));
 const heartbeat = setInterval(() => send({ kind: 'heartbeat' }), 100);
+// End native/runtime startup before executing guest code. A synchronous loop
+// in its first import must hit the ordinary heartbeat deadline, not startup's.
+send({ kind: 'heartbeat' });
 try {
   await import(pathToFileURL(process.argv[2]).href);
   send({ kind: 'ready' });

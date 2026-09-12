@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { PassThrough } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { Session } from '../session.mjs';
+import { encodeFrame, readFrames } from '../wire.mjs';
 
 const deferred = () => Promise.withResolvers();
 const empty = () => new Session({ root: '.', entry: 'app.mts', trusted: true });
@@ -122,4 +127,64 @@ test('two-second native cleanup fits the shutdown budget', async () => {
   const session = empty();
   session.exitPromise = new Promise(resolve => setTimeout(resolve, 2000));
   await session.stop();
+});
+
+// Exercise the real Session framing/watchdog with a controlled launcher clock,
+// rather than sleeping or relying on a particular CI machine's startup speed.
+async function launcher(t) {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval', 'setTimeout'], now: Date.now() });
+  const child = new EventEmitter();
+  child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+  let kills = 0;
+  child.kill = signal => { kills++; queueMicrotask(() => child.emit('close', null, signal)); return true; };
+  readFrames(child.stdin, message => { if (message.kind === 'dispose') queueMicrotask(() => child.emit('close', 0, null)); });
+  const spawn = t.mock.method(childProcess, 'spawn', () => child);
+  syncBuiltinESMExports();
+  t.after(() => { spawn.mock.restore(); syncBuiltinESMExports(); });
+  const session = new Session({ root: fileURLToPath(new URL('.', import.meta.url)), entry: 'lifecycle.test.mjs', trusted: true });
+  const faults = [];
+  session.on('fault', fault => faults.push(fault.message));
+  await session.start();
+  t.after(() => session.stop());
+  return { session, faults, get kills() { return kills; }, send(message) { child.stdout.write(encodeFrame({ generation: session.generation, ...message })); } };
+}
+
+test('native startup can exceed heartbeat budget; first heartbeat switches to the strict running budget', async t => {
+  const run = await launcher(t);
+  t.mock.timers.tick(2500);
+  assert.equal(run.session.closed, false, 'launcher startup is not a stalled worker');
+  run.send({ kind: 'heartbeat' });
+  run.send({ kind: 'ready' });
+  t.mock.timers.tick(1900);
+  assert.equal(run.session.closed, false);
+  run.send({ kind: 'heartbeat' });
+  t.mock.timers.tick(1900);
+  assert.equal(run.session.closed, false, 'a continuing heartbeat renews liveness');
+  t.mock.timers.tick(200);
+  assert.deepEqual(run.faults, ['Worker heartbeat deadline exceeded']);
+  await run.session.stop();
+  assert.equal(run.kills, 1);
+  assert.equal(run.session.childClosed, true);
+});
+
+test('silent startup is bounded and other generations or logs cannot extend its deadline', async t => {
+  const run = await launcher(t);
+  t.mock.timers.tick(29900);
+  assert.equal(run.session.closed, false);
+  run.send({ kind: 'heartbeat', generation: run.session.generation + 1 });
+  run.send({ kind: 'log', level: 'info', message: 'still launching' });
+  t.mock.timers.tick(100);
+  assert.deepEqual(run.faults, ['Worker startup deadline exceeded (no heartbeat)']);
+  await run.session.stop();
+  assert.equal(run.kills, 1);
+  assert.equal(run.session.childClosed, true);
+});
+
+test('first heartbeat arms liveness even if guest activation never becomes ready', async t => {
+  const run = await launcher(t);
+  run.send({ kind: 'heartbeat' });
+  t.mock.timers.tick(2100);
+  assert.deepEqual(run.faults, ['Worker heartbeat deadline exceeded']);
+  await run.session.stop();
+  assert.equal(run.session.childClosed, true);
 });

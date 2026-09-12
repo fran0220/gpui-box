@@ -46,9 +46,11 @@ failure is a refusal, **never a fallback to unrestricted execution**. The backen
   64 file descriptors, 1 MiB per file, no core dumps; V8 additionally has a 64 MiB
   old-generation heap limit. Wasm uses explicit bounds checks, because its normal
   virtual-memory reservation conflicts with the address-space limit;
-- kills an unresponsive event loop after a 2-second heartbeat gap. Disposal gives
-  cleanup callbacks 250 ms, then kills and reaps the process. Bubblewrap destroys
-  the PID namespace when its parent exits.
+- bounds launcher/runtime startup to 30 seconds without a heartbeat. The worker
+  sends its first heartbeat before importing guest code; thereafter a 2-second
+  heartbeat gap kills an unresponsive event loop, including a hung initial import.
+  Disposal gives cleanup callbacks 250 ms, then kills and reaps the process.
+  Bubblewrap destroys the PID namespace when its parent exits.
 
 This is a real OS restriction, not a guarantee against kernel or engine exploits.
 The host's system libraries and its own runtime scripts are visible. Metadata and
