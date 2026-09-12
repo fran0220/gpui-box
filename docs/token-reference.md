@@ -517,6 +517,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -1333,6 +1334,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |
@@ -2149,6 +2151,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -2965,6 +2968,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |
@@ -3781,6 +3785,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -4597,6 +4602,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -5413,6 +5419,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -6229,6 +6236,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -7045,6 +7053,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
@@ -7861,6 +7870,7 @@ Row stagger maximum items: `8`.
 | `effect.glassContrastFlipLow` | 0.42 |
 | `effect.glassContrastFlipHigh` | 0.58 |
 | `effect.glassPressDepth` | 1.5 |
+| `effect.glassPressScale` | 1.014 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |

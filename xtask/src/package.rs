@@ -63,6 +63,13 @@ fn publication_plan(root: &Path) -> Result<PublicationPlan> {
         .output()?;
     ensure!(output.status.success(), "cargo metadata failed");
     let meta: Value = serde_json::from_slice(&output.stdout)?;
+    publication_plan_from_metadata(packages, &meta)
+}
+
+fn publication_plan_from_metadata(
+    packages: BTreeMap<String, Package>,
+    meta: &Value,
+) -> Result<PublicationPlan> {
     let metadata_packages = meta["packages"]
         .as_array()
         .context("Cargo metadata has no packages array")?;
@@ -91,6 +98,10 @@ fn publication_plan(root: &Path) -> Result<PublicationPlan> {
                     .with_context(|| format!("publication graph lacks package {owner}"))?
                     .insert(name.into());
             } else {
+                ensure!(
+                    d["path"].as_str().is_none(),
+                    "{owner} has a published dependency on local package {name}, which is absent from the publishable authority; it cannot be treated as external"
+                );
                 external.insert(name.into());
             }
         }
@@ -460,6 +471,27 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
         );
     }
 
+    let auth = std::env::var("GPUI_BOX_PUBLISH_AUTH").unwrap_or_else(|_| "token".into());
+    ensure!(
+        matches!(auth.as_str(), "token" | "oidc" | "mixed"),
+        "unknown GPUI_BOX_PUBLISH_AUTH; expected token, oidc, or mixed"
+    );
+    let mixed = auth == "mixed";
+    let primary = std::env::var("CARGO_REGISTRY_TOKEN").ok();
+    let bootstrap = std::env::var("GPUI_BOX_BOOTSTRAP_TOKEN").ok();
+    if mixed {
+        // Classify the whole cohort and require its credentials before any upload.
+        // A missing target version says nothing about whether the name is new.
+        mixed_publish_token(false, primary.as_deref(), bootstrap.as_deref())?;
+        for name in &order {
+            mixed_publish_token(
+                remote_crate_is_new(name)?,
+                primary.as_deref(),
+                bootstrap.as_deref(),
+            )?;
+        }
+    }
+
     let reproduction = root.join("target/publish-reproduction");
     if reproduction.exists() {
         fs::remove_dir_all(&reproduction)?;
@@ -483,6 +515,9 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
             .arg(root.join(&p.manifest))
             .current_dir(root)
             .env("CARGO_TARGET_DIR", &reproduction);
+        if mixed {
+            package.env_remove("GPUI_BOX_BOOTSTRAP_TOKEN");
+        }
         apply_package_patches(&mut package, &patches);
         let status = package.status()?;
         ensure!(
@@ -524,6 +559,19 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
             apply_package_patches(&mut publish, &patches);
             let mut accepted = false;
             for attempt in 0..=NEW_CRATE_RATE_LIMIT_RETRIES {
+                if mixed {
+                    // Recheck on every attempt: a newly claimed name must never
+                    // fall back to the bootstrap credential, including on retries.
+                    let token = mixed_publish_token(
+                        remote_crate_is_new(&name)?,
+                        primary.as_deref(),
+                        bootstrap.as_deref(),
+                    )?;
+                    publish
+                        .env("CARGO_REGISTRY_TOKEN", token)
+                        .env_remove("CARGO_REGISTRIES_CRATES_IO_TOKEN")
+                        .env_remove("GPUI_BOX_BOOTSTRAP_TOKEN");
+                }
                 let output = publish.output()?;
                 io::stdout().write_all(&output.stdout)?;
                 io::stderr().write_all(&output.stderr)?;
@@ -612,6 +660,71 @@ fn crate_download_url(name: &str, version: &str) -> Result<String> {
 fn crate_version_url(name: &str, version: &str) -> Result<String> {
     validate_remote_coordinate(name, version)?;
     Ok(format!("https://crates.io/api/v1/crates/{name}/{version}"))
+}
+
+fn mixed_publish_token<'a>(
+    first_publication: bool,
+    oidc: Option<&'a str>,
+    bootstrap: Option<&'a str>,
+) -> Result<&'a str> {
+    let (token, variable) = if first_publication {
+        (bootstrap, "GPUI_BOX_BOOTSTRAP_TOKEN")
+    } else {
+        (oidc, "CARGO_REGISTRY_TOKEN (OIDC)")
+    };
+    token
+        .filter(|token| !token.trim().is_empty())
+        .with_context(|| format!("mixed publication requires {variable} before any upload"))
+}
+
+fn crate_is_new_from_response(code: &str, body: &str, name: &str) -> Result<bool> {
+    let response: Value = serde_json::from_str(body)
+        .with_context(|| format!("invalid crates.io crate lookup response for {name}"))?;
+    match code {
+        "200" => {
+            ensure!(
+                response["crate"]["id"].as_str() == Some(name)
+                    && response["crate"]["name"].as_str() == Some(name)
+                    && response.get("errors").is_none(),
+                "ambiguous crates.io crate identity for {name}; refusing to publish"
+            );
+            Ok(false)
+        }
+        "404" => {
+            ensure!(
+                response == json!({"errors":[{"detail":format!("crate `{name}` does not exist")}]}),
+                "ambiguous crates.io missing-crate response for {name}; refusing to publish"
+            );
+            Ok(true)
+        }
+        _ => bail!("crates.io crate lookup returned HTTP {code} for {name}; refusing to publish"),
+    }
+}
+
+fn remote_crate_is_new(name: &str) -> Result<bool> {
+    validate_remote_coordinate(name, "0")?;
+    let output = Command::new("curl")
+        .args([
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "60",
+            "--user-agent",
+            CRATES_IO_USER_AGENT,
+            "--write-out",
+            "\n%{http_code}",
+            &format!("https://crates.io/api/v1/crates/{name}"),
+        ])
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "crates.io crate lookup failed for {name}"
+    );
+    let output = String::from_utf8(output.stdout)?;
+    let (body, code) = output
+        .rsplit_once('\n')
+        .context("crates.io crate response has no HTTP status")?;
+    crate_is_new_from_response(code, body, name)
 }
 
 fn version_exists_from_status(code: &str, name: &str, version: &str) -> Result<bool> {
@@ -1140,6 +1253,42 @@ mod tests {
     }
 
     #[test]
+    fn publication_plan_rejects_unpublishable_local_dependencies() -> Result<()> {
+        let owner = Package {
+            manifest: "crates/owner/Cargo.toml".into(),
+            name: "owner".into(),
+            lib: None,
+            cohort: "framework".into(),
+            version: "0.2.0".into(),
+            license: "Apache-2.0".into(),
+            publish: true,
+            layer: 0,
+        };
+        let packages = BTreeMap::from([(owner.name.clone(), owner)]);
+        for kind in [Value::Null, json!("build")] {
+            let mut meta = json!({"packages":[{"name":"owner","dependencies":[{
+                "name":"mobile", "kind":kind, "path":"/workspace/mobile",
+                "req":"^0.2.0", "optional":true, "target":"cfg(target_os = \"ios\")"
+            }]}, {"name":"mobile", "publish":[], "dependencies":[]}]});
+            let error = publication_plan_from_metadata(packages.clone(), &meta)
+                .err()
+                .expect("local dependency outside publishable authority must fail");
+            assert!(error.to_string().contains("local package mobile"));
+            meta["packages"][0]["dependencies"][0]["path"] = Value::Null;
+            let plan = publication_plan_from_metadata(packages.clone(), &meta)?;
+            assert_eq!(plan.external, BTreeSet::from(["mobile".into()]));
+            assert_eq!(plan.order, vec!["owner"]);
+        }
+        let meta = json!({"packages":[{"name":"owner","dependencies":[{
+            "name":"mobile", "kind":"dev", "path":"/workspace/mobile", "req":"*"
+        }]}]});
+        let plan = publication_plan_from_metadata(packages, &meta)?;
+        assert!(plan.external.is_empty());
+        assert!(plan.dependencies["owner"].is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn publication_edges_include_versioned_but_not_path_only_dev_dependencies() -> Result<()> {
         assert!(!dependency_is_published(
             &json!({"kind":"dev","name":"local","path":"/workspace/local","req":"*"})
@@ -1253,6 +1402,72 @@ mod tests {
         assert!(!version_exists_from_status("404", "gpui-box", "0.1.0")?);
         assert!(version_exists_from_status("403", "gpui-box", "0.1.0").is_err());
         Ok(())
+    }
+
+    #[test]
+    fn mixed_existing_crate_with_missing_target_version_always_uses_oidc() -> Result<()> {
+        assert!(!version_exists_from_status("404", "gpui-box", "0.2.0")?);
+        let first = crate_is_new_from_response(
+            "200",
+            r#"{"crate":{"id":"gpui-box","name":"gpui-box","max_version":"0.1.1"}}"#,
+            "gpui-box",
+        )?;
+        assert!(!first);
+        assert_eq!(
+            mixed_publish_token(first, Some("oidc"), Some("bootstrap"))?,
+            "oidc"
+        );
+        assert_eq!(mixed_publish_token(first, Some("oidc"), None)?, "oidc");
+        assert!(mixed_publish_token(first, None, Some("bootstrap")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_new_crate_requires_bootstrap_without_oidc_fallback() -> Result<()> {
+        let first = crate_is_new_from_response(
+            "404",
+            r#"{"errors":[{"detail":"crate `gpui-box-android` does not exist"}]}"#,
+            "gpui-box-android",
+        )?;
+        assert!(first);
+        for bootstrap in [None, Some(""), Some(" \n")] {
+            assert!(mixed_publish_token(first, Some("oidc"), bootstrap).is_err());
+        }
+        assert_eq!(
+            mixed_publish_token(first, Some("oidc"), Some("bootstrap"))?,
+            "bootstrap"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_crate_classification_fails_closed() {
+        let missing = r#"{"errors":[{"detail":"crate `gpui-box` does not exist"}]}"#;
+        for code in ["000", "301", "401", "403", "429", "500", "", "404\n"] {
+            assert!(crate_is_new_from_response(code, missing, "gpui-box").is_err());
+        }
+        for code in ["200", "404"] {
+            for body in [
+                "",
+                "not json",
+                "null",
+                "{}",
+                "[]",
+                r#"{"crate":{"id":"other","name":"other"}}"#,
+            ] {
+                assert!(crate_is_new_from_response(code, body, "gpui-box").is_err());
+            }
+        }
+        assert!(crate_is_new_from_response("200", missing, "gpui-box").is_err());
+        assert!(crate_is_new_from_response("404", missing, "other").is_err());
+        assert!(
+            crate_is_new_from_response(
+                "200",
+                r#"{"crate":{"id":"gpui-box","name":"gpui-box"},"errors":[]}"#,
+                "gpui-box"
+            )
+            .is_err()
+        );
     }
 
     #[test]

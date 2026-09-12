@@ -51,6 +51,7 @@ pub struct AccessibleTextCache {
     visible: Vec<Range<usize>>,
     visible_nodes: collections::FxHashMap<accesskit::NodeId, accesskit::Node>,
     clip: Option<accesskit::Rect>,
+    transform: crate::TransformationMatrix,
     document: Option<EditSnapshot>,
     representation: Option<(SharedString, bool)>,
     work: AccessibleTextWork,
@@ -700,6 +701,7 @@ fn publish_accessible_text_inner(
         }
         let unchanged = cache.as_ref().is_some_and(|(cache, _)| {
             cache.clip == builder.bounds_clip()
+                && cache.transform == builder.bounds_transform()
                 && cache.visible_nodes.get(&run_ids[run]) == Some(&node)
         });
         if visible {
@@ -750,6 +752,7 @@ fn publish_accessible_text_inner(
         cache.visible = visible.clone();
         cache.visible_nodes = visible_nodes;
         cache.clip = builder.bounds_clip();
+        cache.transform = builder.bounds_transform();
         cache.work = work;
     }
     published

@@ -27,10 +27,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Bounds, Corners, Element, GlassEdge, GlassLobe, GlassMaterial,
-    GlobalElementId, Hsla, InspectorElementId, InteractiveElement as _, IntoElement, LayoutId,
-    LuminanceProbeLease, MAX_GLASS_LOBES, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
-    StatefulInteractiveElement as _, Styled, Window, div, px,
+    AnyElement, App, BackdropStatistics, Bounds, Corners, Element, GlassEdge, GlassLobe,
+    GlassMaterial, GlobalElementId, Hsla, InspectorElementId, InteractiveElement as _, IntoElement,
+    LayoutId, LuminanceProbeLease, MAX_GLASS_LOBES, MouseButton, ParentElement, Pixels, RenderOnce,
+    Rgba, RoundedClip, StatefulInteractiveElement as _, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
@@ -242,6 +242,7 @@ struct GlassState {
     pressed: bool,
     appearance_flipped: bool,
     lease: LuminanceProbeLease,
+    statistics: Option<BackdropStatistics>,
 }
 
 /// A glass surface: optionally scattered and bent backdrop, optional fill,
@@ -271,7 +272,7 @@ pub struct Glass {
     protect_text: bool,
     tint: Option<Hsla>,
     edge_mask: Option<(GlassEdge, f32)>,
-    child: Option<AnyElement>,
+    children: Vec<AnyElement>,
     frame: Option<gpui::Stateful<gpui::Div>>,
 }
 
@@ -301,7 +302,7 @@ impl std::fmt::Debug for Glass {
             .field("protect_text", &self.protect_text)
             .field("tint", &self.tint)
             .field("edge_mask", &self.edge_mask)
-            .field("has_child", &self.child.is_some())
+            .field("has_child", &!self.children.is_empty())
             .finish()
     }
 }
@@ -332,7 +333,7 @@ impl Glass {
             protect_text: true,
             tint: None,
             edge_mask: None,
-            child: None,
+            children: Vec::new(),
             frame: None,
         }
     }
@@ -453,7 +454,9 @@ impl Glass {
     }
 
     /// Deepen the refraction while the surface is pressed, by
-    /// `effect.glassPressDepth`, springing back on release. This is a purely
+    /// `effect.glassPressDepth`, and scale foreground by `effect.glassPressScale`
+    /// without changing layout or the surface outline, springing back on release.
+    /// Reduced motion suppresses foreground scaling. This is a purely
     /// visual response: the surface publishes no action and installs no
     /// handler beyond the press tracking itself.
     pub fn pressable(mut self, pressable: bool) -> Self {
@@ -515,13 +518,18 @@ impl Glass {
     }
 
     pub fn child(mut self, child: impl IntoElement) -> Self {
-        self.child = Some(child.into_any_element());
+        self.children = vec![child.into_any_element()];
         self
     }
 
     /// Keep the overlay's existing percentage-sizing and focus boundary.
-    pub(crate) fn frame(mut self, frame: gpui::Stateful<gpui::Div>) -> Self {
+    pub(crate) fn frame(
+        mut self,
+        frame: gpui::Stateful<gpui::Div>,
+        children: Vec<AnyElement>,
+    ) -> Self {
         self.frame = Some(frame);
+        self.children = children;
         self
     }
 
@@ -600,41 +608,30 @@ impl RenderOnce for Glass {
             material.light_angle = angle;
         }
 
-        // A press reads as pushing the glass down into the backdrop: the
-        // refraction deepens toward `effect.glassPressDepth` on a spring and
-        // returns on release. The layout, the hit target and the semantics
-        // never move; only the optics answer the finger.
+        // One spring drives material depth and foreground scale. Layout and
+        // the outer surface stay fixed; descendant input/IME/semantics follow
+        // the framework's displayed transform, not a second local mapping.
         let mut press_depth = 1.0;
+        let mut press_scale = 1.0;
         if self.pressable {
             let pressed = state.as_ref().is_some_and(|state| state.borrow().pressed);
-            let target = if pressed {
-                theme.effects.glass_press_depth
-            } else {
-                1.0
-            };
-            let depth = motion::tracked(
-                &id,
-                target,
-                MotionPolicy::spec(MotionRole::StateChange, &theme),
-                window,
-                cx,
-            );
-            press_depth = depth;
-            material.refraction *= depth;
+            (press_depth, press_scale) = glass_press(&id, pressed, &theme, window, cx);
+            material.refraction *= press_depth;
         }
 
-        let mut luminance = None;
+        let mut statistics = None;
         if (adaptive || self.preset == GlassPreset::Liquid)
             && let Some(state) = &state
         {
             let mut state = state.borrow_mut();
             if let Some(slot) = state.lease.id() {
                 material.probe = slot;
-                luminance = window.backdrop_luminance(slot);
-                if adaptive && let Some(luminance) = luminance {
+                state.statistics = window.backdrop_statistics(slot).or(state.statistics);
+                statistics = state.statistics;
+                if adaptive && let Some(statistics) = statistics {
                     state.appearance_flipped = deepen_tint(
                         state.appearance_flipped,
-                        luminance,
+                        statistics.mean_luminance,
                         theme.appearance == Appearance::Dark,
                         theme.effects.glass_contrast_flip_low,
                         theme.effects.glass_contrast_flip_high,
@@ -684,8 +681,13 @@ impl RenderOnce for Glass {
             })
             .rounded(px(radius))
             .text_color(theme.colors.text)
-            .shadow(glass_shadows(&theme, self.elevation, luminance))
-            .children(self.child);
+            .shadow(glass_shadows(&theme, self.elevation, statistics))
+            .children(self.children.into_iter().map(|child| GlassContents {
+                radius: px(radius),
+                scale: press_scale,
+                bounds: Rc::clone(&measured),
+                child,
+            }));
         if alpha > 0.0 {
             surface = surface.bg(fill);
         }
@@ -1006,32 +1008,22 @@ impl RenderOnce for GlassGroup {
         // A press deepens the fused outline, not each pane: the group is one
         // body, so the finger answers against the joined refraction.
         let mut press_depth = 1.0;
+        let mut press_scale = 1.0;
         if self.pressable {
             let pressed = state.as_ref().is_some_and(|state| state.borrow().pressed);
-            let target = if pressed {
-                theme.effects.glass_press_depth
-            } else {
-                1.0
-            };
-            let depth = motion::tracked(
-                &id,
-                target,
-                MotionPolicy::spec(MotionRole::StateChange, &theme),
-                window,
-                cx,
-            );
-            press_depth = depth;
-            material.refraction *= depth;
+            (press_depth, press_scale) = glass_press(&id, pressed, &theme, window, cx);
+            material.refraction *= press_depth;
         }
 
         if adaptive && let Some(state) = &state {
             let mut state = state.borrow_mut();
             if let Some(slot) = state.lease.id() {
                 material.probe = slot;
-                if let Some(luminance) = window.backdrop_luminance(slot) {
+                state.statistics = window.backdrop_statistics(slot).or(state.statistics);
+                if let Some(statistics) = state.statistics {
                     state.appearance_flipped = deepen_tint(
                         state.appearance_flipped,
-                        luminance,
+                        statistics.mean_luminance,
                         theme.appearance == Appearance::Dark,
                         theme.effects.glass_contrast_flip_low,
                         theme.effects.glass_contrast_flip_high,
@@ -1076,13 +1068,20 @@ impl RenderOnce for GlassGroup {
             .text_color(theme.colors.text)
             .gap(px(self.gap.unwrap_or(theme.space(Space::Sm))))
             .children(self.panes.into_iter().map(|(ident, child)| {
+                let bounds = Rc::default();
                 let pane = div()
                     .rounded(px(radius))
                     .bg(fill)
-                    .child(child)
+                    .child(GlassContents {
+                        radius: px(radius),
+                        scale: press_scale,
+                        bounds: Rc::clone(&bounds),
+                        child,
+                    })
                     .semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Region));
                 Lobe {
                     radius: px(radius),
+                    bounds,
                     collected: Rc::clone(&collected),
                     child: pane.into_any_element(),
                 }
@@ -1145,6 +1144,7 @@ impl RenderOnce for GlassGroup {
 /// is what lets the group's single backdrop know all its lobes.
 struct Lobe {
     radius: Pixels,
+    bounds: Rc<Cell<Bounds<Pixels>>>,
     collected: Rc<RefCell<Vec<GlassLobe<Pixels>>>>,
     child: AnyElement,
 }
@@ -1180,11 +1180,15 @@ impl Element for Lobe {
         window: &mut Window,
         cx: &mut App,
     ) {
+        self.bounds.set(bounds);
         self.collected.borrow_mut().push(GlassLobe {
             bounds,
             corner_radii: Corners::all(self.radius).clamp_radii_for_quad_size(bounds.size),
         });
-        self.child.prepaint(window, cx);
+        window.with_rounded_content_mask(
+            RoundedClip::new(bounds, Corners::all(self.radius)),
+            |window| self.child.prepaint(window, cx),
+        );
     }
 
     fn paint(
@@ -1207,6 +1211,109 @@ impl IntoElement for Lobe {
     fn into_element(self) -> Self::Element {
         self
     }
+}
+
+/// Clips caller content to its surface, without applying coverage a second
+/// time to the surface's already-rounded fill, border, or shadow. The parent
+/// installs the same clip during prepaint and records its full bounds here;
+/// a padded child's own bounds must not shrink the material's clipping region.
+struct GlassContents {
+    radius: Pixels,
+    scale: f32,
+    bounds: Rc<Cell<Bounds<Pixels>>>,
+    child: AnyElement,
+}
+
+impl IntoElement for GlassContents {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for GlassContents {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<gpui::ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        window.with_visual_scale(self.scale, self.bounds.get().center(), |window| {
+            self.child.prepaint(window, cx);
+        });
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
+        _request_layout: &mut (),
+        _prepaint: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        window.with_rounded_content_mask(
+            RoundedClip::new(self.bounds.get(), Corners::all(self.radius)),
+            |window| {
+                window.with_visual_scale(self.scale, self.bounds.get().center(), |window| {
+                    self.child.paint(window, cx);
+                });
+            },
+        );
+    }
+}
+
+/// A shared normalized spring keeps optical and foreground responses in phase,
+/// including reversal mid-press. Foreground scaling is a Kit policy inspired
+/// by native label observations, not a fitted universal native transfer.
+fn glass_press(
+    id: &gpui::SharedString,
+    pressed: bool,
+    theme: &Theme,
+    window: &mut Window,
+    cx: &mut App,
+) -> (f32, f32) {
+    let progress = motion::tracked(
+        id,
+        if pressed { 1.0_f32 } else { 0.0 },
+        MotionPolicy::spec(MotionRole::Tracking, theme),
+        window,
+        cx,
+    );
+    (
+        1.0 + (theme.effects.glass_press_depth - 1.0) * progress,
+        if cx.reduce_motion() {
+            1.0
+        } else {
+            1.0 + (theme.effects.glass_press_scale - 1.0) * progress
+        },
+    )
 }
 
 /// Where the light is when the pointer carries it: the angle from the
@@ -1299,12 +1406,17 @@ fn protect_text_contrast(material: &mut GlassMaterial<Pixels>, theme: &Theme) {
 fn glass_shadows(
     theme: &Theme,
     elevation: Elevation,
-    luminance: Option<f32>,
+    statistics: Option<BackdropStatistics>,
 ) -> Vec<gpui::BoxShadow> {
-    let strength = luminance.map_or(1.0, |luminance| {
+    let strength = statistics.map_or(1.0, |statistics| {
+        // Encoded samples in [0,1] have standard deviation at most 0.5.
+        // Busy sampled backdrops need separation even when their mean is light.
+        // This is a five-point cue, not an exhaustive image statistic.
+        let separation = (1.0 - statistics.mean_luminance)
+            .max(2.0 * statistics.luminance_variance.sqrt())
+            .clamp(0.0, 1.0);
         theme.effects.glass_shadow_min
-            + (theme.effects.glass_shadow_max - theme.effects.glass_shadow_min)
-                * (1.0 - luminance.clamp(0.0, 1.0))
+            + (theme.effects.glass_shadow_max - theme.effects.glass_shadow_min) * separation
     });
     theme
         .shadow(elevation)
@@ -1410,7 +1522,16 @@ impl Element for BackdropLayer {
         if let Some(cell) = &self.measured {
             measure::record(cell, bounds, window);
         }
-        self.child.prepaint(window, cx);
+        if matches!(&self.lobes, LobeSource::Surface) {
+            window.with_rounded_content_mask(
+                RoundedClip::new(bounds, Corners::all(self.radius)),
+                |window| self.child.prepaint(window, cx),
+            );
+        } else {
+            // Each pane clips its own descendants; the fused optical bridge
+            // is not the intersection of its constituent rounded rectangles.
+            self.child.prepaint(window, cx);
+        }
     }
 
     fn paint(
@@ -1501,6 +1622,74 @@ impl Glass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn rounded_glass_descendants_reject_corner_input(cx: &mut gpui::TestAppContext) {
+        let clicks = Rc::new(Cell::new(0));
+        let received = clicks.clone();
+        let mut harness = gpui_kit_testkit::harness::Harness::new(
+            cx,
+            |cx| {
+                crate::install(cx);
+                cx.set_reduce_motion(true);
+            },
+            move |_, cx| {
+                let child = |id: &'static str, width| {
+                    let received = received.clone();
+                    div()
+                        .id(id)
+                        .w(px(width))
+                        .h(px(48.0))
+                        .on_mouse_down(MouseButton::Left, move |_, _, _| {
+                            received.set(received.get() + 1)
+                        })
+                };
+                div()
+                    .p(px(40.0))
+                    .flex()
+                    .gap(px(32.0))
+                    .child(
+                        Glass::new("clip.input.single")
+                            .radius_px(24.0)
+                            .child(child("clip.input.single.child", 80.0)),
+                    )
+                    .child(
+                        GlassGroup::new("clip.input.group")
+                            .radius(Radius::Pill)
+                            .pane("clip.input.left", child("clip.input.left.child", 48.0))
+                            .pane("clip.input.right", child("clip.input.right.child", 48.0)),
+                    )
+                    .child(
+                        crate::overlay::surface(
+                            "clip.input.frame",
+                            cx.theme(),
+                            crate::overlay::OverlaySurface::MODAL,
+                        )
+                        .semantic_in(cx, NodeSpec::new("clip.input.frame", Role::Region))
+                        .child(child("clip.input.frame.child", 80.0)),
+                    )
+                    .into_any_element()
+            },
+        );
+        for id in [
+            "clip.input.single",
+            "clip.input.left",
+            "clip.input.right",
+            "clip.input.frame",
+        ] {
+            let bounds = harness.bounds(id).expect("glass region");
+            let previous = clicks.get();
+            harness.context().simulate_click(
+                bounds.origin + gpui::point(px(1.0), px(1.0)),
+                gpui::Modifiers::none(),
+            );
+            assert_eq!(clicks.get(), previous, "rounded corner of {id}");
+            harness
+                .context()
+                .simulate_click(bounds.center(), gpui::Modifiers::none());
+            assert_eq!(clicks.get(), previous + 1, "interior of {id}");
+        }
+    }
 
     #[test]
     fn optical_overrides_survive_theme_resolution_and_respect_accessibility() {
@@ -1924,13 +2113,121 @@ mod tests {
     #[test]
     fn glass_shadows_are_outside_only_and_heavier_on_dark_backdrops() {
         let theme = Theme::studio_light();
-        let bright = glass_shadows(&theme, Elevation::Overlay, Some(1.0));
-        let dark = glass_shadows(&theme, Elevation::Overlay, Some(0.0));
+        let samples = |values: [u8; 5]| {
+            let rgba = values.map(|v| [v, v, v, 255]).concat();
+            BackdropStatistics::from_encoded_texels(&rgba, 4, false)
+        };
+        let bright = glass_shadows(&theme, Elevation::Overlay, Some(samples([255; 5])));
+        let dark = glass_shadows(&theme, Elevation::Overlay, Some(samples([0; 5])));
+        let flat = glass_shadows(&theme, Elevation::Overlay, Some(samples([153; 5])));
+        let busy = glass_shadows(
+            &theme,
+            Elevation::Overlay,
+            Some(samples([0, 0, 255, 255, 255])),
+        );
         assert!(!bright.is_empty());
         for (bright, dark) in bright.iter().zip(&dark) {
             assert_eq!(bright.style, gpui::ShadowStyle::Ring);
             assert!(dark.color.a > bright.color.a);
             assert_eq!(dark.blur_radius, bright.blur_radius);
+        }
+        for (flat, busy) in flat.iter().zip(&busy) {
+            assert!(
+                busy.color.a > flat.color.a,
+                "equal means, different variance"
+            );
+            assert_eq!(flat.blur_radius, busy.blur_radius);
+        }
+    }
+
+    #[gpui::test]
+    fn glass_press_scales_foreground_without_reflow_and_releases(cx: &mut gpui::TestAppContext) {
+        use std::time::Duration;
+        for grouped in [false, true] {
+            let captured = Rc::new(Cell::new((
+                Bounds::default(),
+                gpui::VisualTransform::default(),
+            )));
+            let observed = captured.clone();
+            let mut harness = gpui_kit_testkit::harness::Harness::new(
+                cx,
+                |cx| {
+                    crate::install(cx);
+                    cx.set_reduce_motion(false);
+                },
+                move |_, _| {
+                    let observed = observed.clone();
+                    let child = div().w(px(120.)).h(px(60.)).pl(px(7.)).pt(px(11.)).child(
+                        gpui::canvas(
+                            move |bounds, w, _| {
+                                observed.set((bounds, w.visual_transform()));
+                                w.visual_transform()
+                            },
+                            |_, transform, w, _| assert_eq!(transform, w.visual_transform()),
+                        )
+                        .w(px(40.))
+                        .h(px(20.)),
+                    );
+                    let glass = if grouped {
+                        GlassGroup::new("press")
+                            .pressable(true)
+                            .pane("press.pane", child)
+                            .into_any_element()
+                    } else {
+                        Glass::new("press")
+                            .pressable(true)
+                            .child(child)
+                            .into_any_element()
+                    };
+                    div()
+                        .flex()
+                        .flex_col()
+                        .items_start()
+                        .pl(px(33.))
+                        .pt(px(21.))
+                        .child(glass)
+                        .into_any_element()
+                },
+            );
+            harness.frame();
+            let original = captured.get();
+            let outer = harness.bounds("press").expect("surface");
+            harness.context().simulate_mouse_down(
+                outer.center(),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.frame();
+            harness.advance(Duration::from_secs(2));
+            let (logical, transform) = captured.get();
+            assert_eq!(logical, original.0, "foreground layout is fixed");
+            assert_eq!(
+                harness.bounds("press").expect("pressed surface"),
+                outer,
+                "outer surface is fixed"
+            );
+            let scale = harness.update(|_, cx| cx.theme().effects.glass_press_scale);
+            assert!((transform.scale() - scale).abs() < 0.00001);
+            let expected = outer.center() + (logical.origin - outer.center()) * scale;
+            let actual = transform.map_point(logical.origin);
+            assert!((actual.x - expected.x).abs() < px(0.0001));
+            assert!((actual.y - expected.y).abs() < px(0.0001));
+            harness.context().simulate_mouse_up(
+                outer.center(),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.frame();
+            harness.advance(Duration::from_secs(2));
+            assert_eq!(captured.get(), original, "release restores exact identity");
+            harness.update(|_, cx| cx.set_reduce_motion(true));
+            harness.context().simulate_mouse_down(
+                outer.center(),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.frame();
+            assert_eq!(captured.get(), original, "reduced motion suppresses scale");
         }
     }
 

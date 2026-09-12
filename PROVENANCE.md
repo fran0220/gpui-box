@@ -772,6 +772,31 @@ without changing optical source captures. The shared rounded-rectangle field
 is extracted from the existing local geometry. No new third-party dependency
 or source is introduced; the frozen historical import receipt is unchanged.
 
+Uniform subtree visual transforms, effective text/image raster scaling,
+retained transform invalidation, displayed accessibility geometry and Kit
+text-consumer pointer/IME coordinate mapping are original GPUI Box work under
+the existing framework and Kit licenses. They introduce no imported source,
+dependency or native shader ABI change; the frozen receipt remains unchanged.
+Kit Glass descendant clipping uses the framework scope without reapplying
+coverage to the surface's rounded fill, border or shadow.
+
+Explicit inherited-mask escape (`Window::without_content_masks` and
+`Deferred::unclipped`) is original GPUI Box framework work. It preserves
+visual transforms and logical ownership while allowing Kit window overlays
+to escape ancestor masks. No source, dependency or shader ABI is imported;
+the frozen historical receipt is unchanged.
+
+The foreground press policy, five-sample variance-driven shadow policy,
+persistent resize reference producer and forward observable comparison/fitting
+tools are original GPUI Box work. The 1.014 foreground-scale token is a Kit
+design choice informed by the native 144×48 label specimen's approximate
+1.0134 held fit; neither that specimen nor these policies establish universal
+Apple behavior. The Python tools use NumPy and Pillow as development tooling
+(pinned in their requirements file); no library source or native frames are
+embedded in the runtime packages. Native low-amplitude evidence does not support
+a full active-rim coordinate map, so observable errors retain all regions rather
+than forcing a ray interpretation.
+
 ### Kit Regular/Clear material policy
 
 The Kit overlay recipes now use Regular Liquid, reserving `Clear` with a

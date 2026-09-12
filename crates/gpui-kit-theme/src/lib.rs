@@ -759,6 +759,8 @@ pub struct Effects {
     pub glass_contrast_flip_low: f32,
     pub glass_contrast_flip_high: f32,
     pub glass_press_depth: f32,
+    /// Foreground-only press scale; suppressed under reduced motion.
+    pub glass_press_scale: f32,
     pub scroll_edge_band: f32,
     pub scroll_edge_blur: f32,
     /// How strongly a raised surface catches light along its top edge. The
@@ -1360,6 +1362,7 @@ impl Theme {
                 glass_contrast_flip_low: tokens.effect.glass_contrast_flip_low,
                 glass_contrast_flip_high: tokens.effect.glass_contrast_flip_high,
                 glass_press_depth: tokens.effect.glass_press_depth,
+                glass_press_scale: tokens.effect.glass_press_scale,
                 scroll_edge_band: tokens.effect.scroll_edge_band,
                 scroll_edge_blur: tokens.effect.scroll_edge_blur,
                 sheen_alpha: tokens.effect.sheen_alpha,

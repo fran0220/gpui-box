@@ -271,8 +271,36 @@ threshold. No production tokens or snapshots are changed automatically.
 `metrics.py` separately reports checker contrast, background regression, rim
 gradients, fusion-bridge residuals and masked transition morphology. These are
 image-derived proxies; text masks are conservative geometry, not OCR. The
-current GPUI producer explicitly retains the initial transition body and must
-not be used to claim a dynamic fit until actual motion is implemented.
+GPUI producer now resizes the persistent `menu` Glass surface from 144×48 to
+272×128 points at (64,448), with a 24-point radius and expanded Copy/Share/Delete
+content clipped by the surface. It uses the repository `Animator` with a linear
+0.8-second duration and the GPUI TestDispatcher clock. Static captures retain
+the original Actions fixture. Each transition sample resets and settles that
+compact fixture on the same entity/Glass identity, then replays to the requested
+time; sample order is not an animation timeline.
+
+`resize_geometry` records actual child bounds during prepaint, the measurement's
+elapsed simulated time, identity, and resizing/settled phase. Bounds include
+physical-pixel layout rounding. Collection rejects stale geometry timestamps,
+incorrect bounds/phases, and identical menu-region pixels for differing measured
+sizes in one appearance. This is a producer consistency check, not proof that
+arbitrary reports are authentic or that a single isolated image proves motion.
+The midpoint of a native capture bracket chooses the GPUI sample; the bracket
+is **not** a native presentation timestamp. No cross-view matched geometry,
+physical pointer delivery, SwiftUI content-transition equivalence, or Apple
+glass dynamics equivalence is claimed. The expanded labels are switched at the
+programmatic trigger; SwiftUI's implicit content crossfade is not reproduced.
+
+The renderer test `persistent_resize_measures_real_early_intermediate_and_settled_frames`
+checks 80, 300, 790, 800 and 1200 ms at 1×/2× in light/dark, including measured
+geometry and time, changing menu pixels, stable settled output, unchanged other
+fixture regions, exact restored logical bounds, and restored pixels within the
+headless gate's existing one-step-per-channel contract. Unrelated fixtures
+remain byte-exact. Native Metal diagnostics on the pre-release source found
+stable one-code differences confined to the compact menu's lower edge at 2×
+(177 light / 241 dark pixels); longer settling did not remove them. Their cause
+is not established, and byte-exact whole-frame restoration is not claimed. Portable
+producer tests reject stale geometry and static output falsely claiming resize.
 
 Portable checks run in the Linux gate; the real renderer example tests run in
 `gate full`. Run them directly while iterating:

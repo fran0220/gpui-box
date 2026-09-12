@@ -39,7 +39,10 @@ class Protocol(unittest.TestCase):
             (self.root / f"{i}.png").write_bytes(png(960, 640))
             frames.append({**p, "raw_file": f"{i}.rgb", "file": f"{i}.png", "pixel_size": [960, 640],
                            "sample_time_after_trigger": p.get("requested_sample_time", 0),
-                           "transition_status": "unsupported-initial-body-only" if i == 0 else "not-applicable"})
+                           "transition_status": "persistent-surface-resize" if i == 0 else "not-applicable",
+                           "resize_geometry": {"identity": "menu", "bounds": [64, 448, 184, 73],
+                               "sample_time_after_trigger": .25, "phase": "resizing",
+                               "motion": "Animator linear 0.8s; independent compact-state replay"} if i == 0 else None})
         return {"schema": 1, "renderer": "wgpu-software-fallback",
                 "clock": "GPUI TestDispatcher; measured executor now at draw completion", "frames": frames}
 
@@ -57,7 +60,8 @@ class Protocol(unittest.TestCase):
         self.assertEqual((w, h), (960, 640))
         self.assertEqual(pixels[:6], b"\x19\x63\xdb"*2)
         self.assertEqual(frames[0]["rgb_file_sha256"], g.digest(self.root / "0.ppm"))
-        self.assertEqual(frames[0]["transition_status"], "unsupported-initial-body-only")
+        self.assertEqual(frames[0]["transition_status"], "persistent-surface-resize")
+        self.assertEqual(frames[0]["resize_geometry"]["bounds"], [64, 448, 184, 73])
 
     def test_bad_intervals(self):
         for start, end, trigger in [(4, 3, 2), (3, 3, 2), (1, 2, 3),
@@ -113,6 +117,27 @@ class Protocol(unittest.TestCase):
             report["frames"][0]["sample_time_after_trigger"] = actual
             with self.subTest(actual=actual), self.assertRaises(ValueError):
                 g.collect(self.root, self.request(), report)
+
+    def test_resize_requires_fresh_measured_geometry_and_honest_phase(self):
+        for mutation in ({"sample_time_after_trigger": 0}, {"bounds": [64, 448, 144, 48]},
+                         {"bounds": [64, 448, 185, 73]}, {"bounds": [64, 448, True, 73]},
+                         {"phase": "settled"}, {"identity": "replacement"}, {"motion": "Apple equivalent"}):
+            report = self.report()
+            report["frames"][0]["resize_geometry"].update(mutation)
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                g.collect(self.root, self.request(), report)
+
+    def test_static_pixels_cannot_claim_resize_even_if_other_region_changes(self):
+        report = self.report()
+        request = self.request()
+        request["frames"][1]["appearance"] = "dark"
+        report["frames"][1]["appearance"] = "dark"
+        # Deliberately alter a pixel outside the resize ROI; full-frame hashes
+        # would differ, but that is not evidence of menu motion.
+        raw = self.root / "1.rgb"
+        raw.write_bytes(b"\xff\xff\xff" + raw.read_bytes()[3:])
+        with self.assertRaisesRegex(ValueError, "static resize pixels"):
+            g.collect(self.root, request, report)
 
     def test_report_rejects_malformed_outputs(self):
         mutations = [lambda r: r["frames"].clear(),
@@ -202,7 +227,7 @@ class Protocol(unittest.TestCase):
             self.assertEqual(sources[path], g.digest(g.REPO / path))
         self.assertEqual(candidate["parameters_sha256"], g.digest(output / "parameters.json"))
         self.assertEqual(candidate["provenance"]["reference_manifest_sha256"], g.digest(reference / "manifest.json"))
-        self.assertIn("UNSUPPORTED", candidate["coverage"]["transition"])
+        self.assertIn("no Apple dynamics equivalence", candidate["coverage"]["transition"])
         self.assertEqual(g.load(output / "candidate.json"), candidate)
         self.assertFalse((output / "smoke.json").exists())
 

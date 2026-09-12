@@ -1,10 +1,10 @@
 schema = 1
 project = "GPUI Box"
 repository = "https://github.com/fran0220/gpui-box"
-cohort = "0.1.x"
-release_status = "released"
-release_version = "0.1.2"
-release_date = "2026-08-13"
+cohort = "0.2.x"
+release_status = "unreleased"
+release_version = "0.2.0"
+release_date = "2026-09-12"
 rust_version = "1.97"
 edition = "2024"
 type_universe_package = "gpui-box"
@@ -104,6 +104,32 @@ statistics_tests = ["encoded_statistics_respect_channels_padding_and_alpha", "st
 contract = "Explicit with_rounded_content_mask scopes must surround descendants in both prepaint and paint using window-coordinate logical pixels. Geometry-equal inherited chains govern pointer hitboxes and retained/deferred execution. Scene-local parent-first replay masks primitive writes, leaving rectangular ContentMask culling and optical source capture/probes unchanged. AccessKit uses conservative outer rectangle intersections, not curved bounds. Style overflow behavior is unchanged."
 validation = "Combined Linux CPU613/WGPU57/headless13 tests and 364 catalog images pass. The integer-texture test is not browser GL runtime evidence. Native Metal executed the portable clip pixel test in source snapshot ccf09bc1b45fa3fdaff4c6411beba30a0603c3bd844a39f882da3f371cd0c79c (macOS27 build26A5416b, M4 Pro, SDK26.2). CVPixelBuffer pixels, native D3D/FXC and native full-catalog validation remain pending; this evidence does not cover subsequent visual-scale work."
 portable_test = "framework_rounded_subtree_clip_pixels"
+
+[framework_mask_escape]
+contract = "without_content_masks clears inherited rectangular and rounded masks in paired prepaint/paint scopes, restores siblings, and preserves transforms, offsets and accessibility ownership. Own inner masks and the viewport still apply. Deferred::unclipped opts into escape; default deferred clipping is unchanged. Kit Overlay opts in for its window-level surfaces."
+tests = ["unclipped_deferred_preserves_scale_inner_masks_restoration_cache_and_a11y", "unclipped_deferred_pixels_keep_scale_and_restore_ancestor_masks", "window_overlay_escapes_rounded_glass_ancestor"]
+validation = "Integrated Linux CPU, software WGPU pixel and Kit overlay/popover/toast pointer regressions pass. The three-state pixel image was inspected. Exact source e6ad41ee828afe07ae1973e204bbcbdc00628017d9c800ac01325888c41eaf9f passed 605 GPUI, 978 Kit, 16 headless and 7 Metal renderer tests on macOS27 build26A5416b/M4 Pro/SDK26.2, including the portable escape pixels. Its resize example initially failed an exact-byte restoration assertion; the separate restoration entry records the correction and rerun. Native Direct3D and full native catalog execution remain pending."
+
+[framework_visual_scale]
+contract = "Pair with_visual_scale in prepaint and paint; captured VisualTransform composes inner then outer around enclosing logical origins. Layout, shaping, scroll distances and canvas bounds remain logical. Primitive geometry and effective glyph/emoji/SVG raster resolution scale; inherited outer clips stay fixed and inner clips transform. Hitboxes inverse-map displayed global pointers. Retained/deferred/replay chains capture transforms and invalidate on scale changes. Native PlatformView refuses nonidentity transforms."
+coordinates = "Events remain displayed window-global. on_focus_resolved reports full displayed bounds, not clip-intersected bounds. AccessKit uses conservative displayed rectangles and centrally scaled synthetic character geometry. ElementInputHandler transforms element_bounds metadata ONLY: entity callbacks remain global-in/displayed-out with logical bounds_for_range element bounds. TextLayout pointer indexing inverse-maps points and position_for_index returns displayed points; range rectangles stay logical. Anchored.position stays logical."
+kit = "Input, TextArea and independent auth slots publish captured transforms with layout snapshots; pointer indices inverse-map once and native/legacy IME rectangles forward-map once. TextArea source geometry remains logical plus transform and emits transform-only geometry changes. Editor exports displayed row/viewport rectangles and inverse-maps popup anchors into its shared logical scope. Glass clips caller foreground writes, not surface fill/shadow coverage or the fused optical bridge."
+tests = ["scale_preserves_layout_deferred_cache_clips_and_accessibility", "visual_scale_rasterizes_glyph_and_svg_at_effective_resolution", "input_visual_transform_maps_pointer_selection_and_ime_once", "textarea_visual_transform_preserves_rectangle_selection_and_geometry", "auth_visual_transform_uses_each_slots_own_snapshot", "editor_visual_transform_keeps_public_geometry_hover_and_popup_coherent", "rounded_glass_descendants_reject_corner_input", "glass_clips_foreground_without_clipping_surface_shadows_or_fused_bridge"]
+validation = "Focused integrated Linux CPU, WGPU and Kit tests pass. Storage and integer-texture transports execute on a native software adapter, not a browser GL context. Exact source archive de1837ee42cd66184a684a3113881f9d4e87b147aca2a6700823bda1124806a6 passed 604 GPUI, 14 headless, 5 glass_reference, 7 Metal renderer and 975 Kit tests on macOS27 build26A5416b/M4 Pro/SDK26.2. This includes native Metal effective-resolution glyph/SVG and Glass clipping pixels, plus simulated Kit pointer/IME mappings. Native Direct3D runtime, native-view refusal, physical/native IME delivery and the native full visual catalog remain unverified; no SwiftUI equivalence is claimed."
+
+frame_validation = "Follow-up source cb8f42c7c47c832e4934f77a0befc9a2d65b986d5c810422df54cf6c7ac3784e changes only Kit Glass/frame integration, scene, docs and the pixel fixture; framework/renderers/locks are byte-identical to de1837ee. On the same Mac, 975 Kit and 5 native Metal glass_reference tests pass, including two percentage-width siblings and rounded corner rejection through GlassSurface."
+
+[kit_glass_press]
+contract = "A shared Tracking/Grab spring drives optical depth and foreground scale around each logical surface/pane center. glassPressScale=1.014 is Kit policy, not a universal native constant. Layout and material outline stay fixed; reduced motion suppresses foreground scale. Shadows use the last completed five-sample mean/variance cue, not exhaustive backdrop analysis."
+tests = ["glass_foreground_press_renders_about_each_logical_center"]
+validation = "Actual software-WGPU and native Metal headless down/up tests cover intermediate/settled frames, independent pixel boundaries, single/group centers, glyph changes, release and reduced motion. Native evidence is the exact e6ad41ee source named above; optical fixture frames were inspected. These tests are not physical pointer delivery or a real-window motion recording."
+motion_validation = "On that same production source, an inspected 18s macOS gallery recording with injected OS events shows single/fused material and rim press responses and coherent release without layout jumps or text clipping. The 1.014 foreground scale is NOT clearly resolved in the movie or magnified crops; its evidence remains the separate headless tests. No physical-HID, Apple-dynamics or latency claim. Gallery binary SHA256 54ef51d021aed2f2310535a48cb7a693eb880dd11395bd69852cb2172ed1d7e0; evidence archive SHA256 5713e82419df1b330a9a3b4fa54119bcb39f2938083bd564831f24ce0ec1186c."
+window_limitations = "The current gallery and an origin/main control build both created decorated but blank client windows in the same Xvfb/Openbox setup. Their common cause is not established; this is not successful Linux real-window motion evidence. Linux offscreen coverage is independent."
+
+[glass_reference_resize]
+contract = "A persistent menu replays repository Animator linear 800ms from 144x48 to 272x128 and reports actual prepaint geometry/time for independently replayed samples. Expanded content switches at the trigger and clips to the current surface. Capture-bracket midpoint is a sample choice, not presentation time or Apple dynamics equivalence."
+tests = ["persistent_resize_measures_real_early_intermediate_and_settled_frames"]
+validation = "Exact e6ad41ee source initially passed 7 example tests and failed byte-exact restoration at 2x. Native diagnostics found 177 light/241 dark lower-edge pixels differing by one code, stable after additional frames/10s; no cause is established. The same production source with example SHA256 1c90acec857deca129f051bb7e2bf305a043688aee4ff78e795ccaa0a764f6ea passes all 8 Metal example tests: all four scale/appearance cases restore exact logical bounds/dimensions, pixels within the existing headless one-step/channel contract, and unrelated fixtures byte-exact. Logs SHA256 71cb00d4cce9e9e1d177db9b8506705f675eab96a6ad973669ceb480f68a49cb. No whole-frame byte-exact, native full-catalog or Windows runtime claim."
 
 [framework_accessibility]
 cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."

@@ -295,7 +295,7 @@ impl Element for &'static str {
         _window: &mut Window,
         _cx: &mut App,
     ) {
-        text_layout.prepaint(bounds, self)
+        text_layout.prepaint(bounds, self, _window.visual_transform())
     }
 
     fn paint(
@@ -369,7 +369,7 @@ impl Element for SharedString {
         _window: &mut Window,
         _cx: &mut App,
     ) {
-        text_layout.prepaint(bounds, self.as_ref())
+        text_layout.prepaint(bounds, self.as_ref(), _window.visual_transform())
     }
 
     fn paint(
@@ -621,7 +621,8 @@ impl Element for StyledText {
         _window: &mut Window,
         _cx: &mut App,
     ) {
-        self.layout.prepaint(bounds, &self.text)
+        self.layout
+            .prepaint(bounds, &self.text, _window.visual_transform())
     }
 
     fn paint(
@@ -659,6 +660,7 @@ struct TextLayoutInner {
     truncate_width: Option<Pixels>,
     size: Option<Size<Pixels>>,
     bounds: Option<Bounds<Pixels>>,
+    visual_transform: crate::VisualTransform,
 }
 
 impl TextLayout {
@@ -794,6 +796,7 @@ impl TextLayout {
                         truncate_width,
                         size: Some(Size::default()),
                         bounds: None,
+                        visual_transform: crate::VisualTransform::default(),
                     });
                     return Size::default();
                 };
@@ -814,6 +817,7 @@ impl TextLayout {
                     truncate_width,
                     size: Some(size),
                     bounds: None,
+                    visual_transform: crate::VisualTransform::default(),
                 });
 
                 size
@@ -821,13 +825,14 @@ impl TextLayout {
         })
     }
 
-    fn prepaint(&self, bounds: Bounds<Pixels>, text: &str) {
+    fn prepaint(&self, bounds: Bounds<Pixels>, text: &str, transform: crate::VisualTransform) {
         let mut element_state = self.0.borrow_mut();
         let element_state = element_state
             .as_mut()
             .with_context(|| format!("measurement has not been performed on {text}"))
             .expect("required framework invariant must hold");
         element_state.bounds = Some(bounds);
+        element_state.visual_transform = transform;
     }
 
     fn source(&self) -> SharedString {
@@ -893,7 +898,7 @@ impl TextLayout {
         }
     }
 
-    /// Get the byte index into the input of the pixel position.
+    /// Get the byte index at a displayed window-global pixel position.
     pub fn index_for_position(&self, mut position: Point<Pixels>) -> Result<usize, usize> {
         let element_state = self.0.borrow();
         let element_state = element_state
@@ -902,6 +907,7 @@ impl TextLayout {
         let bounds = element_state
             .bounds
             .expect("prepaint has not been performed");
+        position = element_state.visual_transform.unmap_point(position);
 
         if position.y < bounds.top() {
             return Err(0);
@@ -940,6 +946,7 @@ impl TextLayout {
         let bounds = element_state
             .bounds
             .expect("prepaint has not been performed");
+        let position = element_state.visual_transform.unmap_point(position);
         if position.y < bounds.top() {
             return 0;
         }
@@ -962,7 +969,7 @@ impl TextLayout {
         element_state.len
     }
 
-    /// Get the pixel position for the given byte index.
+    /// Get the displayed window pixel position for the given byte index.
     pub fn position_for_index(&self, index: usize) -> Option<Point<Pixels>> {
         let element_state = self.0.borrow();
         let element_state = element_state
@@ -986,7 +993,9 @@ impl TextLayout {
                 continue;
             } else {
                 let ix_within_line = index - line_start_ix;
-                return Some(line_origin + line.position_for_index(ix_within_line, line_height)?);
+                return Some(element_state.visual_transform.map_point(
+                    line_origin + line.position_for_index(ix_within_line, line_height)?,
+                ));
             }
         }
 
@@ -1059,7 +1068,9 @@ impl TextLayout {
         rows
     }
 
-    /// Returns the visual rectangles occupied by a source byte range.
+    /// Returns layout-space rectangles occupied by a source byte range, suitable
+    /// for painting overlays in the same scope. Unlike `position_for_index`,
+    /// these are not mapped to displayed coordinates.
     ///
     /// The result may contain multiple rectangles for wrapped or
     /// bidirectional text. The caller supplies the same alignment used to
@@ -1766,15 +1777,18 @@ impl Element for InteractiveText {
                         let scope = window.selection_scope();
                         let layout = self.text.layout().clone();
                         let resolver_text = source.clone();
-                        let mut participant =
-                            SelectionParticipant::new(document.key.clone(), document.order, bounds)
-                                .scope(scope)
-                                .text(source.clone())
-                                .rows(visual_rows)
-                                .sensitive(document.sensitive)
-                                .resolver(Rc::new(move |position| {
-                                    selectable_index_at(&resolver_text, &layout, position)
-                                }));
+                        let mut participant = SelectionParticipant::new(
+                            document.key.clone(),
+                            document.order,
+                            window.visual_transform().map_bounds(bounds),
+                        )
+                        .scope(scope)
+                        .text(source.clone())
+                        .rows(visual_rows)
+                        .sensitive(document.sensitive)
+                        .resolver(Rc::new(move |position| {
+                            selectable_index_at(&resolver_text, &layout, position)
+                        }));
                         if document.coverage == SelectionCoverage::Virtualized {
                             participant = participant.virtualized();
                         }
@@ -2203,7 +2217,7 @@ impl Element for InteractiveText {
 
                     // Use bounds instead of testing hitbox since this is called during prepaint.
                     let check_is_hovered_during_prepaint = Rc::new({
-                        let source_bounds = hitbox.bounds;
+                        let source_bounds = hitbox.visual_transform.map_bounds(hitbox.bounds);
                         let text_layout = text_layout.clone();
                         let pending_mouse_down = interactive_state.mouse_down_index.clone();
                         move |window: &Window| {
@@ -2270,6 +2284,55 @@ mod tests {
     };
 
     struct SelectableTextTestView;
+
+    #[gpui::test]
+    fn text_indices_inverse_map_global_points_without_scaling_layout(cx: &mut TestAppContext) {
+        let handle = cx.add_window(|_, _| SelectableTextTestView);
+        handle
+            .update(cx, |_, window, _| {
+                let text: SharedString = "abcdef".into();
+                let lines = window
+                    .text_system()
+                    .shape_text(
+                        text.clone(),
+                        px(16.),
+                        &[window.text_style().to_run(text.len())],
+                        None,
+                        None,
+                    )
+                    .expect("shape");
+                let logical = Bounds::new(point(px(30.), px(18.)), crate::size(px(200.), px(24.)));
+                let layout = TextLayout(Rc::new(RefCell::new(Some(TextLayoutInner {
+                    source: text,
+                    len: 6,
+                    lines,
+                    line_height: px(24.),
+                    wrap_width: None,
+                    truncate_width: None,
+                    size: Some(logical.size),
+                    bounds: Some(logical),
+                    visual_transform: crate::VisualTransform::default(),
+                }))));
+                let cells = layout.bounds_for_range(2..3, TextAlign::Left);
+                let original = layout.position_for_index(2).expect("position");
+                let t = crate::VisualTransform::scale_about(2., point(px(-11.), px(7.)));
+                layout.prepaint(logical, "abcdef", t);
+                let displayed = layout.position_for_index(2).expect("displayed position");
+                assert_eq!(
+                    displayed,
+                    point(original.x * 2. + px(11.), original.y * 2. - px(7.))
+                );
+                assert_eq!(layout.index_for_position(displayed), Ok(2));
+                assert_eq!(layout.closest_index_for_position(displayed), 2);
+                assert_eq!(layout.bounds_for_range(2..3, TextAlign::Left), cells);
+                assert_ne!(
+                    layout.index_for_position(original),
+                    Ok(2),
+                    "unmapped pointer cannot select the same index"
+                );
+            })
+            .expect("window");
+    }
 
     impl Render for SelectableTextTestView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {

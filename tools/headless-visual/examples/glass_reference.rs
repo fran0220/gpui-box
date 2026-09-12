@@ -1,22 +1,35 @@
 //! Independently authored GPUI candidate, not a native reference or fitted material.
 //! Usage: glass_reference REQUEST.json OUTPUT_DIRECTORY
-//! Requests and parameters are produced/validated by gpui_capture.py. Morphing is
-//! explicitly unsupported: transition samples retain the initial Actions body.
+//! Requests and parameters are produced/validated by gpui_capture.py. Transition
+//! samples replay a persistent surface resize, not cross-view matched geometry.
 use anyhow::{Result, bail, ensure};
 use gpui::{
     AnyWindowHandle, App, Context, FontWeight, HeadlessAppContext, IntoElement, Render, Window,
     div, hsla, prelude::*, px, rgb, size,
 };
+use gpui_kit::motion::Animator;
 use gpui_kit::prelude::{Glass, GlassGroup, GlassPreset, ThemeOverlay};
 use gpui_kit_theme::{Radius, activate_theme};
 use serde_json::{Value, json};
-use std::{fs, path::Path, sync::Arc, time::Duration};
+use std::{
+    cell::Cell,
+    fs,
+    path::Path,
+    rc::Rc,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
+#[path = "glass_reference/observable.rs"]
+mod observable;
 
 struct Fixture {
     fixture: Value,
     parameters: Value,
     background: bool,
     dark: bool,
+    resize: Option<Animator>,
+    measured: Rc<Cell<([f32; 4], Option<Instant>)>>,
 }
 
 fn rect(v: &Value) -> [f32; 4] {
@@ -128,7 +141,7 @@ fn validate_parameters(parameters: &Value) -> Result<()> {
     Ok(())
 }
 impl Render for Fixture {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let mut root = div()
             .relative()
             .w(px(960.0))
@@ -256,19 +269,74 @@ impl Render for Fixture {
                     ),
                 ));
             }
-            let r = rect(&self.fixture["transition"]["button"]);
-            root = root.child(
-                positioned(r).child(regular(
-                    material(
-                        Glass::new("menu")
-                            .radius_px(24.0)
-                            .pressable(true)
-                            .track_pointer(true),
-                        &self.parameters,
+            let mut r = rect(&self.fixture["transition"]["button"]);
+            if let Some(animator) = self.resize {
+                let now = cx.background_executor().now();
+                let progress = animator.head(now);
+                let target = rect(&self.fixture["transition"]["menu"]);
+                for i in 0..4 {
+                    r[i] += (target[i] - r[i]) * progress;
+                }
+                if animator.running(now) {
+                    window.request_animation_frame();
+                }
+            }
+            let content = if self.resize.is_some() {
+                div()
+                    .w(px(r[2]))
+                    .h(px(r[3]))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        div().flex().flex_col().gap(px(12.0)).children(
+                            self.fixture["transition"]["menu_labels"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .map(|text| {
+                                    div()
+                                        .text_size(px(17.0))
+                                        .line_height(px(20.0))
+                                        .text_color(rgb(if self.dark {
+                                            0xffffff
+                                        } else {
+                                            0x000000
+                                        }))
+                                        .child(text.as_str().unwrap().to_owned())
+                                }),
+                        ),
                     )
-                    .child(label("Actions", r[2], r[3], self.dark, false)),
-                    &self.parameters,
-                )),
+            } else {
+                label("Actions", r[2], r[3], self.dark, false)
+            };
+            let measured = self.measured.clone();
+            root = root.child(
+                positioned(r)
+                    .on_children_prepainted(move |bounds, _, cx| {
+                        if let Some(b) = bounds.first() {
+                            measured.set((
+                                [
+                                    b.origin.x.into(),
+                                    b.origin.y.into(),
+                                    b.size.width.into(),
+                                    b.size.height.into(),
+                                ],
+                                Some(cx.background_executor().now()),
+                            ));
+                        }
+                    })
+                    .child(regular(
+                        material(
+                            Glass::new("menu")
+                                .radius_px(24.0)
+                                .pressable(true)
+                                .track_pointer(true),
+                            &self.parameters,
+                        )
+                        .child(content),
+                        &self.parameters,
+                    )),
             );
         }
         root
@@ -277,9 +345,12 @@ impl Render for Fixture {
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 4 && args[1] == "--observable" {
+        return observable::run(Path::new(&args[2]), Path::new(&args[3]));
+    }
     ensure!(
         args.len() == 3,
-        "usage: glass_reference REQUEST.json OUTPUT_DIRECTORY"
+        "usage: glass_reference [--observable] REQUEST.json OUTPUT_DIRECTORY"
     );
     let request: Value = serde_json::from_slice(&fs::read(&args[1])?)?;
     let out = Path::new(&args[2]);
@@ -310,6 +381,8 @@ fn main() -> Result<()> {
             parameters: parameters.clone(),
             background: true,
             dark: false,
+            resize: None,
+            measured: Rc::new(Cell::new(([0.0; 4], None))),
         })
     })?;
     let handle: AnyWindowHandle = window.into();
@@ -342,10 +415,12 @@ fn main() -> Result<()> {
         window.update(&mut cx, |view, window, cx| {
             view.dark = appearance == "dark";
             view.background = phase == "background";
+            view.resize = None;
+            view.measured.set(([0.0; 4], None));
             window.set_scale_factor(scale as f32);
             cx.notify();
         })?;
-        // Every unsupported transition starts from the same settled initial body.
+        // Replay each sample from compact state on the same view and Glass id.
         let mut previous: Option<image::RgbaImage> = None;
         let mut settled = false;
         for _ in 0..32 {
@@ -371,6 +446,16 @@ fn main() -> Result<()> {
                 t.is_finite() && (0.0..=120.0).contains(&t),
                 "invalid sample time"
             );
+            window.update(&mut cx, |view, _, cx| {
+                let mut animator = Animator::new(Duration::from_secs_f64(
+                    view.fixture["transition"]["duration_seconds"]
+                        .as_f64()
+                        .unwrap(),
+                ));
+                animator.play(trigger);
+                view.resize = Some(animator);
+                cx.notify();
+            })?;
             cx.advance_clock(Duration::from_secs_f64(t));
         }
         cx.run_until_parked();
@@ -380,6 +465,13 @@ fn main() -> Result<()> {
                 .now()
                 .duration_since(trigger)
                 .as_secs_f64()
+        })?;
+        let geometry = window.update(&mut cx, |view, _, _| {
+            let (bounds, measured_at) = view.measured.get();
+            json!({"identity":"menu", "bounds":bounds,
+                "sample_time_after_trigger":measured_at.map(|t| t.duration_since(trigger).as_secs_f64()),
+                "phase":if actual >= 0.8 {"settled"} else {"resizing"},
+                "motion":"Animator linear 0.8s; independent compact-state replay"})
         })?;
         let frame = cx.capture_screenshot(handle)?;
         // TestPlatform allocates at 2x. At 1x the scene itself is rendered at
@@ -397,7 +489,8 @@ fn main() -> Result<()> {
         fs::write(out.join(format!("{stem}.rgb")), rgb)?;
         frames.push(json!({"appearance":appearance,"phase":phase,"index":f["index"],
             "file":format!("{stem}.png"),"raw_file":format!("{stem}.rgb"),"pixel_size":[w,h],
-            "sample_time_after_trigger":actual,"transition_status":if phase=="transition" {"unsupported-initial-body-only"} else {"not-applicable"}}));
+            "sample_time_after_trigger":actual,"transition_status":if phase=="transition" {"persistent-surface-resize"} else {"not-applicable"},
+            "resize_geometry":if phase=="transition" {geometry} else {Value::Null}}));
     }
     fs::write(
         out.join("render.json"),
@@ -412,6 +505,161 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn persistent_resize_measures_real_early_intermediate_and_settled_frames() {
+        let mut cx = HeadlessAppContext::with_platform(
+            Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                "Geist",
+            )),
+            Arc::new(gpui_kit::assets::Assets),
+            gpui_platform::current_headless_renderer,
+        );
+        cx.update(|cx| {
+            gpui_kit::install(cx);
+            cx.set_reduce_motion(false);
+        });
+        let measured = Rc::new(Cell::new(([0.0; 4], None)));
+        let window = cx
+            .open_window(size(px(960.0), px(640.0)), |_, cx: &mut App| {
+                cx.new(|_| Fixture {
+                    fixture: serde_json::from_str(include_str!(
+                        "../../liquid-glass-reference/fixture.json"
+                    ))
+                    .unwrap(),
+                    parameters: json!({}),
+                    background: false,
+                    dark: false,
+                    resize: None,
+                    measured: measured.clone(),
+                })
+            })
+            .unwrap();
+        let handle: AnyWindowHandle = window.into();
+        let capture = |cx: &mut HeadlessAppContext| {
+            cx.run_until_parked();
+            cx.update_window(handle, |_, w, cx| w.draw(cx).clear(cx))
+                .unwrap();
+            cx.capture_screenshot(handle).unwrap()
+        };
+        for scale in [1, 2] {
+            for dark in [false, true] {
+                cx.update(|cx| {
+                    activate_theme(if dark { "studio-dark" } else { "studio-light" }, cx)
+                });
+                window
+                    .update(&mut cx, |view, w, cx| {
+                        view.dark = dark;
+                        view.resize = None;
+                        w.set_scale_factor(scale as f32);
+                        cx.notify();
+                    })
+                    .unwrap();
+                for _ in 0..4 {
+                    capture(&mut cx);
+                }
+                let initial = capture(&mut cx);
+                assert_eq!(measured.get().0, [64.0, 448.0, 144.0, 48.0]);
+                let trigger = cx.background_executor.now();
+                window
+                    .update(&mut cx, |view, _, cx| {
+                        let mut animator = Animator::new(Duration::from_millis(800));
+                        animator.play(trigger);
+                        view.resize = Some(animator);
+                        cx.notify();
+                    })
+                    .unwrap();
+                let crop = |image: &image::RgbaImage| {
+                    image::imageops::crop_imm(
+                        image,
+                        64 * scale,
+                        448 * scale,
+                        272 * scale,
+                        128 * scale,
+                    )
+                    .to_image()
+                };
+                let mut previous = crop(&initial);
+                let mut elapsed = 0;
+                // Explicit independently calculated endpoints and asymmetric
+                // intermediate sizes catch stale views and swapped axes.
+                for (millis, width, height) in [
+                    (80, 156.8, 56.0),
+                    (300, 192.0, 78.0),
+                    (790, 270.4, 127.0),
+                    (800, 272.0, 128.0),
+                    (1200, 272.0, 128.0),
+                ] {
+                    cx.advance_clock(Duration::from_millis(millis - elapsed));
+                    elapsed = millis;
+                    let image = capture(&mut cx);
+                    let (bounds, at) = measured.get();
+                    assert_eq!(
+                        at.unwrap().duration_since(trigger),
+                        Duration::from_millis(millis)
+                    );
+                    for (actual, expected) in bounds.into_iter().zip([64.0, 448.0, width, height]) {
+                        assert!(
+                            (actual - expected).abs() <= 0.51 / scale as f32,
+                            "{bounds:?}"
+                        );
+                    }
+                    let current = crop(&image);
+                    if millis == 1200 {
+                        // Use the documented headless per-channel contract;
+                        // this test does not establish the cause of rounding.
+                        assert!(
+                            current
+                                .as_raw()
+                                .iter()
+                                .zip(previous.as_raw())
+                                .all(|(a, b)| a.abs_diff(*b) <= 1),
+                            "settled pixels changed"
+                        );
+                    } else {
+                        assert_ne!(current, previous, "static output at {millis}ms");
+                    }
+                    // The resize cannot change the unrelated pills/fusion.
+                    assert_eq!(
+                        image::imageops::crop_imm(&image, 0, 0, 960 * scale, 400 * scale)
+                            .to_image(),
+                        image::imageops::crop_imm(&initial, 0, 0, 960 * scale, 400 * scale)
+                            .to_image()
+                    );
+                    previous = current;
+                }
+                window
+                    .update(&mut cx, |view, _, cx| {
+                        view.resize = None;
+                        cx.notify();
+                    })
+                    .unwrap();
+                for _ in 0..4 {
+                    capture(&mut cx);
+                }
+                let restored = capture(&mut cx);
+                assert_eq!(
+                    measured.get().0,
+                    [64.0, 448.0, 144.0, 48.0],
+                    "compact logical geometry must be restored exactly"
+                );
+                assert_eq!(restored.dimensions(), initial.dimensions());
+                assert!(
+                    restored
+                        .as_raw()
+                        .iter()
+                        .zip(initial.as_raw())
+                        .all(|(a, b)| a.abs_diff(*b) <= 1),
+                    "compact pixels must restore within the headless one-step contract"
+                );
+                assert_eq!(
+                    image::imageops::crop_imm(&restored, 0, 0, 960 * scale, 400 * scale).to_image(),
+                    image::imageops::crop_imm(&initial, 0, 0, 960 * scale, 400 * scale).to_image(),
+                    "unrelated fixtures must restore exactly"
+                );
+            }
+        }
+    }
 
     #[test]
     fn bounded_trial_parameters() {
@@ -469,6 +717,8 @@ mod tests {
                     parameters: json!({}),
                     background: false,
                     dark: false,
+                    resize: None,
+                    measured: Rc::new(Cell::new(([0.0; 4], None))),
                 })
             })
             .unwrap();
@@ -631,6 +881,130 @@ mod tests {
             );
             assert_eq!(tinted[3], 255);
         }
+    }
+
+    struct ClippedContents {
+        visible: bool,
+    }
+
+    impl Render for ClippedContents {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            use gpui_kit_theme::ActiveTheme;
+            let body = |width| {
+                div()
+                    .w(px(width))
+                    .h(px(48.0))
+                    .when(self.visible, |body| body.bg(rgb(0xff0000)))
+            };
+            div()
+                .relative()
+                .size_full()
+                .bg(rgb(0xffffff))
+                .child(
+                    positioned([16.0, 16.0, 80.0, 48.0])
+                        .child(Glass::new("clip-single").radius_px(24.0).child(body(80.0))),
+                )
+                .child(
+                    positioned([128.0, 16.0, 104.0, 48.0]).child(
+                        GlassGroup::new("clip-group")
+                            .radius(Radius::Pill)
+                            .gap(8.0)
+                            .merge(32.0)
+                            .pane("clip-left", body(48.0))
+                            .pane("clip-right", body(48.0)),
+                    ),
+                )
+                .child(
+                    positioned([16.0, 88.0, 80.0, 48.0]).child(
+                        gpui_kit::overlay::surface(
+                            "clip-frame",
+                            cx.theme(),
+                            gpui_kit::overlay::OverlaySurface::MODAL,
+                        )
+                        .w_full()
+                        .h_full()
+                        .children([0xff0000, 0x0000ff].map(|color| {
+                            div()
+                                .w_full()
+                                .h(px(24.0))
+                                .when(self.visible, |child| child.bg(rgb(color)))
+                        })),
+                    ),
+                )
+        }
+    }
+
+    #[test]
+    fn glass_clips_foreground_without_clipping_surface_shadows_or_fused_bridge() {
+        let mut cx = HeadlessAppContext::with_platform(
+            Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                "Geist",
+            )),
+            Arc::new(gpui_kit::assets::Assets),
+            gpui_platform::current_headless_renderer,
+        );
+        cx.update(|cx| {
+            gpui_kit::install(cx);
+            cx.set_reduce_motion(true);
+            activate_theme("studio-light", cx);
+        });
+        let window = cx
+            .open_window(size(px(256.0), px(160.0)), |_, cx: &mut App| {
+                cx.new(|_| ClippedContents { visible: false })
+            })
+            .unwrap();
+        let handle: AnyWindowHandle = window.into();
+        let mut capture = |visible| {
+            cx.update_window(handle, |view, _, cx| {
+                view.downcast::<ClippedContents>()
+                    .unwrap()
+                    .update(cx, |view, cx| {
+                        view.visible = visible;
+                        cx.notify();
+                    });
+            })
+            .unwrap();
+            let mut previous = None;
+            for _ in 0..6 {
+                cx.run_until_parked();
+                cx.update_window(handle, |_, window, cx| window.draw(cx).clear(cx))
+                    .unwrap();
+                let image = cx.capture_screenshot(handle).unwrap();
+                if previous.as_ref() == Some(&image) {
+                    return image;
+                }
+                previous = Some(image);
+            }
+            panic!("glass probe and shadows did not settle");
+        };
+        let empty = capture(false);
+        let content = capture(true);
+        let at = |image: &image::RgbaImage, x: u32, y: u32| image.get_pixel(x * 2, y * 2).0;
+        for (x, y) in [
+            (17, 17),
+            (94, 17),
+            (129, 17),
+            (185, 17),
+            (180, 40),
+            (10, 40),
+            (17, 89),
+            (94, 134),
+        ] {
+            assert_eq!(
+                at(&content, x, y),
+                at(&empty, x, y),
+                "outside contents {x},{y}"
+            );
+        }
+        for x in [56, 152, 208] {
+            assert_eq!(at(&content, x, 40), [255, 0, 0, 255], "inside {x}");
+        }
+        assert_eq!(at(&content, 56, 100), [255, 0, 0, 255]);
+        assert_eq!(at(&content, 56, 124), [0, 0, 255, 255]);
+        assert!(
+            at(&empty, 10, 40)[0] < 255,
+            "surface shadow must survive outside clip"
+        );
     }
 
     #[test]

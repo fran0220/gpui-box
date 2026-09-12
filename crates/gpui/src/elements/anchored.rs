@@ -44,6 +44,8 @@ impl Anchored {
 
     /// Sets the position in window coordinates
     /// (otherwise the location the anchored element is rendered is used)
+    /// Under a visual scale this remains layout-space. Inverse-map a displayed
+    /// caret/selection anchor using the captured transform before supplying it.
     pub fn position(mut self, anchor: Point<Pixels>) -> Self {
         self.anchor_position = Some(anchor);
         self
@@ -151,6 +153,7 @@ impl Element for Anchored {
             origin: Point::default(),
             size: window.viewport_size(),
         };
+        let limits = window.visual_transform().unmap_bounds(limits);
 
         if self.fit_mode == AnchoredFitMode::SwitchAnchor {
             let mut anchor = self.anchor;
@@ -179,7 +182,8 @@ impl Element for Anchored {
             }
         }
 
-        let client_inset = window.client_inset.unwrap_or(px(0.));
+        let client_inset =
+            window.client_inset.unwrap_or(px(0.)) / window.visual_transform().scale();
         let edges = match self.fit_mode {
             AnchoredFitMode::SnapToWindowWithMargin(edges) => edges,
             _ => Edges::default(),

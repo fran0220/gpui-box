@@ -414,6 +414,7 @@ pub fn anchored(
                         .child(content),
                 )),
         )
+        .unclipped()
         .priority(1)
         .into_any_element(),
     )
@@ -433,6 +434,7 @@ pub fn at(
             .snap_to_window_with_margin(px(theme.spacing.sm))
             .child(motion::menu_in(id, theme, div().occlude().child(content))),
     )
+    .unclipped()
     .priority(1)
     .into_any_element()
 }
@@ -459,6 +461,7 @@ pub fn modal(
                     .child(motion::dialog_in(id, theme, div().child(content))),
             ),
     )
+    .unclipped()
     .priority(2)
     .into_any_element()
 }

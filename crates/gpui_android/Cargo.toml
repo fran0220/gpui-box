@@ -1,12 +1,12 @@
 [package]
 name = "gpui-box-android"
-version = "0.1.2"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license = "Apache-2.0"
 repository.workspace = true
 description = "Android Activity and native surface backend for GPUI Box"
-publish = false
+publish = true
 
 [lints]
 workspace = true
@@ -19,7 +19,7 @@ name = "gpui_android"
 host-check = []
 
 [dependencies]
-gpui = { package = "gpui-box", path = "../gpui", version = "0.1.2", default-features = false }
+gpui = { package = "gpui-box", path = "../gpui", version = "0.2.0", default-features = false }
 gpui_wgpu.workspace = true
 anyhow.workspace = true
 futures.workspace = true

@@ -411,6 +411,9 @@ impl TokenDocument {
         if self.effect.glass_press_depth < 1.0 {
             return invalid("effect.glassPressDepth", "must be at least 1");
         }
+        if !self.effect.glass_press_scale.is_finite() || self.effect.glass_press_scale < 1.0 {
+            return invalid("effect.glassPressScale", "must be finite and at least 1");
+        }
 
         for (path, value) in [
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
@@ -2705,6 +2708,10 @@ pub struct EffectTokens {
     /// How much thicker a pressable glass surface reads while pressed, as a
     /// factor on its refraction. 1 is a surface that does not deform.
     pub glass_press_depth: f32,
+    /// Foreground-only visual scale while pressed; layout and the material
+    /// outline stay fixed. A Kit policy, not a universal native constant.
+    /// Reduced motion suppresses this transform.
+    pub glass_press_scale: f32,
     /// How far a scroll-edge effect reaches from a floating surface into the
     /// scrolling content, in pixels.
     pub scroll_edge_band: f32,

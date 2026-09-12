@@ -750,10 +750,12 @@ impl Render for OneTimeCodeInput {
             .when(selected, |slot| slot.bg(theme.colors.selected))
             .child(
                 gpui::canvas(
-                    move |bounds, _, cx| {
-                        field.update(cx, |field, _| field.set_slot_bounds(index, bounds));
+                    move |bounds, window, _| (bounds, window.visual_transform()),
+                    move |_, (bounds, transform), _, cx| {
+                        field.update(cx, |field, _| {
+                            field.set_slot_bounds(index, bounds, transform)
+                        });
                     },
-                    |_, _, _, _| {},
                 )
                 .absolute()
                 .inset_0(),
@@ -786,6 +788,129 @@ impl Render for OneTimeCodeInput {
 mod native_geometry_tests {
     use super::*;
     use gpui::{EntityInputHandler, NativeTextPosition, TextAffinity, TextNavigationDirection};
+
+    #[gpui::test]
+    fn auth_visual_transform_uses_each_slots_own_snapshot(cx: &mut gpui::TestAppContext) {
+        use crate::controls::input::TestVisualScale;
+        use std::{
+            cell::{Cell, RefCell},
+            rc::Rc,
+        };
+        let scaled = Rc::new(Cell::new(false));
+        let scale = scaled.clone();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness =
+            gpui_kit_testkit::harness::Harness::new(cx, crate::install, move |window, cx| {
+                let code = build
+                    .borrow_mut()
+                    .get_or_insert_with(|| {
+                        cx.new(|cx| {
+                            OneTimeCodeInput::new("scaled.code", window, cx)
+                                .slots(4)
+                                .text("a🦀e\u{301}z")
+                        })
+                    })
+                    .clone();
+                TestVisualScale {
+                    enabled: scale.get(),
+                    child: div()
+                        .p(px(40.0))
+                        .w(px(320.0))
+                        .child(code)
+                        .into_any_element(),
+                }
+                .into_any_element()
+            });
+        harness.frame();
+        let code = slot.borrow().clone().expect("code mounted");
+        let field = harness.update(|_, cx| code.read(cx).field.clone());
+        let logical = harness.update(|window, cx| {
+            field.update(cx, |field, cx| {
+                field.selection_rects_for_range(0..6, window, cx)
+            })
+        });
+        assert_eq!(logical.len(), 4);
+        for enabled in [true, false] {
+            scaled.set(enabled);
+            harness.frame();
+            harness.update(|window, cx| {
+                field.update(cx, |field, cx| {
+                    let rects = field.selection_rects_for_range(0..6, window, cx);
+                    for (actual, original) in rects.iter().zip(&logical) {
+                        let expected = if enabled {
+                            gpui::Bounds::new(
+                                gpui::point(
+                                    original.bounds.left() * 1.5 + px(7.5),
+                                    original.bounds.top() * 1.5 - px(20.5),
+                                ),
+                                original.bounds.size.map(|value| value * 1.5),
+                            )
+                        } else {
+                            original.bounds
+                        };
+                        assert_eq!(actual.bounds, expected);
+                    }
+                    assert_eq!(
+                        field.character_index_for_point(rects[2].bounds.origin, window, cx),
+                        Some(3)
+                    );
+                    assert_eq!(
+                        field
+                            .native_position_for_point(
+                                rects[2].bounds.origin,
+                                Some(3..5),
+                                window,
+                                cx
+                            )
+                            .expect("slot point")
+                            .utf16_offset,
+                        3
+                    );
+                    let position = NativeTextPosition {
+                        utf16_offset: 3,
+                        ..Default::default()
+                    };
+                    assert_eq!(
+                        field
+                            .native_position_bounds(position, window, cx)
+                            .expect("slot caret")
+                            .origin,
+                        rects[2].bounds.origin
+                    );
+                    // A well can have a different scale/origin than the hidden
+                    // editor. Publishing that snapshot must not use the editor T.
+                    let bounds = logical[2].bounds;
+                    field.set_slot_bounds(
+                        2,
+                        bounds,
+                        gpui::VisualTransform::scale_about(0.5, gpui::point(px(31.0), px(-19.0))),
+                    );
+                    let expected = gpui::Bounds::new(
+                        gpui::point(bounds.left() * 0.5 + px(15.5), bounds.top() * 0.5 - px(9.5)),
+                        bounds.size.map(|value| value * 0.5),
+                    );
+                    assert_eq!(
+                        field.selection_rects_for_range(3..5, window, cx)[0].bounds,
+                        expected
+                    );
+                    let caret = field
+                        .native_position_bounds(position, window, cx)
+                        .expect("independent slot caret");
+                    assert_eq!(caret.origin, expected.origin);
+                    assert_eq!(caret.size.height, expected.size.height);
+                    assert_eq!(caret.size.width, px(cx.theme().measures.caret_width) * 0.5);
+                    assert_eq!(
+                        field
+                            .native_position_for_point(expected.origin, Some(3..5), window, cx)
+                            .expect("independent slot point")
+                            .utf16_offset,
+                        3
+                    );
+                })
+            });
+        }
+    }
 
     #[gpui::test]
     fn native_otp_fragments_follow_measured_wells_not_uniform_editor_slices(

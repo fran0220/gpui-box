@@ -256,6 +256,7 @@ pub trait EntityInputHandler: 'static + Sized {
 pub struct ElementInputHandler<V> {
     view: Entity<V>,
     element_bounds: Bounds<Pixels>,
+    visual_transform: crate::VisualTransform,
 }
 
 impl<V: 'static> ElementInputHandler<V> {
@@ -266,7 +267,19 @@ impl<V: 'static> ElementInputHandler<V> {
         ElementInputHandler {
             view,
             element_bounds,
+            visual_transform: crate::VisualTransform::default(),
         }
+    }
+
+    /// Captures the mapping used by this frame's logical `element_bounds`.
+    /// Only the handler's element-bounds metadata is mapped here. Entity callback
+    /// points remain window-global, returned caret/range rectangles must already
+    /// be displayed window coordinates, and `bounds_for_range` still receives
+    /// logical element bounds. The entity must store the same prepaint mapping
+    /// with its layout snapshot and inverse-map incoming points exactly once.
+    pub fn with_visual_transform(mut self, transform: crate::VisualTransform) -> Self {
+        self.visual_transform = transform;
+        self
     }
 }
 
@@ -528,7 +541,7 @@ impl<V: EntityInputHandler> InputHandler for ElementInputHandler<V> {
     }
 
     fn element_bounds(&mut self, _window: &mut Window, _cx: &mut App) -> Option<Bounds<Pixels>> {
-        Some(self.element_bounds)
+        Some(self.visual_transform.map_bounds(self.element_bounds))
     }
 
     fn text_length_utf16(&mut self, window: &mut Window, cx: &mut App) -> Option<usize> {
@@ -802,6 +815,64 @@ mod tests {
         ) -> Option<usize> {
             None
         }
+    }
+
+    #[gpui::test]
+    fn visual_transform_maps_input_metadata_but_not_entity_callback_coordinates(
+        cx: &mut TestAppContext,
+    ) {
+        let handle = cx.add_window(|_, cx| NativeInputProbe {
+            focus: cx.focus_handle(),
+            accepts: true,
+            options: TextInputOptions::default(),
+            selection: crate::NativeTextSelection::default(),
+        });
+        handle
+            .update(cx, |_, window, cx| {
+                let view = cx.new(|cx| NativeInputProbe {
+                    focus: cx.focus_handle(),
+                    accepts: true,
+                    options: TextInputOptions::default(),
+                    selection: crate::NativeTextSelection::default(),
+                });
+                let mut input = ElementInputHandler::new(
+                    Bounds::new(point(px(20.), px(30.)), size(px(40.), px(15.))),
+                    view,
+                )
+                .with_visual_transform(crate::VisualTransform::scale_about(
+                    1.5,
+                    point(px(10.), px(4.)),
+                ));
+                assert_eq!(
+                    input.element_bounds(window, cx),
+                    Some(Bounds::new(
+                        point(px(25.), px(43.)),
+                        size(px(60.), px(22.5))
+                    ))
+                );
+                let position = crate::NativeTextPosition {
+                    utf16_offset: 7,
+                    affinity: crate::TextAffinity::Upstream,
+                };
+                assert_eq!(
+                    input.native_position_for_point(
+                        point(px(-23.), px(71.)),
+                        Some(2..9),
+                        window,
+                        cx
+                    ),
+                    Some(position)
+                );
+                assert_eq!(
+                    input.native_position_bounds(position, window, cx),
+                    Some(Bounds::new(point(px(23.), px(41.)), size(px(1.), px(17.))))
+                );
+                assert_eq!(
+                    input.selection_rects_for_range(2..9, window, cx)[0].bounds,
+                    Bounds::new(point(px(17.), px(29.)), size(px(41.), px(13.)))
+                );
+            })
+            .expect("input mapping");
     }
 
     #[gpui::test]

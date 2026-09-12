@@ -4506,6 +4506,109 @@ mod tests {
     }
 
     #[test]
+    fn visual_scale_moves_foreground_and_replay_once_on_both_transports() {
+        use gpui::{
+            AtlasKey, Background, ClipChain, Hsla, PlatformHeadlessRenderer, RenderSvgParams,
+            RoundedClip, TransformationMatrix, VisualTransform, point, px, size,
+        };
+        let _gpu = crate::serialised_gpu_test();
+        let context = WgpuContext::new_headless().expect("software adapter required");
+        let t = VisualTransform::scale_about(2., point(px(10.), px(20.)))
+            .compose(VisualTransform::scale_about(0.75, point(px(30.), px(10.))));
+        for webgl in [false, true] {
+            let atlas = Arc::new(WgpuAtlas::from_context(&context));
+            let mut renderer = WgpuHeadlessRenderer {
+                renderer: WgpuRenderer::new_headless_transport(&context, atlas, webgl)
+                    .expect("transport"),
+                measurement_id: 0,
+            };
+            let tile = renderer
+                .sprite_atlas()
+                .get_or_insert_with(
+                    &AtlasKey::Svg(RenderSvgParams {
+                        path: "scale-L".into(),
+                        size: size(DevicePixels(8), DevicePixels(12)),
+                    }),
+                    &mut || {
+                        Ok(Some((
+                            size(DevicePixels(8), DevicePixels(12)),
+                            std::borrow::Cow::Owned(
+                                (0..96)
+                                    .map(|i| if i % 8 < 2 || i / 8 >= 10 { 255 } else { 0 })
+                                    .collect(),
+                            ),
+                        )))
+                    },
+                )
+                .expect("upload")
+                .expect("tile");
+            let template = probed_scene(Hsla::black(), gpui::NO_LUMINANCE_PROBE);
+            let mut chain = ClipChain::default();
+            chain.push(RoundedClip::new(
+                Bounds::new(point(px(34.), px(29.)), size(px(26.), px(35.))),
+                Corners {
+                    top_left: px(7.),
+                    ..Corners::default()
+                },
+            ));
+            let mut scene = Scene::default();
+            scene.insert_primitive(template.quads[0]);
+            scene.with_clip_chain(&chain, 1., |scene| {
+                scene.with_visual_transform(t, 1., |scene| {
+                    scene.insert_primitive(MonochromeSprite {
+                        order: 0,
+                        pad: 0,
+                        bounds: Bounds::new(
+                            point(ScaledPixels(20.), ScaledPixels(30.)),
+                            size(ScaledPixels(16.), ScaledPixels(24.)),
+                        ),
+                        content_mask: ContentMask {
+                            bounds: t
+                                .unmap_bounds(Bounds::new(
+                                    Point::default(),
+                                    size(px(128.), px(96.)),
+                                ))
+                                .scale(1.),
+                        },
+                        color: Hsla::white(),
+                        tile,
+                        transformation: TransformationMatrix::unit(),
+                        clip_id: gpui::ClipId::NONE,
+                    });
+                    let mut quad = template.quads[0];
+                    quad.bounds = Bounds::new(
+                        point(ScaledPixels(30.), ScaledPixels(49.)),
+                        size(ScaledPixels(2.), ScaledPixels(2.)),
+                    );
+                    quad.background = Background::from(Hsla::white());
+                    scene.insert_primitive(quad);
+                })
+            });
+            scene.finish();
+            let image = renderer
+                .render_scene_to_image(&scene, size(DevicePixels(128), DevicePixels(96)))
+                .expect("scaled foreground");
+            for (x, y) in [(37, 42), (53, 63), (51, 59)] {
+                assert!(image.get_pixel(x, y)[0] > 240, "scaled foreground {x},{y}");
+            }
+            for (x, y) in [(21, 40), (48, 40), (35, 30), (53, 66)] {
+                assert_eq!(
+                    image.get_pixel(x, y).0,
+                    [0, 0, 0, 255],
+                    "clear/clipped {x},{y}"
+                );
+            }
+            let mut replay = Scene::default();
+            replay.with_visual_transform(t, 1., |target| target.replay(0..scene.len(), &scene));
+            replay.finish();
+            let replayed = renderer
+                .render_scene_to_image(&replay, size(DevicePixels(128), DevicePixels(96)))
+                .expect("replayed foreground");
+            assert_eq!(image, replayed, "retained geometry must not scale twice");
+        }
+    }
+
+    #[test]
     fn nested_rounded_clips_mask_every_primitive_without_changing_backdrop_samples() {
         use gpui::{
             AtlasKey, Background, ClipChain, FontId, GlyphId, Hsla, Path, PlatformHeadlessRenderer,

@@ -324,6 +324,8 @@ jobs:
           # Enter the visual workspace directly. Building the root xtask first
           # would compile the same GPUI/Kit graph into a second target.
           workspaces: tools/headless-visual -> target
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml -- --test-threads=1
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml --example glass_reference -- --test-threads=1
       - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check ${{ inputs.scenes }}
       - if: failure()
         uses: actions/upload-artifact@v7
@@ -344,6 +346,8 @@ jobs:
         with:
           workspaces: tools/headless-visual -> target
       - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml -- --test-threads=1
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml --example glass_reference -- --test-threads=1
       - uses: actions/upload-artifact@v7
         with:
           name: headless-windows-executable

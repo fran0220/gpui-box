@@ -8,6 +8,33 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12
+
+### Migration and validation boundaries
+
+This pre-1.0 minor release includes public coordinate-contract changes and new
+theme fields; consumers should review the generated API index rather than treat
+it as a drop-in patch. Events stay in displayed window coordinates. Capture
+`Window::visual_transform()` in prepaint for logical pointer/IME source geometry;
+`on_focus_resolved` now supplies displayed bounds and must not be mapped twice.
+`ElementInputHandler::with_visual_transform` maps element metadata only, not
+entity callbacks. Native embedded views refuse nonidentity transforms.
+
+Glass foreground now scales on press without layout reflow, clips to its rounded
+surface, and restores on release; reduced motion suppresses the scale. The
+`glassPressScale` token is Kit policy, not a universal native constant. Ring
+shadows use the existing five-point mean/variance readback and keep the last
+completed reading. Window overlays, popover helpers and toasts explicitly escape
+ancestor content masks through `Deferred::unclipped`; default deferred clipping
+is unchanged.
+
+Reference tools now render real persistent resizing and compare encoded RGB
+observables against independently captured native frames. They retain held-out
+phases and do not infer a reliable full active-rim coordinate map, native timing,
+or Apple visual equivalence from passing infrastructure tests. Android and iOS
+adapters join the registry cohort because Platform's mobile dependencies must
+resolve; publication does not upgrade their documented native acceptance.
+
 ### Added
 
 **Compact glass keeps a face.** `Glass::grounded` and `GlassGroup::grounded`
@@ -1582,7 +1609,8 @@ and, separately, the application surfaces that are still missing. Charts
 and the remaining form shapes are gaps, not refusals. Read it before
 planning around a component that is not here.
 
-[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/fran0220/gpui-box/releases/tag/v0.2.0
 [0.1.2]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.2
 [0.1.1]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.1
 [0.1.0]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.0

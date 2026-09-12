@@ -1148,7 +1148,13 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
             ('A'..='I').fold(GlassGroup::new("scene.glass.lobe-budget"), |group, name| {
                 group.pane(
                     format!("scene.glass.lobe-budget.{name}"),
-                    div().w(px(58.0)).h(px(30.0)).child(name.to_string()),
+                    div()
+                        .w(px(58.0))
+                        .h(px(30.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(name.to_string()),
                 )
             }),
         )
@@ -1437,6 +1443,57 @@ pub(super) fn glass_materials(_window: &mut Window, cx: &mut App) -> AnyElement 
                     ThemeOverlay::new(move |t| t.clone().with_reduce_transparency(reduced), group),
                 ))
             })),
+        )
+        .child(caption(
+            &theme,
+            "Rounded foreground clips / surface shadows and joined optics stay outside",
+        ))
+        .child(
+            row(&theme)
+                .child(
+                    backdrop().child(
+                        div().absolute().left(px(20.0)).top(px(24.0)).child(
+                            Glass::new("scene.glass-materials.clip-surface")
+                                .radius_px(24.0)
+                                .child(div().w(px(160.0)).h(px(64.0)).bg(theme.colors.accent)),
+                        ),
+                    ),
+                )
+                .child(
+                    backdrop().child(
+                        div().absolute().left(px(28.0)).top(px(28.0)).child(
+                            GlassGroup::new("scene.glass-materials.clip-group")
+                                .radius(Radius::Pill)
+                                .gap(8.0)
+                                .merge(32.0)
+                                .pane(
+                                    "scene.glass-materials.clip-left",
+                                    div().w(px(68.0)).h(px(56.0)).bg(theme.colors.accent),
+                                )
+                                .pane(
+                                    "scene.glass-materials.clip-right",
+                                    div().w(px(68.0)).h(px(56.0)).bg(theme.colors.accent),
+                                ),
+                        ),
+                    ),
+                )
+                .child(
+                    backdrop().child(
+                        div().absolute().left(px(20.0)).top(px(24.0)).child(
+                            crate::overlay::surface(
+                                "scene.glass-materials.clip-frame",
+                                &theme,
+                                crate::overlay::OverlaySurface::MODAL,
+                            )
+                            .w(px(160.0))
+                            .h(px(64.0))
+                            .children(
+                                [theme.colors.accent, theme.colors.text_faint]
+                                    .map(|color| div().w_full().h(px(32.0)).bg(color)),
+                            ),
+                        ),
+                    ),
+                ),
         )
         .into_any_element()
 }

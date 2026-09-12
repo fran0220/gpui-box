@@ -494,11 +494,17 @@ fn panel<V: 'static>(
         })
         .collect::<Vec<_>>();
 
-    surface(ident.clone(), theme, OverlaySurface::FLOATING)
-        .min_w(px(theme.measures.menu_min_width))
-        .p_token(theme, Space::Xs)
-        .children(rows)
-        .into_any_element()
+    // Each panel owns its geometry and material state. Sharing the menu's id
+    // made the last submenu's measured bounds clip every earlier panel.
+    surface(
+        Ident::from(parent).child("panel"),
+        theme,
+        OverlaySurface::FLOATING,
+    )
+    .min_w(px(theme.measures.menu_min_width))
+    .p_token(theme, Space::Xs)
+    .children(rows)
+    .into_any_element()
 }
 
 #[allow(clippy::too_many_arguments)]

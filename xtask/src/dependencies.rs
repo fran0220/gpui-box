@@ -340,7 +340,8 @@ fn check_dependency_table(
             );
         }
         ensure!(
-            owner.layer >= package.layer,
+            owner.layer >= package.layer
+                || (table == "dev-dependencies" && dependency.get("version").is_none()),
             "{} may not depend on higher layer {}",
             owner.name,
             package.name
@@ -369,8 +370,14 @@ fn check_resolved_layers(metadata: &Json, a: &Authority) -> Result<()> {
             .context("resolved node deps missing")?
         {
             if let Some(dependency) = owned(&edge["pkg"]) {
+                // Test-only reverse edges exercise higher-level consumers.
+                // Declaration validation separately requires published internal
+                // dev dependencies to be path-only, so none enters the cohort.
+                let test_only = edge["dep_kinds"].as_array().is_some_and(|kinds| {
+                    !kinds.is_empty() && kinds.iter().all(|kind| kind["kind"] == "dev")
+                });
                 ensure!(
-                    owner.layer >= dependency.layer,
+                    owner.layer >= dependency.layer || test_only,
                     "resolved edge {} -> {} crosses into a higher layer",
                     owner.name,
                     dependency.name
@@ -710,6 +717,12 @@ mod tests {
             "resolve": {"nodes": [{"id":"local-low", "deps":[{"name":"renamed", "pkg":"local-high"}]}]}
         });
         assert!(check_resolved_layers(&graph, &a).is_err());
+        graph["resolve"]["nodes"][0]["deps"][0]["dep_kinds"] =
+            serde_json::json!([{"kind":"dev", "target":null}]);
+        check_resolved_layers(&graph, &a)?;
+        graph["resolve"]["nodes"][0]["deps"][0]["dep_kinds"] =
+            serde_json::json!([{"kind":"dev"}, {"kind":"build"}]);
+        assert!(check_resolved_layers(&graph, &a).is_err());
         graph["resolve"]["nodes"][0] =
             serde_json::json!({"id":"local-high", "deps":[{"pkg":"local-low"}]});
         check_resolved_layers(&graph, &a)?;
@@ -727,6 +740,20 @@ mod tests {
                 .to_string()
                 .contains("higher layer")
         );
+        fs::write(
+            root.join("low/Cargo.toml"),
+            "[dev-dependencies]\nhigh = { path = '../high' }\n",
+        )?;
+        check_internal_declarations(&root, &low, &a)?;
+        fs::write(
+            root.join("low/Cargo.toml"),
+            "[dev-dependencies]\nhigh = { path = '../high', version = '0.1.0' }\n",
+        )?;
+        assert!(check_internal_declarations(&root, &low, &a).is_err());
+        fs::write(
+            root.join("low/Cargo.toml"),
+            "[dependencies]\nrenamed = { workspace = true }\n",
+        )?;
         let owner = Package { layer: 2, ..low };
         check_internal_declarations(&root, &owner, &a)?;
         fs::write(

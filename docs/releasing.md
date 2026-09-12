@@ -8,7 +8,7 @@ Every cohort, including the initial `0.1.0` release, follows this process.
 `package-authority.toml` defines every package name, version, cohort, license,
 and publish flag. Framework packages are Apache-2.0; kit packages and
 `gpui-box-mcp` are MIT. A release keeps mutually dependent publishable packages
-in one compatible version cohort (currently `0.1.x`) and records the contract
+in one compatible version cohort (currently `0.2.x`) and records the contract
 in `compatibility.toml` and `provenance.toml`.
 
 Never hand-maintain publication order. Derive it from Cargo metadata:
@@ -21,6 +21,33 @@ cargo run -p xtask -- package plan
 Save the plan in the release log. Independent packages may appear early, and
 platform packages may appear after consumers; the generated order, not a prose
 list, is authoritative.
+
+### Experimental mobile packaging
+
+The `0.2.0` cohort includes the real `gpui-box-android` and `gpui-box-ios`
+adapters as Apache-2.0 framework packages (28 publishable packages total).
+Cargo resolves even target-specific optional registry dependencies, so the
+public mobile features of `gpui-box-platform` require both adapters in the
+publication graph, before the platform package, not in its external list.
+Publication does not promote mobile acceptance: both remain experimental,
+with the native acceptance limitations recorded in `compatibility.toml`.
+Android `host-check` and iOS `platform-check` prove host type checking only,
+not APK/Xcode linking or device execution.
+
+iOS's Kit and mobile-reference integration-test dependencies stay path-only:
+Cargo omits them from the published manifest while retaining local tests.
+A versioned Kit dev-dependency would create an
+`ios -> kit -> platform -> ios` publication cycle. The package plan rejects
+published local dependencies outside the publishable authority rather than
+silently classifying an unpublished adapter as an external registry crate.
+
+For the first `0.2.0` publication only, the native SemVer jobs exclude
+these two new names and `gpui-box-webview`, which also has no published version:
+cargo-semver-checks 0.50.0 errors on a missing registry
+baseline instead of skipping it. Existing packages remain checked. Later
+versions include all three adapters automatically. Their first upload requires the
+protected bootstrap-token path; an OIDC publisher cannot be configured for a
+crate name that does not yet exist. Verify credentials before starting a cohort.
 
 ## Preflight and dry run
 
@@ -91,6 +118,34 @@ publication:
 GPUI_BOX_PUBLISH=1 cargo run -p xtask -- package publish --execute
 ```
 
+For `0.2.0`, select **`auth=mixed`**, `execute=true`, and
+`bootstrap_trusted_publishing=false`. Existing crates require OIDC because
+they already enforce trusted-publishing-only; `gpui-box-android`,
+`gpui-box-ios`, and `gpui-box-webview` need their first-ever publication using
+the least-privilege `CRATES_IO_TOKEN` secret in the protected `crates-io`
+environment. Do not disable or change existing registry access controls.
+The mixed publishing job obtains both credentials: the official action's
+short-lived token is `CARGO_REGISTRY_TOKEN`, while the protected secret is
+`GPUI_BOX_BOOTSTRAP_TOKEN`, enabled only by `GPUI_BOX_PUBLISH_AUTH=mixed`.
+
+Before any upload, mixed mode checks every name using
+`GET https://crates.io/api/v1/crates/<name>` and preflights OIDC plus the
+bootstrap credential if any name is new. Only a validated crate-not-found
+404 selects bootstrap; malformed responses, mismatched identities, and other
+HTTP or transport errors stop publication. A missing **target version** never
+makes an existing name eligible for bootstrap. Classification is repeated
+before every upload attempt, including retries; existing names always receive
+OIDC, never a token fallback. The normal exact-version/checksum/index resume
+checks still apply. On a partial-cohort rerun, newly created names now require
+OIDC for any further upload; configure their trusted publishers separately
+before trying to publish another version.
+
+Pure `auth=token` (all-token initial cohorts) and `auth=oidc` (all-existing
+cohorts) remain available unchanged. Neither alone can publish a mixed cohort
+of trusted-only existing names and first-ever names. Mixed publication does
+not configure publishers, harden crates, or invoke the separate
+`bootstrap_trusted_publishing` operation.
+
 It refuses other arguments, a missing opt-in, an unprotected workflow ref, a
 dirty release worktree, a release HEAD not pointed to by an annotated
 `v<authority version>` tag, or missing `package check` archives. The publisher
@@ -145,14 +200,14 @@ path dependencies, create consumers using only crates.io:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-box", version = "=0.1.2" }
-gpui_kit = { package = "gpui-box-kit", version = "=0.1.2" }
+gpui = { package = "gpui-box", version = "=0.2.0" }
+gpui_kit = { package = "gpui-box-kit", version = "=0.2.0" }
 ```
 
 Build the framework-only and framework-plus-kit smoke workspaces from the
 registry on each claimed target. Install and start
 `gpui-box-mcp --version` against a checkout and require its output to report
-`gpui-box-mcp 0.1.2`. Archive commands and results.
+`gpui-box-mcp 0.2.0`. Archive commands and results.
 Only after these pass:
 
 1. create the GitHub release at <https://github.com/fran0220/gpui-box>, linking
@@ -186,14 +241,18 @@ authentication. After the workflow succeeds, revoke the bootstrap token from
 crates.io **Account Settings → API Tokens** using the owner's browser session,
 verify that it disappeared, then delete the now-invalid secret from the GitHub
 environment and any external secret stores. Never report revocation from the
-workflow's hardening result alone. Later publication runs use `auth=oidc`;
-token authentication exists only for first-publication recovery.
+workflow's hardening result alone. Later publication runs use `auth=oidc`
+unless the cohort adds new names, in which case use `auth=mixed` with a new
+least-privilege bootstrap token. Token authentication exists only for
+first-publication recovery; never relax trusted-only controls to reuse it for
+existing crates.
 
 There is no crates.io baseline for the first version, so the release workflow
 explicitly skips semantic-version comparison only for `0.1.0`. Every later
 release runs pinned `cargo-semver-checks` against the latest applicable
 published crates.io baseline on Linux, macOS, and Windows before either
-publisher job can start. Workspace selection checks every publishable
+publisher job can start, with only the three first-time `0.2.0` adapters
+excluded as described above. Workspace selection checks every publishable
 library-like package while excluding examples, galleries, and other
 `publish = false` packages; the MCP binary remains covered by its packaged
 install, `--help`, and `--version` acceptance tests rather than a Rust library

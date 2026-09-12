@@ -352,6 +352,7 @@ pub struct A11ySubtreeBuilder<'a> {
     parent_id: NodeId,
     nodes: &'a mut A11yNodeBuilder,
     bounds_clip: Option<accesskit::Rect>,
+    bounds_transform: crate::TransformationMatrix,
     /// Provenance of the real element whose `a11y_synthetic_children` is
     /// running.
     #[cfg(debug_assertions)]
@@ -364,6 +365,7 @@ impl<'a> A11ySubtreeBuilder<'a> {
             parent_id,
             nodes,
             bounds_clip: None,
+            bounds_transform: crate::TransformationMatrix::unit(),
             #[cfg(debug_assertions)]
             creator: debug::NodeCreator::default(),
         }
@@ -371,6 +373,11 @@ impl<'a> A11ySubtreeBuilder<'a> {
 
     pub(crate) fn with_bounds_clip(mut self, bounds: accesskit::Rect) -> Self {
         self.bounds_clip = Some(bounds);
+        self
+    }
+
+    pub(crate) fn with_bounds_transform(mut self, transform: crate::TransformationMatrix) -> Self {
+        self.bounds_transform = transform;
         self
     }
 
@@ -400,8 +407,30 @@ impl<'a> A11ySubtreeBuilder<'a> {
     /// active content clip, but fully clipped logical nodes remain in the tree
     /// with zero-area bounds at the nearest clip edge. Synthetic text and
     /// virtualized collections must not lose content merely because it is
-    /// outside the current viewport.
+    /// outside the current viewport. Supply untransformed physical-pixel bounds
+    /// and character geometry: the inherited visual transform is applied here.
     pub fn push_child(&mut self, id: NodeId, mut node: accesskit::Node) -> bool {
+        let scale = self.bounds_transform.rotation_scale[0][0];
+        if scale != 1. {
+            if let Some(positions) = node.character_positions() {
+                node.set_character_positions(
+                    positions.iter().map(|p| p * scale).collect::<Vec<_>>(),
+                );
+            }
+            if let Some(widths) = node.character_widths() {
+                node.set_character_widths(widths.iter().map(|w| w * scale).collect::<Vec<_>>());
+            }
+        }
+        if let Some(bounds) = node.bounds() {
+            let t = self.bounds_transform;
+            let s = t.rotation_scale[0][0] as f64;
+            node.set_bounds(accesskit::Rect {
+                x0: bounds.x0 * s + t.translation[0] as f64,
+                y0: bounds.y0 * s + t.translation[1] as f64,
+                x1: bounds.x1 * s + t.translation[0] as f64,
+                y1: bounds.y1 * s + t.translation[1] as f64,
+            });
+        }
         if let (Some(clip), Some(bounds)) = (self.bounds_clip, node.bounds())
             && bounds.x1 > bounds.x0
             && bounds.y1 > bounds.y0
@@ -447,6 +476,12 @@ impl<'a> A11ySubtreeBuilder<'a> {
     /// unclipped source cells are unchanged.
     pub fn bounds_clip(&self) -> Option<accesskit::Rect> {
         self.bounds_clip
+    }
+
+    /// Physical-pixel visual mapping applied on publication. Retained geometry
+    /// caches must invalidate when this changes, even if the clip stays fixed.
+    pub fn bounds_transform(&self) -> crate::TransformationMatrix {
+        self.bounds_transform
     }
 
     /// A mutable reference to the parent node.
@@ -1264,6 +1299,87 @@ mod tests {
                 assert_eq!(
                     run.expect("changed clip").1.bounds().expect("bounds").x1,
                     width.min(80.0)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn visual_transform_republishes_text_bounds_and_character_geometry_once() {
+        let mut a11y = new_a11y();
+        let mut cache = crate::AccessibleTextCache::default();
+        for (frame, scale) in [1., 1.5, 1.5, 1.].into_iter().enumerate() {
+            a11y.begin_frame();
+            assert!(
+                a11y.nodes
+                    .push(NodeId(1), accesskit::Node::new(Role::MultilineTextInput))
+            );
+            let mut builder = A11ySubtreeBuilder::new(NodeId(1), &mut a11y.nodes)
+                .with_bounds_transform(
+                    crate::VisualTransform::scale_about(
+                        scale,
+                        crate::point(crate::px(10.), crate::px(4.)),
+                    )
+                    .matrix(2.),
+                )
+                .with_bounds_clip(Rect {
+                    x0: 0.,
+                    y0: 0.,
+                    x1: 100.,
+                    y1: 200.,
+                });
+            cache
+                .publish(
+                    &mut builder,
+                    "ab",
+                    0,
+                    2,
+                    accesskit::TextDirection::LeftToRight,
+                    &std::iter::once(0..2).collect::<Vec<_>>(),
+                    0,
+                    0..2,
+                    2.,
+                    |range| {
+                        vec![crate::Bounds::new(
+                            crate::point(crate::px(20. + range.start as f32 * 15.), crate::px(10.)),
+                            crate::size(crate::px(15.), crate::px(20.)),
+                        )]
+                    },
+                )
+                .expect("text publication");
+            a11y.nodes.pop();
+            let update = a11y.end_frame(super::debug::FrameDebugInfo::default());
+            let run = update
+                .nodes
+                .iter()
+                .find(|(_, node)| node.role() == Role::TextRun);
+            if frame == 2 {
+                assert!(run.is_none(), "unchanged transform retains geometry");
+            } else {
+                let node = &run.expect("changed transform republishes").1;
+                let expected = if scale == 1. {
+                    Rect {
+                        x0: 40.,
+                        y0: 20.,
+                        x1: 100.,
+                        y1: 60.,
+                    }
+                } else {
+                    Rect {
+                        x0: 50.,
+                        y0: 26.,
+                        x1: 100.,
+                        y1: 86.,
+                    }
+                };
+                assert_eq!(node.bounds(), Some(expected));
+                assert_eq!(
+                    node.character_positions(),
+                    Some([0., 30. * scale].as_slice())
+                );
+                assert_eq!(
+                    node.character_widths(),
+                    Some([30. * scale, 30. * scale].as_slice())
                 );
             }
         }

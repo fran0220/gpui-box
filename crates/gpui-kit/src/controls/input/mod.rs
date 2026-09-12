@@ -263,13 +263,14 @@ pub struct TextInput {
     /// A custom visual may segment the one editor into this many slots. The
     /// editor still owns hit testing and IME geometry for the full surface.
     visual_slots: Option<usize>,
-    /// Actual slot wells measured during prepaint, in logical slot order.
-    visual_slot_bounds: Vec<Bounds<Pixels>>,
+    /// Each well retains its own logical bounds and captured transform.
+    visual_slot_bounds: Vec<(Bounds<Pixels>, gpui::VisualTransform)>,
     scroll_offset: Pixels,
     is_selecting: bool,
     last_layout: Option<EditableTextLayout>,
     last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
+    visual_transform: gpui::VisualTransform,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
@@ -315,6 +316,7 @@ impl TextInput {
             last_layout: None,
             last_layout_text: SharedString::default(),
             last_bounds: None,
+            visual_transform: gpui::VisualTransform::default(),
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
             accessible_geometry: Arc::default(),
@@ -630,19 +632,31 @@ impl TextInput {
         self.scroll_offset = offset;
     }
 
-    pub(crate) fn set_last_layout(&mut self, layout: EditableTextLayout, bounds: Bounds<Pixels>) {
+    pub(crate) fn set_last_layout(
+        &mut self,
+        layout: EditableTextLayout,
+        bounds: Bounds<Pixels>,
+        visual_transform: gpui::VisualTransform,
+    ) {
         self.last_layout_text = self.display_text();
         self.last_layout = Some(layout);
         self.last_bounds = Some(bounds);
+        self.visual_transform = visual_transform;
     }
 
     pub(crate) fn reset_slot_bounds(&mut self, slots: usize) {
-        self.visual_slot_bounds = vec![Bounds::default(); slots];
+        self.visual_slot_bounds =
+            vec![(Bounds::default(), gpui::VisualTransform::default()); slots];
     }
 
-    pub(crate) fn set_slot_bounds(&mut self, slot: usize, bounds: Bounds<Pixels>) {
+    pub(crate) fn set_slot_bounds(
+        &mut self,
+        slot: usize,
+        bounds: Bounds<Pixels>,
+        visual_transform: gpui::VisualTransform,
+    ) {
         if let Some(target) = self.visual_slot_bounds.get_mut(slot) {
-            *target = bounds;
+            *target = (bounds, visual_transform);
         }
     }
 
@@ -761,7 +775,8 @@ impl TextInput {
         if self.visual_slots.is_some() {
             let count = self.edit.text().graphemes(true).count();
             let mut closest = (f32::INFINITY, 0);
-            for (index, bounds) in self.visual_slot_bounds.iter().enumerate() {
+            for (index, (bounds, transform)) in self.visual_slot_bounds.iter().enumerate() {
+                let bounds = transform.map_bounds(*bounds);
                 if bounds.size.width <= px(0.0) {
                     continue;
                 }
@@ -779,6 +794,7 @@ impl TextInput {
             }
             return self.content_offset_for_grapheme(closest.1);
         }
+        let position = self.visual_transform.unmap_point(position);
         if position.y < bounds.top() {
             return 0;
         }
@@ -1273,7 +1289,7 @@ impl EntityInputHandler for TextInput {
         let origin = gpui::point(bounds.left() - self.scroll_offset, bounds.top());
         let found = self.native_layout()?.native_position_for_point(
             &self.display_text(),
-            point - origin,
+            self.visual_transform.unmap_point(point) - origin,
             Some(start.utf16_offset..end.utf16_offset),
             gpui::TextAlign::Left,
             bounds.size.width,
@@ -1359,7 +1375,7 @@ impl EntityInputHandler for TextInput {
             } else {
                 index
             };
-            let bounds = *self.visual_slot_bounds.get(slot)?;
+            let (bounds, transform) = *self.visual_slot_bounds.get(slot)?;
             if bounds.size.width <= px(0.0) {
                 return None;
             }
@@ -1368,20 +1384,22 @@ impl EntityInputHandler for TextInput {
             } else {
                 bounds.left()
             };
-            return Some(Bounds::new(
+            return Some(transform.map_bounds(Bounds::new(
                 point(x, bounds.top()),
                 gpui::size(width, bounds.size.height),
-            ));
+            )));
         }
         let bounds = self.last_bounds?;
-        self.native_layout()?.native_position_bounds(
-            &self.display_text(),
-            painted,
-            point(bounds.left() - self.scroll_offset, bounds.top()),
-            width,
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        )
+        self.native_layout()?
+            .native_position_bounds(
+                &self.display_text(),
+                painted,
+                point(bounds.left() - self.scroll_offset, bounds.top()),
+                width,
+                gpui::TextAlign::Left,
+                bounds.size.width,
+            )
+            .map(|bounds| self.visual_transform.map_bounds(bounds))
     }
 
     fn farthest_native_position(
@@ -1450,9 +1468,9 @@ impl EntityInputHandler for TextInput {
             };
             return (start.utf16_offset..end.utf16_offset)
                 .filter_map(|index| {
-                    let bounds = *self.visual_slot_bounds.get(index)?;
+                    let (bounds, transform) = *self.visual_slot_bounds.get(index)?;
                     (bounds.size.width > px(0.0)).then_some(gpui::TextSelectionRect {
-                        bounds,
+                        bounds: transform.map_bounds(bounds),
                         writing_direction: direction,
                         contains_start: index == start.utf16_offset,
                         contains_end: index + 1 == end.utf16_offset,
@@ -1466,13 +1484,20 @@ impl EntityInputHandler for TextInput {
         };
         let text = self.display_text();
         let range = text_edit::range_from_utf16(&text, &(start.utf16_offset..end.utf16_offset));
-        layout.native_selection_rects(
-            &text,
-            range,
-            point(bounds.left() - self.scroll_offset, bounds.top()),
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        )
+        layout
+            .native_selection_rects(
+                &text,
+                range,
+                point(bounds.left() - self.scroll_offset, bounds.top()),
+                gpui::TextAlign::Left,
+                bounds.size.width,
+            )
+            .into_iter()
+            .map(|mut rect| {
+                rect.bounds = self.visual_transform.map_bounds(rect.bounds);
+                rect
+            })
+            .collect()
     }
 
     fn text_position_in_direction(
@@ -1715,12 +1740,15 @@ impl EntityInputHandler for TextInput {
         }
         let layout = self.last_layout.as_ref()?;
         let display_range = self.display_offset(range.start)..self.display_offset(range.end);
-        Some(layout.enclosing_bounds_for_range(
-            display_range,
-            point(bounds.left() - self.scroll_offset, bounds.top()),
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        ))
+        Some(
+            self.visual_transform
+                .map_bounds(layout.enclosing_bounds_for_range(
+                    display_range,
+                    point(bounds.left() - self.scroll_offset, bounds.top()),
+                    gpui::TextAlign::Left,
+                    bounds.size.width,
+                )),
+        )
     }
 
     fn character_index_for_point(
@@ -1928,11 +1956,288 @@ impl Render for TextInput {
 }
 
 #[cfg(test)]
+pub(crate) use element::TestVisualScale;
+
+#[cfg(test)]
 mod retained_options_tests {
     use super::*;
     use gpui::{AppContext as _, TestAppContext};
     use gpui_kit_testkit::harness::Harness;
     use std::{cell::RefCell, rc::Rc};
+
+    // Independent affine result for scales 2 about (13,29), then inner .75
+    // about (41,17). Do not derive expectations from the consumer's snapshot.
+    fn displayed(bounds: Bounds<Pixels>, scaled: bool) -> Bounds<Pixels> {
+        if !scaled {
+            return bounds;
+        }
+        Bounds::new(
+            point(bounds.left() * 1.5 + px(7.5), bounds.top() * 1.5 - px(20.5)),
+            bounds.size.map(|value| value * 1.5),
+        )
+    }
+
+    #[gpui::test]
+    fn input_visual_transform_maps_pointer_selection_and_ime_once(cx: &mut TestAppContext) {
+        use gpui::NativeTextPosition;
+        let scaled = Rc::new(std::cell::Cell::new(false));
+        let scale = scaled.clone();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            let input = build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| TextInput::new("scaled.input", window, cx).text("Wi mQz"))
+                })
+                .clone();
+            TestVisualScale {
+                enabled: scale.get(),
+                child: div()
+                    .p(px(40.0))
+                    .w(px(280.0))
+                    .child(input)
+                    .into_any_element(),
+            }
+            .into_any_element()
+        });
+        harness.frame();
+        let input = slot.borrow().clone().expect("input mounted");
+        let semantic = harness.bounds("scaled.input").expect("semantic bounds");
+        let (start, end, legacy, fragments) = harness.update(|window, cx| {
+            input.update(cx, |input, cx| {
+                (
+                    input
+                        .native_position_bounds(
+                            NativeTextPosition {
+                                utf16_offset: 1,
+                                ..Default::default()
+                            },
+                            window,
+                            cx,
+                        )
+                        .expect("start"),
+                    input
+                        .native_position_bounds(
+                            NativeTextPosition {
+                                utf16_offset: 4,
+                                ..Default::default()
+                            },
+                            window,
+                            cx,
+                        )
+                        .expect("end"),
+                    input
+                        .bounds_for_range(
+                            1..4,
+                            input.last_bounds.expect("logical bounds"),
+                            window,
+                            cx,
+                        )
+                        .expect("legacy bounds"),
+                    input.selection_rects_for_range(1..4, window, cx),
+                )
+            })
+        });
+        for enabled in [true, false] {
+            scaled.set(enabled);
+            harness.frame();
+            assert_eq!(
+                harness.bounds("scaled.input"),
+                Some(displayed(semantic, enabled)),
+                "semantics are already displayed"
+            );
+            harness.update(|window, cx| {
+                input.update(cx, |input, cx| {
+                    let p = NativeTextPosition {
+                        utf16_offset: 4,
+                        ..Default::default()
+                    };
+                    assert_eq!(
+                        input.native_position_bounds(p, window, cx),
+                        Some(displayed(end, enabled))
+                    );
+                    assert_eq!(
+                        input.bounds_for_range(
+                            1..4,
+                            input.last_bounds.expect("logical bounds"),
+                            window,
+                            cx
+                        ),
+                        Some(displayed(legacy, enabled))
+                    );
+                    let rects = input.selection_rects_for_range(1..4, window, cx);
+                    assert_eq!(rects.len(), fragments.len());
+                    for (actual, logical) in rects.iter().zip(&fragments) {
+                        assert_eq!(actual.bounds, displayed(logical.bounds, enabled));
+                    }
+                    let point = displayed(end, enabled).origin;
+                    assert_eq!(input.character_index_for_point(point, window, cx), Some(4));
+                    assert_eq!(
+                        input
+                            .native_position_for_point(point, None, window, cx)
+                            .expect("native point")
+                            .utf16_offset,
+                        4
+                    );
+                })
+            });
+            let start = displayed(start, enabled);
+            let end = displayed(end, enabled);
+            harness.context().simulate_mouse_down(
+                point(start.left(), start.center().y),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.context().simulate_mouse_move(
+                point(end.left(), end.center().y),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.context().simulate_mouse_up(
+                point(end.left(), end.center().y),
+                MouseButton::Left,
+                gpui::Modifiers::none(),
+            );
+            harness.update(|_, cx| assert_eq!(input.read(cx).selected_range(), 1..4));
+        }
+    }
+
+    #[gpui::test]
+    fn textarea_visual_transform_preserves_rectangle_selection_and_geometry(
+        cx: &mut TestAppContext,
+    ) {
+        use crate::controls::textarea::{TextArea, TextAreaEvent};
+        use gpui::NativeTextPosition;
+        let scaled = Rc::new(std::cell::Cell::new(false));
+        let scale = scaled.clone();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = Harness::new(cx, crate::install, move |window, cx| {
+            let area = build
+                .borrow_mut()
+                .get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        TextArea::new("scaled.area", window, cx)
+                            .text("Wi mQz\nWi m12\nWi mXY")
+                            .rows(4)
+                    })
+                })
+                .clone();
+            TestVisualScale {
+                enabled: scale.get(),
+                child: div()
+                    .p(px(40.0))
+                    .w(px(280.0))
+                    .child(area)
+                    .into_any_element(),
+            }
+            .into_any_element()
+        });
+        harness.frame();
+        let area = slot.borrow().clone().expect("area mounted");
+        let changed = Rc::new(std::cell::Cell::new(0));
+        let changes = changed.clone();
+        harness.update(|_, cx| {
+            cx.subscribe(&area, move |_, event, _| {
+                if matches!(event, TextAreaEvent::GeometryChanged) {
+                    changes.set(changes.get() + 1);
+                }
+            })
+            .detach();
+        });
+        let (start, end, range, caret, source, legacy) = harness.update(|window, cx| {
+            area.update(cx, |area, cx| {
+                let source = area.source_geometry().expect("source");
+                (
+                    area.bounds_for_position(1).expect("start"),
+                    area.bounds_for_position(18).expect("end"),
+                    TextArea::bounds_for_range(area, 1..4).expect("range"),
+                    area.caret_bounds().expect("caret"),
+                    area.source_geometry().expect("source"),
+                    EntityInputHandler::bounds_for_range(area, 1..4, source.viewport, window, cx)
+                        .expect("legacy"),
+                )
+            })
+        });
+        for enabled in [true, false] {
+            scaled.set(enabled);
+            let before = changed.get();
+            harness.frame();
+            assert!(
+                changed.get() > before,
+                "transform-only changes must notify geometry consumers"
+            );
+            harness.update(|window, cx| {
+                area.update(cx, |area, cx| {
+                    let geometry = area.source_geometry().expect("source");
+                    assert_eq!(geometry.viewport, source.viewport);
+                    assert_eq!(geometry.line_height, source.line_height);
+                    assert_eq!(geometry.vertical_scroll, source.vertical_scroll);
+                    assert_eq!(geometry.horizontal_scroll, source.horizontal_scroll);
+                    assert_eq!(geometry.rows, source.rows);
+                    assert_eq!(
+                        area.viewport_bounds(),
+                        Some(displayed(source.viewport, enabled))
+                    );
+                    assert_eq!(area.bounds_for_position(18), Some(displayed(end, enabled)));
+                    assert_eq!(
+                        EntityInputHandler::bounds_for_range(
+                            area,
+                            1..4,
+                            source.viewport,
+                            window,
+                            cx
+                        ),
+                        Some(displayed(legacy, enabled))
+                    );
+                    assert_eq!(
+                        TextArea::bounds_for_range(area, 1..4).expect("range"),
+                        range
+                            .iter()
+                            .map(|bounds| displayed(*bounds, enabled))
+                            .collect::<Vec<_>>()
+                    );
+                    let position = NativeTextPosition {
+                        utf16_offset: 18,
+                        ..Default::default()
+                    };
+                    assert_eq!(
+                        area.native_position_bounds(position, window, cx),
+                        Some(displayed(end, enabled))
+                    );
+                    assert_eq!(
+                        area.native_position_for_point(
+                            displayed(end, enabled).origin,
+                            None,
+                            window,
+                            cx
+                        )
+                        .expect("native point")
+                        .utf16_offset,
+                        18
+                    );
+                    assert_eq!(
+                        area.character_index_for_point(displayed(end, enabled).origin, window, cx),
+                        Some(18)
+                    );
+                    area.set_selections([(area.value().len()..area.value().len(), false)], cx);
+                    assert_eq!(area.caret_bounds(), Some(displayed(caret, enabled)));
+                    let a = displayed(start, enabled);
+                    let b = displayed(end, enabled);
+                    assert!(area.select_rectangle(
+                        point(a.left(), a.center().y),
+                        point(b.left(), b.center().y),
+                        cx
+                    ));
+                    assert_eq!(
+                        area.selections(),
+                        vec![(15..18, false), (8..11, false), (1..4, false)]
+                    );
+                })
+            });
+        }
+    }
 
     #[gpui::test]
     fn native_mask_geometry_preserves_model_offsets_and_affinity(cx: &mut TestAppContext) {

@@ -592,7 +592,10 @@ The `glass-optics` exhibit isolates index, thickness, plane distance, dispersion
 Fresnel and scattering over a ruled fixture and includes a fused height field.
 Existing `Glass`/`GlassGroup` press response changes this height and normal
 together; pointer tracking changes the analytic light direction. Foreground
-layout, hit testing and accessibility geometry do not deform.
+layout stays logical, while pressable content scales around its surface center
+using the framework's paired prepaint/paint transform. Descendant hitboxes,
+IME geometry and accessibility bounds follow the displayed transform. The
+surface outline remains fixed. Reduced motion suppresses foreground scale.
 Metal pixel regressions check the inner diagonal against adjacent face pixels,
 retain the real arc highlight, and bound text-stroke variance at a blurred rim
 against the flat interior. Blur-zero Clear remains sharp. These tests do not
@@ -619,6 +622,11 @@ optical-source samples. These are not exhaustive backdrop extrema or linear
 light measurements. Alpha is ignored, not used to unpremultiply or weight RGB.
 Statistics share the lease and completion freshness of the scalar reading;
 existing WGPU polling and Direct3D staging mapping can wait for completion.
+Kit retains the last completed reading while a newer one is unavailable. Ring
+shadow strength responds to mean darkness or twice the sampled standard
+deviation, whichever is larger; sampled busyness cannot describe unsampled
+content. Appearance hysteresis still uses the mean and only eligible compact
+non-Clear controls may flip.
 
 `Window::with_rounded_content_mask` explicitly scopes descendants in both
 prepaint and paint using logical window coordinates. Rounded chains constrain
@@ -633,6 +641,14 @@ passed on an exact source snapshot on macOS 27 build 26A5416b, M4 Pro, SDK26.2;
 `compatibility.toml` records its SHA-256 identity. This does not exercise
 CVPixelBuffer pixels or native Direct3D, certify a native full catalog, or
 validate subsequent visual-scale changes.
+
+`Window::without_content_masks` clears inherited rectangular and rounded masks,
+restoring them after its scope without resetting transforms or logical ownership.
+`Deferred::unclipped` opts in; default deferred clipping stays inherited. Kit
+window overlays, popover helpers and toast layers use this explicit escape.
+Their inner masks still apply. Later exact-source scale/frame tests and the
+current release's platform evidence are recorded separately in
+`compatibility.toml`; earlier clipping evidence is not reused as scale proof.
 
 Independently, the scene admits at most 16 backdrop-glass surfaces per frame.
 Valid surfaces past that paint their caller-supplied ordinary-fill fallback

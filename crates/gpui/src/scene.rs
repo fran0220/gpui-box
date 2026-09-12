@@ -45,6 +45,7 @@ pub struct Scene {
     /// capture bounds. Indices belong to this scene and expire on `clear`.
     pub clip_nodes: crate::ClipNodes,
     active_clip: crate::ClipId,
+    visual_transform: TransformationMatrix,
     primitive_bounds: BoundsTree<ScaledPixels>,
     layer_stack: Vec<DrawOrder>,
     pub shadows: Vec<Shadow>,
@@ -66,6 +67,7 @@ impl Scene {
         self.paint_operations.clear();
         self.clip_nodes.clear();
         self.active_clip = crate::ClipId::NONE;
+        self.visual_transform = TransformationMatrix::unit();
         self.primitive_bounds.clear();
         self.layer_stack.clear();
         self.paths.clear();
@@ -101,6 +103,11 @@ impl Scene {
     }
 
     pub fn push_layer(&mut self, bounds: Bounds<ScaledPixels>) {
+        let bounds = if self.visual_transform == TransformationMatrix::unit() {
+            bounds
+        } else {
+            self.visual_transform.transform_bounds(bounds)
+        };
         let order = self.primitive_bounds.insert(bounds);
         self.layer_stack.push(order);
         self.paint_operations
@@ -135,6 +142,27 @@ impl Scene {
         std::mem::replace(&mut self.active_clip, clip)
     }
 
+    /// Applies a complete inherited visual transform to subsequent emission.
+    /// Geometry is baked before culling/batching; replay is already transformed.
+    pub fn with_visual_transform<R>(
+        &mut self,
+        transform: crate::VisualTransform,
+        device_scale: f32,
+        paint: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let previous = self.replace_visual_transform(transform.matrix(device_scale));
+        let result = paint(self);
+        self.replace_visual_transform(previous);
+        result
+    }
+
+    pub(crate) fn replace_visual_transform(
+        &mut self,
+        transform: TransformationMatrix,
+    ) -> TransformationMatrix {
+        std::mem::replace(&mut self.visual_transform, transform)
+    }
+
     pub(crate) fn push_clip(&mut self, clip: crate::RoundedClip, scale: f32) -> crate::ClipId {
         let next = self.clip_nodes.push(clip, scale, self.active_clip);
         self.replace_clip(next)
@@ -146,6 +174,7 @@ impl Scene {
         fallback: Option<Hsla>,
     ) {
         glass.clip_id = self.active_clip;
+        crate::visual_transform::transform_glass(&mut glass, self.visual_transform);
         glass.material = glass.material.sanitized();
         if !glass.material.needs_backdrop() {
             return;
@@ -191,6 +220,7 @@ impl Scene {
 
     pub fn insert_primitive(&mut self, primitive: impl Into<Primitive>) {
         let mut primitive = primitive.into();
+        crate::visual_transform::transform_primitive(&mut primitive, self.visual_transform);
         *primitive.clip_id_mut() = self.active_clip;
         let clipped_bounds = primitive
             .cull_bounds()
@@ -246,6 +276,7 @@ impl Scene {
 
     pub fn replay(&mut self, range: Range<usize>, prev_scene: &Scene) {
         let previous_clip = self.active_clip;
+        let previous_transform = self.replace_visual_transform(TransformationMatrix::unit());
         let mut remapped = collections::FxHashMap::default();
         for operation in &prev_scene.paint_operations[range] {
             let old_clip = match operation {
@@ -266,6 +297,7 @@ impl Scene {
             }
         }
         self.active_clip = previous_clip;
+        self.visual_transform = previous_transform;
     }
 
     pub fn finish(&mut self) {

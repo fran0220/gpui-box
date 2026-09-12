@@ -13,11 +13,11 @@ on:
         default: false
         type: boolean
       auth:
-        description: crates.io authentication; token is required for each crate's first publication
+        description: crates.io auth; mixed uses OIDC for existing names and token only for new names
         required: true
         default: token
         type: choice
-        options: [token, oidc]
+        options: [token, oidc, mixed]
       bootstrap_trusted_publishing:
         description: Configure OIDC and enforce trusted-publishing-only after initial publication
         required: true
@@ -93,6 +93,12 @@ jobs:
       - run: cargo install cargo-cyclonedx --version 0.5.9 --locked
       - run: scripts/sync-zed/sync-zed verify
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.13" }
+      - name: Install isolated reference-analysis dependencies
+        run: |
+          python3 -m venv target/liquid-glass-python
+          target/liquid-glass-python/bin/python -m pip install -r tools/liquid-glass-reference/requirements.txt
       - run: cargo run -p xtask -- gate
       - run: cargo doc --no-deps --workspace
         env: { RUSTDOCFLAGS: "-D warnings" }
@@ -157,6 +163,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/headless-visual -> target
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml -- --test-threads=1
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml --example glass_reference -- --test-threads=1
       - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check
       - if: failure()
         uses: actions/upload-artifact@v7
@@ -178,6 +186,8 @@ jobs:
         with:
           workspaces: tools/headless-visual -> target
       - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml -- --test-threads=1
+      - run: cargo test --locked --manifest-path tools/headless-visual/Cargo.toml --example glass_reference -- --test-threads=1
       - uses: actions/upload-artifact@v7
         with:
           name: headless-release-windows-executable
@@ -252,8 +262,14 @@ jobs:
         uses: taiki-e/install-action@v2
         with: { tool: "cargo-semver-checks@0.50.0" }
       - name: Compare every published library API with crates.io
-        if: ${{ inputs.version != '0.1.0' }}
+        if: ${{ inputs.version != '0.1.0' && inputs.version != '0.2.0' }}
         run: cargo semver-checks check-release --manifest-path Cargo.toml --workspace --all-features
+      # These adapters first publish in 0.2.0 and have
+      # no crates.io baseline. All existing libraries still receive the check;
+      # subsequent releases include the adapters too.
+      - name: Compare existing APIs for the first adapter publication
+        if: ${{ inputs.version == '0.2.0' }}
+        run: cargo semver-checks check-release --manifest-path Cargo.toml --workspace --all-features --exclude gpui-box-android --exclude gpui-box-ios --exclude gpui-box-webview
 
   publish-with-token:
     if: ${{ inputs.execute && inputs.auth == 'token' }}
@@ -289,7 +305,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
   publish-with-oidc:
-    if: ${{ inputs.execute && inputs.auth == 'oidc' }}
+    if: ${{ inputs.execute && (inputs.auth == 'oidc' || inputs.auth == 'mixed') }}
     needs: [preflight, native, headless, headless-windows, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
@@ -319,6 +335,8 @@ jobs:
           GPUI_BOX_PUBLISH: "1"
           GPUI_BOX_RELEASE_ROOT: ${{ github.workspace }}/release
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+          GPUI_BOX_PUBLISH_AUTH: ${{ inputs.auth }}
+          GPUI_BOX_BOOTSTRAP_TOKEN: ${{ inputs.auth == 'mixed' && secrets.CRATES_IO_TOKEN || '' }}
 
   bootstrap-trusted-publishing:
     if: ${{ inputs.bootstrap_trusted_publishing }}

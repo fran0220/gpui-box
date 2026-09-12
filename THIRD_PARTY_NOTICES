@@ -83,6 +83,16 @@ accessibility, retained replay and Metal/Direct3D/WGPU clip transports are
 original GPUI Box framework work under the existing framework licenses.
 No additional third-party source or dependency is imported, and the frozen
 historical import receipt remains unchanged.
+Uniform subtree visual scaling, effective raster scaling, retained transform
+invalidation, accessibility geometry, Kit pointer/IME mapping and Glass
+descendant clipping are original GPUI Box work under the existing framework
+and Kit licenses, with no new imported source or native shader ABI change.
+Explicit inherited-mask escape and its Kit window-overlay integration are
+original GPUI Box work under those same licenses, with no additional imports.
+Foreground press response, sampled-variance shadow policy, and observable/resize
+reference tools are original GPUI Box work. Development analysis uses NumPy
+(BSD-3-Clause) and Pillow (HPND); neither source nor native captures are embedded
+in the runtime packages. The frozen import receipt is unchanged.
 Unicode line-breaking integration is original GPUI Box work using the existing
 unicode-linebreak 0.1.5 dependency (Apache-2.0, Unicode 15.0 UAX #14).
 No source is copied into the frozen import receipt.

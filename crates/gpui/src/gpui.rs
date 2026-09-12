@@ -65,6 +65,7 @@ pub mod test;
 mod text_system;
 mod util;
 mod view;
+mod visual_transform;
 mod window;
 
 #[cfg(any(test, feature = "test-support"))]
@@ -171,6 +172,7 @@ pub use test::*;
 pub use text_system::*;
 pub use util::{FutureExt, Timeout};
 pub use view::*;
+pub use visual_transform::VisualTransform;
 pub use window::*;
 
 pub use pollster::block_on;

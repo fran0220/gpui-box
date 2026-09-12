@@ -29,6 +29,9 @@ pub struct PlatformView {
 /// scene overlay above native children; hide the child before showing a GPUI
 /// overlay in its area. Rotation, scale, rounded masks and opacity are not
 /// native-child composition operations and must not be applied to this element.
+/// `Window::with_visual_scale` explicitly panics when a native child is painted
+/// with a nonidentity inherited mapping. Resizing a native frame is not an
+/// equivalent raster transform; host it outside that scope or supply a snapshot.
 ///
 /// # Clipping
 ///

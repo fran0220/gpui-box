@@ -491,15 +491,15 @@ impl Editor {
             .map(|(index, range)| EditorLineGeometry {
                 line: self.area.read(cx).document().line_at(range.start) + 1,
                 range,
-                bounds: Bounds::new(
+                bounds: geometry.visual_transform.map_bounds(Bounds::new(
                     point(origin.x, origin.y + geometry.line_height * index as f32),
                     size(geometry.viewport.size.width, geometry.line_height),
-                ),
+                )),
             })
             .collect();
         Some(EditorGeometry {
             revision: geometry.revision,
-            viewport: geometry.viewport,
+            viewport: geometry.visual_transform.map_bounds(geometry.viewport),
             horizontal_scroll: geometry.horizontal_scroll,
             vertical_scroll: geometry.vertical_scroll,
             lines,
@@ -883,4 +883,134 @@ fn valid_highlights(snapshot: &TextAreaSnapshot, highlights: &EditorHighlights) 
         end = span.range.end;
         valid
     })
+}
+
+#[cfg(test)]
+mod visual_transform_tests {
+    use super::*;
+    use crate::controls::input::TestVisualScale;
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+    };
+
+    fn displayed(bounds: Bounds<Pixels>, enabled: bool) -> Bounds<Pixels> {
+        if !enabled {
+            return bounds;
+        }
+        Bounds::new(
+            point(bounds.left() * 1.5 + px(7.5), bounds.top() * 1.5 - px(20.5)),
+            bounds.size.map(|value| value * 1.5),
+        )
+    }
+
+    #[gpui::test]
+    fn editor_visual_transform_keeps_public_geometry_hover_and_popup_coherent(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let scaled = Rc::new(Cell::new(false));
+        let scale = scaled.clone();
+        let slot = Rc::new(RefCell::new(None));
+        let build = slot.clone();
+        let mut harness = gpui_kit_testkit::harness::Harness::new(
+            cx,
+            |cx| {
+                crate::install(cx);
+                // Test affine geometry, not the popup's independent entrance
+                // animation, which otherwise moves between bounds snapshots.
+                cx.set_reduce_motion(true);
+            },
+            move |window, cx| {
+                let editor = build
+                    .borrow_mut()
+                    .get_or_insert_with(|| {
+                        cx.new(|cx| {
+                            Editor::new(
+                                "scaled.editor",
+                                "Source",
+                                "Wi mQz\nabc def\nqrst uv",
+                                window,
+                                cx,
+                            )
+                        })
+                    })
+                    .clone();
+                TestVisualScale {
+                    enabled: scale.get(),
+                    child: div()
+                        .p(px(40.0))
+                        .w(px(360.0))
+                        .child(editor)
+                        .into_any_element(),
+                }
+                .into_any_element()
+            },
+        );
+        harness.frame();
+        let editor = slot.borrow().clone().expect("editor mounted");
+        let logical = harness.update(|_, cx| editor.read(cx).geometry(cx).expect("geometry"));
+        harness.update(|_, cx| {
+            editor.update(cx, |editor, cx| {
+                editor.set_language_services(true, cx);
+                editor
+                    .request_service(EditorServiceKind::Completion, 4, cx)
+                    .expect("request");
+            })
+        });
+        harness.frame();
+        let popup = harness
+            .bounds("scaled.editor.service.status")
+            .expect("loading popup");
+        for enabled in [true, false] {
+            scaled.set(enabled);
+            harness.frame();
+            harness.update(|_, cx| {
+                let current = editor.read(cx).geometry(cx).expect("transformed geometry");
+                assert_eq!(current.revision, logical.revision);
+                assert_eq!(current.viewport, displayed(logical.viewport, enabled));
+                assert_eq!(current.horizontal_scroll, logical.horizontal_scroll);
+                assert_eq!(current.vertical_scroll, logical.vertical_scroll);
+                assert_eq!(current.lines.len(), logical.lines.len());
+                for (actual, original) in current.lines.iter().zip(&logical.lines) {
+                    assert_eq!(actual.range, original.range);
+                    assert_eq!(actual.bounds, displayed(original.bounds, enabled));
+                }
+            });
+            assert_eq!(
+                harness.bounds("scaled.editor.service.status"),
+                Some(displayed(popup, enabled)),
+                "deferred popup anchor must not be transformed twice"
+            );
+        }
+        scaled.set(true);
+        harness.update(|_, cx| {
+            editor.update(cx, |editor, cx| {
+                editor.service_popup = None;
+                cx.notify();
+            })
+        });
+        harness.frame();
+        let point = harness.update(|_, cx| {
+            editor
+                .read(cx)
+                .area
+                .read(cx)
+                .bounds_for_position(11)
+                .expect("hover caret")
+                .center()
+        });
+        harness
+            .context()
+            .simulate_mouse_move(point, None, gpui::Modifiers::none());
+        harness.update(|_, cx| {
+            let editor = editor.read(cx);
+            let request = &editor
+                .service_popup
+                .as_ref()
+                .expect("hover request")
+                .request;
+            assert_eq!(request.kind, EditorServiceKind::Hover);
+            assert_eq!(request.position, 11);
+        });
+    }
 }

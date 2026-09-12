@@ -302,11 +302,15 @@ fused bridges) before its rim light, rather than disappearing behind a zero-alph
 fill or being converted to an achromatic pole by framework sanitization.
 
 `tools/liquid-glass-reference` records native SwiftUI references and validates
-GPUI static candidates with independent colour, rim, bridge and held-out-size
-scores. The original GPUI candidate still marks its transition samples
-unsupported until real dynamic geometry is integrated. Native reference capture
-alone does not close GPUI's rounded-subtree clipping, continuous morph or
-native-button response gaps. Calibration trials are not accepted catalog
+GPUI candidates with independent colour, rim, bridge and held-out-size scores.
+The persistent menu producer now resizes its real layout at simulated times,
+records measured geometry, and rejects unchanged menu pixels claiming a resize.
+This does not reproduce SwiftUI content crossfades or prove native dynamics.
+Foreground press scaling uses paired framework transforms without reflow;
+the material outline stays fixed, and reduced motion suppresses the scale.
+The 1.014 default is Kit policy informed by one native label specimen, not a
+universal native constant. Rounded foreground clipping and explicit window-overlay
+mask escape are implemented. Calibration trials are not accepted catalog
 baselines or proof of Apple's private implementation.
 
 Application-wide Reduce transparency belongs in `ThemeRegistry`, alongside
@@ -591,7 +595,7 @@ that rubric, not that every possible interaction was exercised.
 | `find-replace` | High: dark explanatory copy disappears, controls are over-wide, and count/arrows are crowded. |
 | `form` | Medium: the Region popup covers field help; dark unselected text is still faint. Errors now clear the field. |
 | `frost` | High: dark frost lacks enough edge/surface evidence; light needs bottom clearance and consistent stripes. The edge evidence a frosted surface is missing is what `glass` carries; `Frost` stays frosted deliberately, being the material every renderer can produce. |
-| `glass` | Regular Liquid separates reading surfaces with material-owned blur, saturation, achromatic wash, lensing and hairline. Rim refraction samples the scattered source: colour bands and luminance bend without recognizable background details. Clear stays sharp because its blur is zero; it is media-only, with light content and `dimmed(true)` (35% black backing). Reduced transparency resolves presets and overlays to Frosted; Clear retains a dark body, light content and requested dimming. This is a host-projected reader preference, not a token; Kit does not read platform settings. `adaptive` and `adaptive_appearance` only flip non-Clear surfaces whose measured area is at most `glassFlipMaxExtent²`; unmeasured and large surfaces retain the window appearance. No extra adaptive source-over fill is painted. Capsules use translucent selected fills, not opaque faces. The shared `surface(ident, theme, recipe)` entry gives all overlay recipes the same material and token elevation. Ring-clipped shadows never darken their own interior and vary with the probe's mean luminance. **Deferred framework gaps:** probes expose no variance/busyness measurement, so background-busyness-driven shadow strength is not claimed; fused-outline shadows need a generic SDF shadow primitive. Over-budget surfaces and groups use opaque fallback faces, never holes. The `glass` exhibit shows text and raster-media backdrops, compact controls, large non-flipping surfaces, and both admission/lobe budgets. `scroll-edge-effect` owns the soft/hard transcript-ramp exhibit. Linux headless baselines are active; Metal updates use its native runner; Windows/WARP is unverified without a runner. |
+| `glass` | Regular Liquid separates reading surfaces with material-owned blur, saturation, achromatic wash, lensing and hairline. Rim refraction samples the scattered source; Clear stays sharp and media-only, with light content and optional 35% dimming. Reduced transparency resolves presets and overlays to Frosted. Small non-Clear surfaces may flip appearance through hysteresis; large and unmeasured surfaces keep the window appearance. Ring shadows use the five optical-source samples' mean and variance, retaining the last completed statistics; this is a sampled separation cue, not exhaustive backdrop analysis. Foreground press scale uses paired framework transforms without reflow and is suppressed under reduced motion. Caller content is rounded-clipped; window overlays explicitly escape ancestor masks. Fused-outline shadows still need a generic SDF shadow primitive. Over-budget surfaces/groups use opaque fallbacks. The exhibit covers text/media backdrops, compact controls, non-flipping surfaces and admission/lobe budgets. `scroll-edge-effect` owns the transcript-ramp exhibit. Native renderer evidence is recorded in `compatibility.toml`; no Apple optical/dynamic equivalence is claimed. |
 | `hover-card` | Medium: helper and body copy are too faint, especially in dark. |
 | `ide-shell` | High: dark shell height leaves a large void and Empty/Unavailable claims conflict. |
 | `image-viewer` | High: metadata and disabled controls are too faint; the third viewer breaks the first two viewers' grid/container rhythm. |

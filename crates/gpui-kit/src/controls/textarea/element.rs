@@ -36,6 +36,7 @@ pub struct PrepaintState {
     scroll_offset: Pixels,
     horizontal_scroll_offset: Pixels,
     visible_rows: usize,
+    visual_transform: gpui::VisualTransform,
 }
 
 impl IntoElement for TextAreaElement {
@@ -297,6 +298,7 @@ impl Element for TextAreaElement {
             scroll_offset,
             horizontal_scroll_offset,
             visible_rows,
+            visual_transform: window.visual_transform(),
         }
     }
 
@@ -317,7 +319,8 @@ impl Element for TextAreaElement {
         if !disabled {
             window.handle_input(
                 &focus_handle,
-                ElementInputHandler::new(bounds, self.area.clone()),
+                ElementInputHandler::new(bounds, self.area.clone())
+                    .with_visual_transform(prepaint.visual_transform),
                 cx,
             );
         }
@@ -363,6 +366,7 @@ impl Element for TextAreaElement {
                         caret_width,
                         prepaint.rows.clone(),
                         prepaint.indexed_rows,
+                        prepaint.visual_transform,
                     );
                     // Geometry and accessibility consumers need one
                     // corrective frame when shaped rows, bounds, or scrolling

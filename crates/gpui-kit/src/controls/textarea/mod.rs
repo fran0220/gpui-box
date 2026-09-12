@@ -365,6 +365,8 @@ pub struct TextAreaEdit {
 
 pub(crate) struct TextAreaGeometry {
     pub revision: u64,
+    /// The remaining geometry is logical; map only when exporting to a caller.
+    pub visual_transform: gpui::VisualTransform,
     pub viewport: Bounds<Pixels>,
     pub horizontal_scroll: Pixels,
     pub vertical_scroll: Pixels,
@@ -490,6 +492,7 @@ pub struct TextArea {
     hard_rows: Option<(u64, Arc<[Range<usize>]>)>,
     row_index_work: usize,
     last_bounds: Option<Bounds<Pixels>>,
+    visual_transform: gpui::VisualTransform,
     caret_width: Pixels,
     /// Bumped once per layout pass, so a host that resizes the frame around
     /// this area can tell a measurement taken after its last change from one
@@ -569,6 +572,7 @@ impl TextArea {
             hard_rows: None,
             row_index_work: 0,
             last_bounds: None,
+            visual_transform: gpui::VisualTransform::default(),
             caret_width: px(cx.theme().measures.caret_width),
             layout_pass: 0,
             revision: 0,
@@ -1058,6 +1062,8 @@ impl TextArea {
         let (Some(layout), Some(bounds)) = (&self.last_layout, self.last_bounds) else {
             return false;
         };
+        let anchor = self.visual_transform.unmap_point(anchor);
+        let focus = self.visual_transform.unmap_point(focus);
         let origin = self.text_origin(bounds);
         let first = (((anchor.y.min(focus.y) - origin.y) / layout.line_height())
             .floor()
@@ -1100,12 +1106,18 @@ impl TextArea {
         }
         let layout = self.last_layout.as_ref()?;
         let bounds = self.last_bounds?;
-        Some(layout.bounds_for_range(
-            range,
-            self.text_origin(bounds),
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        ))
+        Some(
+            layout
+                .bounds_for_range(
+                    range,
+                    self.text_origin(bounds),
+                    gpui::TextAlign::Left,
+                    bounds.size.width,
+                )
+                .into_iter()
+                .map(|bounds| self.visual_transform.map_bounds(bounds))
+                .collect(),
+        )
     }
 
     /// The current insertion rectangle in window coordinates.
@@ -1115,11 +1127,11 @@ impl TextArea {
         }
         let layout = self.last_layout.as_ref()?;
         let bounds = self.last_bounds?;
-        Some(layout.caret_bounds(
+        Some(self.visual_transform.map_bounds(layout.caret_bounds(
             self.cursor_offset(),
             self.text_origin(bounds),
             self.caret_width,
-        ))
+        )))
     }
 
     /// Current painted insertion rectangle for a source byte position.
@@ -1127,15 +1139,23 @@ impl TextArea {
         if self.last_layout_text != *self.edit.text() || offset > self.document().len() {
             return None;
         }
-        Some(self.last_layout.as_ref()?.caret_bounds(
-            offset,
-            self.text_origin(self.last_bounds?),
-            self.caret_width,
-        ))
+        Some(
+            self.visual_transform
+                .map_bounds(self.last_layout.as_ref()?.caret_bounds(
+                    offset,
+                    self.text_origin(self.last_bounds?),
+                    self.caret_width,
+                )),
+        )
     }
 
     pub(crate) fn viewport_bounds(&self) -> Option<Bounds<Pixels>> {
         self.last_bounds
+            .map(|bounds| self.visual_transform.map_bounds(bounds))
+    }
+
+    pub(crate) fn visual_transform(&self) -> gpui::VisualTransform {
+        self.visual_transform
     }
 
     /// The visual row the caret sits on, counting wrapped rows.
@@ -1330,6 +1350,7 @@ impl TextArea {
         let viewport = self.last_bounds?;
         Some(TextAreaGeometry {
             revision: self.revision,
+            visual_transform: self.visual_transform,
             viewport,
             horizontal_scroll: self.horizontal_scroll_offset,
             vertical_scroll: self.scroll_offset,
@@ -1404,6 +1425,8 @@ impl TextArea {
         )
     }
 
+    // Publish all geometry from one paint snapshot, including its transform.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn set_last_layout(
         &mut self,
         layout: EditableTextLayout,
@@ -1412,15 +1435,19 @@ impl TextArea {
         caret_width: Pixels,
         rows: Arc<[Range<usize>]>,
         indexed_rows: usize,
+        visual_transform: gpui::VisualTransform,
     ) -> bool {
         self.row_index_work += indexed_rows;
         let rows_changed = self.last_layout_rows != rows;
         self.last_layout_rows = rows;
-        let changed =
-            self.last_layout_text != text || self.last_bounds != Some(bounds) || rows_changed;
+        let changed = self.last_layout_text != text
+            || self.last_bounds != Some(bounds)
+            || rows_changed
+            || self.visual_transform != visual_transform;
         self.last_layout = Some(layout);
         self.last_layout_text = text;
         self.last_bounds = Some(bounds);
+        self.visual_transform = visual_transform;
         self.caret_width = caret_width;
         self.layout_pass = self.layout_pass.wrapping_add(1);
         changed
@@ -1656,6 +1683,7 @@ impl TextArea {
         else {
             return 0;
         };
+        let position = self.visual_transform.unmap_point(position);
         let local = point(
             position.x - bounds.left() + self.horizontal_scroll_offset,
             position.y - bounds.top() + self.scroll_offset,
@@ -2230,7 +2258,7 @@ impl EntityInputHandler for TextArea {
         let bounds = self.last_bounds?;
         self.last_layout.as_ref()?.native_position_for_point(
             self.edit.text(),
-            point - self.text_origin(bounds),
+            self.visual_transform.unmap_point(point) - self.text_origin(bounds),
             within_range,
             gpui::TextAlign::Left,
             bounds.size.width,
@@ -2293,14 +2321,17 @@ impl EntityInputHandler for TextArea {
             return None;
         }
         let bounds = self.last_bounds?;
-        self.last_layout.as_ref()?.native_position_bounds(
-            self.edit.text(),
-            position,
-            self.text_origin(bounds),
-            self.caret_width,
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        )
+        self.last_layout
+            .as_ref()?
+            .native_position_bounds(
+                self.edit.text(),
+                position,
+                self.text_origin(bounds),
+                self.caret_width,
+                gpui::TextAlign::Left,
+                bounds.size.width,
+            )
+            .map(|bounds| self.visual_transform.map_bounds(bounds))
     }
 
     fn farthest_native_position(
@@ -2338,13 +2369,20 @@ impl EntityInputHandler for TextArea {
         if self.range_to_utf16(&bytes) != range {
             return vec![];
         }
-        layout.native_selection_rects(
-            self.edit.text(),
-            bytes,
-            self.text_origin(bounds),
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        )
+        layout
+            .native_selection_rects(
+                self.edit.text(),
+                bytes,
+                self.text_origin(bounds),
+                gpui::TextAlign::Left,
+                bounds.size.width,
+            )
+            .into_iter()
+            .map(|mut rect| {
+                rect.bounds = self.visual_transform.map_bounds(rect.bounds);
+                rect
+            })
+            .collect()
     }
 
     fn text_position_in_direction(
@@ -2582,12 +2620,15 @@ impl EntityInputHandler for TextArea {
     ) -> Option<Bounds<Pixels>> {
         let layout = self.last_layout.as_ref()?;
         let range = self.range_from_utf16(&range_utf16);
-        Some(layout.enclosing_bounds_for_range(
-            range,
-            self.text_origin(bounds),
-            gpui::TextAlign::Left,
-            bounds.size.width,
-        ))
+        Some(
+            self.visual_transform
+                .map_bounds(layout.enclosing_bounds_for_range(
+                    range,
+                    self.text_origin(bounds),
+                    gpui::TextAlign::Left,
+                    bounds.size.width,
+                )),
+        )
     }
 
     fn character_index_for_point(

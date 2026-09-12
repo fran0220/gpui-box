@@ -744,6 +744,7 @@
     "glassContrastFlipLow": 0.42,
     "glassContrastFlipHigh": 0.58,
     "glassPressDepth": 1.5,
+    "glassPressScale": 1.014,
     "scrollEdgeBand": 28,
     "scrollEdgeBlur": 16,
     "sheenAlpha": 0.08,

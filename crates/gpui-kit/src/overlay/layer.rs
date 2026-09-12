@@ -402,6 +402,7 @@ impl RenderOnce for Overlay {
         // stacking context; the token layer decides the order among overlays.
         pinned(
             gpui::deferred(placed)
+                .unclipped()
                 .priority(priority(&theme, self.layer).saturating_add(self.stack))
                 .into_any_element(),
         )
@@ -423,6 +424,7 @@ pub fn surface(
         recipe,
         theme: theme.clone(),
         focused: false,
+        children: Vec::new(),
         inner: div()
             .id(ident.element_id())
             .column()
@@ -439,6 +441,7 @@ pub struct GlassSurface {
     recipe: OverlaySurface,
     theme: Theme,
     focused: bool,
+    children: Vec<AnyElement>,
     inner: Stateful<Div>,
 }
 
@@ -483,7 +486,7 @@ impl gpui::Styled for GlassSurface {
 
 impl gpui::ParentElement for GlassSurface {
     fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
-        self.inner.extend(elements);
+        self.children.extend(elements);
     }
 }
 
@@ -528,10 +531,10 @@ impl gpui::Element for GlassSurface {
             )
             .elevation(self.recipe.elevation)
             .adaptive(true)
-            .frame(std::mem::replace(
-                &mut self.inner,
-                div().id(self.ident.element_id()),
-            ));
+            .frame(
+                std::mem::replace(&mut self.inner, div().id(self.ident.element_id())),
+                std::mem::take(&mut self.children),
+            );
         let mut element =
             crate::foundation::ThemeOverlay::theme(self.theme.clone(), glass).into_any_element();
         let layout = element.request_layout(window, cx);
@@ -606,6 +609,82 @@ pub(crate) fn pinned(layer: AnyElement) -> AnyElement {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn window_overlay_escapes_rounded_glass_ancestor(cx: &mut gpui::TestAppContext) {
+        use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+        use gpui_kit_testkit::harness::Harness;
+        for variant in 0..5 {
+            let hits = Rc::new(std::cell::Cell::new(0));
+            let received = hits.clone();
+            let mut harness = Harness::new(
+                cx,
+                |cx| {
+                    crate::install(cx);
+                    cx.set_reduce_motion(true);
+                },
+                move |window, cx| {
+                    let received = received.clone();
+                    let content = div()
+                        .id("escaped.content")
+                        .w(px(160.))
+                        .h(px(120.))
+                        .on_mouse_down(gpui::MouseButton::Left, move |_, _, _| {
+                            received.set(received.get() + 1);
+                        })
+                        .semantic_in(cx, NodeSpec::new("escaped.content", Role::Group))
+                        .into_any_element();
+                    let placed = match variant {
+                        0 => Overlay::modal("escaped")
+                            .placement(Placement::Center)
+                            .child(content)
+                            .into_any_element(),
+                        1 => Overlay::modal("escaped")
+                            .placement(Placement::Edge(Edge::Bottom))
+                            .child(content)
+                            .into_any_element(),
+                        2 => crate::overlay::popover::modal(
+                            "escaped",
+                            cx.theme(),
+                            window.viewport_size(),
+                            content,
+                        ),
+                        3 => crate::overlay::popover::at(
+                            "escaped",
+                            cx.theme(),
+                            gpui::point(px(180.), px(170.)),
+                            content,
+                        ),
+                        _ => crate::overlay::popover::anchored(
+                            "escaped",
+                            cx.theme(),
+                            Placement::Below,
+                            Hang::Start,
+                            content,
+                        ),
+                    };
+                    div()
+                        .ml(px(13.0))
+                        .mt(px(29.0))
+                        .child(
+                            super::super::Glass::new("clipped.mount")
+                                .child(div().w(px(80.0)).h(px(40.0)).child(placed)),
+                        )
+                        .into_any_element()
+                },
+            );
+            let bounds = harness.bounds("escaped.content").expect("overlay bounds");
+            assert!(bounds.center().y > px(69.0), "target is outside the glass");
+            harness
+                .context()
+                .simulate_click(bounds.center(), gpui::Modifiers::none());
+            assert_eq!(
+                hits.get(),
+                1,
+                "window overlay must escape its rounded mount"
+            );
+        }
+    }
 
     #[gpui::test]
     fn nested_modal_and_edge_anchor_to_window_not_mount(cx: &mut gpui::TestAppContext) {

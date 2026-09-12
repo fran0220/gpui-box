@@ -1173,7 +1173,7 @@ fn gate(full: bool) -> Result<()> {
             "tools/liquid-glass-reference/buttons",
         ] {
             step(
-                "python3",
+                "target/liquid-glass-python/bin/python",
                 &["-B", "-m", "unittest", "discover", "-s", directory, "-v"],
                 None,
             )?;
@@ -1207,6 +1207,18 @@ fn gate(full: bool) -> Result<()> {
             "cargo",
             &["doc", "--no-deps", "--workspace"],
             Some(("RUSTDOCFLAGS", "-D warnings")),
+        )?;
+        step(
+            "cargo",
+            &[
+                "test",
+                "--locked",
+                "--manifest-path",
+                "tools/headless-visual/Cargo.toml",
+                "--",
+                "--test-threads=1",
+            ],
+            None,
         )?;
         step(
             "cargo",
@@ -2557,6 +2569,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             tokens.effect.glass_contrast_flip_high,
         ),
         ("effect.glassPressDepth", tokens.effect.glass_press_depth),
+        ("effect.glassPressScale", tokens.effect.glass_press_scale),
         ("effect.sheenAlpha", tokens.effect.sheen_alpha),
         ("effect.areaWashAlpha", tokens.effect.area_wash_alpha),
         ("effect.headerTintAlpha", tokens.effect.header_tint_alpha),

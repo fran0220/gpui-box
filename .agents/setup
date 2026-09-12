@@ -17,6 +17,7 @@ packages=(
   libxkbcommon-x11-dev
   libvulkan1
   musl-tools
+  python3-venv
   xauth
   xdotool
   xvfb
@@ -40,6 +41,13 @@ if ((${#missing_packages[@]})); then
 else
   echo "System build dependencies are already installed."
 fi
+
+echo "Installing isolated native-reference analysis dependencies."
+if [[ ! -x target/liquid-glass-python/bin/python ]]; then
+  python3 -m venv target/liquid-glass-python
+fi
+target/liquid-glass-python/bin/python -m pip install --disable-pip-version-check \
+  -r tools/liquid-glass-reference/requirements.txt
 
 if [ -f "$HOME/.cargo/env" ]; then
   # shellcheck disable=SC1091

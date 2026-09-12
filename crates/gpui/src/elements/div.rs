@@ -816,6 +816,8 @@ pub trait InteractiveElement: Sized {
     /// The handle is `None` when the element is not focusable. This keeps
     /// framework integrations on the same focus authority used for event
     /// dispatch and platform accessibility without creating another handle.
+    /// Bounds are displayed window coordinates after inherited visual scale,
+    /// not layout coordinates. They are not intersected with content clips.
     fn on_focus_resolved(
         mut self,
         listener: impl Fn(Bounds<Pixels>, Option<&FocusHandle>, &mut Window, &mut App) + 'static,
@@ -2515,7 +2517,12 @@ impl Interactivity {
             },
         );
         if let Some(listener) = self.focus_resolved_listener.as_ref() {
-            listener(bounds, self.tracked_focus_handle.as_ref(), window, cx);
+            listener(
+                window.visual_transform().map_bounds(bounds),
+                self.tracked_focus_handle.as_ref(),
+                window,
+                cx,
+            );
         }
         result
     }
@@ -2783,6 +2790,7 @@ impl Interactivity {
                         origin: hitbox.origin,
                         size: text.size(FONT_SIZE),
                     };
+                    let text_bounds = hitbox.visual_transform.map_bounds(text_bounds);
                     if let Some(source_location) = self.source_location
                         && text_bounds.contains(&window.mouse_position())
                         && window.modifiers().secondary()
@@ -3299,7 +3307,7 @@ impl Interactivity {
                 // Use bounds instead of testing hitbox since this is called during prepaint.
                 let check_is_hovered_during_prepaint = Rc::new({
                     let pending_mouse_down = pending_mouse_down.clone();
-                    let source_bounds = hitbox.bounds;
+                    let source_bounds = hitbox.displayed_bounds();
                     move |window: &Window| {
                         !window.last_input_was_keyboard()
                             && pending_mouse_down.borrow().is_none()

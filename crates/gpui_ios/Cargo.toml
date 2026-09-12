@@ -1,13 +1,13 @@
 [package]
 name = "gpui-box-ios"
-version = "0.1.2"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 homepage = "https://github.com/fran0220/gpui-box"
 repository.workspace = true
 license = "Apache-2.0"
 description = "UIKit host integration for GPUI Box (native acceptance pending)"
-publish = false
+publish = true
 
 [lib]
 name = "gpui_ios"
@@ -32,7 +32,8 @@ accesskit_consumer = "0.38"
 
 [dev-dependencies]
 gpui-box-mobile-reference = { path = "../../examples/mobile-reference", default-features = false }
-gpui-kit.workspace = true
+# Local integration tests must not publish an ios -> kit -> platform -> ios cycle.
+gpui-kit = { package = "gpui-box-kit", path = "../gpui-kit" }
 serde_json.workspace = true
 tempfile.workspace = true
 

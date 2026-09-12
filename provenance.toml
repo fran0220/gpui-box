@@ -1,9 +1,9 @@
 schema = 1
 project = "GPUI Box"
 repository = "https://github.com/fran0220/gpui-box"
-release_status = "released"
-release_version = "0.1.2"
-release_date = "2026-08-13"
+release_status = "unreleased"
+release_version = "0.2.0"
+release_date = "2026-09-12"
 
 [historical_source]
 name = "GPUI / Zed"

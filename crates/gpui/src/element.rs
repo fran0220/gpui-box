@@ -414,12 +414,15 @@ impl<E: Element> Drawable<E> {
                 let bounds = window.layout_bounds(layout_id);
                 // AccessKit cannot express curved regions. Expose the enclosing
                 // intersection, without narrowing rendering's optical source mask.
-                let content_clip = window
-                    .clip_chain
-                    .accessible_bounds(window.content_mask().bounds);
-                let visible_bounds = bounds.intersect(&content_clip);
+                let content_clip = window.clip_chain.accessible_bounds(
+                    window
+                        .visual_transform
+                        .map_bounds(window.content_mask().bounds),
+                );
+                let displayed_bounds = window.visual_transform.map_bounds(bounds);
+                let visible_bounds = displayed_bounds.intersect(&content_clip);
                 let a11y_bounds = if bounds.is_empty() {
-                    bounds
+                    displayed_bounds
                 } else {
                     visible_bounds
                 };
@@ -503,11 +506,13 @@ impl<E: Element> Drawable<E> {
                             y1: ((content_clip.origin.y.0 + content_clip.size.height.0) * scale)
                                 as f64,
                         };
+                        let transform = window.visual_transform.matrix(scale);
                         let mut builder = A11ySubtreeBuilder::new(
                             global_id.accesskit_node_id(),
                             &mut window.a11y.nodes,
                         )
-                        .with_bounds_clip(clip);
+                        .with_bounds_clip(clip)
+                        .with_bounds_transform(transform);
                         #[cfg(debug_assertions)]
                         {
                             builder = builder.with_creator(creator);

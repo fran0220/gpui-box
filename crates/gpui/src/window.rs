@@ -799,11 +799,31 @@ pub struct Hitbox {
     pub content_mask: ContentMask<Pixels>,
     /// Rounded ancestor clips captured during prepaint.
     pub clip_chain: crate::ClipChain,
+    /// Captured mapping for window-global pointer positions and semantic bounds.
+    pub visual_transform: crate::VisualTransform,
     /// Flags that specify hitbox behavior.
     pub behavior: HitboxBehavior,
 }
 
 impl Hitbox {
+    /// Tests a window-global point against this hitbox and its inherited clips,
+    /// without testing occlusion by later elements. `bounds` stays layout-space.
+    pub fn contains(&self, position: &Point<Pixels>) -> bool {
+        self.bounds
+            .intersect(&self.content_mask.bounds)
+            .contains(&self.visual_transform.unmap_point(*position))
+            && self.clip_chain.contains(*position)
+    }
+
+    /// Displayed rectangle for semantic measurement. Rounded clipping may reject
+    /// corners inside this conservative rectangle.
+    pub fn displayed_bounds(&self) -> Bounds<Pixels> {
+        self.clip_chain.accessible_bounds(
+            self.visual_transform
+                .map_bounds(self.bounds.intersect(&self.content_mask.bounds)),
+        )
+    }
+
     /// Checks if the hitbox is currently hovered. Returns `false` during keyboard input modality
     /// so that keyboard navigation suppresses hover highlights. Except when handling
     /// `ScrollWheelEvent`, this is typically what you want when determining whether to handle mouse
@@ -933,6 +953,7 @@ pub(crate) struct DeferredDraw {
     text_style_stack: Vec<TextStyleRefinement>,
     content_mask: Option<ContentMask<Pixels>>,
     clip_chain: crate::ClipChain,
+    visual_transform: crate::VisualTransform,
     rem_size: Pixels,
     element: Option<AnyElement>,
     absolute_offset: Point<Pixels>,
@@ -1098,8 +1119,7 @@ impl Frame {
         let mut set_hover_hitbox_count = false;
         let mut hit_test = HitTest::default();
         for hitbox in self.hitboxes.iter().rev() {
-            let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
-            if bounds.contains(&position) && hitbox.clip_chain.contains(position) {
+            if hitbox.contains(&position) {
                 hit_test.ids.push(hitbox.id);
                 if !set_hover_hitbox_count
                     && hitbox.behavior == HitboxBehavior::BlockMouseExceptScroll
@@ -1184,6 +1204,7 @@ pub struct Window {
     pub(crate) edge_fade: Option<EdgeFade>,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
     pub(crate) clip_chain: crate::ClipChain,
+    pub(crate) visual_transform: crate::VisualTransform,
     pub(crate) selection_scope_stack: Vec<crate::SelectionScopeId>,
     /// One selection that may span separately mounted text elements. It
     /// belongs to the window rather than to a global, so a closed window
@@ -2106,6 +2127,7 @@ impl Window {
             element_offset_stack: Vec::new(),
             content_mask_stack: Vec::new(),
             clip_chain: crate::ClipChain::default(),
+            visual_transform: crate::VisualTransform::default(),
             element_opacity: 1.0,
             edge_fade: None,
             requested_autoscroll: None,
@@ -3291,6 +3313,12 @@ impl Window {
 
     #[inline]
     fn snapped_content_mask(&self) -> ContentMask<ScaledPixels> {
+        if self.visual_transform != crate::VisualTransform::default() {
+            let displayed = self.visual_transform.map_bounds(self.content_mask().bounds);
+            return ContentMask {
+                bounds: self.unmap_raster_bounds(self.cover_bounds(displayed)),
+            };
+        }
         ContentMask {
             bounds: self.cover_bounds(self.content_mask().bounds),
         }
@@ -3997,6 +4025,7 @@ impl Window {
                     absolute_offset,
                     content_mask,
                     clip_chain,
+                    visual_transform,
                     prepaint_range,
                 ) = {
                     let deferred_draw = &mut self.next_frame.deferred_draws[deferred_draw_ix];
@@ -4013,6 +4042,7 @@ impl Window {
                         deferred_draw.absolute_offset,
                         deferred_draw.content_mask,
                         deferred_draw.clip_chain.clone(),
+                        deferred_draw.visual_transform,
                         deferred_draw.prepaint_range.clone(),
                     )
                 };
@@ -4023,6 +4053,8 @@ impl Window {
 
                 let prepaint_start = self.prepaint_index();
                 let previous_chain = std::mem::replace(&mut self.clip_chain, clip_chain);
+                let previous_transform =
+                    std::mem::replace(&mut self.visual_transform, visual_transform);
                 if let Some(mut element) = element {
                     self.with_rendered_view(current_view, |window| {
                         window.with_content_mask(content_mask, |window| {
@@ -4038,6 +4070,7 @@ impl Window {
                     self.reuse_prepaint(prepaint_range);
                 }
                 self.clip_chain = previous_chain;
+                self.visual_transform = previous_transform;
                 if let Some(state) = a11y_state {
                     self.a11y.nodes.end_deferred(state);
                 }
@@ -4078,6 +4111,12 @@ impl Window {
             let content_mask = deferred_draw.content_mask;
             let previous_chain =
                 std::mem::replace(&mut self.clip_chain, deferred_draw.clip_chain.clone());
+            let previous_transform =
+                std::mem::replace(&mut self.visual_transform, deferred_draw.visual_transform);
+            let previous_scene_transform = self
+                .next_frame
+                .scene
+                .replace_visual_transform(self.visual_transform.matrix(self.scale_factor()));
             let clip = self
                 .next_frame
                 .scene
@@ -4096,6 +4135,10 @@ impl Window {
                 self.reuse_paint(deferred_draw.paint_range.clone());
             }
             self.next_frame.scene.replace_clip(previous_clip);
+            self.next_frame
+                .scene
+                .replace_visual_transform(previous_scene_transform);
+            self.visual_transform = previous_transform;
             self.clip_chain = previous_chain;
             let paint_end = self.paint_index();
             deferred_draw.paint_range = paint_start..paint_end;
@@ -4166,6 +4209,7 @@ impl Window {
                     text_style_stack: deferred_draw.text_style_stack.clone(),
                     content_mask: deferred_draw.content_mask,
                     clip_chain: deferred_draw.clip_chain.clone(),
+                    visual_transform: deferred_draw.visual_transform,
                     rem_size: deferred_draw.rem_size,
                     priority: deferred_draw.priority,
                     element: None,
@@ -4429,6 +4473,9 @@ impl Window {
         self.invalidator.debug_assert_paint_or_prepaint();
         if let Some(mask) = mask {
             let mask = mask.intersect(&self.content_mask());
+            let mask = ContentMask {
+                bounds: self.visual_transform.map_bounds(mask.bounds),
+            };
             self.content_mask_stack.push(mask);
             let result = f(self);
             self.content_mask_stack.pop();
@@ -4436,6 +4483,65 @@ impl Window {
         } else {
             f(self)
         }
+    }
+
+    /// Temporarily removes inherited rectangular and rounded content masks.
+    /// The window viewport remains the outer rendering/input boundary. Masks
+    /// introduced inside the closure still apply; ancestor masks are restored
+    /// afterwards. Use identical scopes in prepaint and paint so hit testing
+    /// and conservative accessibility bounds agree with visible output.
+    ///
+    /// This does not change layout, element offsets, visual transforms, or
+    /// accessibility ancestry. Bounds remain logical window coordinates and
+    /// events remain displayed window coordinates. Deferred draws scheduled
+    /// here capture the cleared rounded chain and the unchanged transform.
+    pub fn without_content_masks<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.invalidator.debug_assert_paint_or_prepaint();
+        let masks = std::mem::take(&mut self.content_mask_stack);
+        let chain = std::mem::take(&mut self.clip_chain);
+        let clip = self.next_frame.scene.replace_clip(crate::ClipId::NONE);
+        let result = f(self);
+        self.next_frame.scene.replace_clip(clip);
+        self.clip_chain = chain;
+        self.content_mask_stack = masks;
+        result
+    }
+
+    /// The inherited layout-to-display mapping. Capture during prepaint for
+    /// semantic measurement (`map_bounds`) or pointer handlers (`unmap_point`).
+    /// Layout callbacks and event positions are not implicitly rewritten.
+    pub fn visual_transform(&self) -> crate::VisualTransform {
+        self.visual_transform
+    }
+
+    /// Uniformly scales descendant visuals, not layout, about an origin in
+    /// this scope's layout/window coordinates. Enter identical scopes during
+    /// prepaint and paint. Nested transforms apply inner first, then outer.
+    /// Clips introduced outside stay fixed; clips introduced inside move with
+    /// the scope. Hitboxes and accessibility follow displayed geometry. Glyph
+    /// and SVG raster resolution includes the effective scale, without reshaping.
+    /// Cached/deferred elements retain the mapping. Native hosted views refuse
+    /// nonidentity transforms rather than resizing/reflowing their native frames.
+    /// Events remain window-global: handlers comparing layout bounds must capture
+    /// `visual_transform()` during prepaint and inverse-map event positions.
+    pub fn with_visual_scale<R>(
+        &mut self,
+        scale: f32,
+        origin: Point<Pixels>,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.invalidator.debug_assert_paint_or_prepaint();
+        let previous = self.visual_transform;
+        self.visual_transform =
+            previous.compose(crate::VisualTransform::scale_about(scale, origin));
+        let matrix = self.visual_transform.matrix(self.scale_factor());
+        let previous_scene = self.next_frame.scene.replace_visual_transform(matrix);
+        let result = f(self);
+        self.next_frame
+            .scene
+            .replace_visual_transform(previous_scene);
+        self.visual_transform = previous;
+        result
     }
 
     /// Clips all descendants to a rounded rectangle in window coordinates.
@@ -4448,6 +4554,11 @@ impl Window {
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
         self.invalidator.debug_assert_paint_or_prepaint();
+        let clip = crate::RoundedClip::new(
+            self.visual_transform.map_bounds(clip.bounds()),
+            clip.corner_radii()
+                .map(|r| *r * self.visual_transform.scale()),
+        );
         self.clip_chain.push(clip);
         let painting = self.invalidator.inner.borrow().draw_phase == DrawPhase::Paint;
         let previous = if painting {
@@ -4837,7 +4948,8 @@ impl Window {
     /// Obtain the current content mask. This method should only be called during element drawing.
     pub fn content_mask(&self) -> ContentMask<Pixels> {
         self.invalidator.debug_assert_paint_or_prepaint();
-        self.content_mask_stack
+        let mask = self
+            .content_mask_stack
             .last()
             .cloned()
             .unwrap_or_else(|| ContentMask {
@@ -4845,7 +4957,10 @@ impl Window {
                     origin: Point::default(),
                     size: self.viewport_size,
                 },
-            })
+            });
+        ContentMask {
+            bounds: self.visual_transform.unmap_bounds(mask.bounds),
+        }
     }
 
     /// Provide elements in the called function with a new namespace in which their identifiers must be unique.
@@ -5087,6 +5202,7 @@ impl Window {
             text_style_stack: self.text_style_stack.clone(),
             content_mask,
             clip_chain: self.clip_chain.clone(),
+            visual_transform: self.visual_transform,
             rem_size: self.rem_size(),
             priority,
             element: Some(element),
@@ -5558,6 +5674,16 @@ impl Window {
         });
     }
 
+    fn unmap_raster_bounds(&self, bounds: Bounds<ScaledPixels>) -> Bounds<ScaledPixels> {
+        if self.visual_transform == crate::VisualTransform::default() {
+            return bounds;
+        }
+        let dpi = self.scale_factor();
+        self.visual_transform
+            .unmap_bounds(bounds.map(|p| px(p.0 / dpi)))
+            .scale(dpi)
+    }
+
     /// Paints a monochrome (non-emoji) glyph into the scene for the next frame at the current z-index.
     ///
     /// The y component of the origin is the baseline of the glyph.
@@ -5581,7 +5707,7 @@ impl Window {
             size: size(font_size * 0.6, font_size),
         });
         let scale_factor = self.scale_factor();
-        let glyph_origin = origin.scale(scale_factor);
+        let glyph_origin = self.visual_transform.map_point(origin).scale(scale_factor);
 
         let quantized_origin = Point::new(
             round_half_toward_zero(glyph_origin.x.0 * SUBPIXEL_VARIANTS_X as f32)
@@ -5601,7 +5727,7 @@ impl Window {
             glyph_id,
             font_size,
             subpixel_variant,
-            scale_factor,
+            scale_factor: scale_factor * self.visual_transform.scale(),
             is_emoji: false,
             subpixel_rendering,
             dilation,
@@ -5620,6 +5746,7 @@ impl Window {
                 origin: integer_origin + raster_bounds.origin.map(Into::into),
                 size: tile.bounds.size.map(Into::into),
             };
+            let bounds = self.unmap_raster_bounds(bounds);
             let content_mask = self.snapped_content_mask();
 
             if subpixel_rendering {
@@ -5696,14 +5823,14 @@ impl Window {
         self.invalidator.debug_assert_paint();
 
         let scale_factor = self.scale_factor();
-        let glyph_origin = origin.scale(scale_factor);
+        let glyph_origin = self.visual_transform.map_point(origin).scale(scale_factor);
         let integer_origin = glyph_origin.map(|c| ScaledPixels(round_half_toward_zero(c.0)));
         let params = RenderGlyphParams {
             font_id,
             glyph_id,
             font_size,
             subpixel_variant: Default::default(),
-            scale_factor,
+            scale_factor: scale_factor * self.visual_transform.scale(),
             is_emoji: true,
             subpixel_rendering: false,
             dilation: 0,
@@ -5723,6 +5850,7 @@ impl Window {
                 origin: integer_origin + raster_bounds.origin.map(Into::into),
                 size: tile.bounds.size.map(Into::into),
             };
+            let bounds = self.unmap_raster_bounds(bounds);
             let content_mask = self.snapped_content_mask();
             let opacity = self.element_opacity_for_bounds(&Bounds {
                 origin,
@@ -5764,12 +5892,13 @@ impl Window {
 
         let element_opacity = self.element_opacity_for_visible_bounds(&bounds);
         let bounds = self.snap_bounds(bounds);
+        let raster_scale = SMOOTH_SVG_SCALE_FACTOR * self.visual_transform.scale();
 
         let params = RenderSvgParams {
             path,
-            size: bounds.size.map(|pixels| {
-                DevicePixels::from((pixels.0 * SMOOTH_SVG_SCALE_FACTOR).ceil() as i32)
-            }),
+            size: bounds
+                .size
+                .map(|pixels| DevicePixels::from((pixels.0 * raster_scale).ceil() as i32)),
         };
 
         let Some(tile) =
@@ -5788,13 +5917,13 @@ impl Window {
         let svg_bounds = Bounds {
             origin: bounds.center()
                 - Point::new(
-                    ScaledPixels(tile.bounds.size.width.0 as f32 / SMOOTH_SVG_SCALE_FACTOR / 2.),
-                    ScaledPixels(tile.bounds.size.height.0 as f32 / SMOOTH_SVG_SCALE_FACTOR / 2.),
+                    ScaledPixels(tile.bounds.size.width.0 as f32 / raster_scale / 2.),
+                    ScaledPixels(tile.bounds.size.height.0 as f32 / raster_scale / 2.),
                 ),
             size: tile
                 .bounds
                 .size
-                .map(|value| ScaledPixels(value.0 as f32 / SMOOTH_SVG_SCALE_FACTOR)),
+                .map(|value| ScaledPixels(value.0 as f32 / raster_scale)),
         };
         let final_bounds = svg_bounds
             .map_origin(|value| ScaledPixels(round_half_toward_zero(value.0)))
@@ -6116,6 +6245,11 @@ impl Window {
     /// drawing.
     pub fn paint_platform_view(&mut self, bounds: Bounds<Pixels>, handle: PlatformViewHandle) {
         self.invalidator.debug_assert_paint();
+        assert_eq!(
+            self.visual_transform,
+            crate::VisualTransform::default(),
+            "native platform views do not support subtree visual transforms; use an untransformed host or a raster snapshot"
+        );
 
         // A view clipped away entirely — scrolled out of its container, say —
         // registers nothing, so it is detached rather than left floating over
@@ -6305,6 +6439,7 @@ impl Window {
             bounds,
             content_mask,
             clip_chain: self.clip_chain.clone(),
+            visual_transform: self.visual_transform,
             behavior,
         };
         self.next_frame.hitboxes.push(hitbox.clone());

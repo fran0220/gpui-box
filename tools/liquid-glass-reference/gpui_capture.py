@@ -17,8 +17,9 @@ and regular_refractive_index [1,2.5] isolate its dielectric geometry.
 blur takes precedence over regular_blur. protect_text is numeric 0 or 1 (default 1).
 Omitted fields retain production theme/preset values. No shader fitting occurs.
 --smoke instead of REFERENCE captures four static/control frames without native
-evidence; it writes smoke.json, NEVER candidate.json. Morph frames are sampled
-at real simulated times but remain explicitly unsupported initial-body renders.
+evidence; it writes smoke.json, NEVER candidate.json. Transition frames replay
+one persistent menu surface's linear resize using the GPUI simulated clock.
+Native capture brackets are not presentation timestamps or dynamics equivalence.
 """
 import argparse
 import json
@@ -110,6 +111,7 @@ def collect(root, request, report):
     require(report.get("clock") == "GPUI TestDispatcher; measured executor now at draw completion", "unknown clock")
     wanted = {key(f): f for f in request["frames"]}
     seen, names, result = set(), set(), []
+    resize_pixels = []
     w, h = [v*request["scale"] for v in (960, 640)]
     for f in report["frames"]:
         k = key(f)
@@ -123,7 +125,24 @@ def collect(root, request, report):
             lo, hi = p["reference_interval"]
             require(lo <= actual <= hi and abs(actual-p["requested_sample_time"]) <= 1e-8,
                     "actual simulation timestamp mismatch")
-            require(f.get("transition_status") == "unsupported-initial-body-only", "unverified transition support claim")
+            require(f.get("transition_status") == "persistent-surface-resize", "unverified transition support claim")
+            geometry = f.get("resize_geometry", {})
+            require(isinstance(geometry, dict) and geometry.get("identity") == "menu"
+                    and geometry.get("motion") == "Animator linear 0.8s; independent compact-state replay",
+                    "unknown resize motion/identity")
+            measured_time = geometry.get("sample_time_after_trigger")
+            require(number(measured_time) and abs(measured_time-actual) <= 1e-8,
+                    "stale geometry timestamp")
+            bounds = geometry.get("bounds")
+            progress = min(actual / .8, 1)
+            expected = [64, 448, 144 + 128*progress, 48 + 80*progress]
+            # Prepaint reports layout rounded to physical pixels, not the
+            # unrounded interpolated request (e.g. 156.8pt becomes 157 at 1x).
+            require(isinstance(bounds, list) and len(bounds) == 4
+                    and all(number(v) and abs(v-e) <= .51/request["scale"] for v, e in zip(bounds, expected)),
+                    "measured resize bounds mismatch")
+            require(geometry.get("phase") == ("settled" if actual >= .8 else "resizing"),
+                    "resize phase mismatch")
         else:
             require(actual == 0 and f.get("transition_status") == "not-applicable", "unexpected static clock/state")
         raw = output_file(root, f["raw_file"], names)
@@ -131,12 +150,24 @@ def collect(root, request, report):
         pixels = raw.read_bytes()
         require(len(pixels) == w*h*3, "truncated RGB output")
         require(png_size(png.read_bytes()) == (w, h), "PNG dimension mismatch")
+        if k[1] in ("static", "transition"):
+            # Compare only the resizing region, so an unrelated animated pixel
+            # cannot turn an unchanged menu into evidence of completion.
+            scale = request["scale"]
+            roi = b"".join(pixels[(y*w+64*scale)*3:(y*w+336*scale)*3]
+                           for y in range(448*scale, 576*scale))
+            bounds = f["resize_geometry"]["bounds"] if k[1] == "transition" else [64, 448, 144, 48]
+            for appearance, other_bounds, other_roi in resize_pixels:
+                if appearance == k[0] and max(abs(a-b) for a, b in zip(bounds, other_bounds)) > .5:
+                    require(roi != other_roi, "static resize pixels despite changed geometry")
+            resize_pixels.append((k[0], bounds, roi))
         ppm = root / (raw.stem + ".ppm")
         require(not ppm.exists() and ppm.name not in names, "duplicate sidecar")
         names.add(ppm.name)
         ppm.write_bytes(f"P6\n{w} {h}\n255\n".encode() + pixels)
         result.append({**{n: f[n] for n in ("appearance", "phase", "index", "pixel_size",
                        "sample_time_after_trigger", "transition_status")},
+                       "resize_geometry": f.get("resize_geometry"),
                        "file": png.name, "file_sha256": digest(png),
                        "raw_file": raw.name, "raw_file_sha256": digest(raw),
                        "rgb_file": ppm.name, "rgb_file_sha256": digest(ppm)})
@@ -194,7 +225,8 @@ def capture(reference_dir, output, executable, revision, options=None, smoke_sca
     report = load(output / "render.json")
     frames = collect(output, request, report)
     sources = [HERE / "gpui_capture.py", REPO / "tools/headless-visual/examples/glass_reference.rs",
-               REPO / "tools/headless-visual/Cargo.lock", REPO / "crates/gpui-kit/src/overlay/glass.rs"]
+               REPO / "tools/headless-visual/Cargo.lock", REPO / "crates/gpui-kit/src/overlay/glass.rs",
+               REPO / "crates/gpui-kit/src/motion/animator.rs"]
     sources += sorted((REPO / "crates").glob("gpui*/src/**/*.wgsl"))
     sources += sorted((REPO / "crates").glob("gpui*/src/**/*.metal"))
     sources += sorted((REPO / "crates").glob("gpui*/src/**/*.hlsl"))
@@ -215,7 +247,7 @@ def capture(reference_dir, output, executable, revision, options=None, smoke_sca
                     "color_space": "renderer sRGB RGB readback; PPM P6/255, no CPU glass, no image resampling",
                     "themes": ["studio-light", "studio-dark"], "reduce_motion": False},
                  "coverage": {"static": "production Glass and GlassGroup; uncalibrated",
-                    "transition": "UNSUPPORTED: initial Actions body retained at every actual simulated time; do not fit dynamics",
+                    "transition": "Persistent menu surface resize, GPUI Animator linear 0.8s; actual prepaint bounds and simulated draw time. Each sample replays from compact state. Native capture brackets are not presentation timestamps; no Apple dynamics equivalence or cross-view matched geometry claim.",
                     "pointer": "not dispatched; no interactive-response claim",
                     "fusion": "32pt production merge smoothing is not proven equivalent to Apple's container spacing",
                     "tint": "Color.orange input resolved publicly on macOS 27.0/26A5416b: light #FF8D28, dark #FF9230; separate default-environment experiment, not in-window introspection or a universal colour promise",

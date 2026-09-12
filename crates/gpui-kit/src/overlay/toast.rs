@@ -668,6 +668,7 @@ impl Render for ToastLayer {
 
         pinned(
             gpui::deferred(frame)
+                .unclipped()
                 .priority(priority(&theme, Layer::Toast))
                 .into_any_element(),
         )
@@ -751,6 +752,50 @@ mod tests {
 
     fn theme() -> Theme {
         Theme::studio_dark()
+    }
+
+    #[gpui::test]
+    fn toast_dismiss_escapes_a_rounded_mount(cx: &mut TestAppContext) {
+        let slot = Rc::new(RefCell::new(None));
+        let mounted = slot.clone();
+        let mut harness = gpui_kit_testkit::harness::Harness::new(
+            cx,
+            |cx| {
+                crate::install(cx);
+                cx.set_reduce_motion(true);
+            },
+            move |window, cx| {
+                let layer = mounted
+                    .borrow_mut()
+                    .get_or_insert_with(|| cx.new(|cx| ToastLayer::new(window, cx)))
+                    .clone();
+                super::super::Glass::new("toast.mount")
+                    .child(div().w(px(60.)).h(px(40.)).child(layer))
+                    .into_any_element()
+            },
+        );
+        harness.update(|window, cx| {
+            assert!(push(
+                window,
+                cx,
+                Toast::new("escaped.toast", "Saved").persistent()
+            ));
+        });
+        harness.frame();
+        let target = harness.bounds("escaped.toast.dismiss").expect("dismiss");
+        assert!(target.center().y > px(40.), "target outside mount");
+        harness.click("escaped.toast.dismiss");
+        harness.frame();
+        harness.update(|_, cx| {
+            assert_eq!(
+                slot.borrow()
+                    .as_ref()
+                    .expect("mounted layer")
+                    .read(cx)
+                    .len(),
+                0
+            )
+        });
     }
 
     #[gpui::test]

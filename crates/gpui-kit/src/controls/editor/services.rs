@@ -497,9 +497,14 @@ impl Editor {
         if popup.request.revision != area.revision() {
             return None;
         }
-        let bounds = area.bounds_for_position(popup.request.position)?;
+        // TextArea's public geometry is displayed, while the deferred popup
+        // is laid out in the Editor scope. Editor introduces no visual scale
+        // between that scope and its TextArea; use the same painted snapshot
+        // to recover logical coordinates, retaining logical popup dimensions.
+        let transform = area.visual_transform();
+        let bounds = transform.unmap_bounds(area.bounds_for_position(popup.request.position)?);
         let theme = cx.theme().clone();
-        let viewport = area.viewport_bounds()?;
+        let viewport = transform.unmap_bounds(area.viewport_bounds()?);
         let width = px(theme.measures.compact_overlay_width).min(viewport.size.width);
         let left = bounds
             .left()

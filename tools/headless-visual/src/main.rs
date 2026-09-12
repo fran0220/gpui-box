@@ -480,6 +480,274 @@ mod imp {
         use super::*;
         use image::{Rgba, RgbaImage};
 
+        #[test]
+        fn unclipped_deferred_pixels_keep_scale_and_restore_ancestor_masks() -> Result<()> {
+            use gpui::{Bounds, ContentMask, Corners, RoundedClip, canvas, point};
+            fn inner<R>(w: &mut Window, f: impl FnOnce(&mut Window) -> R) -> R {
+                let bounds = Bounds::new(point(px(10.), px(8.)), size(px(80.), px(60.)));
+                w.with_content_mask(Some(ContentMask { bounds }), |w| {
+                    w.with_rounded_content_mask(
+                        RoundedClip::new(
+                            bounds,
+                            Corners {
+                                top_left: px(12.),
+                                ..Corners::default()
+                            },
+                        ),
+                        f,
+                    )
+                })
+            }
+            fn outer<R>(w: &mut Window, f: impl FnOnce(&mut Window) -> R) -> R {
+                w.with_visual_scale(1.5, point(px(-10.), px(-5.)), |w| {
+                    w.with_content_mask(
+                        Some(ContentMask {
+                            bounds: Bounds::new(point(px(0.), px(0.)), size(px(45.), px(35.))),
+                        }),
+                        |w| {
+                            w.with_rounded_content_mask(
+                                RoundedClip::new(
+                                    Bounds::new(point(px(0.), px(0.)), size(px(60.), px(40.))),
+                                    Corners {
+                                        top_left: px(20.),
+                                        ..Corners::default()
+                                    },
+                                ),
+                                f,
+                            )
+                        },
+                    )
+                })
+            }
+            struct Host {
+                mode: u8,
+            }
+            impl Render for Host {
+                fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                    let mode = self.mode;
+                    div().size_full().bg(gpui::black()).child(
+                        canvas(
+                            move |bounds, w, cx| {
+                                let mut child = div()
+                                    .size_full()
+                                    .child(
+                                        canvas(
+                                            |_, _, _| {},
+                                            |bounds, _, w, _| {
+                                                w.without_content_masks(|w| {
+                                                    inner(w, |w| {
+                                                        w.paint_quad(gpui::fill(
+                                                            bounds,
+                                                            gpui::blue(),
+                                                        ))
+                                                    })
+                                                });
+                                            },
+                                        )
+                                        .absolute()
+                                        .size_full(),
+                                    )
+                                    .child(
+                                        canvas(
+                                            |_, _, _| {},
+                                            |bounds, _, w, _| {
+                                                w.paint_quad(gpui::fill(bounds, gpui::red()))
+                                            },
+                                        )
+                                        .absolute()
+                                        .size_full(),
+                                    );
+                                if mode != 0 {
+                                    let deferred = gpui::deferred(
+                                        canvas(
+                                            |_, _, _| {},
+                                            |bounds, _, w, _| {
+                                                inner(w, |w| {
+                                                    w.paint_quad(gpui::fill(bounds, gpui::green()))
+                                                })
+                                            },
+                                        )
+                                        .absolute()
+                                        .size_full(),
+                                    )
+                                    .preserve_accessibility();
+                                    child = child.child(if mode == 2 {
+                                        deferred.unclipped()
+                                    } else {
+                                        deferred
+                                    });
+                                }
+                                let mut child = child.into_any_element();
+                                child.layout_as_root(
+                                    bounds.size.map(gpui::AvailableSpace::Definite),
+                                    w,
+                                    cx,
+                                );
+                                outer(w, |w| child.prepaint(w, cx));
+                                child
+                            },
+                            |_, mut child, w, cx| outer(w, |w| child.paint(w, cx)),
+                        )
+                        .size_full(),
+                    )
+                }
+            }
+            let mut cx = HeadlessAppContext::with_platform(
+                Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                    "Geist",
+                )),
+                Arc::new(gpui_kit::assets::Assets),
+                gpui_platform::current_headless_renderer,
+            );
+            cx.update(|cx| {
+                gpui_kit::install(cx);
+                cx.set_reduce_motion(true);
+                activate_theme("studio-dark", cx);
+            });
+            let handle = cx.open_window(size(px(180.), px(130.)), |_, cx| {
+                cx.new(|_| Host { mode: 0 })
+            })?;
+            let direct = settled_image(&mut cx, handle.into())?;
+            let pixel = |image: &RgbaImage, x: u32, y: u32| {
+                *image.get_pixel(x * image.width() / 180, y * image.height() / 130)
+            };
+            assert_eq!(
+                pixel(&direct, 80, 40),
+                Rgba([0, 0, 255, 255]),
+                "rectangular escape and sibling restoration"
+            );
+            assert_eq!(
+                pixel(&direct, 110, 60),
+                Rgba([0, 0, 255, 255]),
+                "rounded escape"
+            );
+            handle.update(&mut cx, |v, _, cx| {
+                v.mode = 1;
+                cx.notify();
+            })?;
+            let normal = settled_image(&mut cx, handle.into())?;
+            assert_eq!(
+                pixel(&normal, 110, 60),
+                Rgba([0, 0, 255, 255]),
+                "default deferred retains rounded ancestor"
+            );
+            handle.update(&mut cx, |v, _, cx| {
+                v.mode = 2;
+                cx.notify();
+            })?;
+            let escaped = settled_image(&mut cx, handle.into())?;
+            assert_eq!(
+                pixel(&escaped, 110, 60),
+                Rgba([0, 128, 0, 255]),
+                "opt-in paints at transformed point outside ancestor"
+            );
+            assert_eq!(
+                pixel(&escaped, 21, 15),
+                Rgba([255, 0, 0, 255]),
+                "own rounded corner exposes sibling"
+            );
+            assert_eq!(
+                pixel(&escaped, 145, 60),
+                Rgba([0, 0, 0, 255]),
+                "own rectangle remains"
+            );
+            assert_eq!(
+                escaped,
+                settled_image(&mut cx, handle.into())?,
+                "repeated frame stable"
+            );
+            let mut comparison = RgbaImage::new(escaped.width() * 3, escaped.height());
+            for (i, image) in [&direct, &normal, &escaped].into_iter().enumerate() {
+                image::imageops::replace(
+                    &mut comparison,
+                    image,
+                    (i as u32 * image.width()) as i64,
+                    0,
+                );
+            }
+            comparison.save(repo_root().join("target/unclipped-deferred.png"))?;
+            Ok(())
+        }
+
+        #[test]
+        fn visual_scale_rasterizes_glyph_and_svg_at_effective_resolution() -> Result<()> {
+            use gpui::{Bounds, TransformationMatrix, canvas, point};
+            struct Host {
+                mode: u8,
+            }
+            impl Render for Host {
+                fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                    let mode = self.mode;
+                    div().size_full().bg(gpui::black()).child(canvas(
+                        move |bounds, window, _| {
+                            // Shape once at the original public font size in all
+                            // modes. The reference below changes raster size only.
+                            let line = window.text_system().shape_line("R".into(), px(20.), &[window.text_style().to_run(1)], None);
+                            let run = &line.runs[0];
+                            assert_eq!(bounds.size, size(px(260.), px(110.)), "layout stays fixed");
+                            (run.font_id, run.glyphs[0].id)
+                        },
+                        move |_, (font, glyph), window, cx| {
+                            let paint = |window: &mut Window| {
+                                let (origin, font_size, svg_bounds) = if mode == 2 {
+                                    (point(px(40.), px(70.)), px(30.), Bounds::new(point(px(130.), px(34.)), size(px(30.), px(18.))))
+                                } else {
+                                    (point(px(30.), px(50.)), px(20.), Bounds::new(point(px(90.), px(26.)), size(px(20.), px(12.))))
+                                };
+                                window.paint_glyph(origin, font, glyph, font_size, gpui::white()).expect("glyph paint");
+                                window.paint_svg(svg_bounds, "scale-fixture.svg".into(), Some(br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 12"><path d="M0 0h4v8h16v4H0z"/></svg>"#), TransformationMatrix::unit(), gpui::white(), cx).expect("svg paint");
+                            };
+                            if mode == 1 {
+                                window.with_visual_scale(1.5, point(px(10.), px(10.)), paint);
+                            } else { paint(window); }
+                        },
+                    ).size_full())
+                }
+            }
+            let mut cx = HeadlessAppContext::with_platform(
+                Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                    "Geist",
+                )),
+                Arc::new(gpui_kit::assets::Assets),
+                gpui_platform::current_headless_renderer,
+            );
+            cx.update(|cx| {
+                gpui_kit::install(cx);
+                cx.set_reduce_motion(true);
+                activate_theme("studio-dark", cx);
+            });
+            let handle = cx.open_window(size(px(260.), px(110.)), |_, cx| {
+                cx.new(|_| Host { mode: 0 })
+            })?;
+            let normal = settled_image(&mut cx, handle.into())?;
+            handle.update(&mut cx, |view, _, cx| {
+                view.mode = 1;
+                cx.notify();
+            })?;
+            let scaled = settled_image(&mut cx, handle.into())?;
+            handle.update(&mut cx, |view, _, cx| {
+                view.mode = 2;
+                cx.notify();
+            })?;
+            let reference = settled_image(&mut cx, handle.into())?;
+            assert_ne!(normal, scaled, "actual foreground pixels move and grow");
+            assert!(
+                within_one_step(&scaled, &reference),
+                "scale must rerasterize, not enlarge old glyph/SVG pixels"
+            );
+            handle.update(&mut cx, |view, _, cx| {
+                view.mode = 0;
+                cx.notify();
+            })?;
+            assert_eq!(
+                normal,
+                settled_image(&mut cx, handle.into())?,
+                "release restores original foreground"
+            );
+            scaled.save(repo_root().join("target/headless-visual-scale.png"))?;
+            Ok(())
+        }
+
         /// Runs through the platform's actual headless renderer (Metal on macOS),
         /// not a window or a baseline. Paths must use the same once-only clip as
         /// quads, and nested optics must retain their original source pixels.
@@ -946,6 +1214,291 @@ mod imp {
             );
             initial.save(repo_root().join("target/headless-glass-released.png"))?;
             pressed.save(repo_root().join("target/headless-glass-pressed.png"))?;
+            Ok(())
+        }
+
+        #[test]
+        fn glass_foreground_press_renders_about_each_logical_center() -> Result<()> {
+            use gpui::{
+                MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput, point,
+                rgb,
+            };
+            use gpui_kit::{
+                motion::{MotionPolicy, MotionRole},
+                prelude::{Glass, GlassGroup, GlassPreset, ThemeOverlay},
+            };
+            use gpui_kit_theme::Elevation;
+            use std::time::Duration;
+
+            struct Host {
+                theme: Theme,
+                group: bool,
+            }
+            fn content() -> impl IntoElement {
+                div()
+                    .relative()
+                    .w(px(200.))
+                    .h(px(120.))
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(23.))
+                            .top(px(19.))
+                            .w(px(37.))
+                            .h(px(21.))
+                            .bg(rgb(0xff0000)),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(131.))
+                            .top(px(76.))
+                            .w(px(43.))
+                            .h(px(17.))
+                            .bg(rgb(0x00ff00)),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(67.))
+                            .top(px(45.))
+                            .text_size(px(24.))
+                            .text_color(rgb(0xffffff))
+                            .child("Ag7"),
+                    )
+            }
+            impl Render for Host {
+                fn render(
+                    &mut self,
+                    window: &mut Window,
+                    cx: &mut Context<Self>,
+                ) -> impl IntoElement {
+                    SemanticCoordinator::global(cx).begin_frame(window);
+                    let surface = if self.group {
+                        GlassGroup::new("press.outer")
+                            .preset(GlassPreset::Clear)
+                            .radius(gpui_kit_theme::Radius::Card)
+                            .pressable(true)
+                            .pane("press.a", content())
+                            .pane("press.b", content())
+                            .into_any_element()
+                    } else {
+                        Glass::new("press.outer")
+                            .preset(GlassPreset::Clear)
+                            .elevation(Elevation::Flat)
+                            .radius_px(12.)
+                            .pressable(true)
+                            .child(content())
+                            .into_any_element()
+                    };
+                    div().size_full().bg(rgb(0x202020)).child(
+                        div()
+                            .absolute()
+                            .left(px(30.))
+                            .top(px(30.))
+                            .child(ThemeOverlay::theme(self.theme.clone(), surface)),
+                    )
+                }
+            }
+            // An exaggerated response makes wrong pivots and integer rounding visible;
+            // the real token value is separately rendered for human review.
+            for group in [false, true] {
+                for (scale_override, reduced) in
+                    [(Some(1.24), false), (Some(1.24), true), (None, false)]
+                {
+                    let theme = Theme::studio_dark().modify(|theme| {
+                        if let Some(scale) = scale_override {
+                            theme.effects.glass_press_scale = scale;
+                        }
+                    });
+                    let scale = theme.effects.glass_press_scale;
+                    let spring = MotionPolicy::spec(MotionRole::Tracking, &theme)
+                        .spring()
+                        .expect("press tracks a spring");
+                    let mut cx = HeadlessAppContext::with_platform(
+                        Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
+                            "Geist",
+                        )),
+                        Arc::new(gpui_kit::assets::Assets),
+                        gpui_platform::current_headless_renderer,
+                    );
+                    cx.update(|cx| {
+                        gpui_kit::install(cx);
+                        activate_theme("studio-dark", cx);
+                        cx.set_reduce_motion(reduced);
+                    });
+                    let coordinator = cx.update(|cx| SemanticCoordinator::global(cx));
+                    let _diagnostics = coordinator.arm();
+                    let window: AnyWindowHandle = cx
+                        .open_window(size(px(500.), px(180.)), |_, cx| {
+                            cx.new(|_| Host { theme, group })
+                        })?
+                        .into();
+                    let initial = settled_image(&mut cx, window)?;
+                    let ids = if group {
+                        vec!["press.outer", "press.a", "press.b"]
+                    } else {
+                        vec!["press.outer"]
+                    };
+                    let bounds = || {
+                        let snapshot = coordinator.snapshot(window.window_id()).unwrap();
+                        ids.iter()
+                            .map(|id| snapshot.find(id).unwrap().bounds)
+                            .collect::<Vec<_>>()
+                    };
+                    let original = bounds();
+                    let panes = if group { &original[1..] } else { &original[..] };
+                    let position = point(px(panes[0].x + 100.), px(panes[0].y + 60.));
+                    cx.update_window(window, |_, window, cx| {
+                        window.dispatch_event(
+                            PlatformInput::MouseMove(MouseMoveEvent {
+                                position,
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                        window.dispatch_event(
+                            PlatformInput::MouseDown(MouseDownEvent {
+                                position,
+                                button: MouseButton::Left,
+                                click_count: 1,
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                    })?;
+                    // Establish the target at t=0; settled_image intentionally never advances time.
+                    let _ = settled_image(&mut cx, window)?;
+                    let mut elapsed = 0;
+                    let mut held = initial.clone();
+                    for millis in [16, 96, 2000] {
+                        cx.advance_clock(Duration::from_millis(millis - elapsed));
+                        elapsed = millis;
+                        held = settled_image(&mut cx, window)?;
+                        assert_eq!(
+                            bounds(),
+                            original,
+                            "layout/outer bounds: group={group}, t={millis}"
+                        );
+                        let progress = if millis == 2000 {
+                            1.
+                        } else {
+                            spring.value(Duration::from_millis(millis))
+                        };
+                        let factor = if reduced {
+                            1.
+                        } else {
+                            1. + (scale - 1.) * progress
+                        };
+                        let device_scale = held.width() as f32 / 500.;
+                        for pane in panes {
+                            for (color, rect) in [
+                                ([255, 0, 0, 255], [23., 19., 60., 40.]),
+                                ([0, 255, 0, 255], [131., 76., 174., 93.]),
+                            ] {
+                                let mut actual = [u32::MAX, u32::MAX, 0, 0];
+                                for (x, y, pixel) in held.enumerate_pixels() {
+                                    if pixel.0 == color
+                                        && (x as f32 / device_scale) >= pane.x
+                                        && (x as f32 / device_scale) < pane.x + pane.width
+                                    {
+                                        actual[0] = actual[0].min(x);
+                                        actual[1] = actual[1].min(y);
+                                        actual[2] = actual[2].max(x + 1);
+                                        actual[3] = actual[3].max(y + 1);
+                                    }
+                                }
+                                // Independent affine geometry, not production transform helpers.
+                                let expected = [
+                                    pane.x + 100. + (rect[0] - 100.) * factor,
+                                    pane.y + 60. + (rect[1] - 60.) * factor,
+                                    pane.x + 100. + (rect[2] - 100.) * factor,
+                                    pane.y + 60. + (rect[3] - 60.) * factor,
+                                ];
+                                for edge in 0..4 {
+                                    assert!(
+                                        (actual[edge] as f32 - expected[edge] * device_scale).abs()
+                                            <= 1.1,
+                                        "group={group}, reduced={reduced}, t={millis}, factor={factor}, edge={edge}: {actual:?} != {expected:?}"
+                                    );
+                                }
+                            }
+                        }
+                        if reduced {
+                            assert!(
+                                within_one_step(&initial, &held),
+                                "reduced motion must leave foreground unscaled"
+                            );
+                        }
+                    }
+                    if !reduced {
+                        let glyph_changes = initial
+                            .pixels()
+                            .zip(held.pixels())
+                            .filter(|(a, b)| {
+                                (a.0[..3].iter().all(|v| *v > 220)
+                                    || b.0[..3].iter().all(|v| *v > 220))
+                                    && a.0[..3]
+                                        .iter()
+                                        .zip(&b.0[..3])
+                                        .any(|(a, b)| a.abs_diff(*b) > 8)
+                            })
+                            .count();
+                        assert!(glyph_changes > 20, "glyphs must scale too: {glyph_changes}");
+                    }
+                    // Material perimeter remains at rest: only the interior is transformed.
+                    for (x, y, pixel) in initial.enumerate_pixels() {
+                        let ds = initial.width() as f32 / 500.;
+                        if !panes.iter().any(|p| {
+                            x as f32 / ds > p.x + 2.
+                                && (x as f32 / ds) < p.x + p.width - 2.
+                                && y as f32 / ds > p.y + 2.
+                                && (y as f32 / ds) < p.y + p.height - 2.
+                        }) {
+                            assert!(
+                                pixel
+                                    .0
+                                    .iter()
+                                    .zip(&held.get_pixel(x, y).0)
+                                    .all(|(a, b)| a.abs_diff(*b) <= 1),
+                                "fixed material perimeter at {x},{y}"
+                            );
+                        }
+                    }
+                    cx.update_window(window, |_, window, cx| {
+                        window.dispatch_event(
+                            PlatformInput::MouseUp(MouseUpEvent {
+                                position,
+                                button: MouseButton::Left,
+                                click_count: 1,
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                    })?;
+                    let _ = settled_image(&mut cx, window)?;
+                    cx.advance_clock(Duration::from_secs(2));
+                    let released = settled_image(&mut cx, window)?;
+                    assert_eq!(bounds(), original);
+                    assert!(
+                        within_one_step(&initial, &released),
+                        "release restores foreground"
+                    );
+                    if scale_override.is_none() {
+                        let directory = repo_root().join(".amp/in/artifacts");
+                        std::fs::create_dir_all(&directory)?;
+                        for (name, image) in [
+                            ("before", &initial),
+                            ("held", &held),
+                            ("released", &released),
+                        ] {
+                            image.save(directory.join(format!(
+                                "glass-foreground-default-group-{group}-{name}.png"
+                            )))?;
+                        }
+                    }
+                }
+            }
             Ok(())
         }
 

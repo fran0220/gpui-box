@@ -35,6 +35,7 @@ pub struct PrepaintState {
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
     custom_visual: bool,
+    visual_transform: gpui::VisualTransform,
 }
 
 impl IntoElement for TextElement {
@@ -247,6 +248,7 @@ impl Element for TextElement {
             selection,
             scroll_offset,
             custom_visual,
+            visual_transform: window.visual_transform(),
         }
     }
 
@@ -267,7 +269,8 @@ impl Element for TextElement {
         if !disabled {
             window.handle_input(
                 &focus_handle,
-                ElementInputHandler::new(bounds, self.input.clone()),
+                ElementInputHandler::new(bounds, self.input.clone())
+                    .with_visual_transform(prepaint.visual_transform),
                 cx,
             );
         }
@@ -292,8 +295,11 @@ impl Element for TextElement {
                     }
                 }
                 self.input.update(cx, |input, _| {
-                    input
-                        .set_last_layout(prepaint.document_layout.take().unwrap_or(layout), bounds);
+                    input.set_last_layout(
+                        prepaint.document_layout.take().unwrap_or(layout),
+                        bounds,
+                        prepaint.visual_transform,
+                    );
                     input.set_scroll_offset(scroll_offset);
                 });
             }
@@ -304,5 +310,84 @@ impl Element for TextElement {
                 window.paint_quad(cursor);
             }
         });
+    }
+}
+
+/// Exercise real paired prepaint/paint scopes without introducing a Kit API.
+#[cfg(test)]
+pub(crate) struct TestVisualScale {
+    pub child: gpui::AnyElement,
+    pub enabled: bool,
+}
+
+#[cfg(test)]
+impl IntoElement for TestVisualScale {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+#[cfg(test)]
+impl Element for TestVisualScale {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        window.with_visual_scale(
+            if self.enabled { 2.0 } else { 1.0 },
+            point(px(13.0), px(29.0)),
+            |window| {
+                window.with_visual_scale(
+                    if self.enabled { 0.75 } else { 1.0 },
+                    point(px(41.0), px(17.0)),
+                    |window| self.child.prepaint(window, cx),
+                );
+            },
+        );
+    }
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&gpui::InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        window.with_visual_scale(
+            if self.enabled { 2.0 } else { 1.0 },
+            point(px(13.0), px(29.0)),
+            |window| {
+                window.with_visual_scale(
+                    if self.enabled { 0.75 } else { 1.0 },
+                    point(px(41.0), px(17.0)),
+                    |window| self.child.paint(window, cx),
+                );
+            },
+        );
     }
 }
