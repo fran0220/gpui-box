@@ -9,6 +9,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { windowsSandbox } from '../windows-sandbox.mjs';
+import { readWfp, assertWfpLoopbackBlock } from './windows-wfp.mjs';
 
 const windows = process.platform === 'win32';
 const runtime = fileURLToPath(new URL('..', import.meta.url));
@@ -91,14 +92,22 @@ test('Windows factory refuses execution on another OS', { skip: windows }, async
   await assert.rejects(windowsSandbox('.', '.'), /requires Windows/);
 });
 
+test('native strict handle policy readback and invalid-reference controls', nativeOptions, async t => {
+  await fixture(t);
+  const probe = { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] };
+  const ordinary = launch(t, probe, ['--invalid-handle-control', '0']);
+  assert.equal((await ordinary.closed)[0], 0, ordinary.output().stderr);
+  const strict = launch(t, probe, ['--invalid-handle-control', '1']);
+  assert.equal((await strict.closed)[0] >>> 0, 0xc0000008, strict.output().stderr);
+  assert.match(strict.output().stderr, /strict handle policy readback=3/);
+});
+
 test('native handle snapshot checks low-rights high handles under strict invalid-handle policy', nativeOptions, async t => {
   const { root, secret } = await fixture(t);
   const other = join(root, 'not-the-sentinel');
   await writeFile(other, 'unrelated file');
   const identity = execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE, ['--file-id', secret], { encoding: 'utf8' }).trim();
   const probe = { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] };
-  const invalid = launch(t, probe, ['--invalid-handle-control', identity]);
-  assert.equal((await invalid.closed)[0] >>> 0, 0xc0000008, 'strict policy must terminate an actual invalid handle reference');
   for (const rights of ['0', '1']) {
     for (const [file, inherit, failure] of [
       [other, '0', null],
@@ -107,6 +116,7 @@ test('native handle snapshot checks low-rights high handles under strict invalid
     ]) {
       const run = launch(t, probe, ['--handle-control', identity, file, inherit, rights]);
       assert.equal((await run.closed)[0], failure ? 125 : 0, run.output().stderr);
+      assert.match(run.output().stderr, /strict handle policy readback=3/);
       const control = /control handle=(\d+)/.exec(run.output().stderr);
       assert.ok(control, run.output().stderr);
       assert.ok(Number(control[1]) >= 65536, 'control must exceed the former numeric scan range');
@@ -121,7 +131,9 @@ test('native handle snapshot checks low-rights high handles under strict invalid
   }
 });
 
-test('native AppContainer blocks host reads, writes, network, spawning and leaked handles', nativeOptions, async t => {
+// Native TCP retransmission takes ~21s on this lane. Reserve a separate bounded
+// 10s WFP read budget, plus fixture/ACL/positive-control work; no runtime deadline changes.
+test('native AppContainer blocks host reads, writes, network, spawning and leaked handles', { ...nativeOptions, timeout: 45000 }, async t => {
   const { root, minimalRuntime, secret } = await fixture(t);
   assert.ok(process.env.GPUI_WINDOWS_SANDBOX_PROBE, 'build and set GPUI_WINDOWS_SANDBOX_PROBE');
   assert.ok(process.env.LOCALAPPDATA);
@@ -146,19 +158,39 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   assert.equal((await leaked.closed)[0], 125, 'positive control must detect a real inherited sentinel');
   assert.match(leaked.output().stderr, /wcscmp\(identity, sentinel\) != 0 failed/);
   const config = await windowsSandbox(root, minimalRuntime, { executable: process.env.GPUI_WINDOWS_SANDBOX_PROBE, node: false });
+  const start = Date.now();
   const run = launch(t, config, [String(server.address().port), secret, identity], {
     stdio: [...config.stdio, sentinel.fd],
     env: { ...process.env, GPUI_TEST_SECRET: 'must-not-inherit' },
   });
   const [code] = await run.closed;
+  const end = Date.now();
   assert.equal(connections, 1, 'sandbox reached the proven-live host listener');
   assert.deepEqual(originals.map(acl), originalAcls, 'source and host profile-parent ACLs must remain unchanged');
   assert.equal(code, 0, run.output().stderr);
-  assert.deepEqual(JSON.parse(run.output().stdout), {
+  const { tcpError, tcpLocalPort, ...assertions } = JSON.parse(run.output().stdout);
+  assert.deepEqual(assertions, {
     appcontainer: true, capabilities: 0, readonly: true, hostDenied: true,
-    spawnDenied: true, networkDenied: true, handles: true,
+    spawnDenied: true, udpDenied: true, handles: true,
     memory: 268435456, cpuSeconds: 30, cpuRate: 2500, activeProcesses: 1,
   });
+  assert.ok(Number.isInteger(tcpLocalPort) && tcpLocalPort > 0 && tcpLocalPort <= 65535);
+  assert.ok(tcpError === 10013 || tcpError === 10060, `unexpected TCP error ${tcpError}`);
+  if (tcpError === 10060) {
+    const metadata = /pid=(\d+) packageSID=(S-1-15-2-[\d-]+) tcp=/.exec(run.output().stderr);
+    const appId = /Windows sandbox probe: appID=([^\r\n]+)/.exec(run.output().stderr);
+    assert.ok(metadata && appId, run.output().stderr);
+    const workerPid = Number(metadata[1]);
+    const listenerAppId = execFileSync(probe.execPath, ['--app-id', process.execPath], { encoding: 'utf8', timeout: 10000 }).trim();
+    const filterId = assertWfpLoopbackBlock(await readWfp(workerPid), {
+      start, end, workerPid, sid: metadata[2], workerAppId: appId[1],
+      listenerPid: process.pid, listenerAppId, sourcePort: tcpLocalPort, listenerPort: server.address().port,
+    });
+    t.diagnostic(`TCP timeout verified against AppContainer-isolation WFP filter ${filterId}, worker ${workerPid}, source port ${tcpLocalPort}`);
+  }
+  const after = launch(t, probe, ['--connect-control', String(server.address().port)]);
+  assert.equal((await after.closed)[0], 0, after.output().stderr);
+  await waitUntil(() => connections === 2, 'native listener must remain reachable after the denied attempt');
   assert.deepEqual(originals.map(acl), originalAcls, 'host ACLs must remain unchanged');
   assert.equal(await readFile(secret, 'utf8'), 'host-only-sentinel');
   await config.cleanup();

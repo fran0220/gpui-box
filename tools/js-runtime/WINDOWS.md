@@ -12,12 +12,23 @@ MinGW-w64 GCC on PATH:
 
 ```powershell
 & tools/js-runtime/native/build-windows.ps1
-node --test tools/js-runtime/test/windows.test.mjs
+netsh wfp capture start keywords=19
+if ($LASTEXITCODE -ne 0) { throw 'WFP capture start failed' }
+try {
+    node --test tools/js-runtime/test/windows.test.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Windows native tests failed' }
+} finally {
+    netsh wfp capture stop
+}
 ```
 
 Run both commands in the same PowerShell process: the build script sets
 `GPUI_SANDBOX_LAUNCHER` and `GPUI_WINDOWS_SANDBOX_PROBE`. Native tests fail if
 either required executable is missing; non-Windows runs explicitly skip them.
+Use a disposable native test machine with permission to capture/read WFP
+diagnostics. Do not start another capture if the Platforms lane already owns
+one. TCP timeout acceptance requires live event/filter readback; missing
+diagnostics fail the test rather than treating the timeout as isolation.
 The CPU exhaustion test can take over two minutes on a one-vCPU machine.
 The real-worker test additionally needs the integrated runtime's `worker.mjs`
 and its modules; this Windows-only delivery does not duplicate those files.
@@ -245,7 +256,34 @@ The captured XML contains no events matching either sandbox probe SID
 (PIDs 1660 and 7832, destination ports 62271 and 62292). Those ports have
 PUBLIC_CLASSIFY_ALLOW events for the unsandboxed native positive controls
 (PIDs 5076 and 988) and host listeners. They are not sandbox drop evidence.
-Network remains unverified and its strict assertion remains in force.
+Network remained unverified in that run.
+
+Run [34680808729](https://github.com/fran0220/gpui-box/actions/runs/34680808729)
+at [3d0fe1ec](https://github.com/fran0220/gpui-box/commit/3d0fe1eccbb3aaa2a41144af5a8eab9aa14f2381)
+passed filesystem, spawn and handle checks inside AppContainer. Its captured
+WFP XML binds both raw and combined probes to outbound allows by package SID,
+image and TCP tuple, followed by reversed inbound drops at the live listener.
+The causal filter is `AppContainerLoopback`, in
+`FWPM_SUBLAYER_MPSSVC_APP_ISOLATION`, with `FWP_ACTION_BLOCK`. This is evidence
+for those attempts, not blanket acceptance of error 10060.
+
+The current probe reports TCP error and explicitly bound source port instead
+of claiming `networkDenied`. Error 10013 remains direct denial; error 10060
+requires fresh live WFP records matching the attempt's time interval, worker
+SID/image, full TCP tuple, listener image and isolation blocking filter.
+PIDs are checked when the event schema supplies them. An unsandboxed native
+connection must succeed both before and after the attempt; UDP still requires
+10013. `windows-wfp.ps1` only reads diagnostics and never changes collection,
+policy, capabilities or exemptions. Its XML dumps remain under
+`target/runtime-native/wfp`. Captured XML parser tests do not prove live
+readback works on a particular Windows kernel; the native lane must pass.
+
+Strict handle checks read back both mitigation bits. Separate controls compare
+a valid event wait, a closed-event wait without strict policy, and a
+closed-event wait with strict policy, which must raise `STATUS_INVALID_HANDLE`.
+The prior double-`CloseHandle` control did not raise on this kernel; it did not
+establish the behavior of the documented invalid-reference wait path. All six
+low-rights high-handle snapshot controls run independently of that control.
 
 API references: [AppContainer launch](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer),
 [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects),

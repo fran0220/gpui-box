@@ -165,6 +165,10 @@ static void strict_handles(void) {
     policy.RaiseExceptionOnInvalidHandleReference = 1;
     policy.HandleExceptionsPermanentlyEnabled = 1;
     CHECK(SetProcessMitigationPolicy(ProcessStrictHandleCheckPolicy, &policy, sizeof(policy)));
+    ZeroMemory(&policy, sizeof(policy));
+    CHECK(GetProcessMitigationPolicy(GetCurrentProcess(), ProcessStrictHandleCheckPolicy, &policy, sizeof(policy)));
+    CHECK(policy.RaiseExceptionOnInvalidHandleReference && policy.HandleExceptionsPermanentlyEnabled);
+    fputs("Windows sandbox probe: strict handle policy readback=3\n", stderr);
 }
 
 static void check_disk_handles(const wchar_t *sentinel) {
@@ -209,8 +213,22 @@ static void check_disk_handles(const wchar_t *sentinel) {
     CloseHandle(image);
 }
 
+static void image_path(const wchar_t *path, wchar_t *result) {
+    HANDLE image = CreateFileW(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, 0, NULL);
+    CHECK(image != INVALID_HANDLE_VALUE);
+    DWORD length = GetFinalPathNameByHandleW(image, result, PATH_CAP, VOLUME_NAME_NT);
+    CHECK(length && length < PATH_CAP);
+    CloseHandle(image);
+}
+
 int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 3);
+    if (!wcscmp(argv[1], L"--app-id")) {
+        wchar_t path[PATH_CAP];
+        image_path(argv[2], path);
+        wprintf(L"%ls\n", path); return 0;
+    }
     if (!wcscmp(argv[1], L"--file-id")) {
         HANDLE file = CreateFileW(argv[2], FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             NULL, OPEN_EXISTING, 0, NULL);
@@ -247,13 +265,17 @@ int wmain(int argc, wchar_t **argv) {
     }
     if (!wcscmp(argv[1], L"--invalid-handle-control")) {
         SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
-        strict_handles();
+        if (_wtoi(argv[2])) strict_handles();
         HANDLE event = CreateEventW(NULL, FALSE, FALSE, NULL);
         CHECK(event);
+        CHECK(WaitForMultipleObjects(1, &event, FALSE, 0) == WAIT_TIMEOUT);
         CHECK(CloseHandle(event));
-        // Positive control for the exception policy, in a disposable process.
-        CloseHandle(event);
-        return 2;
+        // Reference a closed object, rather than testing CloseHandle's wrapper.
+        // No intervening handle allocation can reuse the value in this process.
+        // https://devblogs.microsoft.com/oldnewthing/20250620-00/?p=111291
+        CHECK(WaitForMultipleObjects(1, &event, FALSE, 0) == WAIT_FAILED);
+        CHECK(GetLastError() == ERROR_INVALID_HANDLE);
+        return _wtoi(argv[2]) ? 2 : 0; // strict mode must raise, not return
     }
     if (!wcscmp(argv[1], L"--connect-control")) {
         WSADATA wsa;
@@ -372,6 +394,9 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(argc >= 4);
     check_disk_handles(argv[3]);
     fputs("Windows sandbox probe: filesystem, spawn, inherited-handle assertions passed\n", stderr);
+    wchar_t app_id[PATH_CAP];
+    image_path(self, app_id);
+    fprintf(stderr, "Windows sandbox probe: appID=%ls\n", app_id);
     // A listener is established by the test parent: refusal is not a closed port.
     WSADATA wsa;
     CHECK(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
@@ -380,11 +405,20 @@ int wmain(int argc, wchar_t **argv) {
     struct sockaddr_in address = {0};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    // Bind first so correlation does not depend on getsockname after a failed
+    // connect (some providers discard the implicit binding on failure).
+    CHECK(bind(socketHandle, (struct sockaddr *)&address, sizeof(address)) == 0);
+    int address_size = sizeof(address);
+    CHECK(getsockname(socketHandle, (struct sockaddr *)&address, &address_size) == 0);
+    unsigned local_port = ntohs(address.sin_port);
+    CHECK(local_port);
     address.sin_port = htons((u_short)_wtoi(argv[1]));
     CHECK(connect(socketHandle, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR);
     int connect_error = WSAGetLastError();
     fprintf(stderr, "Windows sandbox probe: TCP result=%d destination=127.0.0.1:%ls\n", connect_error, argv[1]);
-    CHECK(connect_error == WSAEACCES); // timeout alone is not policy-drop evidence
+    // A timeout is only an observation: the host test MUST correlate it with
+    // a same-attempt AppContainer WFP block before claiming network denial.
+    CHECK(connect_error == WSAEACCES || connect_error == WSAETIMEDOUT);
     closesocket(socketHandle);
     socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     CHECK(socketHandle != INVALID_SOCKET);
@@ -394,7 +428,7 @@ int wmain(int argc, wchar_t **argv) {
     CHECK(WSAGetLastError() == WSAEACCES);
     closesocket(socketHandle);
     WSACleanup();
-    puts("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"networkDenied\":true,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}");
+    printf("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"tcpError\":%d,\"tcpLocalPort\":%u,\"udpDenied\":true,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}\n", connect_error, local_port);
     return 0;
 }
 #else

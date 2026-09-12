@@ -369,14 +369,23 @@ fn swift_ax_check(pid: u32, mode: &str) -> Result<String> {
 fn accessibility_check() -> Result<()> {
     step("cargo", &["build", "-p", "gpui-box-gallery"], None)?;
     let executable = root().join("target/debug/gpui-box-gallery.exe");
-    for (scene, mode) in [("input", "editable"), ("form", "form"), ("menu", "menu")] {
+    // Exercise fresh menu activation repeatedly: a prior native run failed to
+    // find its Menu, while an unchanged production source subsequently passed.
+    // Every case must pass; these are not retries, and each keeps its own logs.
+    for (scene, mode, case) in [
+        ("input", "editable", "editable"),
+        ("form", "form", "form"),
+        ("menu", "menu", "menu"),
+        ("menu", "menu", "menu-fresh-2"),
+        ("menu", "menu", "menu-fresh-3"),
+    ] {
         let mut gallery = Command::new(&executable)
             .args(["--scene", scene, "--theme", "studio-light"])
             .current_dir(root())
             .spawn()
             .with_context(|| format!("launch the {scene} Windows UI Automation gallery"))?;
-        let result = windows_uia_check(gallery.id(), mode).map(|output| {
-            println!("Windows UIA {mode}: {}", output.trim());
+        let result = windows_uia_check(gallery.id(), mode, case).map(|output| {
+            println!("Windows UIA {case}: {}", output.trim());
         });
         let cleanup = cleanup_gallery(&mut gallery, "Windows UI Automation gallery");
         result.and(cleanup)?;
@@ -386,7 +395,7 @@ fn accessibility_check() -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn windows_uia_check(pid: u32, mode: &str) -> Result<String> {
+fn windows_uia_check(pid: u32, mode: &str, case: &str) -> Result<String> {
     let script = root().join("tools/accessibility/windows-smoke.ps1");
     let mut command = Command::new("powershell.exe");
     command
@@ -403,7 +412,7 @@ fn windows_uia_check(pid: u32, mode: &str) -> Result<String> {
         .args(["-Mode", mode]);
     collect_windows_uia_check(
         command,
-        mode,
+        case,
         Duration::from_secs(30),
         &root().join("target/accessibility/windows"),
     )
