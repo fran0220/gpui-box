@@ -79,6 +79,43 @@ function Native-FullDescription {
     )
 }
 
+# Fixture-only failure evidence. Walk the target provider without the lookup's
+# role/name/PID predicate, never desktop descendants or unrelated applications.
+# Bound traversal and output; the existing runner timeout also bounds a stalled
+# provider call (a synchronous managed UIA call cannot be cancelled here).
+function Write-MenuTreeDiagnostic {
+    try {
+        [Console]::Error.WriteLine("UIA menu diagnostic: requested-pid=$TargetProcessId acquired-hwnd=$targetHwnd")
+        [Console]::Error.WriteLine([GpuiBox.Accessibility.NativeWindow]::Describe($TargetProcessId))
+        $process = Get-Process -Id $TargetProcessId -ErrorAction Stop
+        [Console]::Error.WriteLine("UIA menu diagnostic: live-pid=$($process.Id) main-hwnd=$($process.MainWindowHandle) responding=$($process.Responding)")
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $pending = [System.Collections.Generic.Stack[System.Windows.Automation.AutomationElement]]::new()
+        $pending.Push($script:TargetRoot)
+        $deadline = [DateTime]::UtcNow.AddSeconds(3)
+        $count = 0
+        while ($pending.Count -gt 0 -and $count -lt 128 -and [DateTime]::UtcNow -lt $deadline) {
+            $element = $pending.Pop()
+            $current = $element.Current
+            # Names are fixture data; cap and escape them to keep one record per node.
+            $name = $current.Name -replace '[\r\n\t]', ' '
+            if ($name.Length -gt 160) { $name = $name.Substring(0, 160) + "..." }
+            [Console]::Error.WriteLine("UIA menu diagnostic: node=$count role=$($current.ControlType.ProgrammaticName) name='$name' pid=$($current.ProcessId) hwnd=$($current.NativeWindowHandle) bounds=$($current.BoundingRectangle) offscreen=$($current.IsOffscreen)")
+            # Do not follow the target root's siblings into other providers.
+            if ($count -gt 0) {
+                $sibling = $walker.GetNextSibling($element)
+                if ($null -ne $sibling) { $pending.Push($sibling) }
+            }
+            $child = $walker.GetFirstChild($element)
+            if ($null -ne $child) { $pending.Push($child) }
+            $count++
+        }
+        [Console]::Error.WriteLine("UIA menu diagnostic: nodes-including-root=$count truncated=$($pending.Count -gt 0)")
+    } catch {
+        [Console]::Error.WriteLine("UIA menu diagnostic unavailable: $($_.Exception.Message)")
+    }
+}
+
 function Wait-Until {
     param(
         [scriptblock]$Predicate,
@@ -238,7 +275,12 @@ switch ($Mode) {
 
     "menu" {
         [Console]::Error.WriteLine("UIA menu: finding Run actions")
-        $menu = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions"
+        try {
+            $menu = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Menu) -Name "Run actions"
+        } catch {
+            Write-MenuTreeDiagnostic
+            throw
+        }
         [Console]::Error.WriteLine("UIA menu: waiting for Copy link and global focus to agree")
         # Host focus arrives through WM_SETFOCUS and the AccessKit focus event
         # after Activate-Target returns, so read until they agree.

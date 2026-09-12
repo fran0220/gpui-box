@@ -102,10 +102,10 @@ static void check_query(LONG status, const char *operation) {
     ExitProcess(125);
 }
 
-// FileInternalInformation needs no specific access rights. Unlike the Win32
-// aggregate metadata query (which includes FILE_READ_ATTRIBUTES), this also
-// identifies data-only handles. Query the volume serial separately; never
-// reopen a path, elevate the handle, or skip an access-denied disk handle.
+// FileInternalInformation needs no specific access rights. Aggregate Win32
+// metadata queries may succeed or fail depending on the handle/filesystem;
+// neither outcome establishes its granted rights. Query the serial separately;
+// never reopen a candidate, elevate it, or skip an access-denied disk handle.
 // https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_internal_information
 static void disk_identity(HANDLE handle, wchar_t *identity) {
     typedef struct { union { LONG status; PVOID pointer; }; ULONG_PTR information; } io_status;
@@ -127,21 +127,86 @@ static void disk_identity(HANDLE handle, wchar_t *identity) {
     swprintf(identity, 64, L"%08lx:%08lx:%08lx", volume.serial, (DWORD)index.HighPart, index.LowPart);
 }
 
+// ProcessHandleInformation (51), available since Windows 8. Snapshot the
+// current process only, with no system-wide enumeration or debug privilege.
+// https://ntdoc.m417z.com/process_handle_snapshot_information
+typedef struct {
+    HANDLE handle;
+    ULONG_PTR handle_count, pointer_count;
+    ULONG access, type, attributes, reserved;
+} probe_handle;
+typedef struct {
+    ULONG_PTR count, reserved;
+    probe_handle handles[];
+} probe_handles;
+
+static probe_handles *snapshot_handles(void) {
+    typedef LONG (NTAPI *query_fn)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+    query_fn query = (query_fn)(void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess");
+    CHECK(query);
+    // Grow boundedly when the process's table exceeds the initial allocation.
+    for (ULONG capacity = 4096; capacity <= 16 * 1024 * 1024; capacity *= 2) {
+        probe_handles *snapshot = malloc(capacity);
+        CHECK(snapshot);
+        ULONG length = 0;
+        LONG status = query(GetCurrentProcess(), 51, snapshot, capacity, &length);
+        if ((DWORD)status == 0xc0000004UL) { free(snapshot); continue; } // STATUS_INFO_LENGTH_MISMATCH
+        check_query(status, "ProcessHandleInformation");
+        CHECK(length >= sizeof(*snapshot) && length <= capacity);
+        CHECK(snapshot->count <= (length - sizeof(*snapshot)) / sizeof(probe_handle));
+        return snapshot;
+    }
+    SetLastError(ERROR_INSUFFICIENT_BUFFER); fail("ProcessHandleInformation bounded snapshot");
+    return NULL;
+}
+
+static void strict_handles(void) {
+    PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY policy = {0};
+    policy.RaiseExceptionOnInvalidHandleReference = 1;
+    policy.HandleExceptionsPermanentlyEnabled = 1;
+    CHECK(SetProcessMitigationPolicy(ProcessStrictHandleCheckPolicy, &policy, sizeof(policy)));
+}
+
 static void check_disk_handles(const wchar_t *sentinel) {
-    for (uintptr_t value = 4; value < 65536; value += 4) {
-        HANDLE handle = (HANDLE)value;
-        if (GetFileType(handle) != FILE_TYPE_DISK) continue;
+    strict_handles();
+    // Learn the File object type from an owned, live image handle, rather than
+    // sending file queries to arbitrary kernel objects (or guessed numbers).
+    wchar_t self[PATH_CAP];
+    CHECK(GetModuleFileNameW(NULL, self, PATH_CAP));
+    HANDLE image = CreateFileW(self, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, 0, NULL);
+    CHECK(image != INVALID_HANDLE_VALUE);
+    probe_handles *snapshot = snapshot_handles();
+    ULONG file_type = 0;
+    for (ULONG_PTR i = 0; i < snapshot->count; i++) {
+        if (snapshot->handles[i].handle == image) file_type = snapshot->handles[i].type;
+    }
+    CHECK(file_type);
+    // This single-threaded probe holds its own handles throughout inspection.
+    // A stale snapshot or a failed query is fatal, never silently omitted.
+    for (ULONG_PTR i = 0; i < snapshot->count; i++) {
+        const probe_handle *entry = &snapshot->handles[i];
+        if (entry->type != file_type) continue;
+        HANDLE handle = entry->handle;
+        fprintf(stderr, "Windows sandbox probe: querying file handle=%llu access=%08lx\n",
+            (unsigned long long)(uintptr_t)handle, entry->access);
+        SetLastError(ERROR_SUCCESS);
+        DWORD type = GetFileType(handle);
+        CHECK(type != FILE_TYPE_UNKNOWN || GetLastError() == ERROR_SUCCESS);
+        if (type != FILE_TYPE_DISK) continue;
         DWORD flags;
         CHECK(GetHandleInformation(handle, &flags));
         wchar_t identity[64];
         disk_identity(handle, identity);
-        fprintf(stderr, "Windows sandbox probe: disk handle=%llu flags=%lu id=%ls\n",
-            (unsigned long long)value, flags, identity);
+        fprintf(stderr, "Windows sandbox probe: disk handle=%llu flags=%lu access=%08lx id=%ls\n",
+            (unsigned long long)(uintptr_t)handle, flags, entry->access, identity);
         // Windows opens its own non-inherited cwd/image handles. Detect the
         // host sentinel by file identity even if a duplicate cleared INHERIT.
         CHECK(wcscmp(identity, sentinel) != 0);
         CHECK(!(flags & HANDLE_FLAG_INHERIT));
     }
+    free(snapshot);
+    CloseHandle(image);
 }
 
 int wmain(int argc, wchar_t **argv) {
@@ -159,19 +224,36 @@ int wmain(int argc, wchar_t **argv) {
         check_disk_handles(argv[2]); return 0;
     }
     if (!wcscmp(argv[1], L"--handle-control")) {
-        CHECK(argc == 5);
-        // A real data-only handle, without FILE_READ_ATTRIBUTES. The controls
-        // must fail on identity even with INHERIT cleared, and on INHERIT even
-        // for a different file. No host ACL is changed to manufacture denial.
-        HANDLE file = CreateFileW(argv[3], FILE_READ_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        CHECK(argc == 6);
+        // Keep non-file objects and holes in the table, and a file above the
+        // former numeric scan limit. This also exercises snapshot growth.
+        HANDLE events[17000];
+        for (size_t i = 0; i < 17000; i++) CHECK(events[i] = CreateEventW(NULL, FALSE, FALSE, NULL));
+        HANDLE original = CreateFileW(argv[3], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             NULL, OPEN_EXISTING, 0, NULL);
-        CHECK(file != INVALID_HANDLE_VALUE);
-        BY_HANDLE_FILE_INFORMATION info;
-        CHECK(!GetFileInformationByHandle(file, &info) && GetLastError() == ERROR_ACCESS_DENIED);
-        CHECK(SetHandleInformation(file, HANDLE_FLAG_INHERIT, _wtoi(argv[4]) ? HANDLE_FLAG_INHERIT : 0));
-        CHECK((uintptr_t)file < 65536);
+        CHECK(original != INVALID_HANDLE_VALUE);
+        HANDLE file;
+        // Duplicate with explicit rights: metadata-query success is not a
+        // rights oracle. The test checks GrantedAccess from the OS snapshot.
+        CHECK(DuplicateHandle(GetCurrentProcess(), original, GetCurrentProcess(), &file,
+            _wtoi(argv[5]) ? FILE_READ_DATA : 0, _wtoi(argv[4]) != 0, 0));
+        CloseHandle(original);
+        CHECK((uintptr_t)file >= 65536);
+        for (size_t i = 0; i < 17000; i += 2) CloseHandle(events[i]);
+        fprintf(stderr, "Windows sandbox probe: control handle=%llu\n", (unsigned long long)(uintptr_t)file);
         check_disk_handles(argv[2]);
+        for (size_t i = 1; i < 17000; i += 2) CloseHandle(events[i]);
         CloseHandle(file); return 0;
+    }
+    if (!wcscmp(argv[1], L"--invalid-handle-control")) {
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+        strict_handles();
+        HANDLE event = CreateEventW(NULL, FALSE, FALSE, NULL);
+        CHECK(event);
+        CHECK(CloseHandle(event));
+        // Positive control for the exception policy, in a disposable process.
+        CloseHandle(event);
+        return 2;
     }
     if (!wcscmp(argv[1], L"--connect-control")) {
         WSADATA wsa;

@@ -159071,6 +159071,7 @@
       "contract": "Linux X11 (including XWayland) hosts caller-owned native child XIDs in rectangular clip windows; full viewport allocation, physical-pixel resize, native input crop, paint-order stacking and detach/lifetime restoration are supported. Native Wayland, GPU transforms, rounded masks and X11 GPUI scene overlays above native children are not supported."
     },
     "glass_reference_resize": {
+      "ci_counterexample": "Platforms run 34677542322 on bf45061d failed the unrelated-region byte-equality assertion on Metal. Independent reconstruction of both raw arrays found 24 blue channels differing by exactly one code at x553-563/y745-748 in a 1920x800 crop; the edge difference was inspected. Unrelated regions now use the same existing one-step/channel contract as settled/restored frames. This does not establish a renderer cause; historical exact results above remain limited to their named source and environment.",
       "contract": "A persistent menu replays repository Animator linear 800ms from 144x48 to 272x128 and reports actual prepaint geometry/time for independently replayed samples. Expanded content switches at the trigger and clips to the current surface. Capture-bracket midpoint is a sample choice, not presentation time or Apple dynamics equivalence.",
       "tests": [
         "persistent_resize_measures_real_early_intermediate_and_settled_frames"

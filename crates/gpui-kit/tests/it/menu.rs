@@ -161,6 +161,106 @@ fn opening_publishes_every_row_with_the_state_the_host_holds(cx: &mut TestAppCon
 }
 
 #[gpui::test]
+fn catalog_menu_survives_late_accessibility_activation(cx: &mut TestAppContext) {
+    // Keep the catalog builder, not a hand-built approximation of its deferred
+    // menu/submenu ancestry. Only the root is notified after the first draw.
+    struct Scene(fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyElement);
+    impl gpui::Render for Scene {
+        fn render(
+            &mut self,
+            window: &mut gpui::Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl IntoElement {
+            gpui_kit_semantics::SemanticCoordinator::global(cx).begin_frame(window);
+            div().size_full().child((self.0)(window, cx))
+        }
+    }
+
+    cx.update(gpui_kit::install);
+    let _diagnostics = cx.update(|cx| gpui_kit_semantics::SemanticCoordinator::global(cx).arm());
+    let scene = gpui_kit::scenes::catalog()
+        .into_iter()
+        .find(|scene| scene.name == "menu")
+        .expect("catalog menu scene");
+    let handle = cx.add_window(move |_, _| Scene(scene.build));
+    let mut visual = gpui::VisualTestContext::from_window(handle.into(), cx);
+    visual.run_until_parked();
+    for _ in 0..2 {
+        handle
+            .update(&mut visual, |_, _, cx| cx.notify())
+            .expect("live scene window");
+        visual.run_until_parked();
+        visual.update(|window, _| assert!(window.debug_a11y_tree_json().is_none()));
+    }
+
+    // No reopen, Menu notification, or refresh_windows: activation alone must
+    // publish the already-open surfaces, including the default deferred roots.
+    visual.activate_accessibility(handle.into());
+    let mut native_ids = None;
+    for draw in 0..4 {
+        if draw > 0 {
+            handle
+                .update(&mut visual, |_, _, cx| cx.notify())
+                .expect("live scene window");
+            visual.run_until_parked();
+        }
+        visual.update(|window, cx| {
+            let tree: serde_json::Value =
+                serde_json::from_str(&window.debug_a11y_tree_json().expect("active accessibility"))
+                    .expect("native tree JSON");
+            let nodes = tree["nodes"].as_object().expect("native nodes");
+            let mut reachable = std::collections::BTreeSet::new();
+            let mut pending = vec![tree["root"].as_str().expect("native root")];
+            while let Some(key) = pending.pop() {
+                assert!(reachable.insert(key), "duplicate native ancestry at {key}");
+                let node = nodes.get(key).expect("reachable native node exists");
+                if let Some(children) = node["children"].as_array() {
+                    pending.extend(
+                        children
+                            .iter()
+                            .map(|child| child.as_str().expect("native child key")),
+                    );
+                }
+            }
+            let snapshot = gpui_kit_semantics::SemanticCoordinator::global(cx)
+                .snapshot(window.window_handle().window_id())
+                .expect("scene semantic frame");
+            let ids = [
+                ("Menu", "Run actions", "scene.menu.run.menu"),
+                ("MenuItem", "Copy link", "scene.menu.run.share.link"),
+            ]
+            .map(|(role, name, semantic_id)| {
+                let matches: Vec<_> = nodes
+                    .iter()
+                    .filter(|(_, node)| {
+                        node["aria"]["role"] == role && node["aria"]["label"] == name
+                    })
+                    .collect();
+                assert_eq!(matches.len(), 1, "exactly one {role} named {name}: {tree}");
+                let (key, node) = matches[0];
+                assert!(
+                    reachable.contains(key.as_str()),
+                    "{name} must reach the native root"
+                );
+                let bounds = snapshot
+                    .find(semantic_id)
+                    .expect("measured scene node")
+                    .bounds;
+                assert!(bounds.x.is_finite() && bounds.y.is_finite());
+                assert!(bounds.width.is_finite() && bounds.width > 0.0);
+                assert!(bounds.height.is_finite() && bounds.height > 0.0);
+                node["accesskit_id"].as_str().expect("native id").to_owned()
+            });
+            if let Some(previous) = &native_ids {
+                assert_eq!(&ids, previous, "native IDs survive root-only draws");
+            } else {
+                native_ids = Some(ids);
+            }
+        });
+    }
+}
+
+#[gpui::test]
 fn native_menu_owns_named_rows_actions_and_lifetime(cx: &mut TestAppContext) {
     let (mut harness, menu) = menu(cx);
     let seen = events(&mut harness, &menu);

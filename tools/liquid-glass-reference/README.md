@@ -295,8 +295,12 @@ The renderer test `persistent_resize_measures_real_early_intermediate_and_settle
 checks 80, 300, 790, 800 and 1200 ms at 1×/2× in light/dark, including measured
 geometry and time, changing menu pixels, stable settled output, unchanged other
 fixture regions, exact restored logical bounds, and restored pixels within the
-headless gate's existing one-step-per-channel contract. Unrelated fixtures
-remain byte-exact. Native Metal diagnostics on the pre-release source found
+headless gate's existing one-step-per-channel contract, including unrelated
+fixtures. Metal CI run 34677542322 disproved unrelated-region byte equality:
+the failed 1920×800 crop contains 24 changed blue channels, all by one code,
+at x553–563/y745–748; the reconstructed difference was visually inspected.
+No larger difference or renderer cause is established by that case.
+Native Metal diagnostics on the pre-release source found
 stable one-code differences confined to the compact menu's lower edge at 2×
 (177 light / 241 dark pixels); longer settling did not remove them. Their cause
 is not established, and byte-exact whole-frame restoration is not claimed. Portable

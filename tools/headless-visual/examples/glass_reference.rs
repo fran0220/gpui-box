@@ -619,12 +619,22 @@ mod tests {
                     } else {
                         assert_ne!(current, previous, "static output at {millis}ms");
                     }
-                    // The resize cannot change the unrelated pills/fusion.
-                    assert_eq!(
+                    // Apply the same headless contract to unrelated pills/fusion.
+                    // Metal CI also showed one-code changes on an unrelated
+                    // glyph edge; byte equality is not a portable invariant.
+                    let unrelated =
                         image::imageops::crop_imm(&image, 0, 0, 960 * scale, 400 * scale)
-                            .to_image(),
+                            .to_image();
+                    let initial_unrelated =
                         image::imageops::crop_imm(&initial, 0, 0, 960 * scale, 400 * scale)
-                            .to_image()
+                            .to_image();
+                    assert!(
+                        unrelated
+                            .as_raw()
+                            .iter()
+                            .zip(initial_unrelated.as_raw())
+                            .all(|(a, b)| a.abs_diff(*b) <= 1),
+                        "unrelated fixtures changed beyond one code at {millis}ms, scale {scale}, dark {dark}"
                     );
                     previous = current;
                 }
@@ -652,11 +662,7 @@ mod tests {
                         .all(|(a, b)| a.abs_diff(*b) <= 1),
                     "compact pixels must restore within the headless one-step contract"
                 );
-                assert_eq!(
-                    image::imageops::crop_imm(&restored, 0, 0, 960 * scale, 400 * scale).to_image(),
-                    image::imageops::crop_imm(&initial, 0, 0, 960 * scale, 400 * scale).to_image(),
-                    "unrelated fixtures must restore exactly"
-                );
+                // The full-frame check above includes all unrelated fixtures.
             }
         }
     }

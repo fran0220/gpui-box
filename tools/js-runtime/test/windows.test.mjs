@@ -91,20 +91,33 @@ test('Windows factory refuses execution on another OS', { skip: windows }, async
   await assert.rejects(windowsSandbox('.', '.'), /requires Windows/);
 });
 
-test('native handle scan identifies metadata-denied files and rejects inheritance independently', nativeOptions, async t => {
+test('native handle snapshot checks low-rights high handles under strict invalid-handle policy', nativeOptions, async t => {
   const { root, secret } = await fixture(t);
   const other = join(root, 'not-the-sentinel');
   await writeFile(other, 'unrelated file');
   const identity = execFileSync(process.env.GPUI_WINDOWS_SANDBOX_PROBE, ['--file-id', secret], { encoding: 'utf8' }).trim();
   const probe = { execPath: process.env.GPUI_WINDOWS_SANDBOX_PROBE, execArgv: [], stdio: ['pipe', 'pipe', 'pipe'] };
-  for (const [file, inherit, failure] of [
-    [other, '0', null],
-    [secret, '0', /wcscmp\(identity, sentinel\) != 0 failed/],
-    [other, '1', /!\(flags & HANDLE_FLAG_INHERIT\) failed/],
-  ]) {
-    const run = launch(t, probe, ['--handle-control', identity, file, inherit]);
-    assert.equal((await run.closed)[0], failure ? 125 : 0, run.output().stderr);
-    if (failure) assert.match(run.output().stderr, failure);
+  const invalid = launch(t, probe, ['--invalid-handle-control', identity]);
+  assert.equal((await invalid.closed)[0] >>> 0, 0xc0000008, 'strict policy must terminate an actual invalid handle reference');
+  for (const rights of ['0', '1']) {
+    for (const [file, inherit, failure] of [
+      [other, '0', null],
+      [secret, '0', /wcscmp\(identity, sentinel\) != 0 failed/],
+      [other, '1', /!\(flags & HANDLE_FLAG_INHERIT\) failed/],
+    ]) {
+      const run = launch(t, probe, ['--handle-control', identity, file, inherit, rights]);
+      assert.equal((await run.closed)[0], failure ? 125 : 0, run.output().stderr);
+      const control = /control handle=(\d+)/.exec(run.output().stderr);
+      assert.ok(control, run.output().stderr);
+      assert.ok(Number(control[1]) >= 65536, 'control must exceed the former numeric scan range');
+      const scanned = new RegExp(`disk handle=${control[1]} flags=(\\d+) access=([0-9a-f]+) id=([0-9a-f:]+)`).exec(run.output().stderr);
+      assert.ok(scanned, 'the actual control handle must be inspected');
+      assert.equal(Number(scanned[1]), Number(inherit));
+      assert.equal(parseInt(scanned[2], 16), Number(rights), 'OS GrantedAccess must be zero or FILE_READ_DATA only, without FILE_READ_ATTRIBUTES');
+      if (file === secret) assert.equal(scanned[3], identity);
+      else assert.notEqual(scanned[3], identity);
+      if (failure) assert.match(run.output().stderr, failure);
+    }
   }
 });
 
