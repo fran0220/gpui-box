@@ -6,7 +6,8 @@ $ErrorActionPreference = 'Stop'
 if (!$ReadOnlyFixture) {
     # Read existing diagnostics only. Never change collection, firewall rules,
     # capabilities or exemptions, and never stop the workflow's ETW capture.
-    & netsh wfp show netevents "file=$EventsPath" protocol=6 localaddr=127.0.0.1 remoteaddr=127.0.0.1 timewindow=60 | Out-Null
+    # Include both loopback TCP and the non-loopback TEST-NET-1 UDP attempt.
+    & netsh wfp show netevents "file=$EventsPath" timewindow=60 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'WFP event read failed' }
     & netsh wfp show filters "file=$FiltersPath" verbose=on | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'WFP filter read failed' }

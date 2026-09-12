@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, open, readFile, rm, symlink, writeFile, access } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawn } from 'node:child_process';
@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { windowsSandbox } from '../windows-sandbox.mjs';
-import { readWfp, assertWfpLoopbackBlock } from './windows-wfp.mjs';
+import { readWfp, assertWfpLoopbackBlock, assertWfpExternalUdpBlock } from './windows-wfp.mjs';
 
 const windows = process.platform === 'win32';
 const runtime = fileURLToPath(new URL('..', import.meta.url));
@@ -168,25 +168,39 @@ test('native AppContainer blocks host reads, writes, network, spawning and leake
   assert.equal(connections, 1, 'sandbox reached the proven-live host listener');
   assert.deepEqual(originals.map(acl), originalAcls, 'source and host profile-parent ACLs must remain unchanged');
   assert.equal(code, 0, run.output().stderr);
-  const { tcpError, tcpLocalPort, ...assertions } = JSON.parse(run.output().stdout);
+  const { tcpError, tcpLocalPort, udpError, udpLocalPort, ...assertions } = JSON.parse(run.output().stdout);
   assert.deepEqual(assertions, {
     appcontainer: true, capabilities: 0, readonly: true, hostDenied: true,
-    spawnDenied: true, udpDenied: true, handles: true,
+    spawnDenied: true, handles: true,
     memory: 268435456, cpuSeconds: 30, cpuRate: 2500, activeProcesses: 1,
   });
   assert.ok(Number.isInteger(tcpLocalPort) && tcpLocalPort > 0 && tcpLocalPort <= 65535);
+  assert.ok(Number.isInteger(udpLocalPort) && udpLocalPort > 0 && udpLocalPort <= 65535);
   assert.ok(tcpError === 10013 || tcpError === 10060, `unexpected TCP error ${tcpError}`);
-  if (tcpError === 10060) {
+  assert.ok(udpError === 10013 || udpError === 0, `unexpected UDP error ${udpError}`);
+  if (tcpError === 10060 || udpError === 0) {
     const metadata = /pid=(\d+) packageSID=(S-1-15-2-[\d-]+) tcp=/.exec(run.output().stderr);
     const appId = /Windows sandbox probe: appID=([^\r\n]+)/.exec(run.output().stderr);
     assert.ok(metadata && appId, run.output().stderr);
     const workerPid = Number(metadata[1]);
-    const listenerAppId = execFileSync(probe.execPath, ['--app-id', process.execPath], { encoding: 'utf8', timeout: 10000 }).trim();
-    const filterId = assertWfpLoopbackBlock(await readWfp(workerPid), {
-      start, end, workerPid, sid: metadata[2], workerAppId: appId[1],
-      listenerPid: process.pid, listenerAppId, sourcePort: tcpLocalPort, listenerPort: server.address().port,
-    });
-    t.diagnostic(`TCP timeout verified against AppContainer-isolation WFP filter ${filterId}, worker ${workerPid}, source port ${tcpLocalPort}`);
+    const evidence = await readWfp(workerPid);
+    const attempt = { start, end, workerPid, sid: metadata[2], workerAppId: appId[1] };
+    if (tcpError === 10060) {
+      const listenerAppId = execFileSync(probe.execPath, ['--app-id', process.execPath], { encoding: 'utf8', timeout: 10000 }).trim();
+      const filterId = assertWfpLoopbackBlock(evidence, {
+        ...attempt, listenerPid: process.pid, listenerAppId,
+        sourcePort: tcpLocalPort, listenerPort: server.address().port,
+      });
+      t.diagnostic(`TCP timeout verified against AppContainer-isolation WFP filter ${filterId}, worker ${workerPid}, source port ${tcpLocalPort}`);
+    }
+    if (udpError === 0) {
+      const sourceAddresses = Object.values(networkInterfaces()).flat()
+        .filter(address => address.family === 'IPv4' && !address.internal).map(address => address.address);
+      const filterId = assertWfpExternalUdpBlock(evidence, {
+        ...attempt, sourceAddresses, sourcePort: udpLocalPort,
+      });
+      t.diagnostic(`UDP send verified against outbound AppContainer-isolation WFP filter ${filterId}, worker ${workerPid}, source port ${udpLocalPort}`);
+    }
   }
   const after = launch(t, probe, ['--connect-control', String(server.address().port)]);
   assert.equal((await after.closed)[0], 0, after.output().stderr);

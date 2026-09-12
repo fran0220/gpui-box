@@ -43,3 +43,22 @@ export function assertWfpLoopbackBlock({ events, filters }, attempt) {
   assert.ok(drop, 'no correlated inbound AppContainer-isolation WFP blocking filter');
   return drop.filterId;
 }
+
+// TEST-NET-1 has no receiver. Prove local outbound enforcement instead of
+// inferring delivery or denial from sendto's result or a missing reply.
+export function assertWfpExternalUdpBlock({ events, filters }, attempt) {
+  const path = hex => Buffer.from(hex, 'hex').toString('utf16le').replace(/\0+$/, '').toLowerCase();
+  const drop = events.find(event => event.drop && Number(event.protocol) === 17 &&
+    attempt.sourceAddresses.includes(event.localAddress) &&
+    Number(event.localPort) === attempt.sourcePort &&
+    event.remoteAddress === '192.0.2.1' && Number(event.remotePort) === 9 &&
+    Date.parse(event.time) >= attempt.start && Date.parse(event.time) <= attempt.end &&
+    event.sid === attempt.sid && path(event.appId) === attempt.workerAppId.toLowerCase() &&
+    (!event.pid || Number(event.pid) === attempt.workerPid) &&
+    event.direction === 'MS_FWP_DIRECTION_OUT' && event.loopback === 'false' &&
+    filters.some(rule => rule.id === event.filterId &&
+      rule.layer === 'FWPM_LAYER_ALE_AUTH_CONNECT_V4' &&
+      rule.sublayer === 'FWPM_SUBLAYER_MPSSVC_APP_ISOLATION' && rule.action === 'FWP_ACTION_BLOCK'));
+  assert.ok(drop, 'no same-attempt outbound AppContainer-isolation UDP block');
+  return drop.filterId;
+}

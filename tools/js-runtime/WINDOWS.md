@@ -272,11 +272,30 @@ of claiming `networkDenied`. Error 10013 remains direct denial; error 10060
 requires fresh live WFP records matching the attempt's time interval, worker
 SID/image, full TCP tuple, listener image and isolation blocking filter.
 PIDs are checked when the event schema supplies them. An unsandboxed native
-connection must succeed both before and after the attempt; UDP still requires
-10013. `windows-wfp.ps1` only reads diagnostics and never changes collection,
+connection must succeed both before and after the attempt. `windows-wfp.ps1`
+only reads diagnostics and never changes collection,
 policy, capabilities or exemptions. Its XML dumps remain under
 `target/runtime-native/wfp`. Captured XML parser tests do not prove live
 readback works on a particular Windows kernel; the native lane must pass.
+
+Run [34683324192](https://github.com/fran0220/gpui-box/actions/runs/34683324192)
+passed strict handle readback/wait controls and all six low-rights controls,
+but `sendto` to the original non-loopback `192.0.2.1:9` returned success.
+Its captured XML proves both raw and combined sends hit the outbound
+`UWP Default Outbound Block Rule` in `MPSSVC_APP_ISOLATION`, at
+`ALE_AUTH_CONNECT_V4`. The earlier allow event was socket resource assignment,
+not permission to send to that destination. Successful `sendto` is not
+successful delivery, as its [Microsoft API contract](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-sendto) explicitly states.
+
+The probe retains TEST-NET-1, reports UDP result and a bound source port, and
+does not assert delivery or denial from API success. Success requires a fresh
+protocol-17 outbound non-loopback drop matching the worker SID/image, source
+port, a host interface address, destination and time interval, resolving to
+an AppContainer-isolation blocking filter at the connect layer. A direct
+10013 refusal remains valid. Missing evidence fails; an unrelated firewall
+drop or socket-allocation event cannot pass. This is local outbound enforcement,
+not remote reception or a substitute loopback-only check. Live readback of both
+TCP and UDP remains required before accepting the native lane.
 
 Strict handle checks read back both mitigation bits. Separate controls compare
 a valid event wait, a closed-event wait without strict policy, and a

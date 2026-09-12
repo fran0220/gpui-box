@@ -422,13 +422,25 @@ int wmain(int argc, wchar_t **argv) {
     closesocket(socketHandle);
     socketHandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     CHECK(socketHandle != INVALID_SOCKET);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = 0;
+    CHECK(bind(socketHandle, (struct sockaddr *)&address, sizeof(address)) == 0);
+    address_size = sizeof(address);
+    CHECK(getsockname(socketHandle, (struct sockaddr *)&address, &address_size) == 0);
+    unsigned udp_local_port = ntohs(address.sin_port);
+    CHECK(udp_local_port);
     address.sin_addr.s_addr = htonl(0xc0000201); // TEST-NET-1, not a live service
     address.sin_port = htons(9);
-    CHECK(sendto(socketHandle, "x", 1, 0, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR);
-    CHECK(WSAGetLastError() == WSAEACCES);
+    int udp_result = sendto(socketHandle, "x", 1, 0, (struct sockaddr *)&address, sizeof(address));
+    int udp_error = udp_result == SOCKET_ERROR ? WSAGetLastError() : 0;
+    fprintf(stderr, "Windows sandbox probe: UDP result=%d error=%d source-port=%u destination=192.0.2.1:9\n",
+        udp_result, udp_error, udp_local_port);
+    // Successful sendto is not delivery. The host MUST prove the same send's
+    // outbound AppContainer-isolation drop when the API does not refuse it.
+    CHECK(udp_result == 1 || udp_error == WSAEACCES);
     closesocket(socketHandle);
     WSACleanup();
-    printf("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"tcpError\":%d,\"tcpLocalPort\":%u,\"udpDenied\":true,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}\n", connect_error, local_port);
+    printf("{\"appcontainer\":true,\"capabilities\":0,\"readonly\":true,\"hostDenied\":true,\"spawnDenied\":true,\"tcpError\":%d,\"tcpLocalPort\":%u,\"udpError\":%d,\"udpLocalPort\":%u,\"handles\":true,\"memory\":268435456,\"cpuSeconds\":30,\"cpuRate\":2500,\"activeProcesses\":1}\n", connect_error, local_port, udp_error, udp_local_port);
     return 0;
 }
 #else
