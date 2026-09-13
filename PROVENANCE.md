@@ -4,6 +4,12 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+Calendar tick generation and source-traceable chart transforms are original
+GPUI Box work. Calendar resolution uses the existing Chrono public TimeZone API;
+the caller supplies production timezone policy. chrono-tz is a test-only
+dependency for independent DST/date-line fixtures. No calendar source or timezone
+database is copied into Kit, and DateAdapter ownership is unchanged.
+
 The local geographic visualization family and synthetic exhibit are original
 GPUI Box work. Projection formulas were checked against
 [PROJ's Web Mercator definition](https://proj.org/en/stable/operations/projections/webmerc.html),

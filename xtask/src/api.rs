@@ -42,14 +42,11 @@
 //!
 //! # What it gets wrong
 //!
-//! It matches text, not syntax, so it believes what the source looks like.
-//! Two known consequences: a type aliased or re-exported under another name is
-//! indexed under the name it was declared with, and a builder assembled by a
-//! macro rather than an `impl` block would be missed entirely. Neither shape
-//! is in the tree, and a component that grows one will be absent from the
-//! index rather than wrong in it — which is the failure worth having, because
-//! an agent that cannot find a component asks, and one that reads a wrong
-//! signature does not.
+//! Signatures and classifications still match text, not syntax; a builder
+//! assembled by a macro rather than an `impl` block is missed. Import paths
+//! instead follow parsed module declarations and local reexports. A renamed
+//! export retains its declaration name in the catalog but has the reachable
+//! spelling in `path`. Neither reader expands macros or evaluates feature cfgs.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -124,7 +121,7 @@ fn size(index: &str) -> String {
 #[derive(Debug, Default)]
 struct Item {
     name: String,
-    module: String,
+    import_path: Option<String>,
     source: String,
     summary: String,
     kind: Kind,
@@ -186,24 +183,20 @@ fn build(root: &Path) -> Result<String> {
         if SKIP.iter().any(|skip| relative.ends_with(skip)) || relative.starts_with(SCENES) {
             continue;
         }
-        let module = module_of(&relative);
         let source = strip(&fs::read_to_string(file)?);
-        sources.push((source, module, relative));
+        sources.push((source, relative));
     }
     // Rust permits inherent/trait impls in a child file which sorts before its
     // declaration. Register all public owners before attaching any methods.
     for declarations in [true, false] {
-        for (source, module, relative) in &sources {
-            read_source_pass(
-                source,
-                module,
-                relative,
-                &mut items,
-                &mut events,
-                declarations,
-            );
+        for (source, relative) in &sources {
+            read_source_pass(source, relative, &mut items, &mut events, declarations);
         }
     }
+
+    let paths = public_paths(root, &source_root.join("lib.rs"))?;
+    apply_public_paths(&mut items, &paths);
+    events.retain(|owner, _| items.contains_key(&format!("{owner}Event")));
 
     let scenes = read_scenes(&scene_source(&source_root)?, &items, root)?;
 
@@ -268,16 +261,294 @@ fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-/// The public module a caller reaches the item through, which is the first
-/// path segment under `src` because `lib.rs` publishes exactly those.
-fn module_of(relative: &str) -> String {
-    relative
-        .trim_start_matches("crates/gpui-kit/src/")
-        .split('/')
-        .next()
-        .unwrap_or_default()
-        .trim_end_matches(".rs")
-        .to_string()
+/// Import authority is the Rust module graph, not the declaration's filename.
+/// Resolve local uses to a fixed point (including private intermediate aliases),
+/// then walk only public bindings from the crate root. Source identity remains
+/// separate from the chosen import spelling. This is not macro expansion or cfg
+/// evaluation: like the signature reader it indexes non-test source variants.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ImportTarget {
+    Module(usize),
+    Type(String, String),
+}
+
+#[derive(Default)]
+struct ImportModule {
+    parent: usize,
+    bindings: BTreeMap<String, (ImportTarget, bool)>,
+    uses: Vec<(Vec<String>, Option<String>, bool)>,
+}
+
+fn apply_public_paths(
+    items: &mut BTreeMap<String, Item>,
+    paths: &BTreeMap<(String, String), String>,
+) {
+    items.retain(|name, item| {
+        item.import_path = paths.get(&(item.source.clone(), name.clone())).cloned();
+        item.import_path.is_some()
+    });
+}
+
+fn use_leaves(
+    tree: &syn::UseTree,
+    prefix: Vec<String>,
+    into: &mut Vec<(Vec<String>, Option<String>)>,
+) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            let mut prefix = prefix;
+            prefix.push(path.ident.to_string());
+            use_leaves(&path.tree, prefix, into);
+        }
+        syn::UseTree::Group(group) => {
+            for tree in &group.items {
+                use_leaves(tree, prefix.clone(), into);
+            }
+        }
+        syn::UseTree::Name(name) => {
+            let mut path = prefix;
+            if name.ident != "self" {
+                path.push(name.ident.to_string());
+            }
+            let alias = path.last().cloned();
+            into.push((path, alias));
+        }
+        syn::UseTree::Rename(rename) => {
+            let mut path = prefix;
+            if rename.ident != "self" {
+                path.push(rename.ident.to_string());
+            }
+            into.push((path, Some(rename.rename.to_string())));
+        }
+        syn::UseTree::Glob(_) => into.push((prefix, None)),
+    }
+}
+
+fn load_import_module(
+    root: &Path,
+    file: &Path,
+    directory: &Path,
+    path_directory: &Path,
+    syntax: &[syn::Item],
+    id: usize,
+    modules: &mut Vec<ImportModule>,
+) -> Result<()> {
+    for item in syntax {
+        let (ident, visibility) = match item {
+            syn::Item::Mod(module) => {
+                if module.attrs.iter().any(|attr| {
+                    attr.path().is_ident("cfg")
+                        && attr
+                            .parse_args::<syn::Path>()
+                            .is_ok_and(|path| path.is_ident("test"))
+                }) {
+                    continue;
+                }
+                let child = modules.len();
+                modules.push(ImportModule {
+                    parent: id,
+                    ..ImportModule::default()
+                });
+                modules[id].bindings.insert(
+                    module.ident.to_string(),
+                    (
+                        ImportTarget::Module(child),
+                        matches!(module.vis, syn::Visibility::Public(_)),
+                    ),
+                );
+                let explicit = module.attrs.iter().find_map(|attr| {
+                    if !attr.path().is_ident("path") {
+                        return None;
+                    }
+                    if let syn::Meta::NameValue(value) = &attr.meta
+                        && let syn::Expr::Lit(literal) = &value.value
+                        && let syn::Lit::Str(path) = &literal.lit
+                    {
+                        return Some(path.value());
+                    }
+                    None
+                });
+                if let Some((_, items)) = &module.content {
+                    let directory =
+                        directory.join(explicit.as_deref().unwrap_or(&module.ident.to_string()));
+                    load_import_module(root, file, &directory, &directory, items, child, modules)?;
+                } else {
+                    let path = if let Some(path) = &explicit {
+                        // File modules use the containing file's directory;
+                        // inline modules also contribute their module directory.
+                        path_directory.join(path)
+                    } else {
+                        let flat = directory.join(format!("{}.rs", module.ident));
+                        if flat.exists() {
+                            flat
+                        } else {
+                            directory.join(module.ident.to_string()).join("mod.rs")
+                        }
+                    };
+                    let path = fs::canonicalize(&path)
+                        .with_context(|| format!("locating module {}", path.display()))?;
+                    let source = fs::read_to_string(&path)
+                        .with_context(|| format!("reading module {}", path.display()))?;
+                    let parsed = syn::parse_file(&source)
+                        .with_context(|| format!("parsing {}", path.display()))?;
+                    let child_directory = if explicit.is_some()
+                        || path.file_name().is_some_and(|name| name == "mod.rs")
+                    {
+                        path.parent()
+                            .context("module file has no parent")?
+                            .to_path_buf()
+                    } else {
+                        path.with_extension("")
+                    };
+                    load_import_module(
+                        root,
+                        &path,
+                        &child_directory,
+                        path.parent().context("module file has no parent")?,
+                        &parsed.items,
+                        child,
+                        modules,
+                    )?;
+                }
+                continue;
+            }
+            syn::Item::Use(import) => {
+                let mut leaves = Vec::new();
+                use_leaves(&import.tree, Vec::new(), &mut leaves);
+                modules[id]
+                    .uses
+                    .extend(leaves.into_iter().map(|(path, alias)| {
+                        (
+                            path,
+                            alias,
+                            matches!(import.vis, syn::Visibility::Public(_)),
+                        )
+                    }));
+                continue;
+            }
+            syn::Item::Struct(item) => (&item.ident, &item.vis),
+            syn::Item::Enum(item) => (&item.ident, &item.vis),
+            _ => continue,
+        };
+        let source = file
+            .strip_prefix(root)
+            .unwrap_or(file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        modules[id].bindings.insert(
+            ident.to_string(),
+            (
+                ImportTarget::Type(source, ident.to_string()),
+                matches!(visibility, syn::Visibility::Public(_)),
+            ),
+        );
+    }
+    Ok(())
+}
+
+fn resolve_import(
+    modules: &[ImportModule],
+    mut id: usize,
+    path: &[String],
+) -> Option<ImportTarget> {
+    let mut target = ImportTarget::Module(id);
+    for (at, part) in path.iter().enumerate() {
+        target = match part.as_str() {
+            "crate" => ImportTarget::Module(0),
+            "self" => ImportTarget::Module(id),
+            "super" => ImportTarget::Module(modules[id].parent),
+            name => modules[id].bindings.get(name)?.0.clone(),
+        };
+        if let ImportTarget::Module(module) = target {
+            id = module;
+        } else if at + 1 != path.len() {
+            return None;
+        }
+    }
+    Some(target)
+}
+
+fn public_paths(root: &Path, lib: &Path) -> Result<BTreeMap<(String, String), String>> {
+    let root = fs::canonicalize(root)?;
+    let lib = fs::canonicalize(lib)?;
+    let syntax = syn::parse_file(&fs::read_to_string(&lib)?)?;
+    let mut modules = vec![ImportModule::default()];
+    load_import_module(
+        &root,
+        &lib,
+        lib.parent().context("crate root has no parent")?,
+        lib.parent().context("crate root has no parent")?,
+        &syntax.items,
+        0,
+        &mut modules,
+    )?;
+    loop {
+        let mut changed = false;
+        for id in 0..modules.len() {
+            for (path, alias, public) in modules[id].uses.clone() {
+                let Some(target) = resolve_import(&modules, id, &path) else {
+                    continue;
+                };
+                let bindings = if let Some(alias) = alias {
+                    vec![(alias, (target, public))]
+                } else if let ImportTarget::Module(module) = target {
+                    modules[module]
+                        .bindings
+                        .iter()
+                        .filter(|(_, (_, exported))| *exported)
+                        .map(|(name, (target, _))| (name.clone(), (target.clone(), public)))
+                        .collect()
+                } else {
+                    continue;
+                };
+                for (name, binding) in bindings {
+                    if let std::collections::btree_map::Entry::Vacant(entry) =
+                        modules[id].bindings.entry(name)
+                    {
+                        entry.insert(binding);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut paths = BTreeMap::new();
+    let mut pending = vec![(0, "gpui_kit".to_string(), BTreeSet::new())];
+    while let Some((id, prefix, mut ancestors)) = pending.pop() {
+        if !ancestors.insert(id) {
+            continue;
+        }
+        for (name, (target, public)) in &modules[id].bindings {
+            if !public {
+                continue;
+            }
+            let path = format!("{prefix}::{name}");
+            match target {
+                ImportTarget::Module(child) => pending.push((*child, path, ancestors.clone())),
+                ImportTarget::Type(source, name) => {
+                    let existing = paths
+                        .entry((source.clone(), name.clone()))
+                        .or_insert_with(|| path.clone());
+                    // Prefer family imports over the convenience prelude, then
+                    // the shortest stable spelling among equivalent exports.
+                    let rank = |path: &str| {
+                        (
+                            path.starts_with("gpui_kit::prelude::"),
+                            path.matches("::").count(),
+                            path.to_string(),
+                        )
+                    };
+                    if rank(&path) < rank(existing) {
+                        *existing = path;
+                    }
+                }
+            }
+        }
+    }
+    Ok(paths)
 }
 
 /// Drops comments that are not documentation, and everything from the first
@@ -349,19 +620,17 @@ fn strip(source: &str) -> String {
 #[cfg(test)]
 fn read_source(
     source: &str,
-    module: &str,
     relative: &str,
     items: &mut BTreeMap<String, Item>,
     events: &mut BTreeMap<String, Vec<String>>,
 ) {
     for declarations in [true, false] {
-        read_source_pass(source, module, relative, items, events, declarations);
+        read_source_pass(source, relative, items, events, declarations);
     }
 }
 
 fn read_source_pass(
     source: &str,
-    module: &str,
     relative: &str,
     items: &mut BTreeMap<String, Item>,
     events: &mut BTreeMap<String, Vec<String>>,
@@ -393,7 +662,6 @@ fn read_source_pass(
         if declarations && let Some(name) = declared(line, "pub struct ") {
             let entry = items.entry(name.clone()).or_default();
             entry.name = name;
-            entry.module = module.to_string();
             entry.source = relative.to_string();
             entry.summary = summary(&docs);
             if derives.contains("IntoElement") {
@@ -412,7 +680,6 @@ fn read_source_pass(
             }
             let entry = items.entry(name.clone()).or_default();
             entry.name = name;
-            entry.module = module.to_string();
             entry.source = relative.to_string();
             entry.summary = summary(&docs);
             entry.variants = variants;
@@ -1005,10 +1272,7 @@ fn render(
         out.push_str("    {\n");
         out.push_str(&format!("      \"name\": {},\n", quote(&item.name)));
         out.push_str(&format!("      \"kind\": {},\n", quote(item.kind.name())));
-        out.push_str(&format!(
-            "      \"path\": {},\n",
-            quote(&format!("gpui_kit::{}::{}", item.module, item.name))
-        ));
+        out.push_str(&format!("      \"path\": {},\n", quote(item_path(item))));
         out.push_str(&format!("      \"source\": {},\n", quote(&item.source)));
         out.push_str(&format!("      \"summary\": {},\n", quote(&item.summary)));
         out.push_str(&list("construct", &item.constructors));
@@ -1042,10 +1306,7 @@ fn render(
     for (at, item) in types.iter().enumerate() {
         out.push_str("    {\n");
         out.push_str(&format!("      \"name\": {},\n", quote(&item.name)));
-        out.push_str(&format!(
-            "      \"path\": {},\n",
-            quote(&format!("gpui_kit::{}::{}", item.module, item.name))
-        ));
+        out.push_str(&format!("      \"path\": {},\n", quote(item_path(item))));
         out.push_str(&format!("      \"summary\": {},\n", quote(&item.summary)));
         out.push_str(&list("variants", &item.variants));
         out.push_str(&list("construct", &item.constructors));
@@ -1084,6 +1345,12 @@ fn render(
     out.push_str("  ]\n");
     out.push_str("}\n");
     out
+}
+
+fn item_path(item: &Item) -> &str {
+    item.import_path
+        .as_deref()
+        .expect("only publicly reachable items are rendered")
 }
 
 fn list(key: &str, values: &[String]) -> String {
@@ -1165,6 +1432,168 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generated_paths_follow_exports_and_compile_downstream() -> Result<()> {
+        struct Fixture(PathBuf);
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let fixture = Fixture(std::env::temp_dir().join(format!(
+            "kit-api-imports-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_nanos(),
+        )));
+        let root = &fixture.0;
+        let files = [
+            (
+                "lib.rs",
+                "pub mod display;\nmod hidden;\npub use hidden::Renamed as PublicName;\npub use display::nested as alias;\n",
+            ),
+            (
+                "display/mod.rs",
+                "pub mod nested;\nmod view;\nmod bridge { pub use super::view::Exported; }\npub use self::bridge::*;\npub(crate) mod internal;\n#[path = \"elsewhere.rs\"]\npub mod relocated;\n",
+            ),
+            ("display/nested.rs", "pub mod scale;\npub struct Nested;\n"),
+            ("display/nested/scale/mod.rs", "pub struct NumericScale;\n"),
+            (
+                "display/view.rs",
+                "pub struct Exported;\ntrait Render {}\nimpl Render for Exported {}\npub struct NotExported;\nimpl Render for NotExported {}\npub(crate) struct Restricted;\n",
+            ),
+            ("display/internal.rs", "pub struct Internal;\n"),
+            (
+                "display/elsewhere.rs",
+                "pub struct Relocated;\n#[path = \"sibling.rs\"]\npub mod child;\npub mod conventional;\npub mod inline { #[path = \"custom.rs\"] pub mod custom; }\n",
+            ),
+            ("display/sibling.rs", "pub struct Sibling;\n"),
+            ("display/conventional.rs", "pub struct Conventional;\n"),
+            ("display/inline/custom.rs", "pub struct Inline;\n"),
+            ("hidden.rs", "pub struct Renamed;\n"),
+            ("orphan.rs", "pub struct Orphan;\n"),
+        ];
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        for (path, source) in files {
+            fs::create_dir_all(root.join(path).parent().expect("fixture directory"))?;
+            fs::write(root.join(path), source)?;
+            read_source(source, path, &mut items, &mut events);
+        }
+        let paths = public_paths(root, &root.join("lib.rs"))?;
+        apply_public_paths(&mut items, &paths);
+        let artifact: serde_json::Value =
+            serde_json::from_str(&render(&items, &events, &BTreeMap::new(), &[]))?;
+        let types: Vec<_> = artifact["types"]
+            .as_array()
+            .expect("types array")
+            .iter()
+            .chain(
+                artifact["components"]
+                    .as_array()
+                    .expect("components array")
+                    .iter(),
+            )
+            .collect();
+        for (name, expected) in [
+            ("Nested", "gpui_kit::alias::Nested"),
+            ("NumericScale", "gpui_kit::alias::scale::NumericScale"),
+            ("Exported", "gpui_kit::display::Exported"),
+            ("Relocated", "gpui_kit::display::relocated::Relocated"),
+            ("Sibling", "gpui_kit::display::relocated::child::Sibling"),
+            (
+                "Conventional",
+                "gpui_kit::display::relocated::conventional::Conventional",
+            ),
+            (
+                "Inline",
+                "gpui_kit::display::relocated::inline::custom::Inline",
+            ),
+            ("Renamed", "gpui_kit::PublicName"),
+        ] {
+            let item = types
+                .iter()
+                .find(|item| item["name"] == name)
+                .expect("exported type");
+            assert_eq!(item["path"], expected);
+        }
+        assert_eq!(
+            types.len(),
+            8,
+            "private and undeclared files are not imports"
+        );
+        assert_eq!(items["Exported"].source, "display/view.rs");
+        assert_eq!(artifact["components"][0]["kind"], "view");
+        assert_eq!(artifact["components"][0]["source"], "display/view.rs");
+        let library = root.join("libgpui_kit.rlib");
+        let output = std::process::Command::new("rustc")
+            .args([
+                "--edition=2024",
+                "--crate-type=rlib",
+                "--crate-name=gpui_kit",
+            ])
+            .arg(root.join("lib.rs"))
+            .arg("-o")
+            .arg(&library)
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let imports = types
+            .iter()
+            .map(|item| format!("use {};\n", item["path"].as_str().expect("import path")))
+            .collect::<String>();
+        fs::write(
+            root.join("consumer.rs"),
+            format!("{imports}\nfn main() {{}}\n"),
+        )?;
+        let output = std::process::Command::new("rustc")
+            .args(["--edition=2024", "--extern"])
+            .arg(format!("gpui_kit={}", library.display()))
+            .arg(root.join("consumer.rs"))
+            .arg("-o")
+            .arg(root.join("consumer"))
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generated_chart_imports_are_public_rust_paths() -> Result<()> {
+        let artifact: serde_json::Value = serde_json::from_str(&build(&crate::root())?)?;
+        macro_rules! assert_import {
+            ($name:literal, $path:path) => {{
+                // The same spelling asserted in the artifact is typechecked here.
+                let _: Option<$path> = None;
+                let item = artifact["types"]
+                    .as_array()
+                    .expect("types array")
+                    .iter()
+                    .find(|item| item["name"] == $name)
+                    .expect("chart type");
+                assert_eq!(item["path"], stringify!($path));
+            }};
+        }
+        assert_import!(
+            "CalendarTick",
+            gpui_kit::display::chart::scale::calendar::CalendarTick
+        );
+        assert_import!(
+            "NumericScale",
+            gpui_kit::display::chart::scale::NumericScale
+        );
+        assert_import!(
+            "ChartOrientation",
+            gpui_kit::display::chart::cartesian::ChartOrientation
+        );
+        Ok(())
+    }
+
+    #[test]
     fn a_derived_element_is_a_builder_and_a_render_impl_is_a_view() {
         let source = strip(
             r#"
@@ -1182,7 +1611,7 @@ impl Render for Select {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "display", "badge.rs", &mut items, &mut events);
+        read_source(&source, "badge.rs", &mut items, &mut events);
 
         assert_eq!(items["Badge"].kind, Kind::Builder);
         assert_eq!(items["Select"].kind, Kind::View);
@@ -1222,14 +1651,7 @@ impl Render for Select {
             let mut events = BTreeMap::new();
             for declarations in [true, false] {
                 for (source, path) in sources {
-                    read_source_pass(
-                        source,
-                        "controls",
-                        path,
-                        &mut items,
-                        &mut events,
-                        declarations,
-                    );
+                    read_source_pass(source, path, &mut items, &mut events, declarations);
                 }
             }
             let editor = &items["Editor"];
@@ -1285,7 +1707,7 @@ impl Select {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "controls", "select.rs", &mut items, &mut events);
+        read_source(&source, "select.rs", &mut items, &mut events);
 
         let select = &items["Select"];
         assert_eq!(select.constructors.len(), 1);
@@ -1312,7 +1734,7 @@ impl Slotted for Panel {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "display", "panel.rs", &mut items, &mut events);
+        read_source(&source, "panel.rs", &mut items, &mut events);
 
         assert_eq!(
             items["Panel"].slots,
@@ -1336,7 +1758,7 @@ impl Public {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "controls", "private.rs", &mut items, &mut events);
+        read_source(&source, "private.rs", &mut items, &mut events);
 
         assert!(!items.contains_key("Internal"));
         assert_eq!(items["Public"].queries, vec!["value() -> bool"]);
@@ -1357,7 +1779,7 @@ pub enum SelectEvent {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "controls", "select.rs", &mut items, &mut events);
+        read_source(&source, "select.rs", &mut items, &mut events);
 
         assert_eq!(events["Select"], vec!["Selected", "Opened", "Closed"]);
     }
@@ -1460,7 +1882,7 @@ impl Render for Tooltip {
         );
         let mut items = BTreeMap::new();
         let mut events = BTreeMap::new();
-        read_source(&source, "overlay", "tooltip.rs", &mut items, &mut events);
+        read_source(&source, "tooltip.rs", &mut items, &mut events);
 
         assert!(items.contains_key("Tooltip"));
         assert!(

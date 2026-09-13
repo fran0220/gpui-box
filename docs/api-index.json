@@ -329,7 +329,7 @@
     {
       "name": "AnimatedNumber",
       "kind": "builder",
-      "path": "gpui_kit::display::AnimatedNumber",
+      "path": "gpui_kit::display::animated_number::AnimatedNumber",
       "source": "crates/gpui-kit/src/display/animated_number.rs",
       "summary": "A numeric readout that animates between values.",
       "construct": [
@@ -401,7 +401,7 @@
     {
       "name": "AreaChart",
       "kind": "builder",
-      "path": "gpui_kit::display::AreaChart",
+      "path": "gpui_kit::display::chart::AreaChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A filled area chart over one or more host-owned series.",
       "construct": [
@@ -482,7 +482,7 @@
     {
       "name": "AttachmentTile",
       "kind": "builder",
-      "path": "gpui_kit::display::AttachmentTile",
+      "path": "gpui_kit::display::attachment::AttachmentTile",
       "source": "crates/gpui-kit/src/display/attachment.rs",
       "summary": "A standalone attachment tile, separate from message-list attachment metadata. All four slots compose native elements: media, title, description, and actions. A supplied preview remains visible on failure because already-known media is not erased by a failed transfer or refresh.",
       "construct": [
@@ -560,7 +560,7 @@
     {
       "name": "Avatar",
       "kind": "builder",
-      "path": "gpui_kit::display::Avatar",
+      "path": "gpui_kit::display::avatar::Avatar",
       "source": "crates/gpui-kit/src/display/avatar.rs",
       "summary": "A circular mark for a person or a workspace.",
       "construct": [
@@ -585,7 +585,7 @@
     {
       "name": "AvatarGroup",
       "kind": "builder",
-      "path": "gpui_kit::display::AvatarGroup",
+      "path": "gpui_kit::display::avatar::AvatarGroup",
       "source": "crates/gpui-kit/src/display/avatar.rs",
       "summary": "Several identities in one place, overlapping, with the rest counted.",
       "construct": [
@@ -608,7 +608,7 @@
     {
       "name": "Badge",
       "kind": "builder",
-      "path": "gpui_kit::display::Badge",
+      "path": "gpui_kit::display::badge::Badge",
       "source": "crates/gpui-kit/src/display/badge.rs",
       "summary": "A compact status label.",
       "construct": [
@@ -641,7 +641,7 @@
     {
       "name": "Banner",
       "kind": "builder",
-      "path": "gpui_kit::display::Banner",
+      "path": "gpui_kit::display::status::Banner",
       "source": "crates/gpui-kit/src/display/status.rs",
       "summary": "A page-level tinted report: title, action, and a way to close it.",
       "construct": [
@@ -663,7 +663,7 @@
     {
       "name": "BarChart",
       "kind": "builder",
-      "path": "gpui_kit::display::BarChart",
+      "path": "gpui_kit::display::chart::BarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A bar chart over one host-owned series of categorized values.",
       "construct": [
@@ -687,7 +687,7 @@
     {
       "name": "BarLoader",
       "kind": "builder",
-      "path": "gpui_kit::display::BarLoader",
+      "path": "gpui_kit::display::loading::BarLoader",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "A thin working strip for the edge of a region that is filling in.",
       "construct": [
@@ -820,7 +820,7 @@
     {
       "name": "Bubble",
       "kind": "builder",
-      "path": "gpui_kit::display::Bubble",
+      "path": "gpui_kit::display::bubble::Bubble",
       "source": "crates/gpui-kit/src/display/bubble.rs",
       "summary": "A token-backed message surface with caller-owned content.",
       "construct": [
@@ -868,7 +868,7 @@
     {
       "name": "Button",
       "kind": "builder",
-      "path": "gpui_kit::controls::Button",
+      "path": "gpui_kit::controls::button::Button",
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "A labeled action.",
       "construct": [
@@ -908,7 +908,7 @@
     {
       "name": "ButtonGroup",
       "kind": "builder",
-      "path": "gpui_kit::controls::ButtonGroup",
+      "path": "gpui_kit::controls::button::ButtonGroup",
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "Adjacent related actions sharing one frame.",
       "construct": [
@@ -977,7 +977,7 @@
     {
       "name": "Callout",
       "kind": "builder",
-      "path": "gpui_kit::display::Callout",
+      "path": "gpui_kit::display::status::Callout",
       "source": "crates/gpui-kit/src/display/status.rs",
       "summary": "A tinted message block.",
       "construct": [
@@ -997,7 +997,7 @@
     {
       "name": "CandlestickChart",
       "kind": "builder",
-      "path": "gpui_kit::display::CandlestickChart",
+      "path": "gpui_kit::display::plot::CandlestickChart",
       "source": "crates/gpui-kit/src/display/plot.rs",
       "summary": "Candlesticks over caller-owned normalized OHLC readings.",
       "construct": [
@@ -1046,7 +1046,7 @@
     {
       "name": "Card",
       "kind": "builder",
-      "path": "gpui_kit::display::Card",
+      "path": "gpui_kit::display::card::Card",
       "source": "crates/gpui-kit/src/display/card.rs",
       "summary": "A raised panel that groups related rows or content.",
       "construct": [
@@ -1105,7 +1105,7 @@
     {
       "name": "CartesianChart",
       "kind": "builder",
-      "path": "gpui_kit::display::CartesianChart",
+      "path": "gpui_kit::display::chart::cartesian::CartesianChart",
       "source": "crates/gpui-kit/src/display/chart/cartesian.rs",
       "summary": "Shared-coordinate line/area/bar/scatter layers over raw f64 observations. Missing samples break paths. All-zero data is ready, not empty. An invalid dataset is an explicit error. Stale data remains visible with its reason.",
       "construct": [
@@ -1149,7 +1149,7 @@
     {
       "name": "Cascader",
       "kind": "view",
-      "path": "gpui_kit::controls::Cascader",
+      "path": "gpui_kit::controls::cascader::Cascader",
       "source": "crates/gpui-kit/src/controls/cascader.rs",
       "summary": "A menu of progressively revealed caller-owned option columns.",
       "construct": [
@@ -1196,7 +1196,7 @@
     {
       "name": "ChartLegend",
       "kind": "builder",
-      "path": "gpui_kit::display::ChartLegend",
+      "path": "gpui_kit::display::chart::ChartLegend",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A standalone legend that reports series hide and show.",
       "construct": [
@@ -1217,7 +1217,7 @@
     {
       "name": "Checkbox",
       "kind": "builder",
-      "path": "gpui_kit::controls::Checkbox",
+      "path": "gpui_kit::controls::toggle::Checkbox",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
       "summary": "A box that reports one of on, off, or partly on.",
       "construct": [
@@ -1351,7 +1351,7 @@
     {
       "name": "ColorPicker",
       "kind": "builder",
-      "path": "gpui_kit::controls::ColorPicker",
+      "path": "gpui_kit::controls::color_picker::ColorPicker",
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
       "summary": "Hue, saturation-brightness, optional opacity, and host-owned swatches.",
       "construct": [
@@ -1374,7 +1374,7 @@
     {
       "name": "ColorSwatch",
       "kind": "builder",
-      "path": "gpui_kit::controls::ColorSwatch",
+      "path": "gpui_kit::controls::color_picker::ColorSwatch",
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
       "summary": "A clickable colour chip. Reports the colour it was given; applies nothing.",
       "construct": [
@@ -1395,7 +1395,7 @@
     {
       "name": "Combobox",
       "kind": "view",
-      "path": "gpui_kit::controls::Combobox",
+      "path": "gpui_kit::controls::combobox::Combobox",
       "source": "crates/gpui-kit/src/controls/combobox.rs",
       "summary": "A Select you can type into.",
       "construct": [
@@ -1573,7 +1573,7 @@
     {
       "name": "ContinuousHeatmap",
       "kind": "builder",
-      "path": "gpui_kit::display::ContinuousHeatmap",
+      "path": "gpui_kit::display::heatmap::ContinuousHeatmap",
       "source": "crates/gpui-kit/src/display/heatmap.rs",
       "summary": "A raw-valued matrix with visible cell values and a numeric color legend. Selection is caller controlled. Invalid coordinates, identities, and readings produce an explicit error; a stale refresh retains verified cells and reason.",
       "construct": [
@@ -1596,7 +1596,7 @@
     {
       "name": "CopyButton",
       "kind": "view",
-      "path": "gpui_kit::controls::CopyButton",
+      "path": "gpui_kit::controls::copy_button::CopyButton",
       "source": "crates/gpui-kit/src/controls/copy_button.rs",
       "summary": "A button that copies caller-supplied text and confirms what happened.",
       "construct": [
@@ -1766,7 +1766,7 @@
     {
       "name": "DescriptionList",
       "kind": "builder",
-      "path": "gpui_kit::display::DescriptionList",
+      "path": "gpui_kit::display::description_list::DescriptionList",
       "source": "crates/gpui-kit/src/display/description_list.rs",
       "summary": "A list of term and description pairs, in one or two columns.",
       "construct": [
@@ -1931,7 +1931,7 @@
     {
       "name": "Divider",
       "kind": "builder",
-      "path": "gpui_kit::display::Divider",
+      "path": "gpui_kit::display::empty::Divider",
       "source": "crates/gpui-kit/src/display/empty.rs",
       "summary": "A soft rule between groups.",
       "construct": [
@@ -2074,7 +2074,7 @@
     {
       "name": "Dropzone",
       "kind": "builder",
-      "path": "gpui_kit::controls::Dropzone",
+      "path": "gpui_kit::controls::dropzone::Dropzone",
       "source": "crates/gpui-kit/src/controls/dropzone.rs",
       "summary": "An area that accepts a drop.",
       "construct": [
@@ -2101,7 +2101,7 @@
     {
       "name": "Editor",
       "kind": "view",
-      "path": "gpui_kit::controls::Editor",
+      "path": "gpui_kit::controls::editor::Editor",
       "source": "crates/gpui-kit/src/controls/editor.rs",
       "summary": "Plain source editing with caller-owned language policy.",
       "construct": [
@@ -2199,7 +2199,7 @@
     {
       "name": "EmptyState",
       "kind": "builder",
-      "path": "gpui_kit::display::EmptyState",
+      "path": "gpui_kit::display::empty::EmptyState",
       "source": "crates/gpui-kit/src/display/empty.rs",
       "summary": "A centred explanation with an optional action.",
       "construct": [
@@ -2222,7 +2222,7 @@
     {
       "name": "FailurePanel",
       "kind": "builder",
-      "path": "gpui_kit::display::FailurePanel",
+      "path": "gpui_kit::display::failure_panel::FailurePanel",
       "source": "crates/gpui-kit/src/display/failure_panel.rs",
       "summary": "A panel that states what went wrong instead of what it was going to show.",
       "construct": [
@@ -2274,7 +2274,7 @@
     {
       "name": "FilterBar",
       "kind": "builder",
-      "path": "gpui_kit::controls::FilterBar",
+      "path": "gpui_kit::controls::filter_bar::FilterBar",
       "source": "crates/gpui-kit/src/controls/filter_bar.rs",
       "summary": "A row of active conditions, a way to add one, a clear-all, and the count.",
       "construct": [
@@ -2303,7 +2303,7 @@
     {
       "name": "FindReplace",
       "kind": "view",
-      "path": "gpui_kit::controls::FindReplace",
+      "path": "gpui_kit::controls::search::FindReplace",
       "source": "crates/gpui-kit/src/controls/search.rs",
       "summary": "A SearchField with a replacement field and the two replace actions.",
       "construct": [
@@ -2363,7 +2363,7 @@
     {
       "name": "FormField",
       "kind": "builder",
-      "path": "gpui_kit::controls::FormField",
+      "path": "gpui_kit::controls::form_field::FormField",
       "source": "crates/gpui-kit/src/controls/form_field.rs",
       "summary": "A labelled control, with the secondary text a typist needs around it.",
       "construct": [
@@ -2414,7 +2414,7 @@
     {
       "name": "GaugeChart",
       "kind": "builder",
-      "path": "gpui_kit::display::GaugeChart",
+      "path": "gpui_kit::display::chart::GaugeChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A single already-normalized reading on a semicircle.",
       "construct": [
@@ -2607,7 +2607,7 @@
     {
       "name": "Heatmap",
       "kind": "builder",
-      "path": "gpui_kit::display::Heatmap",
+      "path": "gpui_kit::display::heatmap::Heatmap",
       "source": "crates/gpui-kit/src/display/heatmap.rs",
       "summary": "A labelled grid of intensity cells.",
       "construct": [
@@ -2633,7 +2633,7 @@
     {
       "name": "HighlightedText",
       "kind": "builder",
-      "path": "gpui_kit::display::HighlightedText",
+      "path": "gpui_kit::display::highlight::HighlightedText",
       "source": "crates/gpui-kit/src/display/highlight.rs",
       "summary": "A run of text with some of it marked.",
       "construct": [
@@ -2704,7 +2704,7 @@
     {
       "name": "Icon",
       "kind": "builder",
-      "path": "gpui_kit::display::Icon",
+      "path": "gpui_kit::display::icon::Icon",
       "source": "crates/gpui-kit/src/display/icon.rs",
       "summary": "A glyph from the bundled catalog.",
       "construct": [
@@ -2741,7 +2741,7 @@
     {
       "name": "IconButton",
       "kind": "builder",
-      "path": "gpui_kit::controls::IconButton",
+      "path": "gpui_kit::controls::button::IconButton",
       "source": "crates/gpui-kit/src/controls/button.rs",
       "summary": "An action carried by a glyph alone.",
       "construct": [
@@ -2826,7 +2826,7 @@
     {
       "name": "InlineEdit",
       "kind": "builder",
-      "path": "gpui_kit::controls::InlineEdit",
+      "path": "gpui_kit::controls::inline_edit::InlineEdit",
       "source": "crates/gpui-kit/src/controls/inline_edit.rs",
       "summary": "Text that a click or enter turns into a field.",
       "construct": [
@@ -2932,7 +2932,7 @@
     {
       "name": "KeybindingRecorder",
       "kind": "view",
-      "path": "gpui_kit::controls::KeybindingRecorder",
+      "path": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder",
       "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
       "summary": "A field that records one keystroke.",
       "construct": [
@@ -2974,7 +2974,7 @@
     {
       "name": "KeymapEditor",
       "kind": "view",
-      "path": "gpui_kit::controls::KeymapEditor",
+      "path": "gpui_kit::controls::keymap_editor::KeymapEditor",
       "source": "crates/gpui-kit/src/controls/keymap_editor.rs",
       "summary": "Coordinates one recorder over caller-owned keymap rows; it never applies a binding.",
       "construct": [
@@ -3008,7 +3008,7 @@
     {
       "name": "LineChart",
       "kind": "builder",
-      "path": "gpui_kit::display::LineChart",
+      "path": "gpui_kit::display::chart::LineChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A line chart over one or more host-owned series.",
       "construct": [
@@ -3071,7 +3071,7 @@
     {
       "name": "ListRow",
       "kind": "builder",
-      "path": "gpui_kit::display::ListRow",
+      "path": "gpui_kit::display::card::ListRow",
       "source": "crates/gpui-kit/src/display/card.rs",
       "summary": "One row inside a Card.",
       "construct": [
@@ -3094,7 +3094,7 @@
     {
       "name": "LoadMore",
       "kind": "builder",
-      "path": "gpui_kit::display::LoadMore",
+      "path": "gpui_kit::display::loading::LoadMore",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "The tail row of an incrementally loaded list.",
       "construct": [
@@ -3201,7 +3201,7 @@
     {
       "name": "MentionInput",
       "kind": "view",
-      "path": "gpui_kit::controls::MentionInput",
+      "path": "gpui_kit::controls::mention::MentionInput",
       "source": "crates/gpui-kit/src/controls/mention.rs",
       "summary": "A multiline editor with one caret-anchored mention completion surface.",
       "construct": [
@@ -3345,7 +3345,7 @@
     {
       "name": "MetricCard",
       "kind": "builder",
-      "path": "gpui_kit::display::MetricCard",
+      "path": "gpui_kit::display::metric::MetricCard",
       "source": "crates/gpui-kit/src/display/metric.rs",
       "summary": "A compact KPI card.",
       "construct": [
@@ -3442,7 +3442,7 @@
     {
       "name": "MultiSelect",
       "kind": "view",
-      "path": "gpui_kit::controls::MultiSelect",
+      "path": "gpui_kit::controls::multi_select::MultiSelect",
       "source": "crates/gpui-kit/src/controls/multi_select.rs",
       "summary": "A selectable option set with search, chips, and listbox semantics.",
       "construct": [
@@ -3634,7 +3634,7 @@
     {
       "name": "NumberInput",
       "kind": "view",
-      "path": "gpui_kit::controls::NumberInput",
+      "path": "gpui_kit::controls::number_input::NumberInput",
       "source": "crates/gpui-kit/src/controls/number_input.rs",
       "summary": "A number field with a step grid and, optionally, a range.",
       "construct": [
@@ -3739,7 +3739,7 @@
     {
       "name": "OneTimeCodeInput",
       "kind": "view",
-      "path": "gpui_kit::controls::OneTimeCodeInput",
+      "path": "gpui_kit::controls::auth::OneTimeCodeInput",
       "source": "crates/gpui-kit/src/controls/auth.rs",
       "summary": "One sensitive editor presented as a bounded run of visual slots.",
       "construct": [
@@ -3786,7 +3786,7 @@
     {
       "name": "OutcomePanel",
       "kind": "builder",
-      "path": "gpui_kit::display::OutcomePanel",
+      "path": "gpui_kit::display::outcome::OutcomePanel",
       "source": "crates/gpui-kit/src/display/outcome.rs",
       "summary": "A panel that states what finished, including a partial success.",
       "construct": [
@@ -3935,7 +3935,7 @@
     {
       "name": "PasswordInput",
       "kind": "view",
-      "path": "gpui_kit::controls::PasswordInput",
+      "path": "gpui_kit::controls::auth::PasswordInput",
       "source": "crates/gpui-kit/src/controls/auth.rs",
       "summary": "One sensitive password editor with a visual reveal action.",
       "construct": [
@@ -3985,7 +3985,7 @@
     {
       "name": "PerformanceHud",
       "kind": "builder",
-      "path": "gpui_kit::display::PerformanceHud",
+      "path": "gpui_kit::display::performance_hud::PerformanceHud",
       "source": "crates/gpui-kit/src/display/performance_hud.rs",
       "summary": "A compact or expanded frame diagnostics surface.",
       "construct": [
@@ -4087,7 +4087,7 @@
     {
       "name": "PieChart",
       "kind": "builder",
-      "path": "gpui_kit::display::PieChart",
+      "path": "gpui_kit::display::chart::PieChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A pie or donut over one host-owned series of shares.",
       "construct": [
@@ -4113,7 +4113,7 @@
     {
       "name": "Plot",
       "kind": "builder",
-      "path": "gpui_kit::display::Plot",
+      "path": "gpui_kit::display::plot::Plot",
       "source": "crates/gpui-kit/src/display/plot.rs",
       "summary": "A measured plot with caller-painted content and semantic marks.",
       "construct": [
@@ -4178,7 +4178,7 @@
     {
       "name": "ProgressBar",
       "kind": "builder",
-      "path": "gpui_kit::display::ProgressBar",
+      "path": "gpui_kit::display::progress::ProgressBar",
       "source": "crates/gpui-kit/src/display/progress.rs",
       "summary": "A horizontal bar for work whose extent is known.",
       "construct": [
@@ -4204,7 +4204,7 @@
     {
       "name": "ProgressCircle",
       "kind": "builder",
-      "path": "gpui_kit::display::ProgressCircle",
+      "path": "gpui_kit::display::progress_circle::ProgressCircle",
       "source": "crates/gpui-kit/src/display/progress_circle.rs",
       "summary": "A ring for work in a place too tight for a bar.",
       "construct": [
@@ -4258,7 +4258,7 @@
     {
       "name": "PullToRefresh",
       "kind": "view",
-      "path": "gpui_kit::interaction::PullToRefresh",
+      "path": "gpui_kit::interaction::refresh::PullToRefresh",
       "source": "crates/gpui-kit/src/interaction/refresh.rs",
       "summary": "Retains its caller-built content in every state, including a failed refresh. The supplied scroll handle must be the handle used by that content.",
       "construct": [
@@ -4283,7 +4283,7 @@
     {
       "name": "PulseLoader",
       "kind": "builder",
-      "path": "gpui_kit::display::PulseLoader",
+      "path": "gpui_kit::display::loading::PulseLoader",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "A row of breathing dots, used while a request is in flight.",
       "construct": [
@@ -4304,7 +4304,7 @@
     {
       "name": "RadarChart",
       "kind": "builder",
-      "path": "gpui_kit::display::RadarChart",
+      "path": "gpui_kit::display::chart::RadarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "A polar reading over host-owned axes.",
       "construct": [
@@ -4328,7 +4328,7 @@
     {
       "name": "Radio",
       "kind": "builder",
-      "path": "gpui_kit::controls::Radio",
+      "path": "gpui_kit::controls::toggle::Radio",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
       "summary": "One option in a set where exactly one can hold.",
       "construct": [
@@ -4388,7 +4388,7 @@
     {
       "name": "Rating",
       "kind": "builder",
-      "path": "gpui_kit::display::Rating",
+      "path": "gpui_kit::display::rating::Rating",
       "source": "crates/gpui-kit/src/display/rating.rs",
       "summary": "A controlled scalar rating rendered as token-sized stars.",
       "construct": [
@@ -4413,7 +4413,7 @@
     {
       "name": "RefreshVeil",
       "kind": "builder",
-      "path": "gpui_kit::display::RefreshVeil",
+      "path": "gpui_kit::display::loading::RefreshVeil",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "A veil over content that is still the last verified value.",
       "construct": [
@@ -4478,7 +4478,7 @@
     {
       "name": "RichTextEditor",
       "kind": "view",
-      "path": "gpui_kit::controls::RichTextEditor",
+      "path": "gpui_kit::controls::rich_text_editor::RichTextEditor",
       "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
       "summary": "The visible projection over a caller-owned rich-text editing session.",
       "construct": [
@@ -4531,7 +4531,7 @@
     {
       "name": "SankeyChart",
       "kind": "builder",
-      "path": "gpui_kit::display::SankeyChart",
+      "path": "gpui_kit::display::plot::SankeyChart",
       "source": "crates/gpui-kit/src/display/plot.rs",
       "summary": "Sankey ribbons over caller-owned normalized layout.",
       "construct": [
@@ -4554,7 +4554,7 @@
     {
       "name": "ScatterChart",
       "kind": "builder",
-      "path": "gpui_kit::display::ScatterChart",
+      "path": "gpui_kit::display::chart::ScatterChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "Scatter or bubble marks over one or more host-owned series.",
       "construct": [
@@ -4712,7 +4712,7 @@
     {
       "name": "SearchField",
       "kind": "view",
-      "path": "gpui_kit::controls::SearchField",
+      "path": "gpui_kit::controls::search::SearchField",
       "source": "crates/gpui-kit/src/controls/search.rs",
       "summary": "A query field, a hit count, and next and previous.",
       "construct": [
@@ -4755,7 +4755,7 @@
     {
       "name": "SearchInput",
       "kind": "view",
-      "path": "gpui_kit::controls::SearchInput",
+      "path": "gpui_kit::controls::search::SearchInput",
       "source": "crates/gpui-kit/src/controls/search.rs",
       "summary": "An in-content query with a magnifier and a clear action when nonempty.",
       "construct": [
@@ -4793,7 +4793,7 @@
     {
       "name": "SegmentedControl",
       "kind": "builder",
-      "path": "gpui_kit::controls::SegmentedControl",
+      "path": "gpui_kit::controls::segmented::SegmentedControl",
       "source": "crates/gpui-kit/src/controls/segmented.rs",
       "summary": "A strip where exactly one segment holds.",
       "construct": [
@@ -4817,7 +4817,7 @@
     {
       "name": "Select",
       "kind": "view",
-      "path": "gpui_kit::controls::Select",
+      "path": "gpui_kit::controls::select::Select",
       "source": "crates/gpui-kit/src/controls/select.rs",
       "summary": "A closed list of options with one answer.",
       "construct": [
@@ -4896,7 +4896,7 @@
     {
       "name": "SettingsList",
       "kind": "builder",
-      "path": "gpui_kit::controls::SettingsList",
+      "path": "gpui_kit::controls::settings_row::SettingsList",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "Settings sections filtered by one caller-owned query.",
       "construct": [
@@ -4924,7 +4924,7 @@
     {
       "name": "SettingsRow",
       "kind": "builder",
-      "path": "gpui_kit::controls::SettingsRow",
+      "path": "gpui_kit::controls::settings_row::SettingsRow",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "One setting: what it is called on the left, what it is set to on the right.",
       "construct": [
@@ -4950,7 +4950,7 @@
     {
       "name": "SettingsSection",
       "kind": "builder",
-      "path": "gpui_kit::controls::SettingsSection",
+      "path": "gpui_kit::controls::settings_row::SettingsSection",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
       "summary": "A headed group of settings rows.",
       "construct": [
@@ -5009,7 +5009,7 @@
     {
       "name": "Skeleton",
       "kind": "builder",
-      "path": "gpui_kit::display::Skeleton",
+      "path": "gpui_kit::display::loading::Skeleton",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "Placeholder rows shown while a list's real shape is unknown.",
       "construct": [
@@ -5033,7 +5033,7 @@
     {
       "name": "Slider",
       "kind": "builder",
-      "path": "gpui_kit::controls::Slider",
+      "path": "gpui_kit::controls::slider::Slider",
       "source": "crates/gpui-kit/src/controls/slider.rs",
       "summary": "A track with one or two handles.",
       "construct": [
@@ -5065,7 +5065,7 @@
     {
       "name": "SpanTimeline",
       "kind": "builder",
-      "path": "gpui_kit::display::SpanTimeline",
+      "path": "gpui_kit::display::trace::SpanTimeline",
       "source": "crates/gpui-kit/src/display/trace.rs",
       "summary": "The waterfall alone: bars and a time axis, with each span named at its own bar instead of in a gutter.",
       "construct": [
@@ -5099,7 +5099,7 @@
     {
       "name": "Sparkline",
       "kind": "builder",
-      "path": "gpui_kit::display::Sparkline",
+      "path": "gpui_kit::display::sparkline::Sparkline",
       "source": "crates/gpui-kit/src/display/sparkline.rs",
       "summary": "A compact, accessible trend reading.",
       "construct": [
@@ -5125,7 +5125,7 @@
     {
       "name": "SpecializedChart",
       "kind": "builder",
-      "path": "gpui_kit::display::SpecializedChart",
+      "path": "gpui_kit::display::specialized::SpecializedChart",
       "source": "crates/gpui-kit/src/display/specialized.rs",
       "summary": "Specialized raw-value presentations with a persistent labeled value key, keyboard selection, semantic marks, and retained-data refresh failures.",
       "construct": [
@@ -5147,7 +5147,7 @@
     {
       "name": "Spinner",
       "kind": "builder",
-      "path": "gpui_kit::display::Spinner",
+      "path": "gpui_kit::display::loading::Spinner",
       "source": "crates/gpui-kit/src/display/loading.rs",
       "summary": "An inline turn, for a wait that sits next to a label.",
       "construct": [
@@ -5168,7 +5168,7 @@
     {
       "name": "SplitButton",
       "kind": "view",
-      "path": "gpui_kit::controls::SplitButton",
+      "path": "gpui_kit::controls::split_button::SplitButton",
       "source": "crates/gpui-kit/src/controls/split_button.rs",
       "summary": "One action, plus the ones it stands in for.",
       "construct": [
@@ -5265,7 +5265,7 @@
     {
       "name": "StackedBarChart",
       "kind": "builder",
-      "path": "gpui_kit::display::StackedBarChart",
+      "path": "gpui_kit::display::chart::StackedBarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
       "summary": "Bars stacked from the same category identity across series.",
       "construct": [
@@ -5289,7 +5289,7 @@
     {
       "name": "StageProgress",
       "kind": "builder",
-      "path": "gpui_kit::display::StageProgress",
+      "path": "gpui_kit::display::stage_progress::StageProgress",
       "source": "crates/gpui-kit/src/display/stage_progress.rs",
       "summary": "A run of named stages, all of them supplied by the caller.",
       "construct": [
@@ -5309,7 +5309,7 @@
     {
       "name": "StaleMark",
       "kind": "builder",
-      "path": "gpui_kit::display::StaleMark",
+      "path": "gpui_kit::display::status::StaleMark",
       "source": "crates/gpui-kit/src/display/status.rs",
       "summary": "The mark that a verified value is still on screen after a failed refresh.",
       "construct": [
@@ -5329,7 +5329,7 @@
     {
       "name": "StateView",
       "kind": "builder",
-      "path": "gpui_kit::display::StateView",
+      "path": "gpui_kit::display::state_view::StateView",
       "source": "crates/gpui-kit/src/display/state_view.rs",
       "summary": "A region that picks the truthful waiting, empty, failed, or ready surface.",
       "construct": [
@@ -5381,7 +5381,7 @@
     {
       "name": "StatusDot",
       "kind": "builder",
-      "path": "gpui_kit::display::StatusDot",
+      "path": "gpui_kit::display::status::StatusDot",
       "source": "crates/gpui-kit/src/display/status.rs",
       "summary": "A tone-colored dot, the smallest state indicator in the system.",
       "construct": [
@@ -5403,7 +5403,7 @@
     {
       "name": "StatusLine",
       "kind": "builder",
-      "path": "gpui_kit::display::StatusLine",
+      "path": "gpui_kit::display::status::StatusLine",
       "source": "crates/gpui-kit/src/display/status.rs",
       "summary": "A dot plus a short label, for inline state.",
       "construct": [
@@ -5450,7 +5450,7 @@
     {
       "name": "SwipeActions",
       "kind": "view",
-      "path": "gpui_kit::interaction::SwipeActions",
+      "path": "gpui_kit::interaction::swipe::SwipeActions",
       "source": "crates/gpui-kit/src/interaction/swipe.rs",
       "summary": "A stable row with two optional action trays. Revealing is transient visual state, never selection or deletion. Vertical gestures remain scroll gestures.",
       "construct": [
@@ -5479,7 +5479,7 @@
     {
       "name": "Switch",
       "kind": "builder",
-      "path": "gpui_kit::controls::Switch",
+      "path": "gpui_kit::controls::toggle::Switch",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
       "summary": "A control that takes effect the moment it is flipped.",
       "construct": [
@@ -5577,7 +5577,7 @@
     {
       "name": "Tag",
       "kind": "builder",
-      "path": "gpui_kit::display::Tag",
+      "path": "gpui_kit::display::tag::Tag",
       "source": "crates/gpui-kit/src/display/tag.rs",
       "summary": "A label with an optional remove action.",
       "construct": [
@@ -5601,7 +5601,7 @@
     {
       "name": "TagInput",
       "kind": "view",
-      "path": "gpui_kit::controls::TagInput",
+      "path": "gpui_kit::controls::tag_input::TagInput",
       "source": "crates/gpui-kit/src/controls/tag_input.rs",
       "summary": "A field that collects a set of short tokens.",
       "construct": [
@@ -5682,7 +5682,7 @@
     {
       "name": "TextArea",
       "kind": "view",
-      "path": "gpui_kit::controls::TextArea",
+      "path": "gpui_kit::controls::textarea::TextArea",
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "construct": [
@@ -5782,7 +5782,7 @@
     {
       "name": "TextInput",
       "kind": "view",
-      "path": "gpui_kit::controls::TextInput",
+      "path": "gpui_kit::controls::input::TextInput",
       "source": "crates/gpui-kit/src/controls/input/mod.rs",
       "summary": "One line of editable text.",
       "construct": [
@@ -5901,7 +5901,7 @@
     {
       "name": "Timeline",
       "kind": "builder",
-      "path": "gpui_kit::display::Timeline",
+      "path": "gpui_kit::display::timeline::Timeline",
       "source": "crates/gpui-kit/src/display/timeline.rs",
       "summary": "A chronological feed, optionally divided into days.",
       "construct": [
@@ -5956,7 +5956,7 @@
     {
       "name": "Toggle",
       "kind": "builder",
-      "path": "gpui_kit::controls::Toggle",
+      "path": "gpui_kit::controls::toggle_button::Toggle",
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "summary": "A button that stays in.",
       "construct": [
@@ -5989,7 +5989,7 @@
     {
       "name": "ToggleGroup",
       "kind": "builder",
-      "path": "gpui_kit::controls::ToggleGroup",
+      "path": "gpui_kit::controls::toggle_button::ToggleGroup",
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
       "summary": "A run of toggles where none, one, or several may be in.",
       "construct": [
@@ -6092,7 +6092,7 @@
     {
       "name": "TraceView",
       "kind": "builder",
-      "path": "gpui_kit::display::TraceView",
+      "path": "gpui_kit::display::trace::TraceView",
       "source": "crates/gpui-kit/src/display/trace.rs",
       "summary": "Hierarchical labels beside a waterfall of caller-owned spans.",
       "construct": [
@@ -6126,7 +6126,7 @@
     {
       "name": "TransferList",
       "kind": "view",
-      "path": "gpui_kit::controls::TransferList",
+      "path": "gpui_kit::controls::transfer_list::TransferList",
       "source": "crates/gpui-kit/src/controls/transfer_list.rs",
       "summary": "A controlled source/target assignment control.",
       "construct": [
@@ -6302,7 +6302,7 @@
     {
       "name": "UploadList",
       "kind": "builder",
-      "path": "gpui_kit::controls::UploadList",
+      "path": "gpui_kit::controls::upload_list::UploadList",
       "source": "crates/gpui-kit/src/controls/upload_list.rs",
       "summary": "A list of files being uploaded, optionally over the zone that took them.",
       "construct": [
@@ -6732,7 +6732,7 @@
     },
     {
       "name": "AgentDocumentWork",
-      "path": "gpui_kit::content::AgentDocumentWork",
+      "path": "gpui_kit::content::agent_document::AgentDocumentWork",
       "summary": "Work performed by a mounted virtual document's retained plans. Input checks are linear comparisons of caller records, not byte scans. Parser totals cover currently retained Markdown blocks. These counters do not include GPUI layout, key-vector copies into List, or wall-clock time.",
       "variants": [],
       "construct": [],
@@ -6962,6 +6962,23 @@
       "options": [
         "cue() -> VisualCue"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Aggregate",
+      "path": "gpui_kit::display::chart::data::transform::Aggregate",
+      "summary": "",
+      "variants": [
+        "Count",
+        "Sum",
+        "Mean",
+        "Min",
+        "Max",
+        "Quantile"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -7238,7 +7255,7 @@
     },
     {
       "name": "AttachmentState",
-      "path": "gpui_kit::display::AttachmentState",
+      "path": "gpui_kit::display::attachment::AttachmentState",
       "summary": "Facts reported by the caller. Finishing a transfer does not imply that processing finished; only Ready makes that claim. Unknown totals stay indeterminate, including a supplied zero total.",
       "variants": [
         "Ready",
@@ -7278,7 +7295,7 @@
     },
     {
       "name": "AvatarPresence",
-      "path": "gpui_kit::display::AvatarPresence",
+      "path": "gpui_kit::display::avatar::AvatarPresence",
       "summary": "Whether the identity behind the mark is reachable, in the host's terms.",
       "variants": [
         "Unknown",
@@ -7296,7 +7313,7 @@
     },
     {
       "name": "AxisSide",
-      "path": "gpui_kit::display::AxisSide",
+      "path": "gpui_kit::display::chart::cartesian::AxisSide",
       "summary": "Leading means left for a vertical lane, top for a horizontal lane. Trailing means right or bottom respectively.",
       "variants": [
         "Leading",
@@ -7387,7 +7404,7 @@
     },
     {
       "name": "BlockKind",
-      "path": "gpui_kit::content::BlockKind",
+      "path": "gpui_kit::content::markdown::doc::BlockKind",
       "summary": "The block vocabulary. Closed by design — it is exactly what a block editor's insert menu offers, and a consumer that needs a block of its own is a reason to widen this enum rather than to grow an extension system.",
       "variants": [
         "Paragraph",
@@ -7448,7 +7465,7 @@
     },
     {
       "name": "BoxSummary",
-      "path": "gpui_kit::display::BoxSummary",
+      "path": "gpui_kit::display::specialized::BoxSummary",
       "summary": "R-7 quantiles (linear interpolation at (n - 1) p), Tukey 1.5-IQR fences, and whiskers at the outermost samples within those fences.",
       "variants": [],
       "construct": [
@@ -7492,7 +7509,7 @@
     },
     {
       "name": "BubblePlacement",
-      "path": "gpui_kit::display::BubblePlacement",
+      "path": "gpui_kit::display::bubble::BubblePlacement",
       "summary": "Which reading edge a bubble is placed against.",
       "variants": [
         "Start",
@@ -7517,7 +7534,7 @@
     },
     {
       "name": "ButtonJoin",
-      "path": "gpui_kit::controls::ButtonJoin",
+      "path": "gpui_kit::controls::button::ButtonJoin",
       "summary": "Where a button sits in a joined run of them.",
       "variants": [
         "Alone",
@@ -7532,7 +7549,7 @@
     },
     {
       "name": "ButtonStyle",
-      "path": "gpui_kit::controls::ButtonStyle",
+      "path": "gpui_kit::controls::button::ButtonStyle",
       "summary": "Either presentation vocabulary a button accepts.",
       "variants": [
         "Weight",
@@ -7545,7 +7562,7 @@
     },
     {
       "name": "ButtonVariant",
-      "path": "gpui_kit::controls::ButtonVariant",
+      "path": "gpui_kit::controls::button::ButtonVariant",
       "summary": "How much weight an action carries. Primary is the one decision a local area is asking for; Danger is reserved for irreversible intent.",
       "variants": [
         "Primary",
@@ -7574,8 +7591,62 @@
       "queries": []
     },
     {
+      "name": "CalendarInterval",
+      "path": "gpui_kit::display::chart::scale::calendar::CalendarInterval",
+      "summary": "",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CalendarTick",
+      "path": "gpui_kit::display::chart::scale::calendar::CalendarTick",
+      "summary": "A unique instant. Repeated wall-clock labels during a fall-back retain both instants with different offsets. Nonexistent local boundaries are omitted.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CalendarTickError",
+      "path": "gpui_kit::display::chart::scale::calendar::CalendarTickError",
+      "summary": "",
+      "variants": [
+        "NotTimeScale",
+        "InvalidInterval",
+        "OutOfRange",
+        "LimitExceeded"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CalendarUnit",
+      "path": "gpui_kit::display::chart::scale::calendar::CalendarUnit",
+      "summary": "Wall-clock boundary unit. Weeks start on Monday; months/quarters/years start on their first day. Multiples align to 1970 (weeks to 1969-12-29).",
+      "variants": [
+        "Second",
+        "Minute",
+        "Hour",
+        "Day",
+        "Week",
+        "Month",
+        "Quarter",
+        "Year"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Candlestick",
-      "path": "gpui_kit::display::Candlestick",
+      "path": "gpui_kit::display::plot::Candlestick",
       "summary": "One caller-normalized OHLC reading.",
       "variants": [],
       "construct": [
@@ -7617,7 +7688,7 @@
     },
     {
       "name": "CardHeader",
-      "path": "gpui_kit::display::CardHeader",
+      "path": "gpui_kit::display::card::CardHeader",
       "summary": "The titled top of a card.",
       "variants": [],
       "construct": [
@@ -7686,7 +7757,7 @@
     },
     {
       "name": "CartesianEvent",
-      "path": "gpui_kit::display::CartesianEvent",
+      "path": "gpui_kit::display::chart::cartesian::CartesianEvent",
       "summary": "",
       "variants": [
         "Hover",
@@ -7703,7 +7774,7 @@
     },
     {
       "name": "CascaderEvent",
-      "path": "gpui_kit::controls::CascaderEvent",
+      "path": "gpui_kit::controls::cascader::CascaderEvent",
       "summary": "",
       "variants": [
         "Selected",
@@ -7719,7 +7790,7 @@
     },
     {
       "name": "CascaderOption",
-      "path": "gpui_kit::controls::CascaderOption",
+      "path": "gpui_kit::controls::cascader::CascaderOption",
       "summary": "One caller-owned node in a cascader.",
       "variants": [],
       "construct": [
@@ -7754,7 +7825,7 @@
     },
     {
       "name": "CategoryScale",
-      "path": "gpui_kit::display::CategoryScale",
+      "path": "gpui_kit::display::chart::scale::CategoryScale",
       "summary": "Equal-width category bands. Order and identity are caller-owned.",
       "variants": [],
       "construct": [
@@ -7800,7 +7871,7 @@
     },
     {
       "name": "CellColor",
-      "path": "gpui_kit::content::CellColor",
+      "path": "gpui_kit::content::terminal::CellColor",
       "summary": "What a cell says its colour is, before a theme decides what that means.",
       "variants": [
         "Foreground",
@@ -7862,7 +7933,7 @@
     },
     {
       "name": "ChartAxes",
-      "path": "gpui_kit::display::ChartAxes",
+      "path": "gpui_kit::display::chart::ChartAxes",
       "summary": "Host-supplied wording for the two axes. Empty labels are omitted, not replaced with a guessed scale.",
       "variants": [],
       "construct": [],
@@ -7877,7 +7948,7 @@
     },
     {
       "name": "ChartOrientation",
-      "path": "gpui_kit::display::ChartOrientation",
+      "path": "gpui_kit::display::chart::cartesian::ChartOrientation",
       "summary": "",
       "variants": [
         "Vertical",
@@ -7890,7 +7961,7 @@
     },
     {
       "name": "ChartPoint",
-      "path": "gpui_kit::display::ChartPoint",
+      "path": "gpui_kit::display::chart::ChartPoint",
       "summary": "One host-owned point in a chart series.",
       "variants": [],
       "construct": [
@@ -7906,7 +7977,7 @@
     },
     {
       "name": "ChartReference",
-      "path": "gpui_kit::display::ChartReference",
+      "path": "gpui_kit::display::chart::cartesian::ChartReference",
       "summary": "A line or shaded interval on an identified value axis. Its screen direction follows the chart orientation.",
       "variants": [],
       "construct": [],
@@ -7916,7 +7987,7 @@
     },
     {
       "name": "ChartScale",
-      "path": "gpui_kit::display::ChartScale",
+      "path": "gpui_kit::display::chart::data::ChartScale",
       "summary": "",
       "variants": [
         "Numeric",
@@ -7932,7 +8003,7 @@
     },
     {
       "name": "ChartSelection",
-      "path": "gpui_kit::display::ChartSelection",
+      "path": "gpui_kit::display::chart::ChartSelection",
       "summary": "The business identity of the point under the crosshair.",
       "variants": [],
       "construct": [
@@ -7944,7 +8015,7 @@
     },
     {
       "name": "ChartSeries",
-      "path": "gpui_kit::display::ChartSeries",
+      "path": "gpui_kit::display::chart::ChartSeries",
       "summary": "One named series. Identity is the caller's, never the draw order.",
       "variants": [],
       "construct": [
@@ -7959,7 +8030,7 @@
     },
     {
       "name": "ChartState",
-      "path": "gpui_kit::display::ChartState",
+      "path": "gpui_kit::display::chart::ChartState",
       "summary": "The complete state of one cartesian reading.",
       "variants": [
         "Loading",
@@ -7978,7 +8049,7 @@
     },
     {
       "name": "ChartTick",
-      "path": "gpui_kit::display::ChartTick",
+      "path": "gpui_kit::display::chart::cartesian::ChartTick",
       "summary": "A caller-owned tick, including calendar/locale policy where required.",
       "variants": [],
       "construct": [],
@@ -7988,7 +8059,7 @@
     },
     {
       "name": "ChartValue",
-      "path": "gpui_kit::display::ChartValue",
+      "path": "gpui_kit::display::chart::data::ChartValue",
       "summary": "",
       "variants": [
         "Number",
@@ -8188,7 +8259,7 @@
     },
     {
       "name": "ComboboxEvent",
-      "path": "gpui_kit::controls::ComboboxEvent",
+      "path": "gpui_kit::controls::combobox::ComboboxEvent",
       "summary": "What a combobox reports. The owner decides what any of it means.",
       "variants": [
         "QueryChanged",
@@ -8301,7 +8372,7 @@
     },
     {
       "name": "ContinuousHeatCell",
-      "path": "gpui_kit::display::ContinuousHeatCell",
+      "path": "gpui_kit::display::heatmap::ContinuousHeatCell",
       "summary": "A raw observation; None is missing, not zero. The existing five-level HeatCell contract remains unchanged and is not used as a numeric bin.",
       "variants": [],
       "construct": [
@@ -8313,7 +8384,7 @@
     },
     {
       "name": "CopyEvent",
-      "path": "gpui_kit::controls::CopyEvent",
+      "path": "gpui_kit::controls::copy_button::CopyEvent",
       "summary": "What a copy button reports. The owner decides what any of it means.",
       "variants": [
         "Copied",
@@ -8326,7 +8397,7 @@
     },
     {
       "name": "CopyState",
-      "path": "gpui_kit::controls::CopyState",
+      "path": "gpui_kit::controls::copy_button::CopyState",
       "summary": "What the button is currently claiming.",
       "variants": [
         "Idle",
@@ -8384,7 +8455,7 @@
     },
     {
       "name": "Cursor",
-      "path": "gpui_kit::content::Cursor",
+      "path": "gpui_kit::content::markdown::doc::Cursor",
       "summary": "A caret: which block, and how far into its text.",
       "variants": [],
       "construct": [
@@ -8414,7 +8485,7 @@
     },
     {
       "name": "Curve",
-      "path": "gpui_kit::display::Curve",
+      "path": "gpui_kit::display::chart::data::Curve",
       "summary": "",
       "variants": [
         "Linear",
@@ -8429,7 +8500,7 @@
     },
     {
       "name": "CustomMark",
-      "path": "gpui_kit::display::CustomMark",
+      "path": "gpui_kit::display::chart::cartesian::CustomMark",
       "summary": "A caller-painted scatter glyph, centered at the shared projected point. Painting is clipped to this physical-pixel rectangle and the plot. Its exact visible rectangle also owns hit testing and semantics, including during motion.",
       "variants": [],
       "construct": [
@@ -8441,7 +8512,7 @@
     },
     {
       "name": "DataError",
-      "path": "gpui_kit::display::DataError",
+      "path": "gpui_kit::display::chart::data::DataError",
       "summary": "",
       "variants": [
         "DuplicateIdentity",
@@ -8520,7 +8591,7 @@
     },
     {
       "name": "DeferredDrop",
-      "path": "gpui_kit::interaction::DeferredDrop",
+      "path": "gpui_kit::interaction::dnd::DeferredDrop",
       "summary": "Retained, nonblocking acceptance shared by List and Tabs.",
       "variants": [],
       "construct": [
@@ -8557,7 +8628,7 @@
     },
     {
       "name": "DeltaDirection",
-      "path": "gpui_kit::display::DeltaDirection",
+      "path": "gpui_kit::display::metric::DeltaDirection",
       "summary": "Which way a delta points.",
       "variants": [
         "Up",
@@ -8572,8 +8643,18 @@
       "queries": []
     },
     {
+      "name": "DerivedPoint",
+      "path": "gpui_kit::display::chart::data::transform::DerivedPoint",
+      "summary": "",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DescriptionItem",
-      "path": "gpui_kit::display::DescriptionItem",
+      "path": "gpui_kit::display::description_list::DescriptionItem",
       "summary": "One term and what it describes.",
       "variants": [],
       "construct": [
@@ -8590,7 +8671,7 @@
     },
     {
       "name": "DescriptionValue",
-      "path": "gpui_kit::display::DescriptionValue",
+      "path": "gpui_kit::display::description_list::DescriptionValue",
       "summary": "What a detail row holds.",
       "variants": [
         "Text",
@@ -8906,7 +8987,7 @@
     },
     {
       "name": "DividerAxis",
-      "path": "gpui_kit::display::DividerAxis",
+      "path": "gpui_kit::display::empty::DividerAxis",
       "summary": "Which way a rule runs.",
       "variants": [
         "Horizontal",
@@ -8919,7 +9000,7 @@
     },
     {
       "name": "Doc",
-      "path": "gpui_kit::content::Doc",
+      "path": "gpui_kit::content::markdown::doc::Doc",
       "summary": "A markdown document: blocks in document order.",
       "variants": [],
       "construct": [],
@@ -9348,7 +9429,7 @@
     },
     {
       "name": "DropDecision",
-      "path": "gpui_kit::interaction::DropDecision",
+      "path": "gpui_kit::interaction::dnd::DropDecision",
       "summary": "",
       "variants": [
         "Pending",
@@ -9362,7 +9443,7 @@
     },
     {
       "name": "DropDecisionEvent",
-      "path": "gpui_kit::interaction::DropDecisionEvent",
+      "path": "gpui_kit::interaction::dnd::DropDecisionEvent",
       "summary": "Every request has at most one terminal event, including cancellation.",
       "variants": [
         "Requested",
@@ -9402,7 +9483,7 @@
     },
     {
       "name": "DropRefusal",
-      "path": "gpui_kit::interaction::DropRefusal",
+      "path": "gpui_kit::interaction::dnd::DropRefusal",
       "summary": "",
       "variants": [
         "Policy",
@@ -9419,7 +9500,7 @@
     },
     {
       "name": "DropRequest",
-      "path": "gpui_kit::interaction::DropRequest",
+      "path": "gpui_kit::interaction::dnd::DropRequest",
       "summary": "A released candidate, not a committed reorder. Replies must name its id.",
       "variants": [],
       "construct": [],
@@ -9429,7 +9510,7 @@
     },
     {
       "name": "DropRequestId",
-      "path": "gpui_kit::interaction::DropRequestId",
+      "path": "gpui_kit::interaction::dnd::DropRequestId",
       "summary": "A single-use, process-local request identity, safe to carry as protocol data.",
       "variants": [],
       "construct": [],
@@ -9441,7 +9522,7 @@
     },
     {
       "name": "DropzoneState",
-      "path": "gpui_kit::controls::DropzoneState",
+      "path": "gpui_kit::controls::dropzone::DropzoneState",
       "summary": "What a dropzone is currently saying.",
       "variants": [
         "Idle",
@@ -9582,7 +9663,7 @@
     },
     {
       "name": "EditorDiagnostic",
-      "path": "gpui_kit::controls::EditorDiagnostic",
+      "path": "gpui_kit::controls::editor::EditorDiagnostic",
       "summary": "Diagnostics are caller claims about one revision, not parser error nodes.",
       "variants": [],
       "construct": [],
@@ -9592,7 +9673,7 @@
     },
     {
       "name": "EditorDiagnosticSeverity",
-      "path": "gpui_kit::controls::EditorDiagnosticSeverity",
+      "path": "gpui_kit::controls::editor::EditorDiagnosticSeverity",
       "summary": "",
       "variants": [
         "Error",
@@ -9607,7 +9688,7 @@
     },
     {
       "name": "EditorEvent",
-      "path": "gpui_kit::controls::EditorEvent",
+      "path": "gpui_kit::controls::editor::EditorEvent",
       "summary": "What a source editor reports to its owner.",
       "variants": [
         "ServiceRequested",
@@ -9633,7 +9714,7 @@
     },
     {
       "name": "EditorFold",
-      "path": "gpui_kit::controls::EditorFold",
+      "path": "gpui_kit::controls::editor::EditorFold",
       "summary": "A fold header and its body, in zero-based, half-open source line indices. The first line remains visible. Identities must be unique and stable across caller updates. Nested folds are supported; crossing ranges are refused.",
       "variants": [],
       "construct": [],
@@ -9643,7 +9724,7 @@
     },
     {
       "name": "EditorGeometry",
-      "path": "gpui_kit::controls::EditorGeometry",
+      "path": "gpui_kit::controls::editor::EditorGeometry",
       "summary": "The measured source viewport, tagged with the revision it describes.",
       "variants": [],
       "construct": [],
@@ -9653,7 +9734,7 @@
     },
     {
       "name": "EditorHighlight",
-      "path": "gpui_kit::controls::EditorHighlight",
+      "path": "gpui_kit::controls::editor::EditorHighlight",
       "summary": "One caller-owned style range in an editor revision.",
       "variants": [],
       "construct": [
@@ -9668,7 +9749,7 @@
     },
     {
       "name": "EditorHighlights",
-      "path": "gpui_kit::controls::EditorHighlights",
+      "path": "gpui_kit::controls::editor::EditorHighlights",
       "summary": "Syntax and diagnostic styles tagged with the text revision they describe.",
       "variants": [],
       "construct": [
@@ -9683,7 +9764,7 @@
     },
     {
       "name": "EditorHover",
-      "path": "gpui_kit::controls::EditorHover",
+      "path": "gpui_kit::controls::editor::EditorHover",
       "summary": "Hover content is plain caller text, not interpreted HTML or executable code.",
       "variants": [],
       "construct": [],
@@ -9693,7 +9774,7 @@
     },
     {
       "name": "EditorIndentDirection",
-      "path": "gpui_kit::controls::EditorIndentDirection",
+      "path": "gpui_kit::controls::editor::EditorIndentDirection",
       "summary": "Which indentation chord the source editor received.",
       "variants": [
         "Indent",
@@ -9706,7 +9787,7 @@
     },
     {
       "name": "EditorIndentRequest",
-      "path": "gpui_kit::controls::EditorIndentRequest",
+      "path": "gpui_kit::controls::editor::EditorIndentRequest",
       "summary": "The immutable input to a caller-owned indentation policy.",
       "variants": [],
       "construct": [],
@@ -9716,7 +9797,7 @@
     },
     {
       "name": "EditorIndentation",
-      "path": "gpui_kit::controls::EditorIndentation",
+      "path": "gpui_kit::controls::editor::EditorIndentation",
       "summary": "One synchronous replacement returned by an indentation policy.",
       "variants": [],
       "construct": [
@@ -9730,7 +9811,7 @@
     },
     {
       "name": "EditorLineGeometry",
-      "path": "gpui_kit::controls::EditorLineGeometry",
+      "path": "gpui_kit::controls::editor::EditorLineGeometry",
       "summary": "Current-frame geometry for one hard source line.",
       "variants": [],
       "construct": [],
@@ -9740,7 +9821,7 @@
     },
     {
       "name": "EditorParseWork",
-      "path": "gpui_kit::controls::EditorParseWork",
+      "path": "gpui_kit::controls::editor::EditorParseWork",
       "summary": "Observed input work and reuse for the last syntax parse. Offered bytes may be requested more than once by Tree-sitter; no source bytes are copied.",
       "variants": [],
       "construct": [],
@@ -9750,7 +9831,7 @@
     },
     {
       "name": "EditorReplacement",
-      "path": "gpui_kit::controls::EditorReplacement",
+      "path": "gpui_kit::controls::editor::EditorReplacement",
       "summary": "Current-document replacement in the request's original UTF-8 coordinates.",
       "variants": [],
       "construct": [],
@@ -9760,7 +9841,7 @@
     },
     {
       "name": "EditorSemanticToken",
-      "path": "gpui_kit::controls::EditorSemanticToken",
+      "path": "gpui_kit::controls::editor::EditorSemanticToken",
       "summary": "Caller-classified semantic token using the shared theme's code palette.",
       "variants": [],
       "construct": [],
@@ -9770,7 +9851,7 @@
     },
     {
       "name": "EditorServiceEffect",
-      "path": "gpui_kit::controls::EditorServiceEffect",
+      "path": "gpui_kit::controls::editor::EditorServiceEffect",
       "summary": "Effects are either local atomic edits or caller-owned navigation/actions.",
       "variants": [
         "Edits",
@@ -9784,7 +9865,7 @@
     },
     {
       "name": "EditorServiceItem",
-      "path": "gpui_kit::controls::EditorServiceItem",
+      "path": "gpui_kit::controls::editor::EditorServiceItem",
       "summary": "Stable caller identity, display label, and the effect of accepting a result.",
       "variants": [],
       "construct": [],
@@ -9794,7 +9875,7 @@
     },
     {
       "name": "EditorServiceKind",
-      "path": "gpui_kit::controls::EditorServiceKind",
+      "path": "gpui_kit::controls::editor::EditorServiceKind",
       "summary": "A caller-owned language operation requested by the editing surface.",
       "variants": [
         "Completion",
@@ -9809,7 +9890,7 @@
     },
     {
       "name": "EditorServiceRequest",
-      "path": "gpui_kit::controls::EditorServiceRequest",
+      "path": "gpui_kit::controls::editor::EditorServiceRequest",
       "summary": "Immutable request identity. Replies must match this id and text revision.",
       "variants": [],
       "construct": [],
@@ -9819,7 +9900,7 @@
     },
     {
       "name": "EditorServiceResult",
-      "path": "gpui_kit::controls::EditorServiceResult",
+      "path": "gpui_kit::controls::editor::EditorServiceResult",
       "summary": "Service result paired with a request by Editor::set_service_result.",
       "variants": [
         "Items",
@@ -9832,7 +9913,7 @@
     },
     {
       "name": "EditorSyntax",
-      "path": "gpui_kit::controls::EditorSyntax",
+      "path": "gpui_kit::controls::editor::EditorSyntax",
       "summary": "Revision-aware Tree-sitter adapter, available with the syntax feature.",
       "variants": [],
       "construct": [
@@ -9854,7 +9935,7 @@
     },
     {
       "name": "EditorSyntaxCapture",
-      "path": "gpui_kit::controls::EditorSyntaxCapture",
+      "path": "gpui_kit::controls::editor::EditorSyntaxCapture",
       "summary": "One query capture in UTF-8 source coordinates.",
       "variants": [],
       "construct": [],
@@ -9864,7 +9945,7 @@
     },
     {
       "name": "EditorSyntaxError",
-      "path": "gpui_kit::controls::EditorSyntaxError",
+      "path": "gpui_kit::controls::editor::EditorSyntaxError",
       "summary": "A grammar error or missing node, not an LSP diagnostic.",
       "variants": [],
       "construct": [],
@@ -10050,7 +10131,7 @@
     },
     {
       "name": "EmptyKind",
-      "path": "gpui_kit::display::EmptyKind",
+      "path": "gpui_kit::display::empty::EmptyKind",
       "summary": "Which fact the surface is reporting.",
       "variants": [
         "Empty",
@@ -10127,7 +10208,7 @@
     },
     {
       "name": "Enter",
-      "path": "gpui_kit::controls::Enter",
+      "path": "gpui_kit::controls::textarea::Enter",
       "summary": "What the enter key does.",
       "variants": [
         "Opens",
@@ -10155,7 +10236,7 @@
     },
     {
       "name": "EntryTime",
-      "path": "gpui_kit::display::EntryTime",
+      "path": "gpui_kit::display::timeline::EntryTime",
       "summary": "When an entry happened, as far as anyone knows.",
       "variants": [
         "At",
@@ -10226,7 +10307,7 @@
     },
     {
       "name": "FieldState",
-      "path": "gpui_kit::controls::FieldState",
+      "path": "gpui_kit::controls::field::FieldState",
       "summary": "What an editable surface currently reports about itself.",
       "variants": [],
       "construct": [],
@@ -10276,7 +10357,7 @@
     },
     {
       "name": "FilterCondition",
-      "path": "gpui_kit::controls::FilterCondition",
+      "path": "gpui_kit::controls::filter_bar::FilterCondition",
       "summary": "One condition the list is narrowed by.",
       "variants": [],
       "construct": [
@@ -10293,7 +10374,7 @@
     },
     {
       "name": "FindReplaceEvent",
-      "path": "gpui_kit::controls::FindReplaceEvent",
+      "path": "gpui_kit::controls::search::FindReplaceEvent",
       "summary": "What a find-and-replace surface reports. It replaces nothing.",
       "variants": [
         "Search",
@@ -10326,7 +10407,7 @@
     },
     {
       "name": "FixtureDateAdapter",
-      "path": "gpui_kit::datetime::FixtureDateAdapter",
+      "path": "gpui_kit::datetime::fixture::FixtureDateAdapter",
       "summary": "A fixture calendar: proleptic Gregorian, English labels, weeks starting on Monday, and whatever \"today\" the test pinned.",
       "variants": [],
       "construct": [
@@ -10516,7 +10597,7 @@
     },
     {
       "name": "Frame",
-      "path": "gpui_kit::controls::Frame",
+      "path": "gpui_kit::controls::textarea::Frame",
       "summary": "Who draws the frame the text sits in.",
       "variants": [
         "Own",
@@ -11091,7 +11172,7 @@
     },
     {
       "name": "HeatAxis",
-      "path": "gpui_kit::display::HeatAxis",
+      "path": "gpui_kit::display::heatmap::HeatAxis",
       "summary": "One row or column of the grid: what a cell joins on, and what is printed.",
       "variants": [],
       "construct": [
@@ -11105,7 +11186,7 @@
     },
     {
       "name": "HeatCell",
-      "path": "gpui_kit::display::HeatCell",
+      "path": "gpui_kit::display::heatmap::HeatCell",
       "summary": "One observation in the matrix, or the absence of one.",
       "variants": [],
       "construct": [
@@ -11122,7 +11203,7 @@
     },
     {
       "name": "HeatColorScale",
-      "path": "gpui_kit::display::HeatColorScale",
+      "path": "gpui_kit::display::heatmap::HeatColorScale",
       "summary": "A continuous color encoding with a required finite, strictly increasing domain. Diverging maps interpolate each side independently: the neutral color corresponds to the explicit center, not the arithmetic midpoint. Errors are stable StringKey::name values, not display text; resolve them through the active strings when presenting them outside ContinuousHeatmap.",
       "variants": [],
       "construct": [
@@ -11138,7 +11219,7 @@
     },
     {
       "name": "HeatmapState",
-      "path": "gpui_kit::display::HeatmapState",
+      "path": "gpui_kit::display::heatmap::HeatmapState",
       "summary": "How the matrix was asked for.",
       "variants": [
         "Loading",
@@ -11169,7 +11250,7 @@
     },
     {
       "name": "HierarchyNode",
-      "path": "gpui_kit::display::HierarchyNode",
+      "path": "gpui_kit::display::specialized::HierarchyNode",
       "summary": "Internal nodes contain children only; their quantity is the sum of leaves. A leaf's weight is nonnegative. Zero leaves are retained in the textual key.",
       "variants": [],
       "construct": [
@@ -11226,7 +11307,7 @@
     },
     {
       "name": "HitCount",
-      "path": "gpui_kit::controls::HitCount",
+      "path": "gpui_kit::controls::search::HitCount",
       "summary": "How many hits the host says the query has.",
       "variants": [
         "Unsearched",
@@ -11259,7 +11340,7 @@
     },
     {
       "name": "IconPosition",
-      "path": "gpui_kit::controls::IconPosition",
+      "path": "gpui_kit::controls::button::IconPosition",
       "summary": "Which side of the label the glyph sits on.",
       "variants": [
         "Leading",
@@ -11272,7 +11353,7 @@
     },
     {
       "name": "IconTone",
-      "path": "gpui_kit::display::IconTone",
+      "path": "gpui_kit::display::icon::IconTone",
       "summary": "The semantic colour role a glyph paints in.",
       "variants": [
         "Primary",
@@ -11423,7 +11504,7 @@
     },
     {
       "name": "InputCoalescer",
-      "path": "gpui_kit::content::InputCoalescer",
+      "path": "gpui_kit::content::terminal::InputCoalescer",
       "summary": "Holds keyboard bytes between flushes.",
       "variants": [],
       "construct": [],
@@ -11438,7 +11519,7 @@
     },
     {
       "name": "InvalidMarkSize",
-      "path": "gpui_kit::display::InvalidMarkSize",
+      "path": "gpui_kit::display::chart::cartesian::InvalidMarkSize",
       "summary": "",
       "variants": [],
       "construct": [],
@@ -11562,7 +11643,7 @@
     },
     {
       "name": "KeybindingRecorderEvent",
-      "path": "gpui_kit::controls::KeybindingRecorderEvent",
+      "path": "gpui_kit::controls::keybinding_recorder::KeybindingRecorderEvent",
       "summary": "What a KeybindingRecorder reports.",
       "variants": [
         "Started",
@@ -11605,7 +11686,7 @@
     },
     {
       "name": "KeymapBinding",
-      "path": "gpui_kit::controls::KeymapBinding",
+      "path": "gpui_kit::controls::keymap_editor::KeymapBinding",
       "summary": "One effective binding, identified independently of its position.",
       "variants": [],
       "construct": [
@@ -11625,7 +11706,7 @@
     },
     {
       "name": "KeymapCommand",
-      "path": "gpui_kit::controls::KeymapCommand",
+      "path": "gpui_kit::controls::keymap_editor::KeymapCommand",
       "summary": "Caller-owned command metadata and binding facts.",
       "variants": [],
       "construct": [
@@ -11652,7 +11733,7 @@
     },
     {
       "name": "KeymapEditorEvent",
-      "path": "gpui_kit::controls::KeymapEditorEvent",
+      "path": "gpui_kit::controls::keymap_editor::KeymapEditorEvent",
       "summary": "",
       "variants": [
         "AddCaptured",
@@ -11783,7 +11864,7 @@
     },
     {
       "name": "LoadMoreState",
-      "path": "gpui_kit::display::LoadMoreState",
+      "path": "gpui_kit::display::loading::LoadMoreState",
       "summary": "What the tail of a list is doing.",
       "variants": [
         "Idle",
@@ -11873,7 +11954,7 @@
     },
     {
       "name": "MakeWay",
-      "path": "gpui_kit::interaction::MakeWay",
+      "path": "gpui_kit::interaction::dnd::MakeWay",
       "summary": "An element painted beside where layout put it.",
       "variants": [],
       "construct": [],
@@ -11907,7 +11988,7 @@
     },
     {
       "name": "MarkSpan",
-      "path": "gpui_kit::content::MarkSpan",
+      "path": "gpui_kit::content::markdown::doc::MarkSpan",
       "summary": "",
       "variants": [],
       "construct": [],
@@ -11946,7 +12027,7 @@
     },
     {
       "name": "MarkdownStream",
-      "path": "gpui_kit::content::MarkdownStream",
+      "path": "gpui_kit::content::markdown::MarkdownStream",
       "summary": "A document being read as it arrives.",
       "variants": [],
       "construct": [],
@@ -11963,7 +12044,7 @@
     },
     {
       "name": "MarkdownWork",
-      "path": "gpui_kit::content::MarkdownWork",
+      "path": "gpui_kit::content::markdown::MarkdownWork",
       "summary": "Cumulative parser and source-buffer work, not a CPU-time estimate. Parsed bytes include boundary discovery and display-mending passes. Copied bytes count source-buffer writes, not allocations inside the syntax tree.",
       "variants": [],
       "construct": [],
@@ -11985,7 +12066,7 @@
     },
     {
       "name": "Measured",
-      "path": "gpui_kit::controls::Measured",
+      "path": "gpui_kit::controls::textarea::Measured",
       "summary": "What a text area measured the last time it was laid out.",
       "variants": [],
       "construct": [],
@@ -12152,7 +12233,7 @@
     },
     {
       "name": "MentionCandidate",
-      "path": "gpui_kit::controls::MentionCandidate",
+      "path": "gpui_kit::controls::mention::MentionCandidate",
       "summary": "One caller-owned answer to a mention query.",
       "variants": [],
       "construct": [
@@ -12171,7 +12252,7 @@
     },
     {
       "name": "MentionInputEvent",
-      "path": "gpui_kit::controls::MentionInputEvent",
+      "path": "gpui_kit::controls::mention::MentionInputEvent",
       "summary": "What a mention editor reports without applying caller-owned meaning.",
       "variants": [
         "Changed",
@@ -12190,7 +12271,7 @@
     },
     {
       "name": "MentionQuery",
-      "path": "gpui_kit::controls::MentionQuery",
+      "path": "gpui_kit::controls::mention::MentionQuery",
       "summary": "The active token, in UTF-8 byte offsets into the editor's current value.",
       "variants": [],
       "construct": [],
@@ -12241,7 +12322,7 @@
     },
     {
       "name": "MenuKey",
-      "path": "gpui_kit::overlay::MenuKey",
+      "path": "gpui_kit::overlay::popover::MenuKey",
       "summary": "What a keystroke means to a menu-like surface, once the platform's modifier conventions have been applied.",
       "variants": [
         "Up",
@@ -12332,7 +12413,7 @@
     },
     {
       "name": "MetricReading",
-      "path": "gpui_kit::display::MetricReading",
+      "path": "gpui_kit::display::metric::MetricReading",
       "summary": "One verified KPI the host already formatted.",
       "variants": [],
       "construct": [
@@ -12350,7 +12431,7 @@
     },
     {
       "name": "MetricState",
-      "path": "gpui_kit::display::MetricState",
+      "path": "gpui_kit::display::metric::MetricState",
       "summary": "How the reading was asked for.",
       "variants": [
         "Loading",
@@ -12424,6 +12505,19 @@
       "queries": []
     },
     {
+      "name": "MissingPolicy",
+      "path": "gpui_kit::display::chart::data::transform::MissingPolicy",
+      "summary": "",
+      "variants": [
+        "Skip",
+        "Propagate"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ModalScope",
       "path": "gpui_kit::overlay::ModalScope",
       "summary": "A custom modal's membership in the same per-window stack as super::Dialog and super::Drawer. This handle owns no content or input policy.",
@@ -12443,7 +12537,7 @@
     },
     {
       "name": "ModelAabb",
-      "path": "gpui_kit::media::ModelAabb",
+      "path": "gpui_kit::media::gltf::ModelAabb",
       "summary": "An axis-aligned box around everything the reader accepted.",
       "variants": [],
       "construct": [],
@@ -12792,7 +12886,7 @@
     },
     {
       "name": "MultiSelectEvent",
-      "path": "gpui_kit::controls::MultiSelectEvent",
+      "path": "gpui_kit::controls::multi_select::MultiSelectEvent",
       "summary": "What a multi-select reports. The owner decides whether the intent changes its selected ids or query.",
       "variants": [
         "Toggled",
@@ -12964,7 +13058,7 @@
     },
     {
       "name": "NumberInputEvent",
-      "path": "gpui_kit::controls::NumberInputEvent",
+      "path": "gpui_kit::controls::number_input::NumberInputEvent",
       "summary": "What a number field reports. The owner decides what any of it means.",
       "variants": [
         "Changed",
@@ -12978,7 +13072,7 @@
     },
     {
       "name": "NumericScale",
-      "path": "gpui_kit::display::NumericScale",
+      "path": "gpui_kit::display::chart::scale::NumericScale",
       "summary": "An invertible f64 scale. Constant input expands by 5% (one unit at zero).",
       "variants": [],
       "construct": [
@@ -13164,7 +13258,7 @@
     },
     {
       "name": "OhlcError",
-      "path": "gpui_kit::display::OhlcError",
+      "path": "gpui_kit::display::plot::OhlcError",
       "summary": "An invalid observation or repeated business identity rejects the series.",
       "variants": [
         "InvalidReading",
@@ -13177,7 +13271,7 @@
     },
     {
       "name": "OneTimeCodeInputEvent",
-      "path": "gpui_kit::controls::OneTimeCodeInputEvent",
+      "path": "gpui_kit::controls::auth::OneTimeCodeInputEvent",
       "summary": "What a one-time code field reports to its owner.",
       "variants": [
         "Change",
@@ -13190,7 +13284,7 @@
     },
     {
       "name": "OutcomeKind",
-      "path": "gpui_kit::display::OutcomeKind",
+      "path": "gpui_kit::display::outcome::OutcomeKind",
       "summary": "Which of the three outcomes the host is reporting.",
       "variants": [
         "Success",
@@ -13206,7 +13300,7 @@
     },
     {
       "name": "OverallProgress",
-      "path": "gpui_kit::controls::OverallProgress",
+      "path": "gpui_kit::controls::upload_list::OverallProgress",
       "summary": "How much of the whole batch is done, if anybody knows.",
       "variants": [
         "Known",
@@ -13352,7 +13446,7 @@
     },
     {
       "name": "PasswordInputEvent",
-      "path": "gpui_kit::controls::PasswordInputEvent",
+      "path": "gpui_kit::controls::auth::PasswordInputEvent",
       "summary": "What a password field reports to its owner.",
       "variants": [
         "Change",
@@ -13369,7 +13463,7 @@
     },
     {
       "name": "Pasted",
-      "path": "gpui_kit::controls::Pasted",
+      "path": "gpui_kit::controls::textarea::Pasted",
       "summary": "What a paste carried, when it was not text.",
       "variants": [
         "Images",
@@ -13382,7 +13476,7 @@
     },
     {
       "name": "PathSampling",
-      "path": "gpui_kit::display::PathSampling",
+      "path": "gpui_kit::display::chart::cartesian::PathSampling",
       "summary": "Sampling changes paths, never source marks, identities or readouts.",
       "variants": [
         "Exact",
@@ -13395,7 +13489,7 @@
     },
     {
       "name": "PerformanceHudState",
-      "path": "gpui_kit::display::PerformanceHudState",
+      "path": "gpui_kit::display::performance_hud::PerformanceHudState",
       "summary": "The diagnostics fact a host currently has.",
       "variants": [
         "Waiting",
@@ -13674,7 +13768,7 @@
     },
     {
       "name": "PlotFrame",
-      "path": "gpui_kit::display::PlotFrame",
+      "path": "gpui_kit::display::plot::PlotFrame",
       "summary": "The measured pixel frame handed to a plot painter.",
       "variants": [],
       "construct": [
@@ -13690,7 +13784,7 @@
     },
     {
       "name": "PlotMark",
-      "path": "gpui_kit::display::PlotMark",
+      "path": "gpui_kit::display::plot::PlotMark",
       "summary": "One semantic target inside a plot.",
       "variants": [],
       "construct": [
@@ -13704,7 +13798,7 @@
     },
     {
       "name": "PlotState",
-      "path": "gpui_kit::display::PlotState",
+      "path": "gpui_kit::display::plot::PlotState",
       "summary": "Loading and refresh truth for arbitrary caller-owned plot data.",
       "variants": [
         "Loading",
@@ -13822,16 +13916,6 @@
       "queries": []
     },
     {
-      "name": "PrepaintState",
-      "path": "gpui_kit::controls::PrepaintState",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": [],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "Presence",
       "path": "gpui_kit::motion::Presence",
       "summary": "An element's arrival and departure, either of which can be cancelled by the other while it is still running.",
@@ -13883,7 +13967,7 @@
     },
     {
       "name": "ProgressStage",
-      "path": "gpui_kit::display::ProgressStage",
+      "path": "gpui_kit::display::stage_progress::ProgressStage",
       "summary": "One host-owned stage of a longer piece of work.",
       "variants": [],
       "construct": [
@@ -13895,7 +13979,7 @@
     },
     {
       "name": "ProjectedPoint",
-      "path": "gpui_kit::display::ProjectedPoint",
+      "path": "gpui_kit::display::chart::data::ProjectedPoint",
       "summary": "Geometry references the original series/point indexes; never synthetic IDs.",
       "variants": [],
       "construct": [],
@@ -13905,7 +13989,7 @@
     },
     {
       "name": "ProjectedSeries",
-      "path": "gpui_kit::display::ProjectedSeries",
+      "path": "gpui_kit::display::chart::data::ProjectedSeries",
       "summary": "",
       "variants": [],
       "construct": [],
@@ -13959,7 +14043,7 @@
     },
     {
       "name": "PullToRefreshEvent",
-      "path": "gpui_kit::interaction::PullToRefreshEvent",
+      "path": "gpui_kit::interaction::refresh::PullToRefreshEvent",
       "summary": "",
       "variants": [
         "RefreshRequested"
@@ -14031,7 +14115,7 @@
     },
     {
       "name": "RatingPrecision",
-      "path": "gpui_kit::display::RatingPrecision",
+      "path": "gpui_kit::display::rating::RatingPrecision",
       "summary": "The smallest step a rating can report.",
       "variants": [
         "Whole",
@@ -14044,7 +14128,7 @@
     },
     {
       "name": "RawOhlc",
-      "path": "gpui_kit::display::RawOhlc",
+      "path": "gpui_kit::display::plot::RawOhlc",
       "summary": "One raw OHLC reading. The x coordinate may be Unix milliseconds on a shared Time scale or any caller-defined numeric coordinate. Negative readings are accepted; financial/calendar/domain policy is not inferred.",
       "variants": [],
       "construct": [
@@ -14057,7 +14141,7 @@
     },
     {
       "name": "RawPoint",
-      "path": "gpui_kit::display::RawPoint",
+      "path": "gpui_kit::display::chart::data::RawPoint",
       "summary": "",
       "variants": [],
       "construct": [
@@ -14076,7 +14160,7 @@
     },
     {
       "name": "RawSeries",
-      "path": "gpui_kit::display::RawSeries",
+      "path": "gpui_kit::display::chart::data::RawSeries",
       "summary": "",
       "variants": [],
       "construct": [
@@ -14146,7 +14230,7 @@
     },
     {
       "name": "RefreshState",
-      "path": "gpui_kit::interaction::RefreshState",
+      "path": "gpui_kit::interaction::refresh::RefreshState",
       "summary": "Refresh activity is separate from the retained list's data state.",
       "variants": [
         "Ready",
@@ -14172,7 +14256,7 @@
     },
     {
       "name": "ResultCount",
-      "path": "gpui_kit::controls::ResultCount",
+      "path": "gpui_kit::controls::filter_bar::ResultCount",
       "summary": "How many rows the host says the filter matched.",
       "variants": [
         "Unknown",
@@ -14306,7 +14390,7 @@
     },
     {
       "name": "RichTextDiagnostic",
-      "path": "gpui_kit::controls::RichTextDiagnostic",
+      "path": "gpui_kit::controls::rich_text_editor::RichTextDiagnostic",
       "summary": "A diagnostic projection. The editor draws it but never decides when or how validation runs.",
       "variants": [],
       "construct": [
@@ -14318,7 +14402,7 @@
     },
     {
       "name": "RichTextDiagnosticSeverity",
-      "path": "gpui_kit::controls::RichTextDiagnosticSeverity",
+      "path": "gpui_kit::controls::rich_text_editor::RichTextDiagnosticSeverity",
       "summary": "Severity rendered under one caller-owned document range.",
       "variants": [
         "Info",
@@ -14386,7 +14470,7 @@
     },
     {
       "name": "RichTextEditorEvent",
-      "path": "gpui_kit::controls::RichTextEditorEvent",
+      "path": "gpui_kit::controls::rich_text_editor::RichTextEditorEvent",
       "summary": "Typed output from the editor.",
       "variants": [
         "IntentApplied",
@@ -14675,7 +14759,7 @@
     },
     {
       "name": "SankeyAlignment",
-      "path": "gpui_kit::display::SankeyAlignment",
+      "path": "gpui_kit::display::plot::SankeyAlignment",
       "summary": "Horizontal alignment of an acyclic flow graph. Vertical order follows the caller's node order, making repeated layouts stable and reviewable.",
       "variants": [
         "Left",
@@ -14689,7 +14773,7 @@
     },
     {
       "name": "SankeyData",
-      "path": "gpui_kit::display::SankeyData",
+      "path": "gpui_kit::display::plot::SankeyData",
       "summary": "Caller-owned node and ribbon geometry for a Sankey presentation.",
       "variants": [],
       "construct": [
@@ -14704,7 +14788,7 @@
     },
     {
       "name": "SankeyLayoutError",
-      "path": "gpui_kit::display::SankeyLayoutError",
+      "path": "gpui_kit::display::plot::SankeyLayoutError",
       "summary": "Invalid graph or normalized layout constraints. Layout never silently drops a flow or fabricates a value for an invalid input.",
       "variants": [
         "InvalidDimensions",
@@ -14724,7 +14808,7 @@
     },
     {
       "name": "SankeyLink",
-      "path": "gpui_kit::display::SankeyLink",
+      "path": "gpui_kit::display::plot::SankeyLink",
       "summary": "One caller-laid-out flow ribbon.",
       "variants": [],
       "construct": [
@@ -14739,7 +14823,7 @@
     },
     {
       "name": "SankeyNode",
-      "path": "gpui_kit::display::SankeyNode",
+      "path": "gpui_kit::display::plot::SankeyNode",
       "summary": "One caller-laid-out Sankey node.",
       "variants": [],
       "construct": [
@@ -14753,7 +14837,7 @@
     },
     {
       "name": "SankeyOrder",
-      "path": "gpui_kit::display::SankeyOrder",
+      "path": "gpui_kit::display::plot::SankeyOrder",
       "summary": "Vertical ordering policy. Weighted barycenter sweeps reduce crossings; stable identity breaks ties. This is a deterministic heuristic, not a guarantee of the globally minimum crossing arrangement.",
       "variants": [
         "Input",
@@ -14784,7 +14868,7 @@
     },
     {
       "name": "ScaleError",
-      "path": "gpui_kit::display::ScaleError",
+      "path": "gpui_kit::display::chart::scale::ScaleError",
       "summary": "A rejected coordinate contract, never silently replaced by an empty chart.",
       "variants": [
         "Empty",
@@ -14800,7 +14884,7 @@
     },
     {
       "name": "ScaleKind",
-      "path": "gpui_kit::display::ScaleKind",
+      "path": "gpui_kit::display::chart::scale::ScaleKind",
       "summary": "Continuous coordinate interpretation.",
       "variants": [
         "Linear",
@@ -14961,7 +15045,7 @@
     },
     {
       "name": "SearchFieldEvent",
-      "path": "gpui_kit::controls::SearchFieldEvent",
+      "path": "gpui_kit::controls::search::SearchFieldEvent",
       "summary": "What a search field reports. It applies none of it.",
       "variants": [
         "QueryChanged",
@@ -14978,7 +15062,7 @@
     },
     {
       "name": "SearchInputEvent",
-      "path": "gpui_kit::controls::SearchInputEvent",
+      "path": "gpui_kit::controls::search::SearchInputEvent",
       "summary": "The query edit and focus events reported to the host; no search is run here.",
       "variants": [
         "Change",
@@ -15009,7 +15093,7 @@
     },
     {
       "name": "Segment",
-      "path": "gpui_kit::datetime::Segment",
+      "path": "gpui_kit::datetime::TimeSegment",
       "summary": "Which part of the time the keyboard is on.",
       "variants": [
         "Hour",
@@ -15035,7 +15119,7 @@
     },
     {
       "name": "SelectEvent",
-      "path": "gpui_kit::controls::SelectEvent",
+      "path": "gpui_kit::controls::select::SelectEvent",
       "summary": "What a Select reports. The owner decides what any of it means.",
       "variants": [
         "Selected",
@@ -15050,7 +15134,7 @@
     },
     {
       "name": "SelectOption",
-      "path": "gpui_kit::controls::SelectOption",
+      "path": "gpui_kit::controls::select::SelectOption",
       "summary": "One choice, identified by business identity rather than by position.",
       "variants": [],
       "construct": [
@@ -15153,7 +15237,7 @@
     },
     {
       "name": "SeriesMark",
-      "path": "gpui_kit::display::SeriesMark",
+      "path": "gpui_kit::display::chart::data::SeriesMark",
       "summary": "",
       "variants": [
         "Line",
@@ -15261,7 +15345,7 @@
     },
     {
       "name": "Shortcut",
-      "path": "gpui_kit::content::Shortcut",
+      "path": "gpui_kit::content::markdown::doc::Shortcut",
       "summary": "A markdown prefix typed at the start of a block, and what it turns it into.",
       "variants": [
         "Heading",
@@ -15359,7 +15443,7 @@
     },
     {
       "name": "SkeletonShape",
-      "path": "gpui_kit::display::SkeletonShape",
+      "path": "gpui_kit::display::loading::SkeletonShape",
       "summary": "One placeholder a skeleton can draw.",
       "variants": [
         "Row",
@@ -15375,7 +15459,7 @@
     },
     {
       "name": "SliderOrientation",
-      "path": "gpui_kit::controls::SliderOrientation",
+      "path": "gpui_kit::controls::slider::SliderOrientation",
       "summary": "The axis on which a slider lays out and accepts input.",
       "variants": [
         "Horizontal",
@@ -15419,8 +15503,23 @@
       "queries": []
     },
     {
+      "name": "SourceRows",
+      "path": "gpui_kit::display::chart::data::transform::SourceRows",
+      "summary": "Membership refers only to the retained immutable TransformedData::source. Contiguous rolling windows use ranges, avoiding O(rows × window) lineage.",
+      "variants": [
+        "Range",
+        "Indices"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "indices() -> impl Iterator<Item = usize> + '_"
+      ]
+    },
+    {
       "name": "SpanState",
-      "path": "gpui_kit::display::SpanState",
+      "path": "gpui_kit::display::trace::SpanState",
       "summary": "What a span is doing, as the host already knows it.",
       "variants": [
         "Pending",
@@ -15437,7 +15536,7 @@
     },
     {
       "name": "SparklinePoint",
-      "path": "gpui_kit::display::SparklinePoint",
+      "path": "gpui_kit::display::sparkline::SparklinePoint",
       "summary": "One point already normalized by the caller.",
       "variants": [],
       "construct": [
@@ -15451,7 +15550,7 @@
     },
     {
       "name": "SparklineReading",
-      "path": "gpui_kit::display::SparklineReading",
+      "path": "gpui_kit::display::sparkline::SparklineReading",
       "summary": "The plotted points and the exact text that makes them accessible.",
       "variants": [],
       "construct": [
@@ -15465,7 +15564,7 @@
     },
     {
       "name": "SparklineState",
-      "path": "gpui_kit::display::SparklineState",
+      "path": "gpui_kit::display::sparkline::SparklineState",
       "summary": "The complete state of one trend reading.",
       "variants": [
         "Loading",
@@ -15484,7 +15583,7 @@
     },
     {
       "name": "SpecializedData",
-      "path": "gpui_kit::display::SpecializedData",
+      "path": "gpui_kit::display::specialized::SpecializedData",
       "summary": "Validated, reproducible geometry plus an always-visible exact-value key.",
       "variants": [],
       "construct": [
@@ -15502,7 +15601,7 @@
     },
     {
       "name": "SpecializedError",
-      "path": "gpui_kit::display::SpecializedError",
+      "path": "gpui_kit::display::specialized::SpecializedError",
       "summary": "Invalid raw input never becomes a plausible but incomplete picture.",
       "variants": [
         "DuplicateIdentity",
@@ -15684,7 +15783,7 @@
     },
     {
       "name": "Stack",
-      "path": "gpui_kit::display::Stack",
+      "path": "gpui_kit::display::chart::data::Stack",
       "summary": "",
       "variants": [
         "None",
@@ -15698,7 +15797,7 @@
     },
     {
       "name": "StageStatus",
-      "path": "gpui_kit::display::StageStatus",
+      "path": "gpui_kit::display::stage_progress::StageStatus",
       "summary": "Where one stage stands.",
       "variants": [
         "Pending",
@@ -15829,18 +15928,6 @@
       ]
     },
     {
-      "name": "StringKey",
-      "path": "gpui_kit::strings::StringKey",
-      "summary": "Every piece of text this library can put on a screen.",
-      "variants": [],
-      "construct": [
-        "from_name(name: &str) -> Option<Self>"
-      ],
-      "options": [],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "Strings",
       "path": "gpui_kit::strings::Strings",
       "summary": "The catalogue a host installs, and the one components read.",
@@ -15867,7 +15954,7 @@
     },
     {
       "name": "SwipeActionsEvent",
-      "path": "gpui_kit::interaction::SwipeActionsEvent",
+      "path": "gpui_kit::interaction::swipe::SwipeActionsEvent",
       "summary": "",
       "variants": [
         "Revealed",
@@ -15880,7 +15967,7 @@
     },
     {
       "name": "SwipeSide",
-      "path": "gpui_kit::interaction::SwipeSide",
+      "path": "gpui_kit::interaction::swipe::SwipeSide",
       "summary": "Physical sides. The caller maps leading/trailing according to reading order.",
       "variants": [
         "Left",
@@ -15915,7 +16002,7 @@
     },
     {
       "name": "TagInputEvent",
-      "path": "gpui_kit::controls::TagInputEvent",
+      "path": "gpui_kit::controls::tag_input::TagInputEvent",
       "summary": "What a tag field reports. The owner decides what any of it means.",
       "variants": [
         "Added",
@@ -15991,7 +16078,7 @@
     },
     {
       "name": "Text",
-      "path": "gpui_kit::content::Text",
+      "path": "gpui_kit::content::markdown::doc::Text",
       "summary": "Inline content: a string, plus marks over byte ranges of it.",
       "variants": [],
       "construct": [
@@ -16012,7 +16099,7 @@
     },
     {
       "name": "TextAreaEdit",
-      "path": "gpui_kit::controls::TextAreaEdit",
+      "path": "gpui_kit::controls::textarea::TextAreaEdit",
       "summary": "The single contiguous replacement between two text-area revisions.",
       "variants": [],
       "construct": [],
@@ -16021,20 +16108,8 @@
       "queries": []
     },
     {
-      "name": "TextAreaElement",
-      "path": "gpui_kit::controls::TextAreaElement",
-      "summary": "",
-      "variants": [],
-      "construct": [
-        "new(area: Entity<TextArea>) -> Self"
-      ],
-      "options": [],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "TextAreaEvent",
-      "path": "gpui_kit::controls::TextAreaEvent",
+      "path": "gpui_kit::controls::textarea::TextAreaEvent",
       "summary": "What a text area reports to its owner.",
       "variants": [
         "Edited",
@@ -16060,7 +16135,7 @@
     },
     {
       "name": "TextAreaSnapshot",
-      "path": "gpui_kit::controls::TextAreaSnapshot",
+      "path": "gpui_kit::controls::textarea::TextAreaSnapshot",
       "summary": "An immutable value tagged with the revision that produced it.",
       "variants": [],
       "construct": [],
@@ -16070,7 +16145,7 @@
     },
     {
       "name": "TextAreaWrap",
-      "path": "gpui_kit::controls::TextAreaWrap",
+      "path": "gpui_kit::controls::textarea::TextAreaWrap",
       "summary": "How a text area lays out lines wider than its viewport.",
       "variants": [
         "Soft",
@@ -16082,20 +16157,8 @@
       "queries": []
     },
     {
-      "name": "TextElement",
-      "path": "gpui_kit::controls::TextElement",
-      "summary": "",
-      "variants": [],
-      "construct": [
-        "new(input: Entity<TextInput>) -> Self"
-      ],
-      "options": [],
-      "commands": [],
-      "queries": []
-    },
-    {
       "name": "TextInputEvent",
-      "path": "gpui_kit::controls::TextInputEvent",
+      "path": "gpui_kit::controls::input::TextInputEvent",
       "summary": "What an input reports to its owner.",
       "variants": [
         "Change",
@@ -16125,7 +16188,7 @@
     },
     {
       "name": "TickError",
-      "path": "gpui_kit::display::TickError",
+      "path": "gpui_kit::display::chart::cartesian::TickError",
       "summary": "",
       "variants": [
         "UnknownAxis",
@@ -16167,7 +16230,7 @@
     },
     {
       "name": "TimelineEntry",
-      "path": "gpui_kit::display::TimelineEntry",
+      "path": "gpui_kit::display::timeline::TimelineEntry",
       "summary": "One thing that happened.",
       "variants": [],
       "construct": [
@@ -16187,7 +16250,7 @@
     },
     {
       "name": "TimelineGroup",
-      "path": "gpui_kit::display::TimelineGroup",
+      "path": "gpui_kit::display::timeline::TimelineGroup",
       "summary": "A run of entries under one heading, usually a day.",
       "variants": [],
       "construct": [
@@ -16238,7 +16301,7 @@
     },
     {
       "name": "ToggleItem",
-      "path": "gpui_kit::controls::ToggleItem",
+      "path": "gpui_kit::controls::toggle_button::ToggleItem",
       "summary": "One toggle in a group, identified by business identity.",
       "variants": [],
       "construct": [
@@ -16258,7 +16321,7 @@
     },
     {
       "name": "ToggleSelection",
-      "path": "gpui_kit::controls::ToggleSelection",
+      "path": "gpui_kit::controls::toggle_button::ToggleSelection",
       "summary": "How many of a group's toggles may be in at once.",
       "variants": [
         "AtMostOne",
@@ -16271,7 +16334,7 @@
     },
     {
       "name": "Tone",
-      "path": "gpui_kit::display::Tone",
+      "path": "gpui_kit::display::badge::Tone",
       "summary": "The severity a status surface claims.",
       "variants": [
         "Neutral",
@@ -16386,7 +16449,7 @@
     },
     {
       "name": "TooltipMode",
-      "path": "gpui_kit::display::TooltipMode",
+      "path": "gpui_kit::display::chart::cartesian::TooltipMode",
       "summary": "",
       "variants": [
         "Point",
@@ -16399,7 +16462,7 @@
     },
     {
       "name": "TraceSpan",
-      "path": "gpui_kit::display::TraceSpan",
+      "path": "gpui_kit::display::trace::TraceSpan",
       "summary": "One already-timed interval on a unit axis.",
       "variants": [],
       "construct": [
@@ -16432,7 +16495,7 @@
     },
     {
       "name": "TransferItem",
-      "path": "gpui_kit::controls::TransferItem",
+      "path": "gpui_kit::controls::transfer_list::TransferItem",
       "summary": "An item in one side of a transfer list.",
       "variants": [],
       "construct": [
@@ -16446,7 +16509,7 @@
     },
     {
       "name": "TransferListEvent",
-      "path": "gpui_kit::controls::TransferListEvent",
+      "path": "gpui_kit::controls::transfer_list::TransferListEvent",
       "summary": "What a transfer list reports. The caller performs the actual assignment.",
       "variants": [
         "ToggleSource",
@@ -16455,6 +16518,34 @@
         "MoveToSource",
         "QueryChanged"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TransformError",
+      "path": "gpui_kit::display::chart::data::transform::TransformError",
+      "summary": "",
+      "variants": [
+        "DuplicateIdentity",
+        "InvalidPoint",
+        "InconsistentGroup",
+        "InvalidAggregate",
+        "InvalidBins",
+        "InvalidWindow",
+        "Overflow"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TransformedData",
+      "path": "gpui_kit::display::chart::data::transform::TransformedData",
+      "summary": "Exact original IDs, values and wording remain available through membership even if a downstream source collection is replaced or reordered.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],
@@ -16629,7 +16720,7 @@
     },
     {
       "name": "Upload",
-      "path": "gpui_kit::controls::Upload",
+      "path": "gpui_kit::controls::upload_list::Upload",
       "summary": "One file on the list, identified by business identity.",
       "variants": [],
       "construct": [
@@ -16649,7 +16740,7 @@
     },
     {
       "name": "UploadState",
-      "path": "gpui_kit::controls::UploadState",
+      "path": "gpui_kit::controls::upload_list::UploadState",
       "summary": "Where one file has got to.",
       "variants": [
         "Queued",
@@ -16689,7 +16780,7 @@
     },
     {
       "name": "ValueAxis",
-      "path": "gpui_kit::display::ValueAxis",
+      "path": "gpui_kit::display::chart::data::ValueAxis",
       "summary": "Axis identity is shared by series, references and linked caller state.",
       "variants": [],
       "construct": [],
@@ -16904,7 +16995,7 @@
     },
     {
       "name": "WeightedValue",
-      "path": "gpui_kit::display::WeightedValue",
+      "path": "gpui_kit::display::specialized::WeightedValue",
       "summary": "A stable identity, human label, and finite raw quantity.",
       "variants": [],
       "construct": [

@@ -5,6 +5,11 @@ GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
 source and assets retain the licenses and attribution below. GPUI Box is an
 independent derivative and is not an official Zed Industries project.
 
+Calendar chart ticks and source-traceable transforms are original Kit code.
+They use Chrono's public API (MIT OR Apache-2.0); chrono-tz 0.10.4 (MIT OR
+Apache-2.0) is used only by tests for named-timezone/DST fixtures. Production
+timezone data is caller-owned; no calendar implementation was copied or ported.
+
 Local geographic visualization and its synthetic fixture are original GPUI
 Box code. PROJ projection documentation and RFC 7946 informed the mathematical
 and geometry contracts; no source, geographic dataset, or provider asset was

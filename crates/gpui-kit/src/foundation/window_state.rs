@@ -37,7 +37,61 @@ struct KeyedEntry<T> {
     value: T,
 }
 
-struct KeyedStates<T>(HashMap<Option<EffectOwner>, HashMap<SharedString, KeyedEntry<T>>>);
+struct KeyedGroup<T> {
+    entries: HashMap<SharedString, KeyedEntry<T>>,
+    pruned_generation: Option<u64>,
+    // A zero-grace value remains readable until the next mutation, including
+    // another mutation in this generation. At most one can be pending.
+    zero_grace: Option<SharedString>,
+    #[cfg(test)]
+    examined: usize,
+}
+
+impl<T> Default for KeyedGroup<T> {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::new(),
+            pruned_generation: None,
+            zero_grace: None,
+            #[cfg(test)]
+            examined: 0,
+        }
+    }
+}
+
+impl<T: Default> KeyedGroup<T> {
+    fn touch(&mut self, id: &SharedString, generation: u64, grace: u64) -> &mut T {
+        if let Some(id) = self.zero_grace.take() {
+            self.entries.remove(&id);
+        }
+        if self.pruned_generation != Some(generation) {
+            self.entries.retain(|_, entry| {
+                #[cfg(test)]
+                {
+                    self.examined += 1;
+                }
+                generation.saturating_sub(entry.seen) < entry.grace
+            });
+            self.pruned_generation = Some(generation);
+        }
+        let entry = self
+            .entries
+            .entry(id.clone())
+            .or_insert_with(|| KeyedEntry {
+                seen: generation,
+                grace,
+                value: T::default(),
+            });
+        entry.seen = generation;
+        entry.grace = grace;
+        if grace == 0 {
+            self.zero_grace = Some(id.clone());
+        }
+        &mut entry.value
+    }
+}
+
+struct KeyedStates<T>(HashMap<Option<EffectOwner>, KeyedGroup<T>>);
 
 impl<T> Default for KeyedStates<T> {
     fn default() -> Self {
@@ -121,7 +175,7 @@ fn release_keyed<T: 'static>(owner: EffectOwner, cx: &mut App) -> usize {
             let removed = keys
                 .0
                 .remove(&Some(owner))
-                .map_or(0, |entries| entries.len());
+                .map_or(0, |group| group.entries.len());
             if keys.0.capacity() > keys.0.len().saturating_mul(4) {
                 keys.0.shrink_to(keys.0.len().saturating_mul(2));
             }
@@ -206,15 +260,7 @@ pub(crate) fn with_key_retained<T: Default + 'static, R>(
     let generation = generation(window_id, cx);
     with(window_id, cx, |states: &mut KeyedStates<T>| {
         let keys = states.0.entry(owner).or_default();
-        keys.retain(|_, entry| generation.saturating_sub(entry.seen) < entry.grace);
-        let entry = keys.entry(id.clone()).or_insert_with(|| KeyedEntry {
-            seen: generation,
-            grace,
-            value: T::default(),
-        });
-        entry.seen = generation;
-        entry.grace = grace;
-        update(&mut entry.value)
+        update(keys.touch(id, generation, grace))
     })
 }
 
@@ -230,6 +276,7 @@ pub(crate) fn read_key<T: 'static, R>(
         states
             .0
             .get(&owner)?
+            .entries
             .get(id)
             .map(|entry| read(&entry.value))
     })
@@ -243,7 +290,7 @@ pub(crate) fn keyed_ids<T: 'static>(window_id: WindowId, cx: &App) -> Vec<Shared
             .0
             .get(&owner)
             .into_iter()
-            .flat_map(|keys| keys.keys().cloned())
+            .flat_map(|group| group.entries.keys().cloned())
             .collect();
         ids.sort();
         ids
@@ -264,6 +311,65 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn many_keys_scan_once_per_generation_not_once_per_access() {
+        let mut group = KeyedGroup::<usize>::default();
+        let ids: Vec<SharedString> = (0..100_000).map(|i| i.to_string().into()).collect();
+        for id in &ids {
+            *group.touch(id, 0, 2) = 17;
+        }
+        assert_eq!(
+            group.examined, 0,
+            "insertion must not rescan the growing map"
+        );
+        for id in ids.iter().rev() {
+            assert_eq!(*group.touch(id, 1, 2), 17);
+        }
+        assert_eq!(group.examined, ids.len());
+        for id in &ids {
+            assert_eq!(*group.touch(id, 1, 2), 17);
+        }
+        assert_eq!(
+            group.examined,
+            ids.len(),
+            "redraw in the same frame is scan-free"
+        );
+        assert_eq!(*group.touch(&ids[0], 3, 2), 0);
+        assert_eq!(group.entries.len(), 1);
+        assert_eq!(group.examined, 2 * ids.len());
+    }
+
+    #[gpui::test]
+    fn reads_are_lazy_and_grace_changes_apply_after_touch(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit_semantics::install(cx);
+            let coordinator = SemanticCoordinator::global(cx);
+            let window = WindowId::from(83);
+            let a: SharedString = "a".into();
+            let b: SharedString = "b".into();
+            coordinator.begin_window_frame(window);
+            with_key_retained(&a, 5, window, cx, |v: &mut usize| *v = 19);
+            with_key_retained(&a, 0, window, cx, |v: &mut usize| assert_eq!(*v, 19));
+            assert_eq!(read_key(&a, window, cx, |v: &usize| *v), Some(19));
+            assert_eq!(keyed_ids::<usize>(window, cx), vec![a.clone()]);
+            with_key_retained(&b, 1, window, cx, |v: &mut usize| *v = 23);
+            assert_eq!(read_key(&a, window, cx, |v: &usize| *v), None);
+            with_key_retained(&a, 0, window, cx, |v: &mut usize| *v = 29);
+            with_key_retained(&a, 4, window, cx, |v: &mut usize| {
+                assert_eq!(*v, 0, "zero grace expires even when touching itself");
+                *v = 31;
+            });
+            coordinator.begin_window_frame(window);
+            assert_eq!(read_key(&b, window, cx, |v: &usize| *v), Some(23));
+            with_key_retained(&a, 1, window, cx, |v: &mut usize| assert_eq!(*v, 31));
+            assert_eq!(read_key(&b, window, cx, |v: &usize| *v), None);
+            coordinator.begin_window_frame(window);
+            with_key_retained(&a, 4, window, cx, |v: &mut usize| {
+                assert_eq!(*v, 0, "old grace governs expiry before new grace applies");
+            });
+        });
+    }
 
     struct Fixture;
 

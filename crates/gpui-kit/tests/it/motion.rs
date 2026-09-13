@@ -136,7 +136,7 @@ fn reduced_motion_lands_a_retargeted_spring_at_once(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_keyframed_path_passes_through_the_stops_it_was_given(_cx: &mut TestAppContext) {
     let theme = Theme::studio_dark();
-    let path = Keyframes::new(
+    let path = Keyframes::<f32>::new(
         &theme,
         linear(200),
         [

@@ -7,6 +7,9 @@
 
 use gpui::SharedString;
 
+/// Explicit Gregorian calendar ticks in a caller-supplied timezone.
+pub mod calendar;
+
 /// A rejected coordinate contract, never silently replaced by an empty chart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScaleError {

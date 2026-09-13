@@ -9,6 +9,11 @@
 //! Omitted dimensions retain the canonical 920×1000 defaults; this does not
 //! change the capture/check baseline viewport. The reply reports the actual
 //! logical viewport and scale factor, not a claim about a native mobile device.
+//! Local-only playback: `motion {session,reduced_motion:false}` opts one session
+//! into motion. `frame {session,ms,path?}` advances exactly that simulated duration
+//! and captures the resulting draw without settling. The application clock and
+//! reduced-motion setting are global, so playback requires one exclusive session.
+//! Normal `open`/`screenshot` and catalog baselines retain their settling defaults.
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
@@ -91,6 +96,8 @@ struct Server {
     cx: HeadlessAppContext,
     sessions: HashMap<String, Session>,
     next_id: u64,
+    playback: Option<String>,
+    time_ms: u64,
     _diagnostics: DiagnosticArm,
 }
 
@@ -113,6 +120,8 @@ impl Server {
             cx,
             sessions: HashMap::new(),
             next_id: 1,
+            playback: None,
+            time_ms: 0,
             _diagnostics: diagnostics,
         })
     }
@@ -123,6 +132,8 @@ impl Server {
             "snapshot" => self.snapshot(params),
             "act" => self.act(params),
             "advance" => self.advance(params),
+            "motion" => self.motion(params),
+            "frame" => self.frame(params),
             "screenshot" => self.screenshot(params),
             "audit" => self.audit(params),
             "close" => self.close(params),
@@ -132,6 +143,10 @@ impl Server {
     }
 
     fn open(&mut self, params: &Value) -> Result<Value> {
+        anyhow::ensure!(
+            self.playback.is_none(),
+            "close the playback session or restore reduced motion before opening another session"
+        );
         let viewport = requested_viewport(params)?;
         let scene = required_str(params, "scene")?;
         let theme = match params.get("theme").and_then(Value::as_str).unwrap_or("") {
@@ -294,6 +309,10 @@ impl Server {
             .and_then(Value::as_u64)
             .context("advance needs ms")?;
         self.activate(&session.scene, &session.theme)?;
+        self.time_ms = self
+            .time_ms
+            .checked_add(ms)
+            .context("simulated clock overflow")?;
         self.cx.advance_clock(Duration::from_millis(ms));
         self.cx.update_window(session.window, |_, window, cx| {
             window.simulate_next_frame(cx);
@@ -307,6 +326,53 @@ impl Server {
         let session = self.lookup(params)?;
         self.activate(&session.scene, &session.theme)?;
         let frame = self.settled_image(session.window)?;
+        Self::save_image(params, &frame)
+    }
+
+    fn motion(&mut self, params: &Value) -> Result<Value> {
+        let session = self.lookup(params)?;
+        let reduced = params
+            .get("reduced_motion")
+            .and_then(Value::as_bool)
+            .context("motion needs boolean reduced_motion")?;
+        anyhow::ensure!(
+            reduced || self.sessions.len() == 1,
+            "motion playback requires exactly one open session; use a separate serve process for concurrent playback"
+        );
+        self.playback = if reduced {
+            None
+        } else {
+            Some(required_str(params, "session")?.to_owned())
+        };
+        self.cx.update(|cx| cx.set_reduce_motion(reduced));
+        self.draw(session.window)?;
+        Ok(
+            json!({"time_ms":self.time_ms,"reduced_motion":reduced,"generation":self.generation(session.window)?}),
+        )
+    }
+
+    fn frame(&mut self, params: &Value) -> Result<Value> {
+        let session = self.lookup(params)?;
+        // Reuse scheduling, never settled_image: intermediate pixels are the
+        // result being requested, not a failure to wait for identical images.
+        self.advance(params)?;
+        let frame = self.cx.capture_screenshot(session.window)?;
+        let mut result = Self::save_image(params, &frame)?;
+        result["time_ms"] = json!(self.time_ms);
+        result["reduced_motion"] = json!(self.cx.update(|cx| cx.reduce_motion()));
+        result["generation"] = json!(self.generation(session.window)?);
+        result["snapshot"] = self.cx.update(|cx| {
+            serde_json::to_value(
+                SemanticCoordinator::global(cx)
+                    .snapshot(session.window.window_id())
+                    .expect("sampled frame published semantics")
+                    .redacted(),
+            )
+        })?;
+        Ok(result)
+    }
+
+    fn save_image(params: &Value, frame: &image::RgbaImage) -> Result<Value> {
         let path = match params.get("path").and_then(Value::as_str) {
             Some(path) => {
                 let requested = PathBuf::from(path);
@@ -367,6 +433,10 @@ impl Server {
         };
         self.cx
             .update_window(session.window, |_, window, _| window.remove_window())?;
+        if self.playback.as_deref() == Some(&id) {
+            self.playback = None;
+            self.cx.update(|cx| cx.set_reduce_motion(true));
+        }
         Ok(json!({}))
     }
 
@@ -501,6 +571,80 @@ fn base64(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn playback_samples_interruption_and_reduced_motion_without_settling() -> Result<()> {
+        let mut server = Server::new()?;
+        let opened = server.open(&json!({"scene":"motion-primitives", "theme":"studio-light"}))?;
+        let id = &opened["session"];
+        let click = |target: &str| json!({"session":id,"type":"click","id":target});
+        server.act(&click("scene.motion.tabs.spring"))?;
+        let indicator_x = |snapshot: &Value| -> f64 {
+            snapshot["nodes"]
+                .as_array()
+                .expect("semantic nodes")
+                .iter()
+                .find(|node| node["id"] == "scene.motion.spring.indicator")
+                .expect("spring indicator")["bounds"]["x"]
+                .as_f64()
+                .expect("indicator x")
+        };
+        let left = indicator_x(&server.snapshot(&json!({"session":id}))?);
+        server.act(&click("scene.motion.spring.timeline"))?;
+        let right = indicator_x(&server.snapshot(&json!({"session":id}))?);
+        assert!(
+            (right - left - 120.0).abs() < 0.1,
+            "default reduced motion settles immediately"
+        );
+        let params = |ms| json!({"session":id,"ms":ms,"path":"target/sessions/playback-test.png"});
+        let default = server.frame(&params(0))?;
+        assert_eq!(default["reduced_motion"], true);
+        assert_eq!(default["time_ms"], 0);
+        server.motion(&json!({"session":id,"reduced_motion":false}))?;
+        assert!(server.open(&json!({"scene":"button"})).is_err());
+        server.act(&click("scene.motion.spring.queue"))?;
+        let start = server.frame(&params(0))?;
+        assert_eq!(indicator_x(&start["snapshot"]), right);
+        let moving = server.frame(&params(80))?;
+        let middle = indicator_x(&moving["snapshot"]);
+        assert!(
+            middle > left && middle < right,
+            "intermediate geometry {left} < {middle} < {right}"
+        );
+        assert_ne!(
+            start["png_base64"], moving["png_base64"],
+            "actual rendered intermediate frame"
+        );
+        assert_eq!(moving["time_ms"], 80);
+        server.act(&click("scene.motion.spring.timeline"))?;
+        let interrupted = server.frame(&params(0))?;
+        assert!(
+            (indicator_x(&interrupted["snapshot"]) - middle).abs() < 0.1,
+            "retarget preserves current geometry"
+        );
+        let resumed = server.frame(&params(80))?;
+        assert_eq!(resumed["time_ms"], 160);
+        assert_ne!(resumed["png_base64"], interrupted["png_base64"]);
+        server.motion(&json!({"session":id,"reduced_motion":true}))?;
+        let settled = server.frame(&params(0))?;
+        assert_eq!(indicator_x(&settled["snapshot"]), right);
+        assert_eq!(
+            settled["time_ms"], 160,
+            "reduced motion does not secretly advance time"
+        );
+        assert_eq!(settled["reduced_motion"], true);
+        let other = server.open(&json!({"scene":"button"}))?;
+        assert!(
+            server
+                .motion(&json!({"session":id,"reduced_motion":false}))
+                .is_err()
+        );
+        server.close(&json!({"session":other["session"]}))?;
+        server.motion(&json!({"session":id,"reduced_motion":false}))?;
+        server.close(&json!({"session":id}))?;
+        assert!(server.cx.update(|cx| cx.reduce_motion()));
+        Ok(())
+    }
 
     #[test]
     fn base64_matches_the_specification() {

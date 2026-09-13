@@ -1,9 +1,13 @@
 # Date and time
 
-This crate has no calendar system, no time-zone database, no locale, and no
-notion of what day it is. `Calendar`, `DateInput`, `RangePicker`, and
+The date-picker components have no calendar system, time-zone database, locale,
+or notion of what day it is. `Calendar`, `DateInput`, `RangePicker`, and
 `TimeInput` draw dates and read them, and every fact they draw arrives through
 one trait the host implements: `gpui_kit::datetime::DateAdapter`.
+
+Charts separately offer an opt-in Gregorian boundary utility using a caller's
+Chrono timezone. It neither changes DateAdapter nor supplies the pickers with
+calendar policy. See [visualization data](visualization-data.md).
 
 ## Why the seam is here
 
@@ -17,7 +21,7 @@ library, locale data, and clock the application already has.
 
 So the components refuse to answer any of them. `Day` and `MonthKey` are
 opaque integers minted by the adapter; the components carry them, compare
-them, and hand them back. Nothing in this crate ever adds a day to a date or a
+them, and hand them back. The date-picker components never add a day to a date or a
 month to a month — moving to the next month is `shift_month`, an adapter call,
 not an addition. A `Day` from one adapter means nothing to another.
 

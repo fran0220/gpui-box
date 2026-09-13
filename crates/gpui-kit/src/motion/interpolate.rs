@@ -25,6 +25,33 @@ impl Interpolate for f32 {
     }
 }
 
+/// Raw time/data coordinates keep f64 precision until projection. Endpoints
+/// remain exact, and opposite-sign finite endpoints do not overflow their
+/// difference during interpolation. Extrapolation remains intentional; an
+/// unrepresentable extrapolated value may be infinite. The motion engine's
+/// scalar distance is f32, so unrepresentable distances saturate rather than
+/// introducing infinity into velocity rescaling.
+impl Interpolate for f64 {
+    fn lerp(self, other: Self, t: f32) -> Self {
+        if t == 0. {
+            return self;
+        }
+        if t == 1. {
+            return other;
+        }
+        let t = f64::from(t);
+        if self.is_sign_negative() == other.is_sign_negative() {
+            (other - self).mul_add(t, self)
+        } else {
+            self.mul_add(1. - t, other * t)
+        }
+    }
+
+    fn distance(self, other: Self) -> f32 {
+        (other - self).abs().min(f64::from(f32::MAX)) as f32
+    }
+}
+
 impl Interpolate for Pixels {
     fn lerp(self, other: Self, t: f32) -> Self {
         px(f32::from(self).lerp(f32::from(other), t))
@@ -120,6 +147,22 @@ mod tests {
         assert_eq!(2.0f32.lerp(10.0, 0.0), 2.0);
         assert_eq!(2.0f32.lerp(10.0, 1.0), 10.0);
         assert_eq!(px(0.0).lerp(px(8.0), 0.5), px(4.0));
+    }
+
+    #[test]
+    fn raw_time_interpolation_keeps_precision_and_extreme_endpoints() {
+        let epoch = 1_700_000_000_000f64;
+        assert_eq!(epoch.lerp(epoch + 17., 0.5), epoch + 8.5);
+        assert_eq!((epoch + 17.).lerp(epoch, 0.25), epoch + 12.75);
+        assert_eq!(epoch.distance(epoch + 17.), 17.);
+        assert_eq!(1e16f64.lerp(1., 1.), 1.);
+        assert_eq!(1e16f64.lerp(1., 0.), 1e16);
+        assert_eq!((-f64::MAX).lerp(f64::MAX, 0.5), 0.);
+        assert_eq!((-f64::MAX).lerp(f64::MAX, 0.25), -f64::MAX / 2.);
+        assert_eq!(f64::MAX.lerp(f64::MAX, 0.75), f64::MAX);
+        assert_eq!((-f64::MAX).distance(f64::MAX), f32::MAX);
+        assert_eq!(10f64.lerp(18., 1.25), 20.);
+        assert_eq!(10f64.lerp(18., -0.25), 8.);
     }
 
     #[test]

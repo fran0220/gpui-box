@@ -36,6 +36,7 @@ syntax = ["dep:tree-sitter", "dep:tree-sitter-json"]
 [dependencies]
 unicode-segmentation.workspace = true
 base64 = { workspace = true, optional = true }
+chrono.workspace = true
 gpui.workspace = true
 gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true
@@ -62,6 +63,7 @@ alacritty_terminal = { workspace = true, optional = true }
 windows = { workspace = true, features = ["Win32_Foundation"] }
 
 [dev-dependencies]
+chrono-tz = "0.10"
 gpui = { package = "gpui-box", path = "../gpui", features = ["test-support"] }
 # The tests drive the datetime scenes, which only exist with the reference
 # calendar compiled in.

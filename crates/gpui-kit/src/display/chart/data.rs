@@ -5,6 +5,9 @@ use super::scale::{CategoryScale, NumericScale, ScaleError};
 use gpui::{Hsla, SharedString};
 use std::collections::{HashMap, HashSet};
 
+/// Pure aggregation, binning and rolling windows with retained source lineage.
+pub mod transform;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChartValue {
     Number(f64),
