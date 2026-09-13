@@ -74,10 +74,10 @@ the part hosts otherwise each get wrong — a build with no engine says so
 instead of drawing a blank page, and Loading, Empty, Unavailable, Error, and
 Ready remain five distinct answers.
 
-`NodeGraph` places nothing. The caller positions every node, because where a
-step belongs is a claim about the run rather than a fact about the component,
-and a layout algorithm here would make that claim for every host at once. A
-node may carry a caller-rendered thumbnail, whose pixels the graph neither
+`NodeGraph` renders caller-owned positions. The caller may compute those with
+the optional `layered_layout` helper or a different layout policy; accepting a
+layout result never transfers topology or position ownership to the component.
+A node may carry a caller-rendered thumbnail, whose pixels the graph neither
 fetches nor decodes. `GraphInteraction::Inspect` permits only pan, zoom, and
 selection proposals; `Arrange` additionally permits movement; `Edit` adds
 deletion, connection, and disconnection. The caller remains authoritative for
@@ -236,16 +236,17 @@ own; both are exercised through every control and overlay that uses them.
   a scene-graph dependency, a material system, or a texture pipeline. Other
   formats, materials, animation and skinning are not gaps to be filled here:
   a document that needs them is one an application converts before it arrives.
-- **Inventing a scale, a locale, or a series policy.** A chart still does not
-  own data. Axes, ticks, domains, stacking, aggregation, and "2 minutes ago"
-  are facts the host already has or can compute; Box paints them. Line and bar
-  geometry now enters, updates, and exits by caller business id; area fill,
-  exact-text crosshair tooltips, keyboard traversal, and stale-data retention
-  are component behavior rather than downstream drawing work. The old Kit-era
-  refusal of charts themselves is lifted: line, bar, area, and distribution
-  surfaces are in scope as application primitives. A
-  business-intelligence toolkit — live query, crossfilter, annotation
-  layers, financial overlays — is still a product, not a substrate.
+- **Owning application data or interpreting its business meaning.** Charts
+  read caller-owned observations and report caller-owned actions. Reusable
+  scales, ticks, stacking, statistical layouts, reference marks and controlled
+  range interactions are in scope; they do not require queries or persistence.
+  Hosts still choose the data, domain policy, units, locale/calendar formatting
+  and business transformations. Existing normalized charts retain their
+  caller-prepared coordinates and exact text. Their keyed geometry, crosshair
+  navigation and stale-data retention do not imply a complete raw-data engine.
+  The [visualization delivery plan](../tasks/visualization-delivery.md) records
+  that expansion separately from delivered coverage. Query execution, stored
+  reports, trading logic and data-source orchestration remain application work.
 - **Owning a platform picker.** Colour, file, and print dialogs that replace
   the operating system stay out. In-window colour wells, dropzones, and
   print-preview chrome that report a choice are in scope; they do not
@@ -909,11 +910,14 @@ the form never owns the condition or removes caller data.
 
 `LineChart` and `BarChart` now cover the cartesian presentation gap with keyed
 motion, area fills, pointer and keyboard crosshairs, exact host-formatted text,
-and stale-data retention. Domains, ticks, aggregation, and queries remain host
-facts rather than drawing work. `Plot` supplies the lower generic measured
-frame and semantic mark traversal. `CandlestickChart` and `SankeyChart` render
-caller-normalized OHLC and flow geometry through that boundary; neither owns a
-market scale, topology algorithm, value transform, or financial vocabulary.
+and stale-data retention. Their existing normalized entry points require
+caller-prepared coordinates and axis wording; general raw-data scale and
+composition support is tracked in the visualization delivery plan, not claimed
+by this paragraph. `Plot` supplies the lower generic measured frame and semantic
+mark traversal. `CandlestickChart` and `SankeyChart` render normalized OHLC and
+flow geometry through that boundary. `SankeyData::layout` additionally provides
+an optional validated DAG layout with one weight-to-height scale and explicit
+alignment. Neither component owns market data, queries or trading policy.
 
 Agent and game applications now have product-neutral run, persona, party,
 objective, ability, and reward families rather than one-off downstream cards.
