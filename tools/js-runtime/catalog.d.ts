@@ -42,6 +42,7 @@ export interface KitBindingCatalog {
   readonly "CanvasToolbar": { readonly source: "crates/gpui-kit/src/canvas/toolbar.rs"; readonly status: "partial" };
   readonly "Card": { readonly source: "crates/gpui-kit/src/display/card.rs"; readonly status: "partial" };
   readonly "Carousel": { readonly source: "crates/gpui-kit/src/navigation/carousel.rs"; readonly status: "partial" };
+  readonly "CartesianChart": { readonly source: "crates/gpui-kit/src/display/chart/cartesian.rs"; readonly status: "unbound" };
   readonly "Cascader": { readonly source: "crates/gpui-kit/src/controls/cascader.rs"; readonly status: "partial" };
   readonly "ChartLegend": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
   readonly "Checkbox": { readonly source: "crates/gpui-kit/src/controls/toggle.rs"; readonly status: "partial" };
@@ -56,6 +57,7 @@ export interface KitBindingCatalog {
   readonly "Container": { readonly source: "crates/gpui-kit/src/layout/grid.rs"; readonly status: "partial" };
   readonly "ContextGauge": { readonly source: "crates/gpui-kit/src/agent/cost.rs"; readonly status: "partial" };
   readonly "ContextMenu": { readonly source: "crates/gpui-kit/src/overlay/menu.rs"; readonly status: "partial" };
+  readonly "ContinuousHeatmap": { readonly source: "crates/gpui-kit/src/display/heatmap.rs"; readonly status: "unbound" };
   readonly "CopyButton": { readonly source: "crates/gpui-kit/src/controls/copy_button.rs"; readonly status: "partial" };
   readonly "CostMeter": { readonly source: "crates/gpui-kit/src/agent/cost.rs"; readonly status: "partial" };
   readonly "DataGrid": { readonly source: "crates/gpui-kit/src/data/grid.rs"; readonly status: "partial" };
@@ -81,6 +83,7 @@ export interface KitBindingCatalog {
   readonly "FormField": { readonly source: "crates/gpui-kit/src/controls/form_field.rs"; readonly status: "partial" };
   readonly "Frost": { readonly source: "crates/gpui-kit/src/overlay/frost.rs"; readonly status: "partial" };
   readonly "GaugeChart": { readonly source: "crates/gpui-kit/src/display/chart.rs"; readonly status: "partial" };
+  readonly "GeoMap": { readonly source: "crates/gpui-kit/src/display/geography/view.rs"; readonly status: "unbound" };
   readonly "Glass": { readonly source: "crates/gpui-kit/src/overlay/glass.rs"; readonly status: "partial" };
   readonly "GlassGroup": { readonly source: "crates/gpui-kit/src/overlay/glass.rs"; readonly status: "unbound" };
   readonly "GraphNode": { readonly source: "crates/gpui-kit/src/canvas/node.rs"; readonly status: "partial" };
@@ -168,6 +171,7 @@ export interface KitBindingCatalog {
   readonly "Slider": { readonly source: "crates/gpui-kit/src/controls/slider.rs"; readonly status: "partial" };
   readonly "SpanTimeline": { readonly source: "crates/gpui-kit/src/display/trace.rs"; readonly status: "partial" };
   readonly "Sparkline": { readonly source: "crates/gpui-kit/src/display/sparkline.rs"; readonly status: "partial" };
+  readonly "SpecializedChart": { readonly source: "crates/gpui-kit/src/display/specialized.rs"; readonly status: "unbound" };
   readonly "Spinner": { readonly source: "crates/gpui-kit/src/display/loading.rs"; readonly status: "partial" };
   readonly "SplitButton": { readonly source: "crates/gpui-kit/src/controls/split_button.rs"; readonly status: "partial" };
   readonly "SplitPane": { readonly source: "crates/gpui-kit/src/layout/split.rs"; readonly status: "partial" };

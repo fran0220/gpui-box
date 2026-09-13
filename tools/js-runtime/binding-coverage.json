@@ -587,7 +587,7 @@
     {
       "name": "AnimatedNumber",
       "source": "crates/gpui-kit/src/display/animated_number.rs",
-      "path": "gpui_kit::display::AnimatedNumber",
+      "path": "gpui_kit::display::animated_number::AnimatedNumber",
       "binding": {
         "api": "gpui.kit.AnimatedNumber",
         "status": "partial",
@@ -1043,7 +1043,7 @@
     {
       "name": "AreaChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::AreaChart",
+      "path": "gpui_kit::display::chart::AreaChart",
       "binding": {
         "api": "gpui.kit.AreaChart",
         "status": "partial",
@@ -1176,7 +1176,7 @@
     {
       "name": "AttachmentTile",
       "source": "crates/gpui-kit/src/display/attachment.rs",
-      "path": "gpui_kit::display::AttachmentTile",
+      "path": "gpui_kit::display::attachment::AttachmentTile",
       "binding": {
         "api": "gpui.kit.AttachmentTile",
         "status": "partial",
@@ -1293,7 +1293,7 @@
     {
       "name": "Avatar",
       "source": "crates/gpui-kit/src/display/avatar.rs",
-      "path": "gpui_kit::display::Avatar",
+      "path": "gpui_kit::display::avatar::Avatar",
       "binding": {
         "api": "gpui.kit.Avatar",
         "status": "partial",
@@ -1331,7 +1331,7 @@
     {
       "name": "AvatarGroup",
       "source": "crates/gpui-kit/src/display/avatar.rs",
-      "path": "gpui_kit::display::AvatarGroup",
+      "path": "gpui_kit::display::avatar::AvatarGroup",
       "binding": {
         "api": "gpui.kit.AvatarGroup",
         "status": "partial",
@@ -1365,7 +1365,7 @@
     {
       "name": "Badge",
       "source": "crates/gpui-kit/src/display/badge.rs",
-      "path": "gpui_kit::display::Badge",
+      "path": "gpui_kit::display::badge::Badge",
       "binding": {
         "api": "gpui.kit.Badge",
         "status": "partial",
@@ -1415,7 +1415,7 @@
     {
       "name": "Banner",
       "source": "crates/gpui-kit/src/display/status.rs",
-      "path": "gpui_kit::display::Banner",
+      "path": "gpui_kit::display::status::Banner",
       "binding": {
         "api": "gpui.kit.Banner",
         "status": "partial",
@@ -1451,7 +1451,7 @@
     {
       "name": "BarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::BarChart",
+      "path": "gpui_kit::display::chart::BarChart",
       "binding": {
         "api": "gpui.kit.BarChart",
         "status": "partial",
@@ -1486,7 +1486,7 @@
     {
       "name": "BarLoader",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::BarLoader",
+      "path": "gpui_kit::display::loading::BarLoader",
       "binding": {
         "api": "gpui.kit.BarLoader",
         "status": "partial",
@@ -1651,7 +1651,7 @@
     {
       "name": "Bubble",
       "source": "crates/gpui-kit/src/display/bubble.rs",
-      "path": "gpui_kit::display::Bubble",
+      "path": "gpui_kit::display::bubble::Bubble",
       "binding": {
         "api": "gpui.kit.Bubble",
         "status": "partial",
@@ -1726,7 +1726,7 @@
     {
       "name": "Button",
       "source": "crates/gpui-kit/src/controls/button.rs",
-      "path": "gpui_kit::controls::Button",
+      "path": "gpui_kit::controls::button::Button",
       "binding": {
         "api": "gpui.kit.Button",
         "status": "partial",
@@ -1791,7 +1791,7 @@
     {
       "name": "ButtonGroup",
       "source": "crates/gpui-kit/src/controls/button.rs",
-      "path": "gpui_kit::controls::ButtonGroup",
+      "path": "gpui_kit::controls::button::ButtonGroup",
       "binding": {
         "api": "gpui.kit.ButtonGroup",
         "status": "partial",
@@ -2256,7 +2256,7 @@
     {
       "name": "Callout",
       "source": "crates/gpui-kit/src/display/status.rs",
-      "path": "gpui_kit::display::Callout",
+      "path": "gpui_kit::display::status::Callout",
       "binding": {
         "api": "gpui.kit.Callout",
         "status": "partial",
@@ -2286,7 +2286,7 @@
     {
       "name": "CandlestickChart",
       "source": "crates/gpui-kit/src/display/plot.rs",
-      "path": "gpui_kit::display::CandlestickChart",
+      "path": "gpui_kit::display::plot::CandlestickChart",
       "binding": {
         "api": "gpui.kit.CandlestickChart",
         "status": "partial",
@@ -2365,7 +2365,7 @@
     {
       "name": "Card",
       "source": "crates/gpui-kit/src/display/card.rs",
-      "path": "gpui_kit::display::Card",
+      "path": "gpui_kit::display::card::Card",
       "binding": {
         "api": "gpui.kit.Card",
         "status": "partial",
@@ -2451,9 +2451,48 @@
       }
     },
     {
+      "name": "CartesianChart",
+      "source": "crates/gpui-kit/src/display/chart/cartesian.rs",
+      "path": "gpui_kit::display::chart::cartesian::CartesianChart",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, label: impl Into<SharedString>, x: ChartScale, axes: impl IntoIterator<Item = ValueAxis>) -> Self"
+        ],
+        "options": [
+          "series(series: impl IntoIterator<Item = RawSeries>) -> Self",
+          "shared_series(series: Rc<Vec<RawSeries>>) -> Self",
+          "animate(enabled: bool) -> Self",
+          "sampling(sampling: PathSampling) -> Self",
+          "custom_marks(build: impl Fn(&RawSeries, &RawPoint) -> Option<CustomMark> + 'static) -> Self",
+          "orientation(orientation: ChartOrientation) -> Self",
+          "x_axis_side(side: AxisSide) -> Self",
+          "axis_side(axis: impl Into<SharedString>, side: AxisSide) -> Result<Self, DataError>",
+          "state(state: impl HasPhase) -> Self",
+          "hidden(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+          "hovered(point: Option<ChartSelection>) -> Self",
+          "selected(point: Option<ChartSelection>) -> Self",
+          "tooltip(mode: TooltipMode) -> Self",
+          "references(references: impl IntoIterator<Item = ChartReference>) -> Self",
+          "stale(reason: impl Into<SharedString>) -> Self",
+          "height(height: f32) -> Self",
+          "format_ticks(format: impl Fn(&str, f64) -> SharedString + 'static) -> Self",
+          "x_ticks(ticks: impl IntoIterator<Item = ChartTick>) -> Result<Self, TickError>",
+          "axis_ticks(axis: impl Into<SharedString>, ticks: impl IntoIterator<Item = ChartTick>) -> Result<Self, TickError>",
+          "on_event(handler: impl Fn(CartesianEvent, &mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
       "name": "Cascader",
       "source": "crates/gpui-kit/src/controls/cascader.rs",
-      "path": "gpui_kit::controls::Cascader",
+      "path": "gpui_kit::controls::cascader::Cascader",
       "binding": {
         "api": "gpui.kit.Cascader",
         "status": "partial",
@@ -2822,7 +2861,7 @@
     {
       "name": "ChartLegend",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::ChartLegend",
+      "path": "gpui_kit::display::chart::ChartLegend",
       "binding": {
         "api": "gpui.kit.ChartLegend",
         "status": "partial",
@@ -2856,7 +2895,7 @@
     {
       "name": "Checkbox",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
-      "path": "gpui_kit::controls::Checkbox",
+      "path": "gpui_kit::controls::toggle::Checkbox",
       "binding": {
         "api": "gpui.kit.Checkbox",
         "status": "partial",
@@ -3347,7 +3386,7 @@
     {
       "name": "ColorPicker",
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
-      "path": "gpui_kit::controls::ColorPicker",
+      "path": "gpui_kit::controls::color_picker::ColorPicker",
       "binding": {
         "api": "gpui.kit.ColorPicker",
         "status": "partial",
@@ -3384,7 +3423,7 @@
     {
       "name": "ColorSwatch",
       "source": "crates/gpui-kit/src/controls/color_picker.rs",
-      "path": "gpui_kit::controls::ColorSwatch",
+      "path": "gpui_kit::controls::color_picker::ColorSwatch",
       "binding": {
         "api": "gpui.kit.ColorSwatch",
         "status": "partial",
@@ -3417,7 +3456,7 @@
     {
       "name": "Combobox",
       "source": "crates/gpui-kit/src/controls/combobox.rs",
-      "path": "gpui_kit::controls::Combobox",
+      "path": "gpui_kit::controls::combobox::Combobox",
       "binding": {
         "api": "gpui.kit.Combobox",
         "status": "partial",
@@ -8266,9 +8305,32 @@
       }
     },
     {
+      "name": "ContinuousHeatmap",
+      "source": "crates/gpui-kit/src/display/heatmap.rs",
+      "path": "gpui_kit::display::heatmap::ContinuousHeatmap",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, label: impl Into<SharedString>, scale: HeatColorScale, state: super::plot::PlotState<Vec<ContinuousHeatCell>>) -> Self"
+        ],
+        "options": [
+          "rows(rows: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self",
+          "columns(columns: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self",
+          "current(id: impl Into<SharedString>) -> Self",
+          "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
       "name": "CopyButton",
       "source": "crates/gpui-kit/src/controls/copy_button.rs",
-      "path": "gpui_kit::controls::CopyButton",
+      "path": "gpui_kit::controls::copy_button::CopyButton",
       "binding": {
         "api": "gpui.kit.CopyButton",
         "status": "partial",
@@ -9071,7 +9133,7 @@
     {
       "name": "DescriptionList",
       "source": "crates/gpui-kit/src/display/description_list.rs",
-      "path": "gpui_kit::display::DescriptionList",
+      "path": "gpui_kit::display::description_list::DescriptionList",
       "binding": {
         "api": "gpui.kit.DescriptionList",
         "status": "partial",
@@ -9500,7 +9562,7 @@
     {
       "name": "Divider",
       "source": "crates/gpui-kit/src/display/empty.rs",
-      "path": "gpui_kit::display::Divider",
+      "path": "gpui_kit::display::empty::Divider",
       "binding": {
         "api": "gpui.kit.Divider",
         "status": "partial",
@@ -9999,7 +10061,7 @@
     {
       "name": "Dropzone",
       "source": "crates/gpui-kit/src/controls/dropzone.rs",
-      "path": "gpui_kit::controls::Dropzone",
+      "path": "gpui_kit::controls::dropzone::Dropzone",
       "binding": {
         "api": "gpui.kit.Dropzone",
         "status": "partial",
@@ -10044,7 +10106,7 @@
     {
       "name": "Editor",
       "source": "crates/gpui-kit/src/controls/editor.rs",
-      "path": "gpui_kit::controls::Editor",
+      "path": "gpui_kit::controls::editor::Editor",
       "binding": {
         "api": "gpui.kit.Editor",
         "status": "partial",
@@ -11537,7 +11599,7 @@
     {
       "name": "EmptyState",
       "source": "crates/gpui-kit/src/display/empty.rs",
-      "path": "gpui_kit::display::EmptyState",
+      "path": "gpui_kit::display::empty::EmptyState",
       "binding": {
         "api": "gpui.kit.EmptyState",
         "status": "partial",
@@ -11572,7 +11634,7 @@
     {
       "name": "FailurePanel",
       "source": "crates/gpui-kit/src/display/failure_panel.rs",
-      "path": "gpui_kit::display::FailurePanel",
+      "path": "gpui_kit::display::failure_panel::FailurePanel",
       "binding": {
         "api": "gpui.kit.FailurePanel",
         "status": "partial",
@@ -11653,7 +11715,7 @@
     {
       "name": "FilterBar",
       "source": "crates/gpui-kit/src/controls/filter_bar.rs",
-      "path": "gpui_kit::controls::FilterBar",
+      "path": "gpui_kit::controls::filter_bar::FilterBar",
       "binding": {
         "api": "gpui.kit.FilterBar",
         "status": "partial",
@@ -11702,7 +11764,7 @@
     {
       "name": "FindReplace",
       "source": "crates/gpui-kit/src/controls/search.rs",
-      "path": "gpui_kit::controls::FindReplace",
+      "path": "gpui_kit::controls::search::FindReplace",
       "binding": {
         "api": "gpui.kit.FindReplace",
         "status": "partial",
@@ -12123,7 +12185,7 @@
     {
       "name": "FormField",
       "source": "crates/gpui-kit/src/controls/form_field.rs",
-      "path": "gpui_kit::controls::FormField",
+      "path": "gpui_kit::controls::form_field::FormField",
       "binding": {
         "api": "gpui.kit.FormField",
         "status": "partial",
@@ -12221,7 +12283,7 @@
     {
       "name": "GaugeChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::GaugeChart",
+      "path": "gpui_kit::display::chart::GaugeChart",
       "binding": {
         "api": "gpui.kit.GaugeChart",
         "status": "partial",
@@ -12238,6 +12300,7 @@
       },
       "rustSignatures": {
         "construct": [
+          "from_raw(ident: impl Into<Ident>, label: impl Into<SharedString>, reading: data::RawPoint, domain: scale::NumericScale) -> Result<Self, data::DataError>",
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
         ],
         "options": [],
@@ -12248,6 +12311,30 @@
           "failed",
           "loading"
         ]
+      }
+    },
+    {
+      "name": "GeoMap",
+      "source": "crates/gpui-kit/src/display/geography/view.rs",
+      "path": "gpui_kit::display::GeoMap",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+        ],
+        "options": [
+          "state(state: GeoState) -> Self",
+          "viewport(viewport: GeoViewport) -> Self",
+          "selected(selected: Option<SharedString>) -> Self",
+          "status_text(text: impl Into<SharedString>) -> Self",
+          "on_event(handler: impl Fn(GeoEvent, &mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
       }
     },
     {
@@ -12458,7 +12545,7 @@
     {
       "name": "Heatmap",
       "source": "crates/gpui-kit/src/display/heatmap.rs",
-      "path": "gpui_kit::display::Heatmap",
+      "path": "gpui_kit::display::heatmap::Heatmap",
       "binding": {
         "api": "gpui.kit.Heatmap",
         "status": "partial",
@@ -12498,7 +12585,7 @@
     {
       "name": "HighlightedText",
       "source": "crates/gpui-kit/src/display/highlight.rs",
-      "path": "gpui_kit::display::HighlightedText",
+      "path": "gpui_kit::display::highlight::HighlightedText",
       "binding": {
         "api": "gpui.kit.HighlightedText",
         "status": "partial",
@@ -12916,7 +13003,7 @@
     {
       "name": "Icon",
       "source": "crates/gpui-kit/src/display/icon.rs",
-      "path": "gpui_kit::display::Icon",
+      "path": "gpui_kit::display::icon::Icon",
       "binding": {
         "api": "gpui.kit.Icon",
         "status": "partial",
@@ -13037,7 +13124,7 @@
     {
       "name": "IconButton",
       "source": "crates/gpui-kit/src/controls/button.rs",
-      "path": "gpui_kit::controls::IconButton",
+      "path": "gpui_kit::controls::button::IconButton",
       "binding": {
         "api": "gpui.kit.IconButton",
         "status": "partial",
@@ -13171,7 +13258,7 @@
     {
       "name": "InlineEdit",
       "source": "crates/gpui-kit/src/controls/inline_edit.rs",
-      "path": "gpui_kit::controls::InlineEdit",
+      "path": "gpui_kit::controls::inline_edit::InlineEdit",
       "binding": {
         "api": "gpui.kit.InlineEdit",
         "status": "partial",
@@ -13374,7 +13461,7 @@
     {
       "name": "KeybindingRecorder",
       "source": "crates/gpui-kit/src/controls/keybinding_recorder.rs",
-      "path": "gpui_kit::controls::KeybindingRecorder",
+      "path": "gpui_kit::controls::keybinding_recorder::KeybindingRecorder",
       "binding": {
         "api": "gpui.kit.KeybindingRecorder",
         "status": "partial",
@@ -13656,7 +13743,7 @@
     {
       "name": "KeymapEditor",
       "source": "crates/gpui-kit/src/controls/keymap_editor.rs",
-      "path": "gpui_kit::controls::KeymapEditor",
+      "path": "gpui_kit::controls::keymap_editor::KeymapEditor",
       "binding": {
         "api": "gpui.kit.KeymapEditor",
         "status": "partial",
@@ -13956,7 +14043,7 @@
     {
       "name": "LineChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::LineChart",
+      "path": "gpui_kit::display::chart::LineChart",
       "binding": {
         "api": "gpui.kit.LineChart",
         "status": "partial",
@@ -14057,7 +14144,7 @@
     {
       "name": "ListRow",
       "source": "crates/gpui-kit/src/display/card.rs",
-      "path": "gpui_kit::display::ListRow",
+      "path": "gpui_kit::display::card::ListRow",
       "binding": {
         "api": "gpui.kit.ListRow",
         "status": "partial",
@@ -14091,7 +14178,7 @@
     {
       "name": "LoadMore",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::LoadMore",
+      "path": "gpui_kit::display::loading::LoadMore",
       "binding": {
         "api": "gpui.kit.LoadMore",
         "status": "partial",
@@ -14250,7 +14337,7 @@
     {
       "name": "MentionInput",
       "source": "crates/gpui-kit/src/controls/mention.rs",
-      "path": "gpui_kit::controls::MentionInput",
+      "path": "gpui_kit::controls::mention::MentionInput",
       "binding": {
         "api": "gpui.kit.MentionInput",
         "status": "partial",
@@ -22964,7 +23051,7 @@
     {
       "name": "MetricCard",
       "source": "crates/gpui-kit/src/display/metric.rs",
-      "path": "gpui_kit::display::MetricCard",
+      "path": "gpui_kit::display::metric::MetricCard",
       "binding": {
         "api": "gpui.kit.MetricCard",
         "status": "partial",
@@ -23108,7 +23195,7 @@
     {
       "name": "MultiSelect",
       "source": "crates/gpui-kit/src/controls/multi_select.rs",
-      "path": "gpui_kit::controls::MultiSelect",
+      "path": "gpui_kit::controls::multi_select::MultiSelect",
       "binding": {
         "api": "gpui.kit.MultiSelect",
         "status": "partial",
@@ -23999,7 +24086,7 @@
     {
       "name": "NumberInput",
       "source": "crates/gpui-kit/src/controls/number_input.rs",
-      "path": "gpui_kit::controls::NumberInput",
+      "path": "gpui_kit::controls::number_input::NumberInput",
       "binding": {
         "api": "gpui.kit.NumberInput",
         "status": "partial",
@@ -24448,7 +24535,7 @@
     {
       "name": "OneTimeCodeInput",
       "source": "crates/gpui-kit/src/controls/auth.rs",
-      "path": "gpui_kit::controls::OneTimeCodeInput",
+      "path": "gpui_kit::controls::auth::OneTimeCodeInput",
       "binding": {
         "api": "gpui.kit.OneTimeCodeInput",
         "status": "partial",
@@ -24762,7 +24849,7 @@
     {
       "name": "OutcomePanel",
       "source": "crates/gpui-kit/src/display/outcome.rs",
-      "path": "gpui_kit::display::OutcomePanel",
+      "path": "gpui_kit::display::outcome::OutcomePanel",
       "binding": {
         "api": "gpui.kit.OutcomePanel",
         "status": "partial",
@@ -24979,7 +25066,7 @@
     {
       "name": "PasswordInput",
       "source": "crates/gpui-kit/src/controls/auth.rs",
-      "path": "gpui_kit::controls::PasswordInput",
+      "path": "gpui_kit::controls::auth::PasswordInput",
       "binding": {
         "api": "gpui.kit.PasswordInput",
         "status": "partial",
@@ -25287,7 +25374,7 @@
     {
       "name": "PerformanceHud",
       "source": "crates/gpui-kit/src/display/performance_hud.rs",
-      "path": "gpui_kit::display::PerformanceHud",
+      "path": "gpui_kit::display::performance_hud::PerformanceHud",
       "binding": {
         "api": "gpui.kit.PerformanceHud",
         "status": "partial",
@@ -25445,7 +25532,7 @@
     {
       "name": "PieChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::PieChart",
+      "path": "gpui_kit::display::chart::PieChart",
       "binding": {
         "api": "gpui.kit.PieChart",
         "status": "partial",
@@ -25463,6 +25550,7 @@
       },
       "rustSignatures": {
         "construct": [
+          "from_raw(ident: impl Into<Ident>, label: impl Into<SharedString>, series: data::RawSeries) -> Result<Self, data::DataError>",
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
         ],
         "options": [
@@ -25480,7 +25568,7 @@
     {
       "name": "Plot",
       "source": "crates/gpui-kit/src/display/plot.rs",
-      "path": "gpui_kit::display::Plot",
+      "path": "gpui_kit::display::plot::Plot",
       "binding": {
         "api": "gpui.kit.Plot",
         "status": "partial",
@@ -25720,7 +25808,7 @@
     {
       "name": "ProgressBar",
       "source": "crates/gpui-kit/src/display/progress.rs",
-      "path": "gpui_kit::display::ProgressBar",
+      "path": "gpui_kit::display::progress::ProgressBar",
       "binding": {
         "api": "gpui.kit.ProgressBar",
         "status": "partial",
@@ -25763,7 +25851,7 @@
     {
       "name": "ProgressCircle",
       "source": "crates/gpui-kit/src/display/progress_circle.rs",
-      "path": "gpui_kit::display::ProgressCircle",
+      "path": "gpui_kit::display::progress_circle::ProgressCircle",
       "binding": {
         "api": "gpui.kit.ProgressCircle",
         "status": "partial",
@@ -25848,7 +25936,7 @@
     {
       "name": "PullToRefresh",
       "source": "crates/gpui-kit/src/interaction/refresh.rs",
-      "path": "gpui_kit::interaction::PullToRefresh",
+      "path": "gpui_kit::interaction::refresh::PullToRefresh",
       "binding": {
         "status": "unbound",
         "reason": "Native adapter and behavioral tests not implemented"
@@ -25871,7 +25959,7 @@
     {
       "name": "PulseLoader",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::PulseLoader",
+      "path": "gpui_kit::display::loading::PulseLoader",
       "binding": {
         "api": "gpui.kit.PulseLoader",
         "status": "partial",
@@ -25902,7 +25990,7 @@
     {
       "name": "RadarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::RadarChart",
+      "path": "gpui_kit::display::chart::RadarChart",
       "binding": {
         "api": "gpui.kit.RadarChart",
         "status": "partial",
@@ -25919,6 +26007,7 @@
       },
       "rustSignatures": {
         "construct": [
+          "from_raw(ident: impl Into<Ident>, label: impl Into<SharedString>, series: impl IntoIterator<Item = data::RawSeries>, axes: &[data::ValueAxis]) -> Result<Self, data::DataError>",
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
         ],
         "options": [],
@@ -25934,7 +26023,7 @@
     {
       "name": "Radio",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
-      "path": "gpui_kit::controls::Radio",
+      "path": "gpui_kit::controls::toggle::Radio",
       "binding": {
         "api": "gpui.kit.Radio",
         "status": "partial",
@@ -26339,7 +26428,7 @@
     {
       "name": "Rating",
       "source": "crates/gpui-kit/src/display/rating.rs",
-      "path": "gpui_kit::display::Rating",
+      "path": "gpui_kit::display::rating::Rating",
       "binding": {
         "api": "gpui.kit.Rating",
         "status": "partial",
@@ -26380,7 +26469,7 @@
     {
       "name": "RefreshVeil",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::RefreshVeil",
+      "path": "gpui_kit::display::loading::RefreshVeil",
       "binding": {
         "api": "gpui.kit.RefreshVeil",
         "status": "partial",
@@ -26474,7 +26563,7 @@
     {
       "name": "RichTextEditor",
       "source": "crates/gpui-kit/src/controls/rich_text_editor/mod.rs",
-      "path": "gpui_kit::controls::RichTextEditor",
+      "path": "gpui_kit::controls::rich_text_editor::RichTextEditor",
       "binding": {
         "api": "gpui.kit.RichTextEditor",
         "status": "partial",
@@ -27753,7 +27842,7 @@
     {
       "name": "SankeyChart",
       "source": "crates/gpui-kit/src/display/plot.rs",
-      "path": "gpui_kit::display::SankeyChart",
+      "path": "gpui_kit::display::plot::SankeyChart",
       "binding": {
         "api": "gpui.kit.SankeyChart",
         "status": "partial",
@@ -28175,6 +28264,7 @@
           "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<SankeyData>) -> Self"
         ],
         "options": [
+          "labels(show: bool) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
           "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
         ],
@@ -28186,7 +28276,7 @@
     {
       "name": "ScatterChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::ScatterChart",
+      "path": "gpui_kit::display::chart::ScatterChart",
       "binding": {
         "api": "gpui.kit.ScatterChart",
         "status": "partial",
@@ -29295,7 +29385,7 @@
     {
       "name": "SearchField",
       "source": "crates/gpui-kit/src/controls/search.rs",
-      "path": "gpui_kit::controls::SearchField",
+      "path": "gpui_kit::controls::search::SearchField",
       "binding": {
         "api": "gpui.kit.SearchField",
         "status": "partial",
@@ -29752,7 +29842,7 @@
     {
       "name": "SearchInput",
       "source": "crates/gpui-kit/src/controls/search.rs",
-      "path": "gpui_kit::controls::SearchInput",
+      "path": "gpui_kit::controls::search::SearchInput",
       "binding": {
         "api": "gpui.kit.SearchInput",
         "status": "partial",
@@ -29964,7 +30054,7 @@
     {
       "name": "SegmentedControl",
       "source": "crates/gpui-kit/src/controls/segmented.rs",
-      "path": "gpui_kit::controls::SegmentedControl",
+      "path": "gpui_kit::controls::segmented::SegmentedControl",
       "binding": {
         "api": "gpui.kit.SegmentedControl",
         "status": "partial",
@@ -30002,7 +30092,7 @@
     {
       "name": "Select",
       "source": "crates/gpui-kit/src/controls/select.rs",
-      "path": "gpui_kit::controls::Select",
+      "path": "gpui_kit::controls::select::Select",
       "binding": {
         "api": "gpui.kit.Select",
         "status": "partial",
@@ -30373,7 +30463,7 @@
     {
       "name": "SettingsList",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
-      "path": "gpui_kit::controls::SettingsList",
+      "path": "gpui_kit::controls::settings_row::SettingsList",
       "binding": {
         "api": "gpui.kit.SettingsList",
         "status": "partial",
@@ -30408,7 +30498,7 @@
     {
       "name": "SettingsRow",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
-      "path": "gpui_kit::controls::SettingsRow",
+      "path": "gpui_kit::controls::settings_row::SettingsRow",
       "binding": {
         "api": "gpui.kit.SettingsRow",
         "status": "partial",
@@ -30448,7 +30538,7 @@
     {
       "name": "SettingsSection",
       "source": "crates/gpui-kit/src/controls/settings_row.rs",
-      "path": "gpui_kit::controls::SettingsSection",
+      "path": "gpui_kit::controls::settings_row::SettingsSection",
       "binding": {
         "api": "gpui.kit.SettingsSection",
         "status": "partial",
@@ -30514,6 +30604,12 @@
           "sections(sections: impl IntoIterator<Item = SidebarSection>) -> Self",
           "active(id: impl Into<SharedString>) -> Self",
           "collapsed(collapsed: bool) -> Self",
+          "width(width: f32) -> Self",
+          "fill_width() -> Self",
+          "fit_height() -> Self",
+          "expanded_ids(ids: &[&str]) -> Self",
+          "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self",
+          "on_collapse(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
           "header(header: impl IntoElement) -> Self",
           "footer(footer: impl IntoElement) -> Self",
           "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
@@ -30526,7 +30622,7 @@
     {
       "name": "Skeleton",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::Skeleton",
+      "path": "gpui_kit::display::loading::Skeleton",
       "binding": {
         "api": "gpui.kit.Skeleton",
         "status": "partial",
@@ -30563,7 +30659,7 @@
     {
       "name": "Slider",
       "source": "crates/gpui-kit/src/controls/slider.rs",
-      "path": "gpui_kit::controls::Slider",
+      "path": "gpui_kit::controls::slider::Slider",
       "binding": {
         "api": "gpui.kit.Slider",
         "status": "partial",
@@ -30617,7 +30713,7 @@
     {
       "name": "SpanTimeline",
       "source": "crates/gpui-kit/src/display/trace.rs",
-      "path": "gpui_kit::display::SpanTimeline",
+      "path": "gpui_kit::display::trace::SpanTimeline",
       "binding": {
         "api": "gpui.kit.SpanTimeline",
         "status": "partial",
@@ -30644,6 +30740,13 @@
         ],
         "options": [
           "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
+          "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
+          "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
+          "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
+          "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
+          "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",
+          "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self",
+          "visible_rows(count: usize) -> Self",
           "axis(start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self",
           "ticks<S: Into<SharedString>>(ticks: impl IntoIterator<Item = (f32, S)>) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
@@ -30659,7 +30762,7 @@
     {
       "name": "Sparkline",
       "source": "crates/gpui-kit/src/display/sparkline.rs",
-      "path": "gpui_kit::display::Sparkline",
+      "path": "gpui_kit::display::sparkline::Sparkline",
       "binding": {
         "api": "gpui.kit.Sparkline",
         "status": "partial",
@@ -30713,9 +30816,30 @@
       }
     },
     {
+      "name": "SpecializedChart",
+      "source": "crates/gpui-kit/src/display/specialized.rs",
+      "path": "gpui_kit::display::specialized::SpecializedChart",
+      "binding": {
+        "status": "unbound",
+        "reason": "Native adapter and behavioral tests not implemented"
+      },
+      "rustSignatures": {
+        "construct": [
+          "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: PlotState<SpecializedData>) -> Self"
+        ],
+        "options": [
+          "current(id: impl Into<SharedString>) -> Self",
+          "on_current(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+        ],
+        "commands": [],
+        "queries": [],
+        "slots": []
+      }
+    },
+    {
       "name": "Spinner",
       "source": "crates/gpui-kit/src/display/loading.rs",
-      "path": "gpui_kit::display::Spinner",
+      "path": "gpui_kit::display::loading::Spinner",
       "binding": {
         "api": "gpui.kit.Spinner",
         "status": "partial",
@@ -30746,7 +30870,7 @@
     {
       "name": "SplitButton",
       "source": "crates/gpui-kit/src/controls/split_button.rs",
-      "path": "gpui_kit::controls::SplitButton",
+      "path": "gpui_kit::controls::split_button::SplitButton",
       "binding": {
         "api": "gpui.kit.SplitButton",
         "status": "partial",
@@ -35058,7 +35182,7 @@
     {
       "name": "StackedBarChart",
       "source": "crates/gpui-kit/src/display/chart.rs",
-      "path": "gpui_kit::display::StackedBarChart",
+      "path": "gpui_kit::display::chart::StackedBarChart",
       "binding": {
         "api": "gpui.kit.StackedBarChart",
         "status": "partial",
@@ -35093,7 +35217,7 @@
     {
       "name": "StageProgress",
       "source": "crates/gpui-kit/src/display/stage_progress.rs",
-      "path": "gpui_kit::display::StageProgress",
+      "path": "gpui_kit::display::stage_progress::StageProgress",
       "binding": {
         "api": "gpui.kit.StageProgress",
         "status": "partial",
@@ -35122,7 +35246,7 @@
     {
       "name": "StaleMark",
       "source": "crates/gpui-kit/src/display/status.rs",
-      "path": "gpui_kit::display::StaleMark",
+      "path": "gpui_kit::display::status::StaleMark",
       "binding": {
         "api": "gpui.kit.StaleMark",
         "status": "partial",
@@ -35152,7 +35276,7 @@
     {
       "name": "StateView",
       "source": "crates/gpui-kit/src/display/state_view.rs",
-      "path": "gpui_kit::display::StateView",
+      "path": "gpui_kit::display::state_view::StateView",
       "binding": {
         "api": "gpui.kit.StateView",
         "status": "partial",
@@ -35226,7 +35350,7 @@
     {
       "name": "StatusDot",
       "source": "crates/gpui-kit/src/display/status.rs",
-      "path": "gpui_kit::display::StatusDot",
+      "path": "gpui_kit::display::status::StatusDot",
       "binding": {
         "api": "gpui.kit.StatusDot",
         "status": "partial",
@@ -35260,7 +35384,7 @@
     {
       "name": "StatusLine",
       "source": "crates/gpui-kit/src/display/status.rs",
-      "path": "gpui_kit::display::StatusLine",
+      "path": "gpui_kit::display::status::StatusLine",
       "binding": {
         "api": "gpui.kit.StatusLine",
         "status": "partial",
@@ -35335,7 +35459,7 @@
     {
       "name": "SwipeActions",
       "source": "crates/gpui-kit/src/interaction/swipe.rs",
-      "path": "gpui_kit::interaction::SwipeActions",
+      "path": "gpui_kit::interaction::swipe::SwipeActions",
       "binding": {
         "status": "unbound",
         "reason": "Native adapter and behavioral tests not implemented"
@@ -35361,7 +35485,7 @@
     {
       "name": "Switch",
       "source": "crates/gpui-kit/src/controls/toggle.rs",
-      "path": "gpui_kit::controls::Switch",
+      "path": "gpui_kit::controls::toggle::Switch",
       "binding": {
         "api": "gpui.kit.Switch",
         "status": "partial",
@@ -35517,7 +35641,7 @@
     {
       "name": "Tag",
       "source": "crates/gpui-kit/src/display/tag.rs",
-      "path": "gpui_kit::display::Tag",
+      "path": "gpui_kit::display::tag::Tag",
       "binding": {
         "api": "gpui.kit.Tag",
         "status": "partial",
@@ -35557,7 +35681,7 @@
     {
       "name": "TagInput",
       "source": "crates/gpui-kit/src/controls/tag_input.rs",
-      "path": "gpui_kit::controls::TagInput",
+      "path": "gpui_kit::controls::tag_input::TagInput",
       "binding": {
         "api": "gpui.kit.TagInput",
         "status": "partial",
@@ -35935,7 +36059,7 @@
     {
       "name": "TextArea",
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
-      "path": "gpui_kit::controls::TextArea",
+      "path": "gpui_kit::controls::textarea::TextArea",
       "binding": {
         "api": "gpui.kit.TextArea",
         "status": "partial",
@@ -37117,7 +37241,7 @@
     {
       "name": "TextInput",
       "source": "crates/gpui-kit/src/controls/input/mod.rs",
-      "path": "gpui_kit::controls::TextInput",
+      "path": "gpui_kit::controls::input::TextInput",
       "binding": {
         "api": "gpui.kit.TextInput",
         "status": "partial",
@@ -37871,7 +37995,7 @@
     {
       "name": "Timeline",
       "source": "crates/gpui-kit/src/display/timeline.rs",
-      "path": "gpui_kit::display::Timeline",
+      "path": "gpui_kit::display::timeline::Timeline",
       "binding": {
         "api": "gpui.kit.Timeline",
         "status": "partial",
@@ -38181,7 +38305,7 @@
     {
       "name": "Toggle",
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
-      "path": "gpui_kit::controls::Toggle",
+      "path": "gpui_kit::controls::toggle_button::Toggle",
       "binding": {
         "api": "gpui.kit.Toggle",
         "status": "partial",
@@ -38234,7 +38358,7 @@
     {
       "name": "ToggleGroup",
       "source": "crates/gpui-kit/src/controls/toggle_button.rs",
-      "path": "gpui_kit::controls::ToggleGroup",
+      "path": "gpui_kit::controls::toggle_button::ToggleGroup",
       "binding": {
         "api": "gpui.kit.ToggleGroup",
         "status": "partial",
@@ -38412,7 +38536,7 @@
     {
       "name": "TraceView",
       "source": "crates/gpui-kit/src/display/trace.rs",
-      "path": "gpui_kit::display::TraceView",
+      "path": "gpui_kit::display::trace::TraceView",
       "binding": {
         "api": "gpui.kit.TraceView",
         "status": "partial",
@@ -38439,6 +38563,13 @@
         ],
         "options": [
           "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
+          "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
+          "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
+          "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
+          "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
+          "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",
+          "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self",
+          "visible_rows(count: usize) -> Self",
           "axis(start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self",
           "ticks<S: Into<SharedString>>(ticks: impl IntoIterator<Item = (f32, S)>) -> Self",
           "current(id: impl Into<SharedString>) -> Self",
@@ -38454,7 +38585,7 @@
     {
       "name": "TransferList",
       "source": "crates/gpui-kit/src/controls/transfer_list.rs",
-      "path": "gpui_kit::controls::TransferList",
+      "path": "gpui_kit::controls::transfer_list::TransferList",
       "binding": {
         "api": "gpui.kit.TransferList",
         "status": "partial",
@@ -38926,7 +39057,7 @@
     {
       "name": "UploadList",
       "source": "crates/gpui-kit/src/controls/upload_list.rs",
-      "path": "gpui_kit::controls::UploadList",
+      "path": "gpui_kit::controls::upload_list::UploadList",
       "binding": {
         "api": "gpui.kit.UploadList",
         "status": "partial",

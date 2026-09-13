@@ -5074,7 +5074,7 @@
       "options": [
         "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
         "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
-        "time_viewport(domain: [f64",
+        "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
         "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
         "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
         "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",
@@ -6101,7 +6101,7 @@
       "options": [
         "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
         "shared_spans(spans: Rc<Vec<TraceSpan>>) -> Self",
-        "time_viewport(domain: [f64",
+        "time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>",
         "format_time(format: impl Fn(f64) -> SharedString + 'static) -> Self",
         "on_viewport(handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static) -> Self",
         "collapsed(ids: impl IntoIterator<Item = SharedString>) -> Self",
@@ -10663,7 +10663,7 @@
         "features() -> &[GeoFeature]",
         "points() -> &[GeoPoint]",
         "color_domain() -> &GeoColorDomain",
-        "hit_test(viewport: GeoViewport, size: [f64"
+        "hit_test(viewport: GeoViewport, size: [f64; 2], position: [f64; 2]) -> Option<SharedString>"
       ]
     },
     {
@@ -10791,8 +10791,8 @@
       "construct": [],
       "options": [
         "validate() -> Result<(), GeoRefusal>",
-        "screen(position: GeoProjected, size: [f64",
-        "world(position: [f64",
+        "screen(position: GeoProjected, size: [f64; 2]) -> [f64; 2]",
+        "world(position: [f64; 2], size: [f64; 2]) -> GeoProjected",
         "pan(dx: f64, dy: f64) -> Self",
         "zoom_at(factor: f64, anchor: GeoProjected) -> Self"
       ],
@@ -11210,11 +11210,11 @@
       "summary": "A continuous color encoding with a required finite, strictly increasing domain. Diverging maps interpolate each side independently: the neutral color corresponds to the explicit center, not the arithmetic midpoint. Errors are stable StringKey::name values, not display text; resolve them through the active strings when presenting them outside ContinuousHeatmap.",
       "variants": [],
       "construct": [
-        "sequential(domain: [f64",
-        "diverging(domain: [f64"
+        "sequential(domain: [f64; 2], low: gpui::Hsla, high: gpui::Hsla) -> Result<Self, &'static str>",
+        "diverging(domain: [f64; 3], low: gpui::Hsla, center: gpui::Hsla, high: gpui::Hsla) -> Result<Self, &'static str>"
       ],
       "options": [
-        "domain() -> [f64",
+        "domain() -> [f64; 3]",
         "color(value: f64) -> Result<gpui::Hsla, &'static str>"
       ],
       "commands": [],
@@ -12545,7 +12545,7 @@
       "variants": [],
       "construct": [],
       "options": [
-        "centre() -> [f32",
+        "centre() -> [f32; 3]",
         "radius() -> f32"
       ],
       "commands": [],
@@ -12641,7 +12641,7 @@
       "commands": [],
       "queries": [
         "name() -> &SharedString",
-        "positions() -> &[[f32",
+        "positions() -> &[[f32; 3]]",
         "indices() -> &[u32]",
         "triangle_count() -> usize"
       ]
@@ -13079,17 +13079,17 @@
       "summary": "An invertible f64 scale. Constant input expands by 5% (one unit at zero).",
       "variants": [],
       "construct": [
-        "new(kind: ScaleKind, mut domain: [f64",
+        "new(kind: ScaleKind, mut domain: [f64; 2]) -> Result<Self, ScaleError>",
         "extent(kind: ScaleKind, values: impl IntoIterator<Item = Option<f64>>, include_zero: bool) -> Result<Self, ScaleError>"
       ],
       "options": [
-        "domain() -> [f64",
+        "domain() -> [f64; 2]",
         "kind() -> ScaleKind",
         "map(value: f64) -> Option<f64>",
         "invert(fraction: f64) -> Option<f64>",
         "pan(fraction: f64) -> Result<Self, ScaleError>",
         "zoom(anchor: f64, factor: f64) -> Result<Self, ScaleError>",
-        "window(fractions: [f64",
+        "window(fractions: [f64; 2]) -> Result<Self, ScaleError>",
         "ticks(count: usize) -> Vec<f64>"
       ],
       "commands": [],
@@ -14126,15 +14126,15 @@
       "construct": [],
       "options": [],
       "commands": [
-        "begin(mapping: S, value: Option<[f64",
-        "sync(mapping: &S, value: Option<[f64",
+        "begin(mapping: S, value: Option<[f64; 2]>, intent: RangeIntent, pointer: f64) -> Result<RangeEvent, RangeError>",
+        "sync(mapping: &S, value: Option<[f64; 2]>) -> Option<RangeEvent>",
         "update(pointer: f64) -> Result<Option<RangeEvent>, RangeError>",
         "release(pointer: f64) -> Result<Option<RangeEvent>, RangeError>",
         "cancel() -> Option<RangeEvent>",
-        "keyboard(mapping: &S, value: [f64"
+        "keyboard(mapping: &S, value: [f64; 2], target: RangeTarget, key: RangeKey) -> Result<RangeEvent, RangeError>"
       ],
       "queries": [
-        "preview() -> Option<[f64"
+        "preview() -> Option<[f64; 2]>"
       ]
     },
     {
@@ -14226,7 +14226,7 @@
       "summary": "One raw OHLC reading. The x coordinate may be Unix milliseconds on a shared Time scale or any caller-defined numeric coordinate. Negative readings are accepted; financial/calendar/domain policy is not inferred.",
       "variants": [],
       "construct": [
-        "new(id: impl Into<SharedString>, x: f64, ohlc: [f64",
+        "new(id: impl Into<SharedString>, x: f64, ohlc: [f64; 4], label: impl Into<SharedString>, formatted: impl Into<SharedString>) -> Self",
         "series(id: impl Into<SharedString>, axis: impl Into<SharedString>, readings: impl IntoIterator<Item = Self>, rising: Hsla, falling: Hsla) -> Result<super::chart::data::RawSeries, OhlcError>"
       ],
       "options": [],
@@ -14243,7 +14243,7 @@
       ],
       "options": [
         "text(label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self",
-        "error(interval: [f64",
+        "error(interval: [f64; 2]) -> Self",
         "baseline(value: f64) -> Self",
         "tint(color: Hsla) -> Self"
       ],
@@ -15681,8 +15681,8 @@
       "summary": "Validated, reproducible geometry plus an always-visible exact-value key.",
       "variants": [],
       "construct": [
-        "box_plot(id: impl Into<SharedString>, label: impl Into<SharedString>, samples: &[f64], domain: [f64",
-        "range(id: impl Into<SharedString>, label: impl Into<SharedString>, low: f64, high: f64, domain: [f64",
+        "box_plot(id: impl Into<SharedString>, label: impl Into<SharedString>, samples: &[f64], domain: [f64; 2]) -> Result<Self, SpecializedError>",
+        "range(id: impl Into<SharedString>, label: impl Into<SharedString>, low: f64, high: f64, domain: [f64; 2]) -> Result<Self, SpecializedError>",
         "treemap(root: &HierarchyNode) -> Result<Self, SpecializedError>",
         "sunburst(root: &HierarchyNode) -> Result<Self, SpecializedError>",
         "funnel(items: Vec<WeightedValue>) -> Result<Self, SpecializedError>",

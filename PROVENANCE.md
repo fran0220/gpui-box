@@ -1110,3 +1110,12 @@ or calendar policy. English and Chinese chart state strings are original text.
 `cartesian_performance.rs`, its rectangle tree, immutable projection cache and
 pixel-column extrema reduction, and the chart performance fixtures are original
 Kit implementations. No external sampling or spatial-index source was copied.
+
+### Balanced framework bounds index
+
+The equal-leaf-depth overflow splitting, index-owned traversal and focused
+workload/oracle tests in `crates/gpui/src/bounds_tree.rs` and its `bounds_tree/`
+test directory are independently authored GPUI Box changes to the imported
+framework index. No third-party R-tree implementation was copied. The original
+file's upstream attribution and frozen historical import receipt remain intact;
+no package authority, renderer ABI or dependency source changed.

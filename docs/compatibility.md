@@ -896,3 +896,20 @@ bounds consistently. The token does not expand an arbitrary element's hit area
 or establish mobile keyboard, screen-reader or device support. Native platform
 and mobile component validation remains separately required by the delivery
 ledger in `tasks/mobile-platform-delivery.md`.
+
+### BoundsTree balance preserves primitive ordering
+
+The framework-private bounds index uses equal-depth leaves and propagated
+overflow splits. Its generic unit bounds and public scene/renderer contracts
+are unchanged. Each insertion still returns one plus the maximum assigned
+order among prior bounds intersecting under `Bounds::intersects`, including
+strict edge comparisons and the existing zero-size behavior. A global-max
+representative miss does not rule out a tied maximum elsewhere in the tree.
+
+Insertion depth is logarithmic; arbitrary overlapping-subtree search remains
+linear in the worst case. CPU-only workload evidence and reproduction commands
+live in [bounds-tree-performance.md](bounds-tree-performance.md). These checks
+do not establish FPS, GPU performance or native presentation. Linux headless
+catalog and full gate checks are integration requirements; macOS Metal and
+Windows WARP remain their separately executed platform lanes. No baseline,
+shader, renderer, package authority or frozen historical receipt is changed.

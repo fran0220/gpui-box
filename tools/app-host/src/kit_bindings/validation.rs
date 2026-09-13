@@ -629,6 +629,29 @@ mod tests {
     }
 
     #[test]
+    fn unbound_chart_and_display_descriptors_are_refused_before_rendering() {
+        for component in [
+            "CartesianChart",
+            "SpecializedChart",
+            "ContinuousHeatmap",
+            "GeoMap",
+        ] {
+            let node: Node = serde_json::from_value(json!({
+                "kind": "kit", "id": "unsupported", "component": component,
+                "props": {}, "slots": {}, "events": {}
+            }))
+            .expect("well-formed wire node");
+            assert_eq!(
+                validate_descriptor(&node)
+                    .expect_err("unbound component must not reach rendering")
+                    .to_string(),
+                "unsupported Kit component",
+                "{component}"
+            );
+        }
+    }
+
+    #[test]
     fn embedded_schemas_exactly_match_native_registration() {
         let names: HashSet<_> = SCHEMAS
             .as_object()

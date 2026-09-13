@@ -622,3 +622,8 @@ Kit additions using the same existing framework and motion authority.
 Cartesian rectangle indexing, immutable projection caching, pixel-column path
 reduction and performance fixtures are original work with no new third-party
 source or dependencies.
+
+Balanced framework BoundsTree overflow splitting, index-owned traversal and
+focused ordering/structure/performance tests are original GPUI Box work. No
+external spatial-index source or new dependency was imported. Existing GPUI
+attribution and frozen historical import receipts are unchanged.

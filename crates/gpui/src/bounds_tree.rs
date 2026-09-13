@@ -3,7 +3,6 @@ use std::{
     cmp,
     fmt::Debug,
     ops::{Add, Sub},
-    ptr::NonNull,
 };
 
 /// Maximum children per internal node (R-tree style branching factor).
@@ -12,11 +11,16 @@ const MAX_CHILDREN: usize = 12;
 
 /// A spatial tree optimized for finding maximum ordering among intersecting bounds.
 ///
-/// This is an R-tree variant specifically designed for the use case of assigning
-/// z-order to overlapping UI elements. Key optimizations:
-/// - Tracks the leaf with global max ordering for O(1) fast-path queries
-/// - Uses higher branching factor (4) for lower tree height
-/// - Aggressive pruning during search based on max_order metadata
+/// Leaves have equal depth. Internal nodes hold 6..=12 children, except the root
+/// which holds 2..=12. Overflow splits propagate to the root, so insertion depth
+/// is logarithmic even for spatially ordered submissions. Splits sort a fixed
+/// scratch array along the longest bounding-box axis; no coordinate conversion
+/// or stronger unit bounds are required.
+///
+/// Search prunes by subtree bounds and maximum order and checks a global-max
+/// leaf first. Spatial overlap can still require linear search; balance bounds
+/// insertion depth, not the number of intersecting subtrees. Traversal and split
+/// propagation are iterative, and node indices remain valid across Vec growth.
 #[derive(Debug)]
 pub(crate) struct BoundsTree<U>
 where
@@ -31,7 +35,11 @@ where
     /// Reusable stack for tree traversal during insertion.
     insert_path: Vec<usize>,
     /// Reusable stack for search operations.
-    search_stack: Vec<NonNull<Node<U>>>,
+    search_stack: Vec<usize>,
+    #[cfg(test)]
+    search_visits: usize,
+    #[cfg(test)]
+    insert_visits: usize,
 }
 
 /// A node in the bounds tree.
@@ -111,6 +119,11 @@ where
         self.max_leaf = None;
         self.insert_path.clear();
         self.search_stack.clear();
+        #[cfg(test)]
+        {
+            self.search_visits = 0;
+            self.insert_visits = 0;
+        }
     }
 
     /// Inserts bounds into the tree and returns its assigned ordering.
@@ -141,7 +154,8 @@ where
             return 0;
         };
 
-        // Fast path: check if the max-ordering leaf intersects
+        // Any intersecting global maximum proves the answer, including ties.
+        // A miss proves nothing: another leaf can have the same maximum order.
         if let Some(max_idx) = self.max_leaf {
             let max_node = &self.nodes[max_idx];
             if query.intersects(&max_node.bounds) {
@@ -151,14 +165,16 @@ where
 
         // Slow path: search the tree
         self.search_stack.clear();
-        self.search_stack.push(NonNull::from(&self.nodes[root_idx]));
+        self.search_stack.push(root_idx);
 
         let mut max_found = 0u32;
 
         while let Some(node) = self.search_stack.pop() {
-            // SAFETY: `node` is guaranteed to be valid as the `nodes` stack is unmodified in this function
-            // and the `search_stack` only contains pointers from this function call.
-            let node = unsafe { node.as_ref() };
+            #[cfg(test)]
+            {
+                self.search_visits += 1;
+            }
+            let node = &self.nodes[node];
 
             // Pruning: skip if this subtree can't improve our result
             if node.max_order <= max_found {
@@ -181,9 +197,8 @@ where
                         children
                             .as_slice()
                             .iter()
-                            .map(|&child_idx| &self.nodes[child_idx])
-                            .filter(|node| node.max_order > max_found)
-                            .map(NonNull::from),
+                            .copied()
+                            .filter(|&index| self.nodes[index].max_order > max_found),
                     );
                 }
             }
@@ -208,27 +223,14 @@ where
             return new_leaf_idx;
         };
 
-        // If root is a leaf, create internal node with both
+        // Only the root may be a bare leaf.
         if matches!(self.nodes[root_idx].kind, NodeKind::Leaf { .. }) {
-            let root_bounds = self.nodes[root_idx].bounds.clone();
-            let root_order = self.nodes[root_idx].max_order;
-
             let mut children = NodeChildren::new();
-            // Max end invariant
-            if order > root_order {
-                children.push(root_idx);
-                children.push(new_leaf_idx);
-            } else {
-                children.push(new_leaf_idx);
-                children.push(root_idx);
-            }
-
+            children.push(root_idx);
+            children.push(new_leaf_idx);
+            let root = self.internal_node(children);
             let new_root_idx = self.nodes.len();
-            self.nodes.push(Node {
-                bounds: root_bounds.union(&bounds),
-                max_order: cmp::max(root_order, order),
-                kind: NodeKind::Internal { children },
-            });
+            self.nodes.push(root);
             self.root = Some(new_root_idx);
             return new_leaf_idx;
         }
@@ -238,6 +240,10 @@ where
         let mut current_idx = root_idx;
 
         loop {
+            #[cfg(test)]
+            {
+                self.insert_visits += 1;
+            }
             let current = &self.nodes[current_idx];
             let NodeKind::Internal { children } = &current.kind else {
                 unreachable!("Should only traverse internal nodes");
@@ -245,112 +251,117 @@ where
 
             self.insert_path.push(current_idx);
 
-            // Find the best child to descend into
+            // Equal leaf depth means all children here have the same kind.
+            if matches!(self.nodes[children.indices[0]].kind, NodeKind::Leaf { .. }) {
+                break;
+            }
+
+            // Minimize enlargement, then union perimeter. Stable ties keep
+            // insertion deterministic without requiring Ord on generic units.
             let mut best_child_idx = children.as_slice()[0];
-            let mut best_child_pos = 0;
-            let mut best_cost = bounds
+            let mut best_perimeter = bounds
                 .union(&self.nodes[best_child_idx].bounds)
                 .half_perimeter();
+            let mut best_cost =
+                best_perimeter.clone() - self.nodes[best_child_idx].bounds.half_perimeter();
 
-            for (pos, &child_idx) in children.as_slice().iter().enumerate().skip(1) {
-                let cost = bounds.union(&self.nodes[child_idx].bounds).half_perimeter();
-                if cost < best_cost {
+            for &child_idx in children.as_slice().iter().skip(1) {
+                let perimeter = bounds.union(&self.nodes[child_idx].bounds).half_perimeter();
+                let cost = perimeter.clone() - self.nodes[child_idx].bounds.half_perimeter();
+                if cost < best_cost || (cost == best_cost && perimeter < best_perimeter) {
                     best_cost = cost;
+                    best_perimeter = perimeter;
                     best_child_idx = child_idx;
-                    best_child_pos = pos;
                 }
             }
-
-            // Check if best child is a leaf or internal
-            if matches!(self.nodes[best_child_idx].kind, NodeKind::Leaf { .. }) {
-                // Best child is a leaf. Check if current node has room for another child.
-                if children.len() < MAX_CHILDREN {
-                    // Add new leaf directly to this node
-                    let node = &mut self.nodes[current_idx];
-
-                    if let NodeKind::Internal { children } = &mut node.kind {
-                        children.push(new_leaf_idx);
-                        // Swap new leaf only if it has the highest max_order
-                        if order <= node.max_order {
-                            let last = children.len() - 1;
-                            children.indices.swap(last - 1, last);
-                        }
-                    }
-
-                    node.bounds = node.bounds.union(&bounds);
-                    node.max_order = cmp::max(node.max_order, order);
-                    break;
-                } else {
-                    // Node is full, create new internal with [best_leaf, new_leaf]
-                    let sibling_bounds = self.nodes[best_child_idx].bounds.clone();
-                    let sibling_order = self.nodes[best_child_idx].max_order;
-
-                    let mut new_children = NodeChildren::new();
-                    // Max end invariant
-                    if order > sibling_order {
-                        new_children.push(best_child_idx);
-                        new_children.push(new_leaf_idx);
-                    } else {
-                        new_children.push(new_leaf_idx);
-                        new_children.push(best_child_idx);
-                    }
-
-                    let new_internal_idx = self.nodes.len();
-                    let new_internal_max = cmp::max(sibling_order, order);
-                    self.nodes.push(Node {
-                        bounds: sibling_bounds.union(&bounds),
-                        max_order: new_internal_max,
-                        kind: NodeKind::Internal {
-                            children: new_children,
-                        },
-                    });
-
-                    // Replace the leaf with the new internal in parent
-                    let parent = &mut self.nodes[current_idx];
-                    if let NodeKind::Internal { children } = &mut parent.kind {
-                        let children_len = children.len();
-
-                        children.indices[best_child_pos] = new_internal_idx;
-
-                        // If new internal has highest max_order, swap it to the end
-                        // to maintain sorting invariant
-                        if new_internal_max > parent.max_order {
-                            children.indices.swap(best_child_pos, children_len - 1);
-                        }
-                    }
-                    break;
-                }
-            } else {
-                // Best child is internal, continue descent
-                current_idx = best_child_idx;
-            }
+            current_idx = best_child_idx;
         }
 
-        // Propagate bounds and max_order updates up the tree
-        let mut updated_child_idx = None;
-        for &node_idx in self.insert_path.iter().rev() {
-            let node = &mut self.nodes[node_idx];
-            node.bounds = node.bounds.union(&bounds);
-
-            if node.max_order < order {
-                node.max_order = order;
-
-                // Swap updated child to end (skip first iteration since the invariant is already handled by previous cases)
-                if let Some(child_idx) = updated_child_idx
-                    && let NodeKind::Internal { children } = &mut node.kind
-                    && let Some(pos) = children.as_slice().iter().position(|&c| c == child_idx)
-                {
-                    let last = children.len() - 1;
-                    if pos != last {
-                        children.indices.swap(pos, last);
-                    }
+        // Keep the original node index for one split half, and append the other.
+        // Ancestors retain ownership of the original; no leaf ever moves.
+        let mut pending = Some(new_leaf_idx);
+        while let Some(node_idx) = self.insert_path.pop() {
+            let NodeKind::Internal { mut children } = self.nodes[node_idx].kind.clone() else {
+                unreachable!("insertion path contains only internal nodes");
+            };
+            if let Some(child) = pending.take() {
+                if children.len() == MAX_CHILDREN {
+                    pending = Some(self.split(node_idx, children, child));
+                    continue;
                 }
+                children.push(child);
             }
-
-            updated_child_idx = Some(node_idx);
+            self.nodes[node_idx] = self.internal_node(children);
+        }
+        if let Some(sibling) = pending {
+            let mut children = NodeChildren::new();
+            children.push(root_idx);
+            children.push(sibling);
+            let root = self.internal_node(children);
+            self.root = Some(self.nodes.len());
+            self.nodes.push(root);
         }
 
         new_leaf_idx
+    }
+
+    /// Recompute exact metadata, keeping a maximum-order child last for search.
+    fn internal_node(&self, mut children: NodeChildren) -> Node<U> {
+        let first = &self.nodes[children.indices[0]];
+        let mut bounds = first.bounds.clone();
+        let mut max_order = first.max_order;
+        let mut max_pos = 0;
+        for (pos, &index) in children.as_slice().iter().enumerate().skip(1) {
+            let child = &self.nodes[index];
+            bounds = bounds.union(&child.bounds);
+            if child.max_order > max_order {
+                max_order = child.max_order;
+                max_pos = pos;
+            }
+        }
+        let last = children.len() - 1;
+        children.indices.swap(max_pos, last);
+        Node {
+            bounds,
+            max_order,
+            kind: NodeKind::Internal { children },
+        }
+    }
+
+    /// Split 13 same-level children into groups of 6 and 7. Fixed-size insertion
+    /// sort also supports partially ordered units without a total-order adapter.
+    fn split(&mut self, index: usize, children: NodeChildren, extra: usize) -> usize {
+        let mut indices = [0; MAX_CHILDREN + 1];
+        indices[..MAX_CHILDREN].copy_from_slice(children.as_slice());
+        indices[MAX_CHILDREN] = extra;
+        let bounds = self.nodes[index].bounds.union(&self.nodes[extra].bounds);
+        let horizontal = bounds.size.width >= bounds.size.height;
+        for i in 1..indices.len() {
+            let mut j = i;
+            while j > 0 {
+                let a = &self.nodes[indices[j]].bounds.origin;
+                let b = &self.nodes[indices[j - 1]].bounds.origin;
+                let precedes = if horizontal { a.x < b.x } else { a.y < b.y };
+                if !precedes {
+                    break;
+                }
+                indices.swap(j, j - 1);
+                j -= 1;
+            }
+        }
+        let mut left = NodeChildren::new();
+        let mut right = NodeChildren::new();
+        for &child in &indices[..MAX_CHILDREN / 2] {
+            left.push(child);
+        }
+        for &child in &indices[MAX_CHILDREN / 2..] {
+            right.push(child);
+        }
+        self.nodes[index] = self.internal_node(left);
+        let sibling = self.internal_node(right);
+        let sibling_idx = self.nodes.len();
+        self.nodes.push(sibling);
+        sibling_idx
     }
 }
 
@@ -365,9 +376,17 @@ where
             max_leaf: None,
             insert_path: Vec::new(),
             search_stack: Vec::new(),
+            #[cfg(test)]
+            search_visits: 0,
+            #[cfg(test)]
+            insert_visits: 0,
         }
     }
 }
+
+#[cfg(test)]
+#[path = "bounds_tree/tests.rs"]
+mod balanced_tests;
 
 #[cfg(test)]
 mod tests {

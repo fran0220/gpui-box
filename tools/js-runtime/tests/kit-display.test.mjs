@@ -5,6 +5,7 @@ import { familySchemas, familyMethods, validateFamilyProps } from '../kit-displa
 import { validateValue } from '../kit-schema.mjs';
 import { props } from '../../app-host/src/kit_bindings/display/fixture/props.mjs';
 import { createKitBindings } from '../kit-bindings.mjs';
+import { validateTree } from '../tree.mjs';
 const validate = (component, value) => { validateValue(value, familySchemas[component].props); validateFamilyProps(component, value); };
 test('real factories clone caller data and register only enabled typed actions', () => {
   const actions = new Map();
@@ -23,12 +24,29 @@ test('real factories clone caller data and register only enabled typed actions',
   kit.Rating('disabled', { disabled: true }, { change() { throw new Error('disabled'); } });
   assert.equal(actions.has('disabled:change'), false);
 });
-test('every display component has a native fixture and closed schema; generated data is current', () => {
+test('every display component is accounted for by a supported adapter or explicit unbound contract', () => {
   assert.deepEqual(Object.keys(props).sort(), Object.keys(familySchemas).sort());
+  assert.deepEqual(JSON.parse(readFileSync(new URL('../../app-host/src/kit_bindings/display/fixture/props.json', import.meta.url))), props);
   const index = JSON.parse(readFileSync(new URL('../../../docs/api-index.json', import.meta.url)));
   const expected = index.components.filter(c => c.source.startsWith('crates/gpui-kit/src/display/') && !c.name.endsWith('Chart') && !['Divider', 'Plot', 'Sparkline', 'ChartLegend'].includes(c.name)).map(c => c.name).sort();
-  assert.deepEqual(Object.keys(familySchemas).sort(), expected);
+  const coverage = JSON.parse(readFileSync(new URL('../binding-coverage.json', import.meta.url)));
+  // Continuous color scales and prepared geography do not have wire adapters yet.
+  // Keep this list explicit: a new catalog component must fail this partition.
+  const unbound = ['ContinuousHeatmap', 'GeoMap'];
+  assert.deepEqual([...Object.keys(familySchemas), ...unbound].sort(), expected);
+  const kit = createKitBindings(() => assert.fail('unsupported component registered an action'));
+  for (const component of unbound) {
+    assert.deepEqual(coverage.components.filter(c => c.name === component).map(c => c.binding), [
+      { status: 'unbound', reason: 'Native adapter and behavioral tests not implemented' },
+    ], component);
+    assert.equal(Object.hasOwn(kit, component), false, component);
+    const node = { kind: 'kit', component, id: 'unsupported', props: {}, slots: {}, events: {} };
+    for (const tree of [node, { kind: 'column', id: 'root', children: [node] }]) {
+      assert.throws(() => validateTree(tree), { name: 'TypeError', message: `Unsupported Kit component: ${component}` });
+    }
+  }
   for (const [component, value] of Object.entries(props)) {
+    assert.equal(coverage.components.find(c => c.name === component)?.binding.nativeIntegration, 'registered', component);
     assert.doesNotThrow(() => validate(component, value), component);
     assert.throws(() => validate(component, { ...value, accidental: true }), component);
   }

@@ -42,8 +42,9 @@
 //!
 //! # What it gets wrong
 //!
-//! Signatures and classifications still match text, not syntax; a builder
-//! assembled by a macro rather than an `impl` block is missed. Import paths
+//! Method discovery and classifications still match text; a builder assembled
+//! by a macro rather than an `impl` block is missed. Signature boundaries use
+//! Rust syntax, while emitted signatures retain source spelling. Import paths
 //! instead follow parsed module declarations and local reexports. A renamed
 //! export retains its declaration name in the catalog but has the reachable
 //! spelling in `path`. Neither reader expands macros or evaluates feature cfgs.
@@ -886,18 +887,27 @@ fn read_impl(lines: &[&str], at: usize) -> Vec<String> {
         if depth == 1 && line.starts_with("pub fn ") {
             let mut signature = String::new();
             let mut scan = index;
-            while scan < lines.len() {
+            'signature: while scan < lines.len() {
                 let piece = lines[scan].trim();
-                let (text, complete) = match piece.find(['{', ';']) {
-                    Some(at) => (&piece[..at], true),
-                    None => (piece, false),
-                };
                 if !signature.is_empty() {
                     signature.push(' ');
                 }
-                signature.push_str(text.trim());
-                if complete {
-                    break;
+                let offset = signature.len();
+                signature.push_str(piece);
+                for (at, _) in piece.match_indices(['{', ';']) {
+                    let end = offset + at;
+                    // Array lengths and const generic expressions contain these
+                    // delimiters too. Only a complete Rust signature can precede
+                    // the method body. Parse to locate the boundary, but retain
+                    // source spelling rather than printing syn's token stream.
+                    if syn::parse_str::<syn::Signature>(
+                        signature[..end].trim_start_matches("pub ").trim(),
+                    )
+                    .is_ok()
+                    {
+                        signature.truncate(end);
+                        break 'signature;
+                    }
                 }
                 scan += 1;
             }
@@ -1563,6 +1573,32 @@ mod tests {
     }
 
     #[test]
+    fn generated_trace_viewports_have_complete_array_signatures() -> Result<()> {
+        let artifact: serde_json::Value = serde_json::from_str(&build(&crate::root())?)?;
+        for name in ["TraceView", "SpanTimeline"] {
+            let component = artifact["components"]
+                .as_array()
+                .expect("components")
+                .iter()
+                .find(|component| component["name"] == name)
+                .expect("trace component");
+            let viewport: Vec<_> = component["options"]
+                .as_array()
+                .expect("options")
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .filter(|signature| signature.starts_with("time_viewport("))
+                .collect();
+            assert_eq!(
+                viewport,
+                ["time_viewport(domain: [f64; 2]) -> Result<Self, ScaleError>"],
+                "{name}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn generated_chart_imports_are_public_rust_paths() -> Result<()> {
         let artifact: serde_json::Value = serde_json::from_str(&build(&crate::root())?)?;
         macro_rules! assert_import {
@@ -1714,6 +1750,121 @@ impl Select {
         assert_eq!(select.options.len(), 1);
         assert_eq!(select.commands.len(), 1);
         assert_eq!(select.queries.len(), 1);
+    }
+
+    #[test]
+    fn generated_signatures_preserve_nested_arrays_and_wrapped_returns() {
+        let source = strip(
+            r#"
+#[derive(IntoElement)]
+pub struct Matrix;
+impl Matrix {
+    pub fn new(values: [[u16; 3]; 5]) -> Self { todo!() }
+    pub fn domain(
+        mut self,
+        bounds: [f64; 2],
+        samples: Option<[[i32; 7]; 11]>,
+    ) -> Result<
+        Self,
+        ([u8; 13], Error),
+    > { todo!() }
+    pub fn replace(
+        &mut self,
+        values: &[[u16; 17]; 19],
+    ) -> Option<[u8; 23]> { todo!() }
+    pub fn values(&self) -> [[u16; 29]; 31] { todo!() }
+    pub fn following(&self) -> bool { true }
+}
+"#,
+        );
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "matrix.rs", &mut items, &mut events);
+        items
+            .get_mut("Matrix")
+            .expect("matrix declaration")
+            .import_path = Some("fixture::Matrix".into());
+        let artifact: serde_json::Value =
+            serde_json::from_str(&render(&items, &events, &BTreeMap::new(), &[]))
+                .expect("generated JSON");
+        let matrix = &artifact["components"][0];
+        assert_eq!(
+            matrix["construct"],
+            serde_json::json!(["new(values: [[u16; 3]; 5]) -> Self"])
+        );
+        assert_eq!(
+            matrix["options"],
+            serde_json::json!([
+                "domain(bounds: [f64; 2], samples: Option<[[i32; 7]; 11]>) -> Result<Self, ([u8; 13], Error), >"
+            ])
+        );
+        assert_eq!(
+            matrix["commands"],
+            serde_json::json!(["replace(values: &[[u16; 17]; 19]) -> Option<[u8; 23]>"])
+        );
+        assert_eq!(
+            matrix["queries"],
+            serde_json::json!(["values() -> [[u16; 29]; 31]", "following() -> bool"])
+        );
+    }
+
+    #[test]
+    fn generated_signatures_keep_const_blocks_but_not_method_bodies() {
+        let source = strip(
+            r#"
+#[derive(IntoElement)]
+pub struct Packet;
+impl Packet {
+    pub fn blocks(
+        self,
+        values: [u8; { let sizes = [2; 3]; sizes.len() + 5 }],
+        marker: Marker<{ 7 + 11 }>,
+    ) -> Marker<{
+        let size = 13;
+        size + 17
+    }> {
+        let body_only = [0; 19];
+        todo!()
+    }
+    pub fn constrained<T>(&self) -> [u8; { 23 + 29 }]
+    where
+        T: Trait<{ 31 + 37 }>,
+    {
+        todo!()
+    }
+    pub fn following(&mut self, value: [u8; 41]) { todo!() }
+}
+"#,
+        );
+        syn::parse_file(&source).expect("syntactically valid fixture");
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "packet.rs", &mut items, &mut events);
+        items
+            .get_mut("Packet")
+            .expect("packet declaration")
+            .import_path = Some("fixture::Packet".into());
+        let artifact: serde_json::Value =
+            serde_json::from_str(&render(&items, &events, &BTreeMap::new(), &[]))
+                .expect("generated JSON");
+        let packet = &artifact["components"][0];
+        assert_eq!(
+            packet["options"],
+            serde_json::json!([
+                "blocks(values: [u8; { let sizes = [2; 3]; sizes.len() + 5 }], marker: Marker<{ 7 + 11 }>) -> Marker<{ let size = 13; size + 17 }>"
+            ])
+        );
+        assert_eq!(
+            packet["queries"],
+            serde_json::json!([
+                "constrained<T>() -> [u8; { 23 + 29 }] where T: Trait<{ 31 + 37 }>,"
+            ])
+        );
+        assert_eq!(
+            packet["commands"],
+            serde_json::json!(["following(value: [u8; 41])"])
+        );
+        assert_eq!(packet["construct"], serde_json::json!([]));
     }
 
     #[test]

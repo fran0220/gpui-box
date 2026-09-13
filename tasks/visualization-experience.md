@@ -147,3 +147,47 @@ clean commit and verify both hosted catalogs and complete remote MCP schemas.
   tree passes 625. Trace and Cartesian owners independently reran their real
   arbitrary-unmount regressions successfully. Native acceptance remains pending;
   no per-component capture registry was added.
+
+### Bounds-index and runtime-contract integration (Linux gate passed)
+
+- Shared interaction foundation
+  [480336c3](https://github.com/fran0220/gpui-box/commit/480336c3fd5ea04823c8e06fe063edc5a260dd9b)
+  is deployed. Both domains verified 212 components, 197 scenes and all ten
+  complete MCP tool schemas (`/tmp/interaction-foundation-deploy.log`).
+- The balanced BoundsTree patch preserves assigned overlap ordering and removes
+  degenerate insertion depth. Integrated focused tests pass: seven passed, one
+  opt-in CPU benchmark ignored. Full Linux rendering passes; native index
+  acceptance remains pending. Index-only speedups are not frame-rate claims.
+- Native run [34759501968](https://github.com/fran0220/gpui-box/actions/runs/34759501968)
+  passed both native jobs and Windows headless build/tests. Each renderer's
+  scoped image check reports zero changed and two new FLIP images; all four new
+  images were inspected for readable labels and contained geometry, then accepted.
+  This run predates the BoundsTree integration and remains failed overall because
+  its runtime jobs exposed the contract problem below. It is not evidence for
+  native acceptance of the new bounds index.
+- Both runtime jobs exposed stale JS binding coverage and family tests that
+  incorrectly equated Rust catalog membership with a native JS adapter. The
+  existing generator now explicitly includes the four unbound visualization
+  components. Tests retain closed schemas and caller-data fixtures for supported
+  entries and prove named unsupported entries reject root/nested wire nodes.
+  Integrated JS family tests pass 10/10; catalog check reports 200/212 adapters.
+  Full JS/runtime checks pass 209 tests with 17 platform skips. This does not
+  implement new JS visualization adapters. Signature generation also now uses
+  complete Rust signature parsing to avoid truncating arrays at their semicolon;
+  generated TraceView/SpanTimeline viewport signatures and asymmetric nested-array
+  and const-block fixtures pass in the 84-test xtask suite.
+- Frozen paint integration remains separate. Coordinator review identified
+  repeated Scene-prefix scans per recording and atlas-wide scans per sprite;
+  the owner supplied a frozen follow-up using the active layer stack, reverse
+  tile index and intersecting lease-range lookup. Its measured counters and
+  unchanged frames await combined integration; graph recording is not yet accepted.
+- Integrated exact-time FLIP playback passes 26 frames with real pointer picking,
+  cancellation, timing/size retargets and reduced motion in both themes. The dark
+  reverse-middle image was inspected: readable label, intact controls and no stale
+  target-sized child. `CARGO_INCREMENTAL=0 cargo run -p xtask -- gate full` exited
+  zero with `gate passed`: workspace tests/Clippy, generated artifacts, deterministic
+  performance budgets, wasm compile/build, rustdoc, 394 matching Linux images,
+  headless/mobile-reference tests and 13 browser mobile input tests all passed.
+  Evidence: `/tmp/bounds-runtime-integration-gate-clean.log`. Two earlier attempts
+  failed for disk exhaustion, not assertions; the successful attempt rebuilt a
+  clean disposable debug target with incremental compilation disabled.

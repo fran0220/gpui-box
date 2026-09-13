@@ -95,6 +95,17 @@ catalog**. Remaining bindings need real adapters and native tests, not generated
 constructor names. Native state is reconciled by worker generation/business id;
 removal/reload drops retained entities, while a rerender updates event routes.
 
+In the chart/display families, `CartesianChart`, `SpecializedChart`,
+`ContinuousHeatmap`, and `GeoMap` are currently unbound: **Native adapter and
+behavioral tests not implemented**, as recorded by `catalog.mjs` in
+`binding-coverage.json`. Their raw scales/series, specialized layouts, continuous
+color scales, and prepared geography need explicit wire contracts and native
+caller-data fixtures before support can be advertised. They have no JS factory;
+handwritten wire nodes are rejected by both JS and native validation. Family
+tests account for every catalog entry exactly once as supported or explicitly
+unbound. Supported entries still require closed schemas and real native fixtures;
+adding a Kit component does not automatically create a runtime constructor.
+
 Capabilities are requested in manifests and granted separately for each session.
 Undeclared, denied, unsupported and unavailable operations reject promises.
 Storage is rooted outside the package and partitioned by the host/plugin identity;
