@@ -10,6 +10,11 @@ edition = "2024"
 type_universe_package = "gpui-box"
 type_universe_crate = "gpui"
 
+[assigned_root_layout]
+contract = "Invocation-local assigned border box overrides authored root width/height/min/max/aspect ratio; descendants reflow and authored styles return for natural measurement. Padding/border minima and device rounding determine actual size. Drawable caches assignment mode and dimensions."
+commands = ["cargo test -p gpui-box --features test-support --lib assigned_root", "cargo test -p gpui-box-kit --all-features --test flip_configuration", "cargo test -p gpui-box-kit --all-features --lib motion::flip", "python3 crates/gpui-kit/tests/flip_playback.py target/flip-playback"]
+limitations = ["Linux full gate and both-theme simulated offscreen frames establish layout/input/semantic behavior, not native-window presentation or FPS", "macOS/Windows native acceptance remains pending", "Playback requires the opt-in local headless tooling; baseline defaults remain unchanged"]
+
 [[platform]]
 name = "macos"
 contract = "framework-kit-native-metal-context-menu-clipped-platform-view-avfoundation-media"
@@ -77,6 +82,11 @@ native_smoke = "cargo run --locked -p gpui-box-platform --features test-support 
 native_smoke_contract = "Logged-in macOS/Windows desktop only: observe actual tracking before cancel/replacement, preserve the new menu after stale/wrong-window close and old-owner destruction, await teardown, then open successfully in the surviving window. Unsupported and watchdog expiry fail; no Kit fallback or native selection-input claim."
 native_smoke_evidence = "Platforms run34396298822 at 02468534 failed both native menu watchdogs at initial active cancellation. Main NSRunLoop scheduling on macOS and restored Windows menu-loop notifications are candidates requiring native re-execution; queued replacement cancellation is also checked before invocation."
 validation = "Shared lifecycle tests run on Linux; native cancellation/replacement/teardown execution requires the dispatched macOS/Windows lanes and is not established by Linux tests."
+
+[framework_pointer_capture_retirement]
+contract = "Stable capture identities survive rebuilt and cached hitboxes. When the captured hitbox is absent after prepaint, old live listeners receive cancellation before frame retirement; no release/click is manufactured, and reinsertion does not revive the press. Cached siblings retain their listeners without receiving retired-frame cancellation."
+tests = ["pointer_capture_cached_owner_unmount_cancels_without_click_or_resurrection", "pointer_capture_survives_a_redraw_and_delivers_events_outside_the_element", "pointer_capture_matches_button_and_cancellation_does_not_click"]
+validation = "625 portable framework tests and the integrated Linux full gate pass, including 394 scene images and 13 browser mobile input checks. Native macOS/Windows platform lanes remain pending."
 
 [framework_intrinsic_layout]
 contract = "Window::request_intrinsic_layout distinguishes natural content dimensions from authored aspect ratio. Assigned axes and size constraints win; only missing axes derive from the natural ratio. Block intrinsic widths, flex/grid stretch, absolute insets and unresolved percentages share one local layout result authority. Ordinary measured text retains the stock leaf algorithm; no Taffy vendor or patch and no renderer ABI change."

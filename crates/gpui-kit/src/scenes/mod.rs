@@ -32,6 +32,7 @@ mod data;
 mod datetime;
 mod display;
 mod effects;
+mod flip_configuration;
 mod game;
 mod geography;
 mod heatmap;
@@ -84,6 +85,7 @@ use display::{
     state_ladder, status, tag, trace, trace_time,
 };
 use effects::{cinematic_effects, visual_effects};
+use flip_configuration::flip_configuration;
 use game::game_ui;
 use geography::geography;
 use heatmap::continuous_heatmap;
@@ -629,6 +631,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "motion-flip",
             build: motion_flip,
             shows: Shows::Composition(&["Button", "Card", "ListRow"]),
+        },
+        Scene {
+            name: "flip-configuration",
+            build: flip_configuration,
+            shows: Shows::Composition(&["Button"]),
         },
         Scene {
             name: "motion-state",

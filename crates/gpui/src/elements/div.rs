@@ -4913,6 +4913,133 @@ mod tests {
     }
 
     #[test]
+    fn pointer_capture_cached_owner_unmount_cancels_without_click_or_resurrection() {
+        struct Target {
+            renders: Rc<Cell<usize>>,
+            cancels: Rc<Cell<usize>>,
+            clicks: Rc<Cell<usize>>,
+        }
+        impl Render for Target {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                self.renders.set(self.renders.get() + 1);
+                let cancels = self.cancels.clone();
+                let clicks = self.clicks.clone();
+                div()
+                    .id("retiring-capture")
+                    .size(px(50.))
+                    .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, _| {})
+                    .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                    .child(canvas(
+                        |_, _, _| (),
+                        move |_, _, window, _| {
+                            window.on_mouse_event({
+                                let cancels = cancels.clone();
+                                move |_: &crate::MouseCancelEvent, phase, _, _| {
+                                    if phase == DispatchPhase::Bubble {
+                                        cancels.set(cancels.get() + 1);
+                                    }
+                                }
+                            });
+                        },
+                    ))
+            }
+        }
+        struct Host {
+            target: Entity<Target>,
+            sibling: Entity<PointerCaptureTestView>,
+            shown: Rc<Cell<bool>>,
+        }
+        impl Render for Host {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div()
+                    .size_full()
+                    .child(
+                        self.sibling.clone().cached(
+                            StyleRefinement::default()
+                                .absolute()
+                                .left(px(100.))
+                                .size(px(50.)),
+                        ),
+                    )
+                    .when(self.shown.get(), |root| {
+                        root.child(
+                            self.target
+                                .clone()
+                                .cached(StyleRefinement::default().absolute().size(px(50.))),
+                        )
+                    })
+            }
+        }
+        let mut cx = TestAppContext::single();
+        let renders = Rc::new(Cell::new(0));
+        let cancels = Rc::new(Cell::new(0));
+        let clicks = Rc::new(Cell::new(0));
+        let shown = Rc::new(Cell::new(true));
+        let window = cx.add_window({
+            let (renders, cancels, clicks, shown) = (
+                renders.clone(),
+                cancels.clone(),
+                clicks.clone(),
+                shown.clone(),
+            );
+            move |_, cx| Host {
+                target: cx.new(|_| Target {
+                    renders,
+                    cancels,
+                    clicks,
+                }),
+                sibling: cx.new(|_| PointerCaptureTestView {
+                    moves: Rc::new(Cell::new(0)),
+                    ups: Rc::new(Cell::new(0)),
+                }),
+                shown,
+            }
+        });
+        let target = window
+            .update(&mut cx, |host, _, _| host.target.clone())
+            .expect("capture target exists");
+        cx.update_window(window.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+            let count = renders.get();
+            window.draw(cx).clear(cx);
+            assert_eq!(renders.get(), count, "exercise actual cached subtree reuse");
+            let down = MouseDownEvent {
+                position: point(px(10.), px(10.)),
+                click_count: 1,
+                ..Default::default()
+            };
+            let up = MouseUpEvent {
+                position: down.position,
+                click_count: 1,
+                ..Default::default()
+            };
+            window.dispatch_event(down.clone().to_platform_input(), cx);
+            let previous = window.captured_hitbox().expect("cached target captured");
+            target.update(cx, |_, cx| cx.notify());
+            window.draw(cx).clear(cx);
+            assert_ne!(
+                window.captured_hitbox().expect("remapped capture"),
+                previous
+            );
+            assert_eq!(cancels.get(), 0);
+            shown.set(false);
+            window.draw(cx).clear(cx);
+            assert!(window.captured_hitbox().is_none());
+            assert_eq!(cancels.get(), 1, "unmount sends cancellation exactly once");
+            window.draw(cx).clear(cx);
+            assert_eq!(cancels.get(), 1);
+            shown.set(true);
+            window.draw(cx).clear(cx);
+            window.dispatch_event(up.clone().to_platform_input(), cx);
+            assert_eq!(clicks.get(), 0, "reinsert cannot revive a cancelled press");
+            window.dispatch_event(down.to_platform_input(), cx);
+            window.dispatch_event(up.to_platform_input(), cx);
+            assert_eq!(clicks.get(), 1, "new gesture remains usable");
+        })
+        .expect("capture fixture updates");
+    }
+
+    #[test]
     fn pointer_capture_survives_a_redraw_and_delivers_events_outside_the_element() {
         let mut cx = TestAppContext::single();
         let moves = Rc::new(Cell::new(0));

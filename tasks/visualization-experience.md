@@ -102,27 +102,48 @@ clean commit and verify both hosted catalogs and complete remote MCP schemas.
   wasm compile/release build and rustdoc passed; 392 Linux scene images match;
   17 headless-tool tests, 8 glass-reference tests and 13 browser mobile input
   tests passed. Mobile-reference refusal/restore checks also passed. The log is
-  `/tmp/experience-foundation-gate.log`; hosted verification follows the push.
+  `/tmp/experience-foundation-gate.log`. Foundation commit
+  [53ddf792](https://github.com/fran0220/gpui-box/commit/53ddf792b9ec641d8c5d3bcb47fb22c532f50a09)
+  is deployed: both hosted domains verified the exact revision, 212 components,
+  196 scenes and all 10 MCP tool schemas (`/tmp/experience-foundation-deploy.log`).
   Frozen family patches still await separate coordinator review and are not
   part of this shared-foundation acceptance. Native platform maturity remains
   unproven by the Linux/browser checks.
 
-### Shared follow-up contracts (not yet integrated)
+### Shared interaction foundation (Linux integration passed)
 
 - Core owns a standalone `interaction/range.rs` state machine shared by Cartesian
   and trace. Family adapters own mapping, measured rendering and public events.
   Raw f64 caller state stays authoritative; cancellation clears drafts without
   rolling back already accepted changes. Delayed unrelated acceptance cancels
-  rather than silently rebasing. Reversed/nonlinear mappings and exact unchanged
-  endpoints require focused tests before either family depends on it.
+  rather than silently rebasing. Focused tests cover reversed/nonlinear mappings,
+  exact unchanged endpoints and actual whole-component capture removal.
 - Specialized owns configurable FLIP timing and enable/snap behavior. A new
   mounted test found that existing `flip_size` changes the wrapper but does not
   constrain an explicitly sized child: a 40px wrapper can publish an 80px child
   hit target. The coordinator confirmed no existing forced-root-size API and
   authorized a separate framework primitive with descendant reflow, restored
-  authored styles and correct layout-cache invalidation. Framework provenance,
-  compatibility and platform acceptance are required; none is claimed yet.
+  authored styles and correct layout-cache invalidation. The combined tree now
+  passes 625 framework tests, the configured-FLIP mounted test and seven raw-range
+  tests. Playback asserts 26 actual frames in both themes with delayed tween,
+  timing changes, spring reversal, displayed pointer picking and disabled/reduced
+  snaps. New default baseline inspection caught a clipped label; it was shortened,
+  both themes rerendered and inspected, then accepted. Full Linux gate exited 0
+  with `gate passed`: 394 images match and 13 browser mobile tests pass, alongside
+  workspace tests/Clippy, performance, wasm, rustdoc and tool checks. Evidence is
+  `/tmp/interaction-foundation-gate.log`; native platform acceptance is pending.
 - Frozen graph viewport culling and trace motion/readout patches await review
   after their layout/hierarchy dependencies. Fixed visible paint counts do not
-  establish bounded source scans: the worker's explicit-size edgeless 100k graph
-  still takes about 1.5s to mount and 792ms for static redraw in debug Linux.
+  establish bounded source scans. Prior graph/trace/geography multi-case Harness
+  timings were contaminated by still-open windows and are retracted. Corrected
+  cases explicitly remove each window; geography also asserts empty window lists. Worker
+  isolated debug measurements: edgeless 100k graph 1447ms mount/704ms redraw;
+  sparse 100k/95k-edge graph 3789/1176ms; 100k trace 94.7/6.5ms. Geography full-world
+  10k remains 4127/2289ms. These are CPU evidence, not dense/FPS acceptance.
+  Cartesian timing cases already use a fresh App per case and were not affected.
+- Coordinator's capture-unmount fix passes all 622 GPUI framework tests,
+  including actual cached-subtree capture/remap, removal cancellation, reinsertion
+  without click revival, and button-owned cancellation; the combined assigned-root
+  tree passes 625. Trace and Cartesian owners independently reran their real
+  arbitrary-unmount regressions successfully. Native acceptance remains pending;
+  no per-component capture registry was added.

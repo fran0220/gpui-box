@@ -166,6 +166,36 @@ impl TaffyLayoutEngine {
         self.taffy.set_style(id.0, style).expect(EXPECT_MESSAGE);
     }
 
+    /// Assign a root border box for one computation without changing its
+    /// authored style for later natural measurements. Descendants keep their
+    /// styles; padding/borders may impose a larger minimum actual box.
+    pub fn compute_layout_with_size(
+        &mut self,
+        id: LayoutId,
+        available_space: Size<AvailableSpace>,
+        assigned: Size<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let authored = self.taffy.style(id.0).expect(EXPECT_MESSAGE).clone();
+        let mut forced = authored.clone();
+        let dimension = |v: Pixels| taffy::style::Dimension::length(v.0 * window.scale_factor());
+        forced.size = TaffySize {
+            width: dimension(assigned.width),
+            height: dimension(assigned.height),
+        };
+        forced.min_size = forced.size;
+        forced.max_size = forced.size;
+        forced.aspect_ratio = None;
+        forced.box_sizing = taffy::style::BoxSizing::BorderBox;
+        self.taffy.set_style(id.0, forced).expect(EXPECT_MESSAGE);
+        self.compute_layout(id, available_space, window, cx);
+        // This dirties Taffy's compute cache while preserving the computed
+        // bounds used by this prepaint. Drawable also keys its measurement
+        // cache by assignment mode/size, not available space alone.
+        self.taffy.set_style(id.0, authored).expect(EXPECT_MESSAGE);
+    }
+
     // Used to understand performance
     #[allow(dead_code)]
     fn count_all_children(&self, parent: LayoutId) -> anyhow::Result<u32> {

@@ -10,6 +10,18 @@ the caller supplies production timezone policy. chrono-tz is a test-only
 dependency for independent DST/date-line fixtures. No calendar source or timezone
 database is copied into Kit, and DateAdapter ownership is unchanged.
 
+Pointer-capture retirement and cached-hitbox identity retention are original local
+GPUI Box framework changes. A vanished capture is cancelled before the previous
+frame's listeners retire; no imported platform source or historical receipt is
+changed. Portable framework tests cover cached redraw, unmount and reinsertion.
+
+Assigned border-box root layout and configurable FLIP position/size timing are
+original GPUI Box framework and Kit work. They reuse the local Taffy authority;
+no source was imported or translated, no dependency authority changed, and the
+historical import receipt remains frozen. The root assignment is invocation-local:
+authored constraints return for natural measurement, while descendants, clipping,
+pointer input and accessibility use the actual displayed layout.
+
 The local geographic visualization family and synthetic exhibit are original
 GPUI Box work. Projection formulas were checked against
 [PROJ's Web Mercator definition](https://proj.org/en/stable/operations/projections/webmerc.html),

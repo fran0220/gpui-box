@@ -973,9 +973,9 @@ pub(crate) struct Frame {
     /// First paint operation that belongs on the GPUI overlay surface.
     pub(crate) overlay_scene_start: usize,
     pub(crate) hitboxes: Vec<Hitbox>,
-    /// Interactive hitboxes keyed by stable element identity, used to carry
-    /// pointer capture across frames that redraw during a gesture.
-    pointer_capture_hitboxes: FxHashMap<GlobalElementId, HitboxId>,
+    /// Stable identities for interactive hitboxes. Keying by hitbox lets cached
+    /// subtree replay carry identities in linear time in the reused hitboxes.
+    pointer_capture_hitboxes: FxHashMap<HitboxId, GlobalElementId>,
     /// Text elements taking part in this window's document selection, keyed by
     /// scope and the business identity each declared. Rebuilding the map every
     /// prepaint is what expires a participant that stopped being mounted.
@@ -3384,14 +3384,16 @@ impl Window {
     ///
     /// This legacy unbound capture releases on any mouse up or cancellation.
     /// Prefer [`Self::capture_pointer_for_button`] for a button-owned gesture.
+    /// A capture whose hitbox disappears on redraw is cancelled. Stable element
+    /// ids preserve capture across rebuilt or cached frames, not across unmount.
     pub fn capture_pointer(&mut self, hitbox_id: HitboxId) {
         self.captured_pointer_button = None;
         self.captured_hitbox = Some(hitbox_id);
         self.captured_pointer_element = self
             .rendered_frame
             .pointer_capture_hitboxes
-            .iter()
-            .find_map(|(element_id, id)| (*id == hitbox_id).then(|| element_id.clone()));
+            .get(&hitbox_id)
+            .cloned();
     }
 
     /// Captures until the specified button is released, or the stream is
@@ -3436,7 +3438,7 @@ impl Window {
     ) {
         self.next_frame
             .pointer_capture_hitboxes
-            .insert(element_id.clone(), hitbox_id);
+            .insert(hitbox_id, element_id.clone());
         if self.captured_pointer_element.as_ref() == Some(element_id) {
             self.captured_hitbox = Some(hitbox_id);
         }
@@ -3513,6 +3515,22 @@ impl Window {
         }
         self.dirty_views.clear();
         self.next_frame.window_active = self.active.get();
+
+        // Notify the previous live listeners before retiring their frame. A
+        // removed capture owner cannot render to clean up its own gesture.
+        // Cancellation is not a mouse-up and must never commit a drag/click.
+        if self.captured_hitbox.is_some_and(|captured| {
+            !self
+                .next_frame
+                .hitboxes
+                .iter()
+                .any(|hitbox| hitbox.id == captured)
+        }) {
+            let propagate_event = cx.propagate_event;
+            cx.propagate_event = true;
+            self.dispatch_mouse_event_with_residual(&crate::MouseCancelEvent, cx);
+            cx.propagate_event = propagate_event;
+        }
 
         // Register requested input handler with the platform window.
         // Use .take() instead of .pop() to preserve Vec length, so that cached
@@ -4166,6 +4184,15 @@ impl Window {
     }
 
     pub(crate) fn reuse_prepaint(&mut self, range: Range<PrepaintStateIndex>) {
+        for hitbox in
+            &self.rendered_frame.hitboxes[range.start.hitboxes_index..range.end.hitboxes_index]
+        {
+            if let Some(element_id) = self.rendered_frame.pointer_capture_hitboxes.get(&hitbox.id) {
+                self.next_frame
+                    .pointer_capture_hitboxes
+                    .insert(hitbox.id, element_id.clone());
+            }
+        }
         self.next_frame.hitboxes.extend(
             self.rendered_frame.hitboxes[range.start.hitboxes_index..range.end.hitboxes_index]
                 .iter()
@@ -6404,6 +6431,29 @@ impl Window {
         self.layout_engine = Some(layout_engine);
     }
 
+    /// Compute a root with assigned border-box dimensions for this invocation.
+    /// Authored root size/min/max/aspect-ratio are temporarily overridden;
+    /// descendants reflow normally. Padding/borders and device-pixel rounding
+    /// may enlarge the result: query actual bounds with [`Self::layout_bounds`].
+    /// Subsequent natural computation restores authored sizing.
+    pub fn compute_layout_with_size(
+        &mut self,
+        layout_id: LayoutId,
+        available_space: Size<AvailableSpace>,
+        assigned_size: Size<Pixels>,
+        cx: &mut App,
+    ) {
+        self.invalidator.debug_assert_prepaint();
+        assert!(assigned_size.width.0.is_finite() && assigned_size.width >= Pixels::ZERO);
+        assert!(assigned_size.height.0.is_finite() && assigned_size.height >= Pixels::ZERO);
+        let mut layout_engine = self
+            .layout_engine
+            .take()
+            .expect("required framework invariant must hold");
+        layout_engine.compute_layout_with_size(layout_id, available_space, assigned_size, self, cx);
+        self.layout_engine = Some(layout_engine);
+    }
+
     /// Obtain the bounds computed for the given LayoutId relative to the window. This method will usually be invoked by
     /// GPUI itself automatically in order to pass your element its `Bounds` automatically.
     ///
@@ -7332,10 +7382,9 @@ impl Window {
 
         // Capture phase, events bubble from back to front. Handlers for this phase are used for
         // special purposes, such as detecting events outside of a given Bounds.
-        for listener in &mut mouse_listeners {
-            let listener = listener
-                .as_mut()
-                .expect("required framework invariant must hold");
+        // During unmount cancellation, cached siblings' listeners have already
+        // moved to next_frame. Only the remaining old listeners are retired.
+        for listener in mouse_listeners.iter_mut().flatten() {
             let remaining = wheel.map(|wheel| crate::ScrollWheelEvent {
                 delta: self.remaining_scroll_delta.unwrap_or(wheel.delta),
                 ..wheel.clone()
@@ -7349,10 +7398,7 @@ impl Window {
 
         // Bubble phase, where most normal handlers do their work.
         if cx.propagate_event || cancelled {
-            for listener in mouse_listeners.iter_mut().rev() {
-                let listener = listener
-                    .as_mut()
-                    .expect("required framework invariant must hold");
+            for listener in mouse_listeners.iter_mut().rev().flatten() {
                 let remaining = wheel.map(|wheel| crate::ScrollWheelEvent {
                     delta: self.remaining_scroll_delta.unwrap_or(wheel.delta),
                     ..wheel.clone()

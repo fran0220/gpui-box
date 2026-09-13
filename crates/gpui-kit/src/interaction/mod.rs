@@ -8,6 +8,7 @@
 
 pub mod dnd;
 pub(crate) mod pan;
+pub mod range;
 pub mod refresh;
 pub mod swipe;
 

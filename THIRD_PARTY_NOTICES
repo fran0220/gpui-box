@@ -10,6 +10,15 @@ They use Chrono's public API (MIT OR Apache-2.0); chrono-tz 0.10.4 (MIT OR
 Apache-2.0) is used only by tests for named-timezone/DST fixtures. Production
 timezone data is caller-owned; no calendar implementation was copied or ported.
 
+Pointer-capture unmount cancellation and cached capture identity retention are
+original local GPUI Box framework work under Apache-2.0. No upstream source was
+copied and the frozen historical import receipt remains unchanged.
+
+Assigned root border-box layout and configurable FLIP timing are original
+GPUI Box work using the existing local framework/Taffy dependencies. No new
+third-party source, licenses or assets were introduced; historical receipts
+and upstream copyright notices remain unchanged.
+
 Local geographic visualization and its synthetic fixture are original GPUI
 Box code. PROJ projection documentation and RFC 7946 informed the mathematical
 and geometry contracts; no source, geographic dataset, or provider asset was

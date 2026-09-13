@@ -275,6 +275,10 @@ impl GlobalElementId {
     }
 }
 
+#[cfg(test)]
+#[path = "assigned_root_tests.rs"]
+mod assigned_root_tests;
+
 trait ElementObject {
     fn inner_element(&mut self) -> &mut dyn Any;
 
@@ -287,6 +291,7 @@ trait ElementObject {
     fn layout_as_root(
         &mut self,
         available_space: Size<AvailableSpace>,
+        assigned_size: Option<Size<Pixels>>,
         window: &mut Window,
         cx: &mut App,
     ) -> Size<Pixels>;
@@ -314,6 +319,7 @@ enum ElementDrawPhase<RequestLayoutState, PrepaintState> {
         global_id: Option<GlobalElementId>,
         inspector_id: Option<InspectorElementId>,
         available_space: Size<AvailableSpace>,
+        assigned_size: Option<Size<Pixels>>,
         request_layout: RequestLayoutState,
     },
     Prepaint {
@@ -595,6 +601,16 @@ impl<E: Element> Drawable<E> {
         window: &mut Window,
         cx: &mut App,
     ) -> Size<Pixels> {
+        self.layout_as_root_with_size(available_space, None, window, cx)
+    }
+
+    fn layout_as_root_with_size(
+        &mut self,
+        available_space: Size<AvailableSpace>,
+        assigned_size: Option<Size<Pixels>>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Size<Pixels> {
         if matches!(&self.phase, ElementDrawPhase::Start) {
             self.request_layout(window, cx);
         }
@@ -606,12 +622,17 @@ impl<E: Element> Drawable<E> {
                 inspector_id,
                 request_layout,
             } => {
-                window.compute_layout(layout_id, available_space, cx);
+                if let Some(size) = assigned_size {
+                    window.compute_layout_with_size(layout_id, available_space, size, cx);
+                } else {
+                    window.compute_layout(layout_id, available_space, cx);
+                }
                 self.phase = ElementDrawPhase::LayoutComputed {
                     layout_id,
                     global_id,
                     inspector_id,
                     available_space,
+                    assigned_size,
                     request_layout,
                 };
                 layout_id
@@ -621,16 +642,22 @@ impl<E: Element> Drawable<E> {
                 global_id,
                 inspector_id,
                 available_space: prev_available_space,
+                assigned_size: prev_assigned_size,
                 request_layout,
             } => {
-                if available_space != prev_available_space {
-                    window.compute_layout(layout_id, available_space, cx);
+                if available_space != prev_available_space || assigned_size != prev_assigned_size {
+                    if let Some(size) = assigned_size {
+                        window.compute_layout_with_size(layout_id, available_space, size, cx);
+                    } else {
+                        window.compute_layout(layout_id, available_space, cx);
+                    }
                 }
                 self.phase = ElementDrawPhase::LayoutComputed {
                     layout_id,
                     global_id,
                     inspector_id,
                     available_space,
+                    assigned_size,
                     request_layout,
                 };
                 layout_id
@@ -670,10 +697,15 @@ where
     fn layout_as_root(
         &mut self,
         available_space: Size<AvailableSpace>,
+        assigned_size: Option<Size<Pixels>>,
         window: &mut Window,
         cx: &mut App,
     ) -> Size<Pixels> {
-        Drawable::layout_as_root(self, available_space, window, cx)
+        if assigned_size.is_some() {
+            Drawable::layout_as_root_with_size(self, available_space, assigned_size, window, cx)
+        } else {
+            Drawable::layout_as_root(self, available_space, window, cx)
+        }
     }
 }
 
@@ -728,7 +760,28 @@ impl AnyElement {
         window: &mut Window,
         cx: &mut App,
     ) -> Size<Pixels> {
-        self.0.layout_as_root(available_space, window, cx)
+        self.0.layout_as_root(available_space, None, window, cx)
+    }
+
+    /// Lay out this root with assigned border-box dimensions, independently
+    /// of available space. For this invocation, authored root width, height,
+    /// min/max size and aspect ratio are overridden; descendants reflow using
+    /// their normal styles. Subsequent natural measurement restores the authored
+    /// root style, including within the same frame.
+    ///
+    /// Dimensions must be finite and nonnegative. Padding and borders are not
+    /// removed: if they cannot fit, the layout engine may enlarge the box.
+    /// The return value is the actual laid-out size, including device-pixel
+    /// rounding, not a promise that impossible dimensions were honored.
+    pub fn layout_as_root_with_size(
+        &mut self,
+        available_space: Size<AvailableSpace>,
+        assigned_size: Size<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Size<Pixels> {
+        self.0
+            .layout_as_root(available_space, Some(assigned_size), window, cx)
     }
 
     /// Prepaints this element at the given absolute origin.
@@ -752,6 +805,20 @@ impl AnyElement {
         cx: &mut App,
     ) -> Option<FocusHandle> {
         self.layout_as_root(available_space, window, cx);
+        window.with_absolute_element_offset(origin, |window| self.prepaint(window, cx))
+    }
+
+    /// Lay out using [`Self::layout_as_root_with_size`] then prepaint at the
+    /// given origin. Paint, hitboxes and accessibility use actual layout bounds.
+    pub fn prepaint_as_root_with_size(
+        &mut self,
+        origin: Point<Pixels>,
+        available_space: Size<AvailableSpace>,
+        assigned_size: Size<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<FocusHandle> {
+        self.layout_as_root_with_size(available_space, assigned_size, window, cx);
         window.with_absolute_element_offset(origin, |window| self.prepaint(window, cx))
     }
 }

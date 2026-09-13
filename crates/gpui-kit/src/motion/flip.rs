@@ -4,7 +4,8 @@
 //! element was (First), let layout put it where it belongs (Last), Invert that
 //! difference into a visual offset, and Play the offset back to zero. Nothing
 //! about the layout changes — a reordered row lands in its new slot on the
-//! frame the caller reorders it, and only the pixels take their time.
+//! frame the caller reorders it; child paint, hit targets and semantic bounds
+//! follow the displayed position while sibling layout stays settled.
 //!
 //! ```no_run
 //! # use gpui::{App, Window, div, prelude::*};
@@ -28,12 +29,12 @@
 //! move.
 //!
 //! [`Flipping::flip_size`] additionally animates size, and that is **not**
-//! free. The pinned GPUI revision has no transform for an element subtree —
-//! `TransformationMatrix` reaches sprites alone — so a size animation cannot
-//! be faked with a scale the way a browser does it. The element really is a
-//! different size on every frame of the animation, which means it really does
-//! move its siblings, and it owns a layout node of its own to do it. Ask for
-//! it deliberately, on an element whose neighbours can stand being pushed.
+//! free. This is real assigned border-box layout, not a scaled picture:
+//! descendants reflow at the displayed size and siblings can move with it.
+//! Authored root constraints return for natural measurement. Padding/border
+//! minima and device rounding determine the actual size reported by the handle;
+//! negative spring overshoot is bounded at zero. Ask for it deliberately, on
+//! an element whose neighbours can stand being pushed.
 
 use std::cell::RefCell;
 use std::panic::Location;
@@ -47,7 +48,7 @@ use gpui::{
 use web_time::Instant;
 
 use super::keyed;
-use super::{Interpolate, MotionPolicy, MotionRole, MotionSpec, Spring, Transition};
+use super::{Interpolate, MotionPolicy, MotionRole, MotionSpec, Transition};
 
 /// How far an origin or an edge has to move before it counts as a move.
 ///
@@ -158,9 +159,13 @@ struct FlipState {
     current: Point<Pixels>,
     elapsed: Duration,
     last_frame: Option<Instant>,
+    position_spec: Option<MotionSpec>,
     /// The size the element is being drawn at, animating toward whatever size
     /// it would naturally take. `None` until an element opts into size.
     size: Option<Transition<Size<Pixels>>>,
+    /// Actual rounded border box, including layout-imposed padding minima.
+    drawn_size: Option<Size<Pixels>>,
+    size_spec: Option<MotionSpec>,
     /// The size layout would give the element if nothing were animating.
     natural: Option<Size<Pixels>>,
     /// The space the parent last offered, so the natural size is measured
@@ -197,11 +202,14 @@ impl FlipState {
         self.last_frame = Some(now);
     }
 
-    fn sample(&self, spring: Spring, settle: Duration) -> Point<Pixels> {
-        if self.elapsed >= settle {
+    fn sample(&self, spec: MotionSpec) -> Point<Pixels> {
+        if self.elapsed >= spec.total() {
             return Point::default();
         }
-        self.from.lerp(Point::default(), spring.value(self.elapsed))
+        self.from.lerp(
+            Point::default(),
+            spec.progress(self.elapsed.as_secs_f32() / spec.total().as_secs_f32()),
+        )
     }
 
     /// Records where layout put the element, and inverts a move into an offset.
@@ -233,13 +241,18 @@ impl FlipState {
         now: Instant,
     ) -> Size<Pixels> {
         self.natural = Some(natural);
-        let mut transition = self
-            .size
-            .unwrap_or_else(|| Transition::new(natural, spec))
-            .spec(spec);
+        let mut transition = self.size.unwrap_or_else(|| Transition::new(natural, spec));
         if let Some(last) = self.size_frame {
             transition.advance(now.saturating_duration_since(last));
         }
+        if self.size_spec.is_some_and(|previous| previous != spec) {
+            let target = transition.target();
+            transition = Transition::new(transition.value(), spec);
+            transition.set(target);
+        } else {
+            transition = transition.spec(spec);
+        }
+        self.size_spec = Some(spec);
         self.size_frame = Some(now);
         let target = transition.target();
         if moved(target.width, natural.width) || moved(target.height, natural.height) {
@@ -289,6 +302,7 @@ impl FlipState {
             .spec(spec);
         transition.snap(natural);
         self.size = Some(transition);
+        self.size_spec = Some(spec);
         self.size_frame = Some(now);
     }
 
@@ -323,6 +337,9 @@ impl FlipState {
             self.elapsed = Duration::ZERO;
             self.last_frame = None;
             self.size = None;
+            self.drawn_size = None;
+            self.size_spec = None;
+            self.position_spec = None;
             self.natural = None;
             self.size_frame = None;
             self.shape = None;
@@ -387,10 +404,9 @@ impl Flip {
 
     /// The offset currently painted, in pixels.
     ///
-    /// This is where the element is drawn, not where it is: the layout, the
-    /// hit target and the semantic tree all report the settled position. It
-    /// exists so a test or an inspector can watch a slide without treating a
-    /// value in flight as a fact about the interface.
+    /// Child painting, hit targets and semantic bounds include this offset.
+    /// The parent's layout slot remains settled, so position-only animation
+    /// does not move siblings. This is a displayed-geometry measurement.
     pub fn offset(&self) -> Point<Pixels> {
         self.state.borrow().current
     }
@@ -398,10 +414,10 @@ impl Flip {
     /// The size currently painted, once an element has opted into animating
     /// its size with [`Flipping::flip_size`].
     ///
-    /// Unlike [`Flip::offset`], this one *is* what the layout and the semantic
-    /// tree report, because a size animation is a real layout change.
+    /// Both child layout and semantic bounds report this size: a size
+    /// animation is a real layout change and can move siblings.
     pub fn size(&self) -> Option<Size<Pixels>> {
-        self.state.borrow().size.map(|size| size.value())
+        self.state.borrow().drawn_size
     }
 
     /// The shape to draw with this frame, animating toward `target`.
@@ -540,15 +556,11 @@ fn flipped<E: IntoElement>(
     cx: &mut App,
 ) -> Flipped {
     let motion = MotionPolicy::resolve(MotionRole::Tracking, cx);
-    let spring = motion
-        .spec()
-        .spring()
-        .expect("tracking motion is spring-backed");
     let element = Flipped {
         element: element.into_any_element(),
         state: Rc::clone(&flip.state),
-        spring,
-        settle: motion.spec().total(),
+        timing: motion.spec(),
+        enabled: true,
         sized,
         measuring: false,
         measured_against: None,
@@ -570,8 +582,8 @@ impl<E: IntoElement> Flipping for E {}
 pub struct Flipped {
     element: gpui::AnyElement,
     state: Rc<RefCell<FlipState>>,
-    spring: Spring,
-    settle: Duration,
+    timing: MotionSpec,
+    enabled: bool,
     sized: bool,
     /// Whether this frame is one the element owns its layout node on. The
     /// first frame an id is ever seen on is not: see
@@ -596,8 +608,22 @@ impl std::fmt::Debug for Flipped {
 }
 
 impl Flipped {
+    /// Disable visual motion and settle retained position and size on this
+    /// frame. Re-enabling does not replay an old offset. Reduced motion wins.
+    pub fn animate(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Override Tracking timing for position and size, including tween delay
+    /// or spring behavior. Timing changes retarget from displayed geometry.
+    pub fn animation(mut self, spec: MotionSpec) -> Self {
+        self.timing = spec;
+        self
+    }
+
     fn spec(&self) -> MotionSpec {
-        MotionSpec::sprung(self.spring)
+        self.timing
     }
 }
 
@@ -661,13 +687,30 @@ impl Element for Flipped {
 
         let drawn = {
             let mut state = self.state.borrow_mut();
-            if self.reduce_motion {
+            if self.reduce_motion || !self.enabled {
                 state.settle_size(natural, spec, now);
                 natural
             } else {
                 state.record_size(natural, spec, now)
             }
         };
+        let actual = self.element.layout_as_root_with_size(
+            available,
+            size(drawn.width.max(px(0.0)), drawn.height.max(px(0.0))),
+            window,
+            cx,
+        );
+        let rounding = px(1.0 / window.scale_factor());
+        if actual.width > drawn.width + rounding || actual.height > drawn.height + rounding {
+            // Padding/border minima are real layout. Do not restart timing for
+            // ordinary device-pixel rounding on every frame.
+            let mut state = self.state.borrow_mut();
+            if let Some(transition) = &mut state.size {
+                transition.snap(actual);
+                transition.set(natural);
+            }
+        }
+        let drawn = actual;
 
         self.state.borrow_mut().offered = false;
         let state = Rc::clone(&self.state);
@@ -712,22 +755,32 @@ impl Element for Flipped {
                     AvailableSpace::Definite(bounds.size.height),
                 ));
                 state.settle_size(bounds.size, self.spec(), now);
+                state.drawn_size = Some(bounds.size);
             }
-            if self.reduce_motion || contested {
-                state.settle(origin, self.settle);
+            if self.reduce_motion || !self.enabled || contested {
+                state.settle(origin, self.timing.total());
+                state.position_spec = Some(self.timing);
                 if self.sized
                     && let Some(natural) = state.natural
                 {
                     state.settle_size(natural, self.spec(), now);
                 }
-            } else if state.is_home(origin, self.settle) {
+            } else if state.is_home(origin, self.timing.total()) {
                 // Same bounds and already at rest: skip invert and the next tick.
             } else {
                 state.advance(now);
-                let residual = state.sample(self.spring, self.settle);
+                let residual = state.sample(state.position_spec.unwrap_or(self.timing));
+                if state
+                    .position_spec
+                    .is_some_and(|previous| previous != self.timing)
+                {
+                    state.from = residual;
+                    state.elapsed = Duration::ZERO;
+                }
+                state.position_spec = Some(self.timing);
                 state.record(origin, residual);
-                state.current = state.sample(self.spring, self.settle);
-                if state.elapsed >= self.settle {
+                state.current = state.sample(self.timing);
+                if state.elapsed >= self.timing.total() {
                     state.last_frame = None;
                 }
             }
@@ -738,15 +791,17 @@ impl Element for Flipped {
             // The element owns its layout node, so it also owns where its
             // child sits: the slide is added to the origin rather than pushed
             // through the ambient element offset.
-            self.element.prepaint_as_root(
-                bounds.origin + offset,
+            let actual = self.element.layout_as_root_with_size(
                 size(
                     AvailableSpace::Definite(bounds.size.width),
                     AvailableSpace::Definite(bounds.size.height),
                 ),
+                bounds.size,
                 window,
                 cx,
             );
+            self.state.borrow_mut().drawn_size = Some(actual);
+            self.element.prepaint_at(bounds.origin + offset, window, cx);
         } else {
             window.with_element_offset(offset, |window| {
                 self.element.prepaint(window, cx);
@@ -783,6 +838,7 @@ impl Element for Flipped {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::motion::Spring;
     use gpui::{point, size};
     use gpui_kit_theme::{SpringPreset, Theme};
 
@@ -837,7 +893,7 @@ mod tests {
     fn a_first_measurement_produces_no_offset() {
         let mut state = FlipState::default();
         state.record(point(px(10.0), px(20.0)), Point::default());
-        assert_eq!(state.sample(grab(), grab().settle_time()), Point::default());
+        assert_eq!(state.sample(spec()), Point::default());
     }
 
     #[test]
@@ -847,10 +903,13 @@ mod tests {
         let mut state = FlipState::default();
         state.record(point(px(0.0), px(0.0)), Point::default());
         state.record(point(px(0.0), px(40.0)), Point::default());
-        assert_eq!(state.sample(spring, settle), point(px(0.0), px(-40.0)));
+        assert_eq!(
+            state.sample(MotionSpec::sprung(spring)),
+            point(px(0.0), px(-40.0))
+        );
 
         state.elapsed = settle;
-        assert_eq!(state.sample(spring, settle), Point::default());
+        assert_eq!(state.sample(MotionSpec::sprung(spring)), Point::default());
     }
 
     #[test]
@@ -862,12 +921,12 @@ mod tests {
         state.record(point(px(0.0), px(40.0)), Point::default());
 
         state.elapsed = settle / 2;
-        let residual = state.sample(spring, settle);
+        let residual = state.sample(MotionSpec::sprung(spring));
         assert!(residual.y > px(-40.0) && residual.y < px(0.0));
 
         state.record(point(px(0.0), px(60.0)), residual);
         assert_eq!(
-            state.sample(spring, settle),
+            state.sample(MotionSpec::sprung(spring)),
             residual - point(px(0.0), px(20.0))
         );
     }
@@ -875,11 +934,10 @@ mod tests {
     #[test]
     fn sub_pixel_drift_does_not_start_a_slide() {
         let spring = grab();
-        let settle = spring.settle_time();
         let mut state = FlipState::default();
         state.record(point(px(0.0), px(0.0)), Point::default());
         state.record(point(px(0.2), px(0.3)), Point::default());
-        assert_eq!(state.sample(spring, settle), Point::default());
+        assert_eq!(state.sample(MotionSpec::sprung(spring)), Point::default());
     }
 
     #[test]
@@ -961,7 +1019,6 @@ mod tests {
     fn position_and_size_run_independently() {
         let mut frames = Frames::new();
         let spring = grab();
-        let settle = spring.settle_time();
         let mut state = FlipState::default();
         state.record(point(px(0.0), px(0.0)), Point::default());
         state.record_size(size(px(100.0), px(40.0)), spec(), frames.step());
@@ -969,7 +1026,10 @@ mod tests {
         state.record(point(px(0.0), px(40.0)), Point::default());
         let taller = size(px(100.0), px(90.0));
         let drawn = state.record_size(taller, spec(), frames.step());
-        assert_eq!(state.sample(spring, settle), point(px(0.0), px(-40.0)));
+        assert_eq!(
+            state.sample(MotionSpec::sprung(spring)),
+            point(px(0.0), px(-40.0))
+        );
         assert_eq!(drawn, size(px(100.0), px(40.0)));
         assert_eq!(run_to_rest(&mut state, taller, &mut frames), taller);
     }
@@ -985,7 +1045,7 @@ mod tests {
         state.forget_if_stale(start + MEMORY / 2);
         state.record(point(px(0.0), px(300.0)), Point::default());
         assert_ne!(
-            state.sample(grab(), grab().settle_time()),
+            state.sample(spec()),
             Point::default(),
             "a gap inside the window is a handoff and travels"
         );
@@ -995,7 +1055,7 @@ mod tests {
         assert_eq!(state.size, None);
         state.record(point(px(0.0), px(600.0)), Point::default());
         assert_eq!(
-            state.sample(grab(), grab().settle_time()),
+            state.sample(spec()),
             Point::default(),
             "an element with no recent rectangle is simply already in place"
         );
