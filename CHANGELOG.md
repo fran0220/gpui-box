@@ -8,6 +8,22 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Changed
+
+**Sidebar is adaptive nested navigation.** Its bounded body scrolls between
+fixed header/footer slots; `width` and `fill_width` support host-owned panel
+allocation. Branches retain local expansion or report controlled requests via
+`expanded_ids` / `on_toggle`; `on_collapse` requests rail-width mode changes.
+Arrow keys move focus without changing the active destination, skip disabled
+subtrees, and reveal offscreen targets. Compact parent icons open a dismissable
+flyout with parent and child destinations. Missing icons get a document glyph,
+long labels use ellipsis, and compact badges retain a status dot.
+
+Migration: collapsed child links now live in the flyout, not in the rail;
+descendant semantic parents reflect nesting. Descendants beyond depth two are
+retained instead of discarded. Content-sized embeddings use `fit_height()`;
+bounded panes keep their scrolling body. Destination selection remains caller-owned.
+
 ## [0.2.0] - 2026-09-12
 
 This is a GitHub source release for Git-pinned consumers. No 0.2.0 packages

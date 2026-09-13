@@ -2397,6 +2397,7 @@ pub(super) fn settings_page(window: &mut Window, cx: &mut App) -> AnyElement {
             .slot("sidebar", move |_, _| {
                 let category = category.clone();
                 Sidebar::new("scene.settings-page.categories")
+                    .fit_height()
                     .section(SidebarSection::new("sections").items([
                         SidebarItem::new("all", "All settings"), SidebarItem::new("general", "General"),
                         SidebarItem::new("appearance", "Appearance")]))

@@ -56,6 +56,7 @@ fn chinese(key: StringKey) -> &'static str {
         MoreActions => "更多操作",
         Expand => "展开",
         Collapse => "折叠",
+        SidebarItemWithBadge => "{0} · {1}",
         AttachmentReady | GameAbilityReady => "就绪",
         AttachmentQueued | AgentQueued | UploadQueued => "已排队",
         AttachmentTransferring => "传输中",

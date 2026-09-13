@@ -183,6 +183,9 @@ string_keys! {
     // In-page anchors.
     AnchorMoreSections => "anchor.more-sections", "More sections";
 
+    // Sidebar status help. Both arguments are caller-owned display strings.
+    SidebarItemWithBadge => "sidebar.item-with-badge", "{0} · {1}";
+
     // Pagination.
     PaginationFirst => "pagination.first", "First page";
     PaginationPrevious => "pagination.previous", "Previous page";

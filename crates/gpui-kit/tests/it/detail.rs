@@ -102,6 +102,18 @@ fn settings_page_exhibit_sidebar_and_results_never_overlap(cx: &mut TestAppConte
                 selected.x + selected.width <= results.bounds.x,
                 "{theme}: selected background must not overlap results"
             );
+            for category in ["all", "general", "appearance"] {
+                let row = harness
+                    .node(&format!("scene.settings-page.categories.{category}"))
+                    .expect("settings category")
+                    .bounds;
+                assert!(
+                    row.height > 0.0
+                        && row.y >= sidebar.y
+                        && row.y + row.height <= sidebar.y + sidebar.height,
+                    "{theme}: category {category} must be fully visible, not clipped by a content-sized slot"
+                );
+            }
             let target = if empty {
                 "scene.settings-page.list.empty"
             } else {

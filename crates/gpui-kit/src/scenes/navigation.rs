@@ -507,12 +507,29 @@ pub(super) fn navigation_sections() -> Vec<SidebarSection> {
     ]
 }
 
+#[derive(Default)]
+struct SceneSidebar {
+    active: Option<SharedString>,
+    collapsed: bool,
+}
+
+impl Global for SceneSidebar {}
+
 pub(super) fn sidebar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneSidebar>() {
+        cx.set_global(SceneSidebar::default());
+    }
     let theme = cx.theme().clone();
+    let active = cx
+        .global::<SceneSidebar>()
+        .active
+        .clone()
+        .unwrap_or_else(|| "runs.active".into());
+    let collapsed = cx.global::<SceneSidebar>().collapsed;
     let rail = |ident: &'static str, collapsed: bool| {
         Sidebar::new(ident)
             .sections(navigation_sections())
-            .active("runs.active")
+            .active(active.clone())
             .collapsed(collapsed)
             .footer(
                 crate::foundation::text(
@@ -526,20 +543,66 @@ pub(super) fn sidebar(_window: &mut Window, cx: &mut App) -> AnyElement {
                 )
                 .text_tone(&theme, TextTone::Faint),
             )
-            .on_select(|_, _, _| {})
+            .on_select(|id, window, cx| {
+                cx.global_mut::<SceneSidebar>().active = Some(id);
+                window.refresh();
+            })
     };
 
     stack(&theme)
-        .h(px(420.0))
+        .child(caption(
+            &theme,
+            "Fixture navigation — select a destination, toggle a branch, or collapse the rail",
+        ))
         .child(
             div()
                 .flex()
                 .flex_row()
-                .h(px(360.0))
+                .h(px(400.0))
                 .gap(px(theme.space(Space::Lg)))
-                .child(rail("scene.sidebar.expanded", false))
+                .child(
+                    rail("scene.sidebar.expanded", collapsed)
+                        .width(260.0)
+                        .header(caption(
+                            &theme,
+                            if collapsed { "W" } else { "Fixture workspace" },
+                        ))
+                        .on_collapse(|collapsed, window, cx| {
+                            cx.global_mut::<SceneSidebar>().collapsed = collapsed;
+                            window.refresh();
+                        }),
+                )
                 .child(rail("scene.sidebar.collapsed", true)),
         )
+        .child(caption(
+            &theme,
+            "Current destination is caller-owned; arrow keys move focus without navigating",
+        ))
+        .into_any_element()
+}
+
+pub(super) fn sidebar_overflow(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "Fixture stress states — fixed slots, scrolling, long labels, and a closed current branch"))
+        .child(div().flex().gap(px(theme.space(Space::Lg))).h(px(320.0))
+            .child(div().w(px(300.0)).h_full().child(Sidebar::new("scene.sidebar-overflow.scroll")
+                .fill_width()
+                .header(caption(&theme, "Fixed header"))
+                .footer(caption(&theme, "Fixed footer"))
+                .section(SidebarSection::new("destinations").title("Destinations").items(
+                    (0..24).map(|index| SidebarItem::new(format!("destination-{index}"),
+                        if index == 1 { "A long destination label that needs an ellipsis".to_owned() }
+                        else { format!("Fixture destination {}", index + 1) }).disabled(index == 2))
+                ))
+                .active("destination-1")
+                .on_select(|_, _, _| {})))
+            .child(Sidebar::new("scene.sidebar-overflow.closed")
+                .sections(navigation_sections()).expanded_ids(&[])
+                .active("runs.active")
+                .header(caption(&theme, "Host refuses branch expansion"))
+                .footer(caption(&theme, "Current: Active"))
+                .on_select(|_, _, _| {}).on_toggle(|_, _, _, _| {})))
         .into_any_element()
 }
 

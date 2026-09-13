@@ -89,8 +89,8 @@ use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::{micro, motion_primitives};
 use navigation::{
     accordion, adaptive_navigation, anchor_list, bottom_navigation, breadcrumb, carousel,
-    collapsible, document_tabs, nav_back_preview, nav_stack, pagination, sidebar, tabs,
-    undo_history, wizard,
+    collapsible, document_tabs, nav_back_preview, nav_stack, pagination, sidebar, sidebar_overflow,
+    tabs, undo_history, wizard,
 };
 use overlay::{
     action_sheet, bottom_sheet, command_palette, context_menu, dialog, drawer, frost, glass,
@@ -598,6 +598,11 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "sidebar",
             build: sidebar,
+            shows: Shows::Subjects(&["Sidebar"]),
+        },
+        Scene {
+            name: "sidebar-overflow",
+            build: sidebar_overflow,
             shows: Shows::Subjects(&["Sidebar"]),
         },
         Scene {

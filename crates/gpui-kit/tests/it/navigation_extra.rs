@@ -87,7 +87,7 @@ fn a_nested_place_publishes_the_depth_it_sits_at(cx: &mut TestAppContext) {
     assert_eq!(parent.role, Role::Link);
     assert_eq!(parent.level, Some(1));
     assert_eq!(child.level, Some(2));
-    assert_eq!(child.parent.as_deref(), Some("workspace.rail"));
+    assert_eq!(child.parent.as_deref(), Some("workspace.rail.runs"));
     assert_eq!(parent.value.as_deref(), Some("12"), "a badge is published");
 }
 
@@ -153,6 +153,474 @@ fn an_image_place_still_publishes_its_name(cx: &mut TestAppContext) {
 
     harness.click("workspace.rail.claude");
     assert_eq!(*calls.borrow(), vec!["claude".to_string()]);
+}
+
+fn branch_places() -> Vec<SidebarSection> {
+    vec![
+        SidebarSection::new("places").items([
+            SidebarItem::new("branch", "Branch").children([
+                SidebarItem::new("blocked", "Blocked").disabled(true),
+                SidebarItem::new("child", "Child").children([SidebarItem::new(
+                    "grandchild",
+                    "Grandchild",
+                )
+                .children([SidebarItem::new("deep", "Deep destination")])]),
+            ]),
+            SidebarItem::new("managed", "Managed")
+                .disabled(true)
+                .children([SidebarItem::new("inherited", "Inherited refusal")]),
+            SidebarItem::new("last", "Last"),
+        ]),
+    ]
+}
+
+#[gpui::test]
+fn sidebar_toggle_refusal_does_not_become_local_expansion(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder();
+    let (toggles, toggle_sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        let toggle_sink = toggle_sink.clone();
+        Sidebar::new("rail")
+            .sections(branch_places())
+            .expanded_ids(&[])
+            .active("last")
+            .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .on_toggle(move |id, open, _, _| {
+                toggle_sink.borrow_mut().push((id.to_string(), open));
+            })
+            .into_any_element()
+    });
+
+    for _ in 0..2 {
+        harness.click("rail.branch.toggle");
+        assert_eq!(
+            harness.node("rail.branch").expect("branch").expanded,
+            Some(false)
+        );
+        assert!(harness.node("rail.child").is_none());
+    }
+    assert_eq!(
+        *toggles.borrow(),
+        vec![("branch".to_string(), true), ("branch".to_string(), true)]
+    );
+    assert!(calls.borrow().is_empty());
+    assert!(
+        harness
+            .node("rail.last")
+            .expect("last destination")
+            .selected
+    );
+}
+
+#[gpui::test]
+fn sidebar_uncontrolled_branches_keep_local_expansion_without_navigating(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder();
+    let (toggles, toggle_sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        let toggle_sink = toggle_sink.clone();
+        Sidebar::new("rail")
+            .sections(branch_places())
+            .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .on_toggle(move |id, open, _, _| {
+                toggle_sink.borrow_mut().push((id.to_string(), open));
+            })
+            .into_any_element()
+    });
+
+    let deep = harness.node("rail.deep").expect("no depth cutoff");
+    assert_eq!(deep.level, Some(4));
+    assert_eq!(deep.parent.as_deref(), Some("rail.grandchild"));
+    assert!(
+        harness
+            .node("rail.inherited")
+            .expect("disabled descendant")
+            .disabled
+    );
+    harness.click("rail.inherited");
+    harness.click("rail.branch.toggle");
+    assert!(harness.node("rail.child").is_none());
+    harness.frame();
+    assert_eq!(
+        harness.node("rail.branch").expect("branch").expanded,
+        Some(false)
+    );
+    harness.click("rail.branch.toggle");
+    assert!(harness.node("rail.deep").is_some());
+    assert_eq!(
+        *toggles.borrow(),
+        vec![("branch".to_string(), false), ("branch".to_string(), true)]
+    );
+    assert!(calls.borrow().is_empty());
+}
+
+#[gpui::test]
+fn sidebar_keyboard_moves_focus_not_selection_and_skips_disabled_subtrees(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        Sidebar::new("rail")
+            .sections(branch_places())
+            .active("last")
+            .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+    harness.click("rail.last");
+    calls.borrow_mut().clear();
+    for (key, target) in [
+        ("home", "branch"),
+        ("right", "child"),
+        ("left", "child"),
+        ("left", "branch"),
+        ("left", "branch"),
+        ("right", "branch"),
+        ("down", "child"),
+        ("end", "last"),
+        ("up", "child"),
+    ] {
+        harness.keystrokes(key);
+        assert!(
+            harness
+                .node(&format!("rail.{target}"))
+                .expect("keyboard target")
+                .focused,
+            "{key} must focus {target}"
+        );
+        assert!(
+            harness
+                .node("rail.last")
+                .expect("last destination")
+                .selected
+        );
+        assert!(!harness.node("rail.branch").expect("branch").selected);
+    }
+    assert!(calls.borrow().is_empty());
+}
+
+#[gpui::test]
+fn sidebar_flyout_reports_original_destinations_and_restores_trigger_focus(
+    cx: &mut TestAppContext,
+) {
+    let (calls, sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        Sidebar::new("rail")
+            .sections(branch_places())
+            .collapsed(true)
+            .active("last")
+            .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+    assert!(harness.node("rail.child").is_none());
+    assert!(harness.node("rail.inherited").is_none());
+    harness.click("rail.branch");
+    assert!(calls.borrow().is_empty());
+    assert!(harness.node("rail.branch.flyout").is_some());
+    assert!(harness.node("rail.branch.destination").is_some());
+    assert!(
+        harness
+            .node("rail.blocked")
+            .expect("disabled destination")
+            .disabled
+    );
+    harness.click("rail.blocked");
+    assert!(calls.borrow().is_empty());
+    assert!(harness.node("rail.branch.flyout").is_some());
+    harness.keystrokes("escape");
+    assert!(harness.node("rail.branch.flyout").is_none());
+    assert!(harness.node("rail.branch").expect("flyout trigger").focused);
+
+    harness.keystrokes("enter");
+    harness.click("rail.child");
+    assert_eq!(*calls.borrow(), vec!["child".to_string()]);
+    assert!(harness.node("rail.branch.flyout").is_none());
+    assert!(
+        harness
+            .node("rail.branch")
+            .expect("restored trigger")
+            .focused
+    );
+    assert!(
+        harness
+            .node("rail.last")
+            .expect("last destination")
+            .selected
+    );
+    harness.click("rail.branch");
+    assert!(
+        !harness
+            .node("rail.child")
+            .expect("child destination")
+            .selected
+    );
+    harness.click("rail.branch.destination");
+    assert_eq!(
+        *calls.borrow(),
+        vec!["child".to_string(), "branch".to_string()]
+    );
+    assert!(
+        harness
+            .node("rail.last")
+            .expect("caller-selected destination")
+            .selected
+    );
+}
+
+#[gpui::test]
+fn sidebar_end_reveals_long_content_without_scrolling_the_footer(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .w(px(360.0))
+            .h(px(240.0))
+            .child(
+                Sidebar::new("rail")
+                    .fill_width()
+                    .header(Button::new("rail.header").label("Header"))
+                    .footer(Button::new("rail.footer").label("Footer"))
+                    .sections([SidebarSection::new("many")
+                        .items((0..60).map(|n| {
+                            SidebarItem::new(format!("place-{n}"), format!("Place {n}"))
+                        }))])
+                    .active("place-0")
+                    .on_select(move |id, _, _| sink.borrow_mut().push(id.to_string())),
+            )
+            .into_any_element()
+    });
+    let footer = harness.bounds("rail.footer").expect("fixed footer");
+    let header = harness.bounds("rail.header").expect("fixed header");
+    let body = harness.bounds("rail.scroll").expect("scroll body");
+    assert!(body.origin.y >= header.bottom());
+    assert!(body.bottom() <= footer.origin.y);
+    harness.click("rail.place-0");
+    calls.borrow_mut().clear();
+    harness.keystrokes("end");
+    assert!(
+        harness
+            .node("rail.place-59")
+            .expect("final destination")
+            .focused
+    );
+    let last = harness
+        .bounds("rail.place-59")
+        .expect("final destination bounds");
+    assert!(last.origin.y >= body.origin.y && last.bottom() <= body.bottom());
+    let padding = harness.update(|_, cx| px(cx.theme().space(gpui_kit_theme::Space::Xs)));
+    assert!(
+        last.bottom() + padding <= body.bottom(),
+        "End must reveal trailing padding too, so the edge fade cannot cover the last label"
+    );
+    assert_eq!(
+        harness
+            .bounds("rail.footer")
+            .expect("footer after scrolling"),
+        footer
+    );
+    assert_eq!(
+        harness
+            .bounds("rail.header")
+            .expect("header after scrolling"),
+        header
+    );
+    assert!(
+        harness
+            .node("rail.place-0")
+            .expect("initial destination")
+            .selected
+    );
+    assert!(calls.borrow().is_empty());
+}
+
+#[gpui::test]
+fn sidebar_has_one_row_tab_stop_and_collapse_remains_caller_owned(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .child(Button::new("before").label("Before").on_click(|_, _| {}))
+            .child(
+                div().h(px(400.0)).child(
+                    Sidebar::new("rail")
+                        .width(280.0)
+                        .sections(branch_places())
+                        .active("last")
+                        .on_select(|_, _, _| {})
+                        .on_collapse(move |collapsed, _, _| sink.borrow_mut().push(collapsed)),
+                ),
+            )
+            .child(Button::new("after").label("After").on_click(|_, _| {}))
+            .into_any_element()
+    });
+    let width = harness.bounds("rail").expect("sidebar bounds").size.width;
+    assert!((f32::from(width) - 280.0).abs() < 1.0);
+    harness.click("rail.collapse");
+    harness.click("rail.collapse");
+    assert_eq!(*calls.borrow(), vec![true, true]);
+    assert_eq!(harness.node("rail").expect("sidebar").expanded, Some(true));
+    assert_eq!(
+        harness
+            .bounds("rail")
+            .expect("sidebar after refusal")
+            .size
+            .width,
+        width
+    );
+
+    harness.click("rail.last");
+    harness.keystrokes("home");
+    assert!(harness.node("rail.branch").expect("first branch").focused);
+    // Hosts bind Tab to GPUI traversal; Harness deliberately installs no
+    // application keymap. Exercise the same traversal as other Kit tab tests.
+    harness.update(|window, cx| window.focus_next(cx));
+    assert!(
+        harness.node("after").expect("following control").focused,
+        "focused after traversal: {:?}",
+        harness
+            .snapshot()
+            .nodes
+            .iter()
+            .filter(|node| node.focused)
+            .map(|node| &node.id)
+            .collect::<Vec<_>>()
+    );
+    harness.update(|window, cx| window.focus_prev(cx));
+    assert!(harness.node("rail.branch").expect("remembered row").focused);
+}
+
+#[gpui::test]
+fn sidebar_rtl_disclosure_and_mode_changes_preserve_a_reachable_focus(cx: &mut TestAppContext) {
+    let mode = Rc::new(RefCell::new((false, false)));
+    let drawing = mode.clone();
+    let mut harness = Harness::new(
+        cx,
+        |cx| {
+            gpui_kit::install(cx);
+            set_layout_direction(LayoutDirection::RightToLeft, cx);
+        },
+        move |_, _| {
+            let (collapsed, removed) = *drawing.borrow();
+            Sidebar::new("rail")
+                .section(SidebarSection::new("places").items(if removed {
+                    vec![SidebarItem::new("last", "Last")]
+                } else {
+                    vec![
+                        SidebarItem::new("branch", "Branch")
+                            .children([SidebarItem::new("child", "Child")]),
+                        SidebarItem::new("last", "Last"),
+                    ]
+                }))
+                .active("child")
+                .collapsed(collapsed)
+                .on_select(|_, _, _| {})
+                .into_any_element()
+        },
+    );
+    harness.click("rail.branch");
+    harness.keystrokes("right");
+    assert!(
+        harness.node("rail.child").is_none(),
+        "logical back closes in RTL"
+    );
+    harness.keystrokes("left left");
+    assert!(harness.node("rail.child").expect("RTL child").focused);
+    *mode.borrow_mut() = (true, false);
+    harness.frame();
+    assert!(
+        harness
+            .node("rail.branch")
+            .expect("collapsed branch")
+            .focused
+    );
+    harness.keystrokes("enter");
+    assert!(harness.node("rail.child").expect("flyout child").focused);
+    harness.keystrokes("tab");
+    assert!(
+        harness
+            .node("rail.branch.destination")
+            .expect("parent destination")
+            .focused,
+        "flyout Tab wraps"
+    );
+    *mode.borrow_mut() = (true, true);
+    harness.frame();
+    assert!(harness.node("rail.branch.flyout").is_none());
+    assert!(
+        harness
+            .node("rail.last")
+            .expect("remaining destination")
+            .focused
+    );
+}
+
+#[gpui::test]
+fn sidebar_flyout_without_an_actionable_destination_can_still_be_dismissed(
+    cx: &mut TestAppContext,
+) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Sidebar::new("rail")
+            .collapsed(true)
+            .section(
+                SidebarSection::new("places").item(
+                    SidebarItem::new("branch", "Branch")
+                        .children([SidebarItem::new("child", "Child").disabled(true)]),
+                ),
+            )
+            .into_any_element()
+    });
+    harness.click("rail.branch");
+    assert!(harness.node("rail.branch.flyout").is_some());
+    harness.keystrokes("tab escape");
+    assert!(harness.node("rail.branch.flyout").is_none());
+    assert!(
+        harness
+            .node("rail.branch")
+            .expect("dismissed flyout trigger")
+            .focused
+    );
+}
+
+#[gpui::test]
+fn sidebar_fills_a_resized_host_pane_without_covering_its_sibling(cx: &mut TestAppContext) {
+    let ratio = Rc::new(RefCell::new(0.35));
+    let drawing = ratio.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let next = drawing.clone();
+        div()
+            .w(px(700.0))
+            .h(px(360.0))
+            .child(
+                SplitPane::new("split")
+                    .ratio(*drawing.borrow())
+                    .min_sizes(180.0, 200.0)
+                    .start(
+                        Sidebar::new("rail")
+                            .fill_width()
+                            .sections(places())
+                            .on_select(|_, _, _| {}),
+                    )
+                    .end(Button::new("content").label("Caller content"))
+                    .on_resize(move |ratio, window, _| {
+                        *next.borrow_mut() = ratio;
+                        window.refresh();
+                    }),
+            )
+            .into_any_element()
+    });
+    let before = harness.bounds("rail").expect("initial sidebar bounds");
+    harness.click("split.divider");
+    harness.keystrokes("right right");
+    let after = harness.bounds("rail").expect("resized sidebar bounds");
+    assert!((f32::from(after.size.width - before.size.width) - 48.0).abs() < 1.0);
+    assert!(after.right() <= harness.bounds("split.divider").expect("divider").origin.x);
+    assert!(
+        harness
+            .bounds("split.divider")
+            .expect("divider bounds")
+            .right()
+            <= harness.bounds("content").expect("sibling bounds").origin.x
+    );
 }
 
 // --------------------------------------------------------------- pagination

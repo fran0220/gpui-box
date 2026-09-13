@@ -340,11 +340,43 @@ downstream chatbot or game surface should not have to recreate.
 | `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one. Semantic `Resize` policy supplies progress to GPUI's measured `Reveal`, so Kit owns no second layout/clipping implementation |
 | `Collapsible` | builder | the state activating the header asks for | The one-region case, built by handing a single section to an `Accordion`; both therefore share its policy and GPUI's `Reveal` geometry. The header lands at `{ident}.header` |
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
-| `Sidebar` | builder | the place that was picked | Sections, badges, and one level of nesting. Collapsing narrows the drawing, never the substance: a glyph-only rail reaches each label through a `Tooltip` and every item still publishes its full name and its depth |
+| `Sidebar` | builder | destination id, branch expansion request, rail collapse request | Scrollable nested navigation with fixed header/footer, `width` or parent-allocated `fill_width`, and one remembered row Tab stop. Arrows move focus and disclose branches without changing the caller-owned active destination. `expanded_ids` optionally controls expansion; otherwise branches retain transient local state. Collapsed parent icons open a keyboard-accessible flyout; labels and status values remain available. See the `sidebar` and `sidebar-overflow` exhibits |
 | `Wizard` | builder | a step to jump to, back, next, or finish | A step strip with the caller's body under it, horizontal or vertical. A step is complete, current, upcoming, blocked, or failed, and the last two say why |
 | `UndoHistory`, `HistoryEntry` | builder | the history entry that should be restored | A caller-owned revision list, not an undo stack. Entry order, current identity, descriptions, already-formatted time/source labels, and restore refusals are rendered exactly as supplied. Arrow, Home, and End keys skip refused entries; reporting a jump changes nothing |
 | `Pagination` | builder | the page that was asked for | First, previous, next, last, and a numbered range with an ellipsis that says how many pages it stands for. A step with nowhere to go installs no handler. With `PageTotal::Unknown` there is no last-page control, no numbers, and no total in the copy |
 | `Carousel` | view | previous, next, and selected item intents | Controlled stable-item track with direct selection, keyboard navigation, clipping, reduced-motion presentation, and distinct loading, empty, unavailable, error, and ready states |
+
+### Sidebar layout and state ownership
+
+Give the rail a bounded height. Its `ScrollArea` owns the navigation viewport,
+and GPUI's `reveal_on_focus` brings keyboard targets into view without moving
+the header or footer. In a content-sized layout such as a settings-page slot,
+use `fit_height()` instead; the surrounding page then owns vertical bounds.
+Use `fill_width()` inside a caller-owned `SplitPane` for
+drag resizing; the host keeps the split ratio and persists it if appropriate.
+The default expanded width remains 240px; collapsed width remains 52px.
+
+`on_collapse` adds a control that requests a new `collapsed` value. It does not
+automatically accept a resize or impose a responsive breakpoint. Branches start
+open and retain local expansion unless `expanded_ids` is supplied; in that mode
+`on_toggle` only requests changes, including when the host refuses them.
+The disclosure control and the destination link are separate actions.
+
+Collapsed rails show top-level destinations only. A branch opens a flyout with
+its own parent destination (`{sidebar}.{item}.destination`) and descendants;
+Escape restores the trigger's focus. Item ids must be unique across the whole
+rail. Descendants now publish their actual parent and retain arbitrary depth
+instead of silently dropping grandchildren. A disabled ancestor disables its
+descendants. Resource trees should still use `Tree`, not page navigation.
+
+Up/Down and Home/End move focus, logical Left/Right disclose branches, and
+Enter/Space invoke the focused action. None of these movements changes `active`:
+only a new caller-owned value does. As with other Kit controls, the host binds
+Tab/Shift-Tab to GPUI's `focus_next`/`focus_prev`; the flyout handles its own
+contained Tab traversal. Long labels use ellipsis and full-name help;
+missing leading assets use a document glyph; compact badges use a status dot
+while preserving their full semantic value. Branch disclosure and flyout
+arrival are immediate; only the existing glyph FLIP transition is animated.
 
 ### The wizard moves nothing
 
