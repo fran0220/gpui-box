@@ -39,6 +39,7 @@ mod band;
 mod edge;
 mod graph;
 mod group;
+mod layout;
 mod minimap;
 mod node;
 mod toolbar;
@@ -50,6 +51,7 @@ pub use graph::{
     layered_layout,
 };
 pub use group::NodeGroup;
+pub use layout::{GraphCyclePolicy, GraphLayoutError, layered_layout_sized};
 pub use minimap::{Minimap, MinimapEvent, MinimapMark, MinimapView};
 pub use node::{
     Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection, PortType,

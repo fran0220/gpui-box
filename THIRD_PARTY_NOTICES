@@ -5,6 +5,11 @@ GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
 source and assets retain the licenses and attribution below. GPUI Box is an
 independent derivative and is not an official Zed Industries project.
 
+Local geographic visualization and its synthetic fixture are original GPUI
+Box code. PROJ projection documentation and RFC 7946 informed the mathematical
+and geometry contracts; no source, geographic dataset, or provider asset was
+imported. Existing GPUI/Lyon dependencies and historical receipts are unchanged.
+
 Multi-contact arbitration, captured pan/pinch ownership, residual scrolling
 handoff, lifecycle input cancellation and mobile keyboard/inset/native text
 query contracts are original GPUI Box work. Android and UIKit documentation
@@ -591,3 +596,15 @@ adapter trait checks are original GPUI Box work. They add no third-party source
 or licenses and preserve the frozen historical import receipts.
 Consistent exports of the existing generic priority queue and explicit non-Android
 NDK refusal retain the same source and dependency license authority.
+
+Raw Cartesian scales, stacks, interval marks, composition and controlled
+exploration are original GPUI Box Kit work. The mathematical monotone cubic
+Hermite tangent constraint was consulted, not copied as source. No Recharts,
+ECharts or other visualization implementation was imported; existing framework
+input/rendering dependencies and frozen historical receipts are unchanged.
+Shared Cartesian orientation, caller tick overrides, bounded custom glyphs,
+keyed raw geometry motion and chart state translations are original GPUI Box
+Kit additions using the same existing framework and motion authority.
+Cartesian rectangle indexing, immutable projection caching, pixel-column path
+reduction and performance fixtures are original work with no new third-party
+source or dependencies.

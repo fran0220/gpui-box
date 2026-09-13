@@ -567,6 +567,453 @@ fn heat_cell(
     square.semantic_in(cx, spec).into_any_element()
 }
 
+/// A continuous color encoding with a required finite, strictly increasing
+/// domain. Diverging maps interpolate each side independently: the neutral
+/// color corresponds to the explicit center, not the arithmetic midpoint.
+/// Errors are stable [`StringKey::name`] values, not display text; resolve them
+/// through the active strings when presenting them outside [`ContinuousHeatmap`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HeatColorScale {
+    domain: [f64; 3],
+    colors: [gpui::Hsla; 3],
+}
+
+impl HeatColorScale {
+    pub fn sequential(
+        domain: [f64; 2],
+        low: gpui::Hsla,
+        high: gpui::Hsla,
+    ) -> Result<Self, &'static str> {
+        let center = domain[0] * 0.5 + domain[1] * 0.5;
+        Self::diverging(
+            [domain[0], center, domain[1]],
+            low,
+            mix_heat(low, high, 0.5),
+            high,
+        )
+    }
+
+    pub fn diverging(
+        domain: [f64; 3],
+        low: gpui::Hsla,
+        center: gpui::Hsla,
+        high: gpui::Hsla,
+    ) -> Result<Self, &'static str> {
+        if domain.iter().any(|v| !v.is_finite()) || domain[0] >= domain[1] || domain[1] >= domain[2]
+        {
+            return Err(StringKey::HeatmapInvalidDomain.name());
+        }
+        for pair in domain.windows(2) {
+            super::chart::scale::NumericScale::new(
+                super::chart::scale::ScaleKind::Linear,
+                [pair[0], pair[1]],
+            )
+            .map_err(|_| StringKey::HeatmapDomainOverflow.name())?;
+        }
+        Ok(Self {
+            domain,
+            colors: [low, center, high],
+        })
+    }
+
+    pub fn domain(self) -> [f64; 3] {
+        self.domain
+    }
+
+    /// Out-of-domain and nonfinite readings are invalid, never silently clamped.
+    pub fn color(self, value: f64) -> Result<gpui::Hsla, &'static str> {
+        use super::chart::scale::{NumericScale, ScaleKind};
+        if !value.is_finite() || value < self.domain[0] || value > self.domain[2] {
+            return Err(StringKey::HeatmapOutsideDomain.name());
+        }
+        let side = usize::from(value > self.domain[1]);
+        let scale = NumericScale::new(
+            ScaleKind::Linear,
+            [self.domain[side], self.domain[side + 1]],
+        )
+        .map_err(|_| StringKey::HeatmapDomainOverflow.name())?;
+        let fraction = scale
+            .map(value)
+            .ok_or(StringKey::HeatmapReadingOverflow.name())?;
+        Ok(mix_heat(
+            self.colors[side],
+            self.colors[side + 1],
+            fraction as f32,
+        ))
+    }
+}
+
+/// Straight-alpha sRGB interpolation; all endpoints are explicit caller colors.
+fn mix_heat(a: gpui::Hsla, b: gpui::Hsla, t: f32) -> gpui::Hsla {
+    let a: gpui::Rgba = a.into();
+    let b: gpui::Rgba = b.into();
+    gpui::Rgba {
+        r: a.r * (1.0 - t) + b.r * t,
+        g: a.g * (1.0 - t) + b.g * t,
+        b: a.b * (1.0 - t) + b.b * t,
+        a: a.a * (1.0 - t) + b.a * t,
+    }
+    .into()
+}
+
+/// A raw observation; `None` is missing, not zero. The existing five-level
+/// [`HeatCell`] contract remains unchanged and is not used as a numeric bin.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContinuousHeatCell {
+    pub id: SharedString,
+    pub row: SharedString,
+    pub column: SharedString,
+    pub label: SharedString,
+    pub reading: Option<f64>,
+}
+
+impl ContinuousHeatCell {
+    pub fn new(
+        id: impl Into<SharedString>,
+        row: impl Into<SharedString>,
+        column: impl Into<SharedString>,
+        label: impl Into<SharedString>,
+        reading: Option<f64>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            row: row.into(),
+            column: column.into(),
+            label: label.into(),
+            reading,
+        }
+    }
+}
+
+type HeatSelection = std::rc::Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+
+/// A raw-valued matrix with visible cell values and a numeric color legend.
+/// Selection is caller controlled. Invalid coordinates, identities, and readings
+/// produce an explicit error; a stale refresh retains verified cells and reason.
+#[derive(IntoElement)]
+pub struct ContinuousHeatmap {
+    ident: Ident,
+    label: SharedString,
+    rows: Vec<HeatAxis>,
+    columns: Vec<HeatAxis>,
+    state: super::plot::PlotState<Vec<ContinuousHeatCell>>,
+    scale: HeatColorScale,
+    current: Option<SharedString>,
+    on_current: Option<HeatSelection>,
+}
+
+impl ContinuousHeatmap {
+    pub fn new(
+        ident: impl Into<Ident>,
+        label: impl Into<SharedString>,
+        scale: HeatColorScale,
+        state: super::plot::PlotState<Vec<ContinuousHeatCell>>,
+    ) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            rows: Vec::new(),
+            columns: Vec::new(),
+            state,
+            scale,
+            current: None,
+            on_current: None,
+        }
+    }
+
+    pub fn rows(mut self, rows: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self {
+        self.rows = rows.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn columns(mut self, columns: impl IntoIterator<Item = impl Into<HeatAxis>>) -> Self {
+        self.columns = columns.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn current(mut self, id: impl Into<SharedString>) -> Self {
+        self.current = Some(id.into());
+        self
+    }
+
+    pub fn on_current(
+        mut self,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_current = Some(std::rc::Rc::new(handler));
+        self
+    }
+}
+
+fn validate_continuous(
+    rows: &[HeatAxis],
+    columns: &[HeatAxis],
+    cells: &[ContinuousHeatCell],
+    scale: HeatColorScale,
+) -> Result<(), &'static str> {
+    use std::collections::HashSet;
+    let row_ids = rows.iter().map(|r| &r.id).collect::<HashSet<_>>();
+    let column_ids = columns.iter().map(|c| &c.id).collect::<HashSet<_>>();
+    if row_ids.len() != rows.len() || column_ids.len() != columns.len() {
+        return Err(StringKey::HeatmapDuplicateAxis.name());
+    }
+    let mut ids = HashSet::new();
+    let mut coordinates = HashSet::new();
+    for cell in cells {
+        if !ids.insert(&cell.id) || !coordinates.insert((&cell.row, &cell.column)) {
+            return Err(StringKey::HeatmapDuplicateCell.name());
+        }
+        if !row_ids.contains(&cell.row) || !column_ids.contains(&cell.column) {
+            return Err(StringKey::HeatmapUnknownCoordinate.name());
+        }
+        if let Some(value) = cell.reading {
+            scale.color(value)?;
+        }
+    }
+    Ok(())
+}
+
+impl RenderOnce for ContinuousHeatmap {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        use super::plot::{Plot, PlotState};
+        use gpui::StatefulInteractiveElement;
+        let theme = cx.theme().clone();
+        let (cells, stale) = match self.state {
+            PlotState::Ready(cells) => (cells, None),
+            PlotState::Stale { data, reason } => (data, Some(reason)),
+            other => {
+                return Plot::new(self.ident, self.label, other.map(|_| Vec::new()))
+                    .into_any_element();
+            }
+        };
+        if let Err(reason) = validate_continuous(&self.rows, &self.columns, &cells, self.scale) {
+            let reason = cx
+                .strings()
+                .text(StringKey::from_name(reason).expect("heatmap error key"));
+            return Plot::new(self.ident, self.label, PlotState::Error(reason)).into_any_element();
+        }
+        if self.rows.is_empty() || self.columns.is_empty() {
+            return Plot::new(self.ident, self.label, PlotState::Empty).into_any_element();
+        }
+        let header = div()
+            .row()
+            .gap_token(&theme, Space::Xs)
+            .child(div().w(px(ROW_LABEL)).flex_none())
+            .children(self.columns.iter().map(|column| {
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .child(column.label.clone())
+            }));
+        let rows = self.rows.iter().map(|row| {
+            div()
+                .row()
+                .items_center()
+                .gap_token(&theme, Space::Xs)
+                .child(
+                    div()
+                        .w(px(ROW_LABEL))
+                        .flex_none()
+                        .truncate()
+                        .child(row.label.clone()),
+                )
+                .children(self.columns.iter().map(|column| {
+                    let cell = cells
+                        .iter()
+                        .find(|c| c.row == row.id && c.column == column.id);
+                    let ident =
+                        self.ident
+                            .child("cell")
+                            .child(cell.map(|c| c.id.clone()).unwrap_or_else(|| {
+                                Ident::new(row.id.clone())
+                                    .child(column.id.as_ref())
+                                    .semantic_id()
+                            }));
+                    let value = cell
+                        .and_then(|c| c.reading)
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| {
+                            cx.strings().text(StringKey::HeatmapMissing).to_string()
+                        });
+                    let label = cell
+                        .map(|c| c.label.clone())
+                        .unwrap_or_else(|| format!("{} / {}", row.label, column.label).into());
+                    let fill = cell
+                        .and_then(|c| c.reading)
+                        .map(|v| self.scale.color(v).expect("validated reading"))
+                        .unwrap_or(theme.colors.canvas);
+                    let selected = cell.is_some_and(|c| self.current.as_ref() == Some(&c.id));
+                    let mut square = div()
+                        .id(ident.element_id())
+                        .flex_1()
+                        .min_w_0()
+                        .h(px(32.0))
+                        .overflow_hidden()
+                        .bg(fill)
+                        .border_1()
+                        .border_color(if selected {
+                            theme.colors.text
+                        } else {
+                            theme.colors.control_hairline
+                        })
+                        .child(
+                            div()
+                                .bg(theme.colors.canvas)
+                                .text_color(theme.colors.text)
+                                .type_scale(&theme, TypeScale::Caption)
+                                .truncate()
+                                .child(value.clone()),
+                        )
+                        .tip(
+                            ident.clone(),
+                            cx.strings()
+                                .format(StringKey::HeatmapCellReading, &[label.as_ref(), &value]),
+                        );
+                    if let (Some(cell), Some(report)) = (cell, self.on_current.clone()) {
+                        let id = cell.id.clone();
+                        let key_id = id.clone();
+                        let key_report = report.clone();
+                        square = square
+                            .tab_index(0)
+                            .on_click(move |_, window, cx| report(id.clone(), window, cx))
+                            .on_key_down(move |event, window, cx| {
+                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    key_report(key_id.clone(), window, cx);
+                                }
+                            });
+                    }
+                    square.semantic_in(
+                        cx,
+                        NodeSpec::new(ident.semantic_id(), Role::Cell)
+                            .parent(self.ident.semantic_id())
+                            .text(label)
+                            .value(value)
+                            .selected(selected),
+                    )
+                }))
+        });
+        let [low, center, high] = self.scale.domain();
+        let legend_id = self.ident.child("legend");
+        let legend = div()
+            .column()
+            .gap_token(&theme, Space::Xs)
+            .child(div().row().w_full().h(px(12.0)).children((0..32).map(|i| {
+                let (a, b, t) = if i < 16 {
+                    (low, center, i as f64 / 15.0)
+                } else {
+                    (center, high, (i - 16) as f64 / 15.0)
+                };
+                div().flex_1().h_full().bg(self
+                    .scale
+                    .color(a * (1.0 - t) + b * t)
+                    .expect("validated legend"))
+            })))
+            .child(
+                div()
+                    .row()
+                    .justify_between()
+                    .children([low, center, high].map(|v| div().child(v.to_string()))),
+            )
+            .semantic_in(
+                cx,
+                NodeSpec::new(legend_id.semantic_id(), Role::Image)
+                    .text(cx.strings().text(StringKey::HeatmapColorDomain))
+                    .value(cx.strings().format(
+                        StringKey::HeatmapDomainLegend,
+                        &[&low.to_string(), &center.to_string(), &high.to_string()],
+                    )),
+            );
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Table)
+            .text(self.label.clone())
+            .value(if stale.is_some() { "stale" } else { "ready" });
+        if let Some(reason) = &stale {
+            spec = spec.description(reason.clone());
+        }
+        div()
+            .column()
+            .w_full()
+            .gap_token(&theme, Space::Sm)
+            .text_color(theme.colors.text)
+            .type_scale(&theme, TypeScale::Caption)
+            .child(self.label.clone())
+            .children(stale.clone().map(|reason| {
+                div()
+                    .text_color(theme.colors.danger)
+                    .child(reason.clone())
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.child("stale").semantic_id(), Role::Status)
+                            .text(reason),
+                    )
+            }))
+            .child(header)
+            .children(rows)
+            .child(legend)
+            .semantic_in(cx, spec)
+            .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod continuous_tests {
+    use super::*;
+
+    #[test]
+    fn asymmetric_diverging_domain_places_neutral_at_explicit_center() {
+        let blue = gpui::rgb(0x0000ff).into();
+        let white = gpui::rgb(0xffffff).into();
+        let red = gpui::rgb(0xff0000).into();
+        let scale = HeatColorScale::diverging([-8.0, 2.0, 32.0], blue, white, red).expect("domain");
+        assert_eq!(scale.color(-8.0).expect("low"), blue);
+        assert_eq!(scale.color(2.0).expect("neutral"), white);
+        assert_eq!(scale.color(32.0).expect("high"), red);
+        let halfway_blue: gpui::Rgba = scale.color(-3.0).expect("blue midpoint").into();
+        let halfway_red: gpui::Rgba = scale.color(17.0).expect("red midpoint").into();
+        assert!(
+            (halfway_blue.r - 0.5).abs() < 1e-6
+                && (halfway_blue.g - 0.5).abs() < 1e-6
+                && (halfway_blue.b - 1.0).abs() < 1e-6
+        );
+        assert!(
+            (halfway_red.r - 1.0).abs() < 1e-6
+                && (halfway_red.g - 0.5).abs() < 1e-6
+                && (halfway_red.b - 0.5).abs() < 1e-6
+        );
+        assert!(scale.color(33.0).is_err());
+        assert!(scale.color(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn continuous_coordinates_are_validated_without_hiding_missing_values() {
+        let scale = HeatColorScale::sequential(
+            [0.0, 10.0],
+            gpui::rgb(0xffffff).into(),
+            gpui::rgb(0x0000ff).into(),
+        )
+        .expect("domain");
+        let cell = ContinuousHeatCell::new("a", "r", "c", "A", None);
+        assert!(
+            validate_continuous(
+                &["r".into()],
+                &["c".into()],
+                std::slice::from_ref(&cell),
+                scale
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_continuous(&["r".into()], &["c".into()], &[cell.clone(), cell], scale)
+                .is_err()
+        );
+        assert!(
+            HeatColorScale::sequential([1.0, 1.0], gpui::rgb(0).into(), gpui::rgb(0xffffff).into())
+                .is_err()
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

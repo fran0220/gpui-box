@@ -1131,24 +1131,6 @@ fn bounds_overlap(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> bool {
         && left.bottom() + pad > right.top()
 }
 
-fn route_signature(nodes: &[NodeGeometry], edges: &[GraphEdge]) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    for node in nodes {
-        node.id.hash(&mut hasher);
-        f32::to_bits(node.bounds.origin.x).hash(&mut hasher);
-        f32::to_bits(node.bounds.origin.y).hash(&mut hasher);
-        f32::to_bits(node.bounds.size.width).hash(&mut hasher);
-        f32::to_bits(node.bounds.size.height).hash(&mut hasher);
-    }
-    for edge in edges {
-        edge.edge_id().hash(&mut hasher);
-        edge.from().hash(&mut hasher);
-        edge.to().hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
 fn edge_identity_signature(edges: &[GraphEdge]) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -1261,7 +1243,7 @@ fn selection_after(
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct PortGeometry {
     id: SharedString,
     anchor: Anchor,
@@ -1272,7 +1254,7 @@ struct PortGeometry {
     /// The glyph of the port's type, drawn inside the ring.
     glyph: Option<gpui_kit_assets::Icon>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct NodeGeometry {
     id: SharedString,
     bounds: Bounds<f32>,
@@ -1289,9 +1271,69 @@ struct RoutedEdge {
     tint: Option<Hsla>,
 }
 
+/// Every input captured by RoutedEdge, including its caller-owned presentation.
+/// A port can move without changing its node's bounds, and theme changes can
+/// resolve a named edge colour differently without changing the edge itself.
+#[derive(Debug, Clone, PartialEq)]
+struct RouteInputs {
+    nodes: Vec<NodeGeometry>,
+    edges: Vec<GraphEdge>,
+    routing: GraphRouting,
+    metrics: RouteMetrics,
+    colors: Vec<Option<Hsla>>,
+}
+
+impl RouteInputs {
+    /// Compare borrowed current inputs; cache hits must not clone the graph.
+    fn matches(
+        &self,
+        nodes: &[NodeGeometry],
+        edges: &[GraphEdge],
+        routing: GraphRouting,
+        theme: &gpui_kit_theme::Theme,
+    ) -> bool {
+        self.nodes == nodes
+            && self.edges == edges
+            && self.routing == routing
+            && self.metrics == RouteMetrics::of(theme)
+            && self.colors.iter().zip(edges).all(|(previous, edge)| {
+                *previous
+                    == edge.edge_color().map(|color| {
+                        theme
+                            .variant_colors(gpui_kit_theme::Variant::Light, color)
+                            .text
+                    })
+            })
+    }
+
+    fn new(
+        nodes: &[NodeGeometry],
+        edges: &[GraphEdge],
+        routing: GraphRouting,
+        theme: &gpui_kit_theme::Theme,
+    ) -> Self {
+        Self {
+            nodes: nodes.to_vec(),
+            edges: edges.to_vec(),
+            routing,
+            metrics: RouteMetrics::of(theme),
+            colors: edges
+                .iter()
+                .map(|edge| {
+                    edge.edge_color().map(|color| {
+                        theme
+                            .variant_colors(gpui_kit_theme::Variant::Light, color)
+                            .text
+                    })
+                })
+                .collect(),
+        }
+    }
+}
+
 #[derive(Default)]
 struct RouteCache {
-    signature: u64,
+    inputs: Option<RouteInputs>,
     routes: Vec<RoutedEdge>,
 }
 
@@ -1797,12 +1839,18 @@ impl NodeGraph {
             *m.entry(e.edge_id()).or_insert(0usize) += 1;
             m
         });
+        // Preserve first-match identity semantics without rescanning every
+        // node for each endpoint on a cache miss.
+        let mut by_id = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            by_id.entry(&node.id).or_insert(node);
+        }
         self.edges
             .iter()
             .filter(|edge| counts.get(&edge.edge_id()) == Some(&1))
             .filter_map(|edge| {
-                let from = nodes.iter().find(|n| &n.id == edge.from())?;
-                let to = nodes.iter().find(|n| &n.id == edge.to())?;
+                let from = by_id.get(edge.from())?;
+                let to = by_id.get(edge.to())?;
                 let (a, b, port_tint) = match (edge.source_port(), edge.target_port()) {
                     (Some(a), Some(b)) => {
                         let a = from.ports.iter().find(|p| &p.id == a)?;
@@ -2396,18 +2444,25 @@ impl RenderOnce for NodeGraph {
             window.window_handle().window_id(),
             cx,
         );
-        let signature = route_signature(&geometry, &self.edges);
-        let routes = {
-            let mut cache = route_cell.borrow_mut();
-            if cache.signature == signature && !cache.routes.is_empty() {
-                cache.routes.clone()
-            } else {
-                let routes = self.routable_geometry(&theme, &geometry);
-                cache.signature = signature;
-                cache.routes = routes.clone();
-                routes
-            }
-        };
+        let routes =
+            {
+                let mut cache = route_cell.borrow_mut();
+                if cache.inputs.as_ref().is_some_and(|inputs| {
+                    inputs.matches(&geometry, &self.edges, self.routing, &theme)
+                }) {
+                    cache.routes.clone()
+                } else {
+                    let routes = self.routable_geometry(&theme, &geometry);
+                    cache.inputs = Some(RouteInputs::new(
+                        &geometry,
+                        &self.edges,
+                        self.routing,
+                        &theme,
+                    ));
+                    cache.routes = routes.clone();
+                    routes
+                }
+            };
         let compact = viewport.zoom < LOD_ZOOM;
         let view = {
             let bounds = measured.get();
@@ -2541,20 +2596,12 @@ impl RenderOnce for NodeGraph {
         let routes: Vec<RoutedEdge> = routes
             .into_iter()
             .filter(|routed| {
-                let Some(view) = view else {
-                    return true;
-                };
-                let from = geometry.iter().find(|node| node.id == *routed.edge.from());
-                let to = geometry.iter().find(|node| node.id == *routed.edge.to());
-                match (from, to) {
-                    (Some(from), Some(to)) => {
-                        visible_ids.contains(&from.id)
-                            || visible_ids.contains(&to.id)
-                            || bounds_overlap(from.bounds, view, CULL_PAD)
-                            || bounds_overlap(to.bounds, view, CULL_PAD)
-                    }
-                    _ => false,
-                }
+                // visible_ids already uses the identical padded bounds test.
+                // Routes only contain resolved endpoints, so no second O(V)
+                // endpoint scan is needed for each edge on every redraw.
+                view.is_none()
+                    || visible_ids.contains(routed.edge.from())
+                    || visible_ids.contains(routed.edge.to())
             })
             .collect();
         let hovered_edge = {
@@ -3038,12 +3085,14 @@ impl RenderOnce for NodeGraph {
         }
 
         let mut ports = Vec::new();
+        let mut placed_by_id = HashMap::with_capacity(self.nodes.len());
+        for placed in &self.nodes {
+            placed_by_id
+                .entry(placed.node.ident().semantic_id())
+                .or_insert(placed);
+        }
         for node in geometry.iter().filter(|_| !compact) {
-            let Some(placed) = self
-                .nodes
-                .iter()
-                .find(|placed| placed.node.ident().semantic_id() == node.id)
-            else {
+            let Some(placed) = placed_by_id.get(&node.id) else {
                 continue;
             };
             for port_geometry in &node.ports {
@@ -5202,7 +5251,7 @@ mod tests {
     }
 
     #[test]
-    fn a_route_signature_changes_when_a_node_moves() {
+    fn route_inputs_change_when_a_node_moves() {
         let theme = gpui_kit_theme::Theme::studio_dark();
         let placed = Placed::new(GraphNode::new("a", "A"), 0.0, 0.0);
         let geometry = [NodeGeometry {
@@ -5211,7 +5260,9 @@ mod tests {
             tint: theme.colors.text_faint,
             ports: Vec::new(),
         }];
-        let first = route_signature(&geometry, &[]);
+        let first = RouteInputs::new(&geometry, &[], GraphRouting::Lanes, &theme);
+        assert!(first.matches(&geometry, &[], GraphRouting::Lanes, &theme));
+        assert!(!first.matches(&geometry, &[], GraphRouting::Curves, &theme));
         let moved = Placed::new(GraphNode::new("a", "A"), 40.0, 0.0);
         let shifted = [NodeGeometry {
             id: SharedString::from("a"),
@@ -5219,8 +5270,67 @@ mod tests {
             tint: theme.colors.text_faint,
             ports: Vec::new(),
         }];
-        assert_ne!(first, route_signature(&shifted, &[]));
-        assert_eq!(first, route_signature(&geometry, &[]));
+        assert_ne!(
+            first,
+            RouteInputs::new(&shifted, &[], GraphRouting::Lanes, &theme)
+        );
+        assert!(!first.matches(&shifted, &[], GraphRouting::Lanes, &theme));
+        assert_eq!(
+            first,
+            RouteInputs::new(&geometry, &[], GraphRouting::Lanes, &theme)
+        );
+        assert_ne!(
+            first,
+            RouteInputs::new(&geometry, &[], GraphRouting::Curves, &theme)
+        );
+        let mut port_changed = geometry.clone();
+        port_changed[0].ports.push(PortGeometry {
+            id: "output".into(),
+            anchor: Anchor {
+                point: point(10., 23.),
+                side: PortSide::Right,
+            },
+            direction: PortDirection::Output,
+            tint: None,
+            glyph: None,
+        });
+        assert_ne!(
+            first,
+            RouteInputs::new(&port_changed, &[], GraphRouting::Lanes, &theme)
+        );
+        let port_base = RouteInputs::new(&port_changed, &[], GraphRouting::Lanes, &theme);
+        port_changed[0].ports[0].anchor.point.y += 17.;
+        assert!(!port_base.matches(&port_changed, &[], GraphRouting::Lanes, &theme));
+        assert_ne!(
+            port_base,
+            RouteInputs::new(&port_changed, &[], GraphRouting::Lanes, &theme)
+        );
+        assert_eq!(port_base.nodes[0].bounds, port_changed[0].bounds);
+        let edge = GraphEdge::new("a", "b").id("wire");
+        let base = RouteInputs::new(
+            &geometry,
+            std::slice::from_ref(&edge),
+            GraphRouting::Lanes,
+            &theme,
+        );
+        for changed in [
+            edge.clone().lane(3),
+            edge.clone().label("new"),
+            edge.clone().selected(true),
+            edge.clone().feedback(),
+            edge.ports("p", "q"),
+        ] {
+            assert!(!base.matches(
+                &geometry,
+                std::slice::from_ref(&changed),
+                GraphRouting::Lanes,
+                &theme
+            ));
+            assert_ne!(
+                base,
+                RouteInputs::new(&geometry, &[changed], GraphRouting::Lanes, &theme)
+            );
+        }
     }
 
     #[test]
@@ -5275,6 +5385,63 @@ mod tests {
 #[cfg(test)]
 mod graph_phase_tests {
     use super::*;
+
+    /// Run explicitly with --ignored --nocapture. This measures CPU input,
+    /// layout, geometry, routing and cache-key work, never mount/paint or FPS.
+    #[test]
+    #[ignore = "explicit graph workload evidence"]
+    fn graph_workloads() {
+        use super::super::{GraphCyclePolicy, layered_layout_sized};
+        use std::time::Instant;
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        for count in [1_000usize, 10_000, 100_000] {
+            let begin = Instant::now();
+            let nodes: Vec<_> = (0..count)
+                .map(|i| {
+                    (
+                        SharedString::from(format!("node.{i:06}")),
+                        size(120. + (i % 7) as f32, 40. + (i % 11) as f32),
+                    )
+                })
+                .collect();
+            // Forest of asymmetric 16-node chains, not a dense-graph claim.
+            let edges: Vec<_> = (1..count)
+                .filter(|i| i % 16 != 0)
+                .map(|i| GraphEdge::new(nodes[i - 1].0.clone(), nodes[i].0.clone()))
+                .collect();
+            let input = begin.elapsed();
+            let begin = Instant::now();
+            let placed =
+                layered_layout_sized(nodes, &edges, 40., 16., 24., GraphCyclePolicy::Reject)
+                    .expect("valid sparse forest");
+            let layout = begin.elapsed();
+            assert_eq!(placed.len(), count);
+            let begin = Instant::now();
+            let geometry: Vec<_> = placed
+                .into_iter()
+                .map(|(id, bounds)| NodeGeometry {
+                    id,
+                    bounds,
+                    tint: theme.colors.text,
+                    ports: vec![],
+                })
+                .collect();
+            let geometry_time = begin.elapsed();
+            let graph = NodeGraph::new("workload").edges(edges);
+            let begin = Instant::now();
+            let routes = graph.routable_geometry(&theme, &geometry);
+            let routing = begin.elapsed();
+            assert_eq!(routes.len(), count - count.div_ceil(16));
+            let first = RouteInputs::new(&geometry, &graph.edges, graph.routing, &theme);
+            let begin = Instant::now();
+            assert!(first.matches(&geometry, &graph.edges, graph.routing, &theme));
+            let cache = begin.elapsed();
+            eprintln!(
+                "graph nodes={count} edges={} input={input:?} layout={layout:?} geometry={geometry_time:?} routing={routing:?} borrowed_cache_hit={cache:?}; mount/paint=not measured",
+                graph.edges.len()
+            );
+        }
+    }
 
     #[test]
     fn a_refusal_is_unavailable_and_a_load_failure_is_error() {

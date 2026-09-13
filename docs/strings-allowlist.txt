@@ -264,9 +264,12 @@ ability charges cannot exceed their maximum
 an actionable card has one
 an actionable row has one
 array
+at least two points
+built-in refusal key
 bundled JSON grammar and query are compatible
 camelCase
 candidate value
+category belongs to scale
 checked above
 configured parser without cancellation
 ctrl-k ctrl-i
@@ -276,18 +279,21 @@ drop request identities exhausted
 empty array
 empty object
 end before start
+error interval validated
 false
 floating stack `{id}` has invalid viewport bounds
 game fraction must be between 0 and 1
 game fraction must be finite
 glTF
 handled before mutation
+heatmap error key
 identity segments are valid UTF-8
 indexed syntax row
 layout came from projected document
 layout is present until paint
 listed row
 markdown stream closed `{end:?}` past its root
+monotone guard checked tangents
 month unknown
 more than one root: {}
 motion! does not know this entry: 
@@ -295,6 +301,7 @@ multiline rich-text replacement needs {expected} new block ids, got {actual}
 must be between 0 and 1
 must be finite
 no record without a parent
+nonempty component
 nonempty validated detents
 not applicable
 not fetched
@@ -309,13 +316,18 @@ panel `{id}` appears more than once
 plain text
 platform
 policy-owned particle recipes must remain valid
+radial axis identities validated
+raw pie readings validated
+raw x validated
 ready handled above
 records the root does not reach
 redacted, {shape}
+reference axis validated before paint
 rich text is never blockless
 rich-text block `{id}` does not exist
 rich-text block id `{id}` is repeated
 row keys must be unique
+series axis validated
 series is nonempty
 slot was filled
 soft break
@@ -329,14 +341,20 @@ stateMachines
 status rows are not nodes
 supplied
 the built-in particle atlas has exact RGBA8 dimensions
+tick belongs to axis domain
+tick belongs to x domain
 time unknown
 tracking motion is spring-backed
 true
+unit time domain
 unknown
 unknown-limit
 unrenderable, required
 unrendered html
 validated fold ranges
+validated legend
+validated reading
+validated reference endpoint
 validated selected detent
 visible series are drawn by the caller
 voice {field} {reason}
@@ -358,11 +376,14 @@ x1b[D
 x1b[F
 x1b[H
 x1b[Z
+zoom {}; center {}, {}
 {:02X}{:02X}{:02X}
 {KEY_CONTEXT} && !{COMPLETION_CONTEXT}
 {KEY_CONTEXT} && !{SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}
 {KEY_CONTEXT} && {COMPLETION_CONTEXT}
 {KEY_CONTEXT} && {SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}
+{label}: {reason}
+{label}: {value}
 {name} is not a slot this component names; it offers {:?}
 {number}. 
 {pad}> 

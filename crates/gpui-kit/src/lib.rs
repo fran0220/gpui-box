@@ -249,6 +249,10 @@ pub mod prelude {
     };
     pub use crate::display::empty::{Divider, DividerAxis, EmptyKind, EmptyState};
     pub use crate::display::failure_panel::FailurePanel;
+    pub use crate::display::geography::{
+        GeoColorDomain, GeoData, GeoEvent, GeoFeature, GeoMap, GeoPoint, GeoPolygon, GeoPosition,
+        GeoProjected, GeoProjection, GeoRefusal, GeoState, GeoViewport,
+    };
     pub use crate::display::heatmap::{HeatAxis, HeatCell, Heatmap, HeatmapState};
     pub use crate::display::highlight::HighlightedText;
     pub use crate::display::icon::{Icon, IconTone};

@@ -75,7 +75,8 @@ instead of drawing a blank page, and Loading, Empty, Unavailable, Error, and
 Ready remain five distinct answers.
 
 `NodeGraph` renders caller-owned positions. The caller may compute those with
-the optional `layered_layout` helper or a different layout policy; accepting a
+the optional `layered_layout` / dimension-aware `layered_layout_sized` helpers
+or a different layout policy; accepting a
 layout result never transfers topology or position ownership to the component.
 A node may carry a caller-rendered thumbnail, whose pixels the graph neither
 fetches nor decodes. `GraphInteraction::Inspect` permits only pan, zoom, and
@@ -911,13 +912,31 @@ the form never owns the condition or removes caller data.
 `LineChart` and `BarChart` now cover the cartesian presentation gap with keyed
 motion, area fills, pointer and keyboard crosshairs, exact host-formatted text,
 and stale-data retention. Their existing normalized entry points require
-caller-prepared coordinates and axis wording; general raw-data scale and
-composition support is tracked in the visualization delivery plan, not claimed
-by this paragraph. `Plot` supplies the lower generic measured frame and semantic
+caller-prepared coordinates and axis wording. `CartesianChart` additionally
+provides raw f64 numeric/category/time scales, mixed layers and separate value
+axes, orientation, caller ticks, bounded custom glyphs, controlled exploration
+and keyed raw motion. Shared immutable input, explicit extrema path sampling
+and exact rectangle hit lookup reduce CPU work without replacing source
+identities. Full semantic publication and enabled motion remain linear in
+input size; the [chart contract](cartesian-charts.md) records measured limits.
+`Plot` supplies the lower generic measured frame and semantic
 mark traversal. `CandlestickChart` and `SankeyChart` render normalized OHLC and
 flow geometry through that boundary. `SankeyData::layout` additionally provides
 an optional validated DAG layout with one weight-to-height scale and explicit
-alignment. Neither component owns market data, queries or trading policy.
+alignment and optional deterministic crossing-order improvement. `RawOhlc`
+adapts validated open/high/low/close readings to shared Cartesian intervals;
+`SpecializedChart` provides raw hierarchy/distribution/range/waterfall layouts,
+and `ContinuousHeatmap` supplies explicit continuous/diverging domains with
+missing-value and localized status handling. None owns market data or queries.
+
+`TraceView` and `SpanTimeline` add controlled raw-time viewports and virtual row
+windows while retaining an input-sized hierarchy scan. Sized graph layout and
+complete route-cache inputs preserve controlled geometry; large sparse layout
+tests do not establish a responsive 10k-node editor. See [graph/trace evidence](graph-trace-visualization.md).
+`GeoMap` renders immutable caller-supplied projected polygons/holes and points,
+with controlled selection/camera, localized refusal and measured geometry
+targets. Its [projection subset](geography.md) excludes tile/network services,
+geodesic topology, antimeridian cutting and a general GIS engine.
 
 Agent and game applications now have product-neutral run, persona, party,
 objective, ability, and reward families rather than one-off downstream cards.

@@ -620,6 +620,102 @@ impl Candlestick {
     }
 }
 
+/// One raw OHLC reading. The x coordinate may be Unix milliseconds on a
+/// shared Time scale or any caller-defined numeric coordinate. Negative
+/// readings are accepted; financial/calendar/domain policy is not inferred.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RawOhlc {
+    pub id: SharedString,
+    pub x: f64,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub label: SharedString,
+    pub formatted: SharedString,
+}
+
+/// An invalid observation or repeated business identity rejects the series.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OhlcError {
+    InvalidReading(SharedString),
+    DuplicateIdentity(SharedString),
+}
+
+impl RawOhlc {
+    /// Values are ordered `[open, high, low, close]`; equality is valid (doji).
+    pub fn new(
+        id: impl Into<SharedString>,
+        x: f64,
+        ohlc: [f64; 4],
+        label: impl Into<SharedString>,
+        formatted: impl Into<SharedString>,
+    ) -> Self {
+        let [open, high, low, close] = ohlc;
+        Self {
+            id: id.into(),
+            x,
+            open,
+            high,
+            low,
+            close,
+            label: label.into(),
+            formatted: formatted.into(),
+        }
+    }
+
+    /// Adapt validated readings to the shared Cartesian Range mark. Its body
+    /// runs open→close and its whisker runs low→high. Direction colors and all
+    /// visible wording remain caller-owned. Compose volume/overlays as ordinary
+    /// RawSeries on the same x scale, with independent value axes as needed.
+    pub fn series(
+        id: impl Into<SharedString>,
+        axis: impl Into<SharedString>,
+        readings: impl IntoIterator<Item = Self>,
+        rising: Hsla,
+        falling: Hsla,
+    ) -> Result<super::chart::data::RawSeries, OhlcError> {
+        use super::chart::data::{ChartValue, RawPoint, RawSeries, SeriesMark};
+        let mut ids = HashSet::new();
+        let mut points = Vec::new();
+        for reading in readings {
+            if !ids.insert(reading.id.clone()) {
+                return Err(OhlcError::DuplicateIdentity(reading.id));
+            }
+            if ![
+                reading.x,
+                reading.open,
+                reading.high,
+                reading.low,
+                reading.close,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+                || reading.low > reading.open.min(reading.close)
+                || reading.high < reading.open.max(reading.close)
+            {
+                return Err(OhlcError::InvalidReading(reading.id));
+            }
+            points.push(
+                RawPoint::new(
+                    reading.id,
+                    ChartValue::Number(reading.x),
+                    Some(reading.close),
+                )
+                .baseline(reading.open)
+                .error([reading.low, reading.high])
+                .text(reading.label, reading.formatted)
+                .tint(if reading.close >= reading.open {
+                    rising
+                } else {
+                    falling
+                }),
+            );
+        }
+        Ok(RawSeries::new(id, axis, SeriesMark::Range).points(points))
+    }
+}
+
 /// Candlesticks over caller-owned normalized OHLC readings.
 #[derive(IntoElement)]
 pub struct CandlestickChart {
@@ -873,6 +969,16 @@ pub enum SankeyAlignment {
     Justify,
 }
 
+/// Vertical ordering policy. Weighted barycenter sweeps reduce crossings;
+/// stable identity breaks ties. This is a deterministic heuristic, not a
+/// guarantee of the globally minimum crossing arrangement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SankeyOrder {
+    #[default]
+    Input,
+    Barycenter,
+}
+
 /// Invalid graph or normalized layout constraints. Layout never silently
 /// drops a flow or fabricates a value for an invalid input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -908,11 +1014,25 @@ impl SankeyData {
     /// remain zero-height; cycles, missing endpoints, and invalid constraints
     /// are errors rather than approximations. Returns geometry and the scale.
     pub fn layout(
+        self,
+        weights: &[f64],
+        node_width: f32,
+        gap: f32,
+        alignment: SankeyAlignment,
+    ) -> Result<(Self, f64), SankeyLayoutError> {
+        self.layout_ordered(weights, node_width, gap, alignment, SankeyOrder::Input)
+    }
+
+    /// The same conserved layout with optional deterministic crossing reduction.
+    /// Link storage order is preserved; source and target ribbon stacks follow
+    /// opposite-node order independently, without changing any flow width.
+    pub fn layout_ordered(
         mut self,
         weights: &[f64],
         node_width: f32,
         gap: f32,
         alignment: SankeyAlignment,
+        ordering: SankeyOrder,
     ) -> Result<(Self, f64), SankeyLayoutError> {
         use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -1010,6 +1130,58 @@ impl SankeyData {
         for (i, &column) in depth.iter().enumerate() {
             columns[column].push(i);
         }
+        if ordering == SankeyOrder::Barycenter {
+            for column in &mut columns {
+                column.sort_by(|&a, &b| self.nodes[a].id.cmp(&self.nodes[b].id));
+            }
+            let mut rank = vec![0.0; n];
+            for pass in 0..6 {
+                for column in &columns {
+                    for (position, &i) in column.iter().enumerate() {
+                        rank[i] = position as f64;
+                    }
+                }
+                let forward = pass % 2 == 0;
+                let sequence: Vec<_> = if forward {
+                    (0..columns.len()).collect()
+                } else {
+                    (0..columns.len()).rev().collect()
+                };
+                for column in sequence {
+                    let score = |i: usize| {
+                        let total = if forward {
+                            incoming_value[i]
+                        } else {
+                            outgoing_value[i]
+                        };
+                        if total == 0.0 {
+                            return rank[i];
+                        }
+                        edges
+                            .iter()
+                            .zip(weights)
+                            .filter_map(|(&(a, b), &weight)| {
+                                if forward && b == i {
+                                    Some(rank[a] * (weight / total))
+                                } else if !forward && a == i {
+                                    Some(rank[b] * (weight / total))
+                                } else {
+                                    None
+                                }
+                            })
+                            .sum::<f64>()
+                    };
+                    columns[column].sort_by(|&a, &b| {
+                        score(a)
+                            .total_cmp(&score(b))
+                            .then_with(|| self.nodes[a].id.cmp(&self.nodes[b].id))
+                    });
+                    for (position, &i) in columns[column].iter().enumerate() {
+                        rank[i] = position as f64;
+                    }
+                }
+            }
+        }
         let mut scale = f64::INFINITY;
         for column in &columns {
             let available = 1.0 - f64::from(gap) * column.len().saturating_sub(1) as f64;
@@ -1064,6 +1236,40 @@ impl SankeyData {
             source_offsets[source] += width;
             target_offsets[target] += width;
         }
+        if ordering == SankeyOrder::Barycenter {
+            for source_side in [true, false] {
+                let mut indices: Vec<_> = (0..edges.len()).collect();
+                indices.sort_by(|&a, &b| {
+                    let (a_source, a_target) = edges[a];
+                    let (b_source, b_target) = edges[b];
+                    let (a_node, b_node) = if source_side {
+                        (a_target, b_target)
+                    } else {
+                        (a_source, b_source)
+                    };
+                    self.nodes[a_node]
+                        .bounds
+                        .origin
+                        .y
+                        .total_cmp(&self.nodes[b_node].bounds.origin.y)
+                        .then_with(|| self.links[a].id.cmp(&self.links[b].id))
+                });
+                let mut offsets = vec![0.0f64; n];
+                for index in indices {
+                    let (source, target) = edges[index];
+                    let node = if source_side { source } else { target };
+                    let width = weights[index] * scale;
+                    let center =
+                        self.nodes[node].bounds.origin.y + (offsets[node] + width / 2.0) as f32;
+                    if source_side {
+                        self.links[index].start.y = center;
+                    } else {
+                        self.links[index].end.y = center;
+                    }
+                    offsets[node] += width;
+                }
+            }
+        }
         Ok((self, scale))
     }
 }
@@ -1074,6 +1280,7 @@ pub struct SankeyChart {
     ident: Ident,
     label: SharedString,
     state: PlotState<SankeyData>,
+    show_labels: bool,
     current: Option<SharedString>,
     on_current: Option<CurrentHandler>,
 }
@@ -1101,9 +1308,16 @@ impl SankeyChart {
             ident: ident.into(),
             label: label.into(),
             state,
+            show_labels: false,
             current: None,
             on_current: None,
         }
+    }
+
+    /// Show a persistent node/link key with caller-provided labels and values.
+    pub fn labels(mut self, show: bool) -> Self {
+        self.show_labels = show;
+        self
     }
 
     pub fn current(mut self, id: impl Into<SharedString>) -> Self {
@@ -1127,12 +1341,36 @@ impl RenderOnce for SankeyChart {
         let marks = self.state.map(|data| sankey_marks(&valid_sankey(&data)));
         let data = visible.unwrap_or_default();
         let accent = theme.colors.accent;
-        Plot::new(self.ident, self.label, marks)
-            .paint(move |frame, window, _| paint_sankey(frame, &data, accent, window))
-            .when_some(self.current, |plot, current| plot.current(current))
-            .when_some(self.on_current, |plot, report| {
-                plot.on_current(move |id, window, cx| report(id, window, cx))
-            })
+        let labels = if self.show_labels {
+            sankey_marks(&data)
+        } else {
+            Vec::new()
+        };
+        let key = self.ident.child("labels");
+        div()
+            .column()
+            .w_full()
+            .gap_token(&theme, Space::Xs)
+            .child(
+                Plot::new(self.ident, self.label, marks)
+                    .paint(move |frame, window, _| paint_sankey(frame, &data, accent, window))
+                    .when_some(self.current, |plot, current| plot.current(current))
+                    .when_some(self.on_current, |plot, report| {
+                        plot.on_current(move |id, window, cx| report(id, window, cx))
+                    }),
+            )
+            .children(labels.into_iter().map(|mark| {
+                div()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .text_color(theme.colors.text)
+                    .child(format!("{}: {}", mark.label, mark.value))
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(key.child(mark.id.as_ref()).semantic_id(), Role::Image)
+                            .text(mark.label)
+                            .value(mark.value),
+                    )
+            }))
     }
 }
 
@@ -1251,6 +1489,63 @@ fn paint_sankey(frame: PlotFrame, data: &SankeyData, accent: Hsla, window: &mut 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_ohlc_adapts_all_endpoints_without_normalizing_or_reordering_values() {
+        let rising = gpui::rgb(0x00ff00).into();
+        let falling = gpui::rgb(0xff0000).into();
+        let input = [
+            RawOhlc::new(
+                "fall",
+                86_400_000.0,
+                [65.0, 75.0, 35.0, 40.0],
+                "Falling",
+                "O65 H75 L35 C40",
+            ),
+            RawOhlc::new(
+                "doji",
+                172_800_000.0,
+                [-3.0, -1.0, -8.0, -3.0],
+                "Doji",
+                "O-3 H-1 L-8 C-3",
+            ),
+        ];
+        let series = RawOhlc::series("ohlc", "price", input, rising, falling).expect("valid OHLC");
+        assert_eq!(series.mark, super::super::chart::data::SeriesMark::Range);
+        assert_eq!(series.points[0].baseline, Some(65.0));
+        assert_eq!(series.points[0].y, Some(40.0));
+        assert_eq!(series.points[0].error, Some([35.0, 75.0]));
+        assert_eq!(series.points[0].color, Some(falling));
+        assert_eq!(series.points[0].formatted.as_ref(), "O65 H75 L35 C40");
+        assert_eq!(series.points[1].color, Some(rising));
+        assert_eq!(series.points[1].id.as_ref(), "doji");
+    }
+
+    #[test]
+    fn invalid_raw_ohlc_rejects_the_whole_series() {
+        let tint = gpui::rgb(0).into();
+        let good = RawOhlc::new("same", 0.0, [2.0, 8.0, 1.0, 4.0], "", "");
+        assert_eq!(
+            RawOhlc::series("ohlc", "y", [good.clone(), good], tint, tint),
+            Err(OhlcError::DuplicateIdentity("same".into()))
+        );
+        for values in [
+            [2.0, 3.0, 1.0, 4.0],
+            [2.0, 8.0, 3.0, 4.0],
+            [f64::NAN, 8.0, 1.0, 4.0],
+        ] {
+            assert_eq!(
+                RawOhlc::series(
+                    "ohlc",
+                    "y",
+                    [RawOhlc::new("bad", 0.0, values, "", "")],
+                    tint,
+                    tint
+                ),
+                Err(OhlcError::InvalidReading("bad".into()))
+            );
+        }
+    }
 
     #[test]
     fn a_frame_maps_the_normalized_square_into_measured_pixels() {
@@ -1420,5 +1715,61 @@ mod tests {
                 assert!(data.links.iter().all(|link| link.start_width.is_finite()));
             }
         }
+    }
+
+    #[test]
+    fn barycenter_order_removes_a_crossing_without_changing_asymmetric_widths() {
+        let graph = SankeyData::new(
+            ["a", "b", "c", "d"].map(|id| SankeyNode::new(id, id, "", Bounds::default())),
+            [("ad", "a", "d"), ("bc", "b", "c")].map(|(id, source, target)| {
+                SankeyLink::new(
+                    id,
+                    source,
+                    target,
+                    id,
+                    "",
+                    Point::default(),
+                    Point::default(),
+                    0.0,
+                )
+            }),
+        );
+        let (input, scale) = graph
+            .clone()
+            .layout(&[7.0, 3.0], 0.1, 0.1, SankeyAlignment::Left)
+            .expect("input layout");
+        assert!(
+            input.links[0].start.y < input.links[1].start.y
+                && input.links[0].end.y > input.links[1].end.y
+        );
+        let (ordered, ordered_scale) = graph
+            .clone()
+            .layout_ordered(
+                &[7.0, 3.0],
+                0.1,
+                0.1,
+                SankeyAlignment::Left,
+                SankeyOrder::Barycenter,
+            )
+            .expect("ordered layout");
+        assert_eq!(scale, ordered_scale);
+        assert!(
+            ordered.links[0].start.y < ordered.links[1].start.y
+                && ordered.links[0].end.y < ordered.links[1].end.y
+        );
+        assert!((ordered.links[0].start_width - 0.63).abs() < 1e-6);
+        assert!((ordered.links[1].start_width - 0.27).abs() < 1e-6);
+        let mut reversed = graph;
+        reversed.nodes.reverse();
+        let (reversed, _) = reversed
+            .layout_ordered(
+                &[7.0, 3.0],
+                0.1,
+                0.1,
+                SankeyAlignment::Left,
+                SankeyOrder::Barycenter,
+            )
+            .expect("reordered input");
+        assert_eq!(ordered.links, reversed.links);
     }
 }

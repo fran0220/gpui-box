@@ -1,7 +1,9 @@
 //! Cartesian readings over host-owned series.
 //!
-//! A chart does not invent a domain, a tick, a locale, an aggregation, or a
-//! colour. The host supplies normalized coordinates and exact visible text.
+//! The original builders accept normalized coordinates and exact visible text.
+//! [`cartesian::CartesianChart`] additionally accepts raw f64 observations with
+//! explicit shared scales, computed ticks, stacks and controlled exploration.
+//! Locale, aggregation and business identity always remain caller-owned.
 //! This module owns the reusable presentation work downstream applications
 //! should not have to redraw: axes, legends, keyed data motion, area fills,
 //! crosshair interaction, and truthful loading and refresh states.
@@ -38,6 +40,11 @@ use crate::motion::{self, MotionPolicy, MotionRole, Presence, Stagger, Transitio
 use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
+
+pub mod cartesian;
+mod cartesian_performance;
+pub mod data;
+pub mod scale;
 
 /// One host-owned point in a chart series.
 ///
@@ -1906,6 +1913,17 @@ pub struct PieChart {
 }
 
 impl PieChart {
+    /// Normalize finite nonnegative raw shares. Missing/negative readings are
+    /// rejected; an all-zero series remains a valid zero-share observation.
+    pub fn from_raw(
+        ident: impl Into<Ident>,
+        label: impl Into<SharedString>,
+        series: data::RawSeries,
+    ) -> Result<Self, data::DataError> {
+        let series = data::pie_series(&series)?;
+        Ok(Self::new(ident, label, ChartState::Ready(vec![series])))
+    }
+
     pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
         Self {
             ident: ident.into(),
@@ -2421,6 +2439,27 @@ pub struct RadarChart {
 }
 
 impl RadarChart {
+    /// Raw axis values, ordered by the supplied axes rather than sample order.
+    /// Every series must contain exactly one in-domain reading per axis ID.
+    pub fn from_raw(
+        ident: impl Into<Ident>,
+        label: impl Into<SharedString>,
+        series: impl IntoIterator<Item = data::RawSeries>,
+        axes: &[data::ValueAxis],
+    ) -> Result<Self, data::DataError> {
+        let mut ids = HashSet::new();
+        let series = series
+            .into_iter()
+            .map(|series| {
+                if !ids.insert(series.id.clone()) {
+                    return Err(data::DataError::DuplicateIdentity(series.id));
+                }
+                data::radial_series(&series, axes)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self::new(ident, label, ChartState::Ready(series)))
+    }
+
     pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
         Self {
             ident: ident.into(),
@@ -2642,6 +2681,37 @@ pub struct GaugeChart {
 }
 
 impl GaugeChart {
+    /// A raw reading with an explicit domain. Outside-domain and nonfinite
+    /// values are errors rather than clamped needles. None draws no needle.
+    pub fn from_raw(
+        ident: impl Into<Ident>,
+        label: impl Into<SharedString>,
+        reading: data::RawPoint,
+        domain: scale::NumericScale,
+    ) -> Result<Self, data::DataError> {
+        let label = label.into();
+        let points = if let Some(value) = reading.y {
+            let amount = domain
+                .map(value)
+                .filter(|v| (0.0..=1.0).contains(v))
+                .ok_or_else(|| data::DataError::InvalidPoint(reading.id.clone()))?;
+            vec![ChartPoint::new(
+                reading.id,
+                0.,
+                amount as f32,
+                reading.label,
+                reading.formatted,
+            )]
+        } else {
+            Vec::new()
+        };
+        Ok(Self::new(
+            ident,
+            label.clone(),
+            ChartState::Ready(vec![ChartSeries::new("reading", label).points(points)]),
+        ))
+    }
+
     pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
         Self {
             ident: ident.into(),

@@ -1,5 +1,7 @@
 //! Deterministic structural performance authority for large Kit surfaces.
 
+mod charts;
+
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -94,6 +96,9 @@ fn end_allocation_measurement() -> u64 {
 type ViewBuilder = Box<dyn Fn(&mut gpui::Window, &mut gpui::App) -> AnyElement>;
 
 fn main() -> Result<()> {
+    if charts::selected_run()? {
+        return Ok(());
+    }
     let output = output_path()?;
     let mut reports = Vec::new();
     for items in [1_000, DATASET_ITEMS] {
@@ -223,6 +228,7 @@ fn main() -> Result<()> {
             reports.push(report);
         }
     }
+    reports.extend(charts::run()?);
     prove_unbounded_fixture_fails()?;
 
     let document = serde_json::json!({

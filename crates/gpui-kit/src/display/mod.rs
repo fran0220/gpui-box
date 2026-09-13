@@ -10,6 +10,7 @@ pub mod chart;
 pub mod description_list;
 pub mod empty;
 pub mod failure_panel;
+pub mod geography;
 pub mod heatmap;
 pub mod highlight;
 pub mod icon;
@@ -23,9 +24,15 @@ pub mod progress_circle;
 pub mod rating;
 pub(crate) mod signature;
 pub mod sparkline;
+pub mod specialized;
 pub mod stage_progress;
 pub mod state_view;
 pub mod status;
 pub mod tag;
 pub mod timeline;
 pub mod trace;
+
+pub use geography::{
+    GeoColorDomain, GeoData, GeoEvent, GeoFeature, GeoMap, GeoPoint, GeoPolygon, GeoPosition,
+    GeoProjected, GeoProjection, GeoRefusal, GeoState, GeoViewport,
+};

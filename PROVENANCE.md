@@ -4,6 +4,15 @@ GPUI Box is an independent derivative project, not an official Zed project.
 Provenance applies to imported and translated source as well as linked assets.
 The machine-readable release record is `provenance.toml`.
 
+The local geographic visualization family and synthetic exhibit are original
+GPUI Box work. Projection formulas were checked against
+[PROJ's Web Mercator definition](https://proj.org/en/stable/operations/projections/webmerc.html),
+and the explicit ring/antimeridian subset against
+[RFC 7946](https://www.rfc-editor.org/rfc/rfc7946). No source or geographic
+dataset was copied or translated. Existing GPUI/Lyon path filling is reused;
+there are no provider assets, new dependencies, or historical receipt changes.
+`docs/geography.md` records the deliberately bounded projected-edge contract.
+
 Portable multi-contact arbitration, captured pan/pinch ownership, residual
 scroll-to-manipulation handoff, interrupted-input cleanup, and the mobile
 keyboard/inset/native text query contracts are original GPUI Box framework
@@ -1063,3 +1072,23 @@ These changes do not alter the frozen historical import receipt or introduce
 an external source/package authority. Reference observations do not establish
 Apple-equivalent optics, volume transport or native-platform verification of
 the GPUI implementation.
+
+### Raw Cartesian coordinates and composition
+
+`crates/gpui-kit/src/display/chart/{scale,data,cartesian}.rs` and the original
+Cartesian fixtures are independently authored GPUI Box Kit code. Recharts and
+ECharts are capability references, not source dependencies or compatibility
+targets. The monotone Hermite implementation uses the mathematical
+sign-preservation and radius-three tangent constraint described at
+https://en.wikipedia.org/wiki/Monotone_cubic_interpolation (consulted 2026-09-13);
+no example implementation or third-party source was copied. Time coordinates
+are UTC Unix milliseconds with fixed-duration ticks, not a copied calendar
+implementation. Existing GPUI layout, clipping, text measurement and pointer
+capture are reused. No framework package or historical import receipt changes.
+The sibling `cartesian_layout.rs` and `cartesian_motion.rs` implement original
+shared orientation mapping and keyed f64 geometry using Kit's existing Transition
+primitive. Caller tick lists and bounded custom painters add no imported source
+or calendar policy. English and Chinese chart state strings are original text.
+`cartesian_performance.rs`, its rectangle tree, immutable projection cache and
+pixel-column extrema reduction, and the chart performance fixtures are original
+Kit implementations. No external sampling or spatial-index source was copied.

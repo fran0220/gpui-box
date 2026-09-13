@@ -1,29 +1,89 @@
 //! A caller-owned execution trace as a waterfall of spans.
 //!
-//! Times are already normalized by the host. This component does not invent a
-//! clock, a duration, or a locale: `start` and `end` are positions on a unit
-//! interval, and every label is a finished string. Clicking a span reports
-//! its identity; the host decides whether a payload is shown.
+//! Legacy `start` and `end` are normalized positions. [`TraceSpan::time`] and
+//! [`TraceView::time_viewport`] accept raw UTC milliseconds through the shared
+//! chart scale. The host owns the viewport, formatted labels, duration and
+//! hierarchy; the component proposes changes and mounts only its row window.
 
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px, relative,
+    StatefulInteractiveElement, Styled, Window, div, px, relative, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::display::badge::Tone;
+use crate::display::chart::scale::{NumericScale, ScaleError, ScaleKind};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
+use crate::layout::measure;
 use crate::motion;
 use crate::overlay::tooltip::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type ViewportHandler = Rc<dyn Fn(NumericScale, &mut Window, &mut App)>;
+type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
+type TimeFormatter = Rc<dyn Fn(f64) -> SharedString>;
+type WheelHandler = Rc<dyn Fn(&gpui::ScrollWheelEvent, &mut Window, &mut App)>;
+
+/// Shared temporal presentation, never an independent scale engine. Hierarchy
+/// uses caller-supplied preorder and depth; collapsed descendants are omitted.
+#[derive(Clone)]
+struct TraceOptions {
+    viewport: NumericScale,
+    formatter: Option<TimeFormatter>,
+    on_viewport: Option<ViewportHandler>,
+    collapsed: HashSet<SharedString>,
+    on_toggle: Option<ToggleHandler>,
+    visible_rows: usize,
+}
+
+impl Default for TraceOptions {
+    fn default() -> Self {
+        Self {
+            viewport: NumericScale::new(ScaleKind::Time, [0., 1.]).expect("unit time domain"),
+            formatter: None,
+            on_viewport: None,
+            collapsed: HashSet::new(),
+            on_toggle: None,
+            visible_rows: 12,
+        }
+    }
+}
+
+fn visible_indices(spans: &[TraceSpan], collapsed: &HashSet<SharedString>) -> Vec<usize> {
+    let mut hidden_below = None;
+    spans
+        .iter()
+        .enumerate()
+        .filter_map(|(index, span)| {
+            if hidden_below.is_some_and(|depth| span.depth > depth) {
+                return None;
+            }
+            hidden_below = collapsed.contains(&span.id).then_some(span.depth);
+            Some(index)
+        })
+        .collect()
+}
+
+fn interval(span: &TraceSpan, viewport: NumericScale) -> Option<(f32, f32)> {
+    let [start, end] = span.time.unwrap_or([span.start as f64, span.end as f64]);
+    if end < start {
+        return None;
+    }
+    let a = viewport.map(start)?;
+    let b = viewport.map(end)?;
+    let (a, b) = (a.min(b), a.max(b));
+    if b < 0. || a > 1. {
+        return None;
+    }
+    Some((a.max(0.) as f32, b.min(1.) as f32))
+}
 
 /// The label gutter of [`TraceView`]. Wide enough for a nested name, closed by
 /// a hairline so the space left over reads as a column and not as a gap.
@@ -161,6 +221,9 @@ pub struct TraceSpan {
     /// never derives it from `start` and `end`: those are positions on a unit
     /// interval and know nothing about the clock behind them.
     pub duration: Option<SharedString>,
+    /// Optional raw Unix millisecond interval. Overrides normalized positions
+    /// only for geometry; labels and duration remain caller-owned.
+    pub time: Option<[f64; 2]>,
 }
 
 impl TraceSpan {
@@ -179,6 +242,7 @@ impl TraceSpan {
             state: SpanState::Pending,
             detail: None,
             duration: None,
+            time: None,
         }
     }
 
@@ -202,6 +266,13 @@ impl TraceSpan {
         self.duration = Some(duration.into());
         self
     }
+
+    /// Raw-time entry point preserving sub-millisecond precision until mapping.
+    /// Nonfinite or reversed intervals are retained but have no painted bar.
+    pub fn time(mut self, start_ms: f64, end_ms: f64) -> Self {
+        self.time = Some([start_ms, end_ms]);
+        self
+    }
 }
 
 /// Hierarchical labels beside a waterfall of caller-owned spans.
@@ -209,7 +280,8 @@ impl TraceSpan {
 pub struct TraceView {
     ident: Ident,
     label: SharedString,
-    spans: Vec<TraceSpan>,
+    spans: Rc<Vec<TraceSpan>>,
+    options: TraceOptions,
     axis_start: Option<SharedString>,
     axis_end: Option<SharedString>,
     ticks: Vec<AxisTick>,
@@ -223,7 +295,8 @@ impl TraceView {
         Self {
             ident: ident.into(),
             label: label.into(),
-            spans: Vec::new(),
+            spans: Rc::new(Vec::new()),
+            options: TraceOptions::default(),
             axis_start: None,
             axis_end: None,
             ticks: Vec::new(),
@@ -234,7 +307,56 @@ impl TraceView {
     }
 
     pub fn spans(mut self, spans: impl IntoIterator<Item = TraceSpan>) -> Self {
-        self.spans = spans.into_iter().collect();
+        self.spans = Rc::new(spans.into_iter().collect());
+        self
+    }
+
+    /// Reuse caller-owned input across frames without cloning every span.
+    pub fn shared_spans(mut self, spans: Rc<Vec<TraceSpan>>) -> Self {
+        self.spans = spans;
+        self
+    }
+
+    /// Caller-owned time window. The default remains the normalized [0, 1].
+    pub fn time_viewport(mut self, domain: [f64; 2]) -> Result<Self, ScaleError> {
+        self.options.viewport = NumericScale::new(ScaleKind::Time, domain)?;
+        Ok(self)
+    }
+
+    /// Format measured-density raw-time ticks; no locale is guessed.
+    pub fn format_time(mut self, format: impl Fn(f64) -> SharedString + 'static) -> Self {
+        self.options.formatter = Some(Rc::new(format));
+        self
+    }
+
+    /// Ctrl-wheel zooms at the pointer; shift-wheel pans. The host may refuse.
+    pub fn on_viewport(
+        mut self,
+        handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_viewport = Some(Rc::new(handler));
+        self
+    }
+
+    /// Collapsed identities in the caller's depth-first preorder span list.
+    pub fn collapsed(mut self, ids: impl IntoIterator<Item = SharedString>) -> Self {
+        self.options.collapsed = ids.into_iter().collect();
+        self
+    }
+
+    /// Reports desired expansion, without changing caller-owned hierarchy.
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_toggle = Some(Rc::new(handler));
+        self
+    }
+
+    /// Maximum viewport height in rows; GPUI may measure one additional row.
+    /// Input scanning remains linear and is not a paint-work claim.
+    pub fn visible_rows(mut self, count: usize) -> Self {
+        self.options.visible_rows = count.max(1);
         self
     }
 
@@ -294,12 +416,13 @@ impl RenderOnce for TraceView {
         waterfall(
             &self.ident,
             self.label,
-            &self.spans,
+            self.spans,
             &ticks,
             self.current.as_ref(),
             self.on_select,
             &self.slots,
             true,
+            self.options,
             window,
             cx,
         )
@@ -312,7 +435,8 @@ impl RenderOnce for TraceView {
 pub struct SpanTimeline {
     ident: Ident,
     label: SharedString,
-    spans: Vec<TraceSpan>,
+    spans: Rc<Vec<TraceSpan>>,
+    options: TraceOptions,
     axis_start: Option<SharedString>,
     axis_end: Option<SharedString>,
     ticks: Vec<AxisTick>,
@@ -326,7 +450,8 @@ impl SpanTimeline {
         Self {
             ident: ident.into(),
             label: label.into(),
-            spans: Vec::new(),
+            spans: Rc::new(Vec::new()),
+            options: TraceOptions::default(),
             axis_start: None,
             axis_end: None,
             ticks: Vec::new(),
@@ -337,7 +462,56 @@ impl SpanTimeline {
     }
 
     pub fn spans(mut self, spans: impl IntoIterator<Item = TraceSpan>) -> Self {
-        self.spans = spans.into_iter().collect();
+        self.spans = Rc::new(spans.into_iter().collect());
+        self
+    }
+
+    /// Reuse caller-owned input across frames without cloning every span.
+    pub fn shared_spans(mut self, spans: Rc<Vec<TraceSpan>>) -> Self {
+        self.spans = spans;
+        self
+    }
+
+    /// Caller-owned time window. The default remains the normalized [0, 1].
+    pub fn time_viewport(mut self, domain: [f64; 2]) -> Result<Self, ScaleError> {
+        self.options.viewport = NumericScale::new(ScaleKind::Time, domain)?;
+        Ok(self)
+    }
+
+    /// Format measured-density raw-time ticks; no locale is guessed.
+    pub fn format_time(mut self, format: impl Fn(f64) -> SharedString + 'static) -> Self {
+        self.options.formatter = Some(Rc::new(format));
+        self
+    }
+
+    /// Ctrl-wheel zooms at the pointer; shift-wheel pans. The host may refuse.
+    pub fn on_viewport(
+        mut self,
+        handler: impl Fn(NumericScale, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_viewport = Some(Rc::new(handler));
+        self
+    }
+
+    /// Collapsed identities in the caller's depth-first preorder span list.
+    pub fn collapsed(mut self, ids: impl IntoIterator<Item = SharedString>) -> Self {
+        self.options.collapsed = ids.into_iter().collect();
+        self
+    }
+
+    /// Reports desired expansion, without changing caller-owned hierarchy.
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.options.on_toggle = Some(Rc::new(handler));
+        self
+    }
+
+    /// Maximum viewport height in rows; GPUI may measure one additional row.
+    /// Input scanning remains linear and is not a paint-work claim.
+    pub fn visible_rows(mut self, count: usize) -> Self {
+        self.options.visible_rows = count.max(1);
         self
     }
 
@@ -396,12 +570,13 @@ impl RenderOnce for SpanTimeline {
         waterfall(
             &self.ident,
             self.label,
-            &self.spans,
+            self.spans,
             &ticks,
             self.current.as_ref(),
             self.on_select,
             &self.slots,
             false,
+            self.options,
             window,
             cx,
         )
@@ -412,18 +587,65 @@ impl RenderOnce for SpanTimeline {
 fn waterfall(
     ident: &Ident,
     label: SharedString,
-    spans: &[TraceSpan],
+    spans: Rc<Vec<TraceSpan>>,
     ticks: &[AxisTick],
     current: Option<&SharedString>,
     on_select: Option<SelectHandler>,
     slots: &Slots,
     with_label: bool,
+    options: TraceOptions,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::AnyElement {
     let theme = cx.theme().clone();
     let empty = spans.is_empty();
     let with_duration = spans.iter().any(|span| span.duration.is_some());
+    let measured = measure::cell(&ident.child("measure").semantic_id(), window, cx);
+    let left_gutter = AXIS_GUTTER
+        + if with_label {
+            LABEL_WIDTH + theme.space(Space::Sm)
+        } else {
+            0.
+        };
+    let right_gutter = AXIS_GUTTER
+        + if with_duration {
+            DURATION_WIDTH + theme.space(Space::Sm)
+        } else {
+            0.
+        };
+    let width = (f32::from(measured.get().size.width) - left_gutter - right_gutter).max(0.);
+    let ticks = viewport_ticks(ticks, &options, width);
+    let indices = Rc::new(visible_indices(&spans, &options.collapsed));
+    let scroll = crate::data::viewport::scroll_handle(&ident.child("rows"), window, cx);
+    let wheel: Option<WheelHandler> = options.on_viewport.clone().map(|handler| {
+        let measured = measured.clone();
+        let viewport = options.viewport;
+        Rc::new(
+            move |event: &gpui::ScrollWheelEvent, window: &mut Window, cx: &mut App| {
+                if !event.modifiers.control && !event.modifiers.shift {
+                    return;
+                }
+                let bounds = measured.get();
+                let width = f32::from(bounds.size.width) - left_gutter - right_gutter;
+                if width <= 0. {
+                    return;
+                }
+                let anchor = ((f32::from(event.position.x - bounds.origin.x) - left_gutter)
+                    / width)
+                    .clamp(0., 1.);
+                let delta = match event.delta {
+                    gpui::ScrollDelta::Lines(delta) => delta.y * ROW_HEIGHT,
+                    gpui::ScrollDelta::Pixels(delta) => f32::from(delta.y),
+                };
+                if let Ok(next) =
+                    viewport_proposal(viewport, anchor, delta, width, event.modifiers.control)
+                {
+                    handler(next, window, cx);
+                    cx.stop_propagation();
+                }
+            },
+        ) as WheelHandler
+    });
     let body = if empty {
         slots.or_else(slot::EMPTY, window, cx, |_, cx| {
             marked_empty(
@@ -434,21 +656,61 @@ fn waterfall(
             .into_any_element()
         })
     } else {
-        let rows: Vec<_> = spans
-            .iter()
-            .map(|span| {
-                span_row(
-                    ident,
+        let count = indices.len();
+        let row_height = ROW_HEIGHT + theme.space(Space::Xs);
+        let render_row = {
+            let ident = ident.clone();
+            let current = current.cloned();
+            let theme = theme.clone();
+            let options = options.clone();
+            let indices = indices.clone();
+            let spans = spans.clone();
+            let on_select = on_select.clone();
+            let wheel = wheel.clone();
+            move |index: usize, cx: &App| {
+                let source_index = indices[index];
+                let span = &spans[source_index];
+                let branch = spans
+                    .get(source_index + 1)
+                    .is_some_and(|next| next.depth > span.depth);
+                let mut row = div().w_full().h(px(row_height)).child(span_row(
+                    &ident,
                     span,
                     with_label,
                     with_duration,
-                    current == Some(&span.id),
+                    current.as_ref() == Some(&span.id),
                     on_select.clone(),
+                    &options,
+                    branch,
                     &theme,
                     cx,
-                )
-            })
-            .collect();
+                ));
+                // A row owns modified-wheel time gestures before the list's
+                // ordinary vertical scrolling. Unmodified wheels bubble on.
+                if let Some(wheel) = &wheel {
+                    let wheel = wheel.clone();
+                    row = row.on_scroll_wheel(move |event, window, cx| wheel(event, window, cx));
+                }
+                row
+            }
+        };
+        let rows = if count > options.visible_rows {
+            uniform_list(
+                ident.child("rows").element_id(),
+                count,
+                move |range, _, cx| range.map(|index| render_row(index, cx)).collect::<Vec<_>>(),
+            )
+            .track_scroll(&scroll)
+            .w_full()
+            .h(px(row_height * options.visible_rows as f32))
+            .into_any_element()
+        } else {
+            div()
+                .column()
+                .w_full()
+                .children((0..count).map(|index| render_row(index, cx)))
+                .into_any_element()
+        };
         div()
             .column()
             .w_full()
@@ -458,17 +720,24 @@ fn waterfall(
                     .relative()
                     .column()
                     .w_full()
-                    .gap_token(&theme, Space::Xs)
                     // First, so every line is painted under the bars and the
                     // names rather than across them.
-                    .child(grid_layer(ticks, with_label, with_duration, &theme))
-                    .children(rows),
+                    .child(grid_layer(&ticks, with_label, with_duration, &theme))
+                    .child(rows),
             )
-            .child(axis_row(ticks, with_label, with_duration, &theme))
+            .child(axis_row(&ticks, with_label, with_duration, &theme))
             .into_any_element()
     };
 
-    div()
+    let mut frame = div()
+        .on_children_prepainted({
+            let measured = measured.clone();
+            move |bounds, window, _| {
+                if let Some(body) = bounds.last() {
+                    measure::record(&measured, *body, window);
+                }
+            }
+        })
         .id(ident.element_id())
         .column()
         .w_full()
@@ -479,7 +748,76 @@ fn waterfall(
                 .text_color(theme.colors.text)
                 .child(label.clone()),
         )
-        .child(body)
+        .child(body);
+    if on_select.is_some() || options.on_toggle.is_some() {
+        let focus = crate::motion::keyed::slot::<Option<gpui::FocusHandle>>(
+            &ident.child("focus").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let focus = focus
+            .borrow_mut()
+            .get_or_insert_with(|| cx.focus_handle())
+            .clone();
+        let selected = current.cloned();
+        let toggle = options.on_toggle.clone();
+        let collapsed = options.collapsed.clone();
+        frame = frame
+            .tab_index(0)
+            .track_focus(&focus)
+            .focus_ring(&theme)
+            .on_key_down(move |event, window, cx| {
+                let at = selected
+                    .as_ref()
+                    .and_then(|id| indices.iter().position(|i| &spans[*i].id == id));
+                let next = match event.keystroke.key.as_str() {
+                    "down" => {
+                        Some(at.map_or(0, |at| (at + 1).min(indices.len().saturating_sub(1))))
+                    }
+                    "up" => Some(at.unwrap_or(0).saturating_sub(1)),
+                    "home" => Some(0),
+                    "end" => Some(indices.len().saturating_sub(1)),
+                    "left" | "right" => {
+                        if let Some(at) = at {
+                            let index = indices[at];
+                            let span = &spans[index];
+                            if spans
+                                .get(index + 1)
+                                .is_some_and(|next| next.depth > span.depth)
+                                && let Some(toggle) = &toggle
+                            {
+                                let expanded = event.keystroke.key == "right";
+                                if expanded == collapsed.contains(&span.id) {
+                                    toggle(span.id.clone(), expanded, window, cx);
+                                }
+                                cx.stop_propagation();
+                            }
+                        }
+                        None
+                    }
+                    _ => None,
+                };
+                if let Some(next) = next
+                    && let Some(index) = indices.get(next)
+                    && let Some(select) = &on_select
+                {
+                    select(spans[*index].id.clone(), window, cx);
+                    // The previously focused row may leave the virtual window.
+                    // Keep keyboard navigation on the persistent container.
+                    focus.focus(window, cx);
+                    scroll.scroll_to_item(next, gpui::ScrollStrategy::Nearest);
+                    window.refresh();
+                    cx.stop_propagation();
+                }
+            });
+    }
+    if let Some(wheel) = wheel {
+        frame = frame
+            .tab_index(0)
+            .focus_ring(&theme)
+            .on_scroll_wheel(move |event, window, cx| wheel(event, window, cx));
+    }
+    frame
         .semantic_in(
             cx,
             NodeSpec::new(ident.semantic_id(), Role::List)
@@ -487,6 +825,60 @@ fn waterfall(
                 .value(if empty { "empty" } else { "ready" }),
         )
         .into_any_element()
+}
+
+fn viewport_proposal(
+    viewport: NumericScale,
+    anchor: f32,
+    delta: f32,
+    width: f32,
+    zoom: bool,
+) -> Result<NumericScale, ScaleError> {
+    if zoom {
+        viewport.zoom(anchor as f64, (delta as f64 / 400.).exp())
+    } else {
+        viewport.pan(delta as f64 / width as f64)
+    }
+}
+
+fn viewport_ticks(ticks: &[AxisTick], options: &TraceOptions, width: f32) -> Vec<AxisTick> {
+    let mut ticks: Vec<_> = if let Some(format) = &options.formatter {
+        options
+            .viewport
+            .ticks((width / TICK_LABEL_WIDTH).floor() as usize)
+            .into_iter()
+            .filter_map(|value| {
+                Some(AxisTick {
+                    at: options.viewport.map(value)? as f32,
+                    label: Some(format(value)),
+                })
+            })
+            .collect()
+    } else {
+        ticks
+            .iter()
+            .filter_map(|tick| {
+                let at = options.viewport.map(tick.at as f64)? as f32;
+                (0. ..=1.).contains(&at).then(|| AxisTick {
+                    at,
+                    label: tick.label.clone(),
+                })
+            })
+            .collect()
+    };
+    ticks.sort_by(|a, b| a.at.total_cmp(&b.at));
+    let mut last = f32::NEG_INFINITY;
+    for tick in &mut ticks {
+        if tick.label.is_some() {
+            let x = tick.at * width;
+            if x - last < TICK_LABEL_WIDTH {
+                tick.label = None;
+            } else {
+                last = x;
+            }
+        }
+    }
+    ticks
 }
 
 fn marked_empty(ident: Ident, label: SharedString, kind: EmptyKind) -> impl IntoElement {
@@ -553,13 +945,15 @@ fn span_row(
     with_duration: bool,
     current: bool,
     on_select: Option<SelectHandler>,
+    options: &TraceOptions,
+    branch: bool,
     theme: &gpui_kit_theme::Theme,
     cx: &App,
 ) -> gpui::AnyElement {
     let ident = parent.child(span.id.as_ref());
-    let start = span.start.clamp(0.0, 1.0);
-    let end = span.end.clamp(start, 1.0);
-    let width = (end - start).max(0.02);
+    let visible = interval(span, options.viewport);
+    let (start, end) = visible.unwrap_or((0., 0.));
+    let width = end - start;
     let tone = span.state.tone();
     let color = tone.mark_color(None, theme);
     let status = span.state.label(cx);
@@ -582,6 +976,7 @@ fn span_row(
         .bottom_0()
         .left(relative(start))
         .w(relative(width))
+        .min_w(px(1.))
         .radius(theme, Radius::Small);
     fill = if pending {
         fill.bg(color.opacity(if current {
@@ -597,7 +992,11 @@ fn span_row(
         }))
     };
 
-    let mut track = div().relative().size_full().overflow_hidden().child(fill);
+    let mut track = div()
+        .relative()
+        .size_full()
+        .overflow_hidden()
+        .children(visible.map(|_| fill));
     if !with_label {
         // The waterfall names each span at its own bar. After the bar while
         // there is room after it, before it once there is not.
@@ -612,7 +1011,11 @@ fn span_row(
             .text_color(theme.colors.text)
             .child(mark())
             .child(div().truncate().child(span.label.clone()));
-        name = if after {
+        name = if !after && start < 1.0 - NAME_AFTER_LIMIT {
+            // A span covering most/all of the viewport has no outside seat.
+            // Keep its identity inside the track rather than clipping it off.
+            name.left(relative(start)).pl(px(theme.space(Space::Xs)))
+        } else if after {
             name.left(relative(end)).pl(px(theme.space(Space::Xs)))
         } else {
             name.right(relative(1.0 - start))
@@ -624,6 +1027,7 @@ fn span_row(
 
     let mut row = div()
         .id(ident.element_id())
+        .relative()
         .row()
         .w_full()
         .items_center()
@@ -638,7 +1042,12 @@ fn span_row(
                 .h_full()
                 .flex_none()
                 .gap_token(theme, Space::Xs)
-                .pl(px(span.depth as f32 * theme.space(Space::Md)))
+                .pl(px(span.depth as f32 * theme.space(Space::Md)
+                    + if options.on_toggle.is_some() {
+                        theme.space(Space::Md)
+                    } else {
+                        0.
+                    }))
                 .pr(px(theme.space(Space::Sm)))
                 .child(mark())
                 .child(
@@ -674,11 +1083,63 @@ fn span_row(
             .focus_ring(theme)
             .on_click(move |_, window, cx| click_handler(click_id.clone(), window, cx))
             .on_key_down(move |event, window, cx| {
-                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                    handler(key_id.clone(), window, cx);
+                let target = match event.keystroke.key.as_str() {
+                    "enter" | "space" => Some(key_id.clone()),
+                    _ => None,
+                };
+                if let Some(id) = target {
+                    handler(id, window, cx);
                     cx.stop_propagation();
                 }
             });
+    }
+    let expanded = !options.collapsed.contains(&span.id);
+    if branch && let Some(handler) = &options.on_toggle {
+        let handler = handler.clone();
+        let id = span.id.clone();
+        let toggle = ident.child("toggle");
+        let click_handler = handler.clone();
+        let click_id = id.clone();
+        row = row.child(
+            div()
+                .id(toggle.element_id())
+                .absolute()
+                .left_0()
+                .top_0()
+                .h_full()
+                .row()
+                .items_center()
+                .tab_index(0)
+                .focus_ring(theme)
+                .cursor_pointer()
+                .child(crate::display::icon::Icon::new(if expanded {
+                    gpui_kit_assets::Icon::AltArrowDown
+                } else {
+                    gpui_kit_assets::Icon::AltArrowRight
+                }))
+                .on_click(move |_, window, cx| {
+                    click_handler(click_id.clone(), !expanded, window, cx);
+                    cx.stop_propagation();
+                })
+                .on_key_down(move |event, window, cx| {
+                    let desired = match event.keystroke.key.as_str() {
+                        "left" => Some(false),
+                        "right" => Some(true),
+                        "enter" | "space" => Some(!expanded),
+                        _ => None,
+                    };
+                    if let Some(desired) = desired {
+                        handler(id.clone(), desired, window, cx);
+                        cx.stop_propagation();
+                    }
+                })
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(toggle.semantic_id(), Role::Button)
+                        .text(span.label.clone())
+                        .expanded(expanded),
+                ),
+        );
     }
 
     let mut spec = NodeSpec::new(ident.semantic_id(), Role::TreeItem)
@@ -687,6 +1148,9 @@ fn span_row(
         .value(span.state.name())
         .selected(current)
         .level(span.depth.saturating_add(1));
+    if branch {
+        spec = spec.expanded(expanded);
+    }
     if let Some(detail) = &span.detail {
         spec = spec.description(detail.clone());
     } else {
@@ -729,6 +1193,7 @@ fn axis_row(
                         .absolute()
                         .left(px(-TICK_LABEL_WIDTH / 2.0))
                         .w(px(TICK_LABEL_WIDTH))
+                        .truncate()
                         .text_align(gpui::TextAlign::Center)
                         .type_scale(theme, TypeScale::Caption)
                         .text_color(theme.colors.text_faint)
@@ -774,6 +1239,116 @@ fn axis_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_intervals_clip_and_reverse_without_losing_epoch_precision() {
+        let epoch = 1_700_000_000_000.;
+        let span = TraceSpan::new("raw", "raw", 0., 1.).time(epoch + 25., epoch + 75.);
+        let forward =
+            NumericScale::new(ScaleKind::Time, [epoch, epoch + 200.]).expect("forward domain");
+        let reverse =
+            NumericScale::new(ScaleKind::Time, [epoch + 200., epoch]).expect("reverse domain");
+        assert_eq!(interval(&span, forward), Some((0.125, 0.375)));
+        assert_eq!(interval(&span, reverse), Some((0.625, 0.875)));
+        assert_eq!(
+            interval(&span.clone().time(epoch - 20., epoch + 50.), forward),
+            Some((0., 0.25))
+        );
+        assert_eq!(
+            interval(&span.clone().time(epoch + 210., epoch + 250.), forward),
+            None
+        );
+        assert_eq!(
+            interval(&span.clone().time(epoch + 50., epoch + 20.), forward),
+            None
+        );
+        assert_eq!(interval(&span.time(f64::NAN, epoch + 20.), forward), None);
+    }
+
+    #[test]
+    fn collapse_hides_only_descendants_and_keeps_nested_collapse() {
+        let spans: Vec<_> = [("a", 0), ("b", 1), ("c", 2), ("d", 1), ("e", 0), ("f", 1)]
+            .into_iter()
+            .map(|(id, depth)| TraceSpan::new(id, id, 0., 1.).depth(depth))
+            .collect();
+        assert_eq!(
+            visible_indices(&spans, &HashSet::from(["b".into()])),
+            vec![0, 1, 3, 4, 5]
+        );
+        assert_eq!(
+            visible_indices(&spans, &HashSet::from(["a".into(), "b".into()])),
+            vec![0, 4, 5]
+        );
+    }
+
+    #[test]
+    fn pointer_zoom_and_pan_propose_exact_time_windows() {
+        let viewport = NumericScale::new(ScaleKind::Time, [100., 900.]).expect("valid domain");
+        let zoomed =
+            viewport_proposal(viewport, 0.25, 400. * 2f32.ln(), 640., true).expect("valid zoom");
+        assert!((zoomed.invert(0.25).expect("finite anchor") - 300.).abs() < 0.001);
+        let [start, end] = zoomed.domain();
+        assert!((start - 200.).abs() < 0.001 && (end - 600.).abs() < 0.001);
+        assert_eq!(
+            viewport_proposal(viewport, 0.9, 80., 640., false)
+                .expect("valid pan")
+                .domain(),
+            [0., 800.]
+        );
+        assert_eq!(viewport.domain(), [100., 900.]); // the proposal does not mutate authoritative state.
+    }
+
+    #[test]
+    fn tick_labels_are_bounded_by_measured_width() {
+        let options = TraceOptions {
+            viewport: NumericScale::new(ScaleKind::Time, [1000., 9000.]).expect("valid domain"),
+            formatter: Some(Rc::new(|value| format!("{value}").into())),
+            ..TraceOptions::default()
+        };
+        for width in [80., 192., 640.] {
+            let ticks = viewport_ticks(&[], &options, width);
+            let labels: Vec<_> = ticks.iter().filter(|tick| tick.label.is_some()).collect();
+            assert!(labels.len() <= (width / TICK_LABEL_WIDTH) as usize + 1);
+            for pair in labels.windows(2) {
+                assert!((pair[1].at - pair[0].at) * width >= TICK_LABEL_WIDTH - 0.001);
+            }
+            assert!(ticks.iter().all(|tick| (0. ..=1.).contains(&tick.at)));
+        }
+    }
+
+    #[test]
+    #[ignore = "explicit trace preprocessing workload; mount/paint measured separately"]
+    fn trace_workloads() {
+        use std::time::Instant;
+        for count in [1000, 10000, 100000] {
+            let begin = Instant::now();
+            let spans: Vec<_> = (0..count)
+                .map(|i| {
+                    TraceSpan::new(format!("span.{i}"), "Work", 0., 1.)
+                        .depth(if i % 16 == 0 { 0 } else { 1 })
+                        .time(1000. + i as f64, 1017. + i as f64)
+                })
+                .collect();
+            let input = begin.elapsed();
+            let begin = Instant::now();
+            let indices = visible_indices(&spans, &HashSet::new());
+            let hierarchy = begin.elapsed();
+            let begin = Instant::now();
+            let viewport =
+                NumericScale::new(ScaleKind::Time, [1000., 1200.]).expect("valid domain");
+            let mapped: Vec<_> = indices
+                .iter()
+                .take(12)
+                .map(|index| interval(&spans[*index], viewport))
+                .collect();
+            assert_eq!(mapped.len(), 12);
+            assert_eq!(mapped[0], Some((0., 0.085)));
+            eprintln!(
+                "trace spans={count} input={input:?} hierarchy={hierarchy:?} twelve_row_mapping={:?}; mount/paint=not measured",
+                begin.elapsed()
+            );
+        }
+    }
 
     #[test]
     fn a_span_keeps_the_host_interval_and_names_its_state() {

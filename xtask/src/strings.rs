@@ -57,13 +57,16 @@ use anyhow::{Result, bail};
 /// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
-/// - `interaction/mobile_tests.rs` is an external `#[cfg(test)]` module;
-///   its labels and assertions belong to test fixtures, not component copy.
+/// - `interaction/mobile_tests.rs` and `display/chart/cartesian_tests.rs`
+///   are external `#[cfg(test)]` modules; their labels and assertions belong
+///   to test fixtures, not component copy. Keep this explicit rather than
+///   exempting any production file that happens to have a test-like name.
 const EXEMPT: &[&str] = &[
     "strings.rs",
     "strings/packs.rs",
     "datetime/fixture.rs",
     "interaction/mobile_tests.rs",
+    "display/chart/cartesian_tests.rs",
 ];
 
 /// Directories whose literals are not component copy either.

@@ -1303,3 +1303,48 @@ fn node_group_publishes_its_boundary_selection_and_child_relationship(cx: &mut T
     assert!(group_bounds.top() <= child_bounds.top());
     assert!(group_bounds.bottom() >= child_bounds.bottom());
 }
+
+/// CPU test-platform work, separate from pure layout/routing workloads. The
+/// first unmeasured frame may mount all nodes; this is not a 100k editor claim.
+#[gpui::test]
+#[ignore = "explicit graph mount/redraw evidence"]
+fn graph_mount_workload(cx: &mut TestAppContext) {
+    for count in [1_000usize, 10_000] {
+        let begin = std::time::Instant::now();
+        let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+            let mut graph = NodeGraph::new("workload")
+                .grid(false)
+                .axes(false)
+                .ground_light(false);
+            for i in 0..count {
+                graph = graph.placed(
+                    Placed::new(
+                        GraphNode::new(format!("node.{i}"), "Fixture").width(120.),
+                        (i % 20) as f32 * 200.,
+                        (i / 20) as f32 * 150.,
+                    )
+                    .height(80.),
+                );
+            }
+            div()
+                .w(px(640.))
+                .h(px(360.))
+                .child(graph)
+                .into_any_element()
+        });
+        let mount = begin.elapsed();
+        harness.frame(); // settle actual viewport measurements
+        let begin = std::time::Instant::now();
+        harness.frame();
+        let redraw = begin.elapsed();
+        let stats = harness.frame_stats();
+        eprintln!(
+            "graph nodes={count} edges=0 test_platform_mount={mount:?} static_redraw={redraw:?} paint_calls={} prepaint_calls={}; includes builder/geometry scan; GPU submission not measured",
+            stats.paint_calls, stats.prepaint_calls
+        );
+        assert!(
+            stats.paint_calls < 2000,
+            "settled viewport work must be culled"
+        );
+    }
+}

@@ -2,6 +2,55 @@
 
 use super::support::*;
 
+/// Unequal dimensions and disconnected components in a caller-applied layout.
+pub(super) fn node_graph_layout(_window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::canvas::{GraphCyclePolicy, layered_layout_sized};
+    let theme = cx.theme().clone();
+    let nodes = [
+        ("source-a", 180., 100.),
+        ("source-b", 220., 150.),
+        ("join", 260., 120.),
+        ("detached", 170., 90.),
+    ];
+    let edges = [
+        GraphEdge::new("source-a", "join"),
+        GraphEdge::new("source-b", "join"),
+    ];
+    let bounds = layered_layout_sized(
+        nodes.map(|(id, w, h)| (id.into(), gpui::size(w, h))),
+        &edges,
+        100.,
+        35.,
+        60.,
+        GraphCyclePolicy::Reject,
+    )
+    .expect("valid asymmetric DAG fixture");
+    let mut graph = NodeGraph::new("scene.layout.graph")
+        .edges(edges)
+        .offset(32., 24.)
+        .axes(false);
+    for (id, bounds) in bounds {
+        graph = graph.placed(
+            Placed::new(
+                GraphNode::new(id.clone(), id)
+                    .width(bounds.size.width)
+                    .state(NodeState::Succeeded),
+                bounds.origin.x,
+                bounds.origin.y,
+            )
+            .height(bounds.size.height),
+        );
+    }
+    stack(&theme)
+        .w(px(860.))
+        .child(caption(
+            &theme,
+            "Fixture dimension-aware layers · separate component bands · stable identity order",
+        ))
+        .child(div().w_full().h(px(510.)).child(graph))
+        .into_any_element()
+}
+
 #[derive(Debug)]
 pub(super) struct SceneGraph {
     viewport: GraphViewport,

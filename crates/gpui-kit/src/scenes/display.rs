@@ -1155,6 +1155,73 @@ pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+#[derive(Clone)]
+struct TemporalScene {
+    domain: [f64; 2],
+    collapsed: std::collections::HashSet<SharedString>,
+    selected: SharedString,
+}
+impl Global for TemporalScene {}
+
+/// Raw time, partial intervals, virtual rows and controlled hierarchy.
+pub(super) fn trace_time(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<TemporalScene>() {
+        cx.set_global(TemporalScene {
+            domain: [1_700_000_000_200., 1_700_000_001_000.],
+            collapsed: std::collections::HashSet::from(["request.birch".into()]),
+            selected: "request.atlas.decode".into(),
+        });
+    }
+    let state = cx.global::<TemporalScene>().clone();
+    let theme = cx.theme().clone();
+    let mut spans = vec![];
+    for request in [
+        "atlas", "birch", "cedar", "delta", "elm", "fjord", "grove", "harbor", "iris", "jade",
+        "kelp", "lagoon", "maple", "north", "oak", "pine", "quartz", "reed", "spruce", "tide",
+        "umber", "vale", "willow", "yarrow",
+    ] {
+        spans.push(
+            TraceSpan::new(
+                format!("request.{request}"),
+                format!("Request {request}"),
+                0.,
+                1.,
+            )
+            .time(1_700_000_000_100., 1_700_000_001_200.)
+            .state(SpanState::Succeeded)
+            .duration("1.1 s"),
+        );
+        for (child, stage) in ["prepare", "fetch", "decode", "render", "commit"]
+            .into_iter()
+            .enumerate()
+        {
+            let start = 1_700_000_000_100. + child as f64 * 160.;
+            spans.push(
+                TraceSpan::new(format!("request.{request}.{stage}"), stage, 0., 1.)
+                    .time(start, start + 235.)
+                    .depth(1)
+                    .state(SpanState::Succeeded)
+                    .duration("235 ms"),
+            );
+        }
+    }
+    let spans = std::rc::Rc::new(spans);
+    stack(&theme).w(px(760.)).child(caption(&theme, "Fixture raw UTC milliseconds · Ctrl-wheel zoom · Shift-wheel pan · disclosure / arrow keys"))
+        .child(TraceView::new("scene.trace-time.tree", "144 spans · eight visible rows")
+            .shared_spans(spans.clone()).time_viewport(state.domain).expect("valid time window")
+            .format_time(|time| format!("{:.0} ms", time - 1_700_000_000_000.).into())
+            .visible_rows(8).collapsed(state.collapsed.clone()).current(state.selected.clone())
+            .on_viewport(|scale, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.domain = scale.domain()); cx.refresh_windows(); })
+            .on_toggle(|id, expanded, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| { if expanded { s.collapsed.remove(&id); } else { s.collapsed.insert(id); } }); cx.refresh_windows(); })
+            .on_select(|id, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.selected = id); cx.refresh_windows(); }))
+        .child(SpanTimeline::new("scene.trace-time.timeline", "Same caller-owned time window")
+            .shared_spans(spans).time_viewport(state.domain).expect("valid time window")
+            .format_time(|time| format!("{:.0} ms", time - 1_700_000_000_000.).into())
+            .visible_rows(4).collapsed(state.collapsed).current(state.selected)
+            .on_viewport(|scale, _, cx| { cx.update_global::<TemporalScene, ()>(|s, _| s.domain = scale.domain()); cx.refresh_windows(); }))
+        .into_any_element()
+}
+
 pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     // A quarter of weekdays, which is the shape this component is actually

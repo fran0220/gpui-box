@@ -26,14 +26,14 @@ Workers own disjoint source families and return transferable patches and evidenc
 
 | Stage | Scope | Status |
 | --- | --- | --- |
-| V1 | Typed data, scales, ticks and coordinate systems | Assigned; implementation in progress |
-| V2 | Composable Cartesian series and reading layout | Assigned; depends on V1 |
-| V3 | Controlled chart exploration and synchronization | Assigned; depends on V1/V2 |
-| V4 | Distribution, hierarchy, flow and continuous heatmaps | Assigned; independent layouts first |
-| V5 | Graph layout and temporal exploration | Assigned; raw-time integration awaits V1 |
-| V6 | Geographic visualization | Assigned; implementation in progress |
-| V7 | Performance, accessibility and platform acceptance | Pending |
-| V8 | Documentation, migration, catalog and deployment | Pending |
+| V1 | Typed data, scales, ticks and coordinate systems | Integrated, including caller ticks and measured axis lanes |
+| V2 | Composable Cartesian series and reading layout | Integrated, including orientation and bounded custom marks |
+| V3 | Controlled chart exploration and synchronization | Integrated, including keyed raw motion and current-value semantics |
+| V4 | Distribution, hierarchy, flow and continuous heatmaps | Integrated; EN/zh-Hans localization verified |
+| V5 | Graph layout and temporal exploration | Integrated; disclosure rendering corrected and inspected; Linux gate passed |
+| V6 | Geographic visualization | Integrated; combined Linux gate passed |
+| V7 | Performance, accessibility and platform acceptance | Sampling/index/shared-data integrated; Linux gate passed, native motion/macOS/Windows unclaimed |
+| V8 | Documentation, migration, catalog and deployment | Implementation catalogs regenerated and gate passed; this delivery commit is the deployment candidate |
 
 ### Active ownership
 
@@ -159,21 +159,97 @@ Each completed stage must record its source changes, exact checks and decisive
 results, inspected visuals where relevant, unresolved limits, integration revision
 and deployment. Worker results below are not integrated-main acceptance.
 
-- V1/V2 worker reports `cargo test -p gpui-box-kit --lib display::chart
-  --all-features`: 13 passed, 0 failed. NumericScale and raw-series projection
-  source transferred to the coordinator for inspection and to V4/V5 for shared
-  integration. Exact endpoint cancellation was corrected; source-coordinate
-  stack identity versus projected-coordinate aliasing was returned for correction.
-  Composed renderer visual/input acceptance remains pending.
-- V4 worker reports five layout tests and one semantic/input test passing.
-  First captures exposed exhibit clipping and a range legend mismatch; fixes
-  require re-render inspection. Continuous heatmap validation and composed
-  candlestick integration remain pending. No final patch integrated.
-- V5 worker reports a routing cache dependency omission confirmed in source;
-  dimension-aware deterministic layout and cache corrections are under test.
-  Shared scale bytes were explicitly transferred for raw-time integration.
+- V1–V3 frozen stage 1 is integrated, including six inspected Cartesian frames.
+  Worker all-feature tests: 991 unit, 1023 integration, 17 doctests passed;
+  all-target Clippy passed. Exact interval/wick centers, source-key stacks,
+  controlled pan/cancel/refusal and raw-value semantics are covered. Stage 2
+  remains active; stage 1 is not complete V1–V3 acceptance.
+- V4 final initial stage is integrated: raw hierarchy/statistical geometry,
+  continuous heatmaps, conserved Sankey ordering and shared-Range OHLC.
+  Worker tests: 1002 unit, 1023 existing integration, four specialized and
+  17 doctests passed; all-target Clippy passed. Ten new frames inspected.
+  Integrated strings audit exposed user-visible English; localization is
+  being corrected rather than absorbed into the diagnostic allowlist.
+- V5 final source and baselines are integrated: measured layout, borrowed exact
+  route-cache input comparison and virtual raw-time traces. Worker tests:
+  989 unit, 1026 integration and 17 doctests passed; Clippy and performance
+  check passed. Coordinator replaced missing-glyph disclosure triangles with
+  bundled icons, rendered `headless capture trace-time`, and inspected both
+  themes: expanded/collapsed chevrons, state dots and labels do not overlap.
+- V6 final source is integrated. Worker geography tests: 11 passed; all-target
+  Clippy, strings/API checks and two headless frames passed. Projected holes,
+  controlled input/refusal and clipped measured geometry are covered. This
+  remains the documented projected-edge subset, not a GeoJSON/GIS engine.
+- V7 real Harness workloads run via `cargo run -p gpui-box-performance --
+  --charts --output target/performance/charts-v7.json`: 44 phase reports over
+  sparse 1k/10k/100k input and full-domain 1k, with actual selection, hover and
+  accepted viewport assertions. Initial stage-1 sparse redraws mount 24 marks
+  and record 70 layout/paint calls at all sizes, but allocations grow from
+  31,282 to 3,001,309. Full preprocessing/cloning is not bounded by the viewport.
+  These are CPU/test-platform counters and advisory times, not GPU/FPS results.
+  Separate sampling/index tests pass four cases including exact brute-force
+  hit comparisons at 100k; renderer integration remains pending.
+- First combined `cargo run -p xtask -- gate full` stopped at strings audit:
+  65 unlisted literals, including real localization gaps and a path-based
+  test-module false positive. Test fixture exemption follows the existing
+  explicit-file convention. A passing worker gate does not resolve this
+  combined failure; rerun after fixes. Implementation is not yet committed,
+  pushed or deployed.
 - Coordinator ran `cargo run -p xtask -- gate full` before implementation
   integration: exit 0, `gate passed`, including the headless catalog and all
   13 mobile Chromium/WebGL2 tests. This validates the baseline and planning
   documentation, not worker implementations. The integrated source must run
   the gate again. `git diff --check` also passes.
+
+### Integrated follow-up evidence
+
+- Stage 2 and V4 localization are now integrated. Chart errors/stale status,
+  heatmap missing/refusal/legend and generated statistical labels use EN/zh-Hans
+  keys. `strings check`: 455 literals accounted for; only reviewed invariant
+  diagnostics added to the allowlist. Both generated API catalogs are current.
+- The first combined all-feature Kit suite passed 1024 unit, 1035 integration,
+  four specialized and 18 doctests. After stage 2/V7, focused chart tests pass
+  32 cases, including shared-data revision invalidation, indexed hits, orientation,
+  capture/refusal, motion/current values and actual sampled-path selection.
+  Localized specialized integration tests pass six cases.
+- Combined scoped headless check matched 34 images before stage 2, followed by
+  six localized V4 frames. Coordinator inspected updated trace and heatmap
+  light/dark captures and Chinese statistics. New `cartesian-dense` light/dark
+  images show the gap and both spikes in exact/sampled wide/narrow layouts;
+  the same selected original reading is 73.125. Final combined gate follows.
+- V7 now uses immutable caller-shared input and an exact projection cache, lazy
+  readout formatting, a final-geometry rectangle index and opt-in linear-path
+  extrema sampling. Gaps and source identities are preserved. The benchmark
+  now records 88 phase reports with animation both enabled and disabled.
+  At 100k sparse input, measured static allocations fell to 1917/1937
+  (motion off/on), from 3,001,309. The sparse allocation budget is 2500;
+  semantic publication, hit construction and motion still have linear work.
+  See `docs/cartesian-charts.md` for advisory timings and dense-input limits.
+- `cargo clippy -p gpui-box-kit -p gpui-box-performance --all-features
+  --all-targets -- -D warnings` passes. No framework/token/font/package
+  authority changes were needed. Native motion capture failed in the worker's
+  black Xvfb window; simulated-frame tests are not claimed as native visual
+  verification. macOS/Windows and a universal interactive-100k claim remain
+  explicitly unverified rather than inferred from Linux headless pictures.
+
+### Final integrated Linux acceptance
+
+- `cargo run -p xtask -- gate full` exited 0 with `gate passed`. Kit default
+  tests: 1026 unit and 1035 integration passed; all-feature tests: 1032 unit
+  and 1035 integration passed. Six specialized tests and 18 doctests passed;
+  existing ignored tests remain ignored. The gate also passed workspace
+  checks, all-target Clippy, generated catalogs/strings/tokens, performance
+  budgets, warning-free wasm compilation and rustdoc.
+- The full Linux headless catalog matched all 392 images. The first full
+  comparison exposed two old OHLC axis-label baselines after the shared axis
+  layout change. Both themes were inspected: only tick-text alignment moved,
+  with centered bodies/wicks, independent volume and exact raw readout intact.
+  After accepting these frames, the complete gate was rerun successfully.
+- Mobile reference capture passed retained-data/refusal/navigation/form-restore
+  assertions. All 13 Chromium/WebGL2 tests passed. These do not replace native
+  macOS/Windows or native animation evidence.
+- Source, documentation, generated catalogs and reviewed Linux baselines are
+  delivered together in this commit. The required post-push deployment must
+  verify this commit on both hosted domains, including complete MCP tool
+  schemas and component enumeration; successful deployment is reported by the
+  coordinator after executing that check, not inferred from this ledger.
