@@ -435,6 +435,9 @@ mod tests {
     use gpui::{ImageId, RenderImageParams};
     use std::sync::Arc;
 
+    // This context requires WARP or software Vulkan. Metal has no fallback
+    // adapter; its native recording path is exercised by headless-visual.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn frozen_paint_leases_defer_only_owned_eviction_and_survive_reset_safely() -> anyhow::Result<()>
     {

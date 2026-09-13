@@ -34,8 +34,8 @@ implementation milestones rather than relabeling each partial stage as complete.
 | E4 Graph/trace | Animated node/routes, improved cycle/crossing/obstacle routing, bounded mounting, temporal range/navigation and incremental hierarchy | canvas graph/layout, trace and their scenes/tests | Integrated; safety snaps and work limits documented |
 | E5 Geography | Captured drag/touch exploration, hover/fit, camera/style motion, GeoJSON interchange, explicit antimeridian policy, spatial culling/index/simplification | geography and its scenes/tests | Integrated; tested playback |
 | E6 Data/time foundation | Explicit calendar/timezone ticks and pure source-traceable filtering/aggregation/bin/window transforms | chart scale/data companion modules; coordinator | Deployed foundation; batch transforms |
-| E7 Dynamic/performance acceptance | Real playback evidence, reduced motion and refused updates; sparse/dense and sustained updates; Linux/native platform evidence | shared performance tooling and integrated review; coordinator | Linux evidence integrated; native verification pending; no FPS guarantee |
-| E8 Downstream delivery | Migration/composition guides, locale coverage, generated catalogs, full gate, main commits and hosted MCP verification | shared exports/strings/docs/release; coordinator | Integrated; final gate and deployment pending |
+| E7 Dynamic/performance acceptance | Real playback evidence, reduced motion and refused updates; sparse/dense and sustained updates; Linux/native platform evidence | shared performance tooling and integrated review; coordinator | Playback, CPU and native evidence recorded below; no FPS guarantee |
+| E8 Downstream delivery | Migration/composition guides, locale coverage, generated catalogs, full gate, main commits and hosted MCP verification | shared exports/strings/docs/release; coordinator | Deployed; full Linux gate and both hosted MCP catalogs verified |
 
 Workers continue their existing isolated threads, updated to the exact base.
 They own disjoint source families and return frozen incremental patches; messages
@@ -243,3 +243,36 @@ clean commit and verify both hosted catalogs and complete remote MCP schemas.
   six WARP frames with only 1–3 pixels exceeding tolerance by one channel step.
   This is not native acceptance of the uncommitted integration, and baselines
   have not been blindly accepted.
+
+### Experience release and native follow-up
+
+- Integration commit
+  [41063868](https://github.com/fran0220/gpui-box/commit/41063868029baaae36b2e64a56732701d4cc3c6b)
+  is deployed. Both hosted domains verify that exact revision, 212 components,
+  204 scenes and all ten complete MCP tool schemas. Evidence is
+  `/tmp/visualization-experience-deploy.log`.
+- The deployed settings scene was opened in Chromium/WebGL2 at 2x. Its measured
+  autosave row origin is (281, 196.5), and its label origin is (293, 204.5):
+  exactly 12px horizontal and 8px vertical inset. The inspected screenshot is
+  `.amp/in/artifacts/settings-live-deployed.png`; disabled content remains legible.
+- Native run
+  [34785409721](https://github.com/fran0220/gpui-box/actions/runs/34785409721)
+  passed both runtime jobs and the Windows native job. macOS Kit tests and native
+  menu smoke passed, but two new WGPU tests mistakenly requested software
+  fallback adapters on Metal. Their platform conditions now match the existing
+  Linux/WARP-only lifecycle tests; production renderer behavior is unchanged.
+  The actual Metal frozen text/image recording playback test passed separately.
+- All 60 Metal and 65 WARP changed/new images were inspected, including
+  full-resolution checks of dense labels and comparisons with approved Linux
+  geometry. No blocking visual defects were found. WARP CodeView and Performance
+  HUD each differ at one pixel per theme by at most two channel steps; dark
+  Agent Roster differs at three. The unchanged one-step tolerance was preserved.
+  All 125 reviewed native frames were accepted from that exact run. All Windows
+  headless and optical tests passed; its image jobs failed only for these
+  reviewed baseline changes. Stills are not motion or FPS certification.
+- The test-platform follow-up passed the complete Linux gate again, including
+  408 matching images and 13 browser tests:
+  `/tmp/visualization-native-followup-gate.log`. The macOS-only follow-up lane
+  must verify the corrected WGPU test conditions and accepted Metal baselines;
+  Windows production code and its executed test bodies are unchanged by the
+  platform-condition correction.

@@ -4145,6 +4145,9 @@ mod tests {
         Underline,
     };
 
+    // Match the strict software-adapter hosts of the other WGPU lifecycle
+    // tests. macOS recording playback runs through the native Metal harness.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[test]
     fn frozen_paint_reset_between_replay_and_submission_is_refused() -> anyhow::Result<()> {
         use gpui::{
